@@ -610,9 +610,54 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Nodes (/nodes/)
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         Nodes (/nodes/)
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#node-lifecycle" class="md-nav__link">
+    Node lifecycle
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other-network-information" class="md-nav__link">
+    Other network information
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -945,6 +990,35 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#node-lifecycle" class="md-nav__link">
+    Node lifecycle
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other-network-information" class="md-nav__link">
+    Other network information
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -962,7 +1036,134 @@
 
 
 <h1 id="nodes-nodes">Nodes (/nodes/)</h1>
-<p>Not yet documented.</p>
+<p>Nodes are how Shaken Fist models the hypervisors that actually run your virtual
+machines. They're a little unusual, as we use the host name to track the object
+instead of an assigned UUID. Nodes are an administrative-only object, not
+available to other users of Shaken Fist.</p>
+<h2 id="node-lifecycle">Node lifecycle</h2>
+<p>Nodes cannot be created via the API, instead nodes are created by installing
+Shaken Fist on a machine and having that machine join a Shaken Fist cluster.
+However, you can delete a node via API and that will cause the machine to delete
+all the instances running and stop accepting new work.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/nodes/get_nodes">GET /nodes</a>: List all nodes in the cluster, including deleted nodes.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/nodes/delete_nodes__node_">DELETE /nodes/{node}</a>: Delete a node.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/nodes/get_nodes__node_">GET /nodes/{node}</a>: Get information about a single node.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: get details for a node</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="s1">&#39;sf-1&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: list all nodes</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_nodes</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<h2 id="other-network-information">Other network information</h2>
+<p>We can also request other information for a network. For example, we can list the
+nodes's network interfaces, or the events for the network. See the
+<a href="/user_guide/events/">user guide</a> for a general introduction to the Shaken Fist
+event system.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/nodes/get_nodes__node__events">GET /nodes/{node}/events</a>: Fetch events for a node.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: list events for a node</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_node_events</span><span class="p">(</span><span class="s1">&#39;sf-1&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<p>Note that events are returned in reverse chronological order and are limited
+to the 100 most recent events.</p>
+<div class="highlight"><pre><span></span><code>$ python3 example.py
+[
+    ...
+    {
+        &quot;duration&quot;: null,
+        &quot;extra&quot;: {
+            &quot;cpu_available&quot;: 12,
+            &quot;cpu_load_1&quot;: 2.0,
+            &quot;cpu_load_15&quot;: 1.85,
+            &quot;cpu_load_5&quot;: 1.87,
+            &quot;cpu_max&quot;: 12,
+            &quot;cpu_max_per_instance&quot;: 16,
+            &quot;cpu_total_instance_cpu_time&quot;: 235110000000,
+            &quot;cpu_total_instance_vcpus&quot;: 1,
+            &quot;disk_free&quot;: 376334815232,
+            ...
+        },
+        &quot;fqdn&quot;: &quot;sf-1&quot;,
+        &quot;message&quot;: &quot;updated node resources and package versions&quot;,
+        &quot;timestamp&quot;: 1685475323.252612,
+        &quot;type&quot;: &quot;resources&quot;
+    },
+    ...
+]
+</code></pre></div>
+</details>
+<h2 id="metadata">Metadata</h2>
+<p>All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all,
+with the exception of the <a href="/user_guide/affinity/">instance affinity metadata values</a>.
+The metadata store is in the form of a key value store, and a general introduction
+is available <a href="/user_guide/metadata/">in the user guide</a>.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/nodes/get_nodes__node__metadata">GET ​/nodes/{node}​/metadata</a>: Get metadata for a node.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/nodes/post_nodes__node__metadata">POST /nodes/{node}/metadata</a>: Create a new metadata key for a node.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/nodes/delete_nodes__node__metadata__key_">DELETE /nodes/{node}/metadata/{key}</a>: Delete a specific metadata key for a node.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/nodes/put_nodes__node__metadata__key_">PUT /nodes/{node}/metadata/{key}</a>: Update an existing metadata key for a node.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: set metadata on a node</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">set_node_metadata_item</span><span class="p">(</span><span class="n">net_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: get metadata for a node</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_node_metadata</span><span class="p">(</span><span class="n">net_uuid</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: delete metadata for a node</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">delete_node_metadata_item</span><span class="p">(</span><span class="n">net_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
 
 
 
