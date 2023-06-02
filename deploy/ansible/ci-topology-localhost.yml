@@ -16,7 +16,7 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}"
+          - network_uuid="{{identifier}}",address=10.0.0.10
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
