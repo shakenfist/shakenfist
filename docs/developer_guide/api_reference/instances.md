@@ -92,6 +92,8 @@ Similarly, a `networkspec` consists of the following fields in a JSON dictionary
 * network_uuid (uuid): the UUID of the network the interface should exist on.
 * macaddress (string): the MAC address of the interface. Omit this value to be allocated
   a MAC address automatically.
+* address (string): the IPv4 address to assign to the interface. Omit this value to be
+  allocated a random address.
 * model (enum): the model of the network interface card. In general you should not have
   to set this, although it can matter in some cases, such as unmodified Microsoft
   Windows images. The options include: i82551; i82557b; i82559er; ne2k_pci; pcnet;
