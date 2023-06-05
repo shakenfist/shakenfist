@@ -29,7 +29,7 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}"
+          - network_uuid="{{identifier}}",address=10.0.0.10
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
@@ -57,7 +57,7 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}"
+          - network_uuid="{{identifier}}",address=10.0.0.20
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
@@ -85,7 +85,7 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}"
+          - network_uuid="{{identifier}}",address=10.0.0.21
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
@@ -113,7 +113,7 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}"
+          - network_uuid="{{identifier}}",address=10.0.0.22
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
@@ -141,7 +141,7 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}"
+          - network_uuid="{{identifier}}",address=10.0.0.23
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
@@ -169,7 +169,7 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}"
+          - network_uuid="{{identifier}}",address=10.0.0.24
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
