@@ -154,34 +154,40 @@ class ImageFetchHelper(object):
                 dirty = True
             else:
                 most_recent_blob = Blob.from_db(most_recent['blob_uuid'])
-                resp = self._open_connection(url)
 
-                normalized_new_timestamp = Blob.normalize_timestamp(
-                    resp.headers.get('Last-Modified'))
+                try:
+                    resp = self._open_connection(url)
+                except exceptions.HTTPError as e:
+                    self.artifact.add_event2(
+                        'image fetch had HTTP error, not fetching image: %s'
+                        % e)
+                else:
+                    normalized_new_timestamp = Blob.normalize_timestamp(
+                        resp.headers.get('Last-Modified'))
 
-                if not most_recent_blob.modified:
-                    self.artifact.add_event2(
-                        'image requires fetch, no Last-Modified recorded')
-                    dirty = True
-                elif most_recent_blob.modified != normalized_new_timestamp:
-                    self.artifact.add_event2(
-                        'image requires fetch, Last-Modified: %s -> %s'
-                        % (most_recent_blob.modified, normalized_new_timestamp))
-                    dirty = True
+                    if not most_recent_blob.modified:
+                        self.artifact.add_event2(
+                            'image requires fetch, no Last-Modified recorded')
+                        dirty = True
+                    elif most_recent_blob.modified != normalized_new_timestamp:
+                        self.artifact.add_event2(
+                            'image requires fetch, Last-Modified: %s -> %s'
+                            % (most_recent_blob.modified, normalized_new_timestamp))
+                        dirty = True
 
-                response_size = resp.headers.get('Content-Length')
-                if response_size:
-                    response_size = int(response_size)
+                    response_size = resp.headers.get('Content-Length')
+                    if response_size:
+                        response_size = int(response_size)
 
-                if not most_recent_blob.size:
-                    self.artifact.add_event2(
-                        'image requires fetch, no Content-Length recorded')
-                    dirty = True
-                elif most_recent_blob.size != response_size:
-                    self.artifact.add_event2(
-                        'image requires fetch, Content-Length: %s -> %s'
-                        % (most_recent_blob.size, response_size))
-                    dirty = True
+                    if not most_recent_blob.size:
+                        self.artifact.add_event2(
+                            'image requires fetch, no Content-Length recorded')
+                        dirty = True
+                    elif most_recent_blob.size != response_size:
+                        self.artifact.add_event2(
+                            'image requires fetch, Content-Length: %s -> %s'
+                            % (most_recent_blob.size, response_size))
+                        dirty = True
 
             if not dirty:
                 url = '%s%s' % (BLOB_URL, most_recent_blob.uuid)
@@ -348,8 +354,7 @@ class ImageFetchHelper(object):
             proxies['http'] = config.HTTP_PROXY_SERVER
 
         resp = requests.get(url, allow_redirects=True, stream=True,
-                            headers={
-                                'User-Agent': util_general.get_user_agent()},
+                            headers={'User-Agent': util_general.get_user_agent()},
                             proxies=proxies)
         if resp.status_code != 200:
             raise exceptions.HTTPError(
