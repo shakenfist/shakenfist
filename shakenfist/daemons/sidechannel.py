@@ -1,6 +1,7 @@
 import base64
 import os
 import select
+import setproctitle
 from shakenfist_utilities import logs
 import signal
 from shakenfist_agent import protocol
@@ -13,6 +14,7 @@ from shakenfist.daemons import daemon
 from shakenfist import eventlog
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import instance
+from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import process as util_process
 
@@ -236,7 +238,12 @@ class SFSocketAgent(protocol.SocketAgent):
 
 
 class Monitor(daemon.Daemon):
-    def monitor(self, instance_uuid):
+    def __init__(self, name):
+        super(Monitor, self).__init__(name)
+        self.monitors = {}
+
+    def single_instance_monitor(self, instance_uuid):
+        setproctitle.setproctitle('sf-sidechannel-%s' % instance_uuid)
         inst = instance.Instance.from_db(instance_uuid)
         log_ctx = LOG.with_fields({'instance': instance_uuid})
         if inst.state.value == instance.Instance.STATE_DELETED:
@@ -273,7 +280,7 @@ class Monitor(daemon.Daemon):
 
         build_side_channel_sockets()
 
-        while True:
+        while not self.exit.is_set():
             readable = []
             for sc in sc_clients.values():
                 readable.append(sc.input_fileno)
@@ -323,78 +330,116 @@ class Monitor(daemon.Daemon):
                             if sc in sc_clients:
                                 del sc_clients[sc]
 
+    def reap_single_instance_monitors(self):
+        all_monitors = list(self.monitors.keys())
+        for instance_uuid in all_monitors:
+            if not self.monitors[instance_uuid].is_alive():
+                self.monitors[instance_uuid].join(1)
+                LOG.info('Reaped dead sidechannel monitor with pid %d'
+                         % self.monitors[instance_uuid].pid)
+                eventlog.add_event(
+                    EVENT_TYPE_AUDIT, 'instance', instance_uuid,
+                    'sidechannel monitor ended')
+                del self.monitors[instance_uuid]
+
     def run(self):
         LOG.info('Starting')
-        monitors = {}
+        shutdown_commenced = 0
+        running = True
 
-        while not self.exit.is_set():
-            with util_libvirt.LibvirtConnection() as lc:
-                # Cleanup terminated monitors
-                all_monitors = list(monitors.keys())
-                for instance_uuid in all_monitors:
-                    if not monitors[instance_uuid].is_alive():
-                        # Reap process
-                        monitors[instance_uuid].join(1)
-                        LOG.info('Reaped dead sidechannel monitor with pid %d'
-                                 % monitors[instance_uuid].pid)
+        while True:
+            try:
+                self.reap_single_instance_monitors()
+
+                if not self.exit.is_set():
+                    # Audit desired self.monitors
+                    extra_instances = list(self.monitors.keys())
+                    missing_instances = []
+
+                    # The goal here is to find all instances running on this node so
+                    # that we can monitor them. We used to query etcd for this, but
+                    # we needed to do so frequently and it created a lot of etcd load.
+                    # We also can't use the existence of instance folders (which once
+                    # seemed like a good idea at the time), because some instances might
+                    # also be powered off. Instead, we ask libvirt what domains are
+                    # running.
+                    with util_libvirt.LibvirtConnection() as lc:
+                        for domain in lc.get_sf_domains():
+                            state = lc.extract_power_state(domain)
+                            if state in ['off', 'crashed', 'paused']:
+                                # If the domain isn't running, it shouldn't have a
+                                # sidechannel monitor.
+                                continue
+
+                            instance_uuid = domain.name().split(':')[1]
+                            if instance_uuid in extra_instances:
+                                extra_instances.remove(instance_uuid)
+                            if instance_uuid not in self.monitors:
+                                missing_instances.append(instance_uuid)
+
+                    # Start missing self.monitors
+                    for instance_uuid in missing_instances:
+                        p = util_process.fork(
+                            self.single_instance_monitor, [instance_uuid],
+                            'sidechannel-new')
+
+                        self.monitors[instance_uuid] = p
                         eventlog.add_event(
                             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-                            'sidechannel monitor crashed')
-                        del monitors[instance_uuid]
+                            'sidechannel monitor started')
 
-                # Audit desired monitors
-                extra_instances = list(monitors.keys())
-                missing_instances = []
+                    # Cleanup extra self.monitors
+                    for instance_uuid in extra_instances:
+                        p = self.monitors[instance_uuid]
+                        try:
+                            os.kill(p.pid, signal.SIGTERM)
+                            self.monitors[instance_uuid].join(1)
+                        except Exception:
+                            pass
 
-                # The goal here is to find all instances running on this node so
-                # that we can monitor them. We used to query etcd for this, but
-                # we needed to do so frequently and it created a lot of etcd load.
-                # We also can't use the existence of instance folders (which once
-                # seemed like a good idea at the time), because some instances might
-                # also be powered off. Instead, we ask libvirt what domains are
-                # running.
-                for domain in lc.get_sf_domains():
-                    state = lc.extract_power_state(domain)
-                    if state in ['off', 'crashed', 'paused']:
-                        # If the domain isn't running, it shouldn't have a
-                        # sidechannel monitor.
-                        continue
+                        del self.monitors[instance_uuid]
+                        eventlog.add_event(
+                            EVENT_TYPE_AUDIT, 'instance', instance_uuid,
+                            'sidechannel monitor finished')
 
-                    instance_uuid = domain.name().split(':')[1]
-                    if instance_uuid in extra_instances:
-                        extra_instances.remove(instance_uuid)
-                    if instance_uuid not in monitors:
-                        missing_instances.append(instance_uuid)
+                elif len(self.monitors) > 0:
+                    if running:
+                        shutdown_commenced = time.time()
+                        for instance_uuid in self.monitors:
+                            pid = self.monitors[instance_uuid].pid
+                            try:
+                                LOG.info('Sent SIGTERM to sidechannel-%s (pid %s)'
+                                         % (instance_uuid, pid))
+                                os.kill(pid, signal.SIGTERM)
+                            except ProcessLookupError:
+                                pass
+                            except OSError as e:
+                                LOG.warn('Failed to send SIGTERM to sidechannel-%s: %s'
+                                         % (instance_uuid, e))
 
-                # Start missing monitors
-                for instance_uuid in missing_instances:
-                    p = util_process.fork(
-                        self.monitor, [instance_uuid],
-                        '%s-%s' % (daemon.process_name('sidechannel'),
-                                   instance_uuid))
+                        running = False
 
-                    monitors[instance_uuid] = p
-                    eventlog.add_event(
-                        EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-                        'sidechannel monitor started')
+                    if time.time() - shutdown_commenced > 10:
+                        LOG.warning('We have taken more than ten seconds to shut down')
+                        LOG.warning('Dumping thread traces')
+                        for instance_uuid in self.monitors:
+                            pid = self.monitors[instance_uuid].pid
+                            LOG.warning('sidechannel-%s daemon still running (pid %d)'
+                                        % (instance_uuid, pid))
+                            try:
+                                os.kill(pid, signal.SIGUSR1)
+                            except ProcessLookupError:
+                                pass
+                            except OSError as e:
+                                LOG.warn('Failed to send SIGUSR1 to sidechannel-%s: %s'
+                                         % (instance_uuid, e))
 
-                # Cleanup extra monitors
-                for instance_uuid in extra_instances:
-                    p = monitors[instance_uuid]
-                    try:
-                        os.kill(p.pid, signal.SIGKILL)
-                        monitors[instance_uuid].join(1)
-                    except Exception:
-                        pass
-
-                    del monitors[instance_uuid]
-                    eventlog.add_event(
-                        EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-                        'sidechannel monitor finished')
+                else:
+                    break
 
                 self.exit.wait(1)
 
-        for instance_uuid in monitors:
-            os.kill(monitors[instance_uuid].pid, signal.SIGKILL)
+            except Exception as e:
+                util_general.ignore_exception('sidechannel monitor', e)
 
-        LOG.info('Terminating')
+        LOG.info('Terminated')

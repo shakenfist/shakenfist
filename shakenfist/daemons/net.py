@@ -506,6 +506,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 LOG.warn('Failed to send SIGTERM to %s: %s'
                                          % (proc, e))
 
+                        running = False
+
                     if time.time() - shutdown_commenced > 10:
                         LOG.warning('We have taken more than ten seconds to shut down')
                         LOG.warning('Dumping thread traces')
@@ -520,14 +522,12 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 LOG.warn('Failed to send SIGUSR1 to %s: %s'
                                          % (proc, e))
 
-                        running = False
-
                 else:
-                    return
+                    break
 
                 self.exit.wait(1)
 
             except Exception as e:
                 util_general.ignore_exception('network worker', e)
 
-        LOG.info('Terminating')
+        LOG.info('Terminated')

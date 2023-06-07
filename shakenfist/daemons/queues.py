@@ -488,4 +488,4 @@ class Monitor(daemon.WorkerPoolDaemon):
             except Exception as e:
                 util_general.ignore_exception('queue worker', e)
 
-        LOG.info('Terminating')
+        LOG.info('Terminated')

@@ -98,6 +98,14 @@ jobs:
             failures=1
           fi
 
+          echo
+          sigterms=`grep -c "Sent SIGTERM to " ${GITHUB_WORKSPACE}/syslog || true`
+          echo "This CI run sent $sigterms SIGTERM signals while shutting down."
+          if [ $sigterms -gt 50 ]; then
+            echo "FAILURE: Too many SIGTERMs sent!"
+            failures=1
+          fi
+
           FORBIDDEN=("Traceback (most recent call last):"
                      "ERROR sf"
                      " died"
