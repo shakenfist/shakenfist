@@ -9,6 +9,11 @@ interface objects associated with it.
 To lookup the network interfaces for an instance, use the
 [GET /instances/{instance_ref}/interfaces](/developer_guide/api_reference/instances/#other-instance-information) API call as documented in the instance documentation.
 
+???+ note
+
+    For a detailed reference on the state machine for network interfaces, see the
+    [developer documentation on object states](/developer_guide/state_machine/#network-interfaces).
+
 ## Fetching information about a network interface
 
 As with other objects in the Shaken Fist REST API, you can fetch the details for

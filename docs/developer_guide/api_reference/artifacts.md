@@ -3,6 +3,10 @@
 The general usage of artifacts is documented in the [user guide](/user_guide/artifacts/). This page documents the API flow interacting with artifacts, as well as the
 multi-step process involved with uploading or downloading an artifact.
 
+???+ note
+    For a detailed reference on the state machine for artifacts, see the
+    [developer documentation on object states](/developer_guide/state_machine/#artifacts).
+
 ## Fetching a remote URL as an image artifact
 
 As discussed in the [user guide](/user_guide/artifacts/), remote URLs can be
@@ -199,6 +203,11 @@ don't need to actually upload and can instead pass that blob uuid (with a POST
 argument named `blob_uuid`) instead of an upload uuid to the
 `/artifacts/upload/...name...` endpoint. See the swagger documentation for more
 details.
+
+???+ note
+
+    For a detailed reference on the state machine for uploads, see the
+    [developer documentation on object states](/developer_guide/state_machine/#uploads).
 
 ???+ tip "REST API calls"
 

@@ -16,6 +16,7 @@ import socket
 import time
 from uuid import uuid4
 
+from shakenfist.agentoperation import AgentOperation
 from shakenfist import artifact
 from shakenfist import baseobject
 from shakenfist.baseobject import (
@@ -81,7 +82,7 @@ class Instance(dbo):
     object_type = 'instance'
     current_version = 13
 
-    # docs/development/state_machine.md has a description of these states.
+    # docs/developer_guide/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
     STATE_PREFLIGHT = 'preflight'
     STATE_PREFLIGHT_ERROR = 'preflight-error'
@@ -1451,9 +1452,23 @@ class Instance(dbo):
                 return None
 
             agentop_uuid = db_data['queue'][0]
+            agentop = AgentOperation.from_db(agentop_uuid)
+            if not agentop:
+                # AgentOp is invalid, remove from queue and say we have nothing
+                # to do.
+                db_data['queue'] = db_data['queue'][1:]
+                self._db_set_attribute('agent_operations', db_data)
+                return None
+
+            if agentop.state.value != dbo.STATE_CREATED:
+                # The AgentOp isn't ready, but we like maintaining this order,
+                # so claim we have no work to do right now.
+                return None
+
+            # Otherwise, we're good to go
             db_data['queue'] = db_data['queue'][1:]
             self._db_set_attribute('agent_operations', db_data)
-            return agentop_uuid
+            return agentop
 
     def agent_operation_enqueue(self, agentop_uuid):
         with self.get_lock_attr('agent_operations', 'Enqueue agent operation'):

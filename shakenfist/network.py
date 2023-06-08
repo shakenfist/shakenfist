@@ -45,6 +45,7 @@ class Network(dbo):
     initial_version = 2
     current_version = 4
 
+    # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
         None: (dbo.STATE_INITIAL, ),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),

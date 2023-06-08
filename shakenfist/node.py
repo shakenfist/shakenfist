@@ -21,7 +21,7 @@ class Node(dbo):
     initial_version = 2
     current_version = 3
 
-    # docs/development/state_machine.md has a description of these states.
+    # docs/developer_guide/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
     STATE_STOPPING = 'stopping'
     STATE_STOPPED = 'stopped'

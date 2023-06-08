@@ -1283,7 +1283,8 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
                                instance_from_db.uuid, commands)
         instance_from_db.agent_operation_enqueue(o.uuid)
         instance_from_db.add_event(
-            EVENT_TYPE_AUDIT, 'queued agent command',
+            EVENT_TYPE_AUDIT, 'queued agent command requiring preflight',
             extra={'agentoperation': o.uuid, 'commands': commands})
-        o.state = AgentOperation.STATE_QUEUED
+        o.state = AgentOperation.STATE_PREFLIGHT
+        # TODO: enqueue preflight task
         return o.external_view()

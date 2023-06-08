@@ -64,17 +64,11 @@ class SFSocketAgent(protocol.SocketAgent):
     def poll(self):
         if time.time() - self.last_data > 5:
             if self.instance_ready == self.AGENT_READY and not self.incomplete_file_get:
-                agentop_uuid = self.instance.agent_operation_dequeue()
-                if agentop_uuid:
+                agentop = self.instance.agent_operation_dequeue()
+                if agentop:
                     self.instance.add_event(
                         EVENT_TYPE_AUDIT, 'Dequeued agent operation',
-                        extra={'agentoperation': agentop_uuid})
-                    agentop = AgentOperation.from_db(agentop_uuid)
-                    if not agentop:
-                        self.instance.add_event(
-                            EVENT_TYPE_AUDIT, 'Agent operation is missing or deleted',
-                            extra={'agentoperation': agentop_uuid})
-                        return
+                        extra={'agentoperation': agentop.uuid})
 
                     agentop.state = AgentOperation.STATE_EXECUTING
                     for command in agentop.commands:

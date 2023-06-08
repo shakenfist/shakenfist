@@ -6,7 +6,10 @@ Access to the REST API is granted via an access token. These tokens expire, so
 you may also have to request new tokens for long lived applications from time
 to time. You will receive a HTTP 401 status code if an access token has expired.
 
-For further details of the authentication scheme, see the [developer guide](/developer_guide/authentication/).
+???+ note
+    For further details of the authentication scheme, see the
+    [developer guide](/developer_guide/authentication/).
+
 
 ???+ tip "REST API calls"
 
@@ -64,6 +67,11 @@ For further details of the authentication scheme, see the [developer guide](/dev
 Resources in a Shaken Fist cluster are divided up into logical groupings called
 namespaces. All namespaces have equal permissions, except for the `system`
 namespace, which is used for administrative tasks.
+
+???+ note
+
+    For a detailed reference on the state machine for namespaces, see the
+    [developer documentation on object states](/developer_guide/state_machine/#namespaces).
 
 ???+ tip "REST API calls"
 
