@@ -1460,7 +1460,7 @@ class Instance(dbo):
                 self._db_set_attribute('agent_operations', db_data)
                 return None
 
-            if agentop.state.value != dbo.STATE_CREATED:
+            if agentop.state.value != AgentOperation.STATE_QUEUED:
                 # The AgentOp isn't ready, but we like maintaining this order,
                 # so claim we have no work to do right now.
                 return None

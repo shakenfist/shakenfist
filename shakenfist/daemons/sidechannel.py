@@ -77,8 +77,19 @@ class SFSocketAgent(protocol.SocketAgent):
                             if not b:
                                 agentop.error = 'blob missing: %s' % command['blob_uuid']
                                 return
-                            b.ensure_local([])
-                            # Ummm, put_file() is broken.
+                            self.put_file(Blob.filepath(b.uuid), command['path'])
+                        elif command['command'] == 'chmod':
+                            self.chmod(command['path'], command['mode'])
+                        else:
+                            self.instance.add_event(
+                                EVENT_TYPE_AUDIT,
+                                'Unknown agent operation command, aborting operation',
+                                extra={
+                                    'agentoperation': agentop.uuid,
+                                    'command': command.get('command')
+                                    })
+                            break
+                    agentop.state = AgentOperation.STATE_COMPLETE
 
         elif time.time() - self.last_data > 15:
             if self.instance.agent_state.value != self.NEVER_TALKED:
@@ -158,11 +169,10 @@ class SFSocketAgent(protocol.SocketAgent):
         self.instance.add_event(EVENT_TYPE_AUDIT, 'received system facts')
         self.instance.agent_facts = packet.get('result', {})
 
-    def put_file(self, path):
-        error = self._path_is_file('put-file', path, send_error_packets=False)
-        if error:
-            raise PutException(error)
-        self._send_file('put-file', path)
+    def put_file(self, source_path, destination_path):
+        if not os.path.exists(source_path):
+            raise PutException('source path %s does not exist' % source_path)
+        self._send_file('put-file', source_path, destination_path)
 
     def get_file(self, path):
         self.incomplete_file_get = {
@@ -224,8 +234,22 @@ class SFSocketAgent(protocol.SocketAgent):
     def execute_response(self, packet):
         self.log.info('Received execute response')
 
+    def chmod(self, path, mode):
+        self.send_packet({
+            'command': 'chmod',
+            'path': path,
+            'mode': mode
+            })
+
     def chmod_response(self, packet):
         self.log.info('Received chmod response')
+
+    def chown(self, path, user, group):
+        self.send_packet({
+            'command': 'chown',
+            'user': user,
+            'group': group
+            })
 
     def chown_response(self, packet):
         self.log.info('Received chown response')

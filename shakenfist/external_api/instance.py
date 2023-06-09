@@ -45,7 +45,8 @@ from shakenfist.tasks import (
     FetchImageTask,
     PreflightInstanceTask,
     StartInstanceTask,
-    FloatNetworkInterfaceTask
+    FloatNetworkInterfaceTask,
+    PreflightAgentOperationTask
 )
 from shakenfist.util import general as util_general
 
@@ -1260,7 +1261,7 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
             return sf_api.error(400, 'instance agent not ready')
 
         try:
-            converted_mode = symbolicmode.symbolic_to_numeric_permissions(mode)
+            symbolicmode.symbolic_to_numeric_permissions(mode)
         except ValueError as e:
             return sf_api.error(406, 'invalid mode: %s' % e)
 
@@ -1271,11 +1272,13 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
         commands = [
             {
                 'command': 'put-blob',
-                'blob_uuid': blob_uuid
+                'blob_uuid': blob_uuid,
+                'path': path
             },
             {
                 'command': 'chmod',
-                'mode': converted_mode
+                'path': path,
+                'mode': mode
             }
         ]
 
@@ -1286,5 +1289,6 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
             EVENT_TYPE_AUDIT, 'queued agent command requiring preflight',
             extra={'agentoperation': o.uuid, 'commands': commands})
         o.state = AgentOperation.STATE_PREFLIGHT
-        # TODO: enqueue preflight task
+        etcd.enqueue(instance_from_db.placement['node'],
+                     {'tasks': [PreflightAgentOperationTask(o.uuid)]})
         return o.external_view()

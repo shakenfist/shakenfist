@@ -6,6 +6,7 @@ from shakenfist_utilities import logs
 import time
 import uuid
 
+from shakenfist.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
 from shakenfist import blob
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -28,7 +29,8 @@ from shakenfist.tasks import (QueueTask,
                               FloatNetworkInterfaceTask,
                               SnapshotTask,
                               FetchBlobTask,
-                              ArchiveTranscodeTask)
+                              ArchiveTranscodeTask,
+                              PreflightAgentOperationTask)
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist import scheduler
@@ -186,6 +188,9 @@ def handle(jobname, workitem):
                         b.add_transcode(task.transcode_description(),
                                         transcode_blob_uuid)
                         transcode_blob.ref_count_inc(b)
+
+            elif isinstance(task, PreflightAgentOperationTask):
+                preflight_agent_operation(task.agentop_uuid())
 
             else:
                 log_i.with_fields({'task': task}).error(
@@ -462,6 +467,25 @@ def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):
             a.state = Artifact.STATE_ERROR
     except exceptions.InvalidStateException:
         b.ref_count_dec(a)
+
+
+def preflight_agent_operation(agentop_uuid):
+    agentop = AgentOperation.from_db(agentop_uuid)
+    if not agentop:
+        return
+
+    if not agentop.state.value == AgentOperation.STATE_PREFLIGHT:
+        return
+
+    for command in agentop.commands:
+        if command['command'] == 'put-blob':
+            b = blob.Blob.from_db(command['blob_uuid'])
+            if not b:
+                agentop.error = 'preflight failure, blob missing: %s' % command['blob_uuid']
+                return
+            b.ensure_local([])
+
+    agentop.state = AgentOperation.STATE_QUEUED
 
 
 class Monitor(daemon.WorkerPoolDaemon):
