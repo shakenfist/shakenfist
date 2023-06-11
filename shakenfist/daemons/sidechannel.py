@@ -80,6 +80,8 @@ class SFSocketAgent(protocol.SocketAgent):
                             self.put_file(Blob.filepath(b.uuid), command['path'])
                         elif command['command'] == 'chmod':
                             self.chmod(command['path'], command['mode'])
+                        elif command['command'] == 'execute':
+                            self.execute(command['commandline'], block_for_result=True)
                         else:
                             self.instance.add_event(
                                 EVENT_TYPE_AUDIT,
@@ -224,11 +226,11 @@ class SFSocketAgent(protocol.SocketAgent):
     def watch_file_response(self, packet):
         self.log.info('Received watch content for %s' % packet['path'])
 
-    def execute(self, command):
+    def execute(self, command, block_for_result=False):
         self.send_packet({
             'command': 'execute',
             'command-line': command,
-            'block-for-result': False
+            'block-for-result': block_for_result
             })
 
     def execute_response(self, packet):

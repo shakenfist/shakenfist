@@ -1292,3 +1292,41 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
         etcd.enqueue(instance_from_db.placement['node'],
                      {'tasks': [PreflightAgentOperationTask(o.uuid)]})
         return o.external_view()
+
+
+class InstanceAgentExecuteEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Execute a command within an instance via the Shaken Fist agent.',
+        [
+            ('instance_ref', 'query', 'uuidorname',
+             'The UUID or name of the instance.', True),
+            ('command_line', 'body', 'string', 'The command to execute.', True)
+        ],
+        [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
+         (400, 'No agent connection to instance.', None),
+         (404, 'Instance not found.', None)]))
+    @api_base.verify_token
+    @api_base.arg_is_instance_ref
+    @api_base.requires_instance_ownership
+    @api_base.requires_instance_active
+    @api_base.log_token_use
+    def post(self, instance_ref=None, command_line=None, instance_from_db=None):
+        if instance_from_db.agent_state.value != 'ready':
+            return sf_api.error(400, 'instance agent not ready')
+
+        commands = [
+            {
+                'command': 'execute',
+                'commandline': command_line,
+                'block-for-result': True
+            }
+        ]
+
+        o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
+                               instance_from_db.uuid, commands)
+        instance_from_db.agent_operation_enqueue(o.uuid)
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'queued agent command note requiring preflight',
+            extra={'agentoperation': o.uuid, 'commands': commands})
+        o.state = AgentOperation.STATE_QUEUED
+        return o.external_view()
