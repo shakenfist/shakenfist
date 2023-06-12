@@ -110,7 +110,7 @@
     - name: Unmount the dependencies disk
       mount:
         path: /srv/ci
-        state: absent
+        state: unmounted
 
 - hosts: localhost
   gather_facts: no
