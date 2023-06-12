@@ -131,6 +131,16 @@ class SFSocketAgent(protocol.SocketAgent):
             self.system_boot_time = sbt
             self.instance.agent_system_boot_time = sbt
 
+    def _record_result(self, packet):
+        unique = packet.get('unique', '')
+        if unique.startswith('agentop:'):
+            _, agentop_uuid, index = unique.split(':')
+            agentop = AgentOperation.from_db(agentop_uuid)
+            if agentop:
+                del packet['command']
+                del packet['unique']
+                agentop.add_result(index, packet)
+
     def agent_start(self, packet):
         self.instance_ready = self.AGENT_STARTED
         self.instance.agent_state = self.AGENT_STARTED
@@ -255,7 +265,7 @@ class SFSocketAgent(protocol.SocketAgent):
             })
 
     def execute_response(self, packet):
-        self.log.info('Received execute response')
+        self._record_result(packet)
 
     def chmod(self, path, mode, unique):
         self.send_packet({
@@ -266,7 +276,7 @@ class SFSocketAgent(protocol.SocketAgent):
             })
 
     def chmod_response(self, packet):
-        self.log.info('Received chmod response')
+        self._record_result(packet)
 
     def chown(self, path, user, group, unique):
         self.send_packet({
@@ -277,7 +287,7 @@ class SFSocketAgent(protocol.SocketAgent):
             })
 
     def chown_response(self, packet):
-        self.log.info('Received chown response')
+        self._record_result(packet)
 
 
 class Monitor(daemon.Daemon):

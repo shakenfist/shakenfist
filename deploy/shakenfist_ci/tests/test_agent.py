@@ -62,3 +62,9 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         if op['state'] != 'complete':
             self.fail('Agent execute operation %s did not complete in 60 seconds (%s)'
                       % (op['uuid'], op['state']))
+
+        self.assertNotEqual({}, op['results'])
+        self.assertEqual(0, op['results']['1']['return-code'])
+        self.assertTrue(op['results']['stdout'].startswith(
+            '[0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987'))
+        self.assertEqual(0, len(op['results']['1']['stderr']))

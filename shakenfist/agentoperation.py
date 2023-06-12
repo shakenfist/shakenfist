@@ -70,7 +70,8 @@ class AgentOperation(dbo):
         retval.update({
             'namespace': self.namespace,
             'instance_uuid': self.instance_uuid,
-            'commands': self.commands
+            'commands': self.commands,
+            'results': self.results
         })
         return retval
 
@@ -86,6 +87,19 @@ class AgentOperation(dbo):
     @property
     def commands(self):
         return self.__commands
+
+    @property
+    def results(self):
+        db_data = self._db_get_attribute('results')
+        if not db_data:
+            return {}
+        return db_data.get('results', {})
+
+    def add_result(self, index, value):
+        with self.get_lock_attr('results', op='add result'):
+            results = self.results
+            results[index] = value
+            self._db_set_attribute('results', {'results': results})
 
     def delete(self):
         self.state = self.STATE_DELETED
