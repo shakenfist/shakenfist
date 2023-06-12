@@ -134,7 +134,7 @@
 
     - name: Record the snapshot uuid
       set_fact:
-        snapshot_uuid: "{{cisnapshot['meta']['vda']['blob_uuid']}}"
+        snapshot_uuid: "{{cisnapshot['meta']['vdc']['blob_uuid']}}"
 
     - name: Log snapshot uuid
       debug:
@@ -155,9 +155,15 @@
       debug:
         msg: "Set label {{label}} to blob uuid {{hostvars['localhost']['snapshot_uuid']}}"
 
-    - name: Delete the snapshot (its a label now if it passed)
+    - name: Delete the vda snapshot
       sf_snapshot:
         uuid: "{{cisnapshot['meta']['vda']['artifact_uuid']}}"
+        state: absent
+
+    - name: Delete the vdc snapshot (its a label now if it passed)
+      sf_snapshot:
+        uuid: "{{cisnapshot['meta']['vdc']['artifact_uuid']}}"
+        state: absent
 
     - name: Delete build instance
       sf_instance:
