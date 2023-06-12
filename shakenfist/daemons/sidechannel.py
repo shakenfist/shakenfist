@@ -71,26 +71,38 @@ class SFSocketAgent(protocol.SocketAgent):
                         extra={'agentoperation': agentop.uuid})
 
                     agentop.state = AgentOperation.STATE_EXECUTING
+                    count = 0
                     for command in agentop.commands:
                         if command['command'] == 'put-blob':
                             b = Blob.from_db(command['blob_uuid'])
                             if not b:
                                 agentop.error = 'blob missing: %s' % command['blob_uuid']
                                 return
-                            self.put_file(Blob.filepath(b.uuid), command['path'])
+                            self.put_file(Blob.filepath(b.uuid), command['path'],
+                                          'agentop:%s:%d' % (agentop.uuid, count))
+
                         elif command['command'] == 'chmod':
-                            self.chmod(command['path'], command['mode'])
+                            self.chmod(command['path'], command['mode'],
+                                       'agentop:%s:%d' % (agentop.uuid, count))
+
                         elif command['command'] == 'execute':
-                            self.execute(command['commandline'], block_for_result=True)
+                            self.execute(
+                                command['commandline'], 'agentop:%s:%d' % (agentop.uuid, count),
+                                block_for_result=True)
+
                         else:
                             self.instance.add_event(
                                 EVENT_TYPE_AUDIT,
                                 'Unknown agent operation command, aborting operation',
                                 extra={
                                     'agentoperation': agentop.uuid,
-                                    'command': command.get('command')
+                                    'command': command.get('command'),
+                                    'count': count
                                     })
                             break
+
+                        count += 1
+
                     agentop.state = AgentOperation.STATE_COMPLETE
 
         elif time.time() - self.last_data > 15:
@@ -134,7 +146,10 @@ class SFSocketAgent(protocol.SocketAgent):
         self.instance.agent_state = self.AGENT_STOPPED
 
     def is_system_running(self):
-        self.send_packet({'command': 'is-system-running'})
+        self.send_packet({
+            'command': 'is-system-running',
+            'unique': str(time.time())
+            })
 
     def is_system_running_response(self, packet):
         ready = packet.get('result', 'False')
@@ -165,27 +180,32 @@ class SFSocketAgent(protocol.SocketAgent):
                 self.gather_facts()
 
     def gather_facts(self):
-        self.send_packet({'command': 'gather-facts'})
+        self.send_packet({
+            'command': 'gather-facts',
+            'unique': str(time.time())
+            })
 
     def gather_facts_response(self, packet):
         self.instance.add_event(EVENT_TYPE_AUDIT, 'received system facts')
         self.instance.agent_facts = packet.get('result', {})
 
-    def put_file(self, source_path, destination_path):
+    def put_file(self, source_path, destination_path, unique):
         if not os.path.exists(source_path):
             raise PutException('source path %s does not exist' % source_path)
-        self._send_file('put-file', source_path, destination_path)
+        self._send_file('put-file', source_path, destination_path, unique)
 
-    def get_file(self, path):
+    def get_file(self, path, unique):
         self.incomplete_file_get = {
             'flo': tempfile.NamedTemporaryFile(),
             'source_path': path,
             'callback': self.get_file_complete,
-            'callback_args': {}
+            'callback_args': {},
+            'unique': unique
         }
         self.send_packet({
             'command': 'get-file',
-            'path': path
+            'path': path,
+            'unique': unique
             })
 
     def get_file_response(self, packet):
@@ -226,31 +246,34 @@ class SFSocketAgent(protocol.SocketAgent):
     def watch_file_response(self, packet):
         self.log.info('Received watch content for %s' % packet['path'])
 
-    def execute(self, command, block_for_result=False):
+    def execute(self, command, unique, block_for_result=False):
         self.send_packet({
             'command': 'execute',
             'command-line': command,
-            'block-for-result': block_for_result
+            'block-for-result': block_for_result,
+            'unique': unique
             })
 
     def execute_response(self, packet):
         self.log.info('Received execute response')
 
-    def chmod(self, path, mode):
+    def chmod(self, path, mode, unique):
         self.send_packet({
             'command': 'chmod',
             'path': path,
-            'mode': mode
+            'mode': mode,
+            'unique': unique
             })
 
     def chmod_response(self, packet):
         self.log.info('Received chmod response')
 
-    def chown(self, path, user, group):
+    def chown(self, path, user, group, unique):
         self.send_packet({
             'command': 'chown',
             'user': user,
-            'group': group
+            'group': group,
+            'unique': unique
             })
 
     def chown_response(self, packet):
