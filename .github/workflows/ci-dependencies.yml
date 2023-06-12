@@ -1,0 +1,52 @@
+name: Rebuild CI dependencies
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '00 16 * * *'        # utc
+
+jobs:
+  ci-dependencies:
+    runs-on: self-hosted
+    timeout-minutes: 120
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    # NOTE(mikal): git repos are checked out to /srv/github/_work/{org}/{repo}
+    # which is available as GITHUB_WORKSPACE. You can find other environment
+    # variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
+
+    steps:
+      - name: Set environment variables
+        run: |
+          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
+
+      - name: Checkout shakenfist
+        uses: actions/checkout@v3
+        with:
+          path: shakenfist
+          fetch-depth: 0
+
+      - name: Build dependencies image
+        run: |
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          ansible-playbook -i /home/debian/ansible-hosts \
+            --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+              base_image=debian:11 base_image_user=debian label=ci-images/dependencies" \
+            deploy/ansible/ci-dependencies.yml
+
+      - uses: JasonEtco/create-an-issue@v2
+        if: failure()
+        id: create-issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SF_CI_NAME: ci-dependencies
+          SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          filename: shakenfist/.github/workflows/ci-images-failure.md
+          update_existing: true
+          search_existing: open
+
+      - if: failure()
+        run: 'echo Created ${{ steps.create-issue.outputs.url }}'

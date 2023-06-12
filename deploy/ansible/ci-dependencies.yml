@@ -1,0 +1,166 @@
+- hosts: localhost
+  gather_facts: no
+  connection: ssh
+  vars:
+    identifier: unknown
+    source_path: "/home/jenkins/src/shakenfist/"
+    base_image: "debian:11"
+    base_image_user: "debian"
+
+  tasks:
+    - name: Create an instance
+      sf_instance:
+        name: "rebuild-dependencies"
+        cpu: 4
+        ram: 4096
+        disks:
+          - "30@{{base_image}}"
+          - "30"
+        networkspecs:
+          - network_uuid="{{identifier}}"
+        ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
+        namespace: "{{identifier}}"
+        state: present
+      register: imagerebuild_instance
+
+    - name: Add to ansible (force python3)
+      add_host:
+        hostname: imagerebuild
+        ansible_ssh_host: "{{imagerebuild_instance['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
+        ansible_python_interpreter: "/usr/bin/python3"
+        sf_instance_uuid: "{{imagerebuild_instance['meta']['uuid']}}"
+        groups: sfall
+      when: base_image == "debian:11"
+
+    - name: Add to ansible (detect system python)
+      add_host:
+        hostname: imagerebuild
+        ansible_ssh_host: "{{imagerebuild_instance['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
+        sf_instance_uuid: "{{imagerebuild_instance['meta']['uuid']}}"
+        groups: sfall
+      when: base_image != "debian:11"
+
+    - name: Log instance
+      debug:
+        msg: "{{hostvars['imagerebuild']}}"
+
+    - name: Wait for instance to present an "OpenSSH" prompt
+      wait_for:
+        port: 22
+        host: "{{hostvars['imagerebuild']['ansible_ssh_host']}}"
+        search_regex: OpenSSH
+        delay: 10
+
+- hosts: sfall
+  gather_facts: yes
+  become: true
+  vars:
+    source_path: "/home/jenkins/src/shakenfist/"
+
+  tasks:
+
+    - name: Make a directory for cached images
+      file:
+        path: /srv/ci
+        state: directory
+        mode: "0755"
+
+    - name: Make a filesystem on the dependencies disk
+      shell: mkfs.ext4 /dev/vdc
+
+    - name: Mount the dependencies disk
+      mount:
+        path: /srv/ci
+        src: /dev/vdc
+        fstype: ext4
+        state: present
+
+    - name: Cache most images used during CI to reduce network traffic
+      get_url:
+        url: "{{item.url}}"
+        dest: "/srv/ci/{{item.name}}"
+        mode: u+r
+      loop:
+        - {
+            url: "https://download.cirros-cloud.net/0.5.2/cirros-0.5.2-x86_64-disk.img",
+            name: "cirros",
+          }
+        - {
+            url: "https://images.shakenfist.com/ubuntu:18.04/latest.qcow2",
+            name: "ubuntu:18.04",
+          }
+        - {
+            url: "https://images.shakenfist.com/ubuntu:20.04/latest.qcow2",
+            name: "ubuntu:20.04",
+          }
+        - {
+            url: "https://images.shakenfist.com/debian:11/latest.qcow2",
+            name: "debian:11",
+          }
+
+    - name: Cleanup cloud-init
+      shell: cloud-init clean
+
+    - name: Unmount the dependencies disk
+      mount:
+        path: /srv/ci
+        state: absent
+
+- hosts: localhost
+  gather_facts: no
+  connection: ssh
+  vars:
+    identifier: cron
+    base_image_user: "ubuntu"
+    label: "sfci-image"
+
+  tasks:
+    - name: Snapshot the instance
+      sf_snapshot:
+        instance_uuid: "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
+        all: true
+        state: present
+      register: cisnapshot
+
+    - name: Log snapshot details
+      debug:
+        msg: "{{cisnapshot}}"
+
+    - name: Record the snapshot uuid
+      set_fact:
+        snapshot_uuid: "{{cisnapshot['meta']['vda']['blob_uuid']}}"
+
+    - name: Log snapshot uuid
+      debug:
+        msg: "{{hostvars['localhost']['snapshot_uuid']}}"
+
+- hosts: localhost
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    # NOTE(mikal): this is obviously a placeholder for now, but it explains
+    # what I need to add to the client to make this work.
+    - name: Add the snapshot to the label
+      shell: |
+        sf-client label update "{{label}}" "{{hostvars['localhost']['snapshot_uuid']}}"
+
+    - name: Log the snapshot update
+      debug:
+        msg: "Set label {{label}} to blob uuid {{hostvars['localhost']['snapshot_uuid']}}"
+
+    - name: Delete the snapshot (its a label now if it passed)
+      sf_snapshot:
+        uuid: "{{cisnapshot['meta']['vda']['artifact_uuid']}}"
+
+    - name: Delete build instance
+      sf_instance:
+        uuid: "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
+        namespace: "{{identifier}}"
+        state: absent
