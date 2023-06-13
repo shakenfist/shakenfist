@@ -33,7 +33,8 @@ jobs:
           cd ${GITHUB_WORKSPACE}/shakenfist
           ansible-playbook -i /home/debian/ansible-hosts \
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
-              base_image=debian:11 base_image_user=debian label=ci-images/dependencies" \
+              base_image=sf://label/ci-images/debian-11 base_image_user=debian \
+              label=ci-images/dependencies" \
             deploy/ansible/ci-dependencies.yml
 
       - uses: JasonEtco/create-an-issue@v2
