@@ -148,35 +148,6 @@
       shell: pip3 install -U tox filelock
       when: ansible_distribution == 'Debian'
 
-    - name: Make a directory for cached images
-      file:
-        path: /srv/ci
-        state: directory
-        mode: "0755"
-
-    - name: Cache most images used during CI to reduce network traffic
-      get_url:
-        url: "{{item.url}}"
-        dest: "/srv/ci/{{item.name}}"
-        mode: u+r
-      loop:
-        - {
-            url: "https://download.cirros-cloud.net/0.5.2/cirros-0.5.2-x86_64-disk.img",
-            name: "cirros",
-          }
-        - {
-            url: "https://images.shakenfist.com/ubuntu:18.04/latest.qcow2",
-            name: "ubuntu:18.04",
-          }
-        - {
-            url: "https://images.shakenfist.com/ubuntu:20.04/latest.qcow2",
-            name: "ubuntu:20.04",
-          }
-        - {
-            url: "https://images.shakenfist.com/debian:11/latest.qcow2",
-            name: "debian:11",
-          }
-
     - name: Cleanup cloud-init
       shell: cloud-init clean
 
