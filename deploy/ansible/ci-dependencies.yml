@@ -79,7 +79,7 @@
         path: /srv/ci
         src: /dev/vdc
         fstype: ext4
-        state: present
+        state: mounted
 
     - name: Cache most images used during CI to reduce network traffic
       get_url:
@@ -104,8 +104,8 @@
             name: "debian:11",
           }
 
-    - name: Cleanup cloud-init
-      shell: cloud-init clean
+    - name: List contents of /srv/ci
+      shell: ls -lrth /srv/ci
 
     - name: Unmount the dependencies disk
       mount:
