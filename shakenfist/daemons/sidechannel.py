@@ -103,8 +103,6 @@ class SFSocketAgent(protocol.SocketAgent):
 
                         count += 1
 
-                    agentop.state = AgentOperation.STATE_COMPLETE
-
         elif time.time() - self.last_data > 15:
             if self.instance.agent_state.value != self.NEVER_TALKED:
                 self.instance_ready = self.STOPPED_TALKING
@@ -140,6 +138,13 @@ class SFSocketAgent(protocol.SocketAgent):
                 del packet['command']
                 del packet['unique']
                 agentop.add_result(index, packet)
+
+                # We define complete as "have received a result for every command
+                # we sent".
+                num_commands = len(agentop.commands)
+                num_results = len(agentop.results)
+                if num_results == num_commands:
+                    agentop.state = AgentOperation.STATE_COMPLETE
 
     def agent_start(self, packet):
         self.instance_ready = self.AGENT_STARTED

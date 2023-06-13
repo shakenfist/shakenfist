@@ -26,6 +26,9 @@ have not yet aged out.
 * `queued`: awaiting execution on the `instance`.
 * `executing`: means the Agent Operation is now executing on the `instance`.
 * `complete`: the Agent Operation has finished executing on the `instance`.
+  Specifically, this means we have received a result from the agent for each
+  command. If the agent crashes or a command never returns, this means the Agent
+  Operation will never be marked as complete.
 * `deleted`: the Agent Operation has been deleted.
 * `error`: an error occurred while processing the Agent Operation.
 

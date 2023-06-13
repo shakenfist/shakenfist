@@ -52,6 +52,7 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         op = self.test_client.instance_execute(
             inst['uuid'], '/tmp/fibonacci.py')
 
+        # Wait for the operation to be complete
         start_time = time.time()
         while time.time() - start_time < 60:
             if op['state'] == 'complete':
@@ -61,6 +62,18 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
 
         if op['state'] != 'complete':
             self.fail('Agent execute operation %s did not complete in 60 seconds (%s)'
+                      % (op['uuid'], op['state']))
+
+        # Wait for the operation to have results
+        start_time = time.time()
+        while time.time() - start_time < 60:
+            if op['results'] != {}:
+                break
+            time.sleep(5)
+            op = self.test_client.get_agent_operation(op['uuid'])
+
+        if op['results'] != {}:
+            self.fail('Agent execute operation %s did not have results in 60 seconds (%s)'
                       % (op['uuid'], op['state']))
 
         self.assertNotEqual({}, op['results'])
