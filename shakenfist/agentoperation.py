@@ -119,3 +119,7 @@ class AgentOperations(dbo_iter):
 
 
 active_states_filter = partial(baseobject.state_filter, AgentOperation.ACTIVE_STATES)
+
+
+def instance_filter(instance, o):
+    return o.instance_uuid == instance.uuid

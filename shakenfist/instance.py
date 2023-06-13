@@ -16,7 +16,8 @@ import socket
 import time
 from uuid import uuid4
 
-from shakenfist.agentoperation import AgentOperation
+from shakenfist.agentoperation import (
+    AgentOperation, AgentOperations, instance_filter as agent_instance_filter)
 from shakenfist import artifact
 from shakenfist import baseobject
 from shakenfist.baseobject import (
@@ -713,6 +714,10 @@ class Instance(dbo):
             n = Node.from_db(self.placement['node'])
             if n:
                 n.remove_instance(self.uuid)
+
+        # Find any agent operations for this instance and remove them
+        for agentop in AgentOperations([partial(agent_instance_filter, self)]):
+            agentop.delete()
 
         if self.state.value.endswith('-%s' % self.STATE_ERROR):
             self.state = self.STATE_ERROR
