@@ -15,6 +15,7 @@
         ram: 16384
         disks:
           - "100@{{base_image}}"
+          - "30@sf://label/ci-images/dependencies"
         networkspecs:
           - network_uuid="{{identifier}}",address=10.0.0.10
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
@@ -47,6 +48,22 @@
     source_path: "/srv/github/src/shakenfist/"
 
   tasks:
+    - name: Make /srv/ci
+      file:
+        path: /srv/ci
+        state: directory
+        mode: u+rw,g+rw,o-rwx
+
+    - name: Mount /srv/ci
+      mount:
+        path: /srv/ci
+        src: /dev/vdc
+        fstype: ext4
+        state: mounted
+
+    - name: Log the contents of /srv/ci
+      shell: ls -lrth /srv/ci
+
     - name: Disable logrotate
       service:
         name: logrotate

@@ -28,6 +28,7 @@
         ram: 4096
         disks:
           - "100@{{base_image}}"
+          - "30@sf://label/ci-images/dependencies"
         networkspecs:
           - network_uuid="{{identifier}}",address=10.0.0.10
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
@@ -200,6 +201,29 @@
           - "   sf-5: is {{sf5['meta']['uuid']}} at {{sf5['meta']['network_interfaces'][0]['ipv4']}}"
 
     - include_tasks: ci-include-common-localhost.yml
+
+- hosts: primary
+  gather_facts: yes
+  become: true
+  vars:
+    source_path: "/srv/github/src/shakenfist/"
+
+  tasks:
+    - name: Make /srv/ci
+      file:
+        path: /srv/ci
+        state: directory
+        mode: u+rw,g+rw,o-rwx
+
+    - name: Mount /srv/ci
+      mount:
+        path: /srv/ci
+        src: /dev/vdc
+        fstype: ext4
+        state: mounted
+
+    - name: Log the contents of /srv/ci
+      shell: ls -lrth /srv/ci
 
 - hosts: sfall
   gather_facts: yes
