@@ -343,6 +343,16 @@ class Monitor(daemon.Daemon):
                     etcd.resolve(n.uuid, jobname)
                     jobname, workitem = etcd.dequeue(n.uuid)
 
+        # Remove old entries from the hard-deleted state caches
+        for object_type in OBJECT_NAMES_TO_ITERATORS:
+            with etcd.get_lock('cache', None, object_type, op='Cache update'):
+                hd = etcd.get('cache', object_type, 'hard-deleted')
+                if hd:
+                    for obj in hd.keys():
+                        if time.time() - hd[obj] > 7 * 3600 * 24:
+                            del hd[obj]
+                    etcd.put('cache', object_type, 'hard-deleted', hd)
+
         # And we're done
         LOG.info('Cluster maintenance loop complete')
 
