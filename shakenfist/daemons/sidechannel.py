@@ -52,6 +52,7 @@ class SFSocketAgent(protocol.SocketAgent):
         self.add_command('is-system-running-response',
                          self.is_system_running_response)
         self.add_command('gather-facts-response', self.gather_facts_response)
+        self.add_command('put-file-response', self.put_file_response)
         self.add_command('get-file-response', self.get_file_response)
         self.add_command('watch-file-response', self.watch_file_response)
         self.add_command('execute-response', self.execute_response)
@@ -208,6 +209,9 @@ class SFSocketAgent(protocol.SocketAgent):
         if not os.path.exists(source_path):
             raise PutException('source path %s does not exist' % source_path)
         self._send_file('put-file', source_path, destination_path, unique)
+
+    def put_file_response(self, packet):
+        self._record_result(packet)
 
     def get_file(self, path, unique):
         self.incomplete_file_get = {
