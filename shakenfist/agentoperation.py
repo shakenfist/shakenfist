@@ -48,10 +48,6 @@ class AgentOperation(dbo):
 
     @classmethod
     def new(cls, operation_uuid, namespace, instance_uuid, commands):
-        o = AgentOperation.from_db(operation_uuid)
-        if o:
-            return o
-
         AgentOperation._db_create(operation_uuid, {
             'uuid': operation_uuid,
             'namespace': namespace,

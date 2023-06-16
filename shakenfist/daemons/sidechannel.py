@@ -145,7 +145,12 @@ class SFSocketAgent(protocol.SocketAgent):
                 num_commands = len(agentop.commands)
                 num_results = len(agentop.results)
                 if num_results == num_commands:
+                    agentop.add_event(EVENT_TYPE_STATUS, 'Commands complete')
                     agentop.state = AgentOperation.STATE_COMPLETE
+                else:
+                    agentop.add_event(
+                        EVENT_TYPE_STATUS, 'Commands not yet complete',
+                        extra={'commands': num_commands, 'results': num_results})
 
     def agent_start(self, packet):
         self.instance_ready = self.AGENT_STARTED

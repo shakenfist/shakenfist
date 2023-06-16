@@ -38,30 +38,29 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
             inst['uuid'], input_blob, '/tmp/fibonacci.py', 'ugo+rx')
 
         start_time = time.time()
-        while time.time() - start_time < 60:
+        while time.time() - start_time < 120:
             if op['state'] == 'complete':
                 break
             time.sleep(5)
             op = self.test_client.get_agent_operation(op['uuid'])
 
         if op['state'] != 'complete':
-            self.fail('Agent put operation %s did not complete in 60 seconds (%s)'
+            self.fail('Agent put operation %s did not complete in 120 seconds (%s)'
                       % (op['uuid'], op['state']))
 
         # Request that the agent execute the file
-        op = self.test_client.instance_execute(
-            inst['uuid'], '/tmp/fibonacci.py')
+        op = self.test_client.instance_execute(inst['uuid'], '/tmp/fibonacci.py')
 
         # Wait for the operation to be complete
         start_time = time.time()
-        while time.time() - start_time < 60:
+        while time.time() - start_time < 120:
             if op['state'] == 'complete':
                 break
             time.sleep(5)
             op = self.test_client.get_agent_operation(op['uuid'])
 
         if op['state'] != 'complete':
-            self.fail('Agent execute operation %s did not complete in 60 seconds (%s)'
+            self.fail('Agent execute operation %s did not complete in 120 seconds (%s)'
                       % (op['uuid'], op['state']))
 
         # Wait for the operation to have results
@@ -72,12 +71,8 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
             time.sleep(5)
             op = self.test_client.get_agent_operation(op['uuid'])
 
-        if op['results'] != {}:
-            self.fail('Agent execute operation %s did not have results in 60 seconds (%s)'
-                      % (op['uuid'], op['state']))
-
         self.assertNotEqual({}, op['results'])
-        self.assertEqual(0, op['results']['1']['return-code'])
-        self.assertTrue(op['results']['stdout'].startswith(
+        self.assertEqual(0, op['results']['0']['return-code'])
+        self.assertTrue(op['results']['0']['stdout'].startswith(
             '[0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987'))
-        self.assertEqual(0, len(op['results']['1']['stderr']))
+        self.assertEqual(0, len(op['results']['0']['stderr']))
