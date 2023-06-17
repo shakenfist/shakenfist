@@ -61,7 +61,7 @@ class Daemon(object):
 
     def exit_gracefully(self, sig, _frame):
         if sig == signal.SIGTERM:
-            self.log.info('Caught SIGTERM, commencing shutdown')
+            self.log.info('Caught SIGTERM, terminating')
             self.exit.set()
 
 

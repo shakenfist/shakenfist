@@ -41,6 +41,7 @@ class Blob(dbo):
     initial_version = 3
     current_version = 6
 
+    # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
         None: (dbo.STATE_INITIAL),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_ERROR, dbo.STATE_DELETED),

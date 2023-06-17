@@ -19,6 +19,7 @@ class Namespace(dbo):
     object_type = 'namespace'
     current_version = 5
 
+    # docs/developer_guide/state_machine.md has a description of these states.
     ACTIVE_STATES = {dbo.STATE_CREATED}
 
     state_targets = {

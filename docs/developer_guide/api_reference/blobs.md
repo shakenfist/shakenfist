@@ -9,6 +9,11 @@ This is because blobs can be shared between objects if the data for those
 objects is currently the identical. This is also why only administrators can list
 all blobs in a given Shaken Fist cluster.
 
+???+ note
+
+    For a detailed reference on the state machine for blobs, see the
+    [developer documentation on object states](/developer_guide/state_machine/#blobs).
+
 ## Fetching information about a blob
 
 If you know the UUID of a blob, then you can GET information about that blob from

@@ -13,6 +13,9 @@ node.
     It is not required that an instance be on any networks. However, this is
     by far the most common deployment pattern.
 
+    For a detailed reference on the state machine for networks, see the
+    [developer documentation on object states](/developer_guide/state_machine/#networks).
+
 ## Network lifecycle
 
 ???+ tip "REST API calls"

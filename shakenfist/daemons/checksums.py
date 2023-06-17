@@ -50,4 +50,4 @@ class Monitor(daemon.Daemon):
 
             self.exit.wait(300)
 
-        LOG.info('Terminating')
+        LOG.info('Terminated')

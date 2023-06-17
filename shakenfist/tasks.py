@@ -348,3 +348,25 @@ class ArchiveTranscodeTask(QueueTask):
 
     def transcode_description(self):
         return self._transcode_description
+
+
+#
+# Agent operation tasks
+#
+
+class PreflightAgentOperationTask(QueueTask):
+    _name = 'preflight_agent_operation'
+
+    def __init__(self, agentop_uuid):
+        super(PreflightAgentOperationTask, self).__init__()
+        self._agentop_uuid = agentop_uuid
+
+    def obj_dict(self):
+        return {
+            **super(PreflightAgentOperationTask, self).obj_dict(),
+            'agentop_uuid': self._agentop_uuid
+        }
+
+    # Data methods
+    def agentop_uuid(self):
+        return self._agentop_uuid

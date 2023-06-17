@@ -67,8 +67,8 @@ def get_minimum_object_version(objname):
 
 
 # The names of our objects
-OBJECT_NAMES = ['artifact', 'blob', 'instance', 'namespace', 'network',
-                'networkinterface', 'node', 'upload']
+OBJECT_NAMES = ['agentoperation', 'artifact', 'blob', 'instance', 'namespace',
+                'network', 'networkinterface', 'node', 'upload']
 
 
 class DatabaseBackedObject(object):

@@ -6,6 +6,11 @@ also the most complicated part of Shaken Fist to explain. This description is
 broken into basic functionality -- showing information about instances -- and then
 moves onto more advanced topics like creation, deletion, and other lifecycle events.
 
+???+ note
+
+    For a detailed reference on the state machine for instances, see the
+    [developer documentation on object states](/developer_guide/state_machine/#instances).
+
 ## Fetching information about an instance
 
 There are two main ways to fetch information about instances -- you can list all

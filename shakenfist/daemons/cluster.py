@@ -414,4 +414,4 @@ class Monitor(daemon.Daemon):
         # Stop being the cluster maintenance node if we were
         if self.lock.is_acquired():
             self.lock.release()
-        LOG.info('Terminating')
+        LOG.info('Terminated')

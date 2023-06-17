@@ -2,15 +2,37 @@ site_name: Shaken Fist
 site_url: https://shakenfist.com
 repo_url: https://github.com/shakenfist/shakenfist
 site_description: A minimal cloud aimed at small and edge deployments
+
 theme:
-    name: material
+  name: material
+  palette:
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
 markdown_extensions:
     - admonition
     - pymdownx.details
-    - pymdownx.superfences
+    - pymdownx.superfences:
+        custom_fences:
+          - name: mermaid
+            class: mermaid
+            format: !!python/name:pymdownx.superfences.fence_code_format
     - pymdownx.magiclink:
         repo_url_shorthand: true
         user: shakenfist
+
 nav:
     - Introduction: index.md
     - Manifesto: manifesto.md

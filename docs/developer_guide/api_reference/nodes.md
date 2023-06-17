@@ -5,6 +5,11 @@ machines. They're a little unusual, as we use the host name to track the object
 instead of an assigned UUID. Nodes are an administrative-only object, not
 available to other users of Shaken Fist.
 
+???+ note
+
+    For a detailed reference on the state machine for nodes, see the
+    [developer documentation on object states](/developer_guide/state_machine/#nodes).
+
 ## Node lifecycle
 
 Nodes cannot be created via the API, instead nodes are created by installing
