@@ -183,8 +183,6 @@ class ActualLock(Lock):
                 if duration > threshold:
                     self.log_ctx.with_fields({
                         'duration': duration}).info('Acquired lock, but it was slow')
-                else:
-                    self.log_ctx.debug('Acquired lock')
                 return self
 
             duration = time.time() - start_time
@@ -221,7 +219,6 @@ class ActualLock(Lock):
                                       }).error('Cannot release lock')
             raise exceptions.LockException(
                 'Cannot release lock: %s' % self.name)
-        self.log_ctx.debug('Released lock')
 
 
 def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
