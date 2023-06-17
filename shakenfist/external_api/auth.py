@@ -73,9 +73,12 @@ class AuthEndpoint(sf_api.Resource):
             ('key', 'body', 'string',
              'The secret for the key you wish to use.', True)
         ],
-        [(200, 'An access token.', auth_token_example),
-         (400, 'Missing namepsace or key in request or key is not a string.', None),
-         (404, 'Namespace not found.', None)]))
+        [
+            (200, 'An access token.', auth_token_example),
+            (400, 'Missing namepsace or key in request or key is not a string.', None),
+            (404, 'Namespace not found.', None)
+        ]),
+        validation=True, validation_function=api_base.custom_validator)
     @arg_is_namespace
     def post(self, namespace=None, key=None, namespace_from_db=None):
         if not key:
@@ -127,10 +130,12 @@ class AuthNamespacesEndpoint(sf_api.Resource):
             ('key', 'body', 'string',
              'Secret for an optional first key created at the same time.', False)
         ],
-        [(200, 'The namespace as created.', namespace_get_example),
-         (400, 'No namespace specified, no key specified, or key is not a string.', None),
-         (403, 'Illegal key name.', None)],
-        requires_admin=True))
+        [
+            (200, 'The namespace as created.', namespace_get_example),
+            (400, 'No namespace specified, no key specified, or key is not a string.', None),
+            (403, 'Illegal key name.', None)
+        ], requires_admin=True),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @sf_api.caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
@@ -198,11 +203,13 @@ class AuthNamespaceEndpoint(sf_api.Resource):
         [
             ('namespace', 'body', 'string', 'The namespace to delete.', True)
         ],
-        [(200, 'Nothing.', None),
-         (400, 'You cannot delete a namespace with instances or networks.', None),
-         (403, 'You cannot delete the system namespace.', None),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+        [
+            (200, 'Nothing.', None),
+            (400, 'You cannot delete a namespace with instances or networks.', None),
+            (403, 'You cannot delete the system namespace.', None),
+            (404, 'Namespace not found.', None)
+        ], requires_admin=True),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @sf_api.caller_is_admin
     @arg_is_namespace
@@ -243,8 +250,11 @@ class AuthNamespaceEndpoint(sf_api.Resource):
         [
             ('namespace', 'body', 'string', 'The namespace to get.', True)
         ],
-        [(200, 'Information about a single namespace.', namespace_get_example),
-         (404, 'Namespace not found.', None)]))
+        [
+            (200, 'Information about a single namespace.', namespace_get_example),
+            (404, 'Namespace not found.', None)
+        ]),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
@@ -272,8 +282,11 @@ class AuthNamespaceKeysEndpoint(sf_api.Resource):
             ('namespace', 'body', 'string',
              'The namespace to fetch authentication keys for.', True)
         ],
-        [(200, 'A list of keynames for the namespace.', '["deploy", ...]'),
-         (404, 'Namespace not found.', None)]))
+        [
+            (200, 'A list of keynames for the namespace.', '["deploy", ...]'),
+            (404, 'Namespace not found.', None)
+        ]),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
@@ -291,8 +304,11 @@ class AuthNamespaceKeysEndpoint(sf_api.Resource):
             ('key_name', 'body', 'string', 'The name of the key.', True),
             ('key', 'body', 'string', 'The authentication key.', True)
         ],
-        [(200, 'The name of the created key.', 'newkey'),
-         (404, 'Namespace not found.', None)]))
+        [
+            (200, 'The name of the created key.', 'newkey'),
+            (404, 'Namespace not found.', None)
+        ]),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
@@ -310,8 +326,11 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
             ('key_name', 'body', 'string', 'The name of the key.', True),
             ('key', 'body', 'string', 'The authentication key.', True)
         ],
-        [(200, 'The name of the updated key.', 'newkey'),
-         (404, 'Namespace or key not found.', None)]))
+        [
+            (200, 'The name of the updated key.', 'newkey'),
+            (404, 'Namespace or key not found.', None)
+        ]),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @sf_api.caller_is_admin
     @requires_namespace_ownership
@@ -329,8 +348,11 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
             ('key_name', 'body', 'string', 'The name of the key.', True),
             ('key', 'body', 'string', 'The authentication key.', True)
         ],
-        [(200, 'The name of the updated key.', 'newkey'),
-         (404, 'Namespace or key not found.', None)]))
+        [
+            (200, 'The name of the updated key.', 'newkey'),
+            (404, 'Namespace or key not found.', None)
+        ]),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
@@ -351,8 +373,11 @@ class AuthMetadatasEndpoint(sf_api.Resource):
         [
             ('namespace', 'body', 'string', 'The namespace to fetch metadata for.', True)
         ],
-        [(200, 'Namespace metadata, if any.', None),
-         (404, 'Namespace not found.', None)]))
+        [
+            (200, 'Namespace metadata, if any.', None),
+            (404, 'Namespace not found.', None)
+        ]),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
@@ -367,9 +392,12 @@ class AuthMetadatasEndpoint(sf_api.Resource):
             ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
-        [(200, 'Nothing.', None),
-         (400, 'One of key or value are missing.', None),
-         (404, 'Namespace not found.', None)]))
+        [
+            (200, 'Nothing.', None),
+            (400, 'One of key or value are missing.', None),
+            (404, 'Namespace not found.', None)
+        ]),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @requires_namespace_ownership
     @api_base.requires_namespace_exist_if_specified
@@ -391,9 +419,12 @@ class AuthMetadataEndpoint(sf_api.Resource):
             ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
-        [(200, 'Nothing.', None),
-         (400, 'One of key or value are missing.', None),
-         (404, 'Namespace not found.', None)]))
+        [
+            (200, 'Nothing.', None),
+            (400, 'One of key or value are missing.', None),
+            (404, 'Namespace not found.', None)
+        ]),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @requires_namespace_ownership
     @api_base.requires_namespace_exist_if_specified
@@ -413,9 +444,12 @@ class AuthMetadataEndpoint(sf_api.Resource):
             ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
-        [(200, 'Nothing.', None),
-         (400, 'One of key or value are missing.', None),
-         (404, 'Namespace not found.', None)]))
+        [
+            (200, 'Nothing.', None),
+            (400, 'One of key or value are missing.', None),
+            (404, 'Namespace not found.', None)
+        ]),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
@@ -432,10 +466,12 @@ class AuthNamespaceTrustsEndpoint(sf_api.Resource):
         [
             ('namespace', 'body', 'string', 'The namespace to trust.', True)
         ],
-        [(200, 'The current state of the namespace.', namespace_get_example),
-         (400, 'No external namespace specified.', None),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+        [
+            (200, 'The current state of the namespace.', namespace_get_example),
+            (400, 'No external namespace specified.', None),
+            (404, 'Namespace not found.', None)
+        ], requires_admin=True),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @arg_is_namespace
     @api_base.log_token_use
@@ -459,10 +495,12 @@ class AuthNamespaceTrustEndpoint(sf_api.Resource):
             ('namespace', 'body', 'string',
              'The namespace to no longer trust.', True)
         ],
-        [(200, 'The current state of the namespace.', namespace_get_example),
-         (400, 'No external namespace specified.', None),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+        [
+            (200, 'The current state of the namespace.', namespace_get_example),
+            (400, 'No external namespace specified.', None),
+            (404, 'Namespace not found.', None)
+        ], requires_admin=True),
+        validation=True, validation_function=api_base.custom_validator)
     @api_base.verify_token
     @arg_is_namespace
     @api_base.log_token_use
