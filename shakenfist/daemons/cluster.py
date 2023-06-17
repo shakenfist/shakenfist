@@ -4,6 +4,7 @@
 # maintenance daemon per cluster.
 
 from collections import defaultdict
+import copy
 from functools import partial
 import setproctitle
 from shakenfist_utilities import logs
@@ -348,7 +349,7 @@ class Monitor(daemon.Daemon):
             with etcd.get_lock('cache', None, object_type, op='Cache update'):
                 hd = etcd.get('cache', object_type, 'hard-deleted')
                 if hd:
-                    for obj in hd.keys():
+                    for obj in copy.copy(hd.keys()):
                         if time.time() - hd[obj] > 7 * 3600 * 24:
                             del hd[obj]
                     etcd.put('cache', object_type, 'hard-deleted', hd)
