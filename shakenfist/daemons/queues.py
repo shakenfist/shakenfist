@@ -497,7 +497,6 @@ class Monitor(daemon.WorkerPoolDaemon):
             try:
                 self.reap_workers()
                 if time.time() - last_worker_count_emitted > 10:
-                    LOG.info('Have %d workers' % len(self.workers))
                     last_worker_count_emitted = time.time()
 
                 if not self.exit.is_set():
