@@ -98,7 +98,7 @@ class Root(sf_api.Resource):
              '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
-             'instance-put-blob, instance-execute<li>'
+             'instance-put-blob, instance-execute</li>'
              '<li>networkinterfaces: interface-metadata</li>'
              '<li>nodes: node-get, node-metadata</li>'
              '</ul></p></body></html>'),
