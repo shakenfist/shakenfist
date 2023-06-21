@@ -677,6 +677,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#executing-commands-within-an-instance" class="md-nav__link">
+    Executing commands within an instance
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#metadata" class="md-nav__link">
     Metadata
   </a>
@@ -1138,6 +1145,13 @@
         <li class="md-nav__item">
   <a href="#out-of-band-interactions-with-instances" class="md-nav__link">
     Out-of-band interactions with instances
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#executing-commands-within-an-instance" class="md-nav__link">
+    Executing commands within an instance
   </a>
   
 </li>
@@ -1713,6 +1727,30 @@ functionality in the Shaken Fist client.</p>
         <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">temp_name</span><span class="p">)</span>
 </code></pre></div>
 </details>
+<h2 id="executing-commands-within-an-instance">Executing commands within an instance</h2>
+<p>Assuming a given instance has the Shaken Fist agent installed and running, and
+was created with a <code>sf-agent</code> side channel, you can use the Shaken Fist agent to
+move data into and out of the instance and execute commands without the instance
+needing to have working networking configured. You can read more about the exact
+requirements for agent connectivity in the  <a href="/developer_guide/api_reference/agentoperations/">API reference guide for agent operations</a>.</p>
+<p>Agent Operations are not created directly -- they are a side effect of a call to
+one of the API methods below, which create an Agent Operation so the caller can
+track the state of their request. At the time of writing, you can perform the
+following operations via the agent:</p>
+<ul>
+<li>copy the contents of a blob into an instance and change its file permissions.
+  The python API client has a helper to upload the file into a blob before copying
+  to the instance.</li>
+<li>execute a command and return its results (exit code, stdout, stderr).</li>
+</ul>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__agent_execute">POST ​/instances​/{instance_ref}​/agent​/execute</a>: execute a command within an instance and return results.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__agent_put">POST /instances/{instance_ref}/agent/put</a>: copy a blob into an instance at the specified location with the specified permissions.</li>
+</ul>
+</details>
+<p>...</p>
 <h2 id="metadata">Metadata</h2>
 <p>All objects exposed by the REST API may have metadata associated with them. This
 metadata is for storing values that are of interest to the owner of the resources,
