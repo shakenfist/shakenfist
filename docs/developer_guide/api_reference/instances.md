@@ -575,6 +575,31 @@ functionality in the Shaken Fist client.
             os.unlink(temp_name)
     ```
 
+## Executing commands within an instance
+
+Assuming a given instance has the Shaken Fist agent installed and running, and
+was created with a `sf-agent` side channel, you can use the Shaken Fist agent to
+move data into and out of the instance and execute commands without the instance
+needing to have working networking configured. You can read more about the exact
+requirements for agent connectivity in the  [API reference guide for agent operations](/developer_guide/api_reference/agentoperations/).
+
+Agent Operations are not created directly -- they are a side effect of a call to
+one of the API methods below, which create an Agent Operation so the caller can
+track the state of their request. At the time of writing, you can perform the
+following operations via the agent:
+
+* copy the contents of a blob into an instance and change its file permissions.
+  The python API client has a helper to upload the file into a blob before copying
+  to the instance.
+* execute a command and return its results (exit code, stdout, stderr).
+
+???+ tip "REST API calls"
+
+    * [POST ​/instances​/{instance_ref}​/agent​/execute](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__agent_execute): execute a command within an instance and return results.
+    * [POST /instances/{instance_ref}/agent/put](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__agent_put): copy a blob into an instance at the specified location with the specified permissions.
+
+...
+
 ## Metadata
 
 All objects exposed by the REST API may have metadata associated with them. This

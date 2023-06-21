@@ -1261,9 +1261,12 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
             return sf_api.error(400, 'instance agent not ready')
 
         try:
-            symbolicmode.symbolic_to_numeric_permissions(mode)
-        except ValueError as e:
-            return sf_api.error(406, 'invalid mode: %s' % e)
+            int(mode)
+        except ValueError:
+            try:
+                symbolicmode.symbolic_to_numeric_permissions(mode)
+            except ValueError as e:
+                return sf_api.error(406, 'invalid mode: %s' % e)
 
         b = Blob.from_db(blob_uuid)
         if not b:
