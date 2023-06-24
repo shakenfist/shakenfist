@@ -15,6 +15,12 @@ class NoEtcd(Exception):
     ...
 
 
+# API validation
+
+class APIValidationException(Exception):
+    ...
+
+
 # Objects
 class ObjectException(Exception):
     ...

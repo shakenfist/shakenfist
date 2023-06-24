@@ -379,7 +379,7 @@ class InstancesEndpoint(sf_api.Resource):
             return sf_api.error(404, 'namespace not found')
 
         # Check that the instance name is safe for use as a DNS host name
-        if name != re.sub(r'([^a-zA-Z0-9\-])', '', name) or len(name) > 63:
+        if name != re.sub(r'([^a-zA-Z0-9-])', '', name) or len(name) > 63:
             return sf_api.error(
                 400, ('instance name %s is not useable as a DNS and Linux host name. '
                       'That is, less than 63 characters and in the character set: '

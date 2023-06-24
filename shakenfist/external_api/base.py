@@ -2,6 +2,8 @@ import flask
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from flask_jwt_extended.exceptions import NoAuthorizationError
 import json
+import jsonschema
+import re
 import requests
 from shakenfist_utilities import api as sf_api, logs
 
@@ -9,6 +11,7 @@ from shakenfist_utilities import api as sf_api, logs
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
+from shakenfist.exceptions import APIValidationException
 from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.instance import Instance
@@ -105,6 +108,23 @@ def swagger_helper(section, description, parameters, responses,
             '<br/><br/><i>%s</i>' % '<br/>'.join(constraints)
 
     return out
+
+
+VALID_DNS = re.compile(r'^[-a-zA-Z0-9]+$')
+
+
+def custom_validator(data, schema):
+    jsonschema.validate(data, schema)
+
+    # Types which must be DNS safe
+    if 'namespace' in data:
+        if len(data['namespace']) > 63:
+            raise APIValidationException('The namespace name is too long for DNS.')
+        m = VALID_DNS.match(data['namespace'])
+        if not m:
+            raise APIValidationException(
+                'The namespace name is not valid for DNS, %s does not conform '
+                'to ^[a-zA-Z0-9\-]+$ .' % data['namespace'])
 
 
 def verify_token(func):
