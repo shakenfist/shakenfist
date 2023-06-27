@@ -580,6 +580,14 @@
   connection: ssh
 
   tasks:
+    - name: Write an ansible inventory file to handle ad hoc commands
+      template:
+        src: files/inventory.yaml
+        dest: /etc/sf/inventory.yaml
+        owner: root
+        group: sudo
+        mode: u=r,g=r,o=
+
     - name: Find hypervisor with lowest MTU
       set_fact:
         lowest_mtu_hypervisor: "{{ groups['hypervisors'] | sort('node_mtu' | int) | first }}"

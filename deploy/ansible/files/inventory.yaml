@@ -1,0 +1,70 @@
+---
+primary:
+    hosts:
+{% for svr in groups.primary_node %}
+        {{hostvars[svr]['ansible_fqdn']}}:
+            ansible_fqdn: {{hostvars[svr]['ansible_fqdn']}}
+            ansible_ssh_host: {{hostvars[svr]['ansible_ssh_host']}}
+            ansible_ssh_user: {{hostvars[svr]['ansible_ssh_user']}}
+            ansible_ssh_private_key_file: {{hostvars[svr]['ansible_ssh_private_key_file']}}
+{% endfor %}
+
+hypervisors:
+    hosts:
+{% for svr in groups.hypervisors %}
+        {{hostvars[svr]['ansible_fqdn']}}:
+            ansible_fqdn: {{hostvars[svr]['ansible_fqdn']}}
+            ansible_ssh_host: {{hostvars[svr]['ansible_ssh_host']}}
+            ansible_ssh_user: {{hostvars[svr]['ansible_ssh_user']}}
+            ansible_ssh_private_key_file: {{hostvars[svr]['ansible_ssh_private_key_file']}}
+{% endfor %}
+
+etcd:
+    hosts:
+{% for svr in groups.etcd_master %}
+        {{hostvars[svr]['ansible_fqdn']}}:
+            ansible_fqdn: {{hostvars[svr]['ansible_fqdn']}}
+            ansible_ssh_host: {{hostvars[svr]['ansible_ssh_host']}}
+            ansible_ssh_user: {{hostvars[svr]['ansible_ssh_user']}}
+            ansible_ssh_private_key_file: {{hostvars[svr]['ansible_ssh_private_key_file']}}
+{% endfor %}
+
+network:
+    hosts:
+{% for svr in groups.network_node %}
+        {{hostvars[svr]['ansible_fqdn']}}:
+            ansible_fqdn: {{hostvars[svr]['ansible_fqdn']}}
+            ansible_ssh_host: {{hostvars[svr]['ansible_ssh_host']}}
+            ansible_ssh_user: {{hostvars[svr]['ansible_ssh_user']}}
+            ansible_ssh_private_key_file: {{hostvars[svr]['ansible_ssh_private_key_file']}}
+{% endfor %}
+
+eventlog:
+    hosts:
+{% for svr in groups.eventlog_node %}
+        {{hostvars[svr]['ansible_fqdn']}}:
+            ansible_fqdn: {{hostvars[svr]['ansible_fqdn']}}
+            ansible_ssh_host: {{hostvars[svr]['ansible_ssh_host']}}
+            ansible_ssh_user: {{hostvars[svr]['ansible_ssh_user']}}
+            ansible_ssh_private_key_file: {{hostvars[svr]['ansible_ssh_private_key_file']}}
+{% endfor %}
+
+storage:
+    hosts:
+{% for svr in groups.storage %}
+        {{hostvars[svr]['ansible_fqdn']}}:
+            ansible_fqdn: {{hostvars[svr]['ansible_fqdn']}}
+            ansible_ssh_host: {{hostvars[svr]['ansible_ssh_host']}}
+            ansible_ssh_user: {{hostvars[svr]['ansible_ssh_user']}}
+            ansible_ssh_private_key_file: {{hostvars[svr]['ansible_ssh_private_key_file']}}
+{% endfor %}
+
+all:
+    hosts:
+{% for svr in groups.sfall %}
+        {{hostvars[svr]['ansible_fqdn']}}:
+            ansible_fqdn: {{hostvars[svr]['ansible_fqdn']}}
+            ansible_ssh_host: {{hostvars[svr]['ansible_ssh_host']}}
+            ansible_ssh_user: {{hostvars[svr]['ansible_ssh_user']}}
+            ansible_ssh_private_key_file: {{hostvars[svr]['ansible_ssh_private_key_file']}}
+{% endfor %}
