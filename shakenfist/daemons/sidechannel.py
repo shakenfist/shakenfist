@@ -22,6 +22,10 @@ from shakenfist.util import process as util_process
 LOG, _ = logs.setup(__name__)
 
 
+class ConnectionFailed(Exception):
+    ...
+
+
 class ConnectionIdle(Exception):
     ...
 
@@ -311,91 +315,103 @@ class Monitor(daemon.Daemon):
 
     def single_instance_monitor(self, instance_uuid):
         setproctitle.setproctitle('sf-sidechannel-%s' % instance_uuid)
-        inst = instance.Instance.from_db(instance_uuid)
-        log_ctx = LOG.with_fields({'instance': instance_uuid})
-        if inst.state.value == instance.Instance.STATE_DELETED:
+        self.instance = instance.Instance.from_db(instance_uuid)
+        log = LOG.with_fields({'instance': instance_uuid})
+        if self.instance.state.value == instance.Instance.STATE_DELETED:
             return
 
-        console_path = os.path.join(inst.instance_path, 'console.log')
+        if 'sf-agent' not in self.instance.side_channels:
+            return
+
+        # We use the existence of a console.log file in the instance directory
+        # to indicate the instance has been created. This will be true even if
+        # the instance doesn't actually every write to the serial console.
+        console_path = os.path.join(self.instance.instance_path, 'console.log')
         while not os.path.exists(console_path):
             time.sleep(1)
-        inst.add_event(EVENT_TYPE_STATUS, 'detected console log')
+        self.instance.add_event(EVENT_TYPE_STATUS, 'detected console log')
 
-        sc_clients = {}
-        sc_connected = {}
+        # Ensure side channel path exists.
+        sc_path = os.path.join(self.instance.instance_path, 'sc-sf-agent')
+        if not os.path.exists(sc_path):
+            log.error('sf-agent side channel file missing, aborting')
+            return
 
-        def build_side_channel_sockets():
-            if not inst.side_channels:
-                return
+        self.sc_client = None
+        self.sc_connected = False
 
-            for sc in inst.side_channels:
-                if sc not in sc_clients:
-                    sc_path = os.path.join(inst.instance_path, 'sc-%s' % sc)
-                    if os.path.exists(sc_path):
-                        try:
-                            sc_clients[sc] = SFSocketAgent(
-                                inst, sc_path, logger=log_ctx)
-                            sc_connected[sc] = False
-                            sc_clients[sc].send_ping()
-                        except (BrokenPipeError,
-                                ConnectionRefusedError,
-                                ConnectionResetError,
-                                FileNotFoundError,
-                                OSError):
-                            if sc in sc_clients:
-                                del sc_clients[sc]
+        # Setup a connection to the client
+        while not self.sc_client:
+            try:
+                self.sc_client = SFSocketAgent(self.instance, sc_path, logger=log)
+                break
+            except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
+                    FileNotFoundError, OSError):
+                time.sleep(1)
 
-        build_side_channel_sockets()
+        # We really want to see one of a small number of packets from the client
+        # as our initial conversation.
+        last_attempt = time.time()
+        self.sc_client.is_system_running()
+        expected_packets = ['agent-start', 'is-system-running-response',
+                            'gather-facts-response', 'ping', 'pong']
+        try:
+            while not self.exit.is_set() and not self.sc_connected:
+                for packet in self._await_client():
+                    if packet.get('command') not in expected_packets:
+                        log.with_fields({'packet': packet}).error(
+                            'Unexpected sidechannel client packet for this phase!',)
+                    else:
+                        log.with_fields({'packet': packet}).debug(
+                            'Startup packet for sidechannel')
+                    self.sc_client.dispatch_packet(packet)
 
-        while not self.exit.is_set():
-            readable = []
-            for sc in sc_clients.values():
-                readable.append(sc.input_fileno)
-            readable, _, exceptional = select.select(readable, [], readable, 1)
+                    if packet.get('command') == 'gather-facts-response':
+                        break
 
-            for fd in readable:
-                chan = None
-                for sc in sc_clients:
-                    if fd == sc_clients[sc].input_fileno:
-                        chan = sc
+                if time.time() - last_attempt > 30:
+                    self.sc_client.is_system_running()
+                    last_attempt = time.time()
 
-                if chan:
-                    try:
-                        for packet in sc_clients[chan].find_packets():
-                            if not sc_connected.get(chan, False):
-                                inst.add_event(
-                                    EVENT_TYPE_AUDIT, 'sidechannel %s connected' % chan)
-                                sc_connected[chan] = True
+        except ConnectionFailed:
+            return
 
-                            sc_clients[chan].dispatch_packet(packet)
+        # Spin reading packets and responding until we see an error or are asked
+        # to exit.
+        try:
+            while not self.exit.is_set():
+                for packet in self._await_client():
+                    self.sc_client.dispatch_packet(packet)
 
-                    except (BrokenPipeError,
-                            ConnectionRefusedError,
-                            ConnectionResetError,
-                            FileNotFoundError,
-                            OSError):
-                        del sc_clients[chan]
+                # The idle tasks
+                try:
+                    self.sc_client.poll()
+                except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
+                        FileNotFoundError, ConnectionIdle):
+                    return
 
-            for fd in exceptional:
-                for sc_name in sc_clients:
-                    if fd == sc_clients[sc_name].input_fileno:
-                        sc_clients[sc_name].close()
-                        del sc_clients[sc_name]
+        except ConnectionFailed:
+            return
 
-            build_side_channel_sockets()
+    def _await_client(self):
+        readable, _, exceptional = select.select(
+            [self.sc_client.input_fileno], [], [self.sc_client.input_fileno], 1)
 
-            if inst.side_channels:
-                for sc in inst.side_channels:
-                    if sc in sc_clients:
-                        try:
-                            sc_clients[sc].poll()
-                        except (BrokenPipeError,
-                                ConnectionRefusedError,
-                                ConnectionResetError,
-                                FileNotFoundError,
-                                ConnectionIdle):
-                            if sc in sc_clients:
-                                del sc_clients[sc]
+        if readable:
+            try:
+                for packet in self.sc_client.find_packets():
+                    if not self.sc_connected:
+                        self.instance.add_event(EVENT_TYPE_AUDIT, 'sidechannel connected')
+                        self.sc_connected = True
+
+                    yield packet
+
+            except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
+                    FileNotFoundError, OSError):
+                raise ConnectionFailed()
+
+        if exceptional:
+            raise ConnectionFailed()
 
     def reap_single_instance_monitors(self):
         all_monitors = list(self.monitors.keys())
@@ -413,6 +429,7 @@ class Monitor(daemon.Daemon):
         LOG.info('Starting')
         shutdown_commenced = 0
         running = True
+        instance_sidechannel_cache = {}
 
         while True:
             try:
@@ -444,8 +461,15 @@ class Monitor(daemon.Daemon):
                             if instance_uuid not in self.monitors:
                                 missing_instances.append(instance_uuid)
 
-                    # Start missing self.monitors
+                    # Start missing monitors. We only support sf-agent for now.
                     for instance_uuid in missing_instances:
+                        if instance_uuid not in instance_sidechannel_cache:
+                            inst = instance.Instance.from_db(instance_uuid)
+                            instance_sidechannel_cache[instance_uuid] = inst.side_channels
+
+                        if 'sf-agent' not in instance_sidechannel_cache[instance_uuid]:
+                            continue
+
                         p = util_process.fork(
                             self.single_instance_monitor, [instance_uuid],
                             'sidechannel-new')
@@ -455,7 +479,7 @@ class Monitor(daemon.Daemon):
                             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
                             'sidechannel monitor started')
 
-                    # Cleanup extra self.monitors
+                    # Cleanup extra monitors
                     for instance_uuid in extra_instances:
                         p = self.monitors[instance_uuid]
                         try:
