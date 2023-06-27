@@ -15,7 +15,7 @@ class NoEtcd(Exception):
     ...
 
 
-# Objects
+# Code quality
 class ObjectException(Exception):
     ...
 
@@ -33,6 +33,10 @@ class MultipleObjects(ObjectException):
 
 
 class UpgradeException(ObjectException):
+    ...
+
+
+class LocksDisallowedException(ObjectException):
     ...
 
 

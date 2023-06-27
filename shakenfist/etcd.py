@@ -84,6 +84,7 @@ class WrappedEtcdClient(Etcd3Client):
 # This module stores some state in thread local storage.
 local = threading.local()
 local.sf_etcd_client = None
+local.sf_etcd_allow_locks = True
 
 
 def get_etcd_client():
@@ -103,6 +104,17 @@ def get_etcd_client():
 
 def reset_client():
     local.sf_etcd_client = None
+    local.sf_etcd_allow_locks = True
+
+
+def disallow_locking(func):
+    def wrapper(*args, **kwargs):
+        # Refuse to allow locks while executing the wrapped function
+        local.sf_etcd_allow_locks = False
+        retval = func(*args, **kwargs)
+        local.sf_etcd_allow_locks = True
+        return retval
+    return wrapper
 
 
 def retry_etcd_forever(func):
@@ -172,6 +184,9 @@ class ActualLock(Lock):
         return d['node'], d['pid']
 
     def __enter__(self):
+        if not local.sf_etcd_allow_locks:
+            raise exceptions.LocksDisallowedException()
+
         start_time = time.time()
         slow_warned = False
         threshold = int(config.SLOW_LOCK_THRESHOLD)

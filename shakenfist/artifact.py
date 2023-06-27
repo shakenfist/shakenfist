@@ -199,6 +199,7 @@ class Artifact(dbo):
         })
         return out
 
+    @etcd.disallow_locking
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
