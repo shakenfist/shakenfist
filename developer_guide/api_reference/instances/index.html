@@ -1287,6 +1287,10 @@ passed as a list. You only have one <code>videospec</code> per instance. Once ag
   options include: vga; cirrus (the default); and qxl.</li>
 <li>memory (integer): the amount of video RAM the video card should have, in
   kibibytes (blocks of 1024 bytes).</li>
+<li>vdi (string): the VDI protocol to use. Options are "vnc", "spice" (the default), or
+  "spiceconcurrent". spice and spiceconcurrent are the same except that spiceconcurrent
+  allows limited multi-user sessions, with subsequent sessions not experiencing
+  full VDI functionality.</li>
 </ul>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
