@@ -77,8 +77,8 @@ direct network access to the hypervisor node, and is accessed at the "vdi port"
 TCP port. By default this console is SPICE since v0.7, although VNC is also
 available.
 
-You can select from 'vnc' or 'spice' by setting the `vdi` argument in your video
-specification for the instance. If you set `vdi=spice-concurrent`, then
+You can select from 'vnc' or 'spice' (the default) by setting the `vdi` argument
+in your video specification for the instance. If you set `vdi=spiceconcurrent`, then
 experimental support for multiple users accessing the same SPICE console at the
 same time is enabled. For more details about the experimental nature of concurrent
 SPICE consoles, see https://www.spice-space.org/multiple-clients.html.
