@@ -117,6 +117,10 @@ passed as a list. You only have one `videospec` per instance. Once again, a
   options include: vga; cirrus (the default); and qxl.
 * memory (integer): the amount of video RAM the video card should have, in
   kibibytes (blocks of 1024 bytes).
+* vdi (string): the VDI protocol to use. Options are "vnc", "spice" (the default), or
+  "spiceconcurrent". spice and spiceconcurrent are the same except that spiceconcurrent
+  allows limited multi-user sessions, with subsequent sessions not experiencing
+  full VDI functionality.
 
 ???+ tip "REST API calls"
 
