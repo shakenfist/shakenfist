@@ -4,11 +4,11 @@ from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import ConnectionFailedError
 import json
 from pydantic import (
-    BaseSettings,
     Field,
     SecretStr,
     AnyHttpUrl,
 )
+from pydantic_settings import BaseSettings
 import socket
 
 from shakenfist import exceptions

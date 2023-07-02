@@ -69,9 +69,9 @@ def _resolve_cirros(name):
             raise exceptions.VersionSpecificationError(
                 'Cannot parse version: %s' % name)
 
-    url = config.DOWNLOAD_URL_CIRROS % {'vernum': vernum}
+    url = str(config.DOWNLOAD_URL_CIRROS) % {'vernum': vernum}
 
-    checksum_url = config.CHECKSUM_URL_CIRROS % {'vernum': vernum}
+    checksum_url = str(config.CHECKSUM_URL_CIRROS) % {'vernum': vernum}
     checksums = _fetch_remote_checksum(checksum_url)
     checksum = checksums.get(os.path.basename(url))
     LOG.with_fields({
