@@ -31,26 +31,14 @@ class PutException(Exception):
 
 
 class SFSocketAgent(protocol.SocketAgent):
-    NEVER_TALKED = 'not ready (no contact)'
-    STOPPED_TALKING = 'not ready (unresponsive)'
-    AGENT_STARTED = 'not ready (agent startup)'
-    AGENT_STOPPED = 'not ready (agent stopped)'
-    AGENT_READY = 'ready'
-
     def __init__(self, inst, path, logger=None):
         super(SFSocketAgent, self).__init__(path, logger=logger)
         self.log = LOG.with_fields({'instance': inst})
 
         self.instance = inst
-        self.system_boot_time = 0
 
         self.incomplete_file_get = None
 
-        self.add_command('agent-start', self.agent_start)
-        self.add_command('agent-stop', self.agent_start)
-        self.add_command('is-system-running-response',
-                         self.is_system_running_response)
-        self.add_command('gather-facts-response', self.gather_facts_response)
         self.add_command('put-file-response', self.put_file_response)
         self.add_command('get-file-response', self.get_file_response)
         self.add_command('watch-file-response', self.watch_file_response)
@@ -58,18 +46,8 @@ class SFSocketAgent(protocol.SocketAgent):
         self.add_command('chmod-response', self.chmod_response)
         self.add_command('chown-response', self.chown_response)
 
-        self.instance_ready = self.NEVER_TALKED
-        self.instance.agent_state = self.NEVER_TALKED
-
     def poll(self):
         raise NotImplementedError('Please don\'t call poll() in the sidechannel monitor')
-
-    def _record_system_boot_time(self, sbt):
-        if sbt != self.system_boot_time:
-            if self.system_boot_time != 0:
-                self.instance.add_event(EVENT_TYPE_AUDIT, 'reboot detected')
-            self.system_boot_time = sbt
-            self.instance.agent_system_boot_time = sbt
 
     def _record_result(self, packet):
         unique = packet.get('unique', '')
@@ -92,59 +70,6 @@ class SFSocketAgent(protocol.SocketAgent):
                     agentop.add_event(
                         EVENT_TYPE_STATUS, 'Commands not yet complete',
                         extra={'commands': num_commands, 'results': num_results})
-
-    def agent_start(self, packet):
-        self.instance_ready = self.AGENT_STARTED
-        self.instance.agent_state = self.AGENT_STARTED
-        self.instance.agent_start_time = time.time()
-        sbt = packet.get('system_boot_time', 0)
-        self._record_system_boot_time(sbt)
-
-    def agent_stop(self, _packet):
-        self.instance_ready = self.AGENT_STOPPED
-        self.instance.agent_state = self.AGENT_STOPPED
-
-    def is_system_running(self):
-        self.send_packet({
-            'command': 'is-system-running',
-            'unique': str(time.time())
-            })
-
-    def is_system_running_response(self, packet):
-        ready = packet.get('result', 'False')
-        sbt = packet.get('system_boot_time', 0)
-        self._record_system_boot_time(sbt)
-
-        if ready:
-            new_state = self.AGENT_READY
-        else:
-            # Special case the degraded state here, as the system is in fact
-            # as ready as it is ever going to be, but isn't entirely happy.
-            if packet.get('message', 'none') == 'degraded':
-                new_state = 'ready (degraded)'
-            else:
-                new_state = 'not ready (%s)' % packet.get('message', 'none')
-
-        self.log.debug('Agent state: old = %s; new = %s'
-                       % (self.instance_ready, new_state))
-
-        # We cache the agent state to reduce database load, and then
-        # trigger facts gathering when we transition into the self.AGENT_READY state.
-        if self.instance_ready != new_state:
-            self.instance_ready = new_state
-            self.instance.agent_state = new_state
-            if new_state == self.AGENT_READY:
-                self.gather_facts()
-
-    def gather_facts(self):
-        self.send_packet({
-            'command': 'gather-facts',
-            'unique': str(time.time())
-            })
-
-    def gather_facts_response(self, packet):
-        self.instance.add_event(EVENT_TYPE_AUDIT, 'received system facts')
-        self.instance.agent_facts = packet.get('result', {})
 
     def put_file(self, source_path, destination_path, unique):
         if not os.path.exists(source_path):
@@ -241,19 +166,100 @@ class SFSocketAgent(protocol.SocketAgent):
 
 
 class Monitor(daemon.Daemon):
+    NEVER_TALKED = 'not ready (no contact)'
+    STOPPED_TALKING = 'not ready (unresponsive)'
+    AGENT_STARTED = 'not ready (agent startup)'
+    AGENT_STOPPED = 'not ready (agent stopped)'
+    AGENT_READY = 'ready'
+
     def __init__(self, name):
         super(Monitor, self).__init__(name)
         self.monitors = {}
 
+    def _record_system_boot_time(self, sbt):
+        if sbt != self.system_boot_time:
+            if self.system_boot_time != 0:
+                self.instance.add_event(EVENT_TYPE_AUDIT, 'reboot detected')
+            self.system_boot_time = sbt
+            self.instance.agent_system_boot_time = sbt
+
+    def _handle_background_messages(self, packet):
+        command = packet.get('command')
+        if command == 'agent-start':
+            self.instance_ready = self.AGENT_STARTED
+            self.instance.agent_state = self.AGENT_STARTED
+            self.instance.agent_start_time = time.time()
+            sbt = packet.get('system_boot_time', 0)
+            self._record_system_boot_time(sbt)
+            return True
+
+        elif command == 'agent-stop':
+            self.instance_ready = self.AGENT_STOPPED
+            self.instance.agent_state = self.AGENT_STOPPED
+            return True
+
+        elif command == 'is-system-running-response':
+            ready = packet.get('result', 'False')
+            sbt = packet.get('system_boot_time', 0)
+            self._record_system_boot_time(sbt)
+
+            if ready:
+                new_state = self.AGENT_READY
+            else:
+                # Special case the degraded state here, as the system is in fact
+                # as ready as it is ever going to be, but isn't entirely happy.
+                if packet.get('message', 'none') == 'degraded':
+                    new_state = 'ready (degraded)'
+                else:
+                    new_state = 'not ready (%s)' % packet.get('message', 'none')
+
+            self.log.debug('Agent state: old = %s; new = %s'
+                           % (self.instance_ready, new_state))
+
+            # We cache the agent state to reduce database load, and then
+            # trigger facts gathering when we transition into the self.AGENT_READY state.
+            if self.instance_ready != new_state:
+                self.instance_ready = new_state
+                self.instance.agent_state = new_state
+                if new_state == self.AGENT_READY:
+                    self.sc_client.send_packet({
+                        'command': 'gather-facts',
+                        'unique': str(time.time())
+                        })
+            return True
+
+        elif command == 'gather-facts-response':
+            self.instance.add_event(EVENT_TYPE_AUDIT, 'received system facts')
+            self.instance.agent_facts = packet.get('result', {})
+            return True
+
+        elif command == 'ping':
+            self.sc_client.send_packet({
+                'command': 'pong',
+                'unique': packet['unique']
+            })
+            return True
+
+        elif command == 'pong':
+            return True
+
+        return False
+
     def single_instance_monitor(self, instance_uuid):
         setproctitle.setproctitle('sf-sidechannel-%s' % instance_uuid)
+
         self.instance = instance.Instance.from_db(instance_uuid)
-        log = LOG.with_fields({'instance': instance_uuid})
+        if not self.instance:
+            return
+        if 'sf-agent' not in self.instance.side_channels:
+            return
         if self.instance.state.value == instance.Instance.STATE_DELETED:
             return
 
-        if 'sf-agent' not in self.instance.side_channels:
-            return
+        self.instance_ready = self.NEVER_TALKED
+        self.instance.agent_state = self.NEVER_TALKED
+        self.system_boot_time = 0
+        self.log = LOG.with_fields({'instance': instance_uuid})
 
         # We use the existence of a console.log file in the instance directory
         # to indicate the instance has been created. This will be true even if
@@ -266,7 +272,7 @@ class Monitor(daemon.Daemon):
         # Ensure side channel path exists.
         sc_path = os.path.join(self.instance.instance_path, 'sc-sf-agent')
         if not os.path.exists(sc_path):
-            log.error('sf-agent side channel file missing, aborting')
+            self.log.error('sf-agent side channel file missing, aborting')
             return
 
         self.sc_client = None
@@ -275,40 +281,50 @@ class Monitor(daemon.Daemon):
         # Setup a connection to the client
         while not self.sc_client:
             try:
-                self.sc_client = SFSocketAgent(self.instance, sc_path, logger=log)
+                self.sc_client = SFSocketAgent(self.instance, sc_path, logger=self.log)
                 break
             except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
                     FileNotFoundError, OSError):
                 time.sleep(1)
 
         # We really want to see one of a small number of packets from the client
-        # as our initial conversation.
+        # as our initial conversation. Its possible if this is a restart of the
+        # monitor because of an error that we will receive unexpected packets.
+        # Just ignore them for now.
         last_attempt = time.time()
         expected_packets = ['agent-start', 'agent-stop', 'is-system-running-response',
                             'gather-facts-response', 'ping', 'pong']
         try:
-            self.sc_client.is_system_running()
+            self.sc_client.send_packet({
+                'command': 'is-system-running',
+                'unique': str(time.time())
+                })
 
             while not self.exit.is_set() and not self.sc_connected:
                 for packet in self._await_client():
                     if packet.get('command') not in expected_packets:
-                        log.with_fields({'packet': packet}).error(
-                            'Unexpected sidechannel client packet during startup')
+                        self.log.with_fields({'packet': packet}).error(
+                            'Unexpected sidechannel client packet during startup, ignoring')
                     else:
-                        log.with_fields({'packet': packet}).debug(
+                        self.log.with_fields({'packet': packet}).debug(
                             'Startup packet for sidechannel')
-                    self.sc_client.dispatch_packet(packet)
+                        self._handle_background_messages(packet)
 
+                    # Once we have gathered facts we consider this startup
+                    # phase to be complete.
                     if packet.get('command') == 'gather-facts-response':
                         break
 
                 if time.time() - last_attempt > 30:
-                    self.sc_client.is_system_running()
+                    self.sc_client.send_packet({
+                        'command': 'is-system-running',
+                        'unique': str(time.time())
+                        })
                     last_attempt = time.time()
 
         except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
                 FileNotFoundError, OSError, ConnectionFailed) as e:
-            log.with_fields({'error': str(e)}).debug(
+            self.log.with_fields({'error': str(e)}).debug(
                             'Unexpected sidechannel communication error during '
                             'connection setup, aborting')
             return
@@ -321,17 +337,18 @@ class Monitor(daemon.Daemon):
                 for packet in self._await_client():
                     last_data = time.time()
                     if packet.get('command') not in expected_packets:
-                        log.with_fields({'packet': packet}).error(
+                        self.log.with_fields({'packet': packet}).error(
                             'Unexpected sidechannel client packet')
-                    self.sc_client.dispatch_packet(packet)
+                    if not self._handle_background_messages(packet):
+                        self.sc_client.dispatch_packet(packet)
 
                 # If idle, ping
                 if time.time() - last_data > 5:
-                    if (self.sc_client.instance_ready == SFSocketAgent.AGENT_READY and
+                    if (self.instance_ready == self.AGENT_READY and
                             not self.sc_client.incomplete_file_get):
-                        agentop = self.sc_client.instance.agent_operation_dequeue()
+                        agentop = self.instance.agent_operation_dequeue()
                         if agentop:
-                            self.sc_client.instance.add_event(
+                            self.instance.add_event(
                                 EVENT_TYPE_AUDIT, 'Dequeued agent operation',
                                 extra={'agentoperation': agentop.uuid})
 
@@ -361,7 +378,7 @@ class Monitor(daemon.Daemon):
                                         block_for_result=True)
 
                                 else:
-                                    self.sc_client.instance.add_event(
+                                    self.instance.add_event(
                                         EVENT_TYPE_AUDIT,
                                         'Unknown agent operation command, aborting operation',
                                         extra={
@@ -377,12 +394,12 @@ class Monitor(daemon.Daemon):
 
                 # If very idle, something has gone wrong
                 if time.time() - last_data > 15:
-                    if self.sc_client.instance.agent_state.value != SFSocketAgent.NEVER_TALKED:
-                        self.sc_client.instance_ready = SFSocketAgent.STOPPED_TALKING
-                        self.sc_client.instance.agent_state = SFSocketAgent.STOPPED_TALKING
+                    if self.instance.agent_state.value != self.NEVER_TALKED:
+                        self.instance_ready = self.STOPPED_TALKING
+                        self.instance.agent_state = self.STOPPED_TALKING
                     self.log.debug('Not receiving traffic, aborting.')
-                    if self.sc_client.system_boot_time != 0:
-                        self.sc_client.instance.add_event(
+                    if self.system_boot_time != 0:
+                        self.instance.add_event(
                             EVENT_TYPE_STATUS, 'agent has gone silent, restarting channel')
 
                     # Attempt to close, but the OS might already think its closed
@@ -395,7 +412,7 @@ class Monitor(daemon.Daemon):
 
         except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
                 FileNotFoundError, OSError, ConnectionFailed) as e:
-            self.sc_client.instance.add_event(
+            self.instance.add_event(
                 EVENT_TYPE_STATUS,
                 ('Unexpected sidechannel communication error post '
                  'connection setup, restarting channel'), extra={'error': str(e)})
