@@ -39,45 +39,11 @@ class SFSocketAgent(protocol.SocketAgent):
 
         self.incomplete_file_get = None
 
-        self.add_command('put-file-response', self.put_file_response)
         self.add_command('get-file-response', self.get_file_response)
         self.add_command('watch-file-response', self.watch_file_response)
-        self.add_command('execute-response', self.execute_response)
-        self.add_command('chmod-response', self.chmod_response)
-        self.add_command('chown-response', self.chown_response)
 
     def poll(self):
         raise NotImplementedError('Please don\'t call poll() in the sidechannel monitor')
-
-    def _record_result(self, packet):
-        unique = packet.get('unique', '')
-        if unique.startswith('agentop:'):
-            _, agentop_uuid, index = unique.split(':')
-            agentop = AgentOperation.from_db(agentop_uuid)
-            if agentop:
-                del packet['command']
-                del packet['unique']
-                agentop.add_result(index, packet)
-
-                # We define complete as "have received a result for every command
-                # we sent".
-                num_commands = len(agentop.commands)
-                num_results = len(agentop.results)
-                if num_results == num_commands:
-                    agentop.add_event(EVENT_TYPE_STATUS, 'Commands complete')
-                    agentop.state = AgentOperation.STATE_COMPLETE
-                else:
-                    agentop.add_event(
-                        EVENT_TYPE_STATUS, 'Commands not yet complete',
-                        extra={'commands': num_commands, 'results': num_results})
-
-    def put_file(self, source_path, destination_path, unique):
-        if not os.path.exists(source_path):
-            raise PutException('source path %s does not exist' % source_path)
-        self._send_file('put-file', source_path, destination_path, unique)
-
-    def put_file_response(self, packet):
-        self._record_result(packet)
 
     def get_file(self, path, unique):
         self.incomplete_file_get = {
@@ -131,39 +97,6 @@ class SFSocketAgent(protocol.SocketAgent):
     def watch_file_response(self, packet):
         self.log.info('Received watch content for %s' % packet['path'])
 
-    def execute(self, command, unique, block_for_result=False):
-        self.send_packet({
-            'command': 'execute',
-            'command-line': command,
-            'block-for-result': block_for_result,
-            'unique': unique
-            })
-
-    def execute_response(self, packet):
-        self._record_result(packet)
-
-    def chmod(self, path, mode, unique):
-        self.send_packet({
-            'command': 'chmod',
-            'path': path,
-            'mode': mode,
-            'unique': unique
-            })
-
-    def chmod_response(self, packet):
-        self._record_result(packet)
-
-    def chown(self, path, user, group, unique):
-        self.send_packet({
-            'command': 'chown',
-            'user': user,
-            'group': group,
-            'unique': unique
-            })
-
-    def chown_response(self, packet):
-        self._record_result(packet)
-
 
 class Monitor(daemon.Daemon):
     NEVER_TALKED = 'not ready (no contact)'
@@ -183,7 +116,7 @@ class Monitor(daemon.Daemon):
             self.system_boot_time = sbt
             self.instance.agent_system_boot_time = sbt
 
-    def _handle_background_messages(self, packet):
+    def _handle_background_message(self, packet):
         command = packet.get('command')
         if command == 'agent-start':
             self.instance_ready = self.AGENT_STARTED
@@ -245,6 +178,71 @@ class Monitor(daemon.Daemon):
 
         return False
 
+    def _await_client(self):
+        readable, _, exceptional = select.select(
+            [self.sc_client.input_fileno], [], [self.sc_client.input_fileno], 1)
+
+        if readable:
+            self.last_data = time.time()
+            try:
+                for packet in self.sc_client.find_packets():
+                    if not self.agent_has_talked:
+                        self.instance.add_event(EVENT_TYPE_AUDIT, 'sidechannel connected')
+                        self.agent_has_talked = True
+
+                    if not self._handle_background_message(packet):
+                        yield packet
+
+            except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
+                    FileNotFoundError, OSError):
+                raise ConnectionFailed()
+
+        if exceptional:
+            raise ConnectionFailed()
+
+    # Prototype new version of send_file(), playing here before doing yet another
+    # agent release.
+    def _send_file(self, command, source_path, destination_path, unique):
+        st = os.stat(source_path, follow_symlinks=True)
+        yield {
+            'command': command,
+            'path': destination_path,
+            'stat_result': {
+                'mode': st.st_mode,
+                'size': st.st_size,
+                'uid': st.st_uid,
+                'gid': st.st_gid,
+                'atime': st.st_atime,
+                'mtime': st.st_mtime,
+                'ctime': st.st_ctime
+            },
+            'unique': unique
+        }
+
+        offset = 0
+        with open(source_path, 'rb') as f:
+            d = f.read(1024)
+            while d:
+                yield {
+                    'command': command,
+                    'path': destination_path,
+                    'offset': offset,
+                    'encoding': 'base64',
+                    'chunk': base64.b64encode(d).decode('utf-8'),
+                    'unique': unique
+                }
+                offset += len(d)
+                d = f.read(1024)
+
+            yield {
+                'command': command,
+                'path': destination_path,
+                'offset': offset,
+                'encoding': 'base64',
+                'chunk': None,
+                'unique': unique
+            }
+
     def single_instance_monitor(self, instance_uuid):
         setproctitle.setproctitle('sf-sidechannel-%s' % instance_uuid)
 
@@ -259,6 +257,7 @@ class Monitor(daemon.Daemon):
         self.instance_ready = self.NEVER_TALKED
         self.instance.agent_state = self.NEVER_TALKED
         self.system_boot_time = 0
+        self.last_data = time.time()
         self.log = LOG.with_fields({'instance': instance_uuid})
 
         # We use the existence of a console.log file in the instance directory
@@ -276,7 +275,7 @@ class Monitor(daemon.Daemon):
             return
 
         self.sc_client = None
-        self.sc_connected = False
+        self.agent_has_talked = False
 
         # Setup a connection to the client
         while not self.sc_client:
@@ -291,30 +290,23 @@ class Monitor(daemon.Daemon):
         # as our initial conversation. Its possible if this is a restart of the
         # monitor because of an error that we will receive unexpected packets.
         # Just ignore them for now.
+        first_attempt = time.time()
         last_attempt = time.time()
-        expected_packets = ['agent-start', 'agent-stop', 'is-system-running-response',
-                            'gather-facts-response', 'ping', 'pong']
         try:
             self.sc_client.send_packet({
                 'command': 'is-system-running',
                 'unique': str(time.time())
                 })
 
-            while not self.exit.is_set() and not self.sc_connected:
+            while not self.exit.is_set():
                 for packet in self._await_client():
-                    if packet.get('command') not in expected_packets:
-                        self.log.with_fields({'packet': packet}).error(
-                            'Unexpected sidechannel client packet during startup, ignoring')
-                    else:
-                        self.log.with_fields({'packet': packet}).debug(
-                            'Startup packet for sidechannel')
-                        self._handle_background_messages(packet)
+                    self.log.with_fields({'packet': packet}).error(
+                        'Unexpected sidechannel client packet during startup, ignoring')
 
-                    # Once we have gathered facts we consider this startup
-                    # phase to be complete.
-                    if packet.get('command') == 'gather-facts-response':
-                        break
+                if self.instance_ready == self.AGENT_READY:
+                    break
 
+                # Retry every now and then
                 if time.time() - last_attempt > 30:
                     self.sc_client.send_packet({
                         'command': 'is-system-running',
@@ -322,78 +314,161 @@ class Monitor(daemon.Daemon):
                         })
                     last_attempt = time.time()
 
+                # If its been a long time and we've heard nothing, then we should
+                # exit so we can re-attempt.
+                if time.time() - first_attempt > 300 and not self.agent_has_talked:
+                    self.log.debug('We waited a long time but the agent never spoke, aborting')
+                    return
+
         except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
                 FileNotFoundError, OSError, ConnectionFailed) as e:
             self.log.with_fields({'error': str(e)}).debug(
-                            'Unexpected sidechannel communication error during '
-                            'connection setup, aborting')
+                'Unexpected sidechannel communication error during '
+                'connection setup, aborting')
             return
+
+        self.log.debug('Agent has completed startup')
 
         # Spin reading packets and responding until we see an error or are asked
         # to exit.
-        last_data = time.time()
         try:
             while not self.exit.is_set():
                 for packet in self._await_client():
-                    last_data = time.time()
-                    if packet.get('command') not in expected_packets:
-                        self.log.with_fields({'packet': packet}).error(
-                            'Unexpected sidechannel client packet')
-                    if not self._handle_background_messages(packet):
-                        self.sc_client.dispatch_packet(packet)
+                    self.log.with_fields({'packet': packet}).error(
+                        'Unexpected sidechannel client packet')
 
-                # If idle, ping
-                if time.time() - last_data > 5:
-                    if (self.instance_ready == self.AGENT_READY and
-                            not self.sc_client.incomplete_file_get):
-                        agentop = self.instance.agent_operation_dequeue()
-                        if agentop:
-                            self.instance.add_event(
-                                EVENT_TYPE_AUDIT, 'Dequeued agent operation',
-                                extra={'agentoperation': agentop.uuid})
+                # If idle, try to do something
+                if self.instance_ready == self.AGENT_READY:
+                    agentop = self.instance.agent_operation_dequeue()
+                    if agentop:
+                        self.instance.add_event(
+                            EVENT_TYPE_AUDIT, 'Dequeued agent operation',
+                            extra={'agentoperation': agentop.uuid})
 
-                            agentop.state = AgentOperation.STATE_EXECUTING
-                            count = 0
-                            for command in agentop.commands:
-                                if command['command'] == 'put-blob':
-                                    b = Blob.from_db(command['blob_uuid'])
-                                    if not b:
-                                        agentop.error = 'blob missing: %s' % command['blob_uuid']
-                                        return
-                                    expected_packets.append('put-file-response')
-                                    self.sc_client.put_file(
-                                        Blob.filepath(b.uuid), command['path'],
-                                        'agentop:%s:%d' % (agentop.uuid, count))
+                        agentop.state = AgentOperation.STATE_EXECUTING
+                        count = 0
+                        num_results = 0
+                        commands = agentop.commands
 
-                                elif command['command'] == 'chmod':
-                                    expected_packets.append('chmod-response')
-                                    self.sc_client.chmod(
-                                        command['path'], command['mode'],
-                                        'agentop:%s:%d' % (agentop.uuid, count))
-
-                                elif command['command'] == 'execute':
-                                    expected_packets.append('execute-response')
-                                    self.sc_client.execute(
-                                        command['commandline'], 'agentop:%s:%d' % (agentop.uuid, count),
-                                        block_for_result=True)
-
-                                else:
-                                    self.instance.add_event(
-                                        EVENT_TYPE_AUDIT,
-                                        'Unknown agent operation command, aborting operation',
-                                        extra={
-                                            'agentoperation': agentop.uuid,
-                                            'command': command.get('command'),
-                                            'count': count
-                                            })
+                        for command in commands:
+                            if command['command'] == 'put-blob':
+                                b = Blob.from_db(command['blob_uuid'])
+                                if not b:
+                                    agentop.error = 'blob missing: %s' % command['blob_uuid']
+                                    break
+                                blob_path = Blob.filepath(b.uuid)
+                                if not os.path.exists(blob_path):
+                                    agentop.error = 'blob file missing: %s' % command['blob_uuid']
                                     break
 
-                                count += 1
+                                unique = 'agentop:%s:%d' % (agentop.uuid, count)
+                                inpacket = {}
+                                for outpacket in self._send_file(
+                                        'put-file', blob_path, command['path'], unique):
+                                    self.sc_client.send_packet(outpacket)
+
+                                    # Wait for a matching ACK
+                                    for inpacket in self._await_client():
+                                        if (inpacket.get('command') == 'put-file-response'
+                                                and inpacket.get('unique') == unique):
+                                            break
+                                        else:
+                                            self.log.with_fields({'packet': inpacket}).error(
+                                                'Unexpected sidechannel client packet in '
+                                                'response to put-file command')
+                                agentop.add_result(count, inpacket)
+                                num_results += 1
+
+                            elif command['command'] == 'chmod':
+                                unique = 'agentop:%s:%d' % (agentop.uuid, count)
+                                self.sc_client.send_packet({
+                                    'command': 'chmod',
+                                    'path': command['path'],
+                                    'mode': command['mode'],
+                                    'unique': unique
+                                    })
+                                chmod_done = False
+                                while not chmod_done:
+                                    for inpacket in self._await_client():
+                                        if (inpacket.get('command') == 'chmod-response'
+                                                and inpacket.get('unique') == unique):
+                                            agentop.add_result(count, inpacket)
+                                            num_results += 1
+                                            chmod_done = True
+                                        else:
+                                            self.log.with_fields({'packet': inpacket}).error(
+                                                'Unexpected sidechannel client packet in '
+                                                'response to chmod command')
+
+                            elif command['command'] == 'chown':
+                                unique = 'agentop:%s:%d' % (agentop.uuid, count)
+                                self.sc_client.send_packet({
+                                    'command': 'chown',
+                                    'user': command['user'],
+                                    'group': command['group'],
+                                    'unique': unique
+                                    })
+                                chown_done = False
+                                while not chown_done:
+                                    for inpacket in self._await_client():
+                                        if (inpacket.get('command') == 'chown-response'
+                                                and inpacket.get('unique') == unique):
+                                            agentop.add_result(count, inpacket)
+                                            num_results += 1
+                                            chown_done = True
+                                        else:
+                                            self.log.with_fields({'packet': inpacket}).error(
+                                                'Unexpected sidechannel client packet in '
+                                                'response to chmod command')
+
+                            elif command['command'] == 'execute':
+                                unique = 'agentop:%s:%d' % (agentop.uuid, count)
+                                self.sc_client.send_packet({
+                                    'command': 'execute',
+                                    'command-line': command['commandline'],
+                                    'block-for-result': True,
+                                    'unique': unique
+                                    })
+                                execute_done = False
+                                while not execute_done:
+                                    for inpacket in self._await_client():
+                                        if (inpacket.get('command') == 'execute-response'
+                                                and inpacket.get('unique') == unique):
+                                            agentop.add_result(count, inpacket)
+                                            num_results += 1
+                                            execute_done = True
+                                        else:
+                                            self.log.with_fields({'packet': inpacket}).error(
+                                                'Unexpected sidechannel client packet in '
+                                                'response to execute command')
+
+                            else:
+                                self.instance.add_event(
+                                    EVENT_TYPE_AUDIT,
+                                    'Unknown agent operation command, aborting operation',
+                                    extra={
+                                        'agentoperation': agentop.uuid,
+                                        'command': command.get('command'),
+                                        'count': count
+                                        })
+                                break
+
+                            count += 1
+
+                        if num_results == len(commands):
+                            agentop.add_event(EVENT_TYPE_STATUS, 'Commands complete')
+                            agentop.state = AgentOperation.STATE_COMPLETE
                         else:
-                            self.sc_client.send_ping()
+                            agentop.add_event(
+                                EVENT_TYPE_STATUS, 'Commands not yet complete',
+                                extra={'commands': commands, 'results': num_results})
+
+                # Ping if we've been idle for a small while
+                if time.time() - self.last_data > 5:
+                    self.sc_client.send_ping()
 
                 # If very idle, something has gone wrong
-                if time.time() - last_data > 15:
+                if time.time() - self.last_data > 15:
                     if self.instance.agent_state.value != self.NEVER_TALKED:
                         self.instance_ready = self.STOPPED_TALKING
                         self.instance.agent_state = self.STOPPED_TALKING
@@ -417,26 +492,6 @@ class Monitor(daemon.Daemon):
                 ('Unexpected sidechannel communication error post '
                  'connection setup, restarting channel'), extra={'error': str(e)})
             return
-
-    def _await_client(self):
-        readable, _, exceptional = select.select(
-            [self.sc_client.input_fileno], [], [self.sc_client.input_fileno], 1)
-
-        if readable:
-            try:
-                for packet in self.sc_client.find_packets():
-                    if not self.sc_connected:
-                        self.instance.add_event(EVENT_TYPE_AUDIT, 'sidechannel connected')
-                        self.sc_connected = True
-
-                    yield packet
-
-            except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
-                    FileNotFoundError, OSError):
-                raise ConnectionFailed()
-
-        if exceptional:
-            raise ConnectionFailed()
 
     def reap_single_instance_monitors(self):
         all_monitors = list(self.monitors.keys())
