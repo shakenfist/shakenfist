@@ -1,5 +1,6 @@
 import os
 import psutil
+import re
 from shakenfist_utilities import logs
 import time
 
@@ -194,6 +195,26 @@ class Monitor(daemon.Daemon):
             for obj in OBJECT_NAMES_TO_CLASSES:
                 retval['object_version_%s' % obj] = \
                     OBJECT_NAMES_TO_CLASSES[obj].current_version
+
+            # How much CPU time have the various SF components consumed since restart?
+            # We only traverse two layers here, so its not worth doing something
+            # recursive.
+            def _safe_metric_name(name):
+                return re.sub(r'[^a-zA-Z0-9]', '_', name)
+
+            me = psutil.Process(os.getpid())
+            shim = me.parent()
+            for child in shim.children():
+                with child.oneshot():
+                    times = child.cpu_times()
+                    retval['process_cpu_time_%s' % _safe_metric_name(child.name())] = \
+                        (times.user + times.system)
+
+                    for subchild in child.children():
+                        with subchild.oneshot():
+                            times = subchild.cpu_times()
+                            retval['process_cpu_time_%s' % _safe_metric_name(subchild.name())] = \
+                                (times.user + times.system)
 
             if time.time() - self.last_logged_resources > 300:
                 # What package versions do we have?
