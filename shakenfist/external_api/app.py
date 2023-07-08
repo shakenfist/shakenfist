@@ -97,6 +97,7 @@ class Root(sf_api.Resource):
              '<li>agent-operations: agentoperations-crud</li>'
              '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash</li>'
+             '<li>events: events-by-type</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
              'instance-put-blob, instance-execute</li>'
              '<li>networkinterfaces: interface-metadata</li>'

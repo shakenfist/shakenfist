@@ -11,6 +11,7 @@ import time
 
 from shakenfist.config import config
 from shakenfist import etcd
+from shakenfist import exceptions
 
 
 LOG, _ = logs.setup(__name__)
@@ -233,18 +234,18 @@ class EventLog(object):
             month = int(yearmonth[4:])
             yield year, month
 
-    def read_events(self, limit=100):
+    def read_events(self, limit=100, event_type=None):
         with self.lock:
-            for e in self._read_events_inner(limit=limit):
+            for e in self._read_events_inner(limit=limit, event_type=event_type):
                 yield e
 
-    def _read_events_inner(self, limit=100):
+    def _read_events_inner(self, limit=100, event_type=None):
         count = 0
 
         for year, month in self._get_all_chunks():
             elc = EventLogChunk(self.objtype, self.objuuid, year, month)
             try:
-                for e in elc.read_events(limit=(limit - count)):
+                for e in elc.read_events(limit=(limit - count), event_type=event_type):
                     count += 1
                     yield e
                 elc.close()
@@ -481,13 +482,19 @@ class EventLogChunk(object):
             'extra': extra
         }).error('Failed to record event after 3 retries')
 
-    def read_events(self, limit=100):
+    def read_events(self, limit=100, event_type=None):
         if not self.bootstrapped:
             self._bootstrap()
 
+        sql = 'SELECT * FROM events '
+        if event_type:
+            if event_type not in EVENT_TYPES:
+                raise exceptions.InvalidEventType()
+            sql += 'WHERE type = "%s" ' % event_type
+        sql += 'ORDER BY TIMESTAMP DESC LIMIT %d' % limit
+
         cur = self.con.cursor()
-        cur.execute('SELECT * FROM events ORDER BY TIMESTAMP DESC LIMIT %d'
-                    % limit)
+        cur.execute(sql)
         for row in cur.fetchall():
             out = dict(row)
             if out.get('extra'):

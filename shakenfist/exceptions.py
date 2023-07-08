@@ -223,29 +223,42 @@ class LabelHierarchyTooDeep(ArtifactException):
 
 
 # Blobs
-class BlobMissing(ArtifactException):
+class BlobException(Exception):
     ...
 
 
-class BlobDeleted(ArtifactException):
+class BlobMissing(BlobException):
     ...
 
 
-class BlobFetchFailed(Exception):
+class BlobDeleted(BlobException):
     ...
 
 
-class BlobDependencyMissing(Exception):
+class BlobFetchFailed(BlobException):
     ...
 
 
-class BlobsMustHaveContent(Exception):
+class BlobDependencyMissing(BlobException):
     ...
 
 
-class BlobAlreadyBeingTransferred(Exception):
+class BlobsMustHaveContent(BlobException):
     ...
 
 
-class BlobTransferSetupFailed(Exception):
+class BlobAlreadyBeingTransferred(BlobException):
+    ...
+
+
+class BlobTransferSetupFailed(BlobException):
+    ...
+
+
+# Events
+class EventException(Exception):
+    ...
+
+
+class InvalidEventType(EventException):
     ...
