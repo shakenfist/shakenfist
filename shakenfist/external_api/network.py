@@ -310,8 +310,13 @@ network_events_example = """    [
 class NetworkEventsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network event information.',
-        [('network_ref', 'query', 'uuidorname',
-          'The UUID or name of the network.', True)],
+        [
+            ('network_ref', 'query', 'uuidorname',
+             'The UUID or name of the network.', True),
+            ('event_type', 'body', 'string', 'The type of event to return.', False),
+            ('limit', 'body', 'integer',
+             'The number of events to return, defaults to 100.', False)
+        ],
         [(200, 'Event information about a single network.', network_events_example),
          (404, 'Network not found.', None)]))
     @api_base.verify_token
@@ -319,9 +324,9 @@ class NetworkEventsEndpoint(sf_api.Resource):
     @api_base.requires_network_ownership
     @api_base.redirect_to_eventlog_node
     @api_base.log_token_use
-    def get(self, network_ref=None, network_from_db=None):
+    def get(self, network_ref=None, event_type=None, limit=100, network_from_db=None):
         with eventlog.EventLog('network', network_from_db.uuid) as eventdb:
-            return list(eventdb.read_events())
+            return list(eventdb.read_events(limit=limit, event_type=event_type))
 
 
 network_interfaces_example = """{
