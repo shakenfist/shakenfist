@@ -202,19 +202,26 @@ class Monitor(daemon.Daemon):
             def _safe_metric_name(name):
                 return re.sub(r'[^a-zA-Z0-9]', '_', name)
 
+            def _emit_process_metrics(p):
+                smn = _safe_metric_name(p.name())
+                out = {}
+                times = p.cpu_times()
+                usage = (times.user + times.system)
+                age = time.time() - p.create_time()
+                out['process_cpu_time_%s' % smn] = usage
+                out['process_age_%s' % smn] = age
+                out['process_cpu_fraction_%s' % smn] = usage / age
+                return out
+
             me = psutil.Process(os.getpid())
             shim = me.parent()
             for child in shim.children():
                 with child.oneshot():
-                    times = child.cpu_times()
-                    retval['process_cpu_time_%s' % _safe_metric_name(child.name())] = \
-                        (times.user + times.system)
+                    retval.update(_emit_process_metrics(child))
 
                     for subchild in child.children():
                         with subchild.oneshot():
-                            times = subchild.cpu_times()
-                            retval['process_cpu_time_%s' % _safe_metric_name(subchild.name())] = \
-                                (times.user + times.system)
+                            retval.update(_emit_process_metrics(subchild))
 
             if time.time() - self.last_logged_resources > 300:
                 # What package versions do we have?

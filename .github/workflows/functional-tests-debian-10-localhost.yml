@@ -192,19 +192,9 @@ jobs:
       - name: Check process CPU usage
         if: ${{ ! cancelled() }}
         run: |
-          read -r -d '' script << END
-          . /etc/sf/sfrc
-          for node in \$(sf-client --simple node list | grep -v name | cut -f 1 -d ","); do
-            sf-client --json node resources \$node --type resources
-          done
-          END
-
-          echo "-----"
-          echo $script
-          echo "-----"
-
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary "$script" | grep "process_cpu_time"
+              debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs'
 
       - name: Gather logs
         if: ${{ ! cancelled() }}
