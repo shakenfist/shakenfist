@@ -492,12 +492,9 @@ class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
 
-        last_worker_count_emitted = 0
         while not self.exit.is_set():
             try:
                 self.reap_workers()
-                if time.time() - last_worker_count_emitted > 10:
-                    last_worker_count_emitted = time.time()
 
                 if not self.exit.is_set():
                     if not self.dequeue_work_item(config.NODE_NAME, handle):
