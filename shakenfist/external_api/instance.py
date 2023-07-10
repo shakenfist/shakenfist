@@ -866,8 +866,13 @@ instance_events_example = """[
 class InstanceEventsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get instance event information.',
-        [('instance_ref', 'query', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+        [
+            ('instance_ref', 'query', 'uuidorname',
+             'The UUID or name of the instance.', True),
+            ('event_type', 'body', 'string', 'The type of event to return.', False),
+            ('limit', 'body', 'integer',
+             'The number of events to return, defaults to 100.', False)
+        ],
         [(200, 'Event information about a single instance.', instance_events_example),
          (404, 'Instance not found.', None)]))
     @api_base.verify_token
@@ -875,9 +880,9 @@ class InstanceEventsEndpoint(sf_api.Resource):
     @api_base.requires_instance_ownership
     @api_base.redirect_to_eventlog_node
     @api_base.log_token_use
-    def get(self, instance_ref=None, instance_from_db=None):
+    def get(self, instance_ref=None, event_type=None, limit=100, instance_from_db=None):
         with eventlog.EventLog('instance', instance_from_db.uuid) as eventdb:
-            return list(eventdb.read_events())
+            return list(eventdb.read_events(limit=limit, event_type=event_type))
 
 
 class InstanceRebootSoftEndpoint(sf_api.Resource):

@@ -485,8 +485,13 @@ artifact_events_example = """[
 class ArtifactEventsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Get artifact event information.',
-        [('artifact_ref', 'query', 'uuidorname',
-          'The UUID or name of the artifact.', True)],
+        [
+            ('artifact_ref', 'query', 'uuidorname',
+             'The UUID or name of the artifact.', True),
+            ('event_type', 'body', 'string', 'The type of event to return.', False),
+            ('limit', 'body', 'integer',
+             'The number of events to return, defaults to 100.', False)
+        ],
         [(200, 'Event information about a single artifact.', artifact_events_example),
          (404, 'Artifact not found.', None)]))
     @api_base.verify_token
@@ -494,9 +499,9 @@ class ArtifactEventsEndpoint(sf_api.Resource):
     @requires_artifact_access
     @api_base.log_token_use
     @api_base.redirect_to_eventlog_node
-    def get(self, artifact_ref=None, artifact_from_db=None):
+    def get(self, artifact_ref=None, event_type=None, limit=100, artifact_from_db=None):
         with eventlog.EventLog('artifact', artifact_from_db.uuid) as eventdb:
-            return list(eventdb.read_events())
+            return list(eventdb.read_events(limit=limit, event_type=event_type))
 
 
 artifact_versions_example = """[

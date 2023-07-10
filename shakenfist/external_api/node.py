@@ -183,16 +183,21 @@ node_events_example = """[
 class NodeEventsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Get nodes event information.',
-        [('node', 'query', 'node', 'The name of a node.', True)],
-        [(200, 'Event information about a single artifact.', node_events_example),
+        [
+            ('node', 'query', 'node', 'The name of a node.', True),
+            ('event_type', 'body', 'string', 'The type of event to return.', False),
+            ('limit', 'body', 'integer',
+             'The number of events to return, defaults to 100.', False)
+        ],
+        [(200, 'Event information about a single node.', node_events_example),
          (404, 'Node not found.', None)]))
     @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.redirect_to_eventlog_node
     @api_base.log_token_use
-    def get(self, node=None):
+    def get(self, node=None, event_type=None, limit=100):
         with eventlog.EventLog('node', node) as eventdb:
-            return list(eventdb.read_events())
+            return list(eventdb.read_events(limit=limit, event_type=event_type))
 
 
 class NodeMetadatasEndpoint(sf_api.Resource):

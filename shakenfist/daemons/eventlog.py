@@ -51,6 +51,8 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         while not self.exit.is_set():
             try:
+                did_work = False
+
                 # Fetch queued events from etcd
                 results = defaultdict(list)
                 for k, v in etcd.get_all('event', None, limit=10000):
@@ -80,7 +82,10 @@ class Monitor(daemon.WorkerPoolDaemon):
                         util_general.ignore_exception(
                             'failed to write event for %s %s' % (objtype, objuuid), e)
 
-                if not results:
+                if results:
+                    did_work = True
+
+                else:
                     # Prune old events
                     if not prune_targets:
                         # Only sweep all databases once a day
@@ -116,10 +121,10 @@ class Monitor(daemon.WorkerPoolDaemon):
                                         'Pruned %d events' % count)
 
                             counters['pruned_sweep'].inc()
+                            did_work = True
 
-                        # Have a nap if pruning was quick
-                        if time.time() - start_prune < 1:
-                            time.sleep(1)
+                if not did_work:
+                    self.exit.wait(10)
 
             except Exception as e:
                 util_general.ignore_exception('eventlog daemon', e)
