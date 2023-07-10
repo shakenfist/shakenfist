@@ -331,7 +331,7 @@ class Monitor(daemon.Daemon):
 
         # Spin reading packets and responding until we see an error or are asked
         # to exit.
-        last_data = 0
+        last_data = time.time()
         try:
             while not self.exit.is_set():
                 for packet in self._await_client():
