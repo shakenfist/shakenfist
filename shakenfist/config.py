@@ -49,7 +49,7 @@ class SFConfig(BaseSettings):
         description='How long we wait for an async operation to complete '
                     'before returning to the user'
     )
-    AUTH_SECRET_SEED: SecretStr = Field(
+    AUTH_SECRET_SEED: str = Field(
         '~~unconfigured~~', description='A random string to seed auth secrets with'
     )
     API_TOKEN_DURATION: int = Field(
@@ -338,7 +338,7 @@ def verify_config(skip_auth_seed=False):
             'at least ETCD_HOST!')
 
     if not skip_auth_seed:
-        if config.AUTH_SECRET_SEED.get_secret_value() == '~~unconfigured~~':
+        if config.AUTH_SECRET_SEED == '~~unconfigured~~':
             raise exceptions.NoAuthSeed(
                 'Shaken Fist is configured incorrectly, you _must_ configure '
                 'at least AUTH_SECRET_SEED!')
