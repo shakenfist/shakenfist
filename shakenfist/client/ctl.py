@@ -29,7 +29,10 @@ if os.path.exists('/etc/sf/config'):
 
             os.environ[key] = value
 
+# We skip verifying the auth seed config setting here because we might be
+# bootstrapping it.
 sf_config = importlib.import_module('shakenfist.config')
+sf_config.verify_config(skip_auth_seed=True)
 config = sf_config.config
 
 # These imports _must_ occur after the extra config setup has run.
@@ -98,6 +101,12 @@ def set_etcd_config(flag, value):
 
 
 @click.command()
+def verify_config():
+    sf_config.verify_config()
+    click.echo('Configuration is ok')
+
+
+@click.command()
 def stop():
     click.echo('Gracefully stopping Shaken Fist on this node...')
     n = Node.from_db(config.NODE_NAME)
@@ -114,4 +123,5 @@ def stop():
 cli.add_command(bootstrap_system_key)
 cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
+cli.add_command(verify_config)
 cli.add_command(stop)

@@ -1,7 +1,7 @@
 # Copyright 2019 Michael Still
 
 from etcd3gw.client import Etcd3Client
-from etcd3gw.exceptions import ConnectionFailedError
+from etcd3gw.exceptions import Etcd3Exception, ConnectionFailedError
 import json
 from pydantic import (
     Field,
@@ -20,17 +20,16 @@ def get_node_name():
 
 def etcd_settings(_settings):
     try:
-        value = Etcd3Client(
-            host='localhost', port=2379, protocol='http', api_path='/v3beta/').get(
-                '/sf/config', metadata=True)
+        value = Etcd3Client().get('/sf/config', metadata=True)
         if value is None or len(value) == 0:
             return {}
         return json.loads(value[0][0])
 
-    except ConnectionFailedError:
+    except (Etcd3Exception, ConnectionFailedError):
         # NOTE(mikal): I'm not sure this is the right approach, as it might cause
         # us to silently ignore config errors. However, I can't just mock this away
-        # in tests because this code runs before the mocking occurs.
+        # in tests because this code runs before the mocking occurs. And yes, the
+        # "not found" exception is really a generic Etcd3Exception.
         return {}
 
 
@@ -51,7 +50,7 @@ class SFConfig(BaseSettings):
                     'before returning to the user'
     )
     AUTH_SECRET_SEED: SecretStr = Field(
-        'foo', description='A random string to seed auth secrets with'
+        '~~unconfigured~~', description='A random string to seed auth secrets with'
     )
     API_TOKEN_DURATION: int = Field(
         15,
@@ -330,7 +329,16 @@ class SFConfig(BaseSettings):
 
 
 config = SFConfig()
-if config.ETCD_HOST == '':
-    raise exceptions.NoEtcd(
-        'Shaken Fist is configured incorrectly, you _must_ configure '
-        'at least ETCD_HOST!')
+
+
+def verify_config(skip_auth_seed=False):
+    if config.ETCD_HOST == '':
+        raise exceptions.NoEtcd(
+            'Shaken Fist is configured incorrectly, you _must_ configure '
+            'at least ETCD_HOST!')
+
+    if not skip_auth_seed:
+        if config.AUTH_SECRET_SEED.get_secret_value() == '~~unconfigured~~':
+            raise exceptions.NoAuthSeed(
+                'Shaken Fist is configured incorrectly, you _must_ configure '
+                'at least AUTH_SECRET_SEED!')

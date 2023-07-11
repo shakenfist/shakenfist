@@ -13,6 +13,7 @@ import subprocess
 import time
 
 from shakenfist.blob import Blob, Blobs, placement_filter
+from shakenfist import config as sf_config
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import shim
@@ -186,6 +187,10 @@ signal.signal(signal.SIGUSR1, propagate_signal)
 
 def main():
     global DAEMON_PROCS
+
+    # This is awkward, but let's verify our configuration before we get any
+    # further.
+    sf_config.verify_config()
 
     LOG.info('Starting...')
     setproctitle.setproctitle(
