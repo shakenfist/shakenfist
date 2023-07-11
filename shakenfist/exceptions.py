@@ -11,14 +11,6 @@ class NoNetworkNode(Exception):
     ...
 
 
-class NoEtcd(Exception):
-    ...
-
-
-class NoAuthSeed(Exception):
-    ...
-
-
 # Objects
 class ObjectException(Exception):
     ...

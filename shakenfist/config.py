@@ -3,15 +3,12 @@
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import Etcd3Exception, ConnectionFailedError
 import json
-from pydantic import (
-    Field,
-    SecretStr,
-    AnyHttpUrl,
-)
+from pydantic import BaseSettings, Field, AnyHttpUrl
 from pydantic_settings import BaseSettings
-import socket
+import os
 
-from shakenfist import exceptions
+import socket
+import sys
 
 
 def get_node_name():
@@ -19,8 +16,13 @@ def get_node_name():
 
 
 def etcd_settings(_settings):
+    if not os.getenv('SHAKENFIST_ETCD_HOST'):
+        return {}
+
     try:
-        value = Etcd3Client().get('/sf/config', metadata=True)
+        value = Etcd3Client(
+            host=os.getenv('SHAKENFIST_ETCD_HOST'), port=2379, protocol='http',
+            api_path='/v3beta/').get('/sf/config', metadata=True)
         if value is None or len(value) == 0:
             return {}
         return json.loads(value[0][0])
@@ -331,14 +333,31 @@ class SFConfig(BaseSettings):
 config = SFConfig()
 
 
+def _config_failure(failures):
+    print('Configuration failed validation!')
+    print()
+    print('Configuration from etcd:')
+    for key, value in etcd_settings(None).items():
+        print('    %s = %s' % (key, value))
+    print()
+    print('Configuration as read:')
+    for key, value in config.dict().items():
+        print('    %s = %s' % (key, value))
+    print()
+    print('Errors:')
+    for failure in failures:
+        print('    * %s' % failure)
+    sys.exit(1)
+
+
 def verify_config(skip_auth_seed=False):
+    failures = []
     if config.ETCD_HOST == '':
-        raise exceptions.NoEtcd(
-            'Shaken Fist is configured incorrectly, you _must_ configure '
-            'at least ETCD_HOST!')
+        failures.append('You must configure ETCD_HOST')
 
     if not skip_auth_seed:
         if config.AUTH_SECRET_SEED == '~~unconfigured~~':
-            raise exceptions.NoAuthSeed(
-                'Shaken Fist is configured incorrectly, you _must_ configure '
-                'at least AUTH_SECRET_SEED!')
+            failures.append('You must configure AUTH_SECRET_SEED!')
+
+    if failures:
+        _config_failure(failures)
