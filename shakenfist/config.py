@@ -3,7 +3,7 @@
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import Etcd3Exception, ConnectionFailedError
 import json
-from pydantic import BaseSettings, Field, AnyHttpUrl
+from pydantic import Field, AnyHttpUrl
 from pydantic_settings import BaseSettings
 import os
 
