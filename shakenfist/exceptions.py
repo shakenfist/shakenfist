@@ -11,10 +11,6 @@ class NoNetworkNode(Exception):
     ...
 
 
-class NoEtcd(Exception):
-    ...
-
-
 # Objects
 class ObjectException(Exception):
     ...

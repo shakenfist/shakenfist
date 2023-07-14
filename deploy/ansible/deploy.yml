@@ -1061,10 +1061,6 @@
             HTTP_PROXY "{{hostvars['localhost']['http_proxy']}}"
       when: "{{hostvars['localhost']['http_proxy']}}"
 
-    - name: Parse back etcd configuration
-      shell: |
-        /srv/shakenfist/venv/bin/sf-ctl show-etcd-config
-
     - name: Log additional config
       debug:
         msg: "{{extra_config}}"
@@ -1074,6 +1070,19 @@
         /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
             "{{item['name']}}" "{{item['value']}}"
       loop: "{{extra_config}}"
+
+    - name: Verify configuration
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl verify-config
+
+    - name: Parse back etcd configuration
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl show-etcd-config
+      register: etcd_config
+
+    - name: Log etcd config
+      debug:
+        msg: "{{etcd_config.stdout}}"
 
 - hosts: hypervisors, network_node, etcd_master, storage
   any_errors_fatal: true

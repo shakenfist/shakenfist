@@ -149,7 +149,8 @@ jobs:
                      "because it is leased to"
                      "not committing online upgrade"
                      "Received a GOAWAY with error code ENHANCE_YOUR_CALM"
-                     "ConnectionFailedError")
+                     "ConnectionFailedError"
+                     "invalid JWT in Authorization header")
           IFS=""
           for forbid in ${FORBIDDEN[*]}
           do
@@ -174,6 +175,13 @@ jobs:
               sf-client instance reboot --hard ${node}
           done
           sleep 30
+
+      - name: Check process CPU usage
+        if: ${{ ! cancelled() }}
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs'
 
       - name: Gather logs
         if: ${{ ! cancelled() }}

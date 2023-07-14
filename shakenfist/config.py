@@ -1,37 +1,41 @@
 # Copyright 2019 Michael Still
 
 from etcd3gw.client import Etcd3Client
-from etcd3gw.exceptions import ConnectionFailedError
+from etcd3gw.exceptions import Etcd3Exception, ConnectionFailedError
 import json
-from pydantic import (
-    Field,
-    SecretStr,
-    AnyHttpUrl,
-)
+from pydantic import Field, AnyHttpUrl
 from pydantic_settings import BaseSettings
-import socket
+import os
 
-from shakenfist import exceptions
+import socket
+import sys
 
 
 def get_node_name():
     return socket.getfqdn()
 
 
-def etcd_settings(_settings):
+def load_etcd_settings():
+    if not os.getenv('SHAKENFIST_ETCD_HOST'):
+        return
+
     try:
         value = Etcd3Client(
-            host='localhost', port=2379, protocol='http', api_path='/v3beta/').get(
-                '/sf/config', metadata=True)
+            host=os.getenv('SHAKENFIST_ETCD_HOST'), port=2379, protocol='http',
+            api_path='/v3beta/').get('/sf/config', metadata=True)
         if value is None or len(value) == 0:
-            return {}
-        return json.loads(value[0][0])
+            return
 
-    except ConnectionFailedError:
+        c = json.loads(value[0][0])
+        for key in c:
+            os.environ['SHAKENFIST_%s' % key] = str(c[key])
+
+    except (Etcd3Exception, ConnectionFailedError):
         # NOTE(mikal): I'm not sure this is the right approach, as it might cause
         # us to silently ignore config errors. However, I can't just mock this away
-        # in tests because this code runs before the mocking occurs.
-        return {}
+        # in tests because this code runs before the mocking occurs. And yes, the
+        # "not found" exception is really a generic Etcd3Exception.
+        return
 
 
 class SFConfig(BaseSettings):
@@ -50,8 +54,8 @@ class SFConfig(BaseSettings):
         description='How long we wait for an async operation to complete '
                     'before returning to the user'
     )
-    AUTH_SECRET_SEED: SecretStr = Field(
-        'foo', description='A random string to seed auth secrets with'
+    AUTH_SECRET_SEED: str = Field(
+        '~~unconfigured~~', description='A random string to seed auth secrets with'
     )
     API_TOKEN_DURATION: int = Field(
         15,
@@ -324,13 +328,32 @@ class SFConfig(BaseSettings):
     class Config:
         env_prefix = 'SHAKENFIST_'
 
-        @classmethod
-        def customise_sources(cls, init_settings, env_settings, file_secret_settings):
-            return init_settings, etcd_settings, env_settings, file_secret_settings
 
-
+load_etcd_settings()
 config = SFConfig()
-if config.ETCD_HOST == '':
-    raise exceptions.NoEtcd(
-        'Shaken Fist is configured incorrectly, you _must_ configure '
-        'at least ETCD_HOST!')
+
+
+def _config_failure(failures):
+    print('Configuration failed validation!')
+    print()
+    print('Configuration as read:')
+    for key, value in config.dict().items():
+        print('    %s = %s' % (key, value))
+    print()
+    print('Errors:')
+    for failure in failures:
+        print('    * %s' % failure)
+    sys.exit(1)
+
+
+def verify_config(skip_auth_seed=False):
+    failures = []
+    if config.ETCD_HOST == '':
+        failures.append('You must configure ETCD_HOST')
+
+    if not skip_auth_seed:
+        if config.AUTH_SECRET_SEED == '~~unconfigured~~':
+            failures.append('You must configure AUTH_SECRET_SEED!')
+
+    if failures:
+        _config_failure(failures)
