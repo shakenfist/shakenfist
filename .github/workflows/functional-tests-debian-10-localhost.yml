@@ -77,7 +77,7 @@ jobs:
 
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary 'sudo chmod ugo+r /etc/sf/sfrc /etc/sf/shakenfist.json /var/log/syslog'
+              debian@$primary 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
 
           count=0
           while [ $count -lt 60 ]
@@ -131,7 +131,7 @@ jobs:
               $source_path/shakenfist \
               debian@$primary:shakenfist
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; sudo pip3 install -r requirements.txt; stestr run --concurrency=3"
+              debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; sudo pip3 install -r requirements.txt; set -e; stestr run --concurrency=3; stestr slowest"
 
       - name: Check logs
         if: ${{ ! cancelled() }}
@@ -197,42 +197,35 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs'
 
+      - name: Fetch and tweak inventory
+        if: ${{ ! cancelled() }}
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary:/etc/sf/inventory.yaml /srv/github/
+          sed -i 's|/root/.ssh|/home/debian/.ssh|g' /srv/github/inventory.yaml
+
+          echo "====="
+          cat /srv/github/inventory.yaml
+
       - name: Gather logs
         if: ${{ ! cancelled() }}
         run: |
           set -x
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
 
-          cd ${GITHUB_WORKSPACE}
-          rm -rf artifacts bundle
-          mkdir -p artifacts bundle
+          # We need the ssh key in the place ansible expects it to be, which isn't
+          # true on the CI worker node.
+          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
+          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
 
-          echo "=============================="
-          for node in $nodes
-          do
-            echo "=== $node ==="
-            safe_node=$(echo $node | tr "-" "_")
-
-            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                debian@${!safe_node} sudo /srv/shakenfist/venv/bin/clingwrap gather \
-                --target /srv/shakenfist/venv/share/clingwrap/shakenfist-ci-failure.cwd --output /tmp/$node.zip
-            scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                debian@${!safe_node}:/tmp/$node.zip bundle/
-
-            mkdir -p bundle/$node
-
-            # We ignore the exit code of unzip, as it will return 1 if a warning is
-            # emitted during expansion, even though expansion worked correctly. For
-            # example stripping a leading / from paths.
-            unzip -q bundle/$node.zip -d bundle/$node/ || true
-            rm bundle/$node.zip
-          done
-
-          zip -rq artifacts/bundle.zip bundle/*
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v3
         if: ${{ ! cancelled() }}
         with:
           name: bundle.zip
-          retention-days: 14
-          path: ${{ github.workspace }}/artifacts/bundle.zip
+          retention-days: 90
+          if-no-files-found: error
+          path: /srv/github/artifacts/bundle.zip
