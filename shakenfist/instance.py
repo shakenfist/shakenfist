@@ -55,7 +55,6 @@ NUMBERS = '0123456789'
 
 def _get_disk_device(bus, index):
     bases = {
-        'ide': ('hd', LETTERS),
         'sata': ('sd', LETTERS),
         'scsi': ('sd', LETTERS),
         'usb': ('sd', LETTERS),
