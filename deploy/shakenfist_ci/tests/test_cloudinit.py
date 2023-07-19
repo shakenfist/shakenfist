@@ -56,11 +56,11 @@ sudo echo 'banana' >  /tmp/output"""
 
         console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('cat /tmp/output')
-        if not out.find('banana'):
+        if out.find('banana') == -1:
             self.fail('User data script did not run!\n\n%s' % out)
 
         out = console.execute('cat /home/cirros/.ssh/authorized_keys')
-        if not out.find('elLwq/bpzBWsg0JjjGvtuuKMM'):
+        if out.find('elLwq/bpzBWsg0JjjGvtuuKMM') == -1:
             self.fail('ssh key was not placed in authorized keys!\n\n%s' % out)
 
     def test_cloudinit_no_tracebacks(self):

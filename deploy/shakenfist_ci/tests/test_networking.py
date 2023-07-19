@@ -81,7 +81,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
         console = base.LoggingSocket(self.test_client, inst1)
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
-        if not out.find('100% packet'):
+        if out.find('100% packet') == -1:
             self.fail('Ping should have failed!\n\n%s' % out)
 
     def test_overlapping_virtual_networks_are_separate(self):
@@ -129,7 +129,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
         console = base.LoggingSocket(self.test_client, inst1)
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
-        if not out.find('100% packet'):
+        if out.find('100% packet') == -1:
             self.fail('Ping should have failed!\n\n%s' % out)
 
     def test_single_virtual_networks_work(self):
@@ -178,12 +178,12 @@ class TestNetworking(base.BaseNamespacedTestCase):
         # Ping the other instance on this network
         console = base.LoggingSocket(self.test_client, inst1)
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
-        if not out.find(' 0% packet'):
+        if out.find(' 0% packet') == -1:
             self.fail('Ping should have worked!\n\n%s' % out)
 
         # Ping google (prove NAT works)
         out = console.execute('ping -c 3 8.8.8.8')
-        if not out.find(' 0% packet'):
+        if out.find(' 0% packet') == -1:
             self.fail('Ping should have worked!\n\n%s' % out)
 
     def test_specific_ip_request(self):
@@ -257,7 +257,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
         console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('ip link')
-        if not out.find('04:ed:33:c0:2e:6c'):
+        if out.find('04:ed:33:c0:2e:6c') == -1:
             self.fail('Requested macaddress not used!\n\n%s' % out)
 
     def test_interface_delete(self):

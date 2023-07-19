@@ -22,5 +22,5 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
 
         console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('df -h')
-        if not out.find('vda'):
+        if out.find('vda') == -1:
             self.fail('Disk is not virtio!\n\n%s' % out)

@@ -52,7 +52,7 @@ echo 'Floating IPs work!' > /var/www/html/index.html
 
         console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('cat /var/www/html/index.html')
-        if not out.find('Floating IPs work!'):
+        if out.find('Floating IPs work!') == -1:
             self.fail('User data script did not run!\n\n%s' % out)
 
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])
