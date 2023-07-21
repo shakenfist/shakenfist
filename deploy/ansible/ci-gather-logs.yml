@@ -1,0 +1,59 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Delete bundle directory
+      file:
+        path: /srv/github/bundle
+        state: absent
+
+    - name: Create artifacts directory
+      file:
+        path: /srv/github/artifacts
+        state: directory
+        mode: u+rwx,g+rwx,o+rwx
+
+- hosts: all
+  gather_facts: yes
+  connection: ssh
+  become: yes
+
+  tasks:
+    - name: Create bundle directory for node
+      file:
+        path: /srv/github/bundle/{{ansible_fqdn}}
+        state: directory
+        mode: u+rw,g+rw,o-rwx
+      delegate_to: localhost
+
+    - name: Run clingwrap on node
+      shell: |
+        /srv/shakenfist/venv/bin/clingwrap gather \
+          --target /srv/shakenfist/venv/share/clingwrap/shakenfist-ci-failure.cwd \
+          --output /tmp/{{ansible_fqdn}}.zip
+
+    - name: Collect clingwrap zip files
+      fetch:
+        src: "/tmp/{{ansible_fqdn}}.zip"
+        dest: /srv/github/{{ansible_fqdn}}.zip
+        flat: yes
+        fail_on_missing: yes
+
+    - name: Extract node zip file
+      shell: |
+        unzip -q /srv/github/{{ansible_fqdn}}.zip -d /srv/github/bundle/{{ansible_fqdn}}/ || true
+        chmod -R ugo+rw /srv/github/
+      delegate_to: localhost
+
+- hosts: localhost
+  gather_facts: no
+  become: yes
+
+  tasks:
+    - name: Zip it all up together
+      shell: |
+        zip -rq /srv/github/artifacts/bundle.zip /srv/github/bundle/*
+        chmod -R ugo+rw /srv/github/
+      delegate_to: localhost
+      run_once: true

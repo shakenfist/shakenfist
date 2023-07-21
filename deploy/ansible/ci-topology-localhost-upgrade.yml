@@ -106,6 +106,14 @@
         src: "{{source_path}}/agent-python/dist/{{hostvars['localhost']['agent_wheel_file']}}"
         dest: "/root/{{hostvars['localhost']['agent_wheel_file']}}"
 
+    - name: Copy ssh key to primary node
+      copy:
+        src: /srv/github/id_ci
+        dest: /root/.ssh/id_rsa
+        owner: root
+        group: root
+        mode: u=r,g=,o=
+
     - name: Write a simple getsf wrapper
       copy:
         content: |
@@ -116,6 +124,9 @@
           export GETSF_LOCAL_SOURCE=static
           export GETSF_NODES=localhost
           export GETSF_WARNING=yes
+
+          export GETSF_SSH_USER="{{base_image_user}}"
+          export GETSF_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
 
           export GETSF_SERVER_PACKAGE="/root/{{hostvars['localhost']['server_wheel_file']}}"
           export GETSF_CLIENT_PACKAGE="/root/{{hostvars['localhost']['client_wheel_file']}}"

@@ -509,13 +509,10 @@ class InstancesEndpoint(sf_api.Resource):
                 }).info('NVRAM template URL converted')
                 nvram_template = blob_uuid
 
-        # Make sure that we are on a compatible machine type if we specify any
-        # IDE attachments.
-        if machine_type == 'q35':
-            for d in disk:
-                if d.get('bus') == 'ide':
-                    return sf_api.error(
-                        400, 'secure boot machine type does not support IDE')
+        # We no longer support IDE.
+        for d in disk:
+            if d.get('bus') == 'ide':
+                return sf_api.error(400, 'IDE disks are no longer supported')
 
         if network:
             for netdesc in network:

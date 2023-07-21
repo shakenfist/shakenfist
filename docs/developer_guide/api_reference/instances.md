@@ -75,7 +75,9 @@ A `diskspec` consists of the following fields as a JSON dictionary:
 * bus (enum): the hardware bus the disk device should be attached to on the instance.
   In general you shouldn't care about this and can omit this value. However, in
   some cases, such as unmodified Microsoft Windows images it is required. The options
-  available here are: ide; sata; scsi; usb; virtio (the default); and nvme.
+  available here are: sata; scsi; usb; virtio (the default); and nvme. While ide
+  was previously supported, that support was removed in v0.7 due to extremely
+  poor performance.
 * type (enum): the type of device. The default is "disk", but in some cases you might
   want "cdrom".
 
