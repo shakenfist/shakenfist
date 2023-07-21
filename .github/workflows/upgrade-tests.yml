@@ -13,7 +13,6 @@ on:
 jobs:
   upgrade-0-6-15:
     runs-on: self-hosted
-    timeout-minutes: 120
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
@@ -80,7 +79,7 @@ jobs:
         run: sleep 300
 
       - name: Check logs
-        if: ${{ ! cancelled() }}
+        if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -137,7 +136,7 @@ jobs:
           fi
 
       - name: Fetch and tweak inventory
-        if: ${{ ! cancelled() }}
+        if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -148,7 +147,7 @@ jobs:
           cat /srv/github/inventory.yaml
 
       - name: Gather logs
-        if: ${{ ! cancelled() }}
+        if: always()
         run: |
           set -x
 
@@ -162,7 +161,7 @@ jobs:
               ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v3
-        if: ${{ ! cancelled() }}
+        if: always()
         with:
           name: bundle.zip
           retention-days: 90
