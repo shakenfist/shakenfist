@@ -19,7 +19,7 @@
         <link rel="next" href="../label/">
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.18">
+      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.19">
     
     
       
@@ -27,7 +27,7 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.26e3688c.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.eebd395e.min.css">
       
         
         <link rel="stylesheet" href="../../../assets/stylesheets/palette.ecc896b0.min.css">
@@ -1250,7 +1250,9 @@ in the OpenAPI interface, so are documented here instead.</p>
 <li>bus (enum): the hardware bus the disk device should be attached to on the instance.
   In general you shouldn't care about this and can omit this value. However, in
   some cases, such as unmodified Microsoft Windows images it is required. The options
-  available here are: ide; sata; scsi; usb; virtio (the default); and nvme.</li>
+  available here are: sata; scsi; usb; virtio (the default); and nvme. While ide
+  was previously supported, that support was removed in v0.7 due to extremely
+  poor performance.</li>
 <li>type (enum): the type of device. The default is "disk", but in some cases you might
   want "cdrom".</li>
 </ul>
