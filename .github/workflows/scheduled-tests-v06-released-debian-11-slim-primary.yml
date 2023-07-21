@@ -8,7 +8,6 @@ on:
 jobs:
   v06-released-debian-11-slim-primary:
     runs-on: self-hosted
-    timeout-minutes: 120
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
@@ -129,6 +128,7 @@ jobs:
           echo ""
 
       - name: Run functional tests
+        timeout-minutes: 120
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -139,7 +139,7 @@ jobs:
               debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; sudo pip3 install -r requirements.txt; set -e; stestr run --concurrency=5; stestr slowest"
 
       - name: Check logs
-        if: ${{ ! cancelled() }}
+        if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -196,14 +196,14 @@ jobs:
           fi
 
       - name: Check process CPU usage
-        if: ${{ ! cancelled() }}
+        if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs'
 
       - name: Fetch and tweak inventory
-        if: ${{ ! cancelled() }}
+        if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -214,7 +214,7 @@ jobs:
           cat /srv/github/inventory.yaml
 
       - name: Gather logs
-        if: ${{ ! cancelled() }}
+        if: always()
         run: |
           set -x
           . ${GITHUB_WORKSPACE}/ci-environment.sh
@@ -231,7 +231,7 @@ jobs:
               ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v3
-        if: ${{ ! cancelled() }}
+        if: always()
         with:
           name: bundle.zip
           retention-days: 90
