@@ -53,7 +53,8 @@
   tasks:
     - name: Zip it all up together
       shell: |
-        zip -rq /srv/github/artifacts/bundle.zip /srv/github/bundle/*
+        cd /srv/github
+        zip -rq artifacts/bundle.zip bundle/*
         chmod -R ugo+rw /srv/github/
       delegate_to: localhost
       run_once: true
