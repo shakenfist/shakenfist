@@ -94,6 +94,7 @@ class Root(sf_api.Resource):
              '<body><h1>Shaken Fist REST API service</h1>'
              '<p>You might be interested in the <a href="/apidocs">apidocs</a>.</p>'
              '<p>Machine searchable API capabilities:</p><ul>'
+             '<li>admin: cluster-cacert</li>'
              '<li>agent-operations: agentoperations-crud</li>'
              '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash</li>'
@@ -114,6 +115,7 @@ class Root(sf_api.Resource):
 api.add_resource(Root, '/')
 
 api.add_resource(api_admin.AdminLocksEndpoint, '/admin/locks')
+api.add_resource(api_admin.AdminClusterCaCertificateEndpoint, '/admin/cacert')
 
 api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_ref>')
 api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')
