@@ -114,10 +114,6 @@ class FlagException(Exception):
 
 
 # Images
-class BadCheckSum(Exception):
-    ...
-
-
 class ImagesCannotShrinkException(Exception):
     ...
 
@@ -199,10 +195,6 @@ class ArtifactException(Exception):
 
 
 class TooManyMatches(ArtifactException):
-    ...
-
-
-class UnknownChecksumType(ArtifactException):
     ...
 
 
