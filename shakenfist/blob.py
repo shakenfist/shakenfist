@@ -227,7 +227,7 @@ class Blob(dbo):
                     continue
 
                 # The blob is deleted
-                disk_blob = Blob.from_db(d['blob_uuid'])
+                disk_blob = Blob.from_db(d['blob_uuid'], suppress_failure_audit=True)
                 if not disk_blob:
                     continue
 
