@@ -21,8 +21,7 @@ from shakenfist import etcd
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS, EVENT_TYPE_MUTATE
 from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent,
-                                   BlobAlreadyBeingTransferred, BadCheckSum,
-                                   BlobTransferSetupFailed, UnknownChecksumType)
+                                   BlobAlreadyBeingTransferred, BlobTransferSetupFailed)
 from shakenfist import instance
 from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
                              inactive_states_filter as node_inactive_states_filter)
@@ -679,8 +678,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     return b
 
 
-def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
-               instance_object=None):
+def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
     fetched = 0
     if resp.headers.get('Content-Length'):
         total_size = int(resp.headers.get('Content-Length'))
@@ -725,19 +723,6 @@ def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
             'Fetching required HTTP resource %s into blob %s, complete'
             % (url, blob_uuid))
     logs.with_fields({'bytes_fetched': fetched}).info('Fetch complete')
-
-    # Verify the downloaded checksum, if we were given one
-    if checksum:
-        if checksum_type == 'md5':
-            calc = md5_hash.hexdigest()
-            correct = calc == checksum
-            logs.with_fields({
-                'calculated': calc,
-                'correct': correct}).info('Image checksum verification')
-            if not correct:
-                raise BadCheckSum('url=%s' % url)
-        else:
-            raise UnknownChecksumType(checksum_type)
 
     # Make the associated blob. Note that we deliberately don't calculate the
     # artifact checksum here, as this makes large snapshots even slower for users.

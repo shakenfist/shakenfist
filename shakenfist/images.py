@@ -29,7 +29,7 @@ VALID_SF_IMAGES = ['centos', 'debian', 'ubuntu']
 def _resolve_image(url):
     # Short cut URLs do not have subdirectories
     if url.find('/') != -1:
-        return url, None, None
+        return url
 
     if url.startswith('cirros'):
         # cirros is a special case as we can't rebuild the images yet
@@ -37,10 +37,9 @@ def _resolve_image(url):
 
     for valid in VALID_SF_IMAGES:
         if url.startswith(valid):
-            return ('%s/%s/latest.qcow2' % (config.IMAGE_DOWNLOAD_URL, url),
-                    None, None)
+            return '%s/%s/latest.qcow2' % (config.IMAGE_DOWNLOAD_URL, url)
 
-    return url, None, None
+    return url
 
 
 def _resolve_cirros(name):
@@ -81,9 +80,9 @@ def _resolve_cirros(name):
     }).info('Image resolved')
 
     if checksum:
-        return url, checksum, 'md5'
+        return url
     else:
-        return url, None, None
+        return url
 
 
 def _fetch_remote_checksum(checksum_url):
@@ -141,7 +140,7 @@ class ImageFetchHelper(object):
         # NOTE(mikal): it is assumed the caller holds a lock on the artifact, and passes
         # it in.
 
-        url, checksum, checksum_type = _resolve_image(self.artifact.source_url)
+        url = _resolve_image(self.artifact.source_url)
 
         # If this is a request for a URL, do we have the most recent version
         # somewhere in the cluster?
@@ -207,8 +206,7 @@ class ImageFetchHelper(object):
             b = self._blob_get(lock, url)
         else:
             self.log.info('Fetching image from the internet')
-            b = self._http_get_inner(lock, url, checksum, checksum_type,
-                                     instance_object=self.instance)
+            b = self._http_get_inner(lock, url, instance_object=self.instance)
 
         return b
 
@@ -320,8 +318,7 @@ class ImageFetchHelper(object):
         b.ensure_local([lock], instance_object=self.instance)
         return b
 
-    def _http_get_inner(self, lock, url, checksum, checksum_type,
-                        instance_object=None):
+    def _http_get_inner(self, lock, url, instance_object=None):
         """Fetch image if not downloaded and return image path."""
 
         with util_general.RecordedOperation('fetch image', self.instance):
@@ -334,8 +331,7 @@ class ImageFetchHelper(object):
 
             try:
                 b = blob.http_fetch(
-                    url, resp, blob_uuid, [lock], self.log, checksum,
-                    checksum_type, instance_object=instance_object)
+                    url, resp, blob_uuid, [lock], self.log, instance_object=instance_object)
             except exceptions.BadCheckSum as e:
                 self.instance.add_event(
                     EVENT_TYPE_AUDIT, 'fetched image had bad checksum')
