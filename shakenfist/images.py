@@ -37,7 +37,7 @@ def _resolve_image(url):
 
     for valid in VALID_SF_IMAGES:
         if url.startswith(valid):
-            return '%s/%s/latest.qcow2' % (config.IMAGE_DOWNLOAD_URL, url)
+            return '%s%s/latest.qcow2' % (config.IMAGE_DOWNLOAD_URL, url)
 
     return url
 
