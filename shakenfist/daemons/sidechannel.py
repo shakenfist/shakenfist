@@ -7,6 +7,7 @@ import signal
 from shakenfist_agent import protocol
 import tempfile
 import time
+from versions_comparison import Comparison
 
 from shakenfist.agentoperation import AgentOperation
 from shakenfist.blob import Blob
@@ -20,6 +21,11 @@ from shakenfist.util import process as util_process
 
 
 LOG, _ = logs.setup(__name__)
+
+
+# This is the minimum version of the in-guest agent that we support. This
+# generally gets bumped when the protocol changes.
+MINIMUM_AGENT_VERSION = '0.3.16'
 
 
 class ConnectionFailed(Exception):
@@ -103,6 +109,7 @@ class Monitor(daemon.Daemon):
     STOPPED_TALKING = 'not ready (unresponsive)'
     AGENT_STARTED = 'not ready (agent startup)'
     AGENT_STOPPED = 'not ready (agent stopped)'
+    AGENT_TOO_OLD = 'not ready (agent too old)'
     AGENT_READY = 'ready'
 
     def __init__(self, name):
@@ -119,11 +126,23 @@ class Monitor(daemon.Daemon):
     def _handle_background_message(self, packet):
         command = packet.get('command')
         if command == 'agent-start':
-            self.instance_ready = self.AGENT_STARTED
-            self.instance.agent_state = self.AGENT_STARTED
             self.instance.agent_start_time = time.time()
             sbt = packet.get('system_boot_time', 0)
             self._record_system_boot_time(sbt)
+
+            agent_version = packet.get('message')
+            if agent_version:
+                self.instance.add_event(
+                    EVENT_TYPE_AUDIT, 'Detected agent version %s' % agent_version)
+                versions = Comparison(agent_version.split(' ')[1], MINIMUM_AGENT_VERSION)
+                lesser = versions.get_lesser()
+                if lesser and lesser == agent_version:
+                    self.instance_ready = self.AGENT_TOO_OLD
+                    self.instance.agent_state = self.AGENT_TOO_OLD
+                    return True
+
+            self.instance_ready = self.AGENT_STARTED
+            self.instance.agent_state = self.AGENT_STARTED
             return True
 
         elif command == 'agent-stop':
@@ -328,6 +347,14 @@ class Monitor(daemon.Daemon):
             return
 
         self.log.debug('Agent has completed startup')
+
+        # If the agent is too old, then just sit here not doing the things we
+        # should be doing
+        if self.instance_ready == self.AGENT_TOO_OLD:
+            self.instance.add_event(
+                EVENT_TYPE_AUDIT, 'Instance agent is too old, not executing commands.')
+            while not self.exit.is_set():
+                time.sleep(1)
 
         # Spin reading packets and responding until we see an error or are asked
         # to exit.

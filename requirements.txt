@@ -52,6 +52,7 @@ setuptools>=65.3.0          # mit
 symbolicmode>=1.0           # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
 pydantic                    # mit
 pydantic-settings           # mit
+version-comparison          # mit
 
 requests>=2.31.0            # apache2
 requests_toolbelt>=1.0.0    # apache2
