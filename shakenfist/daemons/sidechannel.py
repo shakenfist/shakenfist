@@ -10,7 +10,8 @@ import time
 from versions_comparison import Comparison
 
 from shakenfist.agentoperation import AgentOperation
-from shakenfist.blob import Blob
+from shakenfist import blob
+from shakenfist import constants
 from shakenfist.daemons import daemon
 from shakenfist import eventlog
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
@@ -379,11 +380,11 @@ class Monitor(daemon.Daemon):
 
                         for command in commands:
                             if command['command'] == 'put-blob':
-                                b = Blob.from_db(command['blob_uuid'])
+                                b = blob.Blob.from_db(command['blob_uuid'])
                                 if not b:
                                     agentop.error = 'blob missing: %s' % command['blob_uuid']
                                     break
-                                blob_path = Blob.filepath(b.uuid)
+                                blob_path = blob.Blob.filepath(b.uuid)
                                 if not os.path.exists(blob_path):
                                     agentop.error = 'blob file missing: %s' % command['blob_uuid']
                                     break
@@ -461,6 +462,20 @@ class Monitor(daemon.Daemon):
                                     for inpacket in self._await_client():
                                         if (inpacket.get('command') == 'execute-response'
                                                 and inpacket.get('unique') == unique):
+                                            # Convert long stdouts and stderrs to blobs
+                                            if len(inpacket.get('stdout')) > 10 * constants.KiB:
+                                                b = blob.from_memory(
+                                                    inpacket['stdout'].encode('utf-8'))
+                                                b.ref_count_inc(agentop)
+                                                del inpacket['stdout']
+                                                inpacket['stdout_blob'] = b.uuid
+                                            if len(inpacket.get('stderr')) > 10 * constants.KiB:
+                                                b = blob.from_memory(
+                                                    inpacket['stderr'].encode('utf-8'))
+                                                b.ref_count_inc(agentop)
+                                                del inpacket['stderr']
+                                                inpacket['stderr_blob'] = b.uuid
+
                                             agentop.add_result(count, inpacket)
                                             num_results += 1
                                             execute_done = True

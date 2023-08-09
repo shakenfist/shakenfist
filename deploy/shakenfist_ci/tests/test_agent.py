@@ -73,6 +73,14 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
 
         self.assertNotEqual({}, op['results'])
         self.assertEqual(0, op['results']['0']['return-code'])
-        self.assertTrue(op['results']['0']['stdout'].startswith(
+        self.assertFalse('stdout' in op['results']['0'])
+        self.assertTrue('stdout_blob' in op['results']['0'])
+
+        # Fetch the blob containing stdout
+        data = ''
+        for chunk in self.test_client.get_blob_data(op['results']['0']['stdout_blob']):
+            data += chunk.decode('utf-8')
+
+        self.assertTrue(data.startswith(
             '[0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987'))
         self.assertEqual(0, len(op['results']['0']['stderr']))
