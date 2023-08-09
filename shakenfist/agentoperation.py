@@ -92,9 +92,14 @@ class AgentOperation(dbo):
         return db_data.get('results', {})
 
     def add_result(self, index, value):
+        if 'command' in value:
+            del value['command']
+        if 'unique' in value:
+            del value['unique']
+
         with self.get_lock_attr('results', op='add result'):
             results = self.results
-            results[index] = value
+            results[str(index)] = value
             self._db_set_attribute('results', {'results': results})
 
     def delete(self):
