@@ -5,6 +5,7 @@ from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist import blob
 from shakenfist import etcd
 
 
@@ -103,6 +104,12 @@ class AgentOperation(dbo):
             self._db_set_attribute('results', {'results': results})
 
     def delete(self):
+        for result in self._db_get_attribute('results'):
+            for key in result:
+                if key.endswith('_blob'):
+                    b = blob.Blob.from_db(result[key])
+                    b.ref_count_dec(self)
+
         self.state = self.STATE_DELETED
 
 

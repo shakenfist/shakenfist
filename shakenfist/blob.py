@@ -9,6 +9,7 @@ import random
 from shakenfist_utilities import logs, random as sf_random
 import socket
 import time
+import uuid
 
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
@@ -730,6 +731,18 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
     os.rename(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, fetched, resp.headers.get('Last-Modified'),
                  time.time())
+    b.state = Blob.STATE_CREATED
+    b.observe()
+    b.request_replication()
+    return b
+
+
+def from_memory(content):
+    blob_uuid = str(uuid.uuid4())
+    with open(Blob.filepath(blob_uuid), 'wb') as f:
+        f.write(content)
+
+    b = Blob.new(blob_uuid, len(content), time.time(), time.time())
     b.state = Blob.STATE_CREATED
     b.observe()
     b.request_replication()
