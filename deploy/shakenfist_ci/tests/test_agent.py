@@ -9,7 +9,7 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         kwargs['namespace_prefix'] = 'agentfileops'
         super(TestAgentFileOperations, self).__init__(*args, **kwargs)
 
-    def test_put_and_get_file(self):
+    def test_put_and_exec_large_stdout(self):
         # Create an instance to run our script on
         inst = self.test_client.create_instance(
             'test-put-and-get-file', 1, 1024, None,
@@ -83,4 +83,50 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
 
         self.assertTrue(data.startswith(
             '[0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987'))
+        self.assertEqual(0, len(op['results']['0']['stderr']))
+
+    def test_exec_small_stdout(self):
+        # Create an instance to run our script on
+        inst = self.test_client.create_instance(
+            'test-put-and-get-file', 1, 1024, None,
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://upload/system/debian-11',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        # Wait for the instance agent to report in
+        self._await_instance_ready(inst['uuid'])
+
+        # Run a simple command
+        op = self.test_client.instance_execute(inst['uuid'], 'cat /etc/os-release')
+
+        # Wait for the operation to be complete
+        start_time = time.time()
+        while time.time() - start_time < 120:
+            if op['state'] == 'complete':
+                break
+            time.sleep(5)
+            op = self.test_client.get_agent_operation(op['uuid'])
+
+        if op['state'] != 'complete':
+            self.fail('Agent execute operation %s did not complete in 120 seconds (%s)'
+                      % (op['uuid'], op['state']))
+
+        # Wait for the operation to have results
+        start_time = time.time()
+        while time.time() - start_time < 60:
+            if op['results'] != {}:
+                break
+            time.sleep(5)
+            op = self.test_client.get_agent_operation(op['uuid'])
+
+        self.assertNotEqual({}, op['results'])
+        self.assertEqual(0, op['results']['0']['return-code'])
+        self.assertFalse('stdout_blob' in op['results']['0'])
+        self.assertTrue('stdout' in op['results']['0'])
+
+        self.assertTrue(op['results']['0']['stdout'].startswith('PRETTY_NAME='))
         self.assertEqual(0, len(op['results']['0']['stderr']))
