@@ -8,6 +8,7 @@ from shakenfist_agent import protocol
 import tempfile
 import time
 from versions_comparison import Comparison
+import uuid
 
 from shakenfist.agentoperation import AgentOperation
 from shakenfist import blob
@@ -406,6 +407,55 @@ class Monitor(daemon.Daemon):
                                                 'response to put-file command')
                                 agentop.add_result(count, inpacket)
                                 num_results += 1
+
+                            elif command['command'] == 'get-file':
+                                unique = 'agentop:%s:%d' % (agentop.uuid, count)
+                                self.sc_client.send_packet({
+                                    'command': 'get-file',
+                                    'path': command['path'],
+                                    'unique': unique
+                                    })
+                                get_done = False
+                                blob_uuid = str(uuid.uuid4())
+                                blob_path = blob.Blob.filepath(blob_uuid)
+                                stat_result = {}
+                                total_length = 0
+
+                                while not get_done:
+                                    with open(blob_path + '.partial', 'wb') as f:
+                                        for inpacket in self._await_client():
+                                            if (inpacket.get('command') == 'get-file-response'
+                                                    and inpacket.get('unique') == unique):
+                                                if 'stat_result' in inpacket:
+                                                    stat_result = inpacket['stat_result']
+
+                                                if 'chunk' in inpacket:
+                                                    if not inpacket['chunk']:
+                                                        # An empty chunk indicates completion
+                                                        del inpacket['chunk']
+                                                        del inpacket['offset']
+                                                        del inpacket['encoding']
+                                                        inpacket['stat_result'] = stat_result
+                                                        inpacket['content_blob'] = blob_uuid
+
+                                                        agentop.add_result(count, inpacket)
+                                                        num_results += 1
+                                                        get_done = True
+                                                    else:
+                                                        d = base64.b64decode(inpacket['chunk'])
+                                                        total_length += len(d)
+                                                        f.write(d)
+                                            else:
+                                                self.log.with_fields({'packet': inpacket}).error(
+                                                    'Unexpected sidechannel client packet in '
+                                                    'response to get-file command')
+
+                                os.rename(blob_path + '.partial', blob_path)
+                                b = blob.Blob.new(blob_uuid, total_length, time.time(), time.time())
+                                b.ref_count_inc(agentop)
+                                b.state = blob.Blob.STATE_CREATED
+                                b.observe()
+                                b.request_replication()
 
                             elif command['command'] == 'chmod':
                                 unique = 'agentop:%s:%d' % (agentop.uuid, count)
