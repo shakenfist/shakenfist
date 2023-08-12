@@ -281,7 +281,10 @@ class ImageFetchHelper(object):
 
             if (cache_info.get('file format', '') == 'qcow2' and
                     cache_info.get('cluster_size', 0) == cluster_size_as_int):
-                util_general.link(blob_path, cache_path)
+                try:
+                    util_general.link(blob_path, cache_path)
+                except FileExistsError:
+                    ...
             else:
                 with util_general.RecordedOperation('transcode image', self.instance):
                     self.log.with_fields({'blob': b}).info(
