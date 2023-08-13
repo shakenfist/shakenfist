@@ -22,8 +22,8 @@ import uuid
 from shakenfist.artifact import (
     Artifact, Artifacts, UPLOAD_URL, namespace_exact_filter,
     namespace_or_shared_filter)
-from shakenfist.blob import Blob
 from shakenfist import baseobject
+from shakenfist.blob import Blob
 from shakenfist import constants
 from shakenfist.daemons import daemon
 from shakenfist import eventlog
