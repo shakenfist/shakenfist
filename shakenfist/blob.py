@@ -25,6 +25,7 @@ from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobAlreadyBeingTransferred, BlobTransferSetupFailed)
 from shakenfist import instance
 from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
+                             active_states_filter as node_active_states_filter,
                              inactive_states_filter as node_inactive_states_filter)
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import callstack as util_callstack
@@ -505,12 +506,12 @@ class Blob(dbo):
             return total_bytes_received
 
     def request_replication(self, allow_excess=0):
-        absent_nodes = []
-        for n in Nodes([node_inactive_states_filter]):
-            LOG.with_fields({
-                'node': n.fqdn}).info('Node is absent for blob replication')
-            absent_nodes.append(n.fqdn)
-        LOG.info('Found %d inactive nodes' % len(absent_nodes))
+        absent_nodes = list(Nodes([node_inactive_states_filter]))
+        LOG.debug('Found %d inactive nodes' % len(absent_nodes))
+
+        present_nodes = list(Nodes([node_active_states_filter]))
+        present_nodes_len = len(present_nodes)
+        LOG.debug('Found %s active nodes' % present_nodes_len)
 
         # We take current transfers into account when replicating, to avoid
         # over replicating very large blobs
@@ -531,6 +532,15 @@ class Blob(dbo):
             replica_count = len(locations)
             targets = (config.BLOB_REPLICATION_FACTOR + current_transfers +
                        allow_excess - replica_count)
+
+            if (replica_count + current_transfers) == present_nodes_len:
+                self.log.info('Desired replica count is %d, we have %d, and %d inflight, '
+                              'which is equal to the number of present nodes. Therefore '
+                              'not replicating further.'
+                              % (config.BLOB_REPLICATION_FACTOR, replica_count,
+                                 current_transfers))
+                return
+
             self.log.info('Desired replica count is %d, we have %d, and %d inflight, '
                           'excess of %d requested, target is therefore %d new copies'
                           % (config.BLOB_REPLICATION_FACTOR, replica_count,
