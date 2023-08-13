@@ -61,7 +61,7 @@ class Node(dbo):
 
     @classmethod
     def new(cls, name, ip):
-        n = Node.from_db(name)
+        n = Node.from_db(name, suppress_failure_audit=True)
         if n:
             return n
 

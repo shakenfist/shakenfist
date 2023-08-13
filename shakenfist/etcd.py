@@ -90,14 +90,6 @@ def get_etcd_client():
     c = getattr(local, 'sf_etcd_client', None)
     if not c:
         c = local.sf_etcd_client = WrappedEtcdClient()
-
-    # Test the connection
-    try:
-        c.status()
-    except Exception as e:
-        LOG.info('Rebuilding etcd connection due to error on status check: %s' % e)
-        c = local.sf_etcd_client = WrappedEtcdClient()
-
     return c
 
 
