@@ -1,6 +1,10 @@
+from shakenfist_utilities import logs
 import time
 
 from shakenfist import etcd
+
+
+LOG, _ = logs.setup(__name__)
 
 
 def read_object_state_cache(object_type, state):
@@ -36,3 +40,10 @@ def update_object_state_cache(object_type, object_uuid, old_state, new_state):
         c = read_object_state_cache(object_type, new_state)
         c[object_uuid] = time.time()
         etcd.put('cache', object_type, new_state, c)
+
+        LOG.with_fields({
+            'old_state': old_state,
+            'new_state': new_state,
+            'object_type': object_type,
+            'object_uuid': object_uuid
+            }).debug('Updated state cache')
