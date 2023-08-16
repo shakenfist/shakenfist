@@ -100,8 +100,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 # to use the more expensive interfaces_for_instance() method of
                 # looking up instance interfaces here if the instance cachce hasn't
                 # been populated yet (i.e. the instance is still being created)
-                for inst in instance.Instances([instance.this_node_filter,
-                                                instance.healthy_states_filter]):
+                for inst in instance.Instances([instance.this_node_filter], prefilter='healthy'):
                     ifaces = inst.interfaces
                     if not ifaces:
                         ifaces = list(
