@@ -183,15 +183,9 @@ class MockEtcd():
         if metadata:
             inst._db_set_attribute('metadata', metadata)
 
-        state_path = defaultdict(set)
-        for initial, allowed in Instance.state_targets.items():
-            if allowed:
-                for a in allowed:
-                    state_path[a].add(initial)
-
         # We just smash the requested state into the object, we don't attempt
         # to find a valid path to that state.
-        inst._db_set_attribute('state', baseobject.State(set_state, time.time()))
+        inst._state_update(set_state, skip_transition_validation=True)
 
         if place_on_node:
             inst.place_instance(place_on_node)
