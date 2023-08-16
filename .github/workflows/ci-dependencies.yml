@@ -28,13 +28,32 @@ jobs:
           path: shakenfist
           fetch-depth: 0
 
+      - name: Install the github command line
+        run: |
+          sudo apt update
+          sudo apt install curl -y
+
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+          sudo apt update
+          sudo apt install gh -y
+
+      - name: Lookup latest version of the GitHub actions runner
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          actions_url=$(gh release view --repo actions/runner --json assets | \
+              jq -r '.assets[].url | select (contains("linux-x64-2")) | select (test("[0-9].tar.gz$"))')
+          echo "GITHUB_ACTIONS_URL=$actions_url" >> $GITHUB_ENV
+
       - name: Build dependencies image
         run: |
           cd ${GITHUB_WORKSPACE}/shakenfist
           ansible-playbook -i /home/debian/ansible-hosts \
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian \
-              label=ci-images/dependencies" \
+              label=ci-images/dependencies actions_url=$GITHUB_ACTIONS_URL" \
             deploy/ansible/ci-dependencies.yml
 
       - uses: JasonEtco/create-an-issue@v2
