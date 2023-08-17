@@ -3,7 +3,6 @@
   connection: ssh
   vars:
     identifier: unknown
-    source_path: "/home/jenkins/src/shakenfist/"
     base_image: "debian:11"
     base_image_user: "debian"
 
@@ -61,7 +60,7 @@
   gather_facts: yes
   become: true
   vars:
-    source_path: "/home/jenkins/src/shakenfist/"
+    actions_url: ""
 
   tasks:
 
@@ -102,6 +101,10 @@
         - {
             url: "https://images.shakenfist.com/debian:11/latest.qcow2",
             name: "debian:11",
+          }
+        - {
+            url: "{{ actions_url }}",
+            name: "github-actions-runner.tar.gz",
           }
 
     - name: List contents of /srv/ci
