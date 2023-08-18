@@ -457,10 +457,13 @@ class DatabaseBackedObjectIterator(object):
         else:
             raise exceptions.InvalidObjectPrefilter(self.prefilter)
 
-        for state in target_states:
-            for objuuid in cache.read_object_state_cache(
-                    self.base_object.object_type, state):
-                yield objuuid, etcd.get(self.base_object.object_type, None, objuuid)
+        # We fetch all the results in a block here before we yield them, because
+        # if the caller is slow to iterate they can end up with inconsistent
+        # values as objects shift state underneath them (for example an active
+        # instance shifting from created to delete-wait while you're iterating).
+        for objuuid in cache.read_object_state_cache_many(
+                self.base_object.object_type, target_states):
+            yield objuuid, etcd.get(self.base_object.object_type, None, objuuid)
 
     def apply_filters(self, o):
         for f in self.filters:

@@ -1493,6 +1493,7 @@ class Instances(dbo_iter):
         for _, i in self.get_iterator():
             i = Instance(i)
             if not i:
+                LOG.with_fields(i).debug('Object disappeared during iteration')
                 continue
 
             out = self.apply_filters(i)

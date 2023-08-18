@@ -273,12 +273,13 @@ class InstancesEndpoint(sf_api.Resource):
     @api_base.verify_token
     @api_base.log_token_use
     def get(self, all=False):
+        prefilter = None
         filters = [partial(baseobject.namespace_filter, get_jwt_identity()[0])]
         if not all:
-            filters.append(instance.active_states_filter)
+            prefilter = 'active'
 
         retval = []
-        for i in instance.Instances(filters):
+        for i in instance.Instances(filters, prefilter=prefilter):
             retval.append(i.external_view())
         return retval
 

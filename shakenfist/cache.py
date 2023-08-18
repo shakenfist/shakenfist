@@ -14,6 +14,17 @@ def read_object_state_cache(object_type, state):
     return c
 
 
+def read_object_state_cache_many(object_type, states):
+    # Prefilters need a consistent view across several states, so are the only
+    # example of a read which holds a lock.
+    out = []
+    with etcd.get_lock('cache', None, object_type, op='Cache read many'):
+        for state in states:
+            for objuuid in read_object_state_cache(object_type, state):
+                out.append(objuuid)
+    return out
+
+
 def update_object_state_cache(object_type, object_uuid, old_state, new_state):
     with etcd.get_lock('cache', None, object_type, op='Cache update'):
         # We have a special case list of objects in all states
@@ -40,10 +51,3 @@ def update_object_state_cache(object_type, object_uuid, old_state, new_state):
         c = read_object_state_cache(object_type, new_state)
         c[object_uuid] = time.time()
         etcd.put('cache', object_type, new_state, c)
-
-        LOG.with_fields({
-            'old_state': old_state,
-            'new_state': new_state,
-            'object_type': object_type,
-            'object_uuid': object_uuid
-            }).debug('Updated state cache')
