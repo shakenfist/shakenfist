@@ -102,7 +102,7 @@ class Namespace(dbo):
 
     @classmethod
     def new(cls, name):
-        n = Namespace.from_db(name)
+        n = Namespace.from_db(name, suppress_failure_audit=True)
         if n:
             return n
 

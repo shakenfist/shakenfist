@@ -51,7 +51,8 @@ def _read_remote(target, blob_uuid, offset=0):
 def arg_is_blob_uuid(func):
     def wrapper(*args, **kwargs):
         if 'blob_uuid' in kwargs:
-            kwargs['blob_from_db'] = Blob.from_db(kwargs['blob_uuid'])
+            kwargs['blob_from_db'] = Blob.from_db(
+                kwargs['blob_uuid'], suppress_failure_audit=True)
 
         if not kwargs.get('blob_from_db'):
             return sf_api.error(404, 'blob not found')

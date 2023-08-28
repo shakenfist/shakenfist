@@ -394,7 +394,7 @@ class InstancesEndpoint(sf_api.Resource):
 
         # If we are placed, make sure that node exists
         if placed_on:
-            n = Node.from_db(placed_on)
+            n = Node.from_db(placed_on, suppress_failure_audit=True)
             if not n:
                 return sf_api.error(404, 'Specified node does not exist')
             if n.state.value != Node.STATE_CREATED:
