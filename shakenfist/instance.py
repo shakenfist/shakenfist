@@ -1508,9 +1508,6 @@ def placement_filter(node, inst):
 
 this_node_filter = partial(placement_filter, config.NODE_NAME)
 
-
-active_states_filter = partial(baseobject.state_filter, Instance.ACTIVE_STATES)
-
 healthy_states_filter = partial(
     baseobject.state_filter, [Instance.STATE_INITIAL, Instance.STATE_PREFLIGHT,
                               Instance.STATE_CREATING, Instance.STATE_CREATED])
