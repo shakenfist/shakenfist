@@ -1508,14 +1508,10 @@ def placement_filter(node, inst):
 
 this_node_filter = partial(placement_filter, config.NODE_NAME)
 
-healthy_states_filter = partial(
-    baseobject.state_filter, [Instance.STATE_INITIAL, Instance.STATE_PREFLIGHT,
-                              Instance.STATE_CREATING, Instance.STATE_CREATED])
-
 
 # Convenience helpers
 def healthy_instances_on_node(n):
-    return Instances([healthy_states_filter, partial(placement_filter, n.uuid)])
+    return Instances([partial(placement_filter, n.uuid)], prefilter='healthy')
 
 
 def instances_in_namespace(namespace):
