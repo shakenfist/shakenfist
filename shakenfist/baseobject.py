@@ -351,8 +351,7 @@ class DatabaseBackedObject(object):
             return State(None, 0)
         return State(**db_data)
 
-    @state.setter
-    def state(self, new_value):
+    def _state_update(self, new_value, skip_transition_validation=False):
         with self.get_lock_attr('state', 'State update'):
             orig = self.state
 
@@ -372,20 +371,25 @@ class DatabaseBackedObject(object):
                     orig.value, new_value, self.object_type, self.uuid)
 
             # Ensure state change is valid
-            if not self.state_targets:
-                raise exceptions.NoStateTransitionsDefined(
-                    self.object_type)
+            if not skip_transition_validation:
+                if not self.state_targets:
+                    raise exceptions.NoStateTransitionsDefined(
+                        self.object_type)
 
-            if new_value not in self.state_targets.get(orig.value, []):
-                raise exceptions.InvalidStateException(
-                    'Invalid state change from %s to %s for object=%s uuid=%s',
-                    orig.value, new_value, self.object_type, self.uuid)
+                if new_value not in self.state_targets.get(orig.value, []):
+                    raise exceptions.InvalidStateException(
+                        'Invalid state change from %s to %s for object=%s uuid=%s',
+                        orig.value, new_value, self.object_type, self.uuid)
 
             new_state = State(new_value, time.time())
             self._db_set_attribute('state', new_state)
 
             cache.update_object_state_cache(
                 self.object_type, self.uuid, orig.value, new_value)
+
+    @state.setter
+    def state(self, new_value):
+        self._state_update(new_value)
 
     @property
     def error(self):
@@ -436,8 +440,30 @@ class DatabaseBackedObject(object):
 
 
 class DatabaseBackedObjectIterator(object):
-    def __init__(self, filters):
+    def __init__(self, filters, prefilter=None):
         self.filters = filters
+        self.prefilter = prefilter
+
+    def get_iterator(self):
+        if not self.prefilter:
+            for objuuid, objdata in etcd.get_all(self.base_object.object_type, None):
+                yield objuuid, objdata
+            return
+
+        if self.prefilter == 'active':
+            target_states = self.base_object.ACTIVE_STATES
+        elif self.prefilter == 'healthy':
+            target_states = self.base_object.HEALTHY_STATES
+        else:
+            raise exceptions.InvalidObjectPrefilter(self.prefilter)
+
+        # We fetch all the results in a block here before we yield them, because
+        # if the caller is slow to iterate they can end up with inconsistent
+        # values as objects shift state underneath them (for example an active
+        # instance shifting from created to delete-wait while you're iterating).
+        for objuuid in cache.read_object_state_cache_many(
+                self.base_object.object_type, target_states):
+            yield objuuid, etcd.get(self.base_object.object_type, None, objuuid)
 
     def apply_filters(self, o):
         for f in self.filters:

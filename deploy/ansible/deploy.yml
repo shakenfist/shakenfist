@@ -14,7 +14,7 @@
   become: yes
   tags: bootstrap
   vars:
-    ram_system_reservation: 5.0
+    ram_system_reservation: 2.0
     dns_server: 8.8.8.8
     http_proxy:
 
@@ -157,10 +157,6 @@
   connection: ssh
   become: yes
   tags: pki
-  vars:
-    ram_system_reservation: 5.0
-    dns_server: 8.8.8.8
-    http_proxy:
 
   tasks:
     - name: Install CA setup tools

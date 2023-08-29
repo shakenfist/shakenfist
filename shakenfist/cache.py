@@ -1,6 +1,10 @@
+from shakenfist_utilities import logs
 import time
 
 from shakenfist import etcd
+
+
+LOG, _ = logs.setup(__name__)
 
 
 def read_object_state_cache(object_type, state):
@@ -8,6 +12,17 @@ def read_object_state_cache(object_type, state):
     if not c:
         c = {}
     return c
+
+
+def read_object_state_cache_many(object_type, states):
+    # Prefilters need a consistent view across several states, so are the only
+    # example of a read which holds a lock.
+    out = []
+    with etcd.get_lock('cache', None, object_type, op='Cache read many'):
+        for state in states:
+            for objuuid in read_object_state_cache(object_type, state):
+                out.append(objuuid)
+    return out
 
 
 def update_object_state_cache(object_type, object_uuid, old_state, new_state):

@@ -409,8 +409,7 @@ def instance_delete(inst):
 
         # Create list of networks used by all other instances
         host_networks = []
-        for i in instance.Instances([instance.this_node_filter,
-                                     instance.active_states_filter]):
+        for i in instance.Instances([instance.this_node_filter], prefilter='active'):
             if not i.uuid == inst.uuid:
                 for iface_uuid in inst.interfaces:
                     ni = networkinterface.NetworkInterface.from_db(iface_uuid)

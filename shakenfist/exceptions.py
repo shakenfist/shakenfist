@@ -32,6 +32,10 @@ class UpgradeException(ObjectException):
     ...
 
 
+class InvalidObjectPrefilter(ObjectException):
+    ...
+
+
 # Instance
 class InstanceException(Exception):
     ...

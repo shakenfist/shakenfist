@@ -94,6 +94,8 @@ class Instance(dbo):
                      STATE_PREFLIGHT_ERROR, dbo.STATE_CREATING, STATE_CREATING_ERROR,
                      dbo.STATE_CREATED, dbo.STATE_DELETE_WAIT, STATE_CREATED_ERROR,
                      dbo.STATE_ERROR}
+    HEALTHY_STATES = {dbo.STATE_INITIAL, STATE_PREFLIGHT, dbo.STATE_CREATING,
+                      dbo.STATE_CREATED}
 
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
@@ -1485,10 +1487,13 @@ class Instance(dbo):
 
 
 class Instances(dbo_iter):
+    base_object = Instance
+
     def __iter__(self):
-        for _, i in etcd.get_all('instance', None):
+        for _, i in self.get_iterator():
             i = Instance(i)
             if not i:
+                LOG.with_fields(i).debug('Object disappeared during iteration')
                 continue
 
             out = self.apply_filters(i)

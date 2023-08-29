@@ -94,8 +94,7 @@ def restore_instances():
     # Ensure all instances for this node are defined and have up to date data.
     networks = []
     instances = []
-    for inst in instance.Instances([instance.this_node_filter,
-                                    instance.healthy_states_filter]):
+    for inst in instance.Instances([instance.this_node_filter], prefilter='healthy'):
         instance_problems = []
         inst_interfaces = inst.interfaces
         if not inst_interfaces:

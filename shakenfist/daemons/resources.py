@@ -216,12 +216,15 @@ class Monitor(daemon.Daemon):
             me = psutil.Process(os.getpid())
             shim = me.parent()
             for child in shim.children():
-                with child.oneshot():
-                    retval.update(_emit_process_metrics(child))
+                try:
+                    with child.oneshot():
+                        retval.update(_emit_process_metrics(child))
 
-                    for subchild in child.children():
-                        with subchild.oneshot():
-                            retval.update(_emit_process_metrics(subchild))
+                        for subchild in child.children():
+                            with subchild.oneshot():
+                                retval.update(_emit_process_metrics(subchild))
+                except psutil.NoSuchProcess:
+                    ...
 
             if time.time() - self.last_logged_resources > 300:
                 # What package versions do we have?

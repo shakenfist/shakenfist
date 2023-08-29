@@ -106,7 +106,7 @@ class SFConfig(BaseSettings):
                     'memory because of shared pages.'
     )
     RAM_SYSTEM_RESERVATION: float = Field(
-        5.0, description='How much RAM is reserved for the OS'
+        2.0, description='How much RAM is reserved for the OS'
     )
     MINIMUM_FREE_DISK: int = Field(
         20, description='Shaken Fist attempts to leave this amount of disk free'

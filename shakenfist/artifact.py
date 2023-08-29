@@ -1,6 +1,5 @@
 # Copyright 2021 Michael Still
 
-from collections import defaultdict
 from functools import partial
 from shakenfist_utilities import logs
 from uuid import uuid4
@@ -15,7 +14,6 @@ from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_USAGE
 from shakenfist import exceptions
-from shakenfist import instance
 from shakenfist.namespace import namespace_is_trusted
 
 
@@ -205,15 +203,6 @@ class Artifact(dbo):
         a = self.external_view_without_index()
         a.update(self.most_recent_index)
 
-        # Build list of instances for each blob
-        blob_usage = defaultdict(list)
-        for inst in instance.Instances([instance.healthy_states_filter]):
-            # inst.block_devices isn't populated until the instance is created,
-            # so it may not be ready yet. This means we will miss instances
-            # which have been requested but not yet started.
-            for d in inst.block_devices.get('devices', []):
-                blob_usage[d.get('blob_uuid')].append(inst.uuid)
-
         # Insert blob information
         blobs = {}
         for blob_index in self.get_all_indexes():
@@ -224,7 +213,7 @@ class Artifact(dbo):
                 # TODO(andy): Artifacts should not reference non-existent blobs
                 blobs[blob_index['index']] = {
                     'uuid': blob_uuid,
-                    'instances': blob_usage.get(blob_uuid, []),
+                    'instances': b.instances,
                     'size': b.size,
                     'reference_count': b.ref_count,
                     'depends_on': b.depends_on

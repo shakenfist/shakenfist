@@ -209,12 +209,12 @@ class Blob(dbo):
 
     # Derived values
     def _instance_usage(self, node=None):
-        filters = [instance.healthy_states_filter]
+        filters = []
         if node:
             filters.append(partial(instance.placement_filter, node))
 
         instance_uuids = []
-        for inst in instance.Instances(filters):
+        for inst in instance.Instances(filters, prefilter='healthy'):
             # inst.block_devices isn't populated until the instance is created,
             # so it may not be ready yet. This means we will miss instances
             # which have been requested but not yet started.
