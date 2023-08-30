@@ -25,7 +25,7 @@ from shakenfist.exceptions import DeadNetwork, CongestedNetwork, IPManagerMissin
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import networkinterface
-from shakenfist.node import Node, Nodes, active_states_filter as active_nodes
+from shakenfist.node import Node, Nodes
 from shakenfist.tasks import (
     DeployNetworkTask,
     HypervisorDestroyNetworkTask,
@@ -510,7 +510,7 @@ class Network(dbo):
         # Ensure that all hypervisors remove this network. This is really
         # just catching strays, apart from on the network node where we
         # absolutely need to do this thing.
-        for hyp in Nodes([active_nodes]):
+        for hyp in Nodes([], prefilter='active'):
             etcd.enqueue(hyp.uuid,
                          {'tasks': [
                              HypervisorDestroyNetworkTask(self.uuid)

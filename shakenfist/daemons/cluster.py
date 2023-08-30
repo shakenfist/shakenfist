@@ -23,10 +23,7 @@ from shakenfist import instance
 from shakenfist import namespace
 from shakenfist import network
 from shakenfist import networkinterface
-from shakenfist.node import (
-    Node, Nodes,
-    inactive_states_filter as node_inactive_states_filter,
-    nodes_by_free_disk_descending)
+from shakenfist.node import Node, Nodes, nodes_by_free_disk_descending
 from shakenfist.upload import Uploads
 
 
@@ -145,7 +142,7 @@ class Monitor(daemon.Daemon):
             intention='blobs')
 
         absent_nodes = []
-        for n in Nodes([node_inactive_states_filter]):
+        for n in Nodes([], prefilter='inactive'):
             LOG.with_fields({
                 'node': n.fqdn}).info('Node is absent for blob replication')
             absent_nodes.append(n.fqdn)

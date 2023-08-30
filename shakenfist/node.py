@@ -1,9 +1,7 @@
 from collections import defaultdict
-from functools import partial
 from shakenfist_utilities import logs
 import time
 
-from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
@@ -27,6 +25,7 @@ class Node(dbo):
     STATE_STOPPED = 'stopped'
 
     ACTIVE_STATES = {dbo.STATE_CREATED}
+    INACTIVE_STATES = {dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING}
 
     state_targets = {
         None: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING),
@@ -172,8 +171,10 @@ class Node(dbo):
 
 
 class Nodes(dbo_iter):
+    base_object = Node
+
     def __iter__(self):
-        for _, n in etcd.get_all('node', None):
+        for _, n in self.get_iterator():
             uniq = n.get('uuid')
             if not uniq:
                 uniq = n.get('fqdn')
@@ -189,11 +190,6 @@ class Nodes(dbo_iter):
                 yield out
 
 
-active_states_filter = partial(baseobject.state_filter, Node.ACTIVE_STATES)
-inactive_states_filter = partial(
-    baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR, Node.STATE_MISSING])
-
-
 def _sort_by_key(d):
     for k in sorted(d, reverse=True):
         for v in d[k]:
@@ -207,7 +203,7 @@ def nodes_by_free_disk_descending(minimum=0, maximum=-1, intention=None):
     else:
         intention = '_%s' % intention
 
-    for n in Nodes([active_states_filter]):
+    for n in Nodes([], prefilter='active'):
         metrics = etcd.get('metrics', n.fqdn, None)
         if metrics:
             metrics = metrics.get('metrics', {})
