@@ -60,7 +60,6 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
 
 def _process_start_shim(*args):
     etcd.reset_client()
-    LOG.info('Starting %s with args %s' % (args[0], args[1:]))
     args[0](*args[1:])
 
 
