@@ -7,7 +7,6 @@ from shakenfist_utilities import logs
 import signal
 import time
 
-from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -49,7 +48,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
             last_loop = time.time()
             LOG.info('Scanning for stray network interfaces')
-            for n in network.Networks([baseobject.active_states_filter]):
+            for n in network.Networks([], prefilter='active'):
                 try:
                     t = time.time()
                     for ni_uuid in n.networkinterfaces:
@@ -117,7 +116,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                             host_networks.append(ni.network_uuid)
             else:
                 # For network nodes, its all networks
-                for n in network.Networks([baseobject.active_states_filter]):
+                for n in network.Networks([], prefilter='active'):
                     host_networks.append(n.uuid)
 
             # Ensure we are on every network we have a host for
@@ -373,7 +372,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 # Collect floating gateways and floating IPs, while ensuring that
                 # they are correctly reserved on the floating network as well.
                 floating_gateways = []
-                for n in network.Networks([baseobject.active_states_filter]):
+                for n in network.Networks([], prefilter='active'):
                     fg = n.floating_gateway
                     if fg:
                         floating_gateways.append(fg)
@@ -387,7 +386,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 LOG.info('Found floating gateways: %s' % floating_gateways)
 
                 floating_addresses = []
-                for ni in networkinterface.NetworkInterfaces([baseobject.active_states_filter]):
+                for ni in networkinterface.NetworkInterfaces([], prefilter='active'):
                     fa = ni.floating.get('floating_address')
                     if fa:
                         floating_addresses.append(fa)

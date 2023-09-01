@@ -10,8 +10,7 @@ from shakenfist_utilities import logs
 import time
 
 from shakenfist import artifact
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo, active_states_filter)
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobjectmapping import (
     OBJECT_NAMES_TO_CLASSES, OBJECT_NAMES_TO_ITERATORS)
 from shakenfist.blob import Blob, Blobs, placement_filter, all_active_blobs
@@ -320,7 +319,7 @@ class Monitor(daemon.Daemon):
                         ni.delete()
 
                 # Cleanup any blob locations
-                for b in Blobs([active_states_filter, partial(placement_filter, n.fqdn)]):
+                for b in Blobs([partial(placement_filter, n.fqdn)], prefilter='active'):
                     n.add_event(
                         EVENT_TYPE_AUDIT,
                         'deleting blob %s location as hosting node has been deleted' % b.uuid)

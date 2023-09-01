@@ -6,7 +6,6 @@ import time
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
-from shakenfist import etcd
 
 
 LOG, _ = logs.setup(__name__)
@@ -71,8 +70,10 @@ class Upload(dbo):
 
 
 class Uploads(dbo_iter):
+    base_object = Upload
+
     def __iter__(self):
-        for _, u in etcd.get_all('upload', None):
+        for _, u in self.get_iterator():
             u = Upload(u)
             if not u:
                 continue

@@ -13,7 +13,7 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.artifact import Artifact, Artifacts, LABEL_URL, type_filter, url_filter
-from shakenfist.baseobject import active_states_filter, DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import LabelHierarchyTooDeep
@@ -95,9 +95,8 @@ class LabelEndpoint(sf_api.Resource):
     def get(self, label_name=None):
         artifacts = list(Artifacts(filters=[
             partial(type_filter, Artifact.TYPE_LABEL),
-            partial(url_filter, _label_url(label_name)),
-            active_states_filter
-        ]))
+            partial(url_filter, _label_url(label_name))
+        ], prefilter='active'))
         if len(artifacts) == 0:
             sf_api.error(404, 'label %s not found' % label_name)
         return artifacts[0].external_view()
@@ -115,9 +114,8 @@ class LabelEndpoint(sf_api.Resource):
     def delete(self, label_name=None):
         artifacts = list(Artifacts(filters=[
             partial(type_filter, Artifact.TYPE_LABEL),
-            partial(url_filter, _label_url(label_name)),
-            active_states_filter
-        ]))
+            partial(url_filter, _label_url(label_name))
+        ], prefilter='active'))
         if len(artifacts) == 0:
             sf_api.error(404, 'label %s not found' % label_name)
 

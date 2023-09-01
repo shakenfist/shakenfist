@@ -17,7 +17,6 @@ from shakenfist_utilities import api as sf_api
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 
-from shakenfist import baseobject
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist.external_api import base as api_base
@@ -182,7 +181,7 @@ class BlobsEndpoint(sf_api.Resource):
     def get(self, node=None):
         retval = []
 
-        for b in Blobs(filters=[baseobject.active_states_filter]):
+        for b in Blobs(filters=[], prefilter='active'):
             if node and node in b.locations:
                 retval.append(b.external_view())
             else:
@@ -203,7 +202,7 @@ class BlobChecksumsEndpoint(sf_api.Resource):
         if not hash:
             return sf_api.error(400, 'you must specify a hash')
 
-        for b in Blobs(filters=[baseobject.active_states_filter]):
+        for b in Blobs(filters=[], prefilter='active'):
             if b.checksums.get('sha512') == hash:
                 return b.external_view()
 

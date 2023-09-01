@@ -7,8 +7,7 @@ from uuid import uuid4
 from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter,
-    active_states_filter)
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import blob
 from shakenfist.config import config
 from shakenfist import etcd
@@ -346,8 +345,10 @@ class Artifact(dbo):
 
 
 class Artifacts(dbo_iter):
+    base_object = Artifact
+
     def __iter__(self):
-        for _, a in etcd.get_all('artifact', None):
+        for _, a in self.get_iterator():
             a = Artifact(a)
             if not a:
                 continue
@@ -394,5 +395,5 @@ def namespace_or_shared_filter(namespace, o):
 
 
 def artifacts_in_namespace(namespace):
-    return Artifacts([partial(baseobject.namespace_filter, namespace),
-                      active_states_filter])
+    return Artifacts([partial(baseobject.namespace_filter, namespace)],
+                     prefilter='active')

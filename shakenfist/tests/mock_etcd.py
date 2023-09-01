@@ -10,7 +10,6 @@ import json
 import mock
 import time
 
-from shakenfist import baseobject
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
 from shakenfist.network import Network
@@ -226,7 +225,7 @@ class MockEtcd():
 
         # We just smash the requested state into the object, we don't attempt
         # to find a valid path to that state.
-        network._db_set_attribute('state', baseobject.State(set_state, time.time()))
+        network._state_update(set_state, skip_transition_validation=True)
 
         return network
 
@@ -264,6 +263,6 @@ class MockEtcd():
 
         # We just smash the requested state into the object, we don't attempt
         # to find a valid path to that state.
-        net_iface._db_set_attribute('state', baseobject.State(set_state, time.time()))
+        net_iface._state_update(set_state, skip_transition_validation=True)
 
         return net_iface

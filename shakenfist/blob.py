@@ -762,8 +762,10 @@ def from_memory(content):
 
 
 class Blobs(dbo_iter):
+    base_object = Blob
+
     def __iter__(self):
-        for _, b in etcd.get_all('blob', None):
+        for _, b in self.get_iterator():
             b = Blob(b)
             if not b:
                 continue

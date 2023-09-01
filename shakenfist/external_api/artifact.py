@@ -22,7 +22,6 @@ import uuid
 from shakenfist.artifact import (
     Artifact, Artifacts, UPLOAD_URL, namespace_exact_filter,
     namespace_or_shared_filter)
-from shakenfist import baseobject
 from shakenfist.blob import Blob
 from shakenfist import constants
 from shakenfist.daemons import daemon
@@ -247,8 +246,8 @@ class ArtifactsEndpoint(sf_api.Resource):
     def get(self, node=None):
         retval = []
         for a in Artifacts(filters=[
-                baseobject.active_states_filter,
-                partial(namespace_or_shared_filter, get_jwt_identity()[0])]):
+                partial(namespace_or_shared_filter, get_jwt_identity()[0])],
+                prefilter='active'):
             if node:
                 idx = a.most_recent_index
                 if 'blob_uuid' in idx:

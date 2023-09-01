@@ -7,7 +7,6 @@ import time
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
 
-from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
@@ -307,7 +306,7 @@ class Monitor(daemon.Daemon):
             if not config.NODE_IS_NETWORK_NODE:
                 return
 
-            for n in network.Networks([baseobject.active_states_filter]):
+            for n in network.Networks([], prefilter='active'):
                 if not n.provide_nat:
                     continue
                 if n.state.value in [dbo.STATE_DELETED, dbo.STATE_ERROR]:

@@ -4,7 +4,6 @@ from functools import partial
 from shakenfist_utilities import logs
 from uuid import uuid4
 
-from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
@@ -160,8 +159,10 @@ class NetworkInterface(dbo):
 
 
 class NetworkInterfaces(dbo_iter):
+    base_object = NetworkInterface
+
     def __iter__(self):
-        for _, ni in etcd.get_all('networkinterface', None):
+        for _, ni in self.get_iterator():
             ni = NetworkInterface(ni)
             if not ni:
                 continue
@@ -187,8 +188,8 @@ def network_uuid_filter(network_uuid, ni):
 def interfaces_for_instance(instance):
     nis = {}
     loggable_nis = {}
-    for ni in NetworkInterfaces([baseobject.active_states_filter,
-                                 partial(instance_filter, instance)]):
+    for ni in NetworkInterfaces([partial(instance_filter, instance)],
+                                prefilter='active'):
         nis[ni.order] = ni
         loggable_nis[ni.order] = str(ni)
 
