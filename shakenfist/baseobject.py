@@ -88,6 +88,8 @@ class DatabaseBackedObject(object):
 
     ACTIVE_STATES = {STATE_INITIAL, STATE_CREATING, STATE_CREATED, STATE_ERROR,
                      STATE_DELETE_WAIT}
+    HEALTHY_STATES = {STATE_INITIAL, STATE_CREATING, STATE_CREATED}
+    INACTIVE_STATES = {}
 
     def __init__(self, object_uuid, version=None, in_memory_only=False):
         self.__uuid = object_uuid
@@ -452,6 +454,8 @@ class DatabaseBackedObjectIterator(object):
 
         if self.prefilter == 'active':
             target_states = self.base_object.ACTIVE_STATES
+        elif self.prefilter == 'inactive':
+            target_states = self.base_object.INACTIVE_STATES
         elif self.prefilter == 'healthy':
             target_states = self.base_object.HEALTHY_STATES
         else:

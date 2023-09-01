@@ -14,8 +14,7 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import networkinterface
-from shakenfist.node import (
-    Node, Nodes, active_states_filter as node_active_states_filter)
+from shakenfist.node import Node, Nodes
 from shakenfist.util import general as util_general
 
 
@@ -35,7 +34,7 @@ def get_network_node():
     if CACHED_NETWORK_NODE:
         return CACHED_NETWORK_NODE
 
-    for n in Nodes([node_active_states_filter]):
+    for n in Nodes([], prefilter='active'):
         if n.ip == config.NETWORK_NODE_IP:
             CACHED_NETWORK_NODE = n
             return CACHED_NETWORK_NODE
@@ -46,7 +45,7 @@ def get_network_node():
 def get_active_node_metrics():
     metrics = {}
 
-    for n in Nodes([node_active_states_filter]):
+    for n in Nodes([], prefilter='active'):
         try:
             new_metrics = etcd.get('metrics', n.uuid, None)
             if new_metrics:

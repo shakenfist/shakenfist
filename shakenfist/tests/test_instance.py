@@ -558,13 +558,6 @@ class InstancesTestCase(base.ShakenFistTestCase):
 
         self.assertEqual([], uuids)
 
-    def test_state_filter_active(self):
-        uuids = []
-        for i in instance.Instances([instance.active_states_filter]):
-            uuids.append(i.uuid)
-
-        self.assertEqual(['b078cb4e-857c-4f04-b011-751742ef5817'], uuids)
-
     def test_namespace_filter(self):
         uuids = []
         for i in instance.Instances([partial(baseobject.namespace_filter, 'gerkin')]):

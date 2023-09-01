@@ -22,6 +22,9 @@ def read_object_state_cache_many(object_type, states):
         for state in states:
             for objuuid in read_object_state_cache(object_type, state):
                 out.append(objuuid)
+    LOG.with_fields({
+        'out': out,
+        'states': states}).debug('Cache read many returns')
     return out
 
 

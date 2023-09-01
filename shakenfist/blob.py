@@ -24,9 +24,7 @@ from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent,
                                    BlobAlreadyBeingTransferred, BlobTransferSetupFailed)
 from shakenfist import instance
-from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
-                             active_states_filter as node_active_states_filter,
-                             inactive_states_filter as node_inactive_states_filter)
+from shakenfist.node import Node, Nodes, nodes_by_free_disk_descending
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
@@ -409,8 +407,12 @@ class Blob(dbo):
             previous_percentage = 0
 
             locations = self.locations
-            for n in Nodes([node_inactive_states_filter]):
+            for n in Nodes([], prefilter='inactive'):
                 if n.uuid in locations:
+                    LOG.with_fields({
+                        'node': n,
+                        'state': n.state.value}).debug(
+                        'Node is inactive, ignoring blob location')
                     locations.remove(n.uuid)
             if len(locations) == 0:
                 raise BlobMissing('There are no online sources for this blob')
@@ -506,10 +508,10 @@ class Blob(dbo):
             return total_bytes_received
 
     def request_replication(self, allow_excess=0):
-        absent_nodes = list(Nodes([node_inactive_states_filter]))
+        absent_nodes = list(Nodes([], prefilter='inactive'))
         LOG.debug('Found %d inactive nodes' % len(absent_nodes))
 
-        present_nodes = list(Nodes([node_active_states_filter]))
+        present_nodes = list(Nodes([], prefilter='active'))
         present_nodes_len = len(present_nodes)
         LOG.debug('Found %s active nodes' % present_nodes_len)
 
