@@ -386,8 +386,9 @@ class DatabaseBackedObject(object):
             new_state = State(new_value, time.time())
             self._db_set_attribute('state', new_state)
 
-            cache.update_object_state_cache(
-                self.object_type, self.uuid, orig.value, new_value)
+            if not self.__in_memory_only:
+                cache.update_object_state_cache(
+                    self.object_type, self.uuid, orig.value, new_value)
 
     @state.setter
     def state(self, new_value):
