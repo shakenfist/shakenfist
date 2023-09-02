@@ -85,3 +85,17 @@ class AgentOperationEndpoint(sf_api.Resource):
     def delete(self, operation_uuid=None, operation_from_db=None):
         operation_from_db.delete()
         return operation_from_db.external_view()
+
+
+class InstanceAgentOperationEndpoint(sf_api.Resource):
+    @api_base.verify_token
+    @api_base.arg_is_instance_ref
+    @api_base.requires_instance_ownership
+    @api_base.log_token_use
+    def get(self, instance_ref=None, instance_from_db=None):
+        out = []
+        for agentop_uuid in instance_from_db.agent_operations:
+            aop = AgentOperation.from_db(agentop_uuid)
+            if aop:
+                out.append(aop.external_view())
+        return out

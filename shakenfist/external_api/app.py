@@ -95,7 +95,7 @@ class Root(sf_api.Resource):
              '<p>You might be interested in the <a href="/apidocs">apidocs</a>.</p>'
              '<p>Machine searchable API capabilities:</p><ul>'
              '<li>admin: cluster-cacert</li>'
-             '<li>agent-operations: agentoperations-crud</li>'
+             '<li>agent-operations: agentoperations-crud, instance-agentoperations</li>'
              '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash</li>'
              '<li>events: events-by-type</li>'
@@ -171,6 +171,8 @@ api.add_resource(api_instance.InstanceInterfacesEndpoint,
                  '/instances/<instance_ref>/interfaces')
 api.add_resource(api_snapshot.InstanceSnapshotEndpoint,
                  '/instances/<instance_ref>/snapshot')
+api.add_resource(api_agentoperation.InstanceAgentOperationEndpoint,
+                 '/instances/<instance_ref>/agentoperation')
 api.add_resource(api_instance.InstanceRebootSoftEndpoint,
                  '/instances/<instance_ref>/rebootsoft')
 api.add_resource(api_instance.InstanceRebootHardEndpoint,
