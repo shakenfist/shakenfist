@@ -1448,6 +1448,10 @@ class Instance(dbo):
                 EVENT_TYPE_AUDIT,
                 'the console log for this instance was not archived as it was empty')
 
+    @property
+    def agent_operations(self):
+        return self._db_get_attribute('agent_operations')
+
     def agent_operation_dequeue(self):
         with self.get_lock_attr('agent_operations', 'Dequeue agent operation'):
             db_data = self._db_get_attribute('agent_operations')
