@@ -330,7 +330,7 @@ class Monitor(daemon.Daemon):
 
         for blob_uuid in n.blobs:
             if not os.path.exists(Blob.filepath(blob_uuid)):
-                b = Blob.from_db(blob_uuid)
+                b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
                 if b:
                     LOG.with_fields({
                         'blob': blob_uuid}).warning('Blob missing from node')
