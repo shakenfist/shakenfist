@@ -106,6 +106,10 @@
             url: "{{ actions_url }}",
             name: "github-actions-runner.tar.gz",
           }
+        - {
+            url: "https://sfcbr.shakenfist.com/backup-0.6.15-20230319",
+            name: "backup-0.6.15-20230319",
+          }
 
     - name: List contents of /srv/ci
       shell: ls -lrth /srv/ci
