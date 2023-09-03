@@ -1,5 +1,6 @@
 # Copyright 2019 Michael Still
 
+from collections import defaultdict
 import faulthandler
 from functools import partial
 import json
@@ -12,7 +13,9 @@ import signal
 import subprocess
 import time
 
+from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_ITERATORS
 from shakenfist.blob import Blob, Blobs, placement_filter
+from shakenfist import cache
 from shakenfist import config as sf_config
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -204,6 +207,23 @@ def main():
         LOG.info('Configuration item %s = %s' % (key, value))
 
     daemon.set_log_level(LOG, 'main')
+
+    # Ensure we have a consistent cache of object states if the cache is entirely
+    # absent.
+    with etcd.get_lock('cache-upgrade', None, None, op='Cache upgrade'):
+        cache_version = etcd.get_raw('/sf/cache/_version')
+        if not cache_version:
+            cache_version = {'version': 0}
+
+        if cache_version['version'] != 1:
+            for obj_type in OBJECT_NAMES_TO_ITERATORS:
+                by_state = defaultdict(list)
+                for obj in OBJECT_NAMES_TO_ITERATORS[obj_type]([]):
+                    by_state[obj.state.value].append(obj.uuid)
+                for state in by_state:
+                    cache.clobber_object_state_cache(obj_type, state, by_state[state])
+            cache_version['version'] = 1
+            etcd.put_raw('/sf/cache/_version', cache_version)
 
     # Check in early and often, also reset processing queue items.
     etcd.clear_stale_locks()

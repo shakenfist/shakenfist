@@ -54,3 +54,8 @@ def update_object_state_cache(object_type, object_uuid, old_state, new_state):
         c = read_object_state_cache(object_type, new_state)
         c[object_uuid] = time.time()
         etcd.put('cache', object_type, new_state, c)
+
+
+def clobber_object_state_cache(object_type, state, object_uuids):
+    with etcd.get_lock('cache', None, object_type, op='Cache clobber'):
+        etcd.put('cache', object_type, state, object_uuids)
