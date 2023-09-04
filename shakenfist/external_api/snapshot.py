@@ -16,6 +16,7 @@ from shakenfist import blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
+from shakenfist.instance import instance_usage_for_blob_uuid
 
 LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
@@ -52,6 +53,7 @@ class InstanceSnapshotEndpoint(sf_api.Resource):
 
                 bout = b.external_view()
                 bout['blob_uuid'] = bout['uuid']
+                bout['instances'] = instance_usage_for_blob_uuid(b.uuid)
                 del bout['uuid']
 
                 # Merge it with the parent artifact

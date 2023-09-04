@@ -153,7 +153,8 @@ class Monitor(daemon.Daemon):
             absent_nodes=absent_nodes)
 
         for b in Blobs([], prefilter='active'):
-            if b.instances:
+            instances = instance.instance_usage_for_blob_uuid(b.uuid)
+            if instances:
                 in_use_blobs[b.uuid] += 1
 
             # If there is current work for a blob, we ignore it until that
@@ -190,7 +191,7 @@ class Monitor(daemon.Daemon):
                 excess_locations = b.locations
                 in_use_locations = []
 
-                for instance_uuid in b.instances:
+                for instance_uuid in instances:
                     i = instance.Instance.from_db(instance_uuid)
                     node = i.placement.get('node')
                     if node in excess_locations:

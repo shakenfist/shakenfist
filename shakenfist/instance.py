@@ -1,5 +1,9 @@
 # Copyright 2019 Michael Still
 
+# Please note: instances are a "compositional" baseobject type, which means
+# part of their role is to combine foundational baseobjects into something more
+# useful.
+
 import base64
 from collections import defaultdict
 from functools import partial
@@ -1522,3 +1526,37 @@ def all_instances():
         i = Instance.from_db(object_uuid)
         if i:
             yield i
+
+
+def instance_usage_for_blob_uuid(blob_uuid, node=None):
+    filters = []
+    if node:
+        filters.append(partial(placement_filter, node))
+
+    instance_uuids = []
+    for inst in Instances(filters, prefilter='healthy'):
+        # inst.block_devices isn't populated until the instance is created,
+        # so it may not be ready yet. This means we will miss instances
+        # which have been requested but not yet started.
+        for d in inst.block_devices.get('devices', []):
+            if 'blob_uuid' not in d:
+                continue
+
+            # This blob is in direct use
+            if d['blob_uuid'] == blob_uuid:
+                instance_uuids.append(inst.uuid)
+                continue
+
+            # The blob is deleted
+            disk_blob = blob.Blob.from_db(d['blob_uuid'], suppress_failure_audit=True)
+            if not disk_blob:
+                continue
+
+            # Recurse for dependencies
+            while disk_blob.depends_on:
+                disk_blob = blob.Blob.from_db(disk_blob.depends_on)
+                if disk_blob and disk_blob.uuid == blob_uuid:
+                    instance_uuids.append(inst.uuid)
+                    break
+
+    return instance_uuids

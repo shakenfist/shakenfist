@@ -20,6 +20,7 @@ from webargs.flaskparser import use_kwargs
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist.external_api import base as api_base
+from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
 from shakenfist.util import general as util_general
 
@@ -204,7 +205,9 @@ class BlobChecksumsEndpoint(sf_api.Resource):
 
         for b in Blobs(filters=[], prefilter='active'):
             if b.checksums.get('sha512') == hash:
-                return b.external_view()
+                out = b.external_view()
+                out['instances'] = instance_usage_for_blob_uuid(b.uuid)
+                return out
 
         return None
 

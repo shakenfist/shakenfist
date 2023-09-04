@@ -236,7 +236,7 @@ class Monitor(daemon.Daemon):
         os.makedirs(cache_path, exist_ok=True)
 
         active_blob_uuids = []
-        for b in Blobs([], prefilters='active'):
+        for b in Blobs([], prefilter='active'):
             active_blob_uuids.append(b.uuid)
         n = node.Node.from_db(config.NODE_NAME)
         all_node_blobs = n.blobs
@@ -307,7 +307,8 @@ class Monitor(daemon.Daemon):
                     os.unlink(entpath)
                     continue
 
-                this_node = len(b.instances_on_this_node)
+                this_node = len(instance.instance_usage_for_blob_uuid(
+                    b.uuid, node=config.NODE_NAME))
                 LOG.with_fields(
                     {
                         'blob': blob_uuid,

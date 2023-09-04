@@ -18,6 +18,7 @@ from shakenfist.blob import Blob
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import LabelHierarchyTooDeep
 from shakenfist.external_api import base as api_base
+from shakenfist.instance import instance_usage_for_blob_uuid
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -80,6 +81,9 @@ class LabelEndpoint(sf_api.Resource):
                               create_if_new=True)
         a.add_index(blob_uuid)
         a.state = dbo.STATE_CREATED
+
+        # NOTE(mikal): no need to mix instances in here, the artifact is brand
+        # new
         return a.external_view()
 
     @swag_from(api_base.swagger_helper(
@@ -125,4 +129,6 @@ class LabelEndpoint(sf_api.Resource):
                 b = Blob.from_db(blob_index['blob_uuid'])
                 b.ref_count_dec(a)
 
-        return a.external_view()
+        ev = a.external_view()
+        ev['instances']: instance_usage_for_blob_uuid(b.uuid)
+        return ev

@@ -212,7 +212,6 @@ class Artifact(dbo):
                 # TODO(andy): Artifacts should not reference non-existent blobs
                 blobs[blob_index['index']] = {
                     'uuid': blob_uuid,
-                    'instances': b.instances,
                     'size': b.size,
                     'reference_count': b.ref_count,
                     'depends_on': b.depends_on
@@ -301,7 +300,7 @@ class Artifact(dbo):
     def del_index(self, index, update_billing=True):
         index_data = self._db_get_attribute('index_%012d' % index)
         if not index_data:
-            self.log.withField('index', index).warn('Cannot find index in DB')
+            self.log.with_fields({'index': index}).warn('Cannot find index in DB')
             return
 
         self._db_delete_attribute('index_%012d' % index)
