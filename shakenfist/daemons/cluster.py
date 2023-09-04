@@ -13,7 +13,7 @@ from shakenfist import artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobjectmapping import (
     OBJECT_NAMES_TO_CLASSES, OBJECT_NAMES_TO_ITERATORS)
-from shakenfist.blob import Blob, Blobs, placement_filter, all_active_blobs
+from shakenfist.blob import Blob, Blobs, placement_filter
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -54,7 +54,7 @@ class Monitor(daemon.Daemon):
         # Recompute our cache of what blobs are on what nodes every 30 minutes
         if time.time() - last_loop_run > 1800:
             per_node = defaultdict(list)
-            for b in all_active_blobs():
+            for b in Blobs([], prefilter='active'):
                 if not b.locations:
                     b.add_event(EVENT_TYPE_AUDIT, 'No locations for this blob, hard deleting.')
                     b.hard_delete()
@@ -152,7 +152,7 @@ class Monitor(daemon.Daemon):
         current_fetches = etcd.get_current_blob_transfers(
             absent_nodes=absent_nodes)
 
-        for b in all_active_blobs():
+        for b in Blobs([], prefilter='active'):
             if b.instances:
                 in_use_blobs[b.uuid] += 1
 
@@ -232,7 +232,7 @@ class Monitor(daemon.Daemon):
         self.lock.refresh()
 
         # Find expired blobs
-        for b in all_active_blobs():
+        for b in Blobs([], prefilter='active'):
             if b.expires_at > 0 and b.expires_at < time.time():
                 b.add_event(EVENT_TYPE_AUDIT, 'blob has expired')
                 b.state = dbo.STATE_DELETED
@@ -272,7 +272,7 @@ class Monitor(daemon.Daemon):
         self.lock.refresh()
 
         # Find transcodes of not recently used blobs and reap them
-        for b in all_active_blobs():
+        for b in Blobs([], prefilter='active'):
             if not b.transcoded:
                 continue
 
@@ -384,7 +384,7 @@ class Monitor(daemon.Daemon):
 
             # Infrequently ensure we have no blobs with a reference count of zero
             orphan_blobs = []
-            for b in all_active_blobs():
+            for b in Blobs([], prefilter='active'):
                 if b.ref_count == 0:
                     orphan_blobs.append(b)
 
