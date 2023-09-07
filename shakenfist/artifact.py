@@ -7,8 +7,7 @@ from uuid import uuid4
 from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter,
-    active_states_filter)
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import blob
 from shakenfist.config import config
 from shakenfist import etcd
@@ -213,7 +212,6 @@ class Artifact(dbo):
                 # TODO(andy): Artifacts should not reference non-existent blobs
                 blobs[blob_index['index']] = {
                     'uuid': blob_uuid,
-                    'instances': b.instances,
                     'size': b.size,
                     'reference_count': b.ref_count,
                     'depends_on': b.depends_on
@@ -302,7 +300,7 @@ class Artifact(dbo):
     def del_index(self, index, update_billing=True):
         index_data = self._db_get_attribute('index_%012d' % index)
         if not index_data:
-            self.log.withField('index', index).warn('Cannot find index in DB')
+            self.log.with_fields({'index': index}).warn('Cannot find index in DB')
             return
 
         self._db_delete_attribute('index_%012d' % index)
@@ -346,8 +344,10 @@ class Artifact(dbo):
 
 
 class Artifacts(dbo_iter):
+    base_object = Artifact
+
     def __iter__(self):
-        for _, a in etcd.get_all('artifact', None):
+        for _, a in self.get_iterator():
             a = Artifact(a)
             if not a:
                 continue
@@ -394,5 +394,5 @@ def namespace_or_shared_filter(namespace, o):
 
 
 def artifacts_in_namespace(namespace):
-    return Artifacts([partial(baseobject.namespace_filter, namespace),
-                      active_states_filter])
+    return Artifacts([partial(baseobject.namespace_filter, namespace)],
+                     prefilter='active')

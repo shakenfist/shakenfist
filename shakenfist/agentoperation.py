@@ -1,12 +1,9 @@
-from functools import partial
 from shakenfist_utilities import logs
 
-from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import blob
-from shakenfist import etcd
 
 
 LOG, _ = logs.setup(__name__)
@@ -114,8 +111,10 @@ class AgentOperation(dbo):
 
 
 class AgentOperations(dbo_iter):
+    base_object = AgentOperation
+
     def __iter__(self):
-        for _, o in etcd.get_all('agentoperation', None):
+        for _, o in self.get_iterator():
             operation_uuid = o.get('uuid')
             o = AgentOperation.from_db(operation_uuid)
             if not o:
@@ -124,9 +123,6 @@ class AgentOperations(dbo_iter):
             out = self.apply_filters(o)
             if out:
                 yield out
-
-
-active_states_filter = partial(baseobject.state_filter, AgentOperation.ACTIVE_STATES)
 
 
 def instance_filter(instance, o):

@@ -1,10 +1,14 @@
 # Copyright 2021 Michael Still
 
-from functools import partial
+# Please note: blobs are a "foundational" baseobject type, which means they
+# should not rely on any other baseobjects for their implementation. This is
+# done to help minimize circular import problems.
+
 import hashlib
 import magic
 import numbers
 import os
+import psutil
 import random
 from shakenfist_utilities import logs, random as sf_random
 import socket
@@ -14,7 +18,6 @@ import uuid
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
-from shakenfist import cache
 from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
@@ -23,7 +26,6 @@ from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS, EVENT_TYPE_
 from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent,
                                    BlobAlreadyBeingTransferred, BlobTransferSetupFailed)
-from shakenfist import instance
 from shakenfist.node import Node, Nodes, nodes_by_free_disk_descending
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import callstack as util_callstack
@@ -124,13 +126,9 @@ class Blob(dbo):
             'transcodes': self.transcoded,
             'locations': self.locations,
             'reference_count': self.ref_count,
-            'sha512': self.checksums.get('sha512')
+            'sha512': self.checksums.get('sha512'),
+            'last_used': self.last_used
         })
-
-        # The order of these two calls matters, as instances updates last_used
-        # if there are instances using the blob
-        out['instances'] = self.instances
-        out['last_used'] = self.last_used
 
         out.update(self.info)
         return out
@@ -204,48 +202,6 @@ class Blob(dbo):
 
     def set_lifetime(self, seconds_from_now):
         self._db_set_attribute('retention', {'expires_at': time.time() + seconds_from_now})
-
-    # Derived values
-    def _instance_usage(self, node=None):
-        filters = []
-        if node:
-            filters.append(partial(instance.placement_filter, node))
-
-        instance_uuids = []
-        for inst in instance.Instances(filters, prefilter='healthy'):
-            # inst.block_devices isn't populated until the instance is created,
-            # so it may not be ready yet. This means we will miss instances
-            # which have been requested but not yet started.
-            for d in inst.block_devices.get('devices', []):
-                if 'blob_uuid' not in d:
-                    continue
-
-                # This blob is in direct use
-                if d['blob_uuid'] == self.uuid:
-                    instance_uuids.append(inst.uuid)
-                    continue
-
-                # The blob is deleted
-                disk_blob = Blob.from_db(d['blob_uuid'], suppress_failure_audit=True)
-                if not disk_blob:
-                    continue
-
-                # Recurse for dependencies
-                while disk_blob.depends_on:
-                    disk_blob = Blob.from_db(disk_blob.depends_on)
-                    if disk_blob and disk_blob.uuid == self.uuid:
-                        instance_uuids.append(inst.uuid)
-                        break
-
-        return instance_uuids
-
-    @property
-    def instances(self):
-        return self._instance_usage()
-
-    @property
-    def instances_on_this_node(self):
-        return self._instance_usage(node=config.NODE_NAME)
 
     # Operations
     def add_node_location(self):
@@ -589,7 +545,20 @@ class Blob(dbo):
                 'remove blob replica %s' % msg)
             return
 
-        if len(self.instances_on_this_node) == 0:
+        # NOTE(mikal): we specifically don't lookup instance records in etcd here
+        # for two reasons -- we don't want to depend on a "higher level object",
+        # but also because it wouldn't cover instances that had somehow escaped
+        # tracking. Instead, we build our own `lsof` instead!
+        blob_path = Blob.filepath(self.uuid)
+        users = 0
+        for pid in psutil.pids():
+            p = psutil.Process(pid)
+            for f in p.get_open_files():
+                if f.path.startswith(blob_path):
+                    users += 1
+                    self.log.warning('Process %d is using blob' % pid)
+
+        if users == 0:
             blob_path = Blob.filepath(self.uuid)
             if os.path.exists(blob_path):
                 os.unlink(blob_path)
@@ -762,8 +731,10 @@ def from_memory(content):
 
 
 class Blobs(dbo_iter):
+    base_object = Blob
+
     def __iter__(self):
-        for _, b in etcd.get_all('blob', None):
+        for _, b in self.get_iterator():
             b = Blob(b)
             if not b:
                 continue
@@ -775,16 +746,3 @@ class Blobs(dbo_iter):
 
 def placement_filter(node, b):
     return node in b.locations
-
-
-def all_active_blob_uuids():
-    for active_state in Blob.ACTIVE_STATES:
-        for object_uuid in cache.read_object_state_cache(Blob.object_type, active_state):
-            yield object_uuid
-
-
-def all_active_blobs():
-    for blob_uuid in all_active_blob_uuids():
-        b = Blob.from_db(blob_uuid)
-        if b:
-            yield b

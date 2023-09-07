@@ -13,11 +13,12 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.artifact import Artifact, Artifacts, LABEL_URL, type_filter, url_filter
-from shakenfist.baseobject import active_states_filter, DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import LabelHierarchyTooDeep
 from shakenfist.external_api import base as api_base
+from shakenfist.instance import instance_usage_for_blob_uuid
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -80,6 +81,9 @@ class LabelEndpoint(sf_api.Resource):
                               create_if_new=True)
         a.add_index(blob_uuid)
         a.state = dbo.STATE_CREATED
+
+        # NOTE(mikal): no need to mix instances in here, the artifact is brand
+        # new
         return a.external_view()
 
     @swag_from(api_base.swagger_helper(
@@ -95,9 +99,8 @@ class LabelEndpoint(sf_api.Resource):
     def get(self, label_name=None):
         artifacts = list(Artifacts(filters=[
             partial(type_filter, Artifact.TYPE_LABEL),
-            partial(url_filter, _label_url(label_name)),
-            active_states_filter
-        ]))
+            partial(url_filter, _label_url(label_name))
+        ], prefilter='active'))
         if len(artifacts) == 0:
             sf_api.error(404, 'label %s not found' % label_name)
         return artifacts[0].external_view()
@@ -115,9 +118,8 @@ class LabelEndpoint(sf_api.Resource):
     def delete(self, label_name=None):
         artifacts = list(Artifacts(filters=[
             partial(type_filter, Artifact.TYPE_LABEL),
-            partial(url_filter, _label_url(label_name)),
-            active_states_filter
-        ]))
+            partial(url_filter, _label_url(label_name))
+        ], prefilter='active'))
         if len(artifacts) == 0:
             sf_api.error(404, 'label %s not found' % label_name)
 
@@ -127,4 +129,6 @@ class LabelEndpoint(sf_api.Resource):
                 b = Blob.from_db(blob_index['blob_uuid'])
                 b.ref_count_dec(a)
 
-        return a.external_view()
+        ev = a.external_view()
+        ev['instances']: instance_usage_for_blob_uuid(b.uuid)
+        return ev

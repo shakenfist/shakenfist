@@ -15,7 +15,7 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist import artifact
-from shakenfist.baseobject import DatabaseBackedObject as dbo, active_states_filter
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
 from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist.external_api import base as api_base
@@ -186,7 +186,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def get(self):
         retval = []
-        for ns in Namespaces(filters=[active_states_filter]):
+        for ns in Namespaces(filters=[], prefilter='active'):
             if namespace_is_trusted(ns.uuid, get_jwt_identity()[0]):
                 retval.append(ns.external_view())
         return retval

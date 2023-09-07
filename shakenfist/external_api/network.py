@@ -168,11 +168,12 @@ class NetworksEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def get(self, all=False):
         filters = [partial(baseobject.namespace_filter, get_jwt_identity()[0])]
+        prefilter = None
         if not all:
-            filters.append(baseobject.active_states_filter)
+            prefilter = 'active'
 
         retval = []
-        for n in network.Networks(filters):
+        for n in network.Networks(filters, prefilter=prefilter):
             # This forces the network through the external view rehydration
             retval.append(n.external_view())
         return retval
@@ -254,8 +255,8 @@ class NetworksEndpoint(sf_api.Resource):
 
         networks_del = []
         networks_unable = []
-        for n in network.Networks([partial(baseobject.namespace_filter, namespace),
-                                   baseobject.active_states_filter]):
+        for n in network.Networks([partial(baseobject.namespace_filter, namespace)],
+                                  prefilter='active'):
             if not n.networkinterfaces:
                 _delete_network(n)
             else:

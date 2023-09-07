@@ -5,7 +5,6 @@ import mock
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config, SFConfig
 from shakenfist.external_api import app as external_api
-from shakenfist.network import Network
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -51,9 +50,8 @@ class NetworksDeleteNoneTestCase(base.ShakenFistTestCase):
 
         self.mock_etcd.create_namespace('system', 'key1', 'bar')
         self.mock_etcd.create_namespace('foo', 'key1', 'bar')
-        self.mock_etcd.create_network('banana', uuid='123', namespace='foo')
-        n = Network.from_db('123')
-        n.state = dbo.STATE_DELETED
+        self.mock_etcd.create_network('banana', uuid='123', namespace='foo',
+                                      set_state=dbo.STATE_DELETED)
 
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))

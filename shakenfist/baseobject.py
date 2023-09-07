@@ -386,8 +386,9 @@ class DatabaseBackedObject(object):
             new_state = State(new_value, time.time())
             self._db_set_attribute('state', new_state)
 
-            cache.update_object_state_cache(
-                self.object_type, self.uuid, orig.value, new_value)
+            if not self.__in_memory_only:
+                cache.update_object_state_cache(
+                    self.object_type, self.uuid, orig.value, new_value)
 
     @state.setter
     def state(self, new_value):
@@ -467,7 +468,10 @@ class DatabaseBackedObjectIterator(object):
         # instance shifting from created to delete-wait while you're iterating).
         for objuuid in cache.read_object_state_cache_many(
                 self.base_object.object_type, target_states):
-            yield objuuid, etcd.get(self.base_object.object_type, None, objuuid)
+            static_values = etcd.get(self.base_object.object_type, None, objuuid)
+            LOG.with_fields(static_values).debug(
+                'Object iterator return for UUID %s' % objuuid)
+            yield objuuid, static_values
 
     def apply_filters(self, o):
         for f in self.filters:
@@ -479,12 +483,6 @@ class DatabaseBackedObjectIterator(object):
 
 def state_filter(states, o):
     return o.state.value in states
-
-
-# Do not use these filters for instances or nodes, use the more
-# specific ones instead
-active_states_filter = partial(
-    state_filter, DatabaseBackedObject.ACTIVE_STATES)
 
 
 def state_age_filter(delay, o):

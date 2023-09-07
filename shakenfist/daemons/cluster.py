@@ -10,11 +10,10 @@ from shakenfist_utilities import logs
 import time
 
 from shakenfist import artifact
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo, active_states_filter)
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobjectmapping import (
     OBJECT_NAMES_TO_CLASSES, OBJECT_NAMES_TO_ITERATORS)
-from shakenfist.blob import Blob, Blobs, placement_filter, all_active_blobs
+from shakenfist.blob import Blob, Blobs, placement_filter
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -55,7 +54,7 @@ class Monitor(daemon.Daemon):
         # Recompute our cache of what blobs are on what nodes every 30 minutes
         if time.time() - last_loop_run > 1800:
             per_node = defaultdict(list)
-            for b in all_active_blobs():
+            for b in Blobs([], prefilter='active'):
                 if not b.locations:
                     b.add_event(EVENT_TYPE_AUDIT, 'No locations for this blob, hard deleting.')
                     b.hard_delete()
@@ -153,8 +152,9 @@ class Monitor(daemon.Daemon):
         current_fetches = etcd.get_current_blob_transfers(
             absent_nodes=absent_nodes)
 
-        for b in all_active_blobs():
-            if b.instances:
+        for b in Blobs([], prefilter='active'):
+            instances = instance.instance_usage_for_blob_uuid(b.uuid)
+            if instances:
                 in_use_blobs[b.uuid] += 1
 
             # If there is current work for a blob, we ignore it until that
@@ -191,7 +191,7 @@ class Monitor(daemon.Daemon):
                 excess_locations = b.locations
                 in_use_locations = []
 
-                for instance_uuid in b.instances:
+                for instance_uuid in instances:
                     i = instance.Instance.from_db(instance_uuid)
                     node = i.placement.get('node')
                     if node in excess_locations:
@@ -233,7 +233,7 @@ class Monitor(daemon.Daemon):
         self.lock.refresh()
 
         # Find expired blobs
-        for b in all_active_blobs():
+        for b in Blobs([], prefilter='active'):
             if b.expires_at > 0 and b.expires_at < time.time():
                 b.add_event(EVENT_TYPE_AUDIT, 'blob has expired')
                 b.state = dbo.STATE_DELETED
@@ -273,7 +273,7 @@ class Monitor(daemon.Daemon):
         self.lock.refresh()
 
         # Find transcodes of not recently used blobs and reap them
-        for b in all_active_blobs():
+        for b in Blobs([], prefilter='active'):
             if not b.transcoded:
                 continue
 
@@ -320,7 +320,7 @@ class Monitor(daemon.Daemon):
                         ni.delete()
 
                 # Cleanup any blob locations
-                for b in Blobs([active_states_filter, partial(placement_filter, n.fqdn)]):
+                for b in Blobs([partial(placement_filter, n.fqdn)], prefilter='active'):
                     n.add_event(
                         EVENT_TYPE_AUDIT,
                         'deleting blob %s location as hosting node has been deleted' % b.uuid)
@@ -385,7 +385,7 @@ class Monitor(daemon.Daemon):
 
             # Infrequently ensure we have no blobs with a reference count of zero
             orphan_blobs = []
-            for b in all_active_blobs():
+            for b in Blobs([], prefilter='active'):
                 if b.ref_count == 0:
                     orphan_blobs.append(b)
 

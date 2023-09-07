@@ -89,8 +89,8 @@ class Network(dbo):
     def _upgrade_step_3_to_4(cls, static_values):
         nis = []
         for ni in networkinterface.NetworkInterfaces(
-                [baseobject.active_states_filter,
-                 partial(networkinterface.network_uuid_filter, static_values['uuid'])]):
+                [partial(networkinterface.network_uuid_filter, static_values['uuid'])],
+                prefilter='active'):
             nis.append(ni.uuid)
         etcd.put('attribute/network', static_values['uuid'], 'networkinterfaces',
                  {
@@ -818,8 +818,10 @@ class Network(dbo):
 
 
 class Networks(dbo_iter):
+    base_object = Network
+
     def __iter__(self):
-        for _, n in etcd.get_all('network', None):
+        for _, n in self.get_iterator():
             if n['uuid'] == 'floating':
                 continue
 

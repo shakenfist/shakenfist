@@ -22,7 +22,6 @@ import uuid
 from shakenfist.artifact import (
     Artifact, Artifacts, UPLOAD_URL, namespace_exact_filter,
     namespace_or_shared_filter)
-from shakenfist import baseobject
 from shakenfist.blob import Blob
 from shakenfist import constants
 from shakenfist.daemons import daemon
@@ -32,6 +31,7 @@ from shakenfist.external_api import base as api_base
 from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token, namespace_is_trusted
 from shakenfist.tasks import FetchImageTask
 from shakenfist.upload import Upload
@@ -179,7 +179,11 @@ class ArtifactEndpoint(sf_api.Resource):
     @requires_artifact_access
     @api_base.log_token_use
     def get(self, artifact_ref=None, artifact_from_db=None):
-        return artifact_from_db.external_view()
+        ev = artifact_from_db.external_view()
+        for idx in ev['blobs']:
+            ev['blobs'][idx]['instances'] = instance_usage_for_blob_uuid(
+                ev['blobs'][idx]['uuid'])
+        return ev
 
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Delete an artifact.',
@@ -247,16 +251,20 @@ class ArtifactsEndpoint(sf_api.Resource):
     def get(self, node=None):
         retval = []
         for a in Artifacts(filters=[
-                baseobject.active_states_filter,
-                partial(namespace_or_shared_filter, get_jwt_identity()[0])]):
+                partial(namespace_or_shared_filter, get_jwt_identity()[0])],
+                prefilter='active'):
             if node:
                 idx = a.most_recent_index
                 if 'blob_uuid' in idx:
                     b = Blob.from_db(idx['blob_uuid'])
                     if b and node in b.locations:
-                        retval.append(a.external_view())
+                        ev = a.external_view()
+                        ev['instances']: instance_usage_for_blob_uuid(b.uuid)
+                        retval.append(ev)
             else:
-                retval.append(a.external_view())
+                ev = a.external_view()
+                ev['instances']: instance_usage_for_blob_uuid(b.uuid)
+                retval.append(ev)
         return retval
 
     @swag_from(api_base.swagger_helper(
@@ -299,6 +307,7 @@ class ArtifactsEndpoint(sf_api.Resource):
         etcd.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url, namespace=namespace)],
         })
+
         return a.external_view()
 
     @swag_from(api_base.swagger_helper(
@@ -465,6 +474,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
 
             if upload_uuid:
                 u.hard_delete()
+
             return a.external_view()
 
 
@@ -557,6 +567,7 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
             b = Blob.from_db(idx['blob_uuid'])
             if b:
                 bout = b.external_view()
+                bout['instances'] = instance_usage_for_blob_uuid(b.uuid)
             bout['index'] = idx['index']
             retval.append(bout)
         return retval

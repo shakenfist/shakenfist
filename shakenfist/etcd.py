@@ -287,6 +287,13 @@ class JSONEncoderCustomTypes(json.JSONEncoder):
 
 
 @retry_etcd_forever
+def put_raw(path, data):
+    encoded = json.dumps(data, indent=4, sort_keys=True,
+                         cls=JSONEncoderCustomTypes)
+    get_etcd_client().put(path, encoded, lease=None)
+
+
+@retry_etcd_forever
 def put(objecttype, subtype, name, data, ttl=None):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True,
@@ -300,6 +307,14 @@ def create(objecttype, subtype, name, data, ttl=None):
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderCustomTypes)
     return get_etcd_client().create(path, encoded, lease=None)
+
+
+@retry_etcd_forever
+def get_raw(path):
+    value = get_etcd_client().get(path, metadata=True)
+    if value is None or len(value) == 0:
+        return None
+    return json.loads(value[0][0])
 
 
 @retry_etcd_forever
