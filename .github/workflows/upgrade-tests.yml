@@ -54,10 +54,7 @@ jobs:
 
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              debian@$primary wget https://sfcbr.shakenfist.com/backup-0.6.15-20230319
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              debian@$primary 'sudo chmod ugo+r /etc/sf/*; . /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-backup restore /home/debian/backup-0.6.15-20230319'
+              debian@$primary 'sudo chmod ugo+r /etc/sf/*; . /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-backup restore /srv/ci/backup-0.6.15-20230319'
 
       - name: Run getsf installer on primary
         run: |
