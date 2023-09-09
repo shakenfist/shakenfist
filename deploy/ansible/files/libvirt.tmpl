@@ -164,6 +164,12 @@
       <address type='virtio-serial' controller='0' bus='0' port='3'/>
     </channel>
 
+    <!-- NOTE(mikal): this is required for the SPICE USB3 redirection to work -->
+    <controller type='usb' index='1' model='nec-xhci'/>
+    <redirdev bus='usb' type='spicevmc'/>
+    <redirdev bus='usb' type='spicevmc'/>
+    <redirdev bus='usb' type='spicevmc'/>
+
     <graphics type='spice' port='{{vdi_port}}' tlsPort='{{vdi_tls_port}}' listen='0.0.0.0'>
       <listen type='address' address='0.0.0.0'/>
       <channel name='main' mode='secure'/>
