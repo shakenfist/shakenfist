@@ -151,7 +151,8 @@ jobs:
                      "not committing online upgrade"
                      "Received a GOAWAY with error code ENHANCE_YOUR_CALM"
                      "ConnectionFailedError"
-                     "invalid JWT in Authorization header")
+                     "invalid JWT in Authorization header"
+                     "Libvirt Error: XML error")
           IFS=""
           for forbid in ${FORBIDDEN[*]}
           do
