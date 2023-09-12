@@ -92,9 +92,15 @@ class InstanceAgentOperationEndpoint(sf_api.Resource):
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
-    def get(self, instance_ref=None, instance_from_db=None):
+    def get(self, instance_ref=None, instance_from_db=None, all=False):
         out = []
-        for agentop_uuid in instance_from_db.agent_operations:
+        ops = instance_from_db.agent_operations
+
+        key = 'queue'
+        if all:
+            key = 'all'
+
+        for agentop_uuid in ops.get(key, []):
             aop = AgentOperation.from_db(agentop_uuid)
             if aop:
                 out.append(aop.external_view())

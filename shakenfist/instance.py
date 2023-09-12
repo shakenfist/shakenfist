@@ -1490,11 +1490,18 @@ class Instance(dbo):
 
     def agent_operation_enqueue(self, agentop_uuid):
         with self.get_lock_attr('agent_operations', 'Enqueue agent operation'):
+            # NOTE(mikal): the "queue" entry is agent operations not yet executed,
+            # the "all" entry is a log of all agent operations ever. We need "all",
+            # otherwise its quite hard to lookup an executed agent operation if
+            # you've lost its UUID.
             db_data = self._db_get_attribute('agent_operations')
             if 'queue' not in db_data:
                 db_data['queue'] = []
+            if 'all' not in db_data:
+                db_data['all'] = []
 
             db_data['queue'].append(agentop_uuid)
+            db_data['all'].append(agentop_uuid)
             self._db_set_attribute('agent_operations', db_data)
 
 
