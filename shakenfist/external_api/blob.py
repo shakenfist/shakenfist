@@ -108,7 +108,9 @@ class BlobEndpoint(sf_api.Resource):
     @api_base.log_token_use
     @arg_is_blob_uuid
     def get(self, blob_uuid=None, blob_from_db=None):
-        return blob_from_db.external_view()
+        out = blob_from_db.external_view()
+        out['instances'] = instance_usage_for_blob_uuid(blob_uuid)
+        return out
 
 
 class BlobDataEndpoint(sf_api.Resource):
