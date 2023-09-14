@@ -16,7 +16,7 @@ equivalent to AWS AMIs or OpenStack images in Glance.
 
 ???+ tip "REST API calls"
 
-    * [POST /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts): Fetch an image artifact into the cluster.
+    * [POST /artifacts](https://openapi.shakenfist.com/#/artifacts/post_artifacts): Fetch an image artifact into the cluster.
 
 ??? example "Python API client: cache an artifact"
 
@@ -40,9 +40,9 @@ a general introduction to the Shaken Fist event system).
 
 ???+ tip "REST API calls"
 
-    * [GET /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts): List artifacts for a namespace.
-    * [GET /artifacts/{artifact_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref_): Get information about a specific artifact.
-    * [GET /artifacts/{artifact_ref}/events](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref__events): Fetch events for a specific artifact.
+    * [GET /artifacts](https://openapi.shakenfist.com/#/artifacts/get_artifacts): List artifacts for a namespace.
+    * [GET /artifacts/{artifact_ref}](https://openapi.shakenfist.com/#/artifacts/get_artifacts__artifact_ref_): Get information about a specific artifact.
+    * [GET /artifacts/{artifact_ref}/events](https://openapi.shakenfist.com/#/artifacts/get_artifacts__artifact_ref__events): Fetch events for a specific artifact.
 
 ??? example "Python API client: list artifacts"
 
@@ -148,8 +148,8 @@ Artifacts may be deleted individually, or an entire namespace at a time.
 
 ???+ tip "REST API calls"
 
-    * [DELETE /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/delete_artifacts): Delete all artifacts within a specific namespace.
-    * [DELETE /artifacts/{artifact_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/delete_artifacts__artifact_ref_): Delete a specific artifact.
+    * [DELETE /artifacts](https://openapi.shakenfist.com/#/artifacts/delete_artifacts): Delete all artifacts within a specific namespace.
+    * [DELETE /artifacts/{artifact_ref}](https://openapi.shakenfist.com/#/artifacts/delete_artifacts__artifact_ref_): Delete a specific artifact.
 
 ??? example "Python API client: delete a single artifact"
 
@@ -211,11 +211,11 @@ details.
 
 ???+ tip "REST API calls"
 
-    * [POST /upload](https://sfcbr.shakenfist.com/api/apidocs/#/upload/post_upload): Create a new upload.
-    * [POST /upload/{upload_uuid}](https://sfcbr.shakenfist.com/api/apidocs/#/upload/post_upload__upload_uuid_): Append a new chunk to an already existing upload.
-    * [POST /upload/{upload_uuid}/truncate](https://sfcbr.shakenfist.com/api/apidocs/#/upload/post_upload__upload_uuid__truncate__offset_): Truncate an upload to a specific index. This can be useful as a retry operation in the case of a transmission error.
-    * [GET /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts): List artifacts.
-    * [POST /artifacts/upload/{artifact_name}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts_upload__artifact_name_): Convert a completed upload into an artifact.
+    * [POST /upload](https://openapi.shakenfist.com/#/upload/post_upload): Create a new upload.
+    * [POST /upload/{upload_uuid}](https://openapi.shakenfist.com/#/upload/post_upload__upload_uuid_): Append a new chunk to an already existing upload.
+    * [POST /upload/{upload_uuid}/truncate](https://openapi.shakenfist.com/#/upload/post_upload__upload_uuid__truncate__offset_): Truncate an upload to a specific index. This can be useful as a retry operation in the case of a transmission error.
+    * [GET /artifacts](https://openapi.shakenfist.com/#/artifacts/get_artifacts): List artifacts.
+    * [POST /artifacts/upload/{artifact_name}](https://openapi.shakenfist.com/#/artifacts/post_artifacts_upload__artifact_name_): Convert a completed upload into an artifact.
 
 ??? example "Python API client: create an upload, transfer data, and convert to an artifact"
 
@@ -311,7 +311,7 @@ remove a specific version of an artifact as well.
 
 ???+ tip "REST API calls"
 
-    * [DELETE /artifacts/{artifact_ref}/versions/{version_id}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/delete_artifacts__artifact_ref__versions__version_id_): Remove a specified version from an artifact.
+    * [DELETE /artifacts/{artifact_ref}/versions/{version_id}](https://openapi.shakenfist.com/#/artifacts/delete_artifacts__artifact_ref__versions__version_id_): Remove a specified version from an artifact.
 
 ??? example "Python API client: delete a specific version of an artifact"
 
@@ -330,7 +330,7 @@ overridden on a per-artifact basis.
 
 ???+ tip "REST API calls"
 
-    * [POST /artifacts/{artifact_ref}/versions](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref__versions): Set the maximum number of versions of an artifact to store.
+    * [POST /artifacts/{artifact_ref}/versions](https://openapi.shakenfist.com/#/artifacts/get_artifacts__artifact_ref__versions): Set the maximum number of versions of an artifact to store.
 
 ??? example "Python API client: delete a specific version of an artifact"
 
@@ -352,7 +352,7 @@ from. This allows recommencing failed downloads.
 
 ???+ tip "REST API calls"
 
-    * [GET /artifacts/{artifact_ref}/versions](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref__versions): List version blobs for a given artifact.
+    * [GET /artifacts/{artifact_ref}/versions](https://openapi.shakenfist.com/#/artifacts/get_artifacts__artifact_ref__versions): List version blobs for a given artifact.
 
 ??? example "Python API client: list versions of an artifact"
 
@@ -373,8 +373,8 @@ for commonly used "official" images which many users will want to use.
 
 ???+ tip "REST API calls"
 
-    * [POST /artifacts/{artifact_ref}/share](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts__artifact_ref__share): Share an artifact.
-    * [POST /artifacts/{artifact_ref}/unshare](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts__artifact_ref__unshare): Unshare an artifact.
+    * [POST /artifacts/{artifact_ref}/share](https://openapi.shakenfist.com/#/artifacts/post_artifacts__artifact_ref__share): Share an artifact.
+    * [POST /artifacts/{artifact_ref}/unshare](https://openapi.shakenfist.com/#/artifacts/post_artifacts__artifact_ref__unshare): Unshare an artifact.
 
 ??? example "Python API client: share an artifact"
 
@@ -405,10 +405,10 @@ is available [in the user guide](/user_guide/metadata/).
 
 ???+ tip "REST API calls"
 
-    * [GET ​/artifacts​/{artifact_ref}​/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref__metadata): Get metadata for an artifact.
-    * [POST /artifacts/{artifact_ref}/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts__artifact_ref__metadata): Create a new metadata key for an artifact.
-    * [DELETE /artifacts/{artifact_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/delete_artifacts__artifact_ref__metadata__key_): Delete a specific metadata key for an artifact.
-    * [PUT /artifacts/{artifact_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/put_artifacts__artifact_ref__metadata__key_): Update an existing metadata key for an artifact.
+    * [GET ​/artifacts​/{artifact_ref}​/metadata](https://openapi.shakenfist.com/#/artifacts/get_artifacts__artifact_ref__metadata): Get metadata for an artifact.
+    * [POST /artifacts/{artifact_ref}/metadata](https://openapi.shakenfist.com/#/artifacts/post_artifacts__artifact_ref__metadata): Create a new metadata key for an artifact.
+    * [DELETE /artifacts/{artifact_ref}/metadata/{key}](https://openapi.shakenfist.com/#/artifacts/delete_artifacts__artifact_ref__metadata__key_): Delete a specific metadata key for an artifact.
+    * [PUT /artifacts/{artifact_ref}/metadata/{key}](https://openapi.shakenfist.com/#/artifacts/put_artifacts__artifact_ref__metadata__key_): Update an existing metadata key for an artifact.
 
 ??? example "Python API client: set metadata on an artifact"
 

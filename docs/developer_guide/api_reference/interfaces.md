@@ -21,7 +21,7 @@ a network interface from the REST API.
 
 ???+ tip "REST API calls"
 
-    * [GET /interfaces/{interface_uuid}](https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/get_interfaces__interface_uuid_): Get information about a specific network interface.
+    * [GET /interfaces/{interface_uuid}](https://openapi.shakenfist.com/#/interfaces/get_interfaces__interface_uuid_): Get information about a specific network interface.
 
 ??? example "Python API client: fetch interface details"
 
@@ -115,8 +115,8 @@ occurred when the packets reach the instance.
 
 ???+ tip "REST API calls"
 
-    * [POST /interfaces/{interface_uuid}/float](https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/post_interfaces__interface_uuid__float): Add a floating address to a network interface to make it externally accessible.
-    * [POST /interfaces/{interface_uuid}/defloat](https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/post_interfaces__interface_uuid__defloat): Remove a floating address from a network interface, thus making the interface not externally accessible.
+    * [POST /interfaces/{interface_uuid}/float](https://openapi.shakenfist.com/#/interfaces/post_interfaces__interface_uuid__float): Add a floating address to a network interface to make it externally accessible.
+    * [POST /interfaces/{interface_uuid}/defloat](https://openapi.shakenfist.com/#/interfaces/post_interfaces__interface_uuid__defloat): Remove a floating address from a network interface, thus making the interface not externally accessible.
 
 ??? example "Python API client: float a network interface"
 
@@ -167,10 +167,10 @@ is available [in the user guide](/user_guide/metadata/).
 
 ???+ tip "REST API calls"
 
-    * [GET ​/interfaces​/{interface_uuid}​/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/get_interfaces__interface_uuid__metadata): Get metadata for an interface.
-    * [POST /interfaces/{interface_uuid}/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/post_interfaces__interface_uuid__metadata): Create a new metadata key for an interface.
-    * [DELETE /interfaces/{interface_uuid}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/delete_interfaces__interface_uuid__metadata__key_): Delete a specific metadata key for an interface.
-    * [PUT /interfaces/{interface_uuid}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/put_interfaces__interface_uuid__metadata__key_): Update an existing metadata key for an interface.
+    * [GET ​/interfaces​/{interface_uuid}​/metadata](https://openapi.shakenfist.com/#/interfaces/get_interfaces__interface_uuid__metadata): Get metadata for an interface.
+    * [POST /interfaces/{interface_uuid}/metadata](https://openapi.shakenfist.com/#/interfaces/post_interfaces__interface_uuid__metadata): Create a new metadata key for an interface.
+    * [DELETE /interfaces/{interface_uuid}/metadata/{key}](https://openapi.shakenfist.com/#/interfaces/delete_interfaces__interface_uuid__metadata__key_): Delete a specific metadata key for an interface.
+    * [PUT /interfaces/{interface_uuid}/metadata/{key}](https://openapi.shakenfist.com/#/interfaces/put_interfaces__interface_uuid__metadata__key_): Update an existing metadata key for an interface.
 
 ??? example "Python API client: set metadata on an interface"
 

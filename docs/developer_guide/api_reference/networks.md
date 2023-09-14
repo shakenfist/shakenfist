@@ -20,11 +20,11 @@ node.
 
 ???+ tip "REST API calls"
 
-    * [POST /networks](https://sfcbr.shakenfist.com/api/apidocs/#/networks/post_networks): Create a network.
-    * [DELETE /networks](https://sfcbr.shakenfist.com/api/apidocs/#/networks/delete_networks): Delete all networks in a given namespace.
-    * [DELETE /networks/networks/{network_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/networks/delete_networks__network_ref_): Delete a specific network.
-    * [GET /networks](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks): List the networks visible to the currently authenticated namespace.
-    * [GET /networks/{network_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref_): Get details of a single network
+    * [POST /networks](https://openapi.shakenfist.com/#/networks/post_networks): Create a network.
+    * [DELETE /networks](https://openapi.shakenfist.com/#/networks/delete_networks): Delete all networks in a given namespace.
+    * [DELETE /networks/networks/{network_ref}](https://openapi.shakenfist.com/#/networks/delete_networks__network_ref_): Delete a specific network.
+    * [GET /networks](https://openapi.shakenfist.com/#/networks/get_networks): List the networks visible to the currently authenticated namespace.
+    * [GET /networks/{network_ref}](https://openapi.shakenfist.com/#/networks/get_networks__network_ref_): Get details of a single network
 
 ??? example "Python API client: create a network"
     ```python
@@ -134,9 +134,9 @@ event system.
 
 ???+ tip "REST API calls"
 
-    * [GET /networks/{network_ref}/events](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__events): Fetch events for a network.
-    * [GET /networks/{network_ref}/interfaces](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__interfaces): Get the network interfaces present on a network.
-    * [GET /networks/{network_ref}/ping/{address}](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__ping__address_): Ping an address on a network from the network node.
+    * [GET /networks/{network_ref}/events](https://openapi.shakenfist.com/#/networks/get_networks__network_ref__events): Fetch events for a network.
+    * [GET /networks/{network_ref}/interfaces](https://openapi.shakenfist.com/#/networks/get_networks__network_ref__interfaces): Get the network interfaces present on a network.
+    * [GET /networks/{network_ref}/ping/{address}](https://openapi.shakenfist.com/#/networks/get_networks__network_ref__ping__address_): Ping an address on a network from the network node.
 
 ??? example "Python API client: list events for a network"
 
@@ -277,10 +277,10 @@ is available [in the user guide](/user_guide/metadata/).
 
 ???+ tip "REST API calls"
 
-    * [GET ​/networks/{network_ref}​/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__metadata): Get metadata for a network.
-    * [POST /networks/{network_ref}/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/networks/post_networks__network_ref__metadata): Create a new metadata key for a network.
-    * [DELETE /networks/{network_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/networks/delete_networks__network_ref__metadata__key_): Delete a specific metadata key for a network.
-    * [PUT /networks/{network_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/networks/put_networks__network_ref__metadata__key_): Update an existing metadata key for a network.
+    * [GET ​/networks/{network_ref}​/metadata](https://openapi.shakenfist.com/#/networks/get_networks__network_ref__metadata): Get metadata for a network.
+    * [POST /networks/{network_ref}/metadata](https://openapi.shakenfist.com/#/networks/post_networks__network_ref__metadata): Create a new metadata key for a network.
+    * [DELETE /networks/{network_ref}/metadata/{key}](https://openapi.shakenfist.com/#/networks/delete_networks__network_ref__metadata__key_): Delete a specific metadata key for a network.
+    * [PUT /networks/{network_ref}/metadata/{key}](https://openapi.shakenfist.com/#/networks/put_networks__network_ref__metadata__key_): Update an existing metadata key for a network.
 
 ??? example "Python API client: set metadata on a network"
 

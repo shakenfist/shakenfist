@@ -7,9 +7,9 @@ introduction to labels, see the [artifacts section of the user guide](/user_guid
 
 ???+ tip "REST API calls"
 
-    * [GET /label/{label_name}](https://sfcbr.shakenfist.com/api/apidocs/#/label/get_label__label_name_): Search for a label by name.
-    * [POST /label/{label_name}](https://sfcbr.shakenfist.com/api/apidocs/#/label/post_label__label_name_): Update the current blob for a label.
-    * [DELETE /label/{label_name}](https://sfcbr.shakenfist.com/api/apidocs/#/label/delete_label__label_name_): Delete a label by name.
+    * [GET /label/{label_name}](https://openapi.shakenfist.com/#/label/get_label__label_name_): Search for a label by name.
+    * [POST /label/{label_name}](https://openapi.shakenfist.com/#/label/post_label__label_name_): Update the current blob for a label.
+    * [DELETE /label/{label_name}](https://openapi.shakenfist.com/#/label/delete_label__label_name_): Delete a label by name.
 
 ??? example "Python API client: update a label"
 

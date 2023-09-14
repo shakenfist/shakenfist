@@ -19,9 +19,9 @@ all the instances running and stop accepting new work.
 
 ???+ tip "REST API calls"
 
-    * [GET /nodes](https://sfcbr.shakenfist.com/api/apidocs/#/nodes/get_nodes): List all nodes in the cluster, including deleted nodes.
-    * [DELETE /nodes/{node}](https://sfcbr.shakenfist.com/api/apidocs/#/nodes/delete_nodes__node_): Delete a node.
-    * [GET /nodes/{node}](https://sfcbr.shakenfist.com/api/apidocs/#/nodes/get_nodes__node_): Get information about a single node.
+    * [GET /nodes](https://openapi.shakenfist.com/#/nodes/get_nodes): List all nodes in the cluster, including deleted nodes.
+    * [DELETE /nodes/{node}](https://openapi.shakenfist.com/#/nodes/delete_nodes__node_): Delete a node.
+    * [GET /nodes/{node}](https://openapi.shakenfist.com/#/nodes/get_nodes__node_): Get information about a single node.
 
 ??? example "Python API client: get details for a node"
 
@@ -54,7 +54,7 @@ event system.
 
 ???+ tip "REST API calls"
 
-    * [GET /nodes/{node}/events](https://sfcbr.shakenfist.com/api/apidocs/#/nodes/get_nodes__node__events): Fetch events for a node.
+    * [GET /nodes/{node}/events](https://openapi.shakenfist.com/#/nodes/get_nodes__node__events): Fetch events for a node.
 
 ??? example "Python API client: list events for a node"
 
@@ -108,10 +108,10 @@ is available [in the user guide](/user_guide/metadata/).
 
 ???+ tip "REST API calls"
 
-    * [GET ​/nodes/{node}​/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/nodes/get_nodes__node__metadata): Get metadata for a node.
-    * [POST /nodes/{node}/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/nodes/post_nodes__node__metadata): Create a new metadata key for a node.
-    * [DELETE /nodes/{node}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/nodes/delete_nodes__node__metadata__key_): Delete a specific metadata key for a node.
-    * [PUT /nodes/{node}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/nodes/put_nodes__node__metadata__key_): Update an existing metadata key for a node.
+    * [GET ​/nodes/{node}​/metadata](https://openapi.shakenfist.com/#/nodes/get_nodes__node__metadata): Get metadata for a node.
+    * [POST /nodes/{node}/metadata](https://openapi.shakenfist.com/#/nodes/post_nodes__node__metadata): Create a new metadata key for a node.
+    * [DELETE /nodes/{node}/metadata/{key}](https://openapi.shakenfist.com/#/nodes/delete_nodes__node__metadata__key_): Delete a specific metadata key for a node.
+    * [PUT /nodes/{node}/metadata/{key}](https://openapi.shakenfist.com/#/nodes/put_nodes__node__metadata__key_): Update an existing metadata key for a node.
 
 ??? example "Python API client: set metadata on a node"
 
