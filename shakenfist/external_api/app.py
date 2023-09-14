@@ -172,8 +172,8 @@ api.add_resource(api_instance.InstanceInterfacesEndpoint,
                  '/instances/<instance_ref>/interfaces')
 api.add_resource(api_snapshot.InstanceSnapshotEndpoint,
                  '/instances/<instance_ref>/snapshot')
-api.add_resource(api_agentoperation.InstanceAgentOperationEndpoint,
-                 '/instances/<instance_ref>/agentoperation')
+api.add_resource(api_agentoperation.InstanceAgentOperationsEndpoint,
+                 '/instances/<instance_ref>/agentoperations')
 api.add_resource(api_instance.InstanceRebootSoftEndpoint,
                  '/instances/<instance_ref>/rebootsoft')
 api.add_resource(api_instance.InstanceRebootHardEndpoint,
