@@ -87,7 +87,19 @@ class AgentOperationEndpoint(sf_api.Resource):
         return operation_from_db.external_view()
 
 
-class InstanceAgentOperationEndpoint(sf_api.Resource):
+agentoperation_instance_example = """{
+    ...
+}"""
+
+
+class InstanceAgentOperationsEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'agentoperations', 'List agent operations for an instance.',
+        [('instance_ref', 'query', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(200, 'Information about a agentoperations for an instance.',
+          agentoperation_instance_example),
+         (404, 'Instance not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

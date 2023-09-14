@@ -50,6 +50,7 @@ nav:
     - Developer Guide:
         - API reference:
             - "Admin (/admin/)": developer_guide/api_reference/admin.md
+            - "Agent Operations (/agentoperations/)": developer_guide/api_reference/agentoperations.md
             - "Artifacts (/artifacts/)": developer_guide/api_reference/artifacts.md
             - "Authentication (/auth/)": developer_guide/api_reference/authentication.md
             - "Blob Checksums (/blob_checksums/)": developer_guide/api_reference/blob_checksums.md
