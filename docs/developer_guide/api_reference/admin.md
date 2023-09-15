@@ -8,7 +8,7 @@ those locks (machine and process id).
 
 ???+ tip "REST API calls"
 
-    * [GET /admin/locks](https://sfcbr.shakenfist.com/api/apidocs/#/admin/get_admin_locks): List locks currently held in the cluster.
+    * [GET /admin/locks](https://openapi.shakenfist.com/#/admin/get_admin_locks): List locks currently held in the cluster.
 
 ??? example "Python API client: list cluster locks"
 

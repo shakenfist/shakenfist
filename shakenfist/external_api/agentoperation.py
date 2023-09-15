@@ -94,7 +94,7 @@ agentoperation_instance_example = """{
 
 class InstanceAgentOperationsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
-        'agentoperations', 'List agent operations for an instance.',
+        'instances', 'List agent operations for an instance.',
         [('instance_ref', 'query', 'uuidorname',
           'The UUID or name of the instance.', True)],
         [(200, 'Information about a agentoperations for an instance.',

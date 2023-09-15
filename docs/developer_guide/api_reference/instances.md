@@ -26,8 +26,8 @@ about a specific instance by providing its UUID or name.
 
 ???+ tip "REST API calls"
 
-    * [GET /instances](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances): List all instances visible to your authenticated namespace.
-    * [GET /instances/{instance_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref_): Get information about a specific instance.
+    * [GET /instances](https://openapi.shakenfist.com/#/instances/get_instances): List all instances visible to your authenticated namespace.
+    * [GET /instances/{instance_ref}](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref_): Get information about a specific instance.
 
 ??? example "Python API client: get all visible instances"
 
@@ -56,7 +56,7 @@ about a specific instance by providing its UUID or name.
 Instance creation is by far the most complicated call in Shaken Fist in terms
 of the arguments that it takes. The code in the Python command line client is
 helpful if you need a fully worked example of every possible permutation. The
-OpenAPI documentation at https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances
+OpenAPI documentation at https://openapi.shakenfist.com/#/instances/post_instances
 provides comprehensive and up to date documentation on all the arguments to
 the creation call.
 
@@ -126,7 +126,7 @@ passed as a list. You only have one `videospec` per instance. Once again, a
 
 ???+ tip "REST API calls"
 
-    * [POST /instances/](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances): Create an instance.
+    * [POST /instances/](https://openapi.shakenfist.com/#/instances/post_instances): Create an instance.
 
 ??? example "Python API client: create and then delete a simple instance"
 
@@ -171,14 +171,14 @@ The power management actions available are:
 
 ???+ tip "REST API calls"
 
-    * [DELETE /instances/{instance_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref_): Delete an instance.
-    * [DELETE /instances/](https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances): Delete all instances in a namespace.
-    * [POST ​/instances​/{instance_ref}​/rebootsoft](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__rebootsoft): Soft (ACPI) reboot the instance.
-    * [POST ​/instances​/{instance_ref}​/reboothard](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__reboothard): Hard (reset switch) reboot the instance.
-    * [POST /instances/{instance_ref}/poweron](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__poweron): Power the instance on.
-    * [POST /instances/{instance_ref}/poweroff](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__poweroff): Power the instance off, as if holding the power switch down.
-    * [POST /instances/{instance_ref}/pause](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__pause): Pause an instance.
-    * [POST /instances/{instance_ref}/unpause](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__unpause): Unpause an instance.
+    * [DELETE /instances/{instance_ref}](https://openapi.shakenfist.com/#/instances/delete_instances__instance_ref_): Delete an instance.
+    * [DELETE /instances/](https://openapi.shakenfist.com/#/instances/delete_instances): Delete all instances in a namespace.
+    * [POST ​/instances​/{instance_ref}​/rebootsoft](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__rebootsoft): Soft (ACPI) reboot the instance.
+    * [POST ​/instances​/{instance_ref}​/reboothard](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__reboothard): Hard (reset switch) reboot the instance.
+    * [POST /instances/{instance_ref}/poweron](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__poweron): Power the instance on.
+    * [POST /instances/{instance_ref}/poweroff](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__poweroff): Power the instance off, as if holding the power switch down.
+    * [POST /instances/{instance_ref}/pause](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__pause): Pause an instance.
+    * [POST /instances/{instance_ref}/unpause](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__unpause): Unpause an instance.
 
 ??? example "Python API client: create and then delete a simple instance"
 
@@ -371,8 +371,8 @@ event system.
 
 ???+ tip "REST API calls"
 
-    * [GET /instances/{instance_ref}/interfaces](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__interfaces): Request information on the instance's network interfaces, if any.
-    * [GET /instances/{instance_ref}/events](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__events): Fetch events for a specific instance.
+    * [GET /instances/{instance_ref}/interfaces](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__interfaces): Request information on the instance's network interfaces, if any.
+    * [GET /instances/{instance_ref}/events](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__events): Fetch events for a specific instance.
 
 ??? example "Python API client: list network interfaces for an instance"
 
@@ -528,9 +528,9 @@ functionality in the Shaken Fist client.
 
 ???+ tip "REST API calls"
 
-    * [GET /instances/{instance_ref}/consoledata](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__consoledata): Fetch read only serial console data for an instance
-    * [DELETE /instances/{instance_ref}/consoledata](https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref__consoledata): Clear the read only serial console for an instance.
-    * [GET /instances/{instance_ref}/vdiconsolehelper](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__vdiconsolehelper): Generate and return a `virt-viewer` configuration file for connecting to the interactive VDI console for the instance (if configured).
+    * [GET /instances/{instance_ref}/consoledata](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__consoledata): Fetch read only serial console data for an instance
+    * [DELETE /instances/{instance_ref}/consoledata](https://openapi.shakenfist.com/#/instances/delete_instances__instance_ref__consoledata): Clear the read only serial console for an instance.
+    * [GET /instances/{instance_ref}/vdiconsolehelper](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__vdiconsolehelper): Generate and return a `virt-viewer` configuration file for connecting to the interactive VDI console for the instance (if configured).
 
 ??? example "Python API client: connect seamlessly to a VDI console using virt-viewer"
 
@@ -601,8 +601,8 @@ following operations via the agent:
 
 ???+ tip "REST API calls"
 
-    * [POST ​/instances​/{instance_ref}​/agent​/execute](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__agent_execute): execute a command within an instance and return results.
-    * [POST /instances/{instance_ref}/agent/put](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__agent_put): copy a blob into an instance at the specified location with the specified permissions.
+    * [POST ​/instances​/{instance_ref}​/agent​/execute](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_execute): execute a command within an instance and return results.
+    * [POST /instances/{instance_ref}/agent/put](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_put): copy a blob into an instance at the specified location with the specified permissions.
 
 ...
 
@@ -625,10 +625,10 @@ is available [in the user guide](/user_guide/metadata/).
 
 ???+ tip "REST API calls"
 
-    * [GET ​/instances​/{instance_ref}​/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__metadata): Get metadata for an instance.
-    * [POST /instances/{instance_ref}/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__metadata): Create a new metadata key for an instance.
-    * [DELETE /instances/{instance_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref__metadata__key_): Delete a specific metadata key for an instance.
-    * [PUT /instances/{instance_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/instances/put_instances__instance_ref__metadata__key_): Update an existing metadata key for an instance.
+    * [GET ​/instances​/{instance_ref}​/metadata](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__metadata): Get metadata for an instance.
+    * [POST /instances/{instance_ref}/metadata](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__metadata): Create a new metadata key for an instance.
+    * [DELETE /instances/{instance_ref}/metadata/{key}](https://openapi.shakenfist.com/#/instances/delete_instances__instance_ref__metadata__key_): Delete a specific metadata key for an instance.
+    * [PUT /instances/{instance_ref}/metadata/{key}](https://openapi.shakenfist.com/#/instances/put_instances__instance_ref__metadata__key_): Update an existing metadata key for an instance.
 
 ??? example "Python API client: set metadata on an instance"
 

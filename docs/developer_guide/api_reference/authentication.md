@@ -13,7 +13,7 @@ to time. You will receive a HTTP 401 status code if an access token has expired.
 
 ???+ tip "REST API calls"
 
-    * [POST /auth](https://sfcbr.shakenfist.com/api/apidocs/#/auth/post_auth): Create an access token.
+    * [POST /auth](https://openapi.shakenfist.com/#/auth/post_auth): Create an access token.
 
 ??? example "Python API client: creating an access token"
 
@@ -75,10 +75,10 @@ namespace, which is used for administrative tasks.
 
 ???+ tip "REST API calls"
 
-    * [GET /auth/namespaces](https://sfcbr.shakenfist.com/api/apidocs/#/auth/get_auth_namespaces): List all namespaces visible to your currently authenticated namespace.
-    * [POST /auth/namespaces](https://sfcbr.shakenfist.com/api/apidocs/#/auth/post_auth_namespaces): Create a namespace, if you have permissions to do so.
-    * [DELETE /auth/namespaces/{namespace}](https://sfcbr.shakenfist.com/api/apidocs/#/auth/delete_auth_namespaces__namespace_): Delete a namespace.
-    * [GET /auth/namespaces/{namespace}](https://sfcbr.shakenfist.com/api/apidocs/#/auth/get_auth_namespaces__namespace_): Get details of a single namespace.
+    * [GET /auth/namespaces](https://openapi.shakenfist.com/#/auth/get_auth_namespaces): List all namespaces visible to your currently authenticated namespace.
+    * [POST /auth/namespaces](https://openapi.shakenfist.com/#/auth/post_auth_namespaces): Create a namespace, if you have permissions to do so.
+    * [DELETE /auth/namespaces/{namespace}](https://openapi.shakenfist.com/#/auth/delete_auth_namespaces__namespace_): Delete a namespace.
+    * [GET /auth/namespaces/{namespace}](https://openapi.shakenfist.com/#/auth/get_auth_namespaces__namespace_): Get details of a single namespace.
 
 ??? example "Python API client: list namespaces"
 
@@ -201,10 +201,10 @@ the keys used to authenticate to a namespace.
 
 ???+ tip "REST API calls"
 
-    * [GET /auth/namespaces/{namespace}/keys](https://sfcbr.shakenfist.com/api/apidocs/#/auth/get_auth_namespaces__namespace__keys): List all authentication keys for a given namespace.
-    * [POST /auth/namespaces/{namespace}/keys](https://sfcbr.shakenfist.com/api/apidocs/#/auth/post_auth_namespaces__namespace__keys): Create a new key for a namespace.
-    * [DELETE /auth/namespaces/{namespace}/keys/{key_name}](https://sfcbr.shakenfist.com/api/apidocs/#/auth/delete_auth_namespaces__namespace__keys__key_name_): Delete a specific key for a namespace.
-    * [PUT /auth/namespaces/{namespace}/keys/{key_name}](https://sfcbr.shakenfist.com/api/apidocs/#/auth/put_auth_namespaces__namespace__keys__key_name_): Update a key for a namespace.
+    * [GET /auth/namespaces/{namespace}/keys](https://openapi.shakenfist.com/#/auth/get_auth_namespaces__namespace__keys): List all authentication keys for a given namespace.
+    * [POST /auth/namespaces/{namespace}/keys](https://openapi.shakenfist.com/#/auth/post_auth_namespaces__namespace__keys): Create a new key for a namespace.
+    * [DELETE /auth/namespaces/{namespace}/keys/{key_name}](https://openapi.shakenfist.com/#/auth/delete_auth_namespaces__namespace__keys__key_name_): Delete a specific key for a namespace.
+    * [PUT /auth/namespaces/{namespace}/keys/{key_name}](https://openapi.shakenfist.com/#/auth/put_auth_namespaces__namespace__keys__key_name_): Update a key for a namespace.
 
 ??? example "Python API client: list all keys for a namespace"
 
@@ -291,10 +291,10 @@ is available [in the user guide](/user_guide/metadata/).
 
 ???+ tip "REST API calls"
 
-    * [GET ​/namespaces/{namespace}​/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/auth/get_auth_namespaces__namespace__metadata): Get metadata for a namespace.
-    * [POST /namespaces/{namespace}/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/auth/post_auth_namespaces__namespace__metadata): Create a new metadata key for a namespace.
-    * [DELETE /namespaces/{namespace}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/auth/delete_auth_namespaces__namespace__metadata__key_): Delete a specific metadata key for a namespace.
-    * [PUT /namespaces/{namespace}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/auth/delete_auth_namespaces__namespace__trust__external_namespace_): Update an existing metadata key for a namespace.
+    * [GET ​/namespaces/{namespace}​/metadata](https://openapi.shakenfist.com/#/auth/get_auth_namespaces__namespace__metadata): Get metadata for a namespace.
+    * [POST /namespaces/{namespace}/metadata](https://openapi.shakenfist.com/#/auth/post_auth_namespaces__namespace__metadata): Create a new metadata key for a namespace.
+    * [DELETE /namespaces/{namespace}/metadata/{key}](https://openapi.shakenfist.com/#/auth/delete_auth_namespaces__namespace__metadata__key_): Delete a specific metadata key for a namespace.
+    * [PUT /namespaces/{namespace}/metadata/{key}](https://openapi.shakenfist.com/#/auth/delete_auth_namespaces__namespace__trust__external_namespace_): Update an existing metadata key for a namespace.
 
 ??? example "Python API client: set metadata on a namespace"
 

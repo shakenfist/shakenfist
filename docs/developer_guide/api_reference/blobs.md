@@ -21,10 +21,10 @@ the REST API, as well as fetching the actual data the blob is storing as well.
 
 ???+ tip "REST API calls"
 
-    * [GET /blobs](https://sfcbr.shakenfist.com/api/apidocs/#/blobs/get_blobs): List all blobs in a cluster. You must be an administrator to make this call.
-    * [GET /blobs/{blob_uuid}](https://sfcbr.shakenfist.com/api/apidocs/#/blobs/get_blobs__blob_uuid_): Get information about a specific blob.
-    * [GET /blobs/{blob_uuid}/data](https://sfcbr.shakenfist.com/api/apidocs/#/blobs/get_blobs__blob_uuid__data): Get the stored data for a specific blob.
-    * [GET /blob_checksums/sha512/{hash}](https://sfcbr.shakenfist.com/api/apidocs/#/blobs/get_blob_checksums_sha512__hash_): Find a blob with this hash.
+    * [GET /blobs](https://openapi.shakenfist.com/#/blobs/get_blobs): List all blobs in a cluster. You must be an administrator to make this call.
+    * [GET /blobs/{blob_uuid}](https://openapi.shakenfist.com/#/blobs/get_blobs__blob_uuid_): Get information about a specific blob.
+    * [GET /blobs/{blob_uuid}/data](https://openapi.shakenfist.com/#/blobs/get_blobs__blob_uuid__data): Get the stored data for a specific blob.
+    * [GET /blob_checksums/sha512/{hash}](https://openapi.shakenfist.com/#/blobs/get_blob_checksums_sha512__hash_): Find a blob with this hash.
 
 ??? example "Python API client: get a specific blob"
 
@@ -124,10 +124,10 @@ is available [in the user guide](/user_guide/metadata/).
 
 ???+ tip "REST API calls"
 
-    * [GET ​/blobs​/{blob_uuid}​/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/blobs/get_blobs__blob_uuid__metadata): Get metadata for a blob.
-    * [POST /blobs/{blob_uuid}/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/blobs/post_blobs__blob_uuid__metadata): Create a new metadata key for a blob.
-    * [DELETE /blobs/{blob_uuid}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/blobs/delete_blobs__blob_uuid__metadata__key_): Delete a specific metadata key for a blob.
-    * [PUT /blobs/{blob_uuid}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/blobs/put_blobs__blob_uuid__metadata__key_): Update an existing metadata key for a blob.
+    * [GET ​/blobs​/{blob_uuid}​/metadata](https://openapi.shakenfist.com/#/blobs/get_blobs__blob_uuid__metadata): Get metadata for a blob.
+    * [POST /blobs/{blob_uuid}/metadata](https://openapi.shakenfist.com/#/blobs/post_blobs__blob_uuid__metadata): Create a new metadata key for a blob.
+    * [DELETE /blobs/{blob_uuid}/metadata/{key}](https://openapi.shakenfist.com/#/blobs/delete_blobs__blob_uuid__metadata__key_): Delete a specific metadata key for a blob.
+    * [PUT /blobs/{blob_uuid}/metadata/{key}](https://openapi.shakenfist.com/#/blobs/put_blobs__blob_uuid__metadata__key_): Update an existing metadata key for a blob.
 
 ??? example "Python API client: set metadata on a blob"
 
