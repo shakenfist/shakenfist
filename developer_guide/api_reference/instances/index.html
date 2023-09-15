@@ -1496,8 +1496,8 @@ calculated.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances">GET /instances</a>: List all instances visible to your authenticated namespace.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref_">GET /instances/{instance_ref}</a>: Get information about a specific instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/get_instances">GET /instances</a>: List all instances visible to your authenticated namespace.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/get_instances__instance_ref_">GET /instances/{instance_ref}</a>: Get information about a specific instance.</li>
 </ul>
 </details>
 <details class="example">
@@ -1524,7 +1524,7 @@ calculated.</p>
 <p>Instance creation is by far the most complicated call in Shaken Fist in terms
 of the arguments that it takes. The code in the Python command line client is
 helpful if you need a fully worked example of every possible permutation. The
-OpenAPI documentation at <a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances">https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances</a>
+OpenAPI documentation at <a href="https://openapi.shakenfist.com/#/instances/post_instances">https://openapi.shakenfist.com/#/instances/post_instances</a>
 provides comprehensive and up to date documentation on all the arguments to
 the creation call.</p>
 <p>The instance creation API call also takes three data structures: the <code>diskspec</code>;
@@ -1587,7 +1587,7 @@ passed as a list. You only have one <code>videospec</code> per instance. Once ag
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances">POST /instances/</a>: Create an instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/post_instances">POST /instances/</a>: Create an instance.</li>
 </ul>
 </details>
 <details class="example">
@@ -1631,14 +1631,14 @@ deletion, and power management.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref_">DELETE /instances/{instance_ref}</a>: Delete an instance.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances">DELETE /instances/</a>: Delete all instances in a namespace.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__rebootsoft">POST ​/instances​/{instance_ref}​/rebootsoft</a>: Soft (ACPI) reboot the instance.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__reboothard">POST ​/instances​/{instance_ref}​/reboothard</a>: Hard (reset switch) reboot the instance.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__poweron">POST /instances/{instance_ref}/poweron</a>: Power the instance on.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__poweroff">POST /instances/{instance_ref}/poweroff</a>: Power the instance off, as if holding the power switch down.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__pause">POST /instances/{instance_ref}/pause</a>: Pause an instance.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__unpause">POST /instances/{instance_ref}/unpause</a>: Unpause an instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/delete_instances__instance_ref_">DELETE /instances/{instance_ref}</a>: Delete an instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/delete_instances">DELETE /instances/</a>: Delete all instances in a namespace.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__rebootsoft">POST ​/instances​/{instance_ref}​/rebootsoft</a>: Soft (ACPI) reboot the instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__reboothard">POST ​/instances​/{instance_ref}​/reboothard</a>: Hard (reset switch) reboot the instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__poweron">POST /instances/{instance_ref}/poweron</a>: Power the instance on.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__poweroff">POST /instances/{instance_ref}/poweroff</a>: Power the instance off, as if holding the power switch down.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__pause">POST /instances/{instance_ref}/pause</a>: Pause an instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__unpause">POST /instances/{instance_ref}/unpause</a>: Unpause an instance.</li>
 </ul>
 </details>
 <details class="example">
@@ -1820,8 +1820,8 @@ event system.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__interfaces">GET /instances/{instance_ref}/interfaces</a>: Request information on the instance's network interfaces, if any.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__events">GET /instances/{instance_ref}/events</a>: Fetch events for a specific instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__interfaces">GET /instances/{instance_ref}/interfaces</a>: Request information on the instance's network interfaces, if any.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__events">GET /instances/{instance_ref}/events</a>: Fetch events for a specific instance.</li>
 </ul>
 </details>
 <details class="example">
@@ -1970,9 +1970,9 @@ functionality in the Shaken Fist client.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__consoledata">GET /instances/{instance_ref}/consoledata</a>: Fetch read only serial console data for an instance</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref__consoledata">DELETE /instances/{instance_ref}/consoledata</a>: Clear the read only serial console for an instance.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__vdiconsolehelper">GET /instances/{instance_ref}/vdiconsolehelper</a>: Generate and return a <code>virt-viewer</code> configuration file for connecting to the interactive VDI console for the instance (if configured).</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__consoledata">GET /instances/{instance_ref}/consoledata</a>: Fetch read only serial console data for an instance</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/delete_instances__instance_ref__consoledata">DELETE /instances/{instance_ref}/consoledata</a>: Clear the read only serial console for an instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__vdiconsolehelper">GET /instances/{instance_ref}/vdiconsolehelper</a>: Generate and return a <code>virt-viewer</code> configuration file for connecting to the interactive VDI console for the instance (if configured).</li>
 </ul>
 </details>
 <details class="example">
@@ -2042,8 +2042,8 @@ following operations via the agent:</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__agent_execute">POST ​/instances​/{instance_ref}​/agent​/execute</a>: execute a command within an instance and return results.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__agent_put">POST /instances/{instance_ref}/agent/put</a>: copy a blob into an instance at the specified location with the specified permissions.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_execute">POST ​/instances​/{instance_ref}​/agent​/execute</a>: execute a command within an instance and return results.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_put">POST /instances/{instance_ref}/agent/put</a>: copy a blob into an instance at the specified location with the specified permissions.</li>
 </ul>
 </details>
 <p>...</p>
@@ -2065,10 +2065,10 @@ future instances.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__metadata">GET ​/instances​/{instance_ref}​/metadata</a>: Get metadata for an instance.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__metadata">POST /instances/{instance_ref}/metadata</a>: Create a new metadata key for an instance.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref__metadata__key_">DELETE /instances/{instance_ref}/metadata/{key}</a>: Delete a specific metadata key for an instance.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/put_instances__instance_ref__metadata__key_">PUT /instances/{instance_ref}/metadata/{key}</a>: Update an existing metadata key for an instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__metadata">GET ​/instances​/{instance_ref}​/metadata</a>: Get metadata for an instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__metadata">POST /instances/{instance_ref}/metadata</a>: Create a new metadata key for an instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/delete_instances__instance_ref__metadata__key_">DELETE /instances/{instance_ref}/metadata/{key}</a>: Delete a specific metadata key for an instance.</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/put_instances__instance_ref__metadata__key_">PUT /instances/{instance_ref}/metadata/{key}</a>: Update an existing metadata key for an instance.</li>
 </ul>
 </details>
 <details class="example">
