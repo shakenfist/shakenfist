@@ -28,7 +28,7 @@ the REST API, as well as fetching the actual data the blob is storing as well.
 
 ??? example "Python API client: get a specific blob"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -42,7 +42,7 @@ the REST API, as well as fetching the actual data the blob is storing as well.
     This example requires retry logic to handle the HTTP connection dropping
     while transferring large files.
 
-    ``` python
+    ```python
     import http
     from shakenfist_client import apiclient
     import requests
@@ -131,7 +131,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: set metadata on a blob"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -140,7 +140,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: get metadata for a blob"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -151,7 +151,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: delete metadata for a blob"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 

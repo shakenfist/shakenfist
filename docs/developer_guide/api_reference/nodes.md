@@ -25,7 +25,7 @@ all the instances running and stop accepting new work.
 
 ??? example "Python API client: get details for a node"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -36,7 +36,7 @@ all the instances running and stop accepting new work.
 
 ??? example "Python API client: list all nodes"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -58,7 +58,7 @@ event system.
 
 ??? example "Python API client: list events for a node"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -70,8 +70,7 @@ event system.
     Note that events are returned in reverse chronological order and are limited
     to the 100 most recent events.
 
-    ```
-    $ python3 example.py
+    ```json
     [
         ...
         {
@@ -115,7 +114,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: set metadata on a node"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -124,7 +123,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: get metadata for a node"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -135,7 +134,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: delete metadata for a node"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
