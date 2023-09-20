@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.2.7">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.2.7">
     
     
       
@@ -623,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agentoperations.md" class="md-nav__link">
+      <a href="../agentoperations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1328,34 +1328,34 @@ version of a label which tracks "blessed" production images.</p>
 <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;The label artifact is now:&#39;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">prod</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-The most recent blob UUID is ffdfce7f-728e-4b76-83c2-304e252f98b1
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>example.py
+The<span class="w"> </span>most<span class="w"> </span>recent<span class="w"> </span>blob<span class="w"> </span>UUID<span class="w"> </span>is<span class="w"> </span>ffdfce7f-728e-4b76-83c2-304e252f98b1
 
-The label artifact is now:
-{
-    &quot;artifact_type&quot;: &quot;label&quot;,
-    &quot;blob_uuid&quot;: &quot;ffdfce7f-728e-4b76-83c2-304e252f98b1&quot;,
-    &quot;blobs&quot;: {
-        &quot;1&quot;: {
-            &quot;depends_on&quot;: null,
-            &quot;instances&quot;: [
-                &quot;d512e9f5-98d6-4c36-8520-33b6fc6de15f&quot;
-            ],
-            &quot;reference_count&quot;: 2,
-            &quot;size&quot;: 403007488,
-            &quot;uuid&quot;: &quot;ffdfce7f-728e-4b76-83c2-304e252f98b1&quot;
-        }
-    },
-    &quot;index&quot;: 1,
-    &quot;max_versions&quot;: 3,
-    &quot;metadata&quot;: {},
-    &quot;namespace&quot;: &quot;system&quot;,
-    &quot;shared&quot;: false,
-    &quot;source_url&quot;: &quot;sf://label/system/debian-11-production&quot;,
-    &quot;state&quot;: &quot;created&quot;,
-    &quot;uuid&quot;: &quot;c9428ea2-a3fa-40cf-9668-61be99bb370a&quot;,
-    &quot;version&quot;: 6
-}
+The<span class="w"> </span>label<span class="w"> </span>artifact<span class="w"> </span>is<span class="w"> </span>now:
+<span class="o">{</span>
+<span class="w">    </span><span class="s2">&quot;artifact_type&quot;</span>:<span class="w"> </span><span class="s2">&quot;label&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;blob_uuid&quot;</span>:<span class="w"> </span><span class="s2">&quot;ffdfce7f-728e-4b76-83c2-304e252f98b1&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;blobs&quot;</span>:<span class="w"> </span><span class="o">{</span>
+<span class="w">        </span><span class="s2">&quot;1&quot;</span>:<span class="w"> </span><span class="o">{</span>
+<span class="w">            </span><span class="s2">&quot;depends_on&quot;</span>:<span class="w"> </span>null,
+<span class="w">            </span><span class="s2">&quot;instances&quot;</span>:<span class="w"> </span><span class="o">[</span>
+<span class="w">                </span><span class="s2">&quot;d512e9f5-98d6-4c36-8520-33b6fc6de15f&quot;</span>
+<span class="w">            </span><span class="o">]</span>,
+<span class="w">            </span><span class="s2">&quot;reference_count&quot;</span>:<span class="w"> </span><span class="m">2</span>,
+<span class="w">            </span><span class="s2">&quot;size&quot;</span>:<span class="w"> </span><span class="m">403007488</span>,
+<span class="w">            </span><span class="s2">&quot;uuid&quot;</span>:<span class="w"> </span><span class="s2">&quot;ffdfce7f-728e-4b76-83c2-304e252f98b1&quot;</span>
+<span class="w">        </span><span class="o">}</span>
+<span class="w">    </span><span class="o">}</span>,
+<span class="w">    </span><span class="s2">&quot;index&quot;</span>:<span class="w"> </span><span class="m">1</span>,
+<span class="w">    </span><span class="s2">&quot;max_versions&quot;</span>:<span class="w"> </span><span class="m">3</span>,
+<span class="w">    </span><span class="s2">&quot;metadata&quot;</span>:<span class="w"> </span><span class="o">{}</span>,
+<span class="w">    </span><span class="s2">&quot;namespace&quot;</span>:<span class="w"> </span><span class="s2">&quot;system&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;shared&quot;</span>:<span class="w"> </span>false,
+<span class="w">    </span><span class="s2">&quot;source_url&quot;</span>:<span class="w"> </span><span class="s2">&quot;sf://label/system/debian-11-production&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;state&quot;</span>:<span class="w"> </span><span class="s2">&quot;created&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;uuid&quot;</span>:<span class="w"> </span><span class="s2">&quot;c9428ea2-a3fa-40cf-9668-61be99bb370a&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;version&quot;</span>:<span class="w"> </span><span class="m">6</span>
+<span class="o">}</span>
 </code></pre></div>
 </details>
 

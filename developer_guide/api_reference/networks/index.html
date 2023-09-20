@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.2.7">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.2.7">
     
     
       
@@ -623,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agentoperations.md" class="md-nav__link">
+      <a href="../agentoperations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1396,20 +1396,19 @@ by far the most common deployment pattern.</p>
 <span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">allocate_network</span><span class="p">(</span><span class="s1">&#39;10.0.0.0/24&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;example&#39;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-{
-    &quot;floating_gateway&quot;: &quot;192.168.10.16&quot;,
-    &quot;metadata&quot;: {},
-    &quot;name&quot;: &quot;example&quot;,
-    &quot;namespace&quot;: &quot;system&quot;,
-    &quot;netblock&quot;: &quot;10.0.0.0/24&quot;,
-    &quot;provide_dhcp&quot;: true,
-    &quot;provide_nat&quot;: true,
-    &quot;state&quot;: &quot;created&quot;,
-    &quot;uuid&quot;: &quot;1e9222c5-2d11-4ada-b258-ed1838bd774b&quot;,
-    &quot;version&quot;: 4,
-    &quot;vxid&quot;: 4882442
-}
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;floating_gateway&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;192.168.10.16&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;system&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;netblock&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;10.0.0.0/24&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;provide_dhcp&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;provide_nat&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;created&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1e9222c5-2d11-4ada-b258-ed1838bd774b&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vxid&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4882442</span>
+<span class="p">}</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -1429,21 +1428,21 @@ by far the most common deployment pattern.</p>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>example.py
 Waiting...
-{
-    &quot;floating_gateway&quot;: null,
-    &quot;metadata&quot;: {},
-    &quot;name&quot;: &quot;example&quot;,
-    &quot;namespace&quot;: &quot;system&quot;,
-    &quot;netblock&quot;: &quot;10.0.0.0/24&quot;,
-    &quot;provide_dhcp&quot;: true,
-    &quot;provide_nat&quot;: true,
-    &quot;state&quot;: &quot;deleted&quot;,
-    &quot;uuid&quot;: &quot;d56ae6e4-2592-43cd-b614-2dc7ca04970a&quot;,
-    &quot;version&quot;: 4,
-    &quot;vxid&quot;: 15408371
-}
+<span class="o">{</span>
+<span class="w">    </span><span class="s2">&quot;floating_gateway&quot;</span>:<span class="w"> </span>null,
+<span class="w">    </span><span class="s2">&quot;metadata&quot;</span>:<span class="w"> </span><span class="o">{}</span>,
+<span class="w">    </span><span class="s2">&quot;name&quot;</span>:<span class="w"> </span><span class="s2">&quot;example&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;namespace&quot;</span>:<span class="w"> </span><span class="s2">&quot;system&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;netblock&quot;</span>:<span class="w"> </span><span class="s2">&quot;10.0.0.0/24&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;provide_dhcp&quot;</span>:<span class="w"> </span>true,
+<span class="w">    </span><span class="s2">&quot;provide_nat&quot;</span>:<span class="w"> </span>true,
+<span class="w">    </span><span class="s2">&quot;state&quot;</span>:<span class="w"> </span><span class="s2">&quot;deleted&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;uuid&quot;</span>:<span class="w"> </span><span class="s2">&quot;d56ae6e4-2592-43cd-b614-2dc7ca04970a&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;version&quot;</span>:<span class="w"> </span><span class="m">4</span>,
+<span class="w">    </span><span class="s2">&quot;vxid&quot;</span>:<span class="w"> </span><span class="m">15408371</span>
+<span class="o">}</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -1463,21 +1462,19 @@ Waiting...
 <span class="n">nets</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_networks</span><span class="p">()</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">nets</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
-<p>```
-$ python3 example.py
-[
-    {
-        "name": "sfcbr-7YWeQo4BoqLjASDd",
-        "namespace": "sfcbr-7YWeQo4BoqLjASDd",
-        "netblock": "10.0.0.0/24",
-        "provide_dhcp": true,
-        "provide_nat": true,
-        "state": "created",
-        "uuid": "759b742d-6140-475e-9553-ac120b56c1ef",
-        "vxlan_id": 0
-    }
-]
-````</p>
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sfcbr-7YWeQo4BoqLjASDd&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sfcbr-7YWeQo4BoqLjASDd&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;netblock&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;10.0.0.0/24&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;provide_dhcp&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;provide_nat&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;created&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;759b742d-6140-475e-9553-ac120b56c1ef&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;vxlan_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">]</span>
+</code></pre></div>
 </details>
 <h2 id="other-network-information">Other network information</h2>
 <p>We can also request other information for a network. For example, we can list the
@@ -1503,36 +1500,35 @@ event system.</p>
 </code></pre></div>
 <p>Note that events are returned in reverse chronological order and are limited
 to the 100 most recent events.</p>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-[
-    ...
-    {
-        &quot;duration&quot;: null,
-        &quot;extra&quot;: {
-            &quot;rx&quot;: {
-                &quot;bytes&quot;: 2146364,
-                &quot;dropped&quot;: 0,
-                &quot;errors&quot;: 0,
-                &quot;multicast&quot;: 0,
-                &quot;over_errors&quot;: 0,
-                &quot;packets&quot;: 13127
-            },
-            &quot;tx&quot;: {
-                &quot;bytes&quot;: 152367092,
-                &quot;carrier_errors&quot;: 0,
-                &quot;collisions&quot;: 0,
-                &quot;dropped&quot;: 0,
-                &quot;errors&quot;: 0,
-                &quot;packets&quot;: 96644
-            }
-        },
-        &quot;fqdn&quot;: &quot;sf-1&quot;,
-        &quot;message&quot;: &quot;usage&quot;,
-        &quot;timestamp&quot;: 1685229103.9690208,
-        &quot;type&quot;: &quot;usage&quot;
-    },
-    ...
-]
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;extra&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;rx&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2146364</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;dropped&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;multicast&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;over_errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;packets&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">13127</span>
+<span class="w">            </span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;tx&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">152367092</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;carrier_errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;collisions&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;dropped&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;packets&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">96644</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;fqdn&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sf-1&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;usage&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1685229103.9690208</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;usage&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="p">]</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -1544,35 +1540,34 @@ to the 100 most recent events.</p>
 <span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_network_interfaces</span><span class="p">(</span><span class="s1">&#39;91b88200-ab4c-4ac4-9709-459504d1da0a&#39;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-[
-    {
-        &quot;floating&quot;: &quot;192.168.10.84&quot;,
-        &quot;instance_uuid&quot;: &quot;fffaa23b-c38b-484b-b58e-22eedc6ba94f&quot;,
-        &quot;ipv4&quot;: &quot;10.0.0.20&quot;,
-        &quot;macaddr&quot;: &quot;02:00:00:19:e4:b4&quot;,
-        &quot;metadata&quot;: {},
-        &quot;model&quot;: &quot;virtio&quot;,
-        &quot;network_uuid&quot;: &quot;91b88200-ab4c-4ac4-9709-459504d1da0a&quot;,
-        &quot;order&quot;: 0,
-        &quot;state&quot;: &quot;created&quot;,
-        &quot;uuid&quot;: &quot;24e636b4-b60c-4fcc-89d3-e717667a8c83&quot;,
-        &quot;version&quot;: 3
-    },
-    {
-        &quot;floating&quot;: null,
-        &quot;instance_uuid&quot;: &quot;1762820a-1e44-41b3-9174-44412481d873&quot;,
-        &quot;ipv4&quot;: &quot;10.0.0.57&quot;,
-        &quot;macaddr&quot;: &quot;02:00:00:4b:dc:5f&quot;,
-        &quot;metadata&quot;: {},
-        &quot;model&quot;: &quot;virtio&quot;,
-        &quot;network_uuid&quot;: &quot;91b88200-ab4c-4ac4-9709-459504d1da0a&quot;,
-        &quot;order&quot;: 0,
-        &quot;state&quot;: &quot;created&quot;,
-        &quot;uuid&quot;: &quot;0c790a6e-a4de-4518-84e7-11d1421cd4df&quot;,
-        &quot;version&quot;: 3
-    }
-]
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;floating&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;192.168.10.84&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;instance_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;fffaa23b-c38b-484b-b58e-22eedc6ba94f&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;ipv4&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;10.0.0.20&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;macaddr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;02:00:00:19:e4:b4&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">        </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virtio&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;network_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;91b88200-ab4c-4ac4-9709-459504d1da0a&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;order&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;created&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;24e636b4-b60c-4fcc-89d3-e717667a8c83&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;floating&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;instance_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1762820a-1e44-41b3-9174-44412481d873&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;ipv4&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;10.0.0.57&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;macaddr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;02:00:00:4b:dc:5f&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">        </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virtio&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;network_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;91b88200-ab4c-4ac4-9709-459504d1da0a&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;order&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;created&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0c790a6e-a4de-4518-84e7-11d1421cd4df&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">]</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -1584,30 +1579,29 @@ to the 100 most recent events.</p>
 <span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">ping</span><span class="p">(</span><span class="s1">&#39;55ea5f3b-d671-4d7f-9b8c-1e8f217a74f4&#39;</span><span class="p">,</span> <span class="s1">&#39;10.0.0.187&#39;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-{
-    &quot;stderr&quot;: [
-        &quot;&quot;
-    ],
-    &quot;stdout&quot;: [
-        &quot;PING 10.0.0.187 (10.0.0.187) 56(84) bytes of data.&quot;,
-        &quot;64 bytes from 10.0.0.187: icmp_seq=1 ttl=64 time=0.393 ms&quot;,
-        &quot;64 bytes from 10.0.0.187: icmp_seq=2 ttl=64 time=0.273 ms&quot;,
-        &quot;64 bytes from 10.0.0.187: icmp_seq=3 ttl=64 time=0.227 ms&quot;,
-        &quot;64 bytes from 10.0.0.187: icmp_seq=4 ttl=64 time=0.252 ms&quot;,
-        &quot;64 bytes from 10.0.0.187: icmp_seq=5 ttl=64 time=0.269 ms&quot;,
-        &quot;64 bytes from 10.0.0.187: icmp_seq=6 ttl=64 time=0.252 ms&quot;,
-        &quot;64 bytes from 10.0.0.187: icmp_seq=7 ttl=64 time=0.228 ms&quot;,
-        &quot;64 bytes from 10.0.0.187: icmp_seq=8 ttl=64 time=0.265 ms&quot;,
-        &quot;64 bytes from 10.0.0.187: icmp_seq=9 ttl=64 time=0.246 ms&quot;,
-        &quot;64 bytes from 10.0.0.187: icmp_seq=10 ttl=64 time=0.257 ms&quot;,
-        &quot;&quot;,
-        &quot;--- 10.0.0.187 ping statistics ---&quot;,
-        &quot;10 packets transmitted, 10 received, 0% packet loss, time 9213ms&quot;,
-        &quot;rtt min/avg/max/mdev = 0.227/0.266/0.393/0.044 ms&quot;,
-        &quot;&quot;
-    ]
-}
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;stderr&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;&quot;</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;stdout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;PING 10.0.0.187 (10.0.0.187) 56(84) bytes of data.&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;64 bytes from 10.0.0.187: icmp_seq=1 ttl=64 time=0.393 ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;64 bytes from 10.0.0.187: icmp_seq=2 ttl=64 time=0.273 ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;64 bytes from 10.0.0.187: icmp_seq=3 ttl=64 time=0.227 ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;64 bytes from 10.0.0.187: icmp_seq=4 ttl=64 time=0.252 ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;64 bytes from 10.0.0.187: icmp_seq=5 ttl=64 time=0.269 ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;64 bytes from 10.0.0.187: icmp_seq=6 ttl=64 time=0.252 ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;64 bytes from 10.0.0.187: icmp_seq=7 ttl=64 time=0.228 ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;64 bytes from 10.0.0.187: icmp_seq=8 ttl=64 time=0.265 ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;64 bytes from 10.0.0.187: icmp_seq=9 ttl=64 time=0.246 ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;64 bytes from 10.0.0.187: icmp_seq=10 ttl=64 time=0.257 ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;--- 10.0.0.187 ping statistics ---&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;10 packets transmitted, 10 received, 0% packet loss, time 9213ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;rtt min/avg/max/mdev = 0.227/0.266/0.393/0.044 ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;&quot;</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="p">}</span>
 </code></pre></div>
 </details>
 <h2 id="metadata">Metadata</h2>

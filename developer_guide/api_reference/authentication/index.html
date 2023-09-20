@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.2.7">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.2.7">
     
     
       
@@ -623,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agentoperations.md" class="md-nav__link">
+      <a href="../agentoperations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1403,33 +1403,33 @@ code implies creation of an access token:</p>
 </details>
 <details class="example">
 <summary>curl: creating an access token</summary>
-<div class="highlight"><pre><span></span><code>curl -X POST https://shakenfist/api/auth -d &#39;{&quot;namespace&quot;: &quot;system&quot;, &quot;key&quot;: &quot;oisoSe7T&quot;}&#39;
-{
-    &quot;access_token&quot;: &quot;eyJhbG...IkpXVCJ9.eyJmc...wwQ&quot;,
-    &quot;token_type&quot;: &quot;Bearer&quot;,
-    &quot;expires_in&quot;: 900
-}
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://shakenfist/api/auth<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;namespace&quot;: &quot;system&quot;, &quot;key&quot;: &quot;oisoSe7T&quot;}&#39;</span>
+<span class="o">{</span>
+<span class="w">    </span><span class="s2">&quot;access_token&quot;</span>:<span class="w"> </span><span class="s2">&quot;eyJhbG...IkpXVCJ9.eyJmc...wwQ&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;token_type&quot;</span>:<span class="w"> </span><span class="s2">&quot;Bearer&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;expires_in&quot;</span>:<span class="w"> </span><span class="m">900</span>
+<span class="o">}</span>
 </code></pre></div>
 <p>This token is then used by passing it as a HTTP Authorization header with
 "Bearer " prepended:</p>
-<div class="highlight"><pre><span></span><code>curl -X GET https://shakenfist/api/auth/namespaces \
-    -H &#39;Authorization: Bearer eyJhbG...IkpXVCJ9.eyJmc...wwQ&#39; \
-    -H &#39;Content-Type: application/json&#39;
-[
-    {
-        &quot;name&quot;: &quot;adhoc&quot;,
-        &quot;state&quot;: &quot;created&quot;,
-        &quot;trust&quot;: {&quot;full&quot;: [&quot;system&quot;]}
-    }, {
-        &quot;name&quot;: &quot;ci&quot;,
-        &quot;state&quot;: &quot;created&quot;,
-        &quot;trust&quot;: {&quot;full&quot;: [&quot;system&quot;]}
-    }, {
-        &quot;name&quot;: &quot;system&quot;,
-        &quot;state&quot;: &quot;created&quot;,
-        &quot;trust&quot;: {&quot;full&quot;: [&quot;system&quot;]}
-    }
-]
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>curl<span class="w"> </span>-X<span class="w"> </span>GET<span class="w"> </span>https://shakenfist/api/auth/namespaces<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-H<span class="w"> </span><span class="s1">&#39;Authorization: Bearer eyJhbG...IkpXVCJ9.eyJmc...wwQ&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-H<span class="w"> </span><span class="s1">&#39;Content-Type: application/json&#39;</span>
+<span class="o">[</span>
+<span class="w">    </span><span class="o">{</span>
+<span class="w">        </span><span class="s2">&quot;name&quot;</span>:<span class="w"> </span><span class="s2">&quot;adhoc&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;state&quot;</span>:<span class="w"> </span><span class="s2">&quot;created&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;trust&quot;</span>:<span class="w"> </span><span class="o">{</span><span class="s2">&quot;full&quot;</span>:<span class="w"> </span><span class="o">[</span><span class="s2">&quot;system&quot;</span><span class="o">]}</span>
+<span class="w">    </span><span class="o">}</span>,<span class="w"> </span><span class="o">{</span>
+<span class="w">        </span><span class="s2">&quot;name&quot;</span>:<span class="w"> </span><span class="s2">&quot;ci&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;state&quot;</span>:<span class="w"> </span><span class="s2">&quot;created&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;trust&quot;</span>:<span class="w"> </span><span class="o">{</span><span class="s2">&quot;full&quot;</span>:<span class="w"> </span><span class="o">[</span><span class="s2">&quot;system&quot;</span><span class="o">]}</span>
+<span class="w">    </span><span class="o">}</span>,<span class="w"> </span><span class="o">{</span>
+<span class="w">        </span><span class="s2">&quot;name&quot;</span>:<span class="w"> </span><span class="s2">&quot;system&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;state&quot;</span>:<span class="w"> </span><span class="s2">&quot;created&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;trust&quot;</span>:<span class="w"> </span><span class="o">{</span><span class="s2">&quot;full&quot;</span>:<span class="w"> </span><span class="o">[</span><span class="s2">&quot;system&quot;</span><span class="o">]}</span>
+<span class="w">    </span><span class="o">}</span>
+<span class="o">]</span>
 </code></pre></div>
 </details>
 <h2 id="namespaces">Namespaces</h2>
@@ -1461,24 +1461,23 @@ namespace, which is used for administrative tasks.</p>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ns</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
 <p>Which returns something like:</p>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-[
-    {
-        &quot;keys&quot;: [
-            &quot;jenkins&quot;
-        ],
-        &quot;metadata&quot;: {},
-        &quot;name&quot;: &quot;ci&quot;,
-        &quot;state&quot;: &quot;created&quot;,
-        &quot;trust&quot;: {
-            &quot;full&quot;: [
-                &quot;system&quot;
-            ]
-        },
-        &quot;version&quot;: 5
-    },
-    ...
-]
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;keys&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">            </span><span class="s2">&quot;jenkins&quot;</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">        </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ci&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;created&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;trust&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;full&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">                </span><span class="s2">&quot;system&quot;</span>
+<span class="w">            </span><span class="p">]</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="p">]</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -1493,19 +1492,18 @@ currently authenticated as the <code>system</code> namespace:</p>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ns</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
 <p>Which returns something like:</p>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-{
-    &quot;keys&quot;: [],
-    &quot;metadata&quot;: {},
-    &quot;name&quot;: &quot;demo&quot;,
-    &quot;state&quot;: &quot;created&quot;,
-    &quot;trust&quot;: {
-        &quot;full&quot;: [
-            &quot;system&quot;
-        ]
-    },
-    &quot;version&quot;: 5
-}
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;keys&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;demo&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;created&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;trust&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;full&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">            </span><span class="s2">&quot;system&quot;</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span>
+<span class="p">}</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -1531,19 +1529,18 @@ currently authenticated as the <code>system</code> namespace:</p>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ns</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
 <p>Which returns something like:</p>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-{
-    &quot;keys&quot;: [],
-    &quot;metadata&quot;: {},
-    &quot;name&quot;: &quot;demo&quot;,
-    &quot;state&quot;: &quot;created&quot;,
-    &quot;trust&quot;: {
-        &quot;full&quot;: [
-            &quot;system&quot;
-        ]
-    },
-    &quot;version&quot;: 5
-}
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;keys&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;demo&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;created&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;trust&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;full&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">            </span><span class="s2">&quot;system&quot;</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span>
+<span class="p">}</span>
 </code></pre></div>
 </details>
 <h2 id="namespace-keys">Namespace keys</h2>
@@ -1569,8 +1566,7 @@ the keys used to authenticate to a namespace.</p>
 <span class="nb">print</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span>
 </code></pre></div>
 <p>Which returns something like:</p>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-[&#39;jenkins&#39;]
+<div class="highlight"><pre><span></span><code><span class="p">[</span><span class="err">&#39;je</span><span class="kc">n</span><span class="err">ki</span><span class="kc">ns</span><span class="err">&#39;</span><span class="p">]</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -1586,8 +1582,7 @@ the keys used to authenticate to a namespace.</p>
 <span class="nb">print</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span>
 </code></pre></div>
 <p>Which returns something like:</p>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-[&#39;jenkins&#39;, &#39;newkey&#39;]
+<div class="highlight"><pre><span></span><code><span class="p">[</span><span class="err">&#39;je</span><span class="kc">n</span><span class="err">ki</span><span class="kc">ns</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="kc">ne</span><span class="err">wkey&#39;</span><span class="p">]</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -1603,8 +1598,7 @@ the keys used to authenticate to a namespace.</p>
 <span class="nb">print</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span>
 </code></pre></div>
 <p>Which returns something like:</p>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-[&#39;jenkins&#39;]
+<div class="highlight"><pre><span></span><code><span class="p">[</span><span class="err">&#39;je</span><span class="kc">n</span><span class="err">ki</span><span class="kc">ns</span><span class="err">&#39;</span><span class="p">]</span>
 </code></pre></div>
 </details>
 <details class="example">

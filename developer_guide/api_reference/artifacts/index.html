@@ -13,14 +13,14 @@
         <link rel="canonical" href="https://shakenfist.com/developer_guide/api_reference/artifacts/">
       
       
-        <link rel="prev" href="../admin/">
+        <link rel="prev" href="../agentoperations/">
       
       
         <link rel="next" href="../authentication/">
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.2.7">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.2.7">
     
     
       
@@ -623,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agentoperations.md" class="md-nav__link">
+      <a href="../agentoperations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1522,10 +1522,10 @@ fetched and if that fetch is complete.</p>
           <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;source_url&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span> <span class="n">versions</span><span class="p">,</span>
           <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;state&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;shared&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)))</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>example.py
 uuid,namespace,type,source_url,versions,state,shared
-05e841a7-7e13-4df6-8c04-8932b98885bd,system,image,sf://upload/system/centos-9-stream,1 of 1,created,False
-1646bc22-674b-4a46-97e5-f767a6e82d1c,system,image,debian:11,3 of 9,created,False
+05e841a7-7e13-4df6-8c04-8932b98885bd,system,image,sf://upload/system/centos-9-stream,1<span class="w"> </span>of<span class="w"> </span><span class="m">1</span>,created,False
+1646bc22-674b-4a46-97e5-f767a6e82d1c,system,image,debian:11,3<span class="w"> </span>of<span class="w"> </span><span class="m">9</span>,created,False
 ...
 </code></pre></div>
 </details>
@@ -1538,29 +1538,28 @@ uuid,namespace,type,source_url,versions,state,shared
 <span class="n">artifact</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_artifact</span><span class="p">(</span><span class="s1">&#39;05e841a7-7e13-4df6-8c04-8932b98885bd&#39;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-{
-    &quot;artifact_type&quot;: &quot;image&quot;,
-    &quot;blob_uuid&quot;: &quot;8fa321aa-1e05-43c9-ade1-36d45940d6bd&quot;,
-    &quot;blobs&quot;: {
-        &quot;1&quot;: {
-            &quot;depends_on&quot;: null,
-            &quot;instances&quot;: [],
-            &quot;reference_count&quot;: 2,
-            &quot;size&quot;: 960546304,
-            &quot;uuid&quot;: &quot;8fa321aa-1e05-43c9-ade1-36d45940d6bd&quot;
-        }
-    },
-    &quot;index&quot;: 1,
-    &quot;max_versions&quot;: 3,
-    &quot;metadata&quot;: {},
-    &quot;namespace&quot;: &quot;system&quot;,
-    &quot;shared&quot;: false,
-    &quot;source_url&quot;: &quot;sf://upload/system/centos-9-stream&quot;,
-    &quot;state&quot;: &quot;created&quot;,
-    &quot;uuid&quot;: &quot;05e841a7-7e13-4df6-8c04-8932b98885bd&quot;,
-    &quot;version&quot;: 6
-}
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;artifact_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;image&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;blob_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;8fa321aa-1e05-43c9-ade1-36d45940d6bd&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;blobs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;depends_on&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;instances&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">            </span><span class="nt">&quot;reference_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">960546304</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;8fa321aa-1e05-43c9-ade1-36d45940d6bd&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;index&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;max_versions&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">    </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;system&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;source_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sf://upload/system/centos-9-stream&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;created&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;05e841a7-7e13-4df6-8c04-8932b98885bd&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span>
+<span class="p">}</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -1574,19 +1573,18 @@ uuid,namespace,type,source_url,versions,state,shared
 </code></pre></div>
 <p>Note that events are returned in reverse chronological order and are limited
 to the 100 most recent events.</p>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-[
-    ...
-    {
-        &quot;duration&quot;: null,
-        &quot;extra&quot;: {},
-        &quot;fqdn&quot;: &quot;sf-3&quot;,
-        &quot;message&quot;: &quot;artifact fetch complete&quot;,
-        &quot;timestamp&quot;: 1684718452.2673004,
-        &quot;type&quot;: &quot;audit&quot;
-    },
-    ...
-]
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;extra&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">        </span><span class="nt">&quot;fqdn&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sf-3&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;artifact fetch complete&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1684718452.2673004</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;audit&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="p">]</span>
 </code></pre></div>
 </details>
 <h2 id="deleting-artifacts">Deleting artifacts</h2>
@@ -1711,23 +1709,23 @@ details.</p>
     <span class="n">artifact</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">upload_artifact</span><span class="p">(</span><span class="s1">&#39;example&#39;</span><span class="p">,</span> <span class="n">upload</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
     <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Created artifact </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">artifact</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-Creating artifact
-Created artifact 2d9c1d4c-3436-4ea8-9b60-833fe791eece
-$ sf-client artifact show 2d9c1d4c-3436-4ea8-9b60-833fe791eece
-uuid                     : 2d9c1d4c-3436-4ea8-9b60-833fe791eece
-namespace                : system
-type                     : image
-state                    : created
-source url               : sf://upload/system/example
-current version blob uuid: 36e846f6-ae20-46e9-8377-1c123f22b610
-number of versions       : 1
-maximum versions         : 3
-shared                   : False
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>example.py
+Creating<span class="w"> </span>artifact
+Created<span class="w"> </span>artifact<span class="w"> </span>2d9c1d4c-3436-4ea8-9b60-833fe791eece
+$<span class="w"> </span>sf-client<span class="w"> </span>artifact<span class="w"> </span>show<span class="w"> </span>2d9c1d4c-3436-4ea8-9b60-833fe791eece
+uuid<span class="w">                     </span>:<span class="w"> </span>2d9c1d4c-3436-4ea8-9b60-833fe791eece
+namespace<span class="w">                </span>:<span class="w"> </span>system
+<span class="nb">type</span><span class="w">                     </span>:<span class="w"> </span>image
+state<span class="w">                    </span>:<span class="w"> </span>created
+<span class="nb">source</span><span class="w"> </span>url<span class="w">               </span>:<span class="w"> </span>sf://upload/system/example
+current<span class="w"> </span>version<span class="w"> </span>blob<span class="w"> </span>uuid:<span class="w"> </span>36e846f6-ae20-46e9-8377-1c123f22b610
+number<span class="w"> </span>of<span class="w"> </span>versions<span class="w">       </span>:<span class="w"> </span><span class="m">1</span>
+maximum<span class="w"> </span>versions<span class="w">         </span>:<span class="w"> </span><span class="m">3</span>
+shared<span class="w">                   </span>:<span class="w"> </span>False
 
 Versions:
-    1  : blob 36e846f6-ae20-46e9-8377-1c123f22b610 is 1.3MB
-$ sf-client artifact delete 2d9c1d4c-3436-4ea8-9b60-833fe791eece
+<span class="w">    </span><span class="m">1</span><span class="w">  </span>:<span class="w"> </span>blob<span class="w"> </span>36e846f6-ae20-46e9-8377-1c123f22b610<span class="w"> </span>is<span class="w"> </span><span class="m">1</span>.3MB
+$<span class="w"> </span>sf-client<span class="w"> </span>artifact<span class="w"> </span>delete<span class="w"> </span>2d9c1d4c-3436-4ea8-9b60-833fe791eece
 </code></pre></div>
 </details>
 <h2 id="using-an-already-existing-blob-as-a-new-version-of-an-artifact">Using an already existing blob as a new version of an artifact</h2>

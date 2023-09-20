@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.2.7">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.2.7">
     
     
       
@@ -623,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agentoperations.md" class="md-nav__link">
+      <a href="../agentoperations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -834,6 +834,19 @@
   <a href="#executing-commands-within-an-instance" class="md-nav__link">
     Executing commands within an instance
   </a>
+  
+    <nav class="md-nav" aria-label="Executing commands within an instance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fetching-information-about-an-instances-agent-operations" class="md-nav__link">
+    Fetching information about an Instance's Agent Operations
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1444,6 +1457,19 @@
     Executing commands within an instance
   </a>
   
+    <nav class="md-nav" aria-label="Executing commands within an instance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fetching-information-about-an-instances-agent-operations" class="md-nav__link">
+    Fetching information about an Instance's Agent Operations
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1727,15 +1753,15 @@ Shaken Fist in guest agent installed.</p>
     <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance did not reboot, hard rebooting&#39;</span><span class="p">)</span>
 </code></pre></div>
 <p>Sample output:</p>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-Waiting for the instance to start: schedule complete
-Instance is created
-Waiting for agent to start: not ready (no contact)
-Waiting for agent to start: not ready (no contact)
-Waiting for agent to start: not ready (no contact)
-Instance booted at 1684404969
-Soft rebooting instance
-Boot time changed from 1684404969 to 1684405036.0
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>example.py
+Waiting<span class="w"> </span><span class="k">for</span><span class="w"> </span>the<span class="w"> </span>instance<span class="w"> </span>to<span class="w"> </span>start:<span class="w"> </span>schedule<span class="w"> </span><span class="nb">complete</span>
+Instance<span class="w"> </span>is<span class="w"> </span>created
+Waiting<span class="w"> </span><span class="k">for</span><span class="w"> </span>agent<span class="w"> </span>to<span class="w"> </span>start:<span class="w"> </span>not<span class="w"> </span>ready<span class="w"> </span><span class="o">(</span>no<span class="w"> </span>contact<span class="o">)</span>
+Waiting<span class="w"> </span><span class="k">for</span><span class="w"> </span>agent<span class="w"> </span>to<span class="w"> </span>start:<span class="w"> </span>not<span class="w"> </span>ready<span class="w"> </span><span class="o">(</span>no<span class="w"> </span>contact<span class="o">)</span>
+Waiting<span class="w"> </span><span class="k">for</span><span class="w"> </span>agent<span class="w"> </span>to<span class="w"> </span>start:<span class="w"> </span>not<span class="w"> </span>ready<span class="w"> </span><span class="o">(</span>no<span class="w"> </span>contact<span class="o">)</span>
+Instance<span class="w"> </span>booted<span class="w"> </span>at<span class="w"> </span><span class="m">1684404969</span>
+Soft<span class="w"> </span>rebooting<span class="w"> </span>instance
+Boot<span class="w"> </span><span class="nb">time</span><span class="w"> </span>changed<span class="w"> </span>from<span class="w"> </span><span class="m">1684404969</span><span class="w"> </span>to<span class="w"> </span><span class="m">1684405036</span>.0
 </code></pre></div>
 </details>
 <details class="example">
@@ -1864,24 +1890,24 @@ before displaying interface details.</p>
 <span class="n">ifaces</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_interfaces</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ifaces</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-Waiting for the instance to start: Fetching required blob ffdfce7f-728e-4b76-83c2-304e252f98b1, 30% complete
-Instance is created
-[
-    {
-        &quot;floating&quot;: null,
-        &quot;instance_uuid&quot;: &quot;d512e9f5-98d6-4c36-8520-33b6fc6de15f&quot;,
-        &quot;ipv4&quot;: &quot;10.0.0.6&quot;,
-        &quot;macaddr&quot;: &quot;02:00:00:73:18:66&quot;,
-        &quot;metadata&quot;: {},
-        &quot;model&quot;: &quot;virtio&quot;,
-        &quot;network_uuid&quot;: &quot;6aaaf243-0406-41a1-aa13-5d79a0b8672d&quot;,
-        &quot;order&quot;: 0,
-        &quot;state&quot;: &quot;created&quot;,
-        &quot;uuid&quot;: &quot;b1981e81-b37a-4176-ba37-b61bc7208012&quot;,
-        &quot;version&quot;: 3
-    }
-]
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>example.py
+Waiting<span class="w"> </span><span class="k">for</span><span class="w"> </span>the<span class="w"> </span>instance<span class="w"> </span>to<span class="w"> </span>start:<span class="w"> </span>Fetching<span class="w"> </span>required<span class="w"> </span>blob<span class="w"> </span>ffdfce7f-728e-4b76-83c2-304e252f98b1,<span class="w"> </span><span class="m">30</span>%<span class="w"> </span><span class="nb">complete</span>
+Instance<span class="w"> </span>is<span class="w"> </span>created
+<span class="o">[</span>
+<span class="w">    </span><span class="o">{</span>
+<span class="w">        </span><span class="s2">&quot;floating&quot;</span>:<span class="w"> </span>null,
+<span class="w">        </span><span class="s2">&quot;instance_uuid&quot;</span>:<span class="w"> </span><span class="s2">&quot;d512e9f5-98d6-4c36-8520-33b6fc6de15f&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;ipv4&quot;</span>:<span class="w"> </span><span class="s2">&quot;10.0.0.6&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;macaddr&quot;</span>:<span class="w"> </span><span class="s2">&quot;02:00:00:73:18:66&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;metadata&quot;</span>:<span class="w"> </span><span class="o">{}</span>,
+<span class="w">        </span><span class="s2">&quot;model&quot;</span>:<span class="w"> </span><span class="s2">&quot;virtio&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;network_uuid&quot;</span>:<span class="w"> </span><span class="s2">&quot;6aaaf243-0406-41a1-aa13-5d79a0b8672d&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;order&quot;</span>:<span class="w"> </span><span class="m">0</span>,
+<span class="w">        </span><span class="s2">&quot;state&quot;</span>:<span class="w"> </span><span class="s2">&quot;created&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;uuid&quot;</span>:<span class="w"> </span><span class="s2">&quot;b1981e81-b37a-4176-ba37-b61bc7208012&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;version&quot;</span>:<span class="w"> </span><span class="m">3</span>
+<span class="w">    </span><span class="o">}</span>
+<span class="o">]</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -1895,55 +1921,54 @@ Instance is created
 </code></pre></div>
 <p>Note that events are returned in reverse chronological order and are limited
 to the 100 most recent events.</p>
-<div class="highlight"><pre><span></span><code>$python3 example.py
-[
-    ...
-    {
-        &quot;duration&quot;: null,
-        &quot;extra&quot;: {
-            &quot;cpu usage&quot;: {
-                &quot;cpu time ns&quot;: 357485828000,
-                &quot;system time ns&quot;: 66297716000,
-                &quot;user time ns&quot;: 291188112000
-            },
-            &quot;disk usage&quot;: {
-                &quot;vda&quot;: {
-                    &quot;actual bytes on disk&quot;: 956301312,
-                    &quot;errors&quot;: -1,
-                    &quot;read bytes&quot;: 406776320,
-                    &quot;read requests&quot;: 12225,
-                    &quot;write bytes&quot;: 2105954304,
-                    &quot;write requests&quot;: 3657
-                },
-                &quot;vdb&quot;: {
-                    &quot;actual bytes on disk&quot;: 102400,
-                    &quot;errors&quot;: -1,
-                    &quot;read bytes&quot;: 279552,
-                    &quot;read requests&quot;: 74,
-                    &quot;write bytes&quot;: 0,
-                    &quot;write requests&quot;: 0
-                }
-            },
-            &quot;network usage&quot;: {
-                &quot;02:00:00:1d:24:ae&quot;: {
-                    &quot;read bytes&quot;: 147084732,
-                    &quot;read drops&quot;: 0,
-                    &quot;read errors&quot;: 0,
-                    &quot;read packets&quot;: 16484,
-                    &quot;write bytes&quot;: 2166754,
-                    &quot;write drops&quot;: 0,
-                    &quot;write errors&quot;: 0,
-                    &quot;write packets&quot;: 13144
-                }
-            }
-        },
-        &quot;fqdn&quot;: &quot;sf-2&quot;,
-        &quot;message&quot;: &quot;usage&quot;,
-        &quot;timestamp&quot;: 1685229509.9592097,
-        &quot;type&quot;: &quot;usage&quot;
-    },
-    ...
-]
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;extra&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;cpu usage&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;cpu time ns&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">357485828000</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;system time ns&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">66297716000</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;user time ns&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">291188112000</span>
+<span class="w">            </span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;disk usage&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;vda&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="nt">&quot;actual bytes on disk&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">956301312</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">-1</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;read bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">406776320</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;read requests&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12225</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;write bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2105954304</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;write requests&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3657</span>
+<span class="w">                </span><span class="p">},</span>
+<span class="w">                </span><span class="nt">&quot;vdb&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="nt">&quot;actual bytes on disk&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">102400</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">-1</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;read bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">279552</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;read requests&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">74</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;write bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;write requests&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;network usage&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;02:00:00:1d:24:ae&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="nt">&quot;read bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">147084732</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;read drops&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;read errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;read packets&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">16484</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;write bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2166754</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;write drops&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;write errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">&quot;write packets&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">13144</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;fqdn&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sf-2&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;usage&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1685229509.9592097</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;usage&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="p">]</span>
 </code></pre></div>
 </details>
 <h2 id="out-of-band-interactions-with-instances">Out-of-band interactions with instances</h2>
@@ -2024,11 +2049,12 @@ functionality in the Shaken Fist client.</p>
 </code></pre></div>
 </details>
 <h2 id="executing-commands-within-an-instance">Executing commands within an instance</h2>
-<p>Assuming a given instance has the Shaken Fist agent installed and running, and
-was created with a <code>sf-agent</code> side channel, you can use the Shaken Fist agent to
-move data into and out of the instance and execute commands without the instance
-needing to have working networking configured. You can read more about the exact
-requirements for agent connectivity in the  <a href="/developer_guide/api_reference/agentoperations/">API reference guide for agent operations</a>.</p>
+<p>Since v0.7, assuming a given instance has the Shaken Fist agent installed and
+running, and was created with a <code>sf-agent</code> side channel, you can use the Shaken
+Fist agent to move data into and out of the instance and execute commands without
+the instance needing to have working networking configured. You can read more
+about the exact requirements for agent connectivity in the
+<a href="/developer_guide/api_reference/agentoperations/">API reference guide for agent operations</a>.</p>
 <p>Agent Operations are not created directly -- they are a side effect of a call to
 one of the API methods below, which create an Agent Operation so the caller can
 track the state of their request. At the time of writing, you can perform the
@@ -2038,6 +2064,7 @@ following operations via the agent:</p>
   The python API client has a helper to upload the file into a blob before copying
   to the instance.</li>
 <li>execute a command and return its results (exit code, stdout, stderr).</li>
+<li>get the contents of a file within an instance into a blob.</li>
 </ul>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
@@ -2046,7 +2073,180 @@ following operations via the agent:</p>
 <li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_put">POST /instances/{instance_ref}/agent/put</a>: copy a blob into an instance at the specified location with the specified permissions.</li>
 </ul>
 </details>
-<p>...</p>
+<details class="example">
+<summary>Python API client: execute a command on an instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">agentop</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">instance_execute</span><span class="p">(</span><span class="s1">&#39;...uuid...&#39;</span><span class="p">,</span> <span class="s1">&#39;cat /etc/os-release&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">agentop</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<p>Which would return something along the lines of:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;commands&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;block-for-result&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;command&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;execute&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;commandline&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cat /etc/os-release&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;instance_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;a771fb13-aaad-4cb6-a86b-7ee51e7bacc6&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">    </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vdi&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;0&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;command-line&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cat /etc/os-release&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;result&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;return-code&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;stderr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;stdout&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PRETTY_NAME=\&quot;Debian GNU/Linux 11 (bullseye)\&quot;...&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;complete&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;93fb538c-84f5-4ff8-83ba-2be5f5f92954&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="p">}</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: put a file onto an instance via a blob</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">util</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">check_capability</span><span class="p">(</span><span class="s1">&#39;blob-search-by-hash&#39;</span><span class="p">):</span>
+    <span class="n">blob</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="c1"># We can cheat here -- if we already have a blob in the cluster with the</span>
+    <span class="c1"># checksum of the file we&#39;re uploading, we can skip the upload entirely and</span>
+    <span class="c1"># just reuse that blob.</span>
+    <span class="n">blob</span> <span class="o">=</span> <span class="n">util</span><span class="o">.</span><span class="n">checksum_with_progress</span><span class="p">(</span><span class="n">sf_client</span><span class="p">,</span> <span class="s1">&#39;README.md&#39;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="ow">not</span> <span class="n">blob</span><span class="p">:</span>
+    <span class="n">artifact</span> <span class="o">=</span> <span class="n">util</span><span class="o">.</span><span class="n">upload_artifact_with_progress</span><span class="p">(</span>
+        <span class="n">sf_client</span><span class="p">,</span> <span class="s1">&#39;upload-to-instance&#39;</span><span class="p">,</span> <span class="s1">&#39;README.md&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Recycling existing blob&#39;</span><span class="p">)</span>
+    <span class="n">artifact</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">blob_artifact</span><span class="p">(</span>
+        <span class="s1">&#39;upload-to-instnace&#39;</span><span class="p">,</span> <span class="n">blob</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">],</span> <span class="n">source_url</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Created artifact </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">artifact</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="n">st</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">stat</span><span class="p">(</span><span class="s1">&#39;README.md&#39;</span><span class="p">)</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">instance_put_blob</span><span class="p">(</span>
+        <span class="s1">&#39;...instance_ref...&#39;</span><span class="p">,</span> <span class="n">artifact</span><span class="p">[</span><span class="s1">&#39;blob_uuid&#39;</span><span class="p">],</span> <span class="s1">&#39;/tmp/README.md&#39;</span><span class="p">,</span> <span class="n">st</span><span class="o">.</span><span class="n">st_mode</span><span class="p">)</span>
+</code></pre></div>
+<p>Which would return something along the lines of:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>/tmp/demo.py
+Calculate<span class="w"> </span>checksum:<span class="w"> </span><span class="m">100</span>%<span class="p">|</span>██████████████████████████<span class="p">|</span><span class="w"> </span><span class="m">805</span>/805<span class="w"> </span><span class="o">[</span><span class="m">00</span>:00&lt;<span class="m">00</span>:00,<span class="w"> </span><span class="m">13</span>.0MB/s<span class="o">]</span>
+Searching<span class="w"> </span><span class="k">for</span><span class="w"> </span>a<span class="w"> </span>pre-existing<span class="w"> </span>blob<span class="w"> </span>with<span class="w"> </span>this<span class="w"> </span>hash...
+Recycling<span class="w"> </span>existing<span class="w"> </span>blob
+Created<span class="w"> </span>artifact<span class="w"> </span>3c0a6a83-e9df-46f0-b9a3-819eb16bea23
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: get a file from an instance via a blob</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">op</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">instance_get</span><span class="p">(</span><span class="s1">&#39;...instance_ref...&#39;</span><span class="p">,</span> <span class="s1">&#39;/tmp/README.md&#39;</span><span class="p">)</span>
+<span class="k">if</span> <span class="s1">&#39;0&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;results&#39;</span><span class="p">,</span> <span class="p">{}):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Results not available.&#39;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">blob_uuid</span> <span class="o">=</span> <span class="n">op</span><span class="p">[</span><span class="s1">&#39;results&#39;</span><span class="p">][</span><span class="s1">&#39;0&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;content_blob&#39;</span><span class="p">)</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">blob_uuid</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Results did not include content&#39;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;/tmp/README.md&#39;</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_blob_data</span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">):</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<h3 id="fetching-information-about-an-instances-agent-operations">Fetching information about an Instance's Agent Operations</h3>
+<p>Additionally, you can list the agent operations for a given instance.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__agentoperations">GET /instances/{instance_ref}/agentoperations</a>: List all agent operations for an instance.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: get all agent operations for a specific instance</summary>
+<p>The instance here had the following command line commands run before this
+sample script was run:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sf-client<span class="w"> </span>instance<span class="w"> </span>upload<span class="w"> </span>...uuid...<span class="w"> </span>README.md<span class="w"> </span>/tmp/README.md
+$<span class="w"> </span>sf-client<span class="w"> </span>--simple<span class="w"> </span>instance<span class="w"> </span>execute<span class="w"> </span>...uuid...<span class="w"> </span><span class="s2">&quot;cat /tmp/README.md&quot;</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">agentops</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_agentoperations</span><span class="p">(</span><span class="s1">&#39;...uuid...&#39;</span><span class="p">,</span> <span class="nb">all</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">agentops</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<p>Note the <code>all</code> argument here. By default you are only returned agent operations
+which are queued to execute. To see all agent operations including those
+which have completed execution, pass <code>all=True</code>. This script outputs:</p>
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;commands&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">            </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;blob_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;09306f15-b1b3-4850-afb4-f4179559fa7f&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;command&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;put-blob&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/tmp/README.md&quot;</span>
+<span class="w">            </span><span class="p">},</span>
+<span class="w">            </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;command&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;chmod&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">33188</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/tmp/README.md&quot;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">&quot;instance_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;a771fb13-aaad-4cb6-a86b-7ee51e7bacc6&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">        </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vdi&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;0&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/tmp/README.md&quot;</span>
+<span class="w">            </span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/tmp/README.md&quot;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;complete&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;343049d7-da2a-46f2-bb5c-edb783ec1fb9&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;commands&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">            </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;block-for-result&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;command&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;execute&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;commandline&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cat /tmp/README.md&quot;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">&quot;instance_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;a771fb13-aaad-4cb6-a86b-7ee51e7bacc6&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">        </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vdi&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;0&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;command-line&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cat /tmp/README.md&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;result&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;return-code&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;stderr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;stdout&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...content of file...&quot;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;complete&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">]</span>
+</code></pre></div>
+</details>
 <h2 id="metadata">Metadata</h2>
 <p>All objects exposed by the REST API may have metadata associated with them. This
 metadata is for storing values that are of interest to the owner of the resources,

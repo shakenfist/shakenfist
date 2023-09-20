@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/developer_guide/api_reference/blob_checksums/">
+        <link rel="canonical" href="https://shakenfist.com/developer_guide/api_reference/agentoperations/">
       
       
-        <link rel="prev" href="../authentication/">
+        <link rel="prev" href="../admin/">
       
       
-        <link rel="next" href="../blobs/">
+        <link rel="next" href="../artifacts/">
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
@@ -24,7 +24,7 @@
     
     
       
-        <title>Blob Checksums (/blob_checksums/) - Shaken Fist</title>
+        <title>Agent Operations (/agentoperations/) - Shaken Fist</title>
       
     
     
@@ -79,7 +79,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#blob-checksums-blob_checksums" class="md-skip">
+        <a href="#agent-operations-agentoperations" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Blob Checksums (/blob_checksums/)
+              Agent Operations (/agentoperations/)
             
           </span>
         </div>
@@ -621,9 +621,18 @@
                 
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../agentoperations/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -632,6 +641,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -681,18 +691,9 @@
                 
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../blob_checksums/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -701,7 +702,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -1281,8 +1281,69 @@
   
 
 
-<h1 id="blob-checksums-blob_checksums">Blob Checksums (/blob_checksums/)</h1>
-<p>Blob checksums are documented as part of <a href="/developer_guide/api_reference/blobs">blobs</a>.</p>
+<h1 id="agent-operations-agentoperations">Agent Operations (/agentoperations/)</h1>
+<p>Since v0.7, when an instance is running the Shaken Fist agent, you can queue agent
+operations to run on that instance. These operations consist of a series of commands
+which are executed in return, with results for each being gathered as they execute.
+In general the API for agent operations is instance-centric -- you lookup the
+agent operations an instance has seen, and then can request further information
+about the agent operation directly. There is currently no way to search for an
+agent operation outside the context of its parent instance.</p>
+<p>For information on how to create an agent operation for an instance, refer to
+the <a href="/developer_guide/api_reference/instances/#executing-commands-within-an-instance">instances API documentation on creating agent operations</a>. For information on how to list the
+agent operations for a given instance, refer to the <a href="/developer_guide/api_reference/instances/#fetching-information-about-an-instances-agent-operations">instances API documentation on listing agent operations</a>.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/agentoperations/get_agentoperations__operation_uuid_">GET /agentoperations/{operation_uuid}</a>: Lookup a specific agent operation.</li>
+<li><a href="https://openapi.shakenfist.com/#/agentoperations/delete_agentoperations__operation_uuid_">DELETE /agentoperations/{operation_uuid}</a>: Delete a specific agent operation.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: lookup an agent operation by uuid</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">agentop</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_agent_operation</span><span class="p">(</span><span class="s1">&#39;5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">agentop</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<p>Which returns something like:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;commands&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;block-for-result&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;command&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;execute&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;commandline&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cat /tmp/README.md&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;instance_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;a771fb13-aaad-4cb6-a86b-7ee51e7bacc6&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">    </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vdi&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;0&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;command-line&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cat /tmp/README.md&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;result&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;return-code&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;stderr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;stdout&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;complete&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="p">}</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: delete an agent operation by uuid</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">agentop</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">delete_agent_operation</span><span class="p">(</span><span class="s1">&#39;5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
 
 
 

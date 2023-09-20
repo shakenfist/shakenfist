@@ -16,11 +16,11 @@
         <link rel="prev" href="../../../user_guide/metadata/">
       
       
-        <link rel="next" href="../artifacts/">
+        <link rel="next" href="../agentoperations/">
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.2.7">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.2.7">
     
     
       
@@ -670,7 +670,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agentoperations.md" class="md-nav__link">
+      <a href="../agentoperations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1355,9 +1355,9 @@ those locks (machine and process id).</p>
 <span class="k">for</span> <span class="n">ref</span><span class="p">,</span> <span class="n">meta</span> <span class="ow">in</span> <span class="n">locks</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
     <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="n">meta</span><span class="p">[</span><span class="s1">&#39;pid&#39;</span><span class="p">],</span> <span class="n">meta</span><span class="p">[</span><span class="s1">&#39;node&#39;</span><span class="p">],</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;operation&#39;</span><span class="p">)))</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>example.py
 lock,pid,node,operation
-/sflocks/sf/network/d2950d74-50c7-4790-a985-c43d9eb9bad9,2834066,sf-3,Network ensure mesh
+/sflocks/sf/network/d2950d74-50c7-4790-a985-c43d9eb9bad9,2834066,sf-3,Network<span class="w"> </span>ensure<span class="w"> </span>mesh
 </code></pre></div>
 </details>
 

@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.2.7">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.2.7">
     
     
       
@@ -623,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agentoperations.md" class="md-nav__link">
+      <a href="../agentoperations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1433,24 +1433,24 @@ before displaying interface details.</p>
 <span class="n">ifaces</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_interfaces</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ifaces</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-Waiting for the instance to start: Fetching required blob ffdfce7f-728e-4b76-83c2-304e252f98b1, 30% complete
-Instance is created
-[
-    {
-        &quot;floating&quot;: null,
-        &quot;instance_uuid&quot;: &quot;d512e9f5-98d6-4c36-8520-33b6fc6de15f&quot;,
-        &quot;ipv4&quot;: &quot;10.0.0.6&quot;,
-        &quot;macaddr&quot;: &quot;02:00:00:73:18:66&quot;,
-        &quot;metadata&quot;: {},
-        &quot;model&quot;: &quot;virtio&quot;,
-        &quot;network_uuid&quot;: &quot;6aaaf243-0406-41a1-aa13-5d79a0b8672d&quot;,
-        &quot;order&quot;: 0,
-        &quot;state&quot;: &quot;created&quot;,
-        &quot;uuid&quot;: &quot;b1981e81-b37a-4176-ba37-b61bc7208012&quot;,
-        &quot;version&quot;: 3
-    }
-]
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>example.py
+Waiting<span class="w"> </span><span class="k">for</span><span class="w"> </span>the<span class="w"> </span>instance<span class="w"> </span>to<span class="w"> </span>start:<span class="w"> </span>Fetching<span class="w"> </span>required<span class="w"> </span>blob<span class="w"> </span>ffdfce7f-728e-4b76-83c2-304e252f98b1,<span class="w"> </span><span class="m">30</span>%<span class="w"> </span><span class="nb">complete</span>
+Instance<span class="w"> </span>is<span class="w"> </span>created
+<span class="o">[</span>
+<span class="w">    </span><span class="o">{</span>
+<span class="w">        </span><span class="s2">&quot;floating&quot;</span>:<span class="w"> </span>null,
+<span class="w">        </span><span class="s2">&quot;instance_uuid&quot;</span>:<span class="w"> </span><span class="s2">&quot;d512e9f5-98d6-4c36-8520-33b6fc6de15f&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;ipv4&quot;</span>:<span class="w"> </span><span class="s2">&quot;10.0.0.6&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;macaddr&quot;</span>:<span class="w"> </span><span class="s2">&quot;02:00:00:73:18:66&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;metadata&quot;</span>:<span class="w"> </span><span class="o">{}</span>,
+<span class="w">        </span><span class="s2">&quot;model&quot;</span>:<span class="w"> </span><span class="s2">&quot;virtio&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;network_uuid&quot;</span>:<span class="w"> </span><span class="s2">&quot;6aaaf243-0406-41a1-aa13-5d79a0b8672d&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;order&quot;</span>:<span class="w"> </span><span class="m">0</span>,
+<span class="w">        </span><span class="s2">&quot;state&quot;</span>:<span class="w"> </span><span class="s2">&quot;created&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;uuid&quot;</span>:<span class="w"> </span><span class="s2">&quot;b1981e81-b37a-4176-ba37-b61bc7208012&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;version&quot;</span>:<span class="w"> </span><span class="m">3</span>
+<span class="w">    </span><span class="o">}</span>
+<span class="o">]</span>
 </code></pre></div>
 </details>
 <h2 id="floating-network-interfaces">Floating network interfaces</h2>
@@ -1491,8 +1491,8 @@ the request and then poll to learn our external address.</p>
 
 <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;The interface is externally accessible at </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">iface</span><span class="p">[</span><span class="s1">&#39;floating&#39;</span><span class="p">])</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-The interface is externally accessible at 192.168.10.5
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>example.py
+The<span class="w"> </span>interface<span class="w"> </span>is<span class="w"> </span>externally<span class="w"> </span>accessible<span class="w"> </span>at<span class="w"> </span><span class="m">192</span>.168.10.5
 </code></pre></div>
 </details>
 <details class="example">

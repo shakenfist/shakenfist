@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.2.7">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.2.7">
     
     
       
@@ -623,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agentoperations.md" class="md-nav__link">
+      <a href="../agentoperations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1426,30 +1426,29 @@ event system.</p>
 </code></pre></div>
 <p>Note that events are returned in reverse chronological order and are limited
 to the 100 most recent events.</p>
-<div class="highlight"><pre><span></span><code>$ python3 example.py
-[
-    ...
-    {
-        &quot;duration&quot;: null,
-        &quot;extra&quot;: {
-            &quot;cpu_available&quot;: 12,
-            &quot;cpu_load_1&quot;: 2.0,
-            &quot;cpu_load_15&quot;: 1.85,
-            &quot;cpu_load_5&quot;: 1.87,
-            &quot;cpu_max&quot;: 12,
-            &quot;cpu_max_per_instance&quot;: 16,
-            &quot;cpu_total_instance_cpu_time&quot;: 235110000000,
-            &quot;cpu_total_instance_vcpus&quot;: 1,
-            &quot;disk_free&quot;: 376334815232,
-            ...
-        },
-        &quot;fqdn&quot;: &quot;sf-1&quot;,
-        &quot;message&quot;: &quot;updated node resources and package versions&quot;,
-        &quot;timestamp&quot;: 1685475323.252612,
-        &quot;type&quot;: &quot;resources&quot;
-    },
-    ...
-]
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;extra&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;cpu_available&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_load_1&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_load_15&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.85</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_load_5&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.87</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_max_per_instance&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_total_instance_cpu_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">235110000000</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_total_instance_vcpus&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;disk_free&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">376334815232</span><span class="p">,</span>
+<span class="w">            </span><span class="err">...</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;fqdn&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sf-1&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;updated node resources and package versions&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1685475323.252612</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;resources&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="p">]</span>
 </code></pre></div>
 </details>
 <h2 id="metadata">Metadata</h2>
