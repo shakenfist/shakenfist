@@ -31,7 +31,7 @@ about a specific instance by providing its UUID or name.
 
 ??? example "Python API client: get all visible instances"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -42,7 +42,7 @@ about a specific instance by providing its UUID or name.
 
 ??? example "Python API client: get information about a specific instance"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -130,7 +130,7 @@ passed as a list. You only have one `videospec` per instance. Once again, a
 
 ??? example "Python API client: create and then delete a simple instance"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
     import time
 
@@ -182,7 +182,7 @@ The power management actions available are:
 
 ??? example "Python API client: create and then delete a simple instance"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
     import time
 
@@ -207,7 +207,7 @@ The power management actions available are:
     Note that this example assumes the instance is running an image with the
     Shaken Fist in guest agent installed.
 
-    ``` python
+    ```python
     import time
     from shakenfist_client import apiclient
     import sys
@@ -271,7 +271,7 @@ The power management actions available are:
 
     Sample output:
 
-    ```
+    ```bash
     $ python3 example.py
     Waiting for the instance to start: schedule complete
     Instance is created
@@ -285,7 +285,7 @@ The power management actions available are:
 
 ??? example "Python API client: power off and then on an instance"
 
-    ``` python
+    ```python
     import time
     from shakenfist_client import apiclient
     import sys
@@ -350,7 +350,7 @@ The power management actions available are:
 
 ??? example "Python API client: pause and unpause an instance"
 
-    ``` python
+    ```python
     import time
     from shakenfist_client import apiclient
 
@@ -382,7 +382,7 @@ event system.
     transcoded. Therefore in this example we wait for the instance to be created
     before displaying interface details.
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
     import time
@@ -417,7 +417,7 @@ event system.
     print(json.dumps(ifaces, indent=4, sort_keys=True))
     ```
 
-    ```
+    ```bash
     $ python3 example.py
     Waiting for the instance to start: Fetching required blob ffdfce7f-728e-4b76-83c2-304e252f98b1, 30% complete
     Instance is created
@@ -452,8 +452,7 @@ event system.
     Note that events are returned in reverse chronological order and are limited
     to the 100 most recent events.
 
-    ```
-    $python3 example.py
+    ```json
     [
         ...
         {
@@ -583,11 +582,12 @@ functionality in the Shaken Fist client.
 
 ## Executing commands within an instance
 
-Assuming a given instance has the Shaken Fist agent installed and running, and
-was created with a `sf-agent` side channel, you can use the Shaken Fist agent to
-move data into and out of the instance and execute commands without the instance
-needing to have working networking configured. You can read more about the exact
-requirements for agent connectivity in the  [API reference guide for agent operations](/developer_guide/api_reference/agentoperations/).
+Since v0.7, assuming a given instance has the Shaken Fist agent installed and
+running, and was created with a `sf-agent` side channel, you can use the Shaken
+Fist agent to move data into and out of the instance and execute commands without
+the instance needing to have working networking configured. You can read more
+about the exact requirements for agent connectivity in the
+[API reference guide for agent operations](/developer_guide/api_reference/agentoperations/).
 
 Agent Operations are not created directly -- they are a side effect of a call to
 one of the API methods below, which create an Agent Operation so the caller can
@@ -598,13 +598,202 @@ following operations via the agent:
   The python API client has a helper to upload the file into a blob before copying
   to the instance.
 * execute a command and return its results (exit code, stdout, stderr).
+* get the contents of a file within an instance into a blob.
 
 ???+ tip "REST API calls"
 
     * [POST ​/instances​/{instance_ref}​/agent​/execute](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_execute): execute a command within an instance and return results.
     * [POST /instances/{instance_ref}/agent/put](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_put): copy a blob into an instance at the specified location with the specified permissions.
 
-...
+??? example "Python API client: execute a command on an instance"
+
+    ```python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    agentop = sf_client.instance_execute('...uuid...', 'cat /etc/os-release')
+    print(json.dumps(agentop, indent=4, sort_keys=True))
+    ```
+
+    Which would return something along the lines of:
+
+    ```json
+    {
+        "commands": [
+            {
+                "block-for-result": true,
+                "command": "execute",
+                "commandline": "cat /etc/os-release"
+            }
+        ],
+        "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
+        "metadata": {},
+        "namespace": "vdi",
+        "results": {
+            "0": {
+                "command-line": "cat /etc/os-release",
+                "result": true,
+                "return-code": 0,
+                "stderr": "",
+                "stdout": "PRETTY_NAME=\"Debian GNU/Linux 11 (bullseye)\"..."
+            }
+        },
+        "state": "complete",
+        "uuid": "93fb538c-84f5-4ff8-83ba-2be5f5f92954",
+        "version": 1
+    }
+    ```
+
+??? example "Python API client: put a file onto an instance via a blob"
+
+    ```python
+    import os
+    from shakenfist_client import apiclient
+    from shakenfist_client import util
+
+    sf_client = apiclient.Client()
+    if not sf_client.check_capability('blob-search-by-hash'):
+        blob = None
+    else:
+        # We can cheat here -- if we already have a blob in the cluster with the
+        # checksum of the file we're uploading, we can skip the upload entirely and
+        # just reuse that blob.
+        blob = util.checksum_with_progress(sf_client, 'README.md')
+
+    if not blob:
+        artifact = util.upload_artifact_with_progress(
+            sf_client, 'upload-to-instance', 'README.md', None)
+    else:
+        print('Recycling existing blob')
+        artifact = sf_client.blob_artifact(
+            'upload-to-instnace', blob['uuid'], source_url=None)
+    print('Created artifact %s' % artifact['uuid'])
+
+    st = os.stat('README.md')
+    sf_client.instance_put_blob(
+            '...instance_ref...', artifact['blob_uuid'], '/tmp/README.md', st.st_mode)
+    ```
+
+    Which would return something along the lines of:
+
+    ```bash
+    $ python3 /tmp/demo.py
+    Calculate checksum: 100%|██████████████████████████| 805/805 [00:00<00:00, 13.0MB/s]
+    Searching for a pre-existing blob with this hash...
+    Recycling existing blob
+    Created artifact 3c0a6a83-e9df-46f0-b9a3-819eb16bea23
+    ```
+
+??? example "Python API client: get a file from an instance via a blob"
+
+    ```python
+    from shakenfist_client import apiclient
+    import sys
+
+    sf_client = apiclient.Client()
+    op = sf_client.instance_get('...instance_ref...', '/tmp/README.md')
+    if '0' not in op.get('results', {}):
+        print('Results not available.')
+        sys.exit(1)
+
+    blob_uuid = op['results']['0'].get('content_blob')
+    if not blob_uuid:
+        print('Results did not include content')
+        sys.exit(1)
+
+    with open('/tmp/README.md', 'wb') as f:
+        for chunk in sf_client.get_blob_data(blob_uuid):
+            f.write(chunk)
+    ```
+
+### Fetching information about an Instance's Agent Operations
+
+Additionally, you can list the agent operations for a given instance.
+
+???+ tip "REST API calls"
+
+    * [GET /instances/{instance_ref}/agentoperations](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__agentoperations): List all agent operations for an instance.
+
+??? example "Python API client: get all agent operations for a specific instance"
+
+    The instance here had the following command line commands run before this
+    sample script was run:
+
+    ```bash
+    $ sf-client instance upload ...uuid... README.md /tmp/README.md
+    $ sf-client --simple instance execute ...uuid... "cat /tmp/README.md"
+    ```
+
+    ```python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    agentops = sf_client.get_instance_agentoperations('...uuid...', all=True)
+    print(json.dumps(agentops, indent=4, sort_keys=True))
+    ```
+
+    Note the `all` argument here. By default you are only returned agent operations
+    which are queued to execute. To see all agent operations including those
+    which have completed execution, pass `all=True`. This script outputs:
+
+    ```json
+    [
+        {
+            "commands": [
+                {
+                    "blob_uuid": "09306f15-b1b3-4850-afb4-f4179559fa7f",
+                    "command": "put-blob",
+                    "path": "/tmp/README.md"
+                },
+                {
+                    "command": "chmod",
+                    "mode": 33188,
+                    "path": "/tmp/README.md"
+                }
+            ],
+            "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
+            "metadata": {},
+            "namespace": "vdi",
+            "results": {
+                "0": {
+                    "path": "/tmp/README.md"
+                },
+                "1": {
+                    "path": "/tmp/README.md"
+                }
+            },
+            "state": "complete",
+            "uuid": "343049d7-da2a-46f2-bb5c-edb783ec1fb9",
+            "version": 1
+        },
+        {
+            "commands": [
+                {
+                    "block-for-result": true,
+                    "command": "execute",
+                    "commandline": "cat /tmp/README.md"
+                }
+            ],
+            "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
+            "metadata": {},
+            "namespace": "vdi",
+            "results": {
+                "0": {
+                    "command-line": "cat /tmp/README.md",
+                    "result": true,
+                    "return-code": 0,
+                    "stderr": "",
+                    "stdout": "...content of file..."
+                }
+            },
+            "state": "complete",
+            "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
+            "version": 1
+        }
+    ]
+    ```
 
 ## Metadata
 
@@ -632,7 +821,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: set metadata on an instance"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -641,7 +830,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: get metadata for an instance"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -652,7 +841,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: delete metadata for an instance"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 

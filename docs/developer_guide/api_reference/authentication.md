@@ -21,7 +21,7 @@ to time. You will receive a HTTP 401 status code if an access token has expired.
     for you, so not specific action is required for this API call. The following
     code implies creation of an access token:
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -29,8 +29,8 @@ to time. You will receive a HTTP 401 status code if an access token has expired.
 
 ??? example "curl: creating an access token"
 
-    ```
-    curl -X POST https://shakenfist/api/auth -d '{"namespace": "system", "key": "oisoSe7T"}'
+    ```bash
+    $ curl -X POST https://shakenfist/api/auth -d '{"namespace": "system", "key": "oisoSe7T"}'
     {
         "access_token": "eyJhbG...IkpXVCJ9.eyJmc...wwQ",
         "token_type": "Bearer",
@@ -41,8 +41,8 @@ to time. You will receive a HTTP 401 status code if an access token has expired.
     This token is then used by passing it as a HTTP Authorization header with
     "Bearer " prepended:
 
-    ```
-    curl -X GET https://shakenfist/api/auth/namespaces \
+    ```bash
+    $ curl -X GET https://shakenfist/api/auth/namespaces \
         -H 'Authorization: Bearer eyJhbG...IkpXVCJ9.eyJmc...wwQ' \
         -H 'Content-Type: application/json'
     [
@@ -84,7 +84,7 @@ namespace, which is used for administrative tasks.
 
     This example lists all namespaces visible to the caller:
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -95,8 +95,7 @@ namespace, which is used for administrative tasks.
 
     Which returns something like:
 
-    ```
-    $ python3 example.py
+    ```json
     [
         {
             "keys": [
@@ -121,7 +120,7 @@ namespace, which is used for administrative tasks.
     This example creates a new namespace, which is only possible if you are
     currently authenticated as the `system` namespace:
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -132,8 +131,7 @@ namespace, which is used for administrative tasks.
 
     Which returns something like:
 
-    ```
-    $ python3 example.py
+    ```json
     {
         "keys": [],
         "metadata": {},
@@ -153,7 +151,7 @@ namespace, which is used for administrative tasks.
     This example deletes a namespace, which is only possible if you are
     currently authenticated as the `system` namespace:
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -166,7 +164,7 @@ namespace, which is used for administrative tasks.
 
 ??? example "Python API client: get details of a single namespace"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -177,8 +175,7 @@ namespace, which is used for administrative tasks.
 
     Which returns something like:
 
-    ```
-    $ python3 example.py
+    ```json
     {
         "keys": [],
         "metadata": {},
@@ -210,7 +207,7 @@ the keys used to authenticate to a namespace.
 
     This example lists all the keys in a namespace:
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -220,8 +217,7 @@ the keys used to authenticate to a namespace.
 
     Which returns something like:
 
-    ```
-    $ python3 example.py
+    ```json
     ['jenkins']
     ```
 
@@ -229,7 +225,7 @@ the keys used to authenticate to a namespace.
 
     This example adds a key to a namespace and then lists all keys:
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -242,8 +238,7 @@ the keys used to authenticate to a namespace.
 
     Which returns something like:
 
-    ```
-    $ python3 example.py
+    ```json
     ['jenkins', 'newkey']
     ```
 
@@ -251,7 +246,7 @@ the keys used to authenticate to a namespace.
 
     This example deletes a key from the namespace and then lists all keys:
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -264,8 +259,7 @@ the keys used to authenticate to a namespace.
 
     Which returns something like:
 
-    ```
-    $ python3 example.py
+    ```json
     ['jenkins']
     ```
 
@@ -273,7 +267,7 @@ the keys used to authenticate to a namespace.
 
     This example updates the secret portion of an existing namespace key to a new value:
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -298,7 +292,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: set metadata on a namespace"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -307,7 +301,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: get metadata for a namespace"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -318,7 +312,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: delete metadata for a namespace"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 

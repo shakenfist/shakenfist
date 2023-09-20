@@ -42,7 +42,7 @@ a network interface from the REST API.
     transcoded. Therefore in this example we wait for the instance to be created
     before displaying interface details.
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
     import time
@@ -77,7 +77,7 @@ a network interface from the REST API.
     print(json.dumps(ifaces, indent=4, sort_keys=True))
     ```
 
-    ```
+    ```bash
     $ python3 example.py
     Waiting for the instance to start: Fetching required blob ffdfce7f-728e-4b76-83c2-304e252f98b1, 30% complete
     Instance is created
@@ -140,7 +140,7 @@ occurred when the packets reach the instance.
     print('The interface is externally accessible at %s' % iface['floating'])
     ```
 
-    ```
+    ```bash
     $ python3 example.py
     The interface is externally accessible at 192.168.10.5
     ```
@@ -174,7 +174,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: set metadata on an interface"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -183,7 +183,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: get metadata for an interface"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -194,7 +194,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: delete metadata for an interface"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 

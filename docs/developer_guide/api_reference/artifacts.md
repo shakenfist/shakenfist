@@ -24,7 +24,7 @@ equivalent to AWS AMIs or OpenStack images in Glance.
     artifact version information and events to determine if a new version was
     fetched and if that fetch is complete.
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -50,7 +50,7 @@ a general introduction to the Shaken Fist event system).
     artifact version information and events to determine if a new version was
     fetched and if that fetch is complete.
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -67,7 +67,7 @@ a general introduction to the Shaken Fist event system).
               meta.get('state', ''), meta.get('shared', False)))
     ```
 
-    ```
+    ```bash
     $ python3 example.py
     uuid,namespace,type,source_url,versions,state,shared
     05e841a7-7e13-4df6-8c04-8932b98885bd,system,image,sf://upload/system/centos-9-stream,1 of 1,created,False
@@ -77,7 +77,7 @@ a general introduction to the Shaken Fist event system).
 
 ??? example "Python API client: get information about a specific artifact"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -86,8 +86,7 @@ a general introduction to the Shaken Fist event system).
     print(json.dumps(artifact, indent=4, sort_keys=True))
     ```
 
-    ```
-    $ python3 example.py
+    ```json
     {
         "artifact_type": "image",
         "blob_uuid": "8fa321aa-1e05-43c9-ade1-36d45940d6bd",
@@ -126,8 +125,7 @@ a general introduction to the Shaken Fist event system).
     Note that events are returned in reverse chronological order and are limited
     to the 100 most recent events.
 
-    ```
-    $ python3 example.py
+    ```json
     [
         ...
         {
@@ -153,7 +151,7 @@ Artifacts may be deleted individually, or an entire namespace at a time.
 
 ??? example "Python API client: delete a single artifact"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -162,7 +160,7 @@ Artifacts may be deleted individually, or an entire namespace at a time.
 
 ??? example "Python API client: delete all artifacts in a namespace"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -219,7 +217,7 @@ details.
 
 ??? example "Python API client: create an upload, transfer data, and convert to an artifact"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
     import time
 
@@ -274,7 +272,7 @@ details.
         print('Created artifact %s' % artifact['uuid'])
     ```
 
-    ```
+    ```bash
     $ python3 example.py
     Creating artifact
     Created artifact 2d9c1d4c-3436-4ea8-9b60-833fe791eece
@@ -315,7 +313,7 @@ remove a specific version of an artifact as well.
 
 ??? example "Python API client: delete a specific version of an artifact"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -334,7 +332,7 @@ overridden on a per-artifact basis.
 
 ??? example "Python API client: delete a specific version of an artifact"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -356,7 +354,7 @@ from. This allows recommencing failed downloads.
 
 ??? example "Python API client: list versions of an artifact"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -378,7 +376,7 @@ for commonly used "official" images which many users will want to use.
 
 ??? example "Python API client: share an artifact"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -387,7 +385,7 @@ for commonly used "official" images which many users will want to use.
 
 ??? example "Python API client: unshare an artifact"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -412,7 +410,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: set metadata on an artifact"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -421,7 +419,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: get metadata for an artifact"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -432,7 +430,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: delete metadata for an artifact"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 

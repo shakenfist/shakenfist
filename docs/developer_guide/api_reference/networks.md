@@ -36,9 +36,7 @@ node.
     print(json.dumps(n, indent=4, sort_keys=True))
     ```
 
-
-    ```
-    $ python3 example.py
+    ```json
     {
         "floating_gateway": "192.168.10.16",
         "metadata": {},
@@ -72,7 +70,7 @@ node.
     print(json.dumps(n, indent=4, sort_keys=True))
     ```
 
-    ```
+    ```bash
     $ python3 example.py
     Waiting...
     {
@@ -109,8 +107,7 @@ node.
     print(json.dumps(nets, indent=4, sort_keys=True))
     ```
 
-    ```
-    $ python3 example.py
+    ```json
     [
         {
             "name": "sfcbr-7YWeQo4BoqLjASDd",
@@ -123,7 +120,7 @@ node.
             "vxlan_id": 0
         }
     ]
-    ````
+    ```
 
 ## Other network information
 
@@ -140,7 +137,7 @@ event system.
 
 ??? example "Python API client: list events for a network"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -152,8 +149,7 @@ event system.
     Note that events are returned in reverse chronological order and are limited
     to the 100 most recent events.
 
-    ```
-    $ python3 example.py
+    ```json
     [
         ...
         {
@@ -196,8 +192,7 @@ event system.
     print(json.dumps(events, indent=4, sort_keys=True))
     ```
 
-    ```
-    $ python3 example.py
+    ```json
     [
         {
             "floating": "192.168.10.84",
@@ -239,8 +234,7 @@ event system.
     print(json.dumps(events, indent=4, sort_keys=True))
     ```
 
-    ```
-    $ python3 example.py
+    ```json
     {
         "stderr": [
             ""
@@ -284,7 +278,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: set metadata on a network"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -293,7 +287,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: get metadata for a network"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 
@@ -304,7 +298,7 @@ is available [in the user guide](/user_guide/metadata/).
 
 ??? example "Python API client: delete metadata for a network"
 
-    ``` python
+    ```python
     import json
     from shakenfist_client import apiclient
 

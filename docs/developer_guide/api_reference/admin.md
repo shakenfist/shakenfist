@@ -12,7 +12,7 @@ those locks (machine and process id).
 
 ??? example "Python API client: list cluster locks"
 
-    ``` python
+    ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
@@ -23,7 +23,7 @@ those locks (machine and process id).
         print('%s,%s,%s,%s' % (ref, meta['pid'], meta['node'], meta.get('operation')))
     ```
 
-    ```
+    ```bash
     $ python3 example.py
     lock,pid,node,operation
     /sflocks/sf/network/d2950d74-50c7-4790-a985-c43d9eb9bad9,2834066,sf-3,Network ensure mesh

@@ -48,7 +48,7 @@ introduction to labels, see the [artifacts section of the user guide](/user_guid
     print(json.dumps(prod, indent=4, sort_keys=True))
     ```
 
-    ```
+    ```bash
     $ python3 example.py
     The most recent blob UUID is ffdfce7f-728e-4b76-83c2-304e252f98b1
 
