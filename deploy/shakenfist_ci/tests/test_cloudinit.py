@@ -49,19 +49,17 @@ sudo echo 'banana' >  /tmp/output"""
             '9YN60gp4lZSKB19GaURxtbKWlajfEakn3mTm9JQH5eU48XIaCh+LcptKYd6lD'
             'BWeoicQzECQLMfnKuGpfoZsKbOTTeCzS0/q6guKLNgfXijpRf5uaZaTqQa18t'
             '8s= mikal@marvin"',
-            str(base64.b64encode(ud.encode('utf-8')), 'utf-8'))
+            str(base64.b64encode(ud.encode('utf-8')), 'utf-8'),
+            side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
 
-        console = base.LoggingSocket(self.test_client, inst)
-        out = console.execute('cat /tmp/output')
-        if not out.find('banana'):
-            self.fail('User data script did not run!\n\n%s' % out)
+        out = self._await_agent_fetch(inst['uuid'], '/tmp/output')
+        self.assertEqual('banana', out.rstrip())
 
-        out = console.execute('cat /home/cirros/.ssh/authorized_keys')
-        if not out.find('elLwq/bpzBWsg0JjjGvtuuKMM'):
-            self.fail('ssh key was not placed in authorized keys!\n\n%s' % out)
+        out = self._await_agent_fetch(inst['uuid'], '/home/debian/.ssh/authorized_keys')
+        self.assertTrue('elLwq/bpzBWsg0JjjGvtuuKMM' in out)
 
     def test_cloudinit_no_tracebacks(self):
         inst = self.test_client.create_instance(
