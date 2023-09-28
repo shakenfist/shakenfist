@@ -278,6 +278,18 @@ class BaseTestCase(testtools.TestCase):
         return self._await_objects_ready(
             self.system_client.get_blob, blob_uuids)
 
+    def _await_agent_fetch(self, instance_ref, path):
+        aop = self.system_client.instance_get(instance_ref, path)
+        while aop['state'] != 'complete':
+            time.sleep(1)
+            aop = self.system_client.get_agent_operation(aop['uuid'])
+
+        blob_uuid = aop['results']['0']['content_blob']
+        data = b''
+        for chunk in self.system_client.get_blob_data(blob_uuid):
+            data += chunk
+        return data.decode('utf-8')
+
     def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
         packet_loss_re = re.compile(r'.* ([0-9\.]+)% packet loss.*')
 
