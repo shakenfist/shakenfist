@@ -50,10 +50,8 @@ echo 'Floating IPs work!' > /var/www/html/index.html
         # Wait for boot and cloud-init
         time.sleep(120)
 
-        console = base.LoggingSocket(self.test_client, inst)
-        out = console.execute('cat /var/www/html/index.html')
-        if not out.find('Floating IPs work!'):
-            self.fail('User data script did not run!\n\n%s' % out)
+        out = self._await_agent_fetch(inst['uuid'], '/var/www/html/index.html')
+        self.assertEqual('Floating IPs work!', out.rstrip())
 
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])
         self.test_client.float_interface(ifaces[0]['uuid'])

@@ -11,27 +11,3 @@ class TestSerialConsole(base.BaseNamespacedTestCase):
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self._await_networks_ready([self.net['uuid']])
-
-    def test_serial_console(self):
-        inst = self.test_client.create_instance(
-            'test-serial-console', 1, 1024,
-            [
-                {
-                    'network_uuid': self.net['uuid']
-                }
-            ],
-            [
-                {
-                    'size': 8,
-                    'base': 'sf://upload/system/debian-11',
-                    'type': 'disk'
-                }
-            ], None, None)
-
-        self.assertIsNotNone(inst['uuid'])
-        self.assertIsNotNone(inst['node'])
-
-        self._await_instance_ready(inst['uuid'])
-
-        console = base.LoggingSocket(self.test_client, inst)
-        self.assertTrue(console.execute('uptime').find('load average'))

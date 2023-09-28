@@ -9,7 +9,6 @@ import re
 import string
 import sys
 import testtools
-import telnetlib
 import time
 
 from oslo_concurrency import processutils
@@ -278,6 +277,14 @@ class BaseTestCase(testtools.TestCase):
         return self._await_objects_ready(
             self.system_client.get_blob, blob_uuids)
 
+    def _await_command(self, instance_ref, command):
+        aop = self.system_client.instance_execute(instance_ref, command)
+        while aop['state'] != 'complete':
+            time.sleep(1)
+            aop = self.system_client.get_agent_operation(aop['uuid'])
+
+        return aop['results']['0']
+
     def _await_agent_fetch(self, instance_ref, path):
         aop = self.system_client.instance_get(instance_ref, path)
         while aop['state'] != 'complete':
@@ -458,61 +465,3 @@ class TestDistroBoots(BaseNamespacedTestCase):
         for i in self.test_client.get_instances():
             inst_uuids.append(i['uuid'])
         self.assertNotIn(inst['uuid'], inst_uuids)
-
-
-class LoggingSocket(object):
-    ctrlc = '\x03'
-
-    def __init__(self, client, inst):
-        inst = client.get_instance(inst['uuid'])
-        if not inst['node']:
-            raise Exception('Host is None!')
-        if not inst['console_port']:
-            raise Exception('Port is None!')
-
-        attempts = 5
-        while attempts:
-            try:
-                attempts -= 1
-                self.s = telnetlib.Telnet(
-                    inst['node'], inst['console_port'], 30)
-                return
-
-            except ConnectionRefusedError:
-                print('!! Connection refused, retrying')
-                time.sleep(5)
-
-        raise ConnectionRefusedError(
-            'Repeated telnet connection attempts failed: host=%s port=%s'
-            % (inst['node'], inst['console_port']))
-
-    def ensure_fresh(self):
-        for d in [self.ctrlc, self.ctrlc, '\nexit\n', 'cirros\n', 'gocubsgo\n']:
-            self.send(d)
-            time.sleep(0.5)
-            self.recv()
-
-    def send(self, data):
-        print('>> %s' % data.replace('\n', '\\n').replace('\r', '\\r'))
-        self.s.write(data.encode('ascii'))
-
-    def recv(self):
-        data = self.s.read_eager().decode('ascii')
-        for line in data.split('\n'):
-            print('<< %s' % line.replace('\n', '\\n').replace('\r', '\\r'))
-        return data
-
-    def execute(self, cmd):
-        self.ensure_fresh()
-        self.send(cmd + '\n')
-        time.sleep(5)
-        d = ''
-
-        reads = 0
-        while not d.endswith('\n$ '):
-            d += self.recv()
-            reads += 1
-
-            if reads > 10:
-                break
-        return d

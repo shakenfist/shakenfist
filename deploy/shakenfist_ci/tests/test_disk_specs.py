@@ -20,7 +20,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
 
-        console = base.LoggingSocket(self.test_client, inst)
-        out = console.execute('df -h')
-        if not out.find('vda'):
-            self.fail('Disk is not virtio!\n\n%s' % out)
+        results = self._await_command(inst['uuid'], 'df -h')
+        self.assertEqual(0, results['return-code'])
+        self.assertEqual('', results['stderr'])
+        self.assertTrue('vda' in results['stdout'])

@@ -79,10 +79,10 @@ class TestNetworking(base.BaseNamespacedTestCase):
             self.assertEqual('created', iface['state'],
                              'Interface %s is not in correct state' % iface['uuid'])
 
-        console = base.LoggingSocket(self.test_client, inst1)
-        out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
-        if not out.find('100% packet'):
-            self.fail('Ping should have failed!\n\n%s' % out)
+        results = self._await_command(inst1['uuid'], 'ping -c 3 %s' % nics[0]['ipv4'])
+        self.assertEqual(1, results['return-code'])
+        self.assertEqual('', results['stderr'])
+        self.assertTrue(' 100% packet' in results['stdout'])
 
     def test_overlapping_virtual_networks_are_separate(self):
         inst1 = self.test_client.create_instance(
@@ -127,10 +127,11 @@ class TestNetworking(base.BaseNamespacedTestCase):
             self.assertEqual('created', iface['state'],
                              'Interface %s is not in correct state' % iface['uuid'])
 
-        console = base.LoggingSocket(self.test_client, inst1)
-        out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
-        if not out.find('100% packet'):
-            self.fail('Ping should have failed!\n\n%s' % out)
+        results = self._await_command(inst1['uuid'], 'ping -c 3 %s' % nics[0]['ipv4'])
+        self.assertEqual(1, results['return-code'],
+                         'Incorrect return code: %s' % results)
+        self.assertEqual('', results['stderr'])
+        self.assertTrue(' 100% packet' in results['stdout'])
 
     def test_single_virtual_networks_work(self):
         inst1 = self.test_client.create_instance(
@@ -146,7 +147,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         inst2 = self.test_client.create_instance(
             'test-networks-2', 1, 1024,
@@ -161,7 +162,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst2['uuid'])
@@ -176,15 +177,16 @@ class TestNetworking(base.BaseNamespacedTestCase):
                              'Interface %s is not in correct state' % iface['uuid'])
 
         # Ping the other instance on this network
-        console = base.LoggingSocket(self.test_client, inst1)
-        out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
-        if not out.find(' 0% packet'):
-            self.fail('Ping should have worked!\n\n%s' % out)
+        results = self._await_command(inst1['uuid'], 'ping -c 3 %s' % nics[0]['ipv4'])
+        self.assertEqual(0, results['return-code'])
+        self.assertEqual('', results['stderr'])
+        self.assertTrue(' 0% packet' in results['stdout'])
 
         # Ping google (prove NAT works)
-        out = console.execute('ping -c 3 8.8.8.8')
-        if not out.find(' 0% packet'):
-            self.fail('Ping should have worked!\n\n%s' % out)
+        results = self._await_command(inst1['uuid'], 'ping -c 3 8.8.8.8')
+        self.assertEqual(0, results['return-code'])
+        self.assertEqual('', results['stderr'])
+        self.assertTrue(' 0% packet' in results['stdout'])
 
     def test_specific_ip_request(self):
         inst = self.test_client.create_instance(
@@ -251,14 +253,14 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
-        self._await_instances_ready([inst['uuid']])
+        self._await_instance_ready(inst['uuid'])
 
-        console = base.LoggingSocket(self.test_client, inst)
-        out = console.execute('ip link')
-        if not out.find('04:ed:33:c0:2e:6c'):
-            self.fail('Requested macaddress not used!\n\n%s' % out)
+        results = self._await_command(inst['uuid'], 'ip link')
+        self.assertEqual(0, results['return-code'])
+        self.assertEqual('', results['stderr'])
+        self.assertTrue('04:ed:33:c0:2e:6c' in results['stdout'])
 
     def test_interface_delete(self):
         inst1 = self.test_client.create_instance(
@@ -363,6 +365,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst_hyp2_vm1['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst_hyp1_vm2['uuid'])
-        console = base.LoggingSocket(self.test_client, inst_hyp1_vm1)
-        out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
-        self.assertFalse('DUP' in out)
+        results = self._await_command(inst_hyp1_vm1['uuid'], 'ping -c 3 %s' % nics[0]['ipv4'])
+        self.assertEqual(0, results['return-code'])
+        self.assertEqual('', results['stderr'])
+        self.assertFalse('DUP' in results['stdout'])
