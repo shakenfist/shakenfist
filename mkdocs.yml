@@ -37,6 +37,8 @@ nav:
     - Introduction: index.md
     - Manifesto: manifesto.md
     - Features: features.md
+    - Release notes:
+        - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
     - Community: community.md
     - User Guide:
         - "Authentication": user_guide/authentication.md
