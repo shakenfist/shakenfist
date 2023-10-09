@@ -843,7 +843,7 @@ def networks_in_namespace(namespace):
 
 
 def floating_network():
-    floating_network = Network.from_db('floating')
+    floating_network = Network.from_db('floating', suppress_failure_audit=True)
     if not floating_network:
         Network.new(network_uuid='floating',
                     vxid=0,
