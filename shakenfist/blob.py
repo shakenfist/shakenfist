@@ -539,12 +539,6 @@ class Blob(dbo):
         return self._db_get_attribute('checksums')
 
     def _remove_if_idle(self, msg):
-        if not config.CHECKSUM_ENFORCEMENT:
-            self.log.error(
-                'Blob checksum enforcement is disabled. If it was enabled, we would '
-                'remove blob replica %s' % msg)
-            return
-
         # NOTE(mikal): we specifically don't lookup instance records in etcd here
         # for two reasons -- we don't want to depend on a "higher level object",
         # but also because it wouldn't cover instances that had somehow escaped
@@ -553,7 +547,7 @@ class Blob(dbo):
         users = 0
         for pid in psutil.pids():
             p = psutil.Process(pid)
-            for f in p.get_open_files():
+            for f in p.open_files():
                 if f.path.startswith(blob_path):
                     users += 1
                     self.log.warning('Process %d is using blob' % pid)
