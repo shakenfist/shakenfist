@@ -469,8 +469,6 @@ class DatabaseBackedObjectIterator(object):
         for objuuid in cache.read_object_state_cache_many(
                 self.base_object.object_type, target_states):
             static_values = etcd.get(self.base_object.object_type, None, objuuid)
-            LOG.with_fields(static_values).debug(
-                'Object iterator return for UUID %s' % objuuid)
             yield objuuid, static_values
 
     def apply_filters(self, o):

@@ -31,8 +31,8 @@ JOBS = {
     ],
     'functional-tests': [
         {
-            'name': 'debian-10-localhost',
-            'baseimage': 'sf://label/ci-images/debian-10',
+            'name': 'debian-11-localhost',
+            'baseimage': 'sf://label/ci-images/debian-11',
             'baseuser': 'debian',
             'topology': 'localhost',
             'concurrency': 3
@@ -54,8 +54,8 @@ JOBS = {
     ],
     'scheduled-tests': [
         {
-            'name': 'develop-debian-10-localhost',
-            'baseimage': 'sf://label/ci-images/debian-10',
+            'name': 'develop-debian-11-localhost',
+            'baseimage': 'sf://label/ci-images/debian-11',
             'baseuser': 'debian',
             'topology': 'localhost',
             'concurrency': 3,

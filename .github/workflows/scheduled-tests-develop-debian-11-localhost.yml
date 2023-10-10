@@ -1,4 +1,4 @@
-name: Retest develop-debian-10-localhost
+name: Retest develop-debian-11-localhost
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     - cron: '00 13 * * *'        # utc
 
 jobs:
-  develop-debian-10-localhost:
+  develop-debian-11-localhost:
     runs-on: self-hosted
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,7 +39,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/shakenfist
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
-              base_image=sf://label/ci-images/debian-10 base_image_user=debian" \
+              base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
               deploy/ansible/ci-topology-localhost.yml
 
       - name: Run getsf installer on primary
@@ -244,7 +244,7 @@ jobs:
         if: success()
         run: |
           if [ $(echo "localhost" | grep -c "localhost") -gt 1 ]; then
-            base=$(echo "sf://label/ci-images/debian-10" | cut -f 5 -d "/")
+            base=$(echo "sf://label/ci-images/debian-11" | cut -f 5 -d "/")
             sf-client instance snapshot primary \
               --label_name ci-images/$base-$GITHUB_BASE_REF \
               --delete-snapshot-after-label --flatten
@@ -255,7 +255,7 @@ jobs:
         id: create-issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SF_CI_NAME: develop-debian-10-localhost
+          SF_CI_NAME: develop-debian-11-localhost
           SF_BRANCH: develop
           SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:

@@ -292,7 +292,7 @@ class Monitor(daemon.Daemon):
         # Ensure side channel path exists.
         sc_path = os.path.join(self.instance.instance_path, 'sc-sf-agent')
         if not os.path.exists(sc_path):
-            self.log.error('sf-agent side channel file missing, aborting')
+            self.log.info('sf-agent side channel file missing, aborting')
             return
 
         self.sc_client = None

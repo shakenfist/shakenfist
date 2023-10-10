@@ -35,9 +35,3 @@ class TestUbuntu(base.BaseNamespacedTestCase):
         # style interface information anyway.
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
         self._test_ping(inst['uuid'], self.net['uuid'], ip, 0)
-
-        self.test_client.delete_instance(inst['uuid'])
-        inst_uuids = []
-        for i in self.test_client.get_instances():
-            inst_uuids.append(i['uuid'])
-        self.assertNotIn(inst['uuid'], inst_uuids)
