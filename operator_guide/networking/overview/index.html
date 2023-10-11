@@ -16,7 +16,7 @@
         <link rel="prev" href="../../locks/">
       
       
-        <link rel="next" href="../single_instance/">
+        <link rel="next" href="../../power_states/">
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
@@ -79,7 +79,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#networking-overview" class="md-skip">
+        <a href="#explaining-shaken-fist-networking" class="md-skip">
           Skip to content
         </a>
       
@@ -1253,15 +1253,36 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#vxlan" class="md-nav__link">
-    VXLAN
+  <a href="#single-node-install-no-networks-or-instances" class="md-nav__link">
+    Single node install, no networks or instances
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#our-worked-examples" class="md-nav__link">
-    Our worked examples
+  <a href="#single-node-install-one-network-and-no-instances" class="md-nav__link">
+    Single node install, one network and no instances
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#single-node-install-one-network-and-one-instance-with-no-floating-ip" class="md-nav__link">
+    Single node install, one network and one instance with no floating IP
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#single-node-install-one-network-and-one-instance-with-no-floating-ip_1" class="md-nav__link">
+    Single node install, one network and one instance with no floating IP
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multiple-nodes" class="md-nav__link">
+    Multiple nodes
   </a>
   
 </li>
@@ -1270,26 +1291,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../single_instance/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Single Instance
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1377,15 +1378,36 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#vxlan" class="md-nav__link">
-    VXLAN
+  <a href="#single-node-install-no-networks-or-instances" class="md-nav__link">
+    Single node install, no networks or instances
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#our-worked-examples" class="md-nav__link">
-    Our worked examples
+  <a href="#single-node-install-one-network-and-no-instances" class="md-nav__link">
+    Single node install, one network and no instances
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#single-node-install-one-network-and-one-instance-with-no-floating-ip" class="md-nav__link">
+    Single node install, one network and one instance with no floating IP
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#single-node-install-one-network-and-one-instance-with-no-floating-ip_1" class="md-nav__link">
+    Single node install, one network and one instance with no floating IP
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multiple-nodes" class="md-nav__link">
+    Multiple nodes
   </a>
   
 </li>
@@ -1408,22 +1430,275 @@
   
 
 
-<h1 id="networking-overview">Networking Overview</h1>
-<p>Shaken Fist networking is complicated. Its actually less complicated that OpenStack Neutron networking, and its about as simple as we can get away with, but in order to allow virtual networks to use overlapping network ranges we are forced to do some vaguely complicated things with network namespaces.
-This document attempts to incrementally describe how Shaken Fist networking works, so that I can remember later.</p>
-<h2 id="vxlan">VXLAN</h2>
-<p>Shaken Fist networking is based on a VXLAN mesh. VXLAN is like a successor to VLANs, except that you can have 1.6 million virtual networks, it doesn't use an IP header field to divide the networks up, and it is transported inside UDP packets between the members of the mesh.</p>
-<p>Normally VXLAN meshes are implemented using multicast UDP, but that doesn't work in public clouds where Shaken Fist was born, so we instead use unicast meshes that we lovingly hand maintain.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The virtual mesh manages itself and changes state over time. If your mesh entries do not look like mine, it does not nessesarily indicate that your networking is broken. This is a dynamic environment!</p>
-</div>
-<h2 id="our-worked-examples">Our worked examples</h2>
-<p>For this document, we will assume there are three Shaken Fist nodes, named <strong>sf-1</strong>, <strong>sf-2</strong>, and <strong>sf-3</strong>. Its a total coincidence that this is the default size for the installer ansible at the time of writing and the exact size of all of the production clusters we are aware of.
-<strong>sf-1</strong> is configured as the "network node", which is just a hypervisor like every other node, except that it is also where packets to and from the virtual networks route in and out of the mesh.</p>
+<h1 id="explaining-shaken-fist-networking">Explaining Shaken Fist networking</h1>
+<p>Shaken Fist networking is complicated, but not as complicated as OpenStack
+Neutron. Its more like the old OpenStack Compute nova-network implementation
+if you're looking for a mental model. Let's work through some examples to explain
+what it is doing.</p>
+<h2 id="single-node-install-no-networks-or-instances">Single node install, no networks or instances</h2>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>ip<span class="w"> </span>a
+<span class="m">1</span>:<span class="w"> </span>lo:<span class="w"> </span>&lt;LOOPBACK,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">65536</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>state<span class="w"> </span>UNKNOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/loopback<span class="w"> </span><span class="m">00</span>:00:00:00:00:00<span class="w"> </span>brd<span class="w"> </span><span class="m">00</span>:00:00:00:00:00
+<span class="w">    </span>inet<span class="w"> </span><span class="m">127</span>.0.0.1/8<span class="w"> </span>scope<span class="w"> </span>host<span class="w"> </span>lo
+<span class="w">       </span>valid_lft<span class="w"> </span>forever<span class="w"> </span>preferred_lft<span class="w"> </span>forever
+<span class="m">2</span>:<span class="w"> </span>eth0:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">8950</span><span class="w"> </span>qdisc<span class="w"> </span>pfifo_fast<span class="w"> </span>state<span class="w"> </span>UP<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span><span class="m">02</span>:00:00:00:0e:a3<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff
+<span class="w">    </span>altname<span class="w"> </span>enp0s11
+<span class="w">    </span>altname<span class="w"> </span>ens11
+<span class="w">    </span>inet<span class="w"> </span><span class="m">10</span>.0.0.74/24<span class="w"> </span>brd<span class="w"> </span><span class="m">10</span>.0.0.255<span class="w"> </span>scope<span class="w"> </span>global<span class="w"> </span>eth0
+<span class="w">       </span>valid_lft<span class="w"> </span>forever<span class="w"> </span>preferred_lft<span class="w"> </span>forever
+<span class="m">3</span>:<span class="w"> </span>egr-br-eth0:<span class="w"> </span>&lt;NO-CARRIER,BROADCAST,MULTICAST,UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">1500</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>state<span class="w"> </span>DOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span>f6:d1:c6:05:15:fd<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff
+<span class="w">    </span>inet<span class="w"> </span><span class="m">192</span>.168.15.1/24<span class="w"> </span>scope<span class="w"> </span>global<span class="w"> </span>egr-br-eth0
+<span class="w">       </span>valid_lft<span class="w"> </span>forever<span class="w"> </span>preferred_lft<span class="w"> </span>forever
+</code></pre></div>
+<p>Explaining this:</p>
 <ul>
-<li><a href="single_instance/">First, off let's start with a simple network with one instance and no DHCP or NAT</a>.</li>
+<li><code>lo</code> is the loopback interface, and not relevant here.</li>
+<li><code>eth0</code> is the primary interface for the machine, and <code>10.0.0.74</code> is the IP
+  address of the machine.</li>
+<li><code>egr-br-eth0</code> is a linux bridge that is currently empty and has the IP
+  <code>192.168.15.1</code>, which is the first IP on this cluster's floating network.
+  Networks will get attached</li>
 </ul>
+<h2 id="single-node-install-one-network-and-no-instances">Single node install, one network and no instances</h2>
+<p>Let's make a network, but not put any instances on it yet:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>demo<span class="w"> </span><span class="m">172</span>.16.0.0/24
+uuid<span class="w">            </span>:<span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3
+name<span class="w">            </span>:<span class="w"> </span>demo
+vxlan<span class="w"> </span>id<span class="w">        </span>:<span class="w"> </span><span class="m">14823439</span>
+netblock<span class="w">        </span>:<span class="w"> </span><span class="m">172</span>.16.0.0/24
+provide<span class="w"> </span>dhcp<span class="w">    </span>:<span class="w"> </span>True
+provide<span class="w"> </span>nat<span class="w">     </span>:<span class="w"> </span>True
+floating<span class="w"> </span>gateway:<span class="w"> </span><span class="m">192</span>.168.15.194
+namespace<span class="w">       </span>:<span class="w"> </span>system
+state<span class="w">           </span>:<span class="w"> </span>created
+
+Metadata:
+
+debian@test:~$<span class="w"> </span>ip<span class="w"> </span>a
+<span class="m">1</span>:<span class="w"> </span>lo:<span class="w"> </span>&lt;LOOPBACK,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">65536</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>state<span class="w"> </span>UNKNOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/loopback<span class="w"> </span><span class="m">00</span>:00:00:00:00:00<span class="w"> </span>brd<span class="w"> </span><span class="m">00</span>:00:00:00:00:00
+<span class="w">    </span>inet<span class="w"> </span><span class="m">127</span>.0.0.1/8<span class="w"> </span>scope<span class="w"> </span>host<span class="w"> </span>lo
+<span class="w">       </span>valid_lft<span class="w"> </span>forever<span class="w"> </span>preferred_lft<span class="w"> </span>forever
+<span class="m">2</span>:<span class="w"> </span>eth0:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">8950</span><span class="w"> </span>qdisc<span class="w"> </span>pfifo_fast<span class="w"> </span>state<span class="w"> </span>UP<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span><span class="m">02</span>:00:00:00:0e:a3<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff
+<span class="w">    </span>altname<span class="w"> </span>enp0s11
+<span class="w">    </span>altname<span class="w"> </span>ens11
+<span class="w">    </span>inet<span class="w"> </span><span class="m">10</span>.0.0.74/24<span class="w"> </span>brd<span class="w"> </span><span class="m">10</span>.0.0.255<span class="w"> </span>scope<span class="w"> </span>global<span class="w"> </span>eth0
+<span class="w">       </span>valid_lft<span class="w"> </span>forever<span class="w"> </span>preferred_lft<span class="w"> </span>forever
+<span class="m">3</span>:<span class="w"> </span>egr-br-eth0:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">1500</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>state<span class="w"> </span>UP<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span>f6:d1:c6:05:15:fd<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff
+<span class="w">    </span>inet<span class="w"> </span><span class="m">192</span>.168.15.1/24<span class="w"> </span>scope<span class="w"> </span>global<span class="w"> </span>egr-br-eth0
+<span class="w">       </span>valid_lft<span class="w"> </span>forever<span class="w"> </span>preferred_lft<span class="w"> </span>forever
+<span class="m">10</span>:<span class="w"> </span>vxlan-e2300f:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">8900</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>master<span class="w"> </span>br-vxlan-e2300f<span class="w"> </span>state<span class="w"> </span>UNKNOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span>6a:c0:ee:6f:83:6f<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff
+<span class="m">11</span>:<span class="w"> </span>br-vxlan-e2300f:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">8900</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>state<span class="w"> </span>UP<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span>8a:a6:8d:31:c9:09<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff
+<span class="m">13</span>:<span class="w"> </span>veth-e2300f-o@if12:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">8900</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>master<span class="w"> </span>br-vxlan-e2300f<span class="w"> </span>state<span class="w"> </span>UP<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span>6e:34:bc:25:68:c2<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff<span class="w"> </span>link-netns<span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3
+<span class="m">15</span>:<span class="w"> </span>egr-e2300f-o@if14:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">1500</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>master<span class="w"> </span>egr-br-eth0<span class="w"> </span>state<span class="w"> </span>UP<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span>5a:9c:f3:eb:2f:bc<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff<span class="w"> </span>link-netns<span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3
+</code></pre></div>
+<p>Here, we allocated a network, which was assigned VXLAN id 14823439 (<code>e2300f</code> in
+hexadecimal). That created a VXLAN interface named <code>vxlan-e2300f</code> on the machine,
+which is where other machines in a multinode cluster would attach for the VXLAN
+mesh which forms our virtual network. <code>br-vxlan-e2300f</code> is a linux bridge used to
+attach the local network namespace for this network to the VXLAN interface. That
+is, the members of the bridge look like this:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>sudo<span class="w"> </span>brctl<span class="w"> </span>show<span class="w"> </span>br-vxlan-e2300f
+bridge<span class="w"> </span>name<span class="w">         </span>bridge<span class="w"> </span>id<span class="w">           </span>STP<span class="w"> </span>enabled<span class="w">     </span>interfaces
+br-vxlan-e2300f<span class="w">     </span><span class="m">8000</span>.8aa68d31c909<span class="w">   </span>no<span class="w">              </span>veth-e2300f-o
+<span class="w">                                                        </span>vxlan-e2300f
+</code></pre></div>
+<p>Similarly, the egress bridge <code>egr-br-eth0</code> now contains a veth as well:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>sudo<span class="w"> </span>brctl<span class="w"> </span>show<span class="w"> </span>egr-br-eth0
+bridge<span class="w"> </span>name<span class="w">         </span>bridge<span class="w"> </span>id<span class="w">           </span>STP<span class="w"> </span>enabled<span class="w">     </span>interfaces
+egr-br-eth0<span class="w">         </span><span class="m">8000</span>.f6d1c60515fd<span class="w">   </span>no<span class="w">              </span>egr-e2300f-o
+</code></pre></div>
+<p>And there is a linux network namespace named with the UUID of the network:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>ls<span class="w"> </span>/var/run/netns/
+17be6538-8f96-4ccb-b71e-a7e3022fead3
+</code></pre></div>
+<p>That linux network namespace contains the other ends of the veths:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>sudo<span class="w"> </span>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3<span class="w"> </span>ip<span class="w"> </span>a
+<span class="m">1</span>:<span class="w"> </span>lo:<span class="w"> </span>&lt;LOOPBACK&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">65536</span><span class="w"> </span>qdisc<span class="w"> </span>noop<span class="w"> </span>state<span class="w"> </span>DOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/loopback<span class="w"> </span><span class="m">00</span>:00:00:00:00:00<span class="w"> </span>brd<span class="w"> </span><span class="m">00</span>:00:00:00:00:00
+<span class="m">12</span>:<span class="w"> </span>veth-e2300f-i@if13:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">1500</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>state<span class="w"> </span>UP<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span><span class="m">36</span>:da:87:ea:ce:16<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff<span class="w"> </span>link-netnsid<span class="w"> </span><span class="m">0</span>
+<span class="w">    </span>inet<span class="w"> </span><span class="m">172</span>.16.0.1/24<span class="w"> </span>scope<span class="w"> </span>global<span class="w"> </span>veth-e2300f-i
+<span class="w">       </span>valid_lft<span class="w"> </span>forever<span class="w"> </span>preferred_lft<span class="w"> </span>forever
+<span class="w">    </span>inet6<span class="w"> </span>fe80::34da:87ff:feea:ce16/64<span class="w"> </span>scope<span class="w"> </span>link
+<span class="w">       </span>valid_lft<span class="w"> </span>forever<span class="w"> </span>preferred_lft<span class="w"> </span>forever
+<span class="m">14</span>:<span class="w"> </span>egr-e2300f-i@if15:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">1500</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>state<span class="w"> </span>UP<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span>d2:b0:c8:31:f4:83<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff<span class="w"> </span>link-netnsid<span class="w"> </span><span class="m">0</span>
+<span class="w">    </span>inet<span class="w"> </span><span class="m">192</span>.168.15.194/24<span class="w"> </span>scope<span class="w"> </span>global<span class="w"> </span>egr-e2300f-i
+<span class="w">       </span>valid_lft<span class="w"> </span>forever<span class="w"> </span>preferred_lft<span class="w"> </span>forever
+<span class="w">    </span>inet6<span class="w"> </span>fe80::d0b0:c8ff:fe31:f483/64<span class="w"> </span>scope<span class="w"> </span>link
+<span class="w">       </span>valid_lft<span class="w"> </span>forever<span class="w"> </span>preferred_lft<span class="w"> </span>forever
+</code></pre></div>
+<p>This network namespace exists to contain a <code>dnsmasq</code> process providing DHCP to
+the virtual network, as well as to contain routing and iptables rules for mangling
+traffic into and out of the virtual network.</p>
+<p>Specifically, NAT for traffic from the virtual network to the outside world is
+implemented with routing and iptables like this:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>sudo<span class="w"> </span>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3<span class="w"> </span>ip<span class="w"> </span>route
+default<span class="w"> </span>via<span class="w"> </span><span class="m">192</span>.168.15.1<span class="w"> </span>dev<span class="w"> </span>egr-e2300f-i
+<span class="m">172</span>.16.0.0/24<span class="w"> </span>dev<span class="w"> </span>veth-e2300f-i<span class="w"> </span>proto<span class="w"> </span>kernel<span class="w"> </span>scope<span class="w"> </span>link<span class="w"> </span>src<span class="w"> </span><span class="m">172</span>.16.0.1
+<span class="m">192</span>.168.15.0/24<span class="w"> </span>dev<span class="w"> </span>egr-e2300f-i<span class="w"> </span>proto<span class="w"> </span>kernel<span class="w"> </span>scope<span class="w"> </span>link<span class="w"> </span>src<span class="w"> </span><span class="m">192</span>.168.15.194
+
+debian@test:~$<span class="w"> </span>sudo<span class="w"> </span>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3<span class="w"> </span>iptables<span class="w"> </span>-L<span class="w"> </span>-t<span class="w"> </span>nat
+Chain<span class="w"> </span>PREROUTING<span class="w"> </span><span class="o">(</span>policy<span class="w"> </span>ACCEPT<span class="o">)</span>
+target<span class="w">     </span>prot<span class="w"> </span>opt<span class="w"> </span><span class="nb">source</span><span class="w">               </span>destination
+
+Chain<span class="w"> </span>INPUT<span class="w"> </span><span class="o">(</span>policy<span class="w"> </span>ACCEPT<span class="o">)</span>
+target<span class="w">     </span>prot<span class="w"> </span>opt<span class="w"> </span><span class="nb">source</span><span class="w">               </span>destination
+
+Chain<span class="w"> </span>OUTPUT<span class="w"> </span><span class="o">(</span>policy<span class="w"> </span>ACCEPT<span class="o">)</span>
+target<span class="w">     </span>prot<span class="w"> </span>opt<span class="w"> </span><span class="nb">source</span><span class="w">               </span>destination
+
+Chain<span class="w"> </span>POSTROUTING<span class="w"> </span><span class="o">(</span>policy<span class="w"> </span>ACCEPT<span class="o">)</span>
+target<span class="w">     </span>prot<span class="w"> </span>opt<span class="w"> </span><span class="nb">source</span><span class="w">               </span>destination
+MASQUERADE<span class="w">  </span>all<span class="w">  </span>--<span class="w">  </span><span class="m">172</span>.16.0.0/24<span class="w">        </span>anywhere
+</code></pre></div>
+<p>So, the default route is via the egress veth at <code>egr-e2300f-i</code> (inside the
+namespace), which comes out on <code>egr-br-eth0</code> (outside the namespace) to be routed
+as normal. Traffic to other machines participating in this virtual network (that
+is, with the same VXLAN id configured), is routed to <code>veth-e2300f-i</code> (inside the
+namespace) which comes out on the <code>br-vxlan-e2300f</code> (outside the namespace) bridge
+which is wired to the linux kernel VXLAN interface at <code>vxlan-e2300f</code>. Finally,
+traffic to other floating IPs on <code>192.168.15.0/24</code> is routed to the egress
+bridge as well.</p>
+<p>The iptables <code>MASQUERADE</code> entry is there to convert internal addresses to the
+external <code>192.168.15.194</code> "floating gateway" address so instances can talk outside
+their virtual network.</p>
+<p>Perhaps a diagram would help!</p>
+<p><img alt="SF single node networking with no instances" src="../sf-single-node-networking-no-instances.png" /></p>
+<h2 id="single-node-install-one-network-and-one-instance-with-no-floating-ip">Single node install, one network and one instance with no floating IP</h2>
+<p>Now let's create a single instance on that network, with the instance specifically
+not having a floating IP:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>demo<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">1024</span><span class="w"> </span>-d<span class="w"> </span><span class="m">10</span>@debian:11<span class="w"> </span>-n<span class="w"> </span>demo
+uuid<span class="w">          </span>:<span class="w"> </span>3b9c13ee-405f-4195-b904-cffb34e022d3
+...
+
+Interfaces:
+
+<span class="w">    </span>uuid<span class="w">    </span>:<span class="w"> </span>afc470fb-8348-4711-8c16-be4c4662d705
+<span class="w">    </span>network<span class="w"> </span>:<span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3
+<span class="w">    </span>macaddr<span class="w"> </span>:<span class="w"> </span><span class="m">02</span>:00:00:bd:cd:9b
+<span class="w">    </span>order<span class="w">   </span>:<span class="w"> </span><span class="m">0</span>
+<span class="w">    </span>ipv4<span class="w">    </span>:<span class="w"> </span><span class="m">172</span>.16.0.232
+<span class="w">    </span>floating:<span class="w"> </span>None
+<span class="w">    </span>model<span class="w">   </span>:<span class="w"> </span>virtio
+...
+</code></pre></div>
+<p>There is only one new outer network interface created by adding the instance:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>ip<span class="w"> </span>a
+...
+<span class="m">16</span>:<span class="w"> </span>vnet0:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">8900</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>master<span class="w"> </span>br-vxlan-e2300f<span class="w"> </span>state<span class="w"> </span>UNKNOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span>fe:00:00:bd:cd:9b<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff
+</code></pre></div>
+<p><code>vnet0</code> is a libvirt construct to attach the virtual machine's network interface
+to the host OS. We attach that interface to the bridge that is the virtual network
+for this machine, in this case <code>br-vxlan-e2300f</code>:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>sudo<span class="w"> </span>brctl<span class="w"> </span>show<span class="w"> </span>br-vxlan-e2300f
+bridge<span class="w"> </span>name<span class="w">         </span>bridge<span class="w"> </span>id<span class="w">           </span>STP<span class="w"> </span>enabled<span class="w">     </span>interfaces
+br-vxlan-e2300f<span class="w">     </span><span class="m">8000</span>.8aa68d31c909<span class="w">   </span>no<span class="w">              </span>veth-e2300f-o
+<span class="w">                                                        </span>vnet0
+<span class="w">                                                        </span>vxlan-e2300f
+</code></pre></div>
+<p>There are no changes to the inside of the network namespace for this VM -- the
+<code>dnsmasq</code> process for example is already connected to the virtual network by
+virtue of the <code>veth-e2300f</code> pair and can therefore provide DHCP to the instance.</p>
+<p>Again perhaps a diagram will help:</p>
+<p><img alt="SF single node networking, one instance with no floating interfaces" src="../sf-single-node-networking-unfloat-instance.png" /></p>
+<p>This instance is not accessible from outside our virtual network as it does not
+have a floating IP. It can however talk to the outside world because our virtual
+network has NAT enabled. This is done by routing the traffic from <code>vnet0</code> to the
+virtual network's network namespace, where the iptables <code>MASQUERADE</code> rule will
+then NAT the traffic out.</p>
+<p>We can show this NAT traffic like this:</p>
+<p><img alt="SF single node networking, one instance with no floating interfaces showing NAT path" src="../sf-single-node-networking-unfloat-instance-nat.png" /></p>
+<h2 id="single-node-install-one-network-and-one-instance-with-no-floating-ip_1">Single node install, one network and one instance with no floating IP</h2>
+<p>Let's add a second instance, but this time with a floating IP associated with it:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>floatingdemo<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">1024</span><span class="w"> </span>-d<span class="w"> </span><span class="m">10</span>@debian:11<span class="w"> </span>-f<span class="w"> </span>demo
+uuid<span class="w">          </span>:<span class="w"> </span>08c0ae07-6a4b-4f63-9d50-a172039091a0
+...
+
+Interfaces:
+
+<span class="w">    </span>uuid<span class="w">    </span>:<span class="w"> </span>a4cfa174-cce9-4cda-907a-b90d7f54efd1
+<span class="w">    </span>network<span class="w"> </span>:<span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3
+<span class="w">    </span>macaddr<span class="w"> </span>:<span class="w"> </span><span class="m">02</span>:00:00:c7:f9:cc
+<span class="w">    </span>order<span class="w">   </span>:<span class="w"> </span><span class="m">0</span>
+<span class="w">    </span>ipv4<span class="w">    </span>:<span class="w"> </span><span class="m">172</span>.16.0.37
+<span class="w">    </span>floating:<span class="w"> </span><span class="m">192</span>.168.15.29
+<span class="w">    </span>model<span class="w">   </span>:<span class="w"> </span>virtio
+...
+</code></pre></div>
+<p>Again we add a <code>vnet</code> device via libvirt:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>ip<span class="w"> </span>a
+...
+<span class="m">17</span>:<span class="w"> </span>vnet1:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">8900</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>master<span class="w"> </span>br-vxlan-e2300f<span class="w"> </span>state<span class="w"> </span>UNKNOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span>fe:00:00:c7:f9:cc<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff
+<span class="m">19</span>:<span class="w"> </span>flt-c0a80f1d-o@if18:<span class="w"> </span>&lt;BROADCAST,MULTICAST&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">8900</span><span class="w"> </span>qdisc<span class="w"> </span>noop<span class="w"> </span>state<span class="w"> </span>DOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span>aa:5c:1c:0c:7c:f6<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff<span class="w"> </span>link-netns<span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3
+</code></pre></div>
+<p>But we've also added another veth pair, this time named <code>flt-c0a80f1d-o</code> on the
+outside of the network namespace. You can see in the instance details above that
+the floating IP associated with this instance is <code>192.168.15.29</code>, which just so
+happens to be <code>c0a80f1d</code> in hexadecimal. So this veth is how floating IP traffic
+is delivered to an instance.</p>
+<p>Here's another diagram showing the new setup:</p>
+<p><img alt="SF single node networking, two instances with one having a floating IP" src="../sf-single-node-networking-two-instances-one-floating-ip.png" /></p>
+<p>Its important to note that traffic <em>from</em> the instance still goes via the NAT
+route shown above, while traffic <em>to</em> the instance via the floating IP uses this
+veth. Replies to floating IP requests return via this veth as well though.</p>
+<p>The instance isn't aware of its floating IP at an operating system level at all.
+That is, inside the network namespace the veth attaches to, we do DNAT to mangle
+the traffic to the instance:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>sudo<span class="w"> </span>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3<span class="w"> </span>iptables<span class="w"> </span>-L<span class="w"> </span>-t<span class="w"> </span>nat
+Chain<span class="w"> </span>PREROUTING<span class="w"> </span><span class="o">(</span>policy<span class="w"> </span>ACCEPT<span class="o">)</span>
+target<span class="w">     </span>prot<span class="w"> </span>opt<span class="w"> </span><span class="nb">source</span><span class="w">               </span>destination
+DNAT<span class="w">       </span>all<span class="w">  </span>--<span class="w">  </span>anywhere<span class="w">             </span><span class="m">192</span>.168.15.29<span class="w">        </span>to:172.16.0.37
+
+Chain<span class="w"> </span>INPUT<span class="w"> </span><span class="o">(</span>policy<span class="w"> </span>ACCEPT<span class="o">)</span>
+target<span class="w">     </span>prot<span class="w"> </span>opt<span class="w"> </span><span class="nb">source</span><span class="w">               </span>destination
+
+Chain<span class="w"> </span>OUTPUT<span class="w"> </span><span class="o">(</span>policy<span class="w"> </span>ACCEPT<span class="o">)</span>
+target<span class="w">     </span>prot<span class="w"> </span>opt<span class="w"> </span><span class="nb">source</span><span class="w">               </span>destination
+
+Chain<span class="w"> </span>POSTROUTING<span class="w"> </span><span class="o">(</span>policy<span class="w"> </span>ACCEPT<span class="o">)</span>
+target<span class="w">     </span>prot<span class="w"> </span>opt<span class="w"> </span><span class="nb">source</span><span class="w">               </span>destination
+MASQUERADE<span class="w">  </span>all<span class="w">  </span>--<span class="w">  </span><span class="m">172</span>.16.0.0/24<span class="w">        </span>anywhere
+</code></pre></div>
+<p>So our floating IP of <code>192.168.15.29</code> is DNAT'ed to the instance's IP of
+<code>172.16.0.37</code>. This means floating IP traffic "bounces" off the network namespace.
+To make that work, the inside of the veth is configured with the floating IP:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>sudo<span class="w"> </span>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3<span class="w"> </span>ip<span class="w"> </span>a
+...
+<span class="m">18</span>:<span class="w"> </span>flt-c0a80f1d-i@if19:<span class="w"> </span>&lt;BROADCAST,MULTICAST&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">1500</span><span class="w"> </span>qdisc<span class="w"> </span>noop<span class="w"> </span>state<span class="w"> </span>DOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<span class="w">    </span>link/ether<span class="w"> </span>fe:cb:4c:4a:17:ef<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff<span class="w"> </span>link-netnsid<span class="w"> </span><span class="m">0</span>
+<span class="w">    </span>inet<span class="w"> </span><span class="m">192</span>.168.15.29/32<span class="w"> </span>scope<span class="w"> </span>global<span class="w"> </span>flt-c0a80f1d-i
+<span class="w">       </span>valid_lft<span class="w"> </span>forever<span class="w"> </span>preferred_lft<span class="w"> </span>forever
+</code></pre></div>
+<p>Note the <code>/32</code> netmask for that address assignment. Notably, the routing table
+for the outer linux still looks like this:</p>
+<div class="highlight"><pre><span></span><code>debian@test:~$<span class="w"> </span>ip<span class="w"> </span>route
+default<span class="w"> </span>via<span class="w"> </span><span class="m">10</span>.0.0.1<span class="w"> </span>dev<span class="w"> </span>eth0
+<span class="m">10</span>.0.0.0/24<span class="w"> </span>dev<span class="w"> </span>eth0<span class="w"> </span>proto<span class="w"> </span>kernel<span class="w"> </span>scope<span class="w"> </span>link<span class="w"> </span>src<span class="w"> </span><span class="m">10</span>.0.0.74
+<span class="m">192</span>.168.15.0/24<span class="w"> </span>dev<span class="w"> </span>egr-br-eth0<span class="w"> </span>proto<span class="w"> </span>kernel<span class="w"> </span>scope<span class="w"> </span>link<span class="w"> </span>src<span class="w"> </span><span class="m">192</span>.168.15.1
+</code></pre></div>
+<p>The outer linux knows to route the floating IP down that veth because of this
+address assigned on the inside of the namespace.</p>
+<p>Let's have a final diagram showing how a packet for a floating IP gets to its
+instance:</p>
+<p><img alt="SF single node networking, two instances with one having a floating IP showing ingress path" src="../sf-single-node-networking-two-instances-one-floating-ip-ingress.png" /></p>
+<h2 id="multiple-nodes">Multiple nodes</h2>
+<p>Its actually a relatively small step from the above to multiple hypervisor nodes,
+as additional nodes don't have the network namespace or the veths -- those exist
+only on the network node (node 1 in our example).</p>
+<p><img alt="SF multinode networking" src="../sf-multinode-networking.png" /></p>
 
 
 
