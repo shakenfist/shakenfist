@@ -17,7 +17,6 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
-from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import etcd
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
@@ -763,7 +762,7 @@ class Network(dbo):
         return IPManager.from_db(self.uuid)
 
     def reserve(self, address, unique_label_tuple):
-        with db.get_lock('ipmanager', None, self.uuid, ttl=120, op='reserve'):
+        with etcd.get_lock('ipmanager', None, self.uuid, ttl=120, op='reserve'):
             return self._reserve_inner(address, unique_label_tuple)
 
     def _reserve_inner(self, address, unique_label_tuple):
@@ -775,7 +774,7 @@ class Network(dbo):
         return retval
 
     def reserve_random_free_address(self, unique_label_tuple):
-        with db.get_lock('ipmanager', None, self.uuid, ttl=120, op='reserve random'):
+        with etcd.get_lock('ipmanager', None, self.uuid, ttl=120, op='reserve random'):
             ipm = self._get_ipmanager()
             retval = ipm.reserve_random_free_address(
                 unique_label_tuple=unique_label_tuple)
@@ -783,7 +782,7 @@ class Network(dbo):
             return retval
 
     def release(self, address):
-        with db.get_lock('ipmanager', None, self.uuid, ttl=120, op='release'):
+        with etcd.get_lock('ipmanager', None, self.uuid, ttl=120, op='release'):
             self._release_inner(address)
 
     def _release_inner(self, address):

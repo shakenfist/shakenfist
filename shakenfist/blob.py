@@ -20,7 +20,6 @@ from shakenfist.baseobject import (
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS, EVENT_TYPE_MUTATE
 from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
@@ -409,7 +408,7 @@ class Blob(dbo):
                     total_bytes_received += len(d)
 
                     if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
-                        db.refresh_locks(locks)
+                        etcd.refresh_locks(locks)
                         last_refresh = time.time()
 
                     percentage = total_bytes_received / int(self.size) * 100.0
@@ -690,7 +689,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
                     previous_percentage = percentage
 
             if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
-                db.refresh_locks(locks)
+                etcd.refresh_locks(locks)
                 last_refresh = time.time()
 
     if instance_object:
