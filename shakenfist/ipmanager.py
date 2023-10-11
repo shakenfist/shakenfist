@@ -3,7 +3,7 @@ import random
 from shakenfist_utilities import logs
 import time
 
-from shakenfist import db
+from shakenfist import etcd
 from shakenfist import exceptions
 
 
@@ -52,8 +52,11 @@ class IPManager(object):
         return ipm
 
     @staticmethod
-    def from_db(uuid):
-        db_data = db.get_ipmanager(uuid)
+    def from_db(network_uuid):
+        db_data = etcd.get('ipmanager', None, network_uuid)
+        if not db_data:
+            raise exceptions.IPManagerMissing(
+                'IP Manager not found for network %s' % network_uuid)
 
         if 'ipmanager.v3' in db_data:
             ipm = IPManager(**db_data['ipmanager.v3'])
@@ -79,10 +82,10 @@ class IPManager(object):
                 'uuid': self.uuid
             }
         }
-        db.persist_ipmanager(self.uuid, d)
+        etcd.put('ipmanager', None, self.uuid, d)
 
     def delete(self):
-        db.delete_ipmanager(self.uuid)
+        etcd.delete('ipmanager', None, self.uuid)
 
     def get_address_at_index(self, idx):
         return str(self.ipblock_obj[idx])

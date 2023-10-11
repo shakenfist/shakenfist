@@ -5,7 +5,6 @@ import uuid
 
 from shakenfist import constants
 from shakenfist import etcd
-from shakenfist.exceptions import IPManagerMissing
 
 
 LOG, _ = logs.setup(__name__)
@@ -30,23 +29,3 @@ def refresh_locks(locks, relatedobjects=None, log_ctx=LOG):
     if locks:
         for lock in locks:
             refresh_lock(lock, log_ctx=log_ctx)
-
-
-#####################################################################
-# IPManagers
-#####################################################################
-
-
-def get_ipmanager(network_uuid):
-    ipm = etcd.get('ipmanager', None, network_uuid)
-    if not ipm:
-        raise IPManagerMissing('IP Manager not found for network %s' % network_uuid)
-    return ipm
-
-
-def persist_ipmanager(network_uuid, data):
-    etcd.put('ipmanager', None, network_uuid, data)
-
-
-def delete_ipmanager(network_uuid):
-    etcd.delete('ipmanager', None, uuid)
