@@ -29,7 +29,7 @@ class IPManager(object):
             self.in_use_counter = len(in_use)
             self.in_use = in_use
         else:
-            self.in_use_counter = 0
+            self.in_use_counter = 2
             self.in_use = {
                 self.network_address: {
                     'user': self.unique_label(),
@@ -104,7 +104,7 @@ class IPManager(object):
             'user': unique_label_tuple,
             'when': time.time()
         }
-        self.in_use_counter += 1
+        self.in_use_counter = len(self.in_use)
         return True
 
     def release(self, address):
@@ -112,7 +112,7 @@ class IPManager(object):
             return False
 
         del self.in_use[address]
-        self.in_use_counter -= 1
+        self.in_use_counter = len(self.in_use)
         return True
 
     def get_random_address(self):
