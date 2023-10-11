@@ -77,6 +77,5 @@ nav:
        - "Locks": operator_guide/locks.md
        - "Networking":
            - "Overview": "operator_guide/networking/overview.md"
-           - "Single Instance": "operator_guide/networking/single_instance.md"
        - "Power States": "operator_guide/power_states.md"
        - "Upgrades": "operator_guide/upgrades.md"
