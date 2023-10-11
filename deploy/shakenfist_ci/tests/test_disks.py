@@ -1,23 +1,20 @@
 from shakenfist_ci import base
 
 
-class TestDisks(base.BaseNamespacedTestCase):
-    """Make sure instances boot under various configurations."""
-
+class TestDiskBusBase(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
-        kwargs['namespace_prefix'] = 'disks'
-        super(TestDisks, self).__init__(*args, **kwargs)
+        kwargs['namespace_prefix'] = '%s-disks' % self.bus
+        super(TestDiskBusBase, self).__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestDisks, self).setUp()
+        super(TestDiskBusBase, self).setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, self.namespace)
         self._await_networks_ready([self.net['uuid']])
 
-    def test_boot_nvme(self):
-        self.skip('This test is flakey in CI for reasons I do not understand.')
+    def test_disk(self):
         inst = self.test_client.create_instance(
-            'test-cirros-boot-nvme', 1, 1024,
+            'test-boot-%s' % self.bus, 2, 2048,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -26,9 +23,9 @@ class TestDisks(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/ubuntu-2004',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk',
-                    'bus': 'nvme'
+                    'bus': self.bus
                 }
             ], None, None)
 
@@ -41,3 +38,21 @@ class TestDisks(base.BaseNamespacedTestCase):
         for i in self.test_client.get_instances():
             inst_uuids.append(i['uuid'])
         self.assertNotIn(inst['uuid'], inst_uuids)
+
+
+class TestNVMeDisks(TestDiskBusBase):
+    def __init__(self, *args, **kwargs):
+        self.bus = 'nvme'
+        super(TestNVMeDisks, self).__init__(*args, **kwargs)
+
+
+class TestSATADisks(TestDiskBusBase):
+    def __init__(self, *args, **kwargs):
+        self.bus = 'sata'
+        super(TestSATADisks, self).__init__(*args, **kwargs)
+
+
+class TestIDEDisks(TestDiskBusBase):
+    def __init__(self, *args, **kwargs):
+        self.bus = 'ide'
+        super(TestIDEDisks, self).__init__(*args, **kwargs)
