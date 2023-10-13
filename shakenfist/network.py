@@ -17,13 +17,12 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
-from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import etcd
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
 from shakenfist.exceptions import DeadNetwork, CongestedNetwork, IPManagerMissing
 from shakenfist import instance
-from shakenfist.ipmanager import IPManager
+from shakenfist import ipam
 from shakenfist import networkinterface
 from shakenfist.node import Node, Nodes
 from shakenfist.tasks import (
@@ -73,13 +72,18 @@ class Network(dbo):
         self.mesh_nic = static_values.get(
             'mesh_nic', config.NODE_MESH_NIC)
 
-        ipm = IPManager.from_db(self.uuid)
-        self.__ipblock = ipm.network_address
-        self.__router = ipm.get_address_at_index(1)
-        self.__dhcp_start = ipm.get_address_at_index(2)
-        self.__netmask = ipm.netmask
-        self.__broadcast = ipm.broadcast_address
-        self.__network_address = ipm.network_address
+        self.__ipam = ipam.IPAM.from_db(self.uuid, suppress_failure_audit=True)
+        if not self.__ipam:
+            self.log.info('Creating a new IPAM for network')
+            self.__ipam = ipam.IPAM.new(
+                self.uuid, self.namespace, self.uuid, self.__netblock)
+
+        self.__ipblock = self.ipam.network_address
+        self.__router = self.ipam.get_address_at_index(1)
+        self.__dhcp_start = self.ipam.get_address_at_index(2)
+        self.__netmask = self.ipam.netmask
+        self.__broadcast = self.ipam.broadcast_address
+        self.__network_address = self.ipam.network_address
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values):
@@ -116,8 +120,8 @@ class Network(dbo):
         if not vxid:
             vxid = Network.allocate_vxid(network_uuid)
 
-        # Pre-create the IPManager
-        IPManager.new(network_uuid, netblock)
+        # Pre-create the IPAM
+        ipam.IPAM.new(network_uuid, namespace, network_uuid, netblock)
 
         Network._db_create(
             network_uuid,
@@ -166,6 +170,10 @@ class Network(dbo):
         return n
 
     # Static values
+    @property
+    def ipam(self):
+        return self.__ipam
+
     @property
     def floating_gateway(self):
         fg = self._db_get_attribute('routing', {'floating_gateway': None})
@@ -240,6 +248,10 @@ class Network(dbo):
     def update_floating_gateway(self, gateway):
         with self.get_lock_attr('routing', 'Update floating gateway'):
             routing = self.routing
+            if routing.get('floating_gateway') and gateway:
+                self.log.with_fields({
+                    'old_gateway': routing['floating_gateway'],
+                    'new_gateway': gateway}).error('Clobbering previous floating gateway')
             routing['floating_gateway'] = gateway
             self._db_set_attribute('routing', routing)
 
@@ -428,9 +440,10 @@ class Network(dbo):
                     fn = floating_network()
                     if not self.floating_gateway:
                         self.update_floating_gateway(
-                            fn.reserve_random_free_address(self.unique_label()))
+                            fn.ipam.reserve_random_free_address(
+                                self.unique_label(), ipam.RESERVATION_TYPE_GATEWAY, ''))
 
-                    subst['floating_router'] = fn.get_address_at_index(1)
+                    subst['floating_router'] = fn.ipam.get_address_at_index(1)
                     subst['floating_gateway'] = self.floating_gateway
                     subst['floating_netmask'] = fn.netmask
                 except CongestedNetwork:
@@ -502,7 +515,7 @@ class Network(dbo):
 
             if self.floating_gateway:
                 fn = floating_network()
-                fn.release(self.floating_gateway)
+                fn.ipam.release(self.floating_gateway)
                 self.update_floating_gateway(None)
 
             self.state = self.STATE_DELETED
@@ -521,7 +534,6 @@ class Network(dbo):
 
     def hard_delete(self):
         etcd.delete('vxlan', None, self.vxid)
-        etcd.delete('ipmanager', None, self.uuid)
         super(Network, self).hard_delete()
 
     def is_dnsmasq_running(self):
@@ -593,7 +605,7 @@ class Network(dbo):
         if config.NODE_IS_NETWORK_NODE:
             if self.floating_gateway:
                 fn = floating_network()
-                fn.release(self.floating_gateway)
+                fn.ipam.release(self.floating_gateway)
                 self.update_floating_gateway(None)
 
         else:
@@ -757,64 +769,6 @@ class Network(dbo):
             util_process.execute(None,
                                  'ip link del flt-%(floating_address_as_hex)s-o'
                                  % subst)
-
-    # Proxy to IPManager
-    def _get_ipmanager(self):
-        return IPManager.from_db(self.uuid)
-
-    def reserve(self, address, unique_label_tuple):
-        with db.get_lock('ipmanager', None, self.uuid, ttl=120, op='reserve'):
-            return self._reserve_inner(address, unique_label_tuple)
-
-    def _reserve_inner(self, address, unique_label_tuple):
-        ipm = self._get_ipmanager()
-        retval = ipm.reserve(
-            address, unique_label_tuple=unique_label_tuple)
-        if retval:
-            ipm.persist()
-        return retval
-
-    def reserve_random_free_address(self, unique_label_tuple):
-        with db.get_lock('ipmanager', None, self.uuid, ttl=120, op='reserve random'):
-            ipm = self._get_ipmanager()
-            retval = ipm.reserve_random_free_address(
-                unique_label_tuple=unique_label_tuple)
-            ipm.persist()
-            return retval
-
-    def release(self, address):
-        with db.get_lock('ipmanager', None, self.uuid, ttl=120, op='release'):
-            self._release_inner(address)
-
-    def _release_inner(self, address):
-        ipm = self._get_ipmanager()
-        if ipm.release(address):
-            ipm.persist()
-
-    def get_address_at_index(self, idx):
-        ipm = self._get_ipmanager()
-        return ipm.get_address_at_index(idx)
-
-    def is_free(self, address):
-        ipm = self._get_ipmanager()
-        return ipm.is_free(address)
-
-    def is_in_range(self, address):
-        ipm = self._get_ipmanager()
-        return ipm.is_in_range(address)
-
-    def get_broadcast_address(self):
-        return self._get_ipmanager().broadcast_address
-
-    def get_network_address(self):
-        return self._get_ipmanager().network_address
-
-    def get_in_use_addresses(self):
-        return self._get_ipmanager().in_use
-
-    def get_allocation_age(self, address):
-        ipm = self._get_ipmanager()
-        return ipm.in_use[address]['when']
 
 
 class Networks(dbo_iter):

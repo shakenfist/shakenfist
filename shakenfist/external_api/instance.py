@@ -35,6 +35,7 @@ from shakenfist.external_api import (
     base as api_base,
     util as api_util)
 from shakenfist import instance
+from shakenfist import ipam
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist import network as sfnet
 from shakenfist.networkinterface import NetworkInterface
@@ -541,7 +542,7 @@ class InstancesEndpoint(sf_api.Resource):
                 if netdesc.get('address') and not util_general.noneish(netdesc.get('address')):
                     # The requested address must be within the ip range specified
                     # for that virtual network, unless it is equivalent to "none".
-                    if not n.is_in_range(netdesc['address']):
+                    if not n.ipam.is_in_range(netdesc['address']):
                         return sf_api.error(
                             400,
                             'network specification requests an address outside the '
@@ -623,13 +624,14 @@ class InstancesEndpoint(sf_api.Resource):
                         netdesc['address'] = None
                     else:
                         if 'address' not in netdesc or not netdesc['address']:
-                            netdesc['address'] = n.reserve_random_free_address(
-                                inst.unique_label())
+                            netdesc['address'] = n.ipam.reserve_random_free_address(
+                                inst.unique_label(), ipam.RESERVATION_TYPE_INSTANCE, '')
                             inst.add_event(
                                 EVENT_TYPE_AUDIT,
                                 'allocated ip address', extra=netdesc)
                         else:
-                            if not n.reserve(netdesc['address'], inst.unique_label()):
+                            if not n.ipam.reserve(netdesc['address'], inst.unique_label(),
+                                                  ipam.RESERVATION_TYPE_INSTANCE, ''):
                                 inst.enqueue_delete_due_error(
                                     'failed to reserve an IP on network %s'
                                     % netdesc['network_uuid'])

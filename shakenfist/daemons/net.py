@@ -14,6 +14,7 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
+from shakenfist import ipam
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
@@ -308,7 +309,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         if isinstance(workitem, DefloatNetworkInterfaceTask):
             n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
             fn = network.floating_network()
-            fn.release(ni.floating.get('floating_address'))
+            fn.ipam.release(ni.floating.get('floating_address'))
             ni.floating = None
             return
 
@@ -376,8 +377,10 @@ class Monitor(daemon.WorkerPoolDaemon):
                     fg = n.floating_gateway
                     if fg:
                         floating_gateways.append(fg)
-                        if floating_network.is_free(fg):
-                            floating_network._reserve_inner(fg, n.unique_label())
+                        if floating_network.ipam.is_free(fg):
+                            floating_network.ipam.reserve(
+                                fg, n.unique_label(), ipam.RESERVATION_TYPE_GATEWAY,
+                                'Rescued from incorrect registration')
                             LOG.with_fields({
                                 'network': n.uuid,
                                 'address': fg
@@ -390,8 +393,10 @@ class Monitor(daemon.WorkerPoolDaemon):
                     fa = ni.floating.get('floating_address')
                     if fa:
                         floating_addresses.append(fa)
-                        if floating_network.is_free(fa):
-                            floating_network._reserve_inner(fa, ni.unique_label())
+                        if floating_network.ipam.is_free(fa):
+                            floating_network.ipam.reserve(
+                                fg, n.unique_label(), ipam.RESERVATION_TYPE_FLOATING,
+                                'Rescued from incorrect registration')
                             LOG.with_fields({
                                 'networkinterface': ni.uuid,
                                 'address': fa
@@ -399,17 +404,17 @@ class Monitor(daemon.WorkerPoolDaemon):
                 LOG.info('Found floating addresses: %s' % floating_addresses)
 
                 floating_reserved = [
-                    floating_network.get_address_at_index(0),
-                    floating_network.get_address_at_index(1),
-                    floating_network.get_broadcast_address(),
-                    floating_network.get_network_address()
+                    floating_network.ipam.get_address_at_index(0),
+                    floating_network.ipam.get_address_at_index(1),
+                    floating_network.ipam.broadcast_address,
+                    floating_network.ipam.network_address
                 ]
                 LOG.info('Found floating reservations: %s' % floating_reserved)
 
                 # Now the reverse check. Test if there are any reserved IPs which
                 # are not actually in use. Free any we find.
                 leaks = []
-                for ip in floating_network.get_in_use_addresses():
+                for ip in floating_network.ipam.in_use:
                     if ip not in itertools.chain(floating_gateways,
                                                  floating_addresses,
                                                  floating_reserved):
@@ -417,12 +422,12 @@ class Monitor(daemon.WorkerPoolDaemon):
 
                         # This IP needs to have been allocated more than 300 seconds
                         # ago to ensure that the network setup isn't still queued.
-                        if time.time() - floating_network.get_allocation_age(ip) > 300:
+                        if time.time() - floating_network.ipam.get_allocation_age(ip) > 300:
                             leaks.append(ip)
 
                 for ip in leaks:
                     LOG.error('Leaked floating IP %s has been released.' % ip)
-                    floating_network._release_inner(ip)
+                    floating_network.ipam.release(ip)
 
     def _validate_mtus(self):
         last_loop = 0

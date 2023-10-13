@@ -634,16 +634,6 @@ class Instance(dbo):
             if dbstate.get('power_state') == state:
                 return
 
-            # TODO(andy): Find out what problem this is avoiding
-
-            # If we are in transition, and its new, then we might
-            # not want to update just yet
-            state_age = time.time() - dbstate.get('power_state_updated', 0)
-            if (dbstate.get('power_state', '').startswith('transition-to-') and
-                    dbstate['power_state_previous'] == state and
-                    state_age < 70):
-                return
-
             dbstate['power_state_previous'] = dbstate.get('power_state')
             dbstate['power_state'] = state
             dbstate['power_state_updated'] = time.time()

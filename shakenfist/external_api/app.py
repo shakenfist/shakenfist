@@ -102,6 +102,7 @@ class Root(sf_api.Resource):
              '<li>events: events-by-type</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
              'instance-put-blob, instance-execute, instance-get</li>'
+             '<li>networks: list-addresses'
              '<li>networkinterfaces: interface-metadata</li>'
              '<li>nodes: node-get, node-metadata</li>'
              '</ul></p></body></html>'),
@@ -216,6 +217,8 @@ api.add_resource(api_label.LabelEndpoint, '/label/<path:label_name>')
 
 api.add_resource(api_network.NetworksEndpoint, '/networks')
 api.add_resource(api_network.NetworkEndpoint, '/networks/<network_ref>')
+api.add_resource(api_network.NetworkAddressesEndpoint,
+                 '/networks/<network_ref>/addresses')
 api.add_resource(api_network.NetworkEventsEndpoint,
                  '/networks/<network_ref>/events')
 api.add_resource(api_network.NetworkInterfacesEndpoint,

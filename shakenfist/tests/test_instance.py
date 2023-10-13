@@ -7,39 +7,15 @@ import pycdlib
 import tempfile
 import testtools
 import time
+import uuid
 
 from shakenfist import baseobject
 from shakenfist.baseobject import State
 from shakenfist import exceptions
-from shakenfist.ipmanager import IPManager
 from shakenfist import instance
 from shakenfist.config import SFConfig
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
-
-
-class FakeNetwork(object):
-    object_type = 'network'
-
-    def __init__(self):
-        self.ipmanager = IPManager('uuid', '127.0.0.0/8')
-        self.router = self.ipmanager.get_address_at_index(1)
-        self.netmask = '255.0.0.0'
-        self.dhcp_start = '127.0.0.2'
-        self.broadcast = '127.255.255.255'
-        self.provide_nat = True
-
-
-class FakeNetworkInterface(object):
-    object_type = 'networkinterface'
-
-    def __init__(self, values):
-        self.uuid = values['uuid']
-        self.instance_uuid = values['instance_uuid']
-        self.network_uuid = values['network_uuid']
-        self.macaddr = values['macaddr']
-        self.ipv4 = values['ipv4']
-        self.order = values['order']
 
 
 class VirtMetaTestCase(base.ShakenFistTestCase):
@@ -145,97 +121,20 @@ class InstanceTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        # self.libvirt = mock.patch('libvirt')
-        # self.mock_libvirt = self.libvirt.start()
-
-        self.put = mock.patch('shakenfist.etcd.put')
-        self.mock_put = self.put.start()
-        self.addCleanup(self.put.stop)
-
         self.gmov = mock.patch(
             'shakenfist.baseobject.get_minimum_object_version', return_value=6)
         self.mock_gmov = self.gmov.start()
         self.addCleanup(self.gmov.stop)
 
-    @mock.patch('shakenfist.instance.Instance._db_create')
-    @mock.patch('shakenfist.instance.Instance._db_get',
-                return_value={
-                    'uuid': 'fakeuuid',
-                    'cpus': 1,
-                    'disk_spec': [{
-                        'base': 'cirros',
-                        'size': 8
-                    }],
-                    'memory': 1024,
-                    'name': 'cirros',
-                    'namespace': 'namespace',
-                    'requested_placement': None,
-                    'ssh_key': 'thisisasshkey',
-                    'user_data': str(base64.b64encode(
-                        'thisisuserdata'.encode('utf-8')), 'utf-8'),
-                    'video': {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
-                    'uefi': False,
-                    'configdrive': 'openstack-disk',
-                    'version': 6,
-                    'nvram_template': None,
-                    'secure_boot': False
-                })
-    def _make_instance(self, mock_get_instance, mock_create_instance):
-        return instance.Instance.new(
-            'cirros', 1, 1024,  'namespace',
-            instance_uuid='fakeuuid',
-            disk_spec=[{
-                'base': 'cirros',
-                'size': 8
-            }],
-            ssh_key='thisisasshkey',
-            user_data=str(base64.b64encode(
-                'thisisuserdata'.encode('utf-8')), 'utf-8'),
-        )
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
 
-    @mock.patch('shakenfist.cache.update_object_state_cache')
-    @mock.patch('shakenfist.instance.Instance.error',
-                new_callable=mock.PropertyMock)
-    @mock.patch('shakenfist.etcd.get_lock')
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                side_effect=[
-                    {'value': None, 'update_time': 0},
-                    {'value': instance.Instance.STATE_INITIAL, 'update_time': 0},
-                ])
-    @mock.patch('shakenfist.instance.Instance._db_set_attribute')
-    @mock.patch('shakenfist.etcd.put')
-    def test_set_state(
-            self, mock_put, mock_attribute_set, mock_state_get, mock_lock,
-            mock_error, mock_update_cache):
-        i = self._make_instance()
-        i.state = 'preflight'
+    def test_set_state_valid1(self):
+        instance_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_instance('cirros', instance_uuid,
+                                       set_state=instance.Instance.STATE_PREFLIGHT)
+        i = instance.Instance.from_db(instance_uuid)
 
-        etcd_write = mock_attribute_set.mock_calls[2]
-        self.assertTrue(time.time() - etcd_write[1][1].update_time < 3)
-        self.assertEqual('preflight', etcd_write[1][1].value)
-
-    @mock.patch('shakenfist.cache.update_object_state_cache')
-    @mock.patch('shakenfist.etcd.get_lock')
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                side_effect=[
-                    {'value': None, 'update_time': 0},
-                    {'value': instance.Instance.STATE_INITIAL, 'update_time': 0},
-                    {'value': 'preflight', 'update_time': 0},
-                    {'value': 'preflight', 'update_time': 0},
-                    {'value': 'preflight', 'update_time': 0},
-                    {'value': instance.Instance.STATE_CREATING, 'update_time': 0},
-                    {'value': instance.Instance.STATE_CREATED, 'update_time': 0},
-                    {'value': 'created-error', 'update_time': 0},
-                    {'value': instance.Instance.STATE_ERROR, 'update_time': 0},
-                ])
-    @mock.patch('shakenfist.instance.Instance._db_set_attribute')
-    @mock.patch('shakenfist.etcd.put')
-    def test_set_state_valid1(
-            self, mock_put, mock_attribute_set, mock_state_get, mock_lock,
-            mock_update_state):
-
-        i = self._make_instance()
-        i.state = 'preflight'
         with testtools.ExpectedException(exceptions.InvalidStateException):
             i.state = instance.Instance.STATE_INITIAL
         with testtools.ExpectedException(exceptions.InvalidStateException):
@@ -246,155 +145,80 @@ class InstanceTestCase(base.ShakenFistTestCase):
         i.state = instance.Instance.STATE_ERROR
         i.state = instance.Instance.STATE_DELETED
 
-    @mock.patch('shakenfist.cache.update_object_state_cache')
-    @mock.patch('shakenfist.etcd.get_lock')
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                side_effect=[
-                    {'value': None, 'update_time': 0},
-                    {'value': instance.Instance.STATE_INITIAL, 'update_time': 0},
-                    {'value': 'preflight', 'update_time': 0},
-                    {'value': instance.Instance.STATE_ERROR, 'update_time': 0},
-                ])
-    @mock.patch('shakenfist.instance.Instance._db_set_attribute')
-    @mock.patch('shakenfist.etcd.put')
-    def test_set_state_valid2(
-            self, mock_put, mock_attribute_set, mock_state_get, mock_lock,
-            mock_update_sate):
+    def test_set_state_valid2(self):
+        instance_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_instance('cirros', instance_uuid,
+                                       set_state=instance.Instance.STATE_PREFLIGHT)
+        i = instance.Instance.from_db(instance_uuid)
 
-        i = self._make_instance()
-        i.state = 'preflight'
         i.state = 'preflight-error'
         with testtools.ExpectedException(exceptions.InvalidStateException):
             i.state = instance.Instance.STATE_CREATED
 
-    @mock.patch('shakenfist.etcd.get_lock')
-    @mock.patch('shakenfist.instance.Instance.power_state',
-                new_callable=mock.PropertyMock)
-    @mock.patch('shakenfist.instance.Instance._db_set_attribute')
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
-                new_callable=mock.PropertyMock)
-    def test_update_power_state(self, mock_update, mock_attribute_set,
-                                mock_power_state_get, mock_lock):
-        mock_power_state_get.return_value = {
-            'power_state_previous': 'off',
-            'power_state': 'on',
-            'power_state_updated': 0
-        }
-
-        i = self._make_instance()
+    def test_update_power_state(self):
+        instance_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_instance('cirros', instance_uuid)
+        i = instance.Instance.from_db(instance_uuid)
         i.update_power_state('off')
 
-        etcd_write = mock_attribute_set.mock_calls[1][1]
-        self.assertTrue(time.time() - etcd_write[1]['power_state_updated'] < 3)
-        self.assertEqual('off', etcd_write[1]['power_state'])
-        self.assertEqual('on', etcd_write[1]['power_state_previous'])
+        etcd_value = i._db_get_attribute('power_state')
+        self.assertTrue(time.time() - etcd_value['power_state_updated'] < 3)
+        self.assertEqual('off', etcd_value['power_state'])
+        self.assertEqual('initial', etcd_value['power_state_previous'])
 
-    @mock.patch('shakenfist.etcd.get_lock')
-    @mock.patch('shakenfist.instance.Instance.power_state',
-                new_callable=mock.PropertyMock)
-    @mock.patch('shakenfist.instance.Instance._db_set_attribute')
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
-                new_callable=mock.PropertyMock)
-    def test_update_power_state_duplicate(self, mock_get, mock_attribute_set,
-                                          mock_power_state_get, mock_lock):
-        mock_power_state_get.return_value = {
-            'power_state_previous': 'off',
-            'power_state': 'on',
-            'power_state_updated': time.time()
-        }
+    def test_update_power_state_duplicate(self):
+        instance_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_instance('cirros', instance_uuid)
+        i = instance.Instance.from_db(instance_uuid)
+        i.update_power_state('off')
+        etcd_value_one = i._db_get_attribute('power_state')
 
-        i = self._make_instance()
-        i.update_power_state('on')
-        self.assertEqual(
-            [mock.call('power_state', {
-                       'power_state': instance.Instance.STATE_INITIAL})],
-            mock_attribute_set.mock_calls)
+        i.update_power_state('off')
+        etcd_value_two = i._db_get_attribute('power_state')
 
-    @mock.patch('shakenfist.etcd.get_lock')
-    @mock.patch('shakenfist.instance.Instance.power_state',
-                new_callable=mock.PropertyMock)
-    @mock.patch('shakenfist.instance.Instance._db_set_attribute')
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
-                new_callable=mock.PropertyMock)
-    def test_update_power_state_transition_new(
-            self, mock_update,
-            mock_attribute_set, mock_power_state_get, mock_lock):
-        mock_power_state_get.return_value = {
-            'power_state_previous': 'on',
-            'power_state': 'transition-to-off',
-            'power_state_updated': time.time()
-        }
+        # That is, the second update was ignored
+        self.assertEqual(etcd_value_one['power_state_updated'],
+                         etcd_value_two['power_state_updated'])
 
-        i = self._make_instance()
-        i.update_power_state('on')
-        self.assertEqual(
-            [mock.call('power_state', {
-                       'power_state': instance.Instance.STATE_INITIAL})],
-            mock_attribute_set.mock_calls)
-
-    @mock.patch('shakenfist.etcd.get_lock')
-    @mock.patch('shakenfist.instance.Instance.power_state',
-                new_callable=mock.PropertyMock)
-    @mock.patch('shakenfist.instance.Instance._db_set_attribute')
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
-                new_callable=mock.PropertyMock)
-    def test_update_power_state_transition_old(
-            self, mock_update, mock_put, mock_attribute_set,
-            mock_power_state_get, mock_lock):
-        mock_power_state_get.return_value = {
-            'power_state_previous': 'on',
-            'power_state': 'transition-to-off',
-            'power_state_updated': time.time() - 71
-        }
-
-        i = self._make_instance()
-        i.update_power_state('on')
-
-        etcd_write = mock_attribute_set.mock_calls[1][1]
-        self.assertTrue(
-            time.time() - etcd_write[1]['power_state_updated'] < 30)
-        self.assertEqual('on', etcd_write[1]['power_state'])
-        self.assertEqual('transition-to-off',
-                         etcd_write[1]['power_state_previous'])
-
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
-                new_callable=mock.PropertyMock)
-    def test_str(self, mock_update):
-        i = self._make_instance()
+    def test_str(self):
+        instance_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_instance('cirros', instance_uuid)
+        i = instance.Instance.from_db(instance_uuid)
         s = str(i)
-        self.assertEqual('instance(fakeuuid)', s)
+        self.assertEqual('instance(%s)' % instance_uuid, s)
 
     # create, delete
+    def test_make_config_drive(self):
+        instance_uuid = str(uuid.uuid4())
+        network_uuid = str(uuid.uuid4())
+        iface_uuid_one = str(uuid.uuid4())
+        iface_uuid_two = str(uuid.uuid4())
 
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                return_value=['ifaceuuid', 'ifaceuuid2'])
-    @mock.patch('shakenfist.networkinterface.NetworkInterface.from_db',
-                side_effect=[
-                    FakeNetworkInterface({
-                        'uuid': 'ifaceuuid',
-                        'instance_uuid': 'instuuid',
-                        'network_uuid': 'netuuid',
-                        'macaddr': '1a:91:64:d2:15:39',
-                        'ipv4': '127.0.0.5',
-                        'order': 0
-                    }),
-                    FakeNetworkInterface({
-                        'uuid': 'ifaceuuid2',
-                        'instance_uuid': 'instuuid',
-                        'network_uuid': 'netuuid',
-                        'macaddr': '1a:91:64:d2:15:40',
-                        'ipv4': '127.0.0.6',
-                        'order': 1
-                    })
-                ])
-    @mock.patch('shakenfist.network.Network.from_db',
-                return_value=FakeNetwork())
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
-                new_callable=mock.PropertyMock)
-    def test_make_config_drive(self, mock_update, mock_net_from_db,
-                               mock_interfaces, mock_get_attribute):
-        i = self._make_instance()
+        self.mock_etcd.create_network('testing', network_uuid, netblock='127.0.0.0/8')
+        self.mock_etcd.create_network_interface(
+            iface_uuid_one,
+            {
+                'network_uuid': network_uuid,
+                'address': '127.0.0.5',
+                'model': None,
+                'macaddress': '1a:91:64:d2:15:39',
+            },
+            instance_uuid=instance_uuid, order=0)
+        self.mock_etcd.create_network_interface(
+            iface_uuid_two,
+            {
+                'network_uuid': network_uuid,
+                'address': '127.0.0.6',
+                'model': None,
+                'macaddress': '1a:91:64:d2:15:40',
+            },
+            instance_uuid=instance_uuid, order=1)
+        self.mock_etcd.create_instance(
+            'cirros', instance_uuid, 1, ssh_key='thisisasshkey',
+            user_data=str(base64.b64encode('thisisuserdata'.encode('utf-8')), 'utf-8'))
+
+        i = instance.Instance.from_db(instance_uuid)
+        i.interfaces = [iface_uuid_one, iface_uuid_two]
 
         (fd, cd_file) = tempfile.mkstemp()
         os.close(fd)
@@ -431,49 +255,49 @@ class InstanceTestCase(base.ShakenFistTestCase):
                     nd = json.loads(entries[entry])
                     self.assertEqual(
                         {
-                            "links": [
+                            'links': [
                                 {
-                                    "ethernet_mac_address": "1a:91:64:d2:15:39",
-                                    "id": "eth0",
-                                    "mtu": 7950,
-                                    "name": "eth0",
-                                    "type": "vif",
-                                    "vif_id": "ifaceuuid"
+                                    'ethernet_mac_address': '1a:91:64:d2:15:39',
+                                    'id': 'eth0',
+                                    'mtu': 7950,
+                                    'name': 'eth0',
+                                    'type': 'vif',
+                                    'vif_id': iface_uuid_one
                                 },
                                 {
-                                    "ethernet_mac_address": "1a:91:64:d2:15:40",
-                                    "id": "eth1",
-                                    "mtu": 7950,
-                                    "name": "eth1",
-                                    "type": "vif",
-                                    "vif_id": "ifaceuuid2"
+                                    'ethernet_mac_address': '1a:91:64:d2:15:40',
+                                    'id': 'eth1',
+                                    'mtu': 7950,
+                                    'name': 'eth1',
+                                    'type': 'vif',
+                                    'vif_id': iface_uuid_two
                                 }
                             ],
-                            "networks": [
+                            'networks': [
                                 {
-                                    'id': 'netuuid-0',
+                                    'id': '%s-0' % network_uuid,
                                     'ip_address': '127.0.0.5',
                                           'link': 'eth0',
                                           'netmask': '255.0.0.0',
-                                          'network_id': 'netuuid',
+                                          'network_id': network_uuid,
                                           'routes': [{'gateway': '127.0.0.1',
                                                       'netmask': '0.0.0.0',
                                                       'network': '0.0.0.0'}],
                                           'type': 'ipv4'
                                 },
                                 {
-                                    'id': 'netuuid-1',
+                                    'id': '%s-1' % network_uuid,
                                     'ip_address': '127.0.0.6',
                                     'link': 'eth1',
                                     'netmask': '255.0.0.0',
-                                    'network_id': 'netuuid',
+                                    'network_id': network_uuid,
                                     'type': 'ipv4'
                                 }
                             ],
-                            "services": [
+                            'services': [
                                 {
-                                    "address": "8.8.8.8",
-                                    "type": "dns"
+                                    'address': '8.8.8.8',
+                                    'type': 'dns'
                                 }
                             ]
                         },
@@ -487,17 +311,17 @@ class InstanceTestCase(base.ShakenFistTestCase):
                         md['random_seed'] = '...lol...'
                     self.assertEqual(
                         {
-                            "availability_zone": "sfzone",
-                            "devices": [],
-                            "hostname": "cirros.local",
-                            "launch_index": 0,
-                            "name": "cirros",
-                            "project_id": None,
-                            "public_keys": {
-                                "mykey": "thisisasshkey"
+                            'availability_zone': 'sfzone',
+                            'devices': [],
+                            'hostname': 'cirros.local',
+                            'launch_index': 0,
+                            'name': 'cirros',
+                            'project_id': None,
+                            'public_keys': {
+                                'mykey': 'thisisasshkey'
                             },
-                            "random_seed": "...lol...",
-                            "uuid": "fakeuuid"
+                            'random_seed': '...lol...',
+                            'uuid': instance_uuid
                         },
                         md, '%s does not match' % entry
                     )

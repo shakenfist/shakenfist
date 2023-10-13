@@ -262,7 +262,7 @@ def main():
             #
             # No locking as read only
             fn = network.floating_network()
-            subst['master_float'] = fn.get_address_at_index(1)
+            subst['master_float'] = fn.ipam.get_address_at_index(1)
             subst['netmask'] = fn.netmask
 
             # We need to copy the MTU of the interface we are bridging to

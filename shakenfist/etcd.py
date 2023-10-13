@@ -327,11 +327,15 @@ def get(objecttype, subtype, name):
 
 
 @retry_etcd_forever
-def get_all(objecttype, subtype, prefix=None, sort_order=None, limit=0):
-    path = _construct_key(objecttype, subtype, prefix)
+def get_prefix(path, prefix=None, sort_order=None, sort_target='key', limit=0):
     for data, metadata in get_etcd_client().get_prefix(
             path, sort_order=sort_order, sort_target='key', limit=limit):
         yield str(metadata['key'].decode('utf-8')), json.loads(data)
+
+
+def get_all(objecttype, subtype, prefix=None, sort_order=None, limit=0):
+    path = _construct_key(objecttype, subtype, prefix)
+    return get_prefix(path, sort_order=sort_order, sort_target='key', limit=limit)
 
 
 @retry_etcd_forever
@@ -347,14 +351,23 @@ def get_all_dict(objecttype, subtype=None, sort_order=None, limit=0):
 
 
 @retry_etcd_forever
+def delete_raw(path):
+    get_etcd_client().delete(path)
+
+
 def delete(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
-    get_etcd_client().delete(path)
+    delete_raw(path)
 
 
 @retry_etcd_forever
 def delete_all(objecttype, subtype):
     path = _construct_key(objecttype, subtype, None)
+    get_etcd_client().delete_prefix(path)
+
+
+@retry_etcd_forever
+def delete_prefix(path):
     get_etcd_client().delete_prefix(path)
 
 

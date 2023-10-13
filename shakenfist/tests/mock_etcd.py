@@ -8,6 +8,7 @@ from collections import defaultdict
 from itertools import count
 import json
 import mock
+import os
 import time
 
 from shakenfist.instance import Instance
@@ -43,6 +44,9 @@ class MockEtcd():
 
         self.node_names = [n[0] for n in self.nodes]
 
+        # Optional trace logging
+        self.emit_tracing = os.environ.get('MOCK_ETCD_TRACE', '0') == '1'
+
     def setup(self):
         # Mock the health check in get_etcd_client()
         self.etcd_status = mock.patch('shakenfist.etcd.WrappedEtcdClient.status')
@@ -71,6 +75,16 @@ class MockEtcd():
         self.etcd_put.start()
         self.test_obj.addCleanup(self.etcd_put.stop)
 
+        self.etcd_delete = mock.patch(
+            'shakenfist.etcd.WrappedEtcdClient.delete', side_effect=self.delete)
+        self.etcd_delete.start()
+        self.test_obj.addCleanup(self.etcd_delete.stop)
+
+        self.etcd_delete_prefix = mock.patch(
+            'shakenfist.etcd.WrappedEtcdClient.delete_prefix', side_effect=self.delete_prefix)
+        self.etcd_delete_prefix.start()
+        self.test_obj.addCleanup(self.etcd_delete_prefix.stop)
+
         # Mock etcd
         self.etcd_get_lock = mock.patch('shakenfist.etcd.get_lock')
         self.etcd_get_lock.start()
@@ -84,18 +98,22 @@ class MockEtcd():
         """Generate predictable UUIDs that are unique during the testcase"""
         return '12345678-1234-4321-1234-%012i' % next(self.obj_counter)
 
+    def _trace(self, m):
+        if self.emit_tracing:
+            print(m)
+
     #
     # DB operations - Low level
     #
 
     def create(self, path, encoded, lease=None):
         self.db[path] = encoded
-        print('MockEtcd.create() %s: %s' % (path, encoded))
+        self._trace('MockEtcd.create() %s: %s' % (path, encoded))
         return True
 
     def get(self, path, metadata=False, sort_order=None, sort_target=None):
         d = self.db.get(path)
-        print('MockEtcd.get() retrieving data for key %s: %s' % (path, d))
+        self._trace('MockEtcd.get() retrieving data for key %s: %s' % (path, d))
         if not d:
             return None
         return [[d]]
@@ -105,11 +123,23 @@ class MockEtcd():
         for k in sorted(self.db):
             if k.startswith(path):
                 ret.append((self.db[k], {'key': k.encode('utf-8')}))
+                self._trace('MockEtcd.delete_prefix() %s' % k)
         return ret
 
     def put(self, path, encoded, lease=None):
         self.db[path] = encoded
-        print('MockEtcd.put() %s: %s' % (path, encoded))
+        self._trace('MockEtcd.put() %s: %s' % (path, encoded))
+
+    def delete(self, path):
+        if path in self.db:
+            del self.db[path]
+            self._trace('MockEtcd.delete() %s' % path)
+
+    def delete_prefix(self, path, sort_order=None, sort_target=None, limit=0):
+        for k in sorted(self.db):
+            if k.startswith(path):
+                del self.db[k]
+                self._trace('MockEtcd.delete_prefix() %s' % k)
 
     #
     # DB operations - Utilizing SF DB functionality
@@ -238,7 +268,7 @@ class MockEtcd():
             'network_uuid': network_uuid,
             'address': address,
             'model': model,
-            'macaddr': mac_address,
+            'macaddress': mac_address,
         }
 
     def create_network_interface(self,

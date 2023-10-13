@@ -1,11 +1,13 @@
 import mock
 import testtools
+import uuid
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist import exceptions
 from shakenfist import network
 from shakenfist.config import SFConfig
 from shakenfist.tests import base
+from shakenfist.tests.mock_etcd import MockEtcd
 
 
 class NetworkTestCase(base.ShakenFistTestCase):
@@ -32,35 +34,14 @@ class NetworkTestCase(base.ShakenFistTestCase):
 
 
 class NetworkGeneralTestCase(NetworkTestCase):
-    def test_init(self):
-        network.Network({
-            'uuid': 'notauuid',
-            'vxid': 2,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': True,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
-
     def test_str(self):
-        n = network.Network({
-            'uuid': 'notauuid',
-            'vxid': 42,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': True,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
-        self.assertEqual('network(notauuid)', str(n))
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid)
+        n = network.Network.from_db(network_uuid)
+        self.assertEqual('network(%s)' % network_uuid, str(n))
 
 
 class NetworkNormalNodeTestCase(NetworkTestCase):
@@ -68,7 +49,8 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
         super(NetworkNormalNodeTestCase, self).setUp()
         fake_config = SFConfig(NODE_EGRESS_IP='1.1.1.2',
                                NODE_MESH_IP='1.1.1.2',
-                               NETWORK_NODE_IP='1.1.1.2')
+                               NETWORK_NODE_IP='1.1.1.2',
+                               NODE_IS_NETWORK_NODE=False)
         self.config = mock.patch('shakenfist.network.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
@@ -77,59 +59,40 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
     #  is_okay()
     #
     @mock.patch('shakenfist.network.Network.is_created', return_value=True)
-    @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=True)
+    @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=False)
     def test_is_okay_yes(self, mock_is_dnsmasq, mock_is_created):
-        n = network.Network({
-            'uuid': 'actualuuid',
-            'vxid': 42,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': True,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                      provide_nat=True)
+        n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
 
     @mock.patch('shakenfist.network.Network.is_created', return_value=False)
     @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=True)
     def test_is_okay_not_created(self, mock_is_dnsmasq, mock_is_created):
-        n = network.Network({
-            'uuid': 'actualuuid',
-            'vxid': 42,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': True,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                      provide_nat=True)
+        n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_okay())
 
     @mock.patch('shakenfist.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=False)
-    @mock.patch('shakenfist.network.config', SFConfig(NODE_EGRESS_IP='1.1.1.1',
-                                                      NODE_MESH_IP='1.1.1.2',
-                                                      NETWORK_NODE_IP='1.1.1.2',
-                                                      NODE_IS_NETWORK_NODE=True))
     def test_is_okay_no_dns(self, mock_is_dnsmasq, mock_is_created):
-        n = network.Network({
-            'uuid': 'actualuuid',
-            'vxid': 42,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': True,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
-        self.assertFalse(n.is_okay())
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                      provide_nat=True)
+        n = network.Network.from_db(network_uuid)
+        self.assertTrue(n.is_okay())
 
 
 class NetworkNetNodeTestCase(NetworkTestCase):
@@ -150,69 +113,49 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     @mock.patch('shakenfist.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=True)
     def test_is_okay_yes(self, mock_is_dnsmasq, mock_is_created):
-        n = network.Network({
-            'uuid': 'actualuuid',
-            'vxid': 42,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': True,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                      provide_nat=True)
+        n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
 
     @mock.patch('shakenfist.network.Network.is_created', return_value=False)
     @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=True)
     def test_is_okay_not_created(self, mock_is_dnsmasq, mock_is_created):
-        n = network.Network({
-            'uuid': 'actualuuid',
-            'vxid': 42,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': True,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                      provide_nat=True)
+        n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_okay())
 
     @mock.patch('shakenfist.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=False)
     def test_is_okay_no_masq(self, mock_is_dnsmasq, mock_is_created):
-        n = network.Network({
-            'uuid': 'actualuuid',
-            'vxid': 42,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': False,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                      provide_nat=False)
+        n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_okay())
 
     @mock.patch('shakenfist.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=False)
     def test_is_okay_no_masq_no_dhcp(self, mock_is_dnsmasq, mock_is_created):
-        n = network.Network({
-            'uuid': 'actualuuid',
-            'vxid': 42,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': False,
-            'provide_nat': False,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=False,
+                                      provide_nat=False)
+        n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
 
     #
@@ -234,18 +177,13 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         "broadcast": "ff:ff:ff:ff:ff:ff"
     },{},{},{} ]""", ''))
     def test_is_created_yes(self, mock_execute):
-        n = network.Network({
-            'uuid': '8abbc9a6-d923-4441-b498-4f8e3c166804',
-            'vxid': 5,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': True,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                      provide_nat=False)
+        n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_created())
 
     @mock.patch('shakenfist.util.process.execute',
@@ -263,66 +201,37 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         "broadcast": "ff:ff:ff:ff:ff:ff"
     },{},{},{} ]""", ''))
     def test_is_created_no(self, mock_execute):
-        n = network.Network({
-            'uuid': '8abbc9a6-d923-4441-b498-4f8e3c166804',
-            'vxid': 1,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': True,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                      provide_nat=False)
+        n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_created())
 
     @mock.patch('shakenfist.util.process.execute',
                 return_value=('', "Device 'br-vxlan-45' does not exist."))
     def test_is_created_no_bridge(self, mock_execute):
-        n = network.Network({
-            'uuid': '8abbc9a6-d923-4441-b498-4f8e3c166804',
-            'vxid': 5,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': True,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                      provide_nat=False)
+        n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_created())
 
-    @mock.patch('shakenfist.cache.update_object_state_cache')
-    @mock.patch('shakenfist.db.get_lock')
-    @mock.patch('shakenfist.network.Network._db_get_attribute',
-                side_effect=[
-                    {'value': dbo.STATE_CREATED, 'update_time': 0},
-                    {'value': dbo.STATE_CREATED, 'update_time': 0},
-                    {'value': dbo.STATE_CREATED, 'update_time': 0},
-                    {'value': dbo.STATE_ERROR, 'update_time': 0},
-                    {'value': dbo.STATE_DELETED, 'update_time': 0},
-                    {'value': dbo.STATE_DELETED, 'update_time': 0},
-                ])
-    @mock.patch('shakenfist.network.Network._db_set_attribute')
-    @mock.patch('shakenfist.etcd.put')
-    def test_set_state_valid(
-            self, mock_put, mock_attribute_set, mock_state_get, mock_lock,
-            mock_cache_update):
+    def test_set_state_valid(self):
 
-        n = network.Network({
-            'uuid': '8abbc9a6-d923-4441-b498-4f8e3c166804',
-            'vxid': 5,
-            'name': 'bobnet',
-            'namespace': 'finitespace',
-            'provide_dhcp': True,
-            'provide_nat': True,
-            'egress_nic': 'eth0',
-            'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24',
-            'version': 4
-        })
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                      provide_nat=False)
+        n = network.Network.from_db(network_uuid)
+
         with testtools.ExpectedException(exceptions.InvalidStateException):
             n.state = network.Network.STATE_INITIAL
         n.state = dbo.STATE_ERROR

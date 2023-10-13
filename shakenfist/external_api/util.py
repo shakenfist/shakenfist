@@ -3,6 +3,7 @@ from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.daemons import daemon
 from shakenfist.instance import Instance
+from shakenfist import ipam
 from shakenfist import network
 from shakenfist.networkinterface import NetworkInterface
 
@@ -14,7 +15,8 @@ daemon.set_log_level(LOG, 'api')
 def assign_floating_ip(ni):
     # Address is allocated and added to the record here, so the job has it later.
     fn = network.floating_network()
-    ni.floating = fn.reserve_random_free_address(ni.unique_label())
+    ni.floating = fn.ipam.reserve_random_free_address(
+        ni.unique_label(), ipam.RESERVATION_TYPE_FLOATING, '')
 
 
 def safe_get_network_interface(interface_uuid):
