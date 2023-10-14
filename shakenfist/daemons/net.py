@@ -418,11 +418,10 @@ class Monitor(daemon.WorkerPoolDaemon):
                     if ip not in itertools.chain(floating_gateways,
                                                  floating_addresses,
                                                  floating_reserved):
-                        LOG.error('Floating IP %s has leaked.' % ip)
-
                         # This IP needs to have been allocated more than 300 seconds
                         # ago to ensure that the network setup isn't still queued.
                         if time.time() - floating_network.ipam.get_allocation_age(ip) > 300:
+                            LOG.error('Floating IP %s has leaked.' % ip)
                             leaks.append(ip)
 
                 for ip in leaks:
