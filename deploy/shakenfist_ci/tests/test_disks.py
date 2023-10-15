@@ -37,7 +37,4 @@ class TestDisks(base.BaseNamespacedTestCase):
         self.assertNotIn(inst['agent_system_boot_time'], [None, 0])
 
         self.test_client.delete_instance(inst['uuid'])
-        inst_uuids = []
-        for i in self.test_client.get_instances():
-            inst_uuids.append(i['uuid'])
-        self.assertNotIn(inst['uuid'], inst_uuids)
+        self._await_instance_deleted(inst['uuid'])

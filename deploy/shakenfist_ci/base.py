@@ -48,8 +48,7 @@ class BaseTestCase(testtools.TestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
 
-        self.system_client = apiclient.Client(
-            async_strategy=apiclient.ASYNC_PAUSE)
+        self.system_client = apiclient.Client(async_strategy=apiclient.ASYNC_PAUSE)
 
     def _make_namespace(self, name, key):
         self._remove_namespace(name)
@@ -125,6 +124,14 @@ class BaseTestCase(testtools.TestCase):
 
     def _await_instance_not_ready(self, instance_uuid):
         self._await_agent_state(instance_uuid, ready=False)
+
+    def _await_instance_deleted(self, instance_uuid):
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            if instance_uuid not in self.system_client.get_instances():
+                return
+            time.sleep(5)
+        self.fail('Failed to delete instance: %s' % instance_uuid)
 
     def _await_agent_state(self, instance_uuid, ready=True, timeout=7):
         # Wait up to 5 minutes for the instance to be created and enter
