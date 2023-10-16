@@ -360,7 +360,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                 continue
 
             last_loop = time.time()
-            LOG.info('Reaping stray floating IPs')
 
             # Ensure we haven't leaked any floating IPs (because we used to). We
             # have to hold a lock here to avoid races where an IP is freed while
@@ -369,6 +368,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             with db.get_lock('ipmanager', None, 'floating', ttl=120,
                              op='Cleanup leaks'):
                 floating_network = network.floating_network()
+                LOG.debug('Floating network registrations: %s'
+                          % floating_network.ipam.in_use)
 
                 # Collect floating gateways and floating IPs, while ensuring that
                 # they are correctly reserved on the floating network as well.
