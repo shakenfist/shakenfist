@@ -404,7 +404,10 @@ class BaseNamespacedTestCase(BaseTestCase):
             namespace=self.namespace, key=self.namespace_key,
             async_strategy=apiclient.ASYNC_CONTINUE)
         for inst in non_blocking_client.get_instances():
-            non_blocking_client.delete_instance(inst['uuid'])
+            try:
+                non_blocking_client.delete_instance(inst['uuid'])
+            except apiclient.ResourceNotFoundException:
+                pass
 
         start_time = time.time()
         while time.time() - start_time < 5 * 60:
@@ -422,7 +425,8 @@ class BaseNamespacedTestCase(BaseTestCase):
             for net in non_blocking_client.get_networks():
                 try:
                     non_blocking_client.delete_network(net['uuid'])
-                except apiclient.ResourceStateConflictException:
+                except (apiclient.ResourceStateConflictException,
+                        apiclient.ResourceNotFoundException):
                     pass
 
             time.sleep(5)
