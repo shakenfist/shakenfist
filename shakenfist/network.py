@@ -449,8 +449,12 @@ class Network(dbo):
                 except CongestedNetwork:
                     self.error('Unable to allocate floating gateway IP')
 
-                addresses = util_network.get_interface_addresses(
-                    subst['egress_veth_inner'], namespace=subst['netns'])
+                addresses = list(util_network.get_interface_addresses(
+                    subst['egress_veth_inner'], namespace=subst['netns']))
+                self.log.with_fields({
+                    'addresses': addresses,
+                    'current_address': subst['floating_gateway']}).debug(
+                        'Egress veth has these addresses')
                 if not subst['floating_gateway'] in list(addresses):
                     util_process.execute(
                         None,
