@@ -202,22 +202,24 @@ class IPAM(dbo):
         return address not in self.in_use
 
     def reserve(self, address, user, reservation_type, comment):
+        reservation = {
+                'address': address,
+                'user': user,
+                'when': time.time(),
+                'type': reservation_type,
+                'comment': comment
+            }
+
         with self.get_lock('reservations', op='Reserve address'):
             if self.version == 3:
                 success = self.cached_ipmanager_object.reserve(address, user)
                 if success:
                     self.cached_ipmanager_object.persist()
+                self.log.with_fields(reservation).info('Reserved address via ipmanager')
                 return success
 
             if not self.is_free(address):
                 return False
-            reservation = {
-                    'address': address,
-                    'user': user,
-                    'when': time.time(),
-                    'type': reservation_type,
-                    'comment': comment
-                }
             etcd.put_raw(self.reservations_path + address, reservation)
             self.log.with_fields(reservation).info('Reserved address')
             return True
@@ -228,6 +230,7 @@ class IPAM(dbo):
                 success = self.cached_ipmanager_object.release(address)
                 if success:
                     self.cached_ipmanager_object.persist()
+                self.log.with_fields({'address': address}).info('Released address via ipmanager')
                 return success
 
             if self.is_free(address):
