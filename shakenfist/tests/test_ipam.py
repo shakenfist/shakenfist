@@ -1,4 +1,5 @@
 import mock
+import time
 import uuid
 
 from shakenfist import exceptions
@@ -10,6 +11,7 @@ from shakenfist.tests.mock_etcd import MockEtcd
 class IPAMTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(IPAMTestCase, self).setUp()
+
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
 
@@ -54,15 +56,22 @@ class IPAMTestCase(base.ShakenFistTestCase):
         self.assertTrue(ipm.is_in_range('192.168.1.21'))
         self.assertFalse(ipm.is_in_range('10.1.1.1'))
 
-    @mock.patch('time.time', return_value=1632261535.027476)
-    def test_reservation_lifecycle(self, mock_time):
+    def test_reservation_lifecycle(self):
         ipam_uuid = str(uuid.uuid4())
         ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
 
         self.assertNotIn('192.168.1.10', ipm.in_use)
         ipm.reserve('192.168.1.10', ('test', '123'), ipam.RESERVATION_TYPE_FLOATING, '')
         self.assertIn('192.168.1.10', ipm.in_use)
+
+        # Check for halo
         ipm.release('192.168.1.10')
+        self.assertIn('192.168.1.10', ipm.in_use)
+
+        # Check that halo goes away, but this requires we reserve another IP as
+        # release is a side effect of reservation
+        time.sleep(1)
+        ipm.release_haloed(0)
         self.assertNotIn('192.168.1.10', ipm.in_use)
 
     def test_is_free_and_reserve(self):
@@ -79,8 +88,6 @@ class IPAMTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             True, ipm.reserve('192.168.1.42', ('test', '123'), ipam.RESERVATION_TYPE_FLOATING, ''))
         self.assertEqual(False, ipm.is_free('192.168.1.42'))
-        ipm.release('192.168.1.42')
-        self.assertEqual(True, ipm.is_free('192.168.1.42'))
 
     def test_get_free_random_ip(self):
         ipam_uuid = str(uuid.uuid4())

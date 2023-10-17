@@ -7,6 +7,7 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter,
     get_minimum_object_version as gmov)
+from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist.eventlog import EVENT_TYPE_AUDIT
@@ -30,6 +31,7 @@ RESERVATION_TYPE_BROADCAST = 'broadcast'
 RESERVATION_TYPE_GATEWAY = 'gateway'
 RESERVATION_TYPE_FLOATING = 'floating'
 RESERVATION_TYPE_INSTANCE = 'instance'
+RESERVATION_TYPE_DELETION_HALO = 'deletion-halo'
 RESERVATION_TYPE_UNKNOWN = 'unknown'
 
 
@@ -202,13 +204,14 @@ class IPAM(dbo):
         return address not in self.in_use
 
     def reserve(self, address, user, reservation_type, comment):
+        self.release_haloed(config.IP_DELETION_HALO_DURATION)
         reservation = {
-                'address': address,
-                'user': user,
-                'when': time.time(),
-                'type': reservation_type,
-                'comment': comment
-            }
+            'address': address,
+            'user': user,
+            'when': time.time(),
+            'type': reservation_type,
+            'comment': comment
+        }
 
         with self.get_lock('reservations', op='Reserve address'):
             if self.version == 3:
@@ -225,6 +228,14 @@ class IPAM(dbo):
             return True
 
     def release(self, address):
+        reservation = {
+            'address': address,
+            'user': None,
+            'when': time.time(),
+            'type': RESERVATION_TYPE_DELETION_HALO,
+            'comment': ''
+        }
+
         with self.get_lock('reservations', op='Release address'):
             if self.version == 3:
                 success = self.cached_ipmanager_object.release(address)
@@ -235,9 +246,31 @@ class IPAM(dbo):
 
             if self.is_free(address):
                 return False
-            etcd.delete_raw(self.reservations_path + address)
-            self.log.with_fields({'address': address}).info('Released address')
+
+            etcd.put_raw(self.reservations_path + address, reservation)
+            self._add_item_in_attribute_list(
+                'deletion-halo', [address, reservation['when']])
+            self.log.with_fields(reservation).info('Released address to deletion halo')
             return True
+
+    def release_haloed(self, duration):
+        freed = 0
+        with self.get_lock('reservations', op='Release haloed addresses'):
+            haloed = self._db_get_attribute('deletion-halo', {'deletion-halo': []})
+            for address, when in haloed['deletion-halo']:
+                if time.time() - when > duration:
+                    etcd.delete_raw(self.reservations_path + address)
+                    self._remove_item_in_attribute_list(
+                        'deletion-halo', [address, when])
+                    self.log.with_fields({'address': address}).info(
+                        'Released address to free pool')
+                    freed += 1
+        return freed
+
+    def get_haloed_addresses(self):
+        haloed = self._db_get_attribute('deletion-halo', {'deletion-halo': []})
+        for address, _ in haloed['deletion-halo']:
+            yield address
 
     def get_random_address(self):
         bits = random.getrandbits(
@@ -267,6 +300,23 @@ class IPAM(dbo):
                 return str(addr)
 
             idx += 1
+
+        # If we're congested, decrease the deletion halo period to see if that
+        # helps
+        freed = self.release_haloed(30)
+        if freed:
+            self.log.warning(
+                'Released %d haloed network addresses due to congestion' % freed)
+
+            # One last linear scan if we freed any
+            idx = 1
+            while idx < self.num_addresses:
+                addr = self.get_address_at_index(idx)
+                free = self.reserve(addr, unique_label_tuple, address_type, comment)
+                if free:
+                    return str(addr)
+
+                idx += 1
 
         # Give up
         raise exceptions.CongestedNetwork('No free addresses on network')

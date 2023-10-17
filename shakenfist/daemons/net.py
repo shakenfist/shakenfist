@@ -412,13 +412,17 @@ class Monitor(daemon.WorkerPoolDaemon):
                 ]
                 LOG.info('Found floating reservations: %s' % floating_reserved)
 
+                floating_halo = list(floating_network.ipam.get_haloed_addresses())
+                LOG.info('Found floating deletion halos: %s' % floating_halo)
+
                 # Now the reverse check. Test if there are any reserved IPs which
                 # are not actually in use. Free any we find.
                 leaks = []
                 for ip in floating_network.ipam.in_use:
                     if ip not in itertools.chain(floating_gateways,
                                                  floating_addresses,
-                                                 floating_reserved):
+                                                 floating_reserved,
+                                                 floating_halo):
                         # This IP needs to have been allocated more than 300 seconds
                         # ago to ensure that the network setup isn't still queued.
                         if time.time() - floating_network.ipam.get_allocation_age(ip) > 300:
