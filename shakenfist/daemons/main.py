@@ -272,11 +272,9 @@ def main():
             util_network.create_interface(
                 subst['egress_bridge'], 'bridge', '', mtu=mtu)
 
-            util_process.execute(None,
-                                 'ip link set %(egress_bridge)s up' % subst)
-            util_process.execute(None,
-                                 'ip addr add %(master_float)s/%(netmask)s '
-                                 'dev %(egress_bridge)s' % subst)
+            util_process.execute(None, 'ip link set %(egress_bridge)s up' % subst)
+            util_network.add_address_to_interface(
+                None, subst['master_float'], subst['netmask'], subst['egress_bridge'])
 
             util_process.execute(None,
                                  'iptables -A FORWARD -o %(egress_nic)s '

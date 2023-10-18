@@ -1,8 +1,10 @@
 import json
 import os
+from oslo_concurrency import processutils
 import random
 import re
 from shakenfist_utilities import logs
+import time
 
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
@@ -218,3 +220,46 @@ def random_macaddr():
     return '02:00:00:%02x:%02x:%02x' % (random.randint(0, 255),
                                         random.randint(0, 255),
                                         random.randint(0, 255))
+
+
+def add_address_to_interface(namespace, address, netmask, device):
+    # Adding an address to an interface can sometimes require waiting briefly
+    # to ensure the address appears. This is a wrapper which does all that
+    # for you. This used to error if repeated attempts fail, but that's so
+    # common its not useful. This needs revisiting.
+    log = LOG.with_fields({
+        'namespace': namespace,
+        'address': address,
+        'netmask': netmask,
+        'device': device
+    })
+
+    def _add_address(namespace, address, netmask, device):
+        try:
+            process.execute(
+                None,
+                'ip addr add %(address)s/%(netmask)s dev %(device)s' % {
+                    'address': address,
+                    'netmask': netmask,
+                    'device': device
+                },
+                namespace=namespace)
+            process.execute(None, 'ip link set %s up' % device, namespace=namespace)
+
+        except processutils.ProcessExecutionError as e:
+            if e.stderr.rstrip() != 'RTNETLINK answers: File exists':
+                raise e
+
+    attempts = 0
+    while address not in list(get_interface_addresses(device, namespace=namespace)):
+        _add_address(namespace, address, netmask, device)
+        time.sleep(0.5)
+        attempts += 1
+
+        if attempts < 5:
+            log.with_fields({'attempt': attempts}).info(
+                'Repeated failures to add address to device')
+        else:
+            log.with_fields({'attempt': attempts}).warning(
+                'Repeated failures to add address to device')
+            return

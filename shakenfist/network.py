@@ -405,11 +405,9 @@ class Network(dbo):
                 util_process.execute(
                     None, 'ip link set %(vx_veth_inner)s up' % subst,
                     namespace=self.uuid)
-                util_process.execute(
-                    None,
-                    'ip addr add %(router)s/%(netmask)s '
-                    'dev %(vx_veth_inner)s' % subst,
-                    namespace=self.uuid)
+                util_network.add_address_to_interface(
+                    self.uuid, subst['router'], subst['netmask'],
+                    subst['vx_veth_inner'])
 
             if not util_network.check_for_interface(subst['egress_veth_outer']):
                 util_network.create_interface(
@@ -456,14 +454,9 @@ class Network(dbo):
                     'current_address': subst['floating_gateway']}).debug(
                         'Egress veth has these addresses')
                 if not subst['floating_gateway'] in list(addresses):
-                    util_process.execute(
-                        None,
-                        'ip addr add %(floating_gateway)s/%(floating_netmask)s '
-                        'dev %(egress_veth_inner)s' % subst,
-                        namespace=self.uuid)
-                    util_process.execute(
-                        None, 'ip link set  %(egress_veth_inner)s up' % subst,
-                        namespace=self.uuid)
+                    util_network.add_address_to_interface(
+                        self.uuid, subst['floating_gateway'], subst['floating_netmask'],
+                        subst['egress_veth_inner'])
 
                 default_routes = util_network.get_default_routes(
                     subst['netns'])
@@ -747,11 +740,8 @@ class Network(dbo):
             'peer name flt-%(floating_address_as_hex)s-i' % subst)
         util_process.execute(
             None,  'ip link set flt-%(floating_address_as_hex)s-i netns %(netns)s' % subst)
-        util_process.execute(
-            None,
-            'ip addr add %(floating_address)s/32 '
-            'dev flt-%(floating_address_as_hex)s-i' % subst,
-            namespace=self.uuid)
+        util_network.add_address_to_interface(
+            self.uuid, floating_address, '32', 'flt-%(floating_address_as_hex)s-i' % subst)
         util_process.execute(
             None,
             'iptables -t nat -A PREROUTING -d %(floating_address)s -j DNAT '
