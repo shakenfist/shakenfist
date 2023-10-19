@@ -66,10 +66,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
 
         # Ensure that deleting a local instance works
         self.test_client.delete_instance(inst['uuid'])
-        inst_uuids = []
-        for i in self.test_client.get_instances():
-            inst_uuids.append(i['uuid'])
-        self.assertNotIn(inst['uuid'], inst_uuids)
+        self._await_instance_deleted(inst['uuid'])
 
     def test_remote_placement_works(self):
         # Create another instance, force it to be on a remote node.
@@ -102,7 +99,4 @@ class TestPlacement(base.BaseNamespacedTestCase):
 
         # Ensure that deleting a remote instance works
         self.test_client.delete_instance(inst['uuid'])
-        inst_uuids = []
-        for i in self.test_client.get_instances():
-            inst_uuids.append(i['uuid'])
-        self.assertNotIn(inst['uuid'], inst_uuids)
+        self._await_instance_deleted(inst['uuid'])

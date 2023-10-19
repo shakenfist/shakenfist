@@ -104,8 +104,8 @@ def upgrade_data_store():
         # sqlite database.
         version = 2
         count = 0
-        for objtype in ['agentoperation', 'artifact', 'blob', 'instance', 'namespace',
-                        'network', 'networkinterface', 'node', 'upload']:
+        for objtype in ['agentoperation', 'artifact', 'blob', 'instance', 'ipam',
+                        'namespace', 'network', 'networkinterface', 'node', 'upload']:
             objroot = os.path.join(config.STORAGE_PATH, 'events', objtype)
             if os.path.exists(objroot):
                 for ent in os.listdir(objroot):

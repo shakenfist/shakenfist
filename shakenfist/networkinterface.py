@@ -148,7 +148,7 @@ class NetworkInterface(dbo):
 
         n = network.Network.from_db(self.network_uuid)
         if n:
-            n.release(self.ipv4)
+            n.ipam.release(self.ipv4)
             n.remove_networkinterface(self)
 
         self.state = dbo.STATE_DELETED

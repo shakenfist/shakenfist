@@ -78,7 +78,7 @@ class Monitor(daemon.Daemon):
         for k, objdata in etcd.get_all('vxlan', None):
             network_uuid = objdata.get('network_uuid')
             if network_uuid:
-                n = network.Network.from_db(network_uuid)
+                n = network.Network.from_db(network_uuid, suppress_failure_audit=True)
                 if not n:
                     etcd.get_etcd_client().delete(k)
                     LOG.with_fields({

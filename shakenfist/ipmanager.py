@@ -1,10 +1,8 @@
 import ipaddress
-import random
 from shakenfist_utilities import logs
 import time
 
 from shakenfist import db
-from shakenfist import exceptions
 
 
 LOG, _ = logs.setup(__name__)
@@ -45,13 +43,6 @@ class IPManager(object):
         return ('ipmanager', self.uuid)
 
     @staticmethod
-    def new(uuid, ipblock):
-        ipm = IPManager(uuid, ipblock)
-        ipm.reserve(ipm.get_address_at_index(1), ipm.unique_label())
-        ipm.persist()
-        return ipm
-
-    @staticmethod
     def from_db(uuid):
         db_data = db.get_ipmanager(uuid)
 
@@ -84,12 +75,6 @@ class IPManager(object):
     def delete(self):
         db.delete_ipmanager(self.uuid)
 
-    def get_address_at_index(self, idx):
-        return str(self.ipblock_obj[idx])
-
-    def is_in_range(self, address):
-        return ipaddress.ip_address(address) in self.ipblock_obj
-
     def is_free(self, address):
         return address not in self.in_use
 
@@ -111,35 +96,3 @@ class IPManager(object):
         del self.in_use[address]
         self.in_use_counter -= 1
         return True
-
-    def get_random_address(self):
-        bits = random.getrandbits(
-            self.ipblock_obj.max_prefixlen - self.ipblock_obj.prefixlen)
-        return str(ipaddress.IPv4Address(self.ipblock_obj.network_address + bits))
-
-    def reserve_random_free_address(self, unique_label_tuple):
-        # Fast path give up for full networks
-        if self.in_use_counter == self.num_addresses:
-            raise exceptions.CongestedNetwork('No free addresses on network')
-
-        # Five attempts at using a random address
-        attempts = 0
-        while attempts < 5:
-            attempts += 1
-            addr = self.get_random_address()
-            free = self.reserve(addr, unique_label_tuple)
-            if free:
-                return str(addr)
-
-        # Fall back to a linear scan looking for a gap
-        idx = 1
-        while idx < self.num_addresses:
-            addr = self.get_address_at_index(idx)
-            free = self.reserve(addr, unique_label_tuple)
-            if free:
-                return str(addr)
-
-            idx += 1
-
-        # Give up
-        raise exceptions.CongestedNetwork('No free addresses on network')

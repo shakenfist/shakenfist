@@ -512,7 +512,7 @@ class NetworkPingEndpoint(sf_api.Resource):
         except ValueError:
             return sf_api.error(400, 'invalid address')
 
-        if not network_from_db.is_in_range(address):
+        if not network_from_db.ipam.is_in_range(address):
             return sf_api.error(400, 'ping request for address outside network block')
 
         out, err = util_process.execute(
@@ -522,3 +522,12 @@ class NetworkPingEndpoint(sf_api.Resource):
             'stdout': out.split('\n'),
             'stderr': err.split('\n')
         }
+
+
+class NetworkAddressesEndpoint(sf_api.Resource):
+    @api_base.verify_token
+    @api_base.arg_is_network_ref
+    @api_base.requires_network_ownership
+    @api_base.log_token_use
+    def get(self, network_ref=None, network_from_db=None):
+        return network_from_db.ipam.reservations

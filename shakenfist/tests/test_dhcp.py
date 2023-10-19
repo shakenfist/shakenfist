@@ -7,38 +7,14 @@ import six
 import tempfile
 import testtools
 import time
+import uuid
 
 from shakenfist.config import BaseSettings
-from shakenfist.ipmanager import IPManager
 from shakenfist import dhcp
-from shakenfist.instance import Instance
-from shakenfist.networkinterface import NetworkInterface
+from shakenfist import network
+from shakenfist.tests.mock_etcd import MockEtcd
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-class FakeNetwork(object):
-    def __init__(self):
-        self.uuid = 'notauuid'
-        self.ipmanager = IPManager('uuid', '10.0.0.0/8')
-        self.router = self.ipmanager.get_address_at_index(1)
-        self.dhcp_start = '10.0.0.2'
-        self.netmask = '255.0.0.0'
-        self.broadcast = '10.255.255.255'
-        self.provide_nat = True
-        self.networkinterfaces = ['notauuid1', 'notauuid2']
-
-
-class FakeNetworkInterface(object):
-    object_type = 'networkinterface'
-
-    def __init__(self, values):
-        self.uuid = values['uuid']
-        self.instance_uuid = values['instance_uuid']
-        self.network_uuid = values['network_uuid']
-        self.macaddr = values['macaddr']
-        self.ipv4 = values['ipv4']
-        self.order = values['order']
 
 
 class DHCPTestCase(testtools.TestCase):
@@ -85,17 +61,37 @@ class DHCPTestCase(testtools.TestCase):
         self.addCleanup(self.template.stop)
 
     def test_init(self):
-        d = dhcp.DHCP(FakeNetwork(), 'eth0')
-        self.assertEqual('/a/b/c/dhcp/notauuid', d.subst['config_dir'])
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid)
+        n = network.Network.from_db(network_uuid)
+
+        d = dhcp.DHCP(n, 'eth0')
+        self.assertEqual('/a/b/c/dhcp/%s' % network_uuid, d.subst['config_dir'])
 
     def test_str(self):
-        d = dhcp.DHCP(FakeNetwork(), 'eth0')
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid)
+        n = network.Network.from_db(network_uuid)
+
+        d = dhcp.DHCP(n, 'eth0')
         s = str(d)
-        self.assertEqual('dhcp(notauuid)', s)
+        self.assertEqual('dhcp(%s)' % network_uuid, s)
 
     @mock.patch('os.makedirs')
     def test_make_config(self, mock_makedir):
-        d = dhcp.DHCP(FakeNetwork(), 'eth0')
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dhcp.DHCP(n, 'eth0')
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open',
@@ -114,8 +110,8 @@ class DHCPTestCase(testtools.TestCase):
                 '# Disable DNS',
                 'port=0',
                 '',
-                'pid-file=/a/b/c/dhcp/notauuid/pid',
-                'dhcp-leasefile=/a/b/c/dhcp/notauuid/leases',
+                'pid-file=/a/b/c/dhcp/%(network_uuid)s/pid',
+                'dhcp-leasefile=/a/b/c/dhcp/%(network_uuid)s/leases',
                 '',
                 'interface=eth0',
                 'listen-address=10.0.0.1',
@@ -128,54 +124,48 @@ class DHCPTestCase(testtools.TestCase):
                 'dhcp-option=eth0,3,10.0.0.1',
                 'dhcp-option=eth0,6,8.8.8.8',
                 'dhcp-option=eth0,15,shakenfist',
-                'dhcp-hostsfile=/a/b/c/dhcp/notauuid/hosts',
-            ])
+                'dhcp-hostsfile=/a/b/c/dhcp/%(network_uuid)s/hosts',
+            ]) % {'network_uuid': network_uuid}
         )
 
     @mock.patch('os.makedirs')
-    @mock.patch('shakenfist.networkinterface.NetworkInterface._db_get',
-                side_effect=[
-                    {
-                        'uuid': 'notauuid1',
-                        'instance_uuid': 'instuuid1',
-                        'network_uuid': 'netuuid',
-                        'macaddr': '1a:91:64:d2:15:39',
-                        'model': 'virtio',
-                        'ipv4': '127.0.0.5',
-                        'order': 0,
-                        'version': NetworkInterface.current_version
-                    },
-                    {
-                        'uuid': 'notauuid2',
-                        'instance_uuid': 'instuuid2',
-                        'network_uuid': 'netuuid',
-                        'macaddr': '1a:91:64:d2:15:40',
-                        'model': 'virtio',
-                        'ipv4': '127.0.0.6',
-                        'order': 0,
-                        'version': NetworkInterface.current_version
-                    }
-                ])
-    @mock.patch('shakenfist.instance.Instance._db_get',
-                side_effect=[
-                    {
-                        'uuid': 'instuuid1',
-                        'name': 'inst1',
-                        'disk_spec': [{'size': 4, 'base': 'foo'}],
-                        'version': Instance.current_version
-                    },
-                    {
-                        'uuid': 'instuuid2',
-                        'name': 'inst2',
-                        'disk_spec': [{'size': 4, 'base': 'foo'}],
-                        'version': Instance.current_version
-                    }])
-    def test_make_hosts(self, mock_instances, mock_interfaces, mock_makedir):
-        d = dhcp.DHCP(FakeNetwork(), 'eth0')
+    def test_make_hosts(self, mock_makedir):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        instance_uuid_one = str(uuid.uuid4())
+        instance_uuid_two = str(uuid.uuid4())
+        network_uuid = str(uuid.uuid4())
+        iface_uuid_one = str(uuid.uuid4())
+        iface_uuid_two = str(uuid.uuid4())
+
+        self.mock_etcd.create_network('testing', network_uuid, netblock='127.0.0.0/8')
+        self.mock_etcd.create_network_interface(
+            iface_uuid_one,
+            {
+                'network_uuid': network_uuid,
+                'address': '127.0.0.5',
+                'model': None,
+                'macaddress': '1a:91:64:d2:15:39',
+            },
+            instance_uuid=instance_uuid_one, order=0)
+        self.mock_etcd.create_network_interface(
+            iface_uuid_two,
+            {
+                'network_uuid': network_uuid,
+                'address': '127.0.0.6',
+                'model': None,
+                'macaddress': '1a:91:64:d2:15:40',
+            },
+            instance_uuid=instance_uuid_two, order=0)
+        self.mock_etcd.create_instance('inst1', instance_uuid_one)
+        self.mock_etcd.create_instance('inst2', instance_uuid_two)
+
+        n = network.Network.from_db(network_uuid)
+        d = dhcp.DHCP(n, 'eth0')
 
         mock_open = mock.mock_open()
-        with mock.patch.object(six.moves.builtins, 'open',
-                               new=mock_open):
+        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
             d._make_hosts()
 
         handle = mock_open()
@@ -190,10 +180,17 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('shutil.rmtree')
     def test_remove_config(self, mock_rmtree, mock_exists):
-        d = dhcp.DHCP(FakeNetwork(), 'eth0')
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dhcp.DHCP(n, 'eth0')
+
         d._remove_config()
-        mock_exists.assert_called_with('/a/b/c/dhcp/notauuid')
-        mock_rmtree.assert_called_with('/a/b/c/dhcp/notauuid')
+        mock_exists.assert_called_with('/a/b/c/dhcp/%s' % network_uuid)
+        mock_rmtree.assert_called_with('/a/b/c/dhcp/%s' % network_uuid)
 
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('psutil.pid_exists', return_value=True)
@@ -201,7 +198,13 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('os.waitpid')
     def test_send_signal(self, mock_waitpid, mock_kill, mock_pid_exists,
                          mock_path_exists):
-        d = dhcp.DHCP(FakeNetwork(), 'eth0')
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dhcp.DHCP(n, 'eth0')
 
         mock_open = mock.mock_open(read_data='424242')
         with mock.patch.object(six.moves.builtins, 'open',
@@ -209,7 +212,7 @@ class DHCPTestCase(testtools.TestCase):
             self.assertEqual(True, d._send_signal(signal.SIGKILL))
 
         mock_pid_exists.assert_called()
-        mock_path_exists.assert_called_with('/a/b/c/dhcp/notauuid/pid')
+        mock_path_exists.assert_called_with('/a/b/c/dhcp/%s/pid' % network_uuid)
         mock_kill.assert_called_with(424242, signal.SIGKILL)
 
     @mock.patch('os.path.exists', return_value=True)
@@ -217,7 +220,13 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('os.kill')
     def test_send_signal_no_process(self, mock_kill, mock_pid_exists,
                                     mock_path_exists):
-        d = dhcp.DHCP(FakeNetwork(), 'eth0')
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dhcp.DHCP(n, 'eth0')
 
         mock_open = mock.mock_open(read_data='424242')
         with mock.patch.object(six.moves.builtins, 'open',
@@ -225,13 +234,20 @@ class DHCPTestCase(testtools.TestCase):
             self.assertEqual(False, d._send_signal(signal.SIGKILL))
 
         mock_pid_exists.assert_called()
-        mock_path_exists.assert_called_with('/a/b/c/dhcp/notauuid/pid')
+        mock_path_exists.assert_called_with('/a/b/c/dhcp/%s/pid' % network_uuid)
         mock_kill.assert_not_called()
 
     @mock.patch('shakenfist.dhcp.DHCP._send_signal')
     @mock.patch('shakenfist.dhcp.DHCP._remove_config')
     def test_remove_dhcpd(self, mock_remove_config, mock_signal):
-        d = dhcp.DHCP(FakeNetwork(), 'eth0')
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dhcp.DHCP(n, 'eth0')
+
         d.remove_dhcpd()
         mock_remove_config.assert_called()
         mock_signal.assert_called_with(signal.SIGKILL)
@@ -244,17 +260,24 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('shakenfist.util.process.execute')
     def test_restart_dhcpd(self, mock_execute, mock_hosts, mock_config,
                            mock_signal, mock_makedirs, mock_exists):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+
         with tempfile.TemporaryDirectory() as dir:
             with open(os.path.join(dir, 'leases'), 'w') as f:
                 f.write('')
 
-            d = dhcp.DHCP(FakeNetwork(), 'eth0')
+            d = dhcp.DHCP(n, 'eth0')
             d.subst['config_dir'] = dir
             d.restart_dhcpd()
             mock_signal.assert_called_with(signal.SIGHUP)
             mock_execute.assert_called_with(
                 None, 'dnsmasq --conf-file=%s/config' % dir,
-                namespace='notauuid')
+                namespace=network_uuid)
 
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('shakenfist.dhcp.DHCP._send_signal', return_value=False)
@@ -267,6 +290,13 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('shakenfist.util.process.execute')
     def test_remove_leases(self, mock_execute, mock_hosts, mock_config,
                            mock_signal, mock_exists):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+
         with tempfile.TemporaryDirectory() as dir:
             with open(os.path.join(dir, 'leases'), 'w') as f:
                 f.write('%d 02:00:00:55:04:a2 172.10.0.8 client *\n'
@@ -276,7 +306,7 @@ class DHCPTestCase(testtools.TestCase):
                 f.write('%d 1a:91:64:d2:15:39 127.0.0.5 client3 *'
                         % (time.time() + 3600))
 
-            d = dhcp.DHCP(FakeNetwork(), 'eth0')
+            d = dhcp.DHCP(n, 'eth0')
             d.subst['config_dir'] = dir
 
             d.restart_dhcpd()
@@ -284,7 +314,7 @@ class DHCPTestCase(testtools.TestCase):
             mock_signal.assert_called_with(signal.SIGKILL)
             mock_execute.assert_called_with(
                 None, 'dnsmasq --conf-file=%s/config' % dir,
-                namespace='notauuid')
+                namespace=network_uuid)
 
             with open(os.path.join(dir, 'leases'), 'r') as f:
                 leases = f.read()
@@ -309,12 +339,19 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('shakenfist.util.process.execute')
     def test_remove_no_leases(self, mock_execute, mock_hosts, mock_config,
                               mock_signal, mock_exists):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network('bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+
         with tempfile.TemporaryDirectory() as dir:
             with open(os.path.join(dir, 'leases'), 'w') as f:
                 f.write('%d 1a:91:64:d2:15:39 127.0.0.5 client3 *'
                         % (time.time() + 3600))
 
-            d = dhcp.DHCP(FakeNetwork(), 'eth0')
+            d = dhcp.DHCP(n, 'eth0')
             d.subst['config_dir'] = dir
 
             d.restart_dhcpd()

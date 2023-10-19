@@ -1,5 +1,3 @@
-import time
-
 from shakenfist_client import apiclient
 
 from shakenfist_ci import base
@@ -41,11 +39,7 @@ class TestSystemNamespace(base.BaseTestCase):
         self.assertIn(inst['uuid'], insts)
 
         self.system_client.delete_instance(inst['uuid'])
-        start_time = time.time()
-        while time.time() - start_time < 300:
-            if not list(self.system_client.get_instances()):
-                break
-            time.sleep(5)
+        self._await_instance_deleted(inst['uuid'])
 
         self.system_client.delete_network(net['uuid'])
 

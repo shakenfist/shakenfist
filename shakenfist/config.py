@@ -133,6 +133,10 @@ class SFConfig(BaseSettings):
         8000,
         description='Maximum network MTU our hypervisors can safely set.'
     )
+    IP_DELETION_HALO_DURATION: int = Field(
+        300,
+        description='How long an IP is unusable for after being released.'
+    )
 
     # Database Options
     CLEANER_DELAY: int = Field(

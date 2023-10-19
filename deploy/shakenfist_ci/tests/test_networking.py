@@ -1,5 +1,3 @@
-import time
-
 from shakenfist_client import apiclient
 
 from shakenfist_ci import base
@@ -293,9 +291,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
         # Delete the instance
         self.test_client.delete_instance(inst1['uuid'])
-
-        # Allow some time for propogation
-        time.sleep(10)
+        self._await_instance_deleted(inst1['uuid'])
 
         # Ensure that interfaces are now marked as deleted
         for iface in nics:
