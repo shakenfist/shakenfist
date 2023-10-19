@@ -198,16 +198,6 @@ def main():
     setproctitle.setproctitle(
         daemon.process_name('main') + '-v%s' % util_general.get_version())
 
-    # If you ran this, it means we're not shutting down any more
-    n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
-    n.state = Node.STATE_CREATED
-
-    # Log configuration on startup
-    for key, value in config.dict().items():
-        LOG.info('Configuration item %s = %s' % (key, value))
-
-    daemon.set_log_level(LOG, 'main')
-
     # Ensure we have a consistent cache of object states if the cache is entirely
     # absent.
     with etcd.get_lock('cache-upgrade', None, None, op='Cache upgrade'):
@@ -224,6 +214,16 @@ def main():
                     cache.clobber_object_state_cache(obj_type, state, by_state[state])
             cache_version['version'] = 1
             etcd.put_raw('/sf/cache/_version', cache_version)
+
+    # If you ran this, it means we're not shutting down any more
+    n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
+    n.state = Node.STATE_CREATED
+
+    # Log configuration on startup
+    for key, value in config.dict().items():
+        LOG.info('Configuration item %s = %s' % (key, value))
+
+    daemon.set_log_level(LOG, 'main')
 
     # Check in early and often, also reset processing queue items.
     etcd.clear_stale_locks()
