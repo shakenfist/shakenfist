@@ -1346,6 +1346,15 @@
 
 <h1 id="v07-to-v08-release-notes">v0.7 to v0.8 release notes</h1>
 <h2 id="major-changes">Major changes</h2>
+<ul>
+<li>IP address management has moved to a new baseoject called IPAM. Events are
+  therefore recorded for address management as you would expect.</li>
+<li>Addresses released on any network (including the floating network) are now
+  quarantined for <code>IP_DELETION_HALO_DURATION</code> seconds after deletion before they
+  can be reused. The only exception to this is if a network is heavily congested
+  and an allocation attempt will fail. In that case the halo is temporarily
+  reduced to 30 seconds and a warning log message is emitted.</li>
+</ul>
 <h2 id="minor-changes">Minor changes</h2>
 <ul>
 <li>CI has been moved from relatively unreliable scraping of the instance serial
