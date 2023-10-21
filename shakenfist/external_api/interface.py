@@ -102,7 +102,7 @@ class InterfaceDefloatEndpoint(sf_api.Resource):
 class InterfaceMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Fetch metadata for an interface.',
-        [('interface_uuid', 'body', 'uuid', 'The interface to add a key to.', True)],
+        [('interface_uuid', 'query', 'uuid', 'The interface to add a key to.', True)],
         [(200, 'Interface metadata, if any.', None),
          (404, 'Interface not found.', None)],
         requires_admin=True))
@@ -117,8 +117,8 @@ class InterfaceMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Add metadata for an interface.',
         [
-            ('interface_uuid', 'body', 'uuid', 'The interface to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('interface_uuid', 'query', 'uuid', 'The interface to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -142,8 +142,8 @@ class InterfaceMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Update a metadata key for an interface.',
         [
-            ('interface_uuid', 'body', 'uuid', 'The interface to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('interface_uuid', 'query', 'uuid', 'The interface to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -165,9 +165,8 @@ class InterfaceMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Delete a metadata key for an interface.',
         [
-            ('interface_uuid', 'body', 'uuid', 'The interface to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('interface_uuid', 'query', 'uuid', 'The interface to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),

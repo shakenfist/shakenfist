@@ -673,7 +673,7 @@ class ArtifactUnshareEndpoint(sf_api.Resource):
 class ArtifactMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Fetch metadata for an artifact.',
-        [('artifact_ref', 'body', 'uuidorname',
+        [('artifact_ref', 'qeury', 'uuidorname',
           'The artifact to fetch metadata for.', True)],
         [(200, 'Artifact metadata, if any.', None),
          (404, 'Artifact not found.', None)],
@@ -688,8 +688,8 @@ class ArtifactMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Add metadata for an artifact.',
         [
-            ('artifact_ref', 'body', 'uuidorname', 'The artifact to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('artifact_ref', 'query', 'uuidorname', 'The artifact to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -712,8 +712,8 @@ class ArtifactMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Update a metadata key for an artifact.',
         [
-            ('artifact_ref', 'body', 'uuidorname', 'The artifact to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('artifact_ref', 'query', 'uuidorname', 'The artifact to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -734,9 +734,8 @@ class ArtifactMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Delete a metadata key for an artifact.',
         [
-            ('artifact_ref', 'body', 'uuidorname', 'The artifact to remove a key from.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('artifact_ref', 'query', 'uuidorname', 'The artifact to remove a key from.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),

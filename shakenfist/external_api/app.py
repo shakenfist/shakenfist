@@ -102,7 +102,7 @@ class Root(sf_api.Resource):
              '<li>events: events-by-type</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
              'instance-put-blob, instance-execute, instance-get</li>'
-             '<li>networks: list-addresses'
+             '<li>networks: list-addresses, route-addresses'
              '<li>networkinterfaces: interface-metadata</li>'
              '<li>nodes: node-get, node-metadata</li>'
              '</ul></p></body></html>'),
@@ -229,6 +229,10 @@ api.add_resource(api_network.NetworkMetadataEndpoint,
                  '/networks/<network_ref>/metadata/<key>')
 api.add_resource(api_network.NetworkPingEndpoint,
                  '/networks/<network_ref>/ping/<address>')
+api.add_resource(api_network.NetworkRouteAddressEndpoint,
+                 '/networks/<network_ref>/route')
+api.add_resource(api_network.NetworkUnrouteAddressEndpoint,
+                 '/networks/<network_ref>/route/<address>')
 
 api.add_resource(api_node.NodesEndpoint, '/nodes')
 api.add_resource(api_node.NodeEndpoint, '/nodes/<node>')

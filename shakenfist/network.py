@@ -764,6 +764,22 @@ class Network(dbo):
                                  'ip link del flt-%(floating_address_as_hex)s-o'
                                  % subst)
 
+    def route_address(self, floating_address):
+        self.add_event(
+            EVENT_TYPE_AUDIT, 'routing floating ip %s to network' % floating_address)
+        subst = self.subst_dict()
+        subst['floating_address'] = floating_address
+        util_process.execute(
+            None, 'ip route add %(floating_address)s/32 dev %(vx_bridge)s' % subst)
+
+    def unroute_address(self, floating_address):
+        self.add_event(
+            EVENT_TYPE_AUDIT, 'unrouting floating ip %s to network' % floating_address)
+        subst = self.subst_dict()
+        subst['floating_address'] = floating_address
+        util_process.execute(
+            None, 'ip route del %(floating_address)s/32 dev %(vx_bridge)s' % subst)
+
 
 class Networks(dbo_iter):
     base_object = Network

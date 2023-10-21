@@ -349,7 +349,7 @@ class AuthMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Fetch metadata for a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to fetch metadata for.', True)
+            ('namespace', 'query', 'string', 'The namespace to fetch metadata for.', True)
         ],
         [(200, 'Namespace metadata, if any.', None),
          (404, 'Namespace not found.', None)]))
@@ -363,8 +363,8 @@ class AuthMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Add metadata for a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('namespace', 'query', 'string', 'The namespace to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -387,8 +387,8 @@ class AuthMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Update a metadata key for a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('namespace', 'query', 'string', 'The namespace to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -409,9 +409,8 @@ class AuthMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Delete a metadata key for a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to remove a key from.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('namespace', 'query', 'string', 'The namespace to remove a key from.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -430,7 +429,7 @@ class AuthNamespaceTrustsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Trust an external namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to trust.', True)
+            ('namespace', 'query', 'string', 'The namespace to trust.', True)
         ],
         [(200, 'The current state of the namespace.', namespace_get_example),
          (400, 'No external namespace specified.', None),
@@ -456,7 +455,9 @@ class AuthNamespaceTrustEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Remove trust from an external namespace.',
         [
-            ('namespace', 'body', 'string',
+            ('namespace', 'query', 'string',
+             'The namespace to alter.', True),
+            ('external_namespace', 'query', 'string',
              'The namespace to no longer trust.', True)
         ],
         [(200, 'The current state of the namespace.', namespace_get_example),
