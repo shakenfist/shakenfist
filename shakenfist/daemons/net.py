@@ -28,7 +28,8 @@ from shakenfist.tasks import (
     RemoveDHCPLeaseNetworkTask,
     NetworkInterfaceTask,
     FloatNetworkInterfaceTask,
-    DefloatNetworkInterfaceTask)
+    DefloatNetworkInterfaceTask,
+    RouteAddressTask, UnrouteAddressTask)
 from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
 
@@ -226,6 +227,9 @@ class Monitor(daemon.WorkerPoolDaemon):
             n.remove_nat()
             return
 
+        if isinstance(workitem, UnrouteAddressTask):
+            n.unroute_address(workitem.ipv4())
+
         #
         # Tasks that should NOT operate on a DEAD network
         #
@@ -259,31 +263,24 @@ class Monitor(daemon.WorkerPoolDaemon):
                 'Received work item for a dead network')
             return
 
-        if isinstance(workitem, DeployNetworkTask):
-            try:
+        try:
+            if isinstance(workitem, DeployNetworkTask):
                 n.create_on_network_node()
                 n.ensure_mesh()
-            except exceptions.DeadNetwork as e:
-                log_ctx.with_fields({'exception': e}).warning(
-                    'DeployNetworkTask on dead network')
-            return
 
-        elif isinstance(workitem, UpdateDHCPNetworkTask):
-            try:
+            elif isinstance(workitem, UpdateDHCPNetworkTask):
                 n.create_on_network_node()
                 n.ensure_mesh()
-            except exceptions.DeadNetwork as e:
-                log_ctx.with_fields({'exception': e}).warning(
-                    'UpdateDHCPNetworkTask on dead network')
-            return
 
-        elif isinstance(workitem, RemoveDHCPLeaseNetworkTask):
-            try:
+            elif isinstance(workitem, RemoveDHCPLeaseNetworkTask):
                 n.remove_dhcp_lease(workitem.ipv4(), workitem.macaddr())
-            except exceptions.DeadNetwork as e:
-                log_ctx.with_fields({'exception': e}).warning(
-                    'RemoveDHCPLeaseNetworkTask on dead network')
-            return
+
+            elif isinstance(workitem, RouteAddressTask):
+                n.route_address(workitem.ipv4())
+
+        except exceptions.DeadNetwork as e:
+            log_ctx.with_fields({'exception': e}).warning(
+                'Network task on dead network')
 
     def _process_networkinterface_workitem(self, log_ctx, workitem):
         log_ctx = log_ctx.with_fields({

@@ -15,16 +15,21 @@ import ipaddress
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.config import config
-from shakenfist.external_api import base as api_base
+from shakenfist.external_api import (
+    base as api_base,
+    util as api_util)
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
 from shakenfist import etcd
+from shakenfist import exceptions
 from shakenfist import eventlog
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.util import process as util_process
-from shakenfist.tasks import DestroyNetworkTask, DeleteNetworkWhenClean
+from shakenfist.tasks import (
+    DestroyNetworkTask, DeleteNetworkWhenClean, RouteAddressTask,
+    UnrouteAddressTask)
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -383,7 +388,7 @@ class NetworkInterfacesEndpoint(sf_api.Resource):
 class NetworkMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Fetch metadata for a network.',
-        [('network_ref', 'body', 'uuidorname',
+        [('network_ref', 'query', 'uuidorname',
           'The network fetch metadata for.', True)],
         [(200, 'Artifact metadata, if any.', None),
          (404, 'Artifact not found.', None)],
@@ -398,7 +403,7 @@ class NetworkMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Add metadata for a network.',
         [
-            ('network_ref', 'body', 'uuidorname', 'The network to add a key to.', True),
+            ('network_ref', 'query', 'uuidorname', 'The network to add a key to.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
@@ -422,8 +427,8 @@ class NetworkMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Update a metadata key for a network.',
         [
-            ('network_ref', 'body', 'uuidorname', 'The network to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('network_ref', 'query', 'uuidorname', 'The network to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -444,8 +449,8 @@ class NetworkMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Delete a metadata key for a network.',
         [
-            ('network_ref', 'body', 'uuidorname', 'The network to remove a key from.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('network_ref', 'query', 'uuidorname', 'The network to remove a key from.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -491,9 +496,9 @@ class NetworkPingEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Send ICMP ping traffic to an address on a network.',
         [
-            ('network_ref', 'body', 'uuidorname',
+            ('network_ref', 'query', 'uuidorname',
              'The network to send traffic on.', True),
-            ('address', 'body', 'string', 'The IPv4 address to ping.', True)
+            ('address', 'query', 'string', 'The IPv4 address to ping.', True)
         ],
         [(200, 'The stdout and stderr of the ping request.', None),
          (400, 'The IPv4 address is not in the network\'s netblock or is invalid.',
@@ -524,10 +529,76 @@ class NetworkPingEndpoint(sf_api.Resource):
         }
 
 
+network_allocations_example = ''
+
+
 class NetworkAddressesEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Return information about the address reservations in a network.',
+        [
+            ('network_ref', 'query', 'uuidorname',
+             'The network to return address allocation information about.', True)
+        ],
+        [(200, 'Address allocations', network_allocations_example),
+         (404, 'Network not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
     def get(self, network_ref=None, network_from_db=None):
-        return network_from_db.ipam.reservations
+        out = []
+        for addr in network_from_db.ipam.in_use:
+            out.append(network_from_db.ipam.get_reservation(addr))
+        return out
+
+
+class NetworkRouteAddressEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Route a floating address to this network, with no DNAT.',
+        [
+            ('network_ref', 'query', 'uuidorname',
+             'The network route the address to.', True)
+        ],
+        [(200, 'The address that was routed', None),
+         (507, 'No floating addresses are available', None),
+         (404, 'Network not found.', None)]))
+    @api_base.verify_token
+    @api_base.arg_is_network_ref
+    @api_base.requires_network_ownership
+    @api_base.requires_network_active
+    @api_base.log_token_use
+    def post(self, network_ref=None, network_from_db=None):
+        try:
+            address = api_util.assign_floating_ip(network_ref)
+        except exceptions.CongestedNetwork as e:
+            return sf_api.error(507, str(e), suppress_traceback=True)
+
+        etcd.enqueue('networknode', RouteAddressTask(network_ref.uuid, address))
+        return address
+
+
+class NetworkUnrouteAddressEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Remove routing for a floating address to this network.',
+        [
+            ('network_ref', 'query', 'uuidorname',
+             'The network route the address to.', True),
+            ('address', 'query', 'string', 'The address to remove routing for', True)
+        ],
+        [(200, 'The address that was routed', None),
+         (403, 'That address is not routed by this network.', None),
+         (404, 'That address is not routed.', None)]))
+    @api_base.verify_token
+    @api_base.arg_is_network_ref
+    @api_base.requires_network_ownership
+    @api_base.requires_network_active
+    @api_base.log_token_use
+    def delete(self, network_ref=None, network_from_db=None, address=None):
+        fn = network.floating_network()
+        reservation = fn.ipam.get_reservation(address)
+        if not reservation:
+            return sf_api.error(404, 'address not routed')
+        if reservation['user'] != network_ref.unique_label():
+            return sf_api.error(403, 'address not routed by this network')
+
+        etcd.enqueue('networknode', UnrouteAddressTask(network_ref.uuid, address))

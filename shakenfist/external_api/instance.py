@@ -1014,7 +1014,7 @@ class InstanceUnpauseEndpoint(sf_api.Resource):
 class InstanceMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Fetch metadata for an instance.',
-        [('instance_ref', 'body', 'uuidorname',
+        [('instance_ref', 'query', 'uuidorname',
           'The instance to fetch metadata for.', True)],
         [(200, 'Instance metadata, if any.', None),
          (404, 'Instance not found.', None)],
@@ -1029,8 +1029,8 @@ class InstanceMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Add metadata for an instance.',
         [
-            ('instance_ref', 'body', 'uuidorname', 'The instance to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('instance_ref', 'query', 'uuidorname', 'The instance to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -1077,8 +1077,8 @@ class InstanceMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Update a metadata key for an instance.',
         [
-            ('instance_ref', 'body', 'uuidorname', 'The instance to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('instance_ref', 'query', 'uuidorname', 'The instance to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -1098,9 +1098,8 @@ class InstanceMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Delete a metadata key for an instance.',
         [
-            ('instance_ref', 'body', 'uuidorname', 'The instance to remove a key from.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('instance_ref', 'query', 'uuidorname', 'The instance to remove a key from.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -1120,7 +1119,7 @@ class InstanceConsoleDataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Fetch console data from an instance.',
         [
-            ('instance_ref', 'body', 'uuidorname',
+            ('instance_ref', 'query', 'uuidorname',
              'The instance fetch console data for.', True),
             ('length', 'body', 'integer',
              'The amount of data to fetch, defaults to 10240 bytes.', False)
@@ -1158,7 +1157,7 @@ class InstanceConsoleDataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Delete console data for an instance.',
         [
-            ('instance_ref', 'body', 'uuidorname',
+            ('instance_ref', 'query', 'uuidorname',
              'The instance fetch console data for.', True)
         ],
         [(200, 'Nothing.', None),
@@ -1199,7 +1198,7 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
         ('Fetch a virt-viewer .vv file describing how to connect to the VDI console '
          'for this instance.'),
         [
-            ('instance_ref', 'body', 'uuidorname',
+            ('instance_ref', 'query', 'uuidorname',
              'The instance fetch console data for.', True)
         ],
         [(200, 'A .vv file to open in virt-viewer as a application/x-virt-viewer stream.',

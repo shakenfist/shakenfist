@@ -203,7 +203,7 @@ class NodeEventsEndpoint(sf_api.Resource):
 class NodeMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Fetch metadata for a node.',
-        [('node', 'body', 'node', 'The node to fetch metadata for.', True)],
+        [('node', 'query', 'node', 'The node to fetch metadata for.', True)],
         [(200, 'Node metadata, if any.', None),
          (404, 'Node not found.', None)],
         requires_admin=True))
@@ -219,8 +219,8 @@ class NodeMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Add metadata for a node.',
         [
-            ('node', 'body', 'node', 'The node to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('node', 'query', 'node', 'The node to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -245,8 +245,8 @@ class NodeMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Update a metadata key for a node.',
         [
-            ('node', 'body', 'node', 'The node to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('node', 'query', 'node', 'The node to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -269,8 +269,8 @@ class NodeMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Delete a metadata key for a node.',
         [
-            ('node', 'body', 'node', 'The node to remove a key from.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('node', 'query', 'node', 'The node to remove a key from.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),

@@ -218,7 +218,7 @@ class BlobMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Fetch metadata for a blob.',
         [
-            ('blob_uuid', 'body', 'uuid', 'The blob to fetch metadaa for.', True)
+            ('blob_uuid', 'query', 'uuid', 'The blob to fetch metadata for.', True)
         ],
         [(200, 'Blob metadata, if any.', None),
          (404, 'Blob not found.', None)],
@@ -232,8 +232,8 @@ class BlobMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Add metadata for a blob.',
         [
-            ('blob_uuid', 'body', 'uuid', 'The blob to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('blob_uuid', 'query', 'uuid', 'The blob to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -255,8 +255,8 @@ class BlobMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Update a metadata key for an blob.',
         [
-            ('blob_uuid', 'body', 'uuid', 'The blob to add a key to.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('blob_uuid', 'query', 'uuid', 'The blob to add a key to.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -276,9 +276,8 @@ class BlobMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Delete a metadata key for an blob.',
         [
-            ('blob_uuid', 'body', 'uuid', 'The blob to remove a key from.', True),
-            ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('blob_uuid', 'query', 'uuid', 'The blob to remove a key from.', True),
+            ('key', 'query', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),

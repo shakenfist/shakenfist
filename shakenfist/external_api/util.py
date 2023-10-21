@@ -19,6 +19,14 @@ def assign_floating_ip(ni):
         ni.unique_label(), ipam.RESERVATION_TYPE_FLOATING, '')
 
 
+def assign_routed_ip(n):
+    # Address is allocated and then returned, as there is no network interface
+    # to associate it with.
+    fn = network.floating_network()
+    return fn.ipam.reserve_random_free_address(
+        n.unique_label(), ipam.RESERVATION_TYPE_ROUTED, '')
+
+
 def safe_get_network_interface(interface_uuid):
     ni = NetworkInterface.from_db(interface_uuid)
     if not ni:

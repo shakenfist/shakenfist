@@ -167,6 +167,25 @@ class DeleteNetworkWhenClean(NetworkTask):
                 'wait_interfaces': self._wait_interfaces}
 
 
+class RouteAddressTask(NetworkTask):
+    _name = 'network_route_address'
+
+    def __init__(self, network_uuid, ipv4):
+        super(RouteAddressTask, self).__init__(network_uuid)
+        self._ipv4 = ipv4
+
+    def ipv4(self):
+        return self._ipv4
+
+    def obj_dict(self):
+        return {**super(RouteAddressTask, self).obj_dict(),
+                'address': self._ipv4}
+
+
+class UnrouteAddressTask(NetworkTask):
+    _name = 'network_unroute_address'
+
+
 #
 # NetworkInterface Tasks
 #
