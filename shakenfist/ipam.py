@@ -56,7 +56,6 @@ class IPAM(dbo):
             cluster_minimum = 3
 
         if cluster_minimum > 3:
-            self.log('Online upgrade enabled')
             self.upgrade(static_values)
 
         super(IPAM, self).__init__(static_values['uuid'],

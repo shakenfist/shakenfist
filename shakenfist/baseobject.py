@@ -31,6 +31,8 @@ class NoopLock(Lock):
 
 VERSION_CACHE = None
 VERSION_CACHE_AGE = 0
+OBJECT_NAMES = ['agentoperation', 'artifact', 'blob', 'instance', 'ipam',
+                'namespace', 'network', 'networkinterface', 'node', 'upload']
 
 
 def get_minimum_object_version(objname):
@@ -64,11 +66,6 @@ def get_minimum_object_version(objname):
 
     VERSION_CACHE_AGE = time.time()
     return VERSION_CACHE[objname]
-
-
-# The names of our objects
-OBJECT_NAMES = ['agentoperation', 'artifact', 'blob', 'instance', 'namespace',
-                'network', 'networkinterface', 'node', 'upload']
 
 
 class DatabaseBackedObject(object):
