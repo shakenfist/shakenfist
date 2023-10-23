@@ -39,7 +39,7 @@ RESERVATION_TYPE_UNKNOWN = 'unknown'
 class IPAM(dbo):
     object_type = 'ipam'
     initial_version = 3
-    current_version = 4
+    current_version = 5
 
     state_targets = {
         None: (dbo.STATE_CREATED),
@@ -72,11 +72,6 @@ class IPAM(dbo):
 
         if self.version == 3:
             self.cached_ipmanager_object = ipmanager.IPManager.from_db(self.uuid)
-        if self.version > 4:
-            ipm = ipmanager.from_db(self.uuid)
-            if ipm:
-                self.log.info('Removed obsolete ipmanager post IPAM upgrade')
-                ipm.delete()
 
     @classmethod
     def _upgrade_step_3_to_4(cls, static_values):
@@ -90,6 +85,14 @@ class IPAM(dbo):
                              'type': RESERVATION_TYPE_UNKNOWN,
                              'comment': ''
                          })
+
+    @classmethod
+    def _upgrade_step_4_to_5(cls, static_values):
+        ipm = ipmanager.IPManager.from_db(static_values['uuid'])
+        if ipm:
+            LOG.with_fields({'ipam': static_values['uuid']}).info(
+                'Removed obsolete ipmanager post IPAM upgrade')
+            ipm.delete()
 
     def _ensure_ipblock_object(self):
         if not self.cached_ipblock_object:
