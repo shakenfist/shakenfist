@@ -88,11 +88,14 @@ class IPAM(dbo):
 
     @classmethod
     def _upgrade_step_4_to_5(cls, static_values):
-        ipm = ipmanager.IPManager.from_db(static_values['uuid'])
-        if ipm:
-            LOG.with_fields({'ipam': static_values['uuid']}).info(
-                'Removed obsolete ipmanager post IPAM upgrade')
-            ipm.delete()
+        try:
+            ipm = ipmanager.IPManager.from_db(static_values['uuid'])
+            if ipm:
+                LOG.with_fields({'ipam': static_values['uuid']}).info(
+                    'Removed obsolete ipmanager post IPAM upgrade')
+                ipm.delete()
+        except exceptions.IPManagerMissing:
+            pass
 
     def _ensure_ipblock_object(self):
         if not self.cached_ipblock_object:

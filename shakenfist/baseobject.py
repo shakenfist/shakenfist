@@ -452,10 +452,12 @@ class DatabaseBackedObjectIterator(object):
 
         if self.prefilter == 'active':
             target_states = self.base_object.ACTIVE_STATES
-        elif self.prefilter == 'inactive':
-            target_states = self.base_object.INACTIVE_STATES
+        elif self.prefilter == 'deleted':
+            target_states = [DatabaseBackedObject.STATE_DELETED]
         elif self.prefilter == 'healthy':
             target_states = self.base_object.HEALTHY_STATES
+        elif self.prefilter == 'inactive':
+            target_states = self.base_object.INACTIVE_STATES
         else:
             raise exceptions.InvalidObjectPrefilter(self.prefilter)
 

@@ -19,6 +19,7 @@ from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import instance
+from shakenfist import ipam
 from shakenfist import namespace
 from shakenfist import network
 from shakenfist import networkinterface
@@ -68,9 +69,8 @@ class Monitor(daemon.Daemon):
 
         # Cleanup soft deleted objects
         for objtype in OBJECT_NAMES_TO_ITERATORS:
-            for obj in OBJECT_NAMES_TO_ITERATORS[objtype]([]):
-                if (obj.state.value == dbo.STATE_DELETED and
-                        time.time() - obj.state.update_time > config.CLEANER_DELAY):
+            for obj in OBJECT_NAMES_TO_ITERATORS[objtype]([], prefilter='deleted'):
+                if time.time() - obj.state.update_time > config.CLEANER_DELAY:
                     obj.hard_delete()
         self.lock.refresh()
 
@@ -88,6 +88,7 @@ class Monitor(daemon.Daemon):
         self.lock.refresh()
 
         # Cleanup ipmanagers whose network is absent
+        # TODO(mikal): remove in v0.9
         for k, objdata in etcd.get_all('ipmanager', None):
             network_uuid = objdata.get('uuid')
             if network_uuid:
@@ -97,6 +98,14 @@ class Monitor(daemon.Daemon):
                     LOG.with_fields({
                         'ipmanager': network_uuid
                     }).warning('Cleaning up leaked ipmanager')
+        self.lock.refresh()
+
+        # Cleanup IPAMs whose network is absent
+        for ipm in ipam.IPAMs([], prefilter='active'):
+            n = network.Network.from_db(ipm.network_uuid)
+            if not n:
+                ipm.state = dbo.STATE_DELETED
+            ipm.log.warning('Cleaning up leaked IPAM')
         self.lock.refresh()
 
         # Cleanup old uploads which were never completed
