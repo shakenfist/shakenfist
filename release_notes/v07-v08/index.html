@@ -1354,6 +1354,9 @@
   can be reused. The only exception to this is if a network is heavily congested
   and an allocation attempt will fail. In that case the halo is temporarily
   reduced to 30 seconds and a warning log message is emitted.</li>
+<li>We no longer reset the authentication secret used to generate authentication
+  tokens on install. This means tokens from before install will continue to work
+  for their normal lifetime.</li>
 </ul>
 <h2 id="minor-changes">Minor changes</h2>
 <ul>
