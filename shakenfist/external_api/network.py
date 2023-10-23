@@ -569,11 +569,11 @@ class NetworkRouteAddressEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def post(self, network_ref=None, network_from_db=None):
         try:
-            address = api_util.assign_floating_ip(network_ref)
+            address = api_util.assign_routed_ip(network_from_db)
         except exceptions.CongestedNetwork as e:
             return sf_api.error(507, str(e), suppress_traceback=True)
 
-        etcd.enqueue('networknode', RouteAddressTask(network_ref.uuid, address))
+        etcd.enqueue('networknode', RouteAddressTask(network_from_db.uuid, address))
         return address
 
 
@@ -598,7 +598,7 @@ class NetworkUnrouteAddressEndpoint(sf_api.Resource):
         reservation = fn.ipam.get_reservation(address)
         if not reservation:
             return sf_api.error(404, 'address not routed')
-        if reservation['user'] != network_ref.unique_label():
+        if reservation['user'] != network_from_db.unique_label():
             return sf_api.error(403, 'address not routed by this network')
 
-        etcd.enqueue('networknode', UnrouteAddressTask(network_ref.uuid, address))
+        etcd.enqueue('networknode', UnrouteAddressTask(network_from_db.uuid, address))
