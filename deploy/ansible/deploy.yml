@@ -29,10 +29,6 @@
 
     - include_tasks: tasks/distro-check.yml
 
-    - name: Generate a random auth secret
-      set_fact:
-        auth_secret: "{{ lookup('password', '/dev/null length=30 chars=ascii_letters') }}"
-
     - name: Log topology
       debug:
         msg: "{{topology}}"
