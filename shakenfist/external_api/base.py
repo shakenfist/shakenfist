@@ -126,6 +126,10 @@ def verify_token(func):
             LOG.with_fields({'namespace', ns_name}).error(
                 'JWT token is for non-existent namespace')
             raise NoAuthorizationError()
+        if ns.state.value == dbo.STATE_DELETED:
+            LOG.with_fields({'namespace', ns_name}).error(
+                'JWT token is for deleted namespace')
+            raise NoAuthorizationError()
 
         if key_name != '_service_key':
             keys = ns.keys.get('nonced_keys', {})

@@ -34,10 +34,14 @@ def arg_is_namespace(func):
         if 'namespace' not in kwargs:
             return sf_api.error(400, 'missing namespace in request')
 
-        ns = Namespace.from_db(kwargs.get('namespace'))
+        ns = Namespace.from_db(kwargs.get('namespace'), suppress_failure_audit=True)
         if not ns:
             LOG.with_fields({'namespace': kwargs.get('namespace')}).info(
                 'Namespace not found, missing or deleted')
+            return sf_api.error(404, 'namespace not found')
+        if ns.state.value == dbo.STATE_DELETED:
+            LOG.with_fields({'namespace': kwargs.get('namespace')}).info(
+                'Namespace is deleted')
             return sf_api.error(404, 'namespace not found')
 
         kwargs['namespace_from_db'] = ns
