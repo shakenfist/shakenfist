@@ -102,7 +102,7 @@ class Monitor(daemon.Daemon):
 
         # Cleanup IPAMs whose network is absent
         for ipm in ipam.IPAMs([], prefilter='active'):
-            n = network.Network.from_db(ipm.network_uuid)
+            n = network.Network.from_db(ipm.network_uuid, suppress_failure_audit=True)
             if not n:
                 ipm.state = dbo.STATE_DELETED
             ipm.log.warning('Cleaning up leaked IPAM')

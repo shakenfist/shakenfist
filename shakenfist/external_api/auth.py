@@ -141,7 +141,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
         if not namespace:
             return sf_api.error(400, 'no namespace specified')
 
-        if Namespace.from_db(namespace):
+        if Namespace.from_db(namespace, suppress_failure_audit=True):
             return sf_api.error(403, 'namespace exists')
 
         ns = Namespace.new(namespace)
