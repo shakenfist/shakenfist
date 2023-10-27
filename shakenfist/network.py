@@ -515,6 +515,7 @@ class Network(dbo):
             if os.path.exists('/var/run/netns/%s' % self.uuid):
                 util_process.execute(None, 'ip netns del %s' % self.uuid)
 
+            self.ipam.state = self.ipam.STATE_DELETED
             self.state = self.STATE_DELETED
 
         # Ensure that all hypervisors remove this network. This is really

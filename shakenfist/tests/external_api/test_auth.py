@@ -600,15 +600,15 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         resp = self.client.post('/auth/namespaces',
                                 headers={'Authorization': self.auth_token},
                                 data=json.dumps({
-                                    'namespace': 'foo',
+                                    'namespace': 'foo-unique',
                                     'key_name': 'bernard',
                                     'key': 'cheese'
                                 }))
         self.assertEqual(200, resp.status_code)
         self.assertEqual({
-            'keys': ['bernard', 'key1'],
+            'keys': ['bernard'],
             'metadata': {},
-            'name': 'foo',
+            'name': 'foo-unique',
             'state': 'created',
             'trust': {'full': ['system']},
             'version': 5

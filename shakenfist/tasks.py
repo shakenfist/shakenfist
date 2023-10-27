@@ -179,10 +179,10 @@ class RouteAddressTask(NetworkTask):
 
     def obj_dict(self):
         return {**super(RouteAddressTask, self).obj_dict(),
-                'address': self._ipv4}
+                'ipv4': self._ipv4}
 
 
-class UnrouteAddressTask(NetworkTask):
+class UnrouteAddressTask(RouteAddressTask):
     _name = 'network_unroute_address'
 
 

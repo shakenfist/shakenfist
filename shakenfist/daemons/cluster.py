@@ -102,11 +102,32 @@ class Monitor(daemon.Daemon):
 
         # Cleanup IPAMs whose network is absent
         for ipm in ipam.IPAMs([], prefilter='active'):
-            n = network.Network.from_db(ipm.network_uuid)
+            n = network.Network.from_db(ipm.network_uuid, suppress_failure_audit=True)
             if not n:
                 ipm.state = dbo.STATE_DELETED
-            ipm.log.warning('Cleaning up leaked IPAM')
+                ipm.log.warning('Cleaning up leaked IPAM')
         self.lock.refresh()
+
+        # Cleanup floating IP reservations which refer to deleted objects
+        fn = network.floating_network()
+        releaseable = []
+        with fn.ipam.get_lock('reservations', op='Delete stray reservations'):
+            for addr in fn.ipam.in_use:
+                reservation = fn.ipam.get_reservation(addr)
+                if reservation['type'] not in [ipam.RESERVATION_TYPE_GATEWAY,
+                                               ipam.RESERVATION_TYPE_FLOATING,
+                                               ipam.RESERVATION_TYPE_ROUTED]:
+                    continue
+
+                object_type, object_uuid = reservation['user']
+                obj = OBJECT_NAMES_TO_CLASSES[object_type].from_db(object_uuid)
+                if not obj or obj.state.value == dbo.STATE_DELETED:
+                    releaseable.append(addr)
+
+        for addr in releaseable:
+            fn.ipam.release(addr)
+            fn.ipam.log.with_fields({object_type: object_uuid}).warning(
+                'Cleaned up an address which refers to a deleted object')
 
         # Cleanup old uploads which were never completed
         for upload in Uploads([]):
