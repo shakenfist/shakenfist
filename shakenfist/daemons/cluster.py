@@ -5,6 +5,7 @@
 
 from collections import defaultdict
 from functools import partial
+import json
 import setproctitle
 from shakenfist_utilities import logs
 import time
@@ -74,8 +75,19 @@ class Monitor(daemon.Daemon):
                     obj.hard_delete()
         self.lock.refresh()
 
-        # Cleanup vxids which specify a missing network
+        # Cleanup vxids which specify a missing network. We ignore allocations
+        # less than five minutes old to let the network setup complete.
         for k, objdata in etcd.get_all('vxlan', None):
+            when = objdata.get('when')
+            if not when:
+                objdata['when'] = time.time()
+                etcd.get_etcd_client().put(
+                    k, json.dumps(objdata, indent=4, sort_keys=True))
+                continue
+
+            if time.time() - when < 300:
+                continue
+
             network_uuid = objdata.get('network_uuid')
             if network_uuid:
                 n = network.Network.from_db(network_uuid, suppress_failure_audit=True)
@@ -90,6 +102,14 @@ class Monitor(daemon.Daemon):
         # Cleanup ipmanagers whose network is absent
         # TODO(mikal): remove in v0.9
         for k, objdata in etcd.get_all('ipmanager', None):
+            when = time.time()
+            if 'ipmanager.v3' in objdata:
+                for reservation in objdata['ipmanager.v3']['in_use']:
+                    when = objdata['ipmanager.v3']['in_use'][reservation]['when']
+                    break
+            if time.time() - when < 300:
+                continue
+
             network_uuid = objdata.get('uuid')
             if network_uuid:
                 n = network.Network.from_db(network_uuid)
@@ -102,6 +122,9 @@ class Monitor(daemon.Daemon):
 
         # Cleanup IPAMs whose network is absent
         for ipm in ipam.IPAMs([], prefilter='active'):
+            if time.time() - ipm.state.update_time < 300:
+                continue
+
             n = network.Network.from_db(ipm.network_uuid, suppress_failure_audit=True)
             if not n:
                 ipm.state = dbo.STATE_DELETED

@@ -104,8 +104,13 @@ class Network(dbo):
 
     @staticmethod
     def allocate_vxid(net_id):
+        reservation = {
+            'network_uuid': net_id,
+            'when': time.time()
+            }
+
         vxid = random.randint(1, 16777215)
-        while not etcd.create('vxlan', None, vxid, {'network_uuid': net_id}):
+        while not etcd.create('vxlan', None, vxid, reservation):
             vxid = random.randint(1, 16777215)
         return vxid
 
