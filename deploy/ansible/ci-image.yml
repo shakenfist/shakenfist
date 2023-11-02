@@ -61,10 +61,14 @@
   tasks:
     - name: Ensure ssh is actually answering now
       shell: |
-        ssh "{{base_image_user}}"@"{{hostvars['imagerebuild']['ansible_ssh_host']}}" uptime
+        ssh -o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null \
+            -o UserKnownHostsFile=/dev/null -i /srv/github/id_ci \
+            {{base_image_user}}@{{hostvars['imagerebuild']['ansible_ssh_host']}} \
+            uptime
       retries: 10
       delay: 30
-      until: result is not failed
+      register: result
+      until: result.rc == 0
 
 - hosts: imagerebuild
   gather_facts: yes
@@ -251,10 +255,14 @@
   tasks:
     - name: Ensure ssh is actually answering now
       shell: |
-        ssh "{{base_image_user}}"@"{{hostvars['imagetest']['ansible_ssh_host']}}" uptime
+        ssh -o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null \
+            -o UserKnownHostsFile=/dev/null -i /srv/github/id_ci \
+            {{base_image_user}}@{{hostvars['imagetest']['ansible_ssh_host']}} \
+            uptime
       retries: 10
       delay: 30
-      until: result is not failed
+      register: result
+      until: result.rc == 0
 
 - hosts: imagetest
   gather_facts: no
@@ -266,9 +274,10 @@
         update_cache: yes
         upgrade: dist
         autoremove: yes
+      register: apt_action
       retries: 10
       delay: 30
-      until: result is not failed
+      until: apt_action is success
 
 - hosts: localhost
   gather_facts: no
