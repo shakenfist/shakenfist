@@ -113,16 +113,19 @@ class IPAM(dbo):
         if static_values:
             return cls(static_values)
 
-        ipm = ipmanager.IPManager.from_db(ipam_uuid)
-        if not ipm:
-            LOG.with_fields({'ipam': ipam_uuid}).debug(
-                'Failed to find both an IPAM and an ipmanager')
-            if not suppress_failure_audit:
-                eventlog.add_event(
-                        EVENT_TYPE_AUDIT, cls.object_type, ipam_uuid,
-                        'attempt to lookup non-existent object',
-                        extra={'caller': util_callstack.get_caller(offset=-3)},
-                        log_as_error=True)
+        try:
+            ipm = ipmanager.IPManager.from_db(ipam_uuid)
+            if not ipm:
+                LOG.with_fields({'ipam': ipam_uuid}).debug(
+                    'Failed to find both an IPAM and an ipmanager')
+                if not suppress_failure_audit:
+                    eventlog.add_event(
+                            EVENT_TYPE_AUDIT, cls.object_type, ipam_uuid,
+                            'attempt to lookup non-existent object',
+                            extra={'caller': util_callstack.get_caller(offset=-3)},
+                            log_as_error=True)
+                return None
+        except exceptions.IPManagerMissing:
             return None
 
         LOG.with_fields({'ipam': ipam_uuid}).warning('Falling back to ipmanager for IPAM')
