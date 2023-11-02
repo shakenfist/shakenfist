@@ -8,25 +8,57 @@ JOBS = {
             'name': 'debian-10',
             'baseimage': 'debian:10',
             'baseuser': 'debian',
-            'outputlabel': 'ci-images/debian-10'
+            'outputlabel': 'ci-images/debian-10',
+            'scheduled': True
         },
         {
             'name': 'debian-11',
             'baseimage': 'debian:11',
             'baseuser': 'debian',
-            'outputlabel': 'ci-images/debian-11'
+            'outputlabel': 'ci-images/debian-11',
+            'scheduled': True
         },
         {
             'name': 'ubuntu-2004',
             'baseimage': 'ubuntu:20.04',
             'baseuser': 'ubuntu',
-            'outputlabel': 'ci-images/ubuntu-2004'
+            'outputlabel': 'ci-images/ubuntu-2004',
+            'scheduled': True
         },
         {
             'name': 'ubuntu-2204',
             'baseimage': 'ubuntu:22.04',
             'baseuser': 'ubuntu',
-            'outputlabel': 'ci-images/ubuntu-2204'
+            'outputlabel': 'ci-images/ubuntu-2204',
+            'scheduled': True
+        },
+        {
+            'name': 'debian-10-test',
+            'baseimage': 'debian:10',
+            'baseuser': 'debian',
+            'outputlabel': 'ci-images/debian-10-test',
+            'scheduled': False
+        },
+        {
+            'name': 'debian-11-test',
+            'baseimage': 'debian:11',
+            'baseuser': 'debian',
+            'outputlabel': 'ci-images/debian-11-test',
+            'scheduled': False
+        },
+        {
+            'name': 'ubuntu-2004-test',
+            'baseimage': 'ubuntu:20.04',
+            'baseuser': 'ubuntu',
+            'outputlabel': 'ci-images/ubuntu-2004-test',
+            'scheduled': False
+        },
+        {
+            'name': 'ubuntu-2204-test',
+            'baseimage': 'ubuntu:22.04',
+            'baseuser': 'ubuntu',
+            'outputlabel': 'ci-images/ubuntu-2204-test',
+            'scheduled': False
         },
     ],
     'functional-tests': [

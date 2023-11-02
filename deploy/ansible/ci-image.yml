@@ -31,7 +31,6 @@
         ansible_ssh_private_key_file: "/srv/github/id_ci"
         ansible_python_interpreter: "/usr/bin/python3"
         sf_instance_uuid: "{{imagerebuild_instance['meta']['uuid']}}"
-        groups: sfall
       when: base_image == "debian:11"
 
     - name: Add to ansible (detect system python)
@@ -42,7 +41,6 @@
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
         sf_instance_uuid: "{{imagerebuild_instance['meta']['uuid']}}"
-        groups: sfall
       when: base_image != "debian:11"
 
     - name: Log instance
@@ -55,8 +53,24 @@
         host: "{{hostvars['imagerebuild']['ansible_ssh_host']}}"
         search_regex: OpenSSH
         delay: 10
+        sleep: 10
+        state: present
 
-- hosts: sfall
+- hosts: localhost
+  become: true
+  tasks:
+    - name: Ensure ssh is actually answering now
+      shell: |
+        ssh -o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null \
+            -o UserKnownHostsFile=/dev/null -i /srv/github/id_ci \
+            {{base_image_user}}@{{hostvars['imagerebuild']['ansible_ssh_host']}} \
+            uptime
+      retries: 10
+      delay: 30
+      register: result
+      until: result.rc == 0
+
+- hosts: imagerebuild
   gather_facts: yes
   become: true
   vars:
@@ -211,7 +225,6 @@
         ansible_ssh_private_key_file: "/srv/github/id_ci"
         ansible_python_interpreter: /usr/bin/python3
         sf_instance_uuid: "{{imagetest_instance['meta']['uuid']}}"
-        groups: sfall
       when: base_image == "debian:11"
 
     - name: Add to ansible (detect system python)
@@ -222,19 +235,34 @@
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
         sf_instance_uuid: "{{imagetest_instance['meta']['uuid']}}"
-        groups: sfall
       when: base_image != "debian:11"
 
     - name: Log instance
       debug:
         msg: "{{hostvars['imagetest']}}"
 
-    - name: Wait for test instance to present an "OpenSSH" prompt
+    - name: Wait for instance to present an "OpenSSH" prompt
       wait_for:
         port: 22
         host: "{{hostvars['imagetest']['ansible_ssh_host']}}"
         search_regex: OpenSSH
         delay: 10
+        sleep: 10
+        state: present
+
+- hosts: localhost
+  become: true
+  tasks:
+    - name: Ensure ssh is actually answering now
+      shell: |
+        ssh -o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null \
+            -o UserKnownHostsFile=/dev/null -i /srv/github/id_ci \
+            {{base_image_user}}@{{hostvars['imagetest']['ansible_ssh_host']}} \
+            uptime
+      retries: 10
+      delay: 30
+      register: result
+      until: result.rc == 0
 
 - hosts: imagetest
   gather_facts: no
@@ -246,6 +274,10 @@
         update_cache: yes
         upgrade: dist
         autoremove: yes
+      register: apt_action
+      retries: 10
+      delay: 30
+      until: apt_action is success
 
 - hosts: localhost
   gather_facts: no

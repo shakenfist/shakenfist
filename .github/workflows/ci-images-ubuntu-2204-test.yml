@@ -1,22 +1,16 @@
-name: Rebuild {{name}}
+name: Rebuild ubuntu-2204-test
 
 on:
-  {%- if scheduled %}
-  workflow_dispatch:
-  schedule:
-    - cron: '00 16 * * *'        # utc
-  {%- else %}
   pull_request:
     paths:
       - deploy/ansible/ci-image.yml
-  {%- endif %}
 
 jobs:
-  {{name}}:
+  ubuntu-2204-test:
     runs-on: self-hosted
     timeout-minutes: 120
     concurrency:
-      group: {% raw %}${{ github.workflow }}-${{ github.ref }}{% endraw %}
+      group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
 
     # NOTE(mikal): git repos are checked out to /srv/github/_work/{org}/{repo}
@@ -39,20 +33,20 @@ jobs:
           cd ${GITHUB_WORKSPACE}/shakenfist
           ansible-playbook -i /home/debian/ansible-hosts \
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
-              base_image={{baseimage}} base_image_user={{baseuser}} label={{outputlabel}}" \
+              base_image=ubuntu:22.04 base_image_user=ubuntu label=ci-images/ubuntu-2204-test" \
             deploy/ansible/ci-image.yml
 
       - uses: JasonEtco/create-an-issue@v2
         if: failure()
         id: create-issue
         env:
-          GITHUB_TOKEN: {% raw %}${{{% endraw %} secrets.GITHUB_TOKEN {% raw %}}}{% endraw %}
-          SF_CI_NAME: {{name}}
-          SF_ACTION_RUN: {% raw %}${{{% endraw %} github.server_url {% raw %}}}{% endraw %}/{% raw %}${{{% endraw %} github.repository {% raw %}}}{% endraw %}/actions/runs/{% raw %}${{{% endraw %} github.run_id {% raw %}}}{% endraw %}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SF_CI_NAME: ubuntu-2204-test
+          SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           filename: shakenfist/.github/workflows/ci-images-failure.md
           update_existing: true
           search_existing: open
 
       - if: failure()
-        run: 'echo Created {% raw %}${{{% endraw %} steps.create-issue.outputs.url {% raw %}}}{% endraw %}'
+        run: 'echo Created ${{ steps.create-issue.outputs.url }}'
