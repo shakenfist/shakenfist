@@ -232,8 +232,9 @@ class IPAM(dbo):
 
             if not self.is_free(address):
                 return False
+
             etcd.put_raw(self.reservations_path + address, reservation)
-            self.log.with_fields(reservation).info('Reserved address')
+            self.add_event(EVENT_TYPE_AUDIT, 'reserved address', extra=reservation)
             return True
 
     def release(self, address):
@@ -259,7 +260,8 @@ class IPAM(dbo):
             etcd.put_raw(self.reservations_path + address, reservation)
             self._add_item_in_attribute_list(
                 'deletion-halo', [address, reservation['when']])
-            self.log.with_fields(reservation).info('Released address to deletion halo')
+            self.add_event(
+                EVENT_TYPE_AUDIT, 'released address to deletion-halo', extra=reservation)
             return True
 
     def release_haloed(self, duration):
@@ -271,8 +273,9 @@ class IPAM(dbo):
                     etcd.delete_raw(self.reservations_path + address)
                     self._remove_item_in_attribute_list(
                         'deletion-halo', [address, when])
-                    self.log.with_fields({'address': address}).info(
-                        'Released address to free pool')
+                    self.add_event(
+                        EVENT_TYPE_AUDIT, 'released address to free pool',
+                        extra={'address': address})
                     freed += 1
         return freed
 

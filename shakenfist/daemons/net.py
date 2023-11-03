@@ -383,7 +383,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 'network': n.uuid,
                                 'address': fg
                             }).error('Floating gateway not reserved correctly')
-
                 LOG.info('Found floating gateways: %s' % floating_gateways)
 
                 floating_addresses = []
@@ -400,6 +399,29 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 'address': fa
                             }).error('Floating address not reserved correctly')
                 LOG.info('Found floating addresses: %s' % floating_addresses)
+
+                floating_routed = []
+                for addr in floating_network.ipam.in_use:
+                    reservation = floating_network.ipam.get_reservation(addr)
+                    if not reservation:
+                        continue
+                    if reservation.get('type') != ipam.RESERVATION_TYPE_ROUTED:
+                        continue
+                    user_type, user_uuid = reservation['user']
+                    if user_type != 'network':
+                        LOG.with_fields(reservation).error(
+                            'Objects of type %s should not be routing floating IPs!'
+                            % user_type)
+                        continue
+
+                    n = network.Network.from_db(user_uuid)
+                    if not n:
+                        LOG.with_fields(reservation).error(
+                            'Routed IP reserved by missing network')
+                        continue
+
+                    floating_routed.append(addr)
+                LOG.info('Found routed addresses: %s' % floating_routed)
 
                 floating_reserved = [
                     floating_network.ipam.get_address_at_index(0),
@@ -418,6 +440,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 for ip in floating_network.ipam.in_use:
                     if ip not in itertools.chain(floating_gateways,
                                                  floating_addresses,
+                                                 floating_routed,
                                                  floating_reserved,
                                                  floating_halo):
                         # This IP needs to have been allocated more than 300 seconds
