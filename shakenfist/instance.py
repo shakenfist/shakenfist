@@ -1494,6 +1494,20 @@ class Instance(dbo):
             db_data['all'].append(agentop_uuid)
             self._db_set_attribute('agent_operations', db_data)
 
+    def get_screenshot(self):
+        blob_uuid = str(uuid4())
+        dest_path = blob.Blob.filepath(blob_uuid)
+        util_libvirt.get_screenshot(self.uuid, dest_path + '.partial')
+
+        st = os.stat(dest_path + '.partial')
+        os.rename(dest_path + '.partial', dest_path)
+        b = blob.Blob.new(blob_uuid, st.st_size, time.time(), time.time())
+        b.state = blob.Blob.STATE_CREATED
+        b.observe()
+        b.request_replication()
+
+        return blob_uuid
+
 
 class Instances(dbo_iter):
     base_object = Instance
