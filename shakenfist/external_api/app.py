@@ -101,7 +101,7 @@ class Root(sf_api.Resource):
              '<li>blobs: blob-metadata, blob-search-by-hash</li>'
              '<li>events: events-by-type</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
-             'instance-put-blob, instance-execute, instance-get</li>'
+             'instance-put-blob, instance-execute, instance-get, instance-screenshot</li>'
              '<li>networks: list-addresses, route-addresses'
              '<li>networkinterfaces: interface-metadata</li>'
              '<li>nodes: node-get, node-metadata</li>'
@@ -201,6 +201,8 @@ api.add_resource(api_instance.InstanceAgentGetEndpoint,
                  '/instances/<instance_ref>/agent/get')
 api.add_resource(api_instance.InstanceAgentExecuteEndpoint,
                  '/instances/<instance_ref>/agent/execute')
+api.add_resource(api_instance.InstanceScreenshotEndpoint,
+                 '/instances/<instance_ref>/screenshot')
 
 api.add_resource(api_interface.InterfaceEndpoint,
                  '/interfaces/<interface_uuid>')

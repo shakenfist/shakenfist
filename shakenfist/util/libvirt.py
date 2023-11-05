@@ -95,6 +95,22 @@ class LibvirtConnection():
         return self.conn.getMemoryStats(
             self.libvirt.VIR_NODE_MEMORY_STATS_ALL_CELLS)
 
+    def get_screenshot(self, instance_uuid, dest_path):
+        domain = self.get_domain_from_sf_uuid(instance_uuid)
+        stream = self.conn.newStream()
+
+        # The numeric argument here is the display number. We just assume there
+        # is only one for now.
+        domain.screenshot(stream, 0)
+
+        with open(dest_path, 'wb') as f:
+            d = stream.recv(262120)
+            while d:
+                f.write(d)
+                d = stream.recv(262120)
+
+        stream.finish()
+
 
 def extract_hypervisor_devices(domain):
     out = {

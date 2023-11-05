@@ -1375,3 +1375,22 @@ class InstanceAgentExecuteEndpoint(sf_api.Resource):
             extra={'agentoperation': o.uuid, 'commands': commands})
         o.state = AgentOperation.STATE_QUEUED
         return o.external_view()
+
+
+class InstanceScreenshotEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Collect a screenshot of an instance.',
+        [
+            ('instance_ref', 'query', 'uuidorname',
+             'The UUID or name of the instance.', True)
+        ],
+        [(200, 'The UUID of a blob containing the screenshot.', None),
+         (404, 'Instance not found.', None)]))
+    @api_base.verify_token
+    @api_base.arg_is_instance_ref
+    @api_base.requires_instance_ownership
+    @api_base.redirect_instance_request
+    @api_base.requires_instance_active
+    @api_base.log_token_use
+    def get(self, instance_ref=None, instance_from_db=None):
+        return instance_from_db.get_screenshot()
