@@ -1497,7 +1497,9 @@ class Instance(dbo):
     def get_screenshot(self):
         blob_uuid = str(uuid4())
         dest_path = blob.Blob.filepath(blob_uuid)
-        util_libvirt.get_screenshot(self.uuid, dest_path + '.partial')
+
+        with util_libvirt.LibvirtConnection() as lc:
+            lc.get_screenshot(self.uuid, dest_path + '.partial')
 
         st = os.stat(dest_path + '.partial')
         os.rename(dest_path + '.partial', dest_path)
