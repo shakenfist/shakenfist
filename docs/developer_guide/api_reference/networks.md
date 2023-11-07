@@ -5,8 +5,8 @@ services outside the Shaken Fist cluster. Networks are implemented as a VXLAN
 mesh between the hypervisor nodes which host the instances on that network, and
 the network node. The network node exists on every VXLAN mesh, and provides
 services to the network such as DHCP, ping, and egress NAT. If a floating IP
-is assigned to a network interface, that is also implemented on the network
-node.
+is assigned to a network interface or a routed IP to a network, then that is
+also implemented on the network node.
 
 ???+ note
 
@@ -15,6 +15,9 @@ node.
 
     For a detailed reference on the state machine for networks, see the
     [developer documentation on object states](/developer_guide/state_machine/#networks).
+
+    For a detailed overview of how networks are constructed on the network node
+    and hypervisors, see the [operator guide networking overview](/operator_guide/networking/overview).
 
 ## Network lifecycle
 
@@ -258,6 +261,75 @@ event system.
             ""
         ]
     }
+    ```
+
+## Listing network address usage
+
+Each network is associated with a single IP address block which is used to allocate
+addresses for that network. You can view the state of allocations on that address
+block using the REST API.
+
+???+ tip "REST API calls"
+
+    * [GET ​/networks​/{network_ref}​/addresses](https://openapi.shakenfist.com/#/networks/get_networks__network_ref__addresses): list address allocations for a given network.
+
+??? example "Python API client: list address allocations for a network"
+
+    ```python
+    import ipaddress
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    addresses = sf_client.get_network_addresses(network_ref)
+
+    info_by_addr = {}
+    for addr in addresses:
+        info_by_addr[int(ipaddress.IPv4Address(addr['address']))] = addr
+
+    print('address,type,user,comment')
+    for addr in sorted(info_by_addr.keys()):
+        if not info_by_addr[addr]['user']:
+            user = ''
+        elif type(info_by_addr[addr]['user']) is list:
+            user = ' '.join(info_by_addr[addr]['user'])
+        else:
+            user = info_by_addr[addr]['user']
+
+        print('%s,%s,%s,%s'
+              % (info_by_addr[addr]['address'],
+                 info_by_addr[addr]['type'],
+                 ' '.join(info_by_addr[addr]['user']),
+                 info_by_addr[addr]['comment']))
+    ```
+
+## Routed IPs
+
+Unlikely floating IPs, which are associated with a network interface, routed IPs
+are associated with a network -- its up to the virtual network to decide who will
+answer for that address via ARP responses. The API calls for routed IPs are therefore
+documented here instead of on the network interfaces page.
+
+???+ tip "REST API calls"
+
+    * [POST /networks/{network_ref}/route](https://openapi.shakenfist.com/#/networks/post_networks__network_ref__route): route an address to this network.
+    * [DELETE ​/networks​/{network_ref}​/route​/{address}](https://openapi.shakenfist.com/#/networks/delete_networks__network_ref__route__address_): unroute an address.
+
+??? example "Python API client: add a routed address"
+
+    ```python
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    routed = sf_client.route_network_address(network_ref)
+    ```
+
+??? example "Python API client: remove a routed address"
+
+    ```python
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client.unroute_network_address(network_ref, address)
     ```
 
 ## Metadata

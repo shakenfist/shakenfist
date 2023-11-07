@@ -795,6 +795,33 @@ Additionally, you can list the agent operations for a given instance.
     ]
     ```
 
+## Console screen captures
+
+Since v0.8, Shaken Fist has provided an API for collecting screen captures of the
+instance console. This works for either serial consoles or graphical consoles, its
+literally the same was whatever would have been displayed on the monitor if the
+instance was a physical machine.
+
+???+ tip "REST API calls"
+
+    * [GET ​/instances​/{instance_ref}​/screenshot](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__screenshot): Collect a screenshot for an instance.
+
+This API call returns a blob UUID, you then need to collect the contents of the
+blob using the [GET /blobs/{blob_uuid}/data](https://openapi.shakenfist.com/#/blobs/get_blobs__blob_uuid__data)
+API call. The python Shaken Fist API client perfoms both operations for you and
+returns an iterator of binary chunks ready for you to process or write to a file.
+
+??? example "Python API client: collect a screenshot for an instance an instance"
+
+    ```python
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    with open(destination, 'wb') as f:
+        for chunk in sf_client.get_screenshot(instance_ref):
+            f.write(chunk)
+    ```
+
 ## Metadata
 
 All objects exposed by the REST API may have metadata associated with them. This

@@ -1,7 +1,7 @@
 # Explaining Shaken Fist networking
 
 Shaken Fist networking is complicated, but not as complicated as OpenStack
-Neutron. Its more like the old OpenStack Compute nova-network implementation
+Neutron -- its more like the old OpenStack Compute nova-network implementation
 if you're looking for a mental model. Let's work through some examples to explain
 what it is doing.
 
@@ -337,3 +337,31 @@ as additional nodes don't have the network namespace or the veths -- those exist
 only on the network node (node 1 in our example).
 
 ![SF multinode networking](sf-multinode-networking.png)
+
+## Routed IPs
+
+Shaken Fist v0.8 introduced the concept of *routed IPs* to support Kubernetes
+services in the K3S orchestration support. A routed IP is an address from the
+floating address pool which uses routing to deliver traffic to the relevant
+virtual network. An interface on the virtual network must then have been
+configured by the user to answer ARP requests for that address. This works well
+with metallb, which our K3S orchestration uses to expose services, but would
+work equally well for other traffic.
+
+???+ tip
+
+    The fundamental difference between a floating IP and a routed IP is whether
+    the destination of the traffic inside the virtual network is aware of the
+    address. A floating IP is packet mangled on its way to an interface so that
+    the interface can't tell that the traffic was sent to a floating IP. On the
+    other hand, an interface with a routed address can tell that the traffic was
+    intended for a specific floating IP, but in return must have been configured
+    to use that floating IP.
+
+The implementation of routed IPs is relatively trivial. For each routed IP, a
+route on the network node into the relevant virtual network bridge is created.
+Such a route might look like this:
+
+```
+ip route add 192.168.15.29/32 dev br-vxlan-e2300f
+```

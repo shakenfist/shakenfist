@@ -1,7 +1,8 @@
 # Consoles
 
 Shaken Fist supports three types of instance consoles. This page describes each
-of those consoles and their functionality.
+of those consoles and their functionality. Additionally, Shaken Fist can collect
+screen captures of your instance's consoles, which is also documented here.
 
 ## Read only serial console
 
@@ -10,7 +11,7 @@ of the serial console via our REST API. This console is based off a log of
 console activity, so can return events which have already occurred. You can
 access the console information from the command line like this:
 
-```
+```bash
 sf-client instance consoledata ca8b3e3b-f681-47a2-99c5-6ddea00cc49f 1000
 [530]: |                       Self-hosted runner registration                        |
 [   74.594732] cloud-init[530]: |                                                                              |
@@ -37,7 +38,7 @@ There is also interactive access to that same serial console, although it
 requires direct network access to the hypervisor node at the moment. If you lookup
 the instance with a show command, you'll see a "console port" listed:
 
-```
+```bash
 sf-client instance show c301ad4a-1ad4-49d7-b1e7-cb08ad3bf23d
 uuid          : c301ad4a-1ad4-49d7-b1e7-cb08ad3bf23d
 name          : sfcbr-s2SXNcZGKaJMywSd
@@ -51,7 +52,7 @@ vdi port      : 37804
 If you telnet to the console port on the hypervisor node's IP, you'll land in
 an interactive console for the instance. So in this example:
 
-```
+```bash
 telnet sf-2 30049
 ```
 
@@ -88,3 +89,18 @@ And example video specification would be:
 ```
 --video model=qxl,memory=65536,vdi=spiceconcurrent
 ```
+
+## Screen captures
+
+Since v0.78, Shaken Fist also provides an API for collecting screen captures of
+the console. This works for either serial consoles or graphical consoles, its
+literally the same was whatever would have been displayed on the monitor if the
+instance was a physical machine.
+
+You can take a screen capture of an instance using the python command line client
+like this:
+
+```bash
+sf-client instance screenshot ...uuid...
+```
+
