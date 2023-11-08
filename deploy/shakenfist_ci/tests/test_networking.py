@@ -178,13 +178,13 @@ class TestNetworking(base.BaseNamespacedTestCase):
         results = self._await_command(inst1['uuid'], 'ping -c 3 %s' % nics[0]['ipv4'])
         self.assertEqual(0, results['return-code'])
         self.assertEqual('', results['stderr'])
-        self.assertTrue(' 0% packet' in results['stdout'])
+        self.assertTrue(' 0% packet' in results['stdout'], results['stdout'])
 
         # Ping google (prove NAT works)
         results = self._await_command(inst1['uuid'], 'ping -c 3 8.8.8.8')
         self.assertEqual(0, results['return-code'])
         self.assertEqual('', results['stderr'])
-        self.assertTrue(' 0% packet' in results['stdout'])
+        self.assertTrue(' 0% packet' in results['stdout'], results['stdout'])
 
     def test_specific_ip_request(self):
         inst = self.test_client.create_instance(

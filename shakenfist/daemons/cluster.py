@@ -126,7 +126,7 @@ class Monitor(daemon.Daemon):
                 continue
 
             n = network.Network.from_db(ipm.network_uuid, suppress_failure_audit=True)
-            if not n:
+            if not n and ipm.state.value != dbo.STATE_DELETED:
                 ipm.state = dbo.STATE_DELETED
                 ipm.log.warning('Cleaning up leaked IPAM')
         self.lock.refresh()
