@@ -884,6 +884,20 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#listing-network-address-usage" class="md-nav__link">
+    Listing network address usage
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#routed-ips" class="md-nav__link">
+    Routed IPs
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#metadata" class="md-nav__link">
     Metadata
   </a>
@@ -1336,6 +1350,20 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#listing-network-address-usage" class="md-nav__link">
+    Listing network address usage
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#routed-ips" class="md-nav__link">
+    Routed IPs
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#metadata" class="md-nav__link">
     Metadata
   </a>
@@ -1366,14 +1394,16 @@ services outside the Shaken Fist cluster. Networks are implemented as a VXLAN
 mesh between the hypervisor nodes which host the instances on that network, and
 the network node. The network node exists on every VXLAN mesh, and provides
 services to the network such as DHCP, ping, and egress NAT. If a floating IP
-is assigned to a network interface, that is also implemented on the network
-node.</p>
+is assigned to a network interface or a routed IP to a network, then that is
+also implemented on the network node.</p>
 <details class="note" open="open">
 <summary>Note</summary>
 <p>It is not required that an instance be on any networks. However, this is
 by far the most common deployment pattern.</p>
 <p>For a detailed reference on the state machine for networks, see the
 <a href="/developer_guide/state_machine/#networks">developer documentation on object states</a>.</p>
+<p>For a detailed overview of how networks are constructed on the network node
+and hypervisors, see the <a href="/operator_guide/networking/overview">operator guide networking overview</a>.</p>
 </details>
 <h2 id="network-lifecycle">Network lifecycle</h2>
 <details class="tip" open="open">
@@ -1601,6 +1631,72 @@ to the 100 most recent events.</p>
 <span class="w">        </span><span class="s2">&quot;&quot;</span>
 <span class="w">    </span><span class="p">]</span>
 <span class="p">}</span>
+</code></pre></div>
+</details>
+<h2 id="listing-network-address-usage">Listing network address usage</h2>
+<p>Each network is associated with a single IP address block which is used to allocate
+addresses for that network. You can view the state of allocations on that address
+block using the REST API.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/networks/get_networks__network_ref__addresses">GET ​/networks​/{network_ref}​/addresses</a>: list address allocations for a given network.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: list address allocations for a network</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">ipaddress</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">addresses</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_network_addresses</span><span class="p">(</span><span class="n">network_ref</span><span class="p">)</span>
+
+<span class="n">info_by_addr</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="k">for</span> <span class="n">addr</span> <span class="ow">in</span> <span class="n">addresses</span><span class="p">:</span>
+    <span class="n">info_by_addr</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">ipaddress</span><span class="o">.</span><span class="n">IPv4Address</span><span class="p">(</span><span class="n">addr</span><span class="p">[</span><span class="s1">&#39;address&#39;</span><span class="p">]))]</span> <span class="o">=</span> <span class="n">addr</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;address,type,user,comment&#39;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">addr</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">info_by_addr</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">info_by_addr</span><span class="p">[</span><span class="n">addr</span><span class="p">][</span><span class="s1">&#39;user&#39;</span><span class="p">]:</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="k">elif</span> <span class="nb">type</span><span class="p">(</span><span class="n">info_by_addr</span><span class="p">[</span><span class="n">addr</span><span class="p">][</span><span class="s1">&#39;user&#39;</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">info_by_addr</span><span class="p">[</span><span class="n">addr</span><span class="p">][</span><span class="s1">&#39;user&#39;</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="n">info_by_addr</span><span class="p">[</span><span class="n">addr</span><span class="p">][</span><span class="s1">&#39;user&#39;</span><span class="p">]</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">&#39;</span>
+          <span class="o">%</span> <span class="p">(</span><span class="n">info_by_addr</span><span class="p">[</span><span class="n">addr</span><span class="p">][</span><span class="s1">&#39;address&#39;</span><span class="p">],</span>
+             <span class="n">info_by_addr</span><span class="p">[</span><span class="n">addr</span><span class="p">][</span><span class="s1">&#39;type&#39;</span><span class="p">],</span>
+             <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">info_by_addr</span><span class="p">[</span><span class="n">addr</span><span class="p">][</span><span class="s1">&#39;user&#39;</span><span class="p">]),</span>
+             <span class="n">info_by_addr</span><span class="p">[</span><span class="n">addr</span><span class="p">][</span><span class="s1">&#39;comment&#39;</span><span class="p">]))</span>
+</code></pre></div>
+</details>
+<h2 id="routed-ips">Routed IPs</h2>
+<p>Unlikely floating IPs, which are associated with a network interface, routed IPs
+are associated with a network -- its up to the virtual network to decide who will
+answer for that address via ARP responses. The API calls for routed IPs are therefore
+documented here instead of on the network interfaces page.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/networks/post_networks__network_ref__route">POST /networks/{network_ref}/route</a>: route an address to this network.</li>
+<li><a href="https://openapi.shakenfist.com/#/networks/delete_networks__network_ref__route__address_">DELETE ​/networks​/{network_ref}​/route​/{address}</a>: unroute an address.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: add a routed address</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">routed</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">route_network_address</span><span class="p">(</span><span class="n">network_ref</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: remove a routed address</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">unroute_network_address</span><span class="p">(</span><span class="n">network_ref</span><span class="p">,</span> <span class="n">address</span><span class="p">)</span>
 </code></pre></div>
 </details>
 <h2 id="metadata">Metadata</h2>

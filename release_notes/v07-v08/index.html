@@ -397,6 +397,40 @@
     Major changes
   </a>
   
+    <nav class="md-nav" aria-label="Major changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#containers-and-kubernetes" class="md-nav__link">
+    Containers and Kubernetes
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#networking" class="md-nav__link">
+    Networking
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instances" class="md-nav__link">
+    Instances
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployment" class="md-nav__link">
+    Deployment
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1317,6 +1351,40 @@
     Major changes
   </a>
   
+    <nav class="md-nav" aria-label="Major changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#containers-and-kubernetes" class="md-nav__link">
+    Containers and Kubernetes
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#networking" class="md-nav__link">
+    Networking
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instances" class="md-nav__link">
+    Instances
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployment" class="md-nav__link">
+    Deployment
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1346,6 +1414,18 @@
 
 <h1 id="v07-to-v08-release-notes">v0.7 to v0.8 release notes</h1>
 <h2 id="major-changes">Major changes</h2>
+<h3 id="containers-and-kubernetes">Containers and Kubernetes</h3>
+<ul>
+<li>The Shaken Fist client can now orchestrate K3S Kubernetes clusters for you. The
+  lifecycle support is relatively simple at the moment, with cluster creation and
+  deletion supported, as well as fetching the kubectl configuration from the
+  cluster. This will be expanded over time. This support is implemented entirely
+  in the Shaken Fist python client, and heavily utilises the in guest agent
+  added in v0.7. The client side nature of the orchestration makes it easy for you
+  to customize the orchestration if desired without having to alter the main
+  server code.</li>
+</ul>
+<h3 id="networking">Networking</h3>
 <ul>
 <li>IP address management has moved to a new baseoject called IPAM. Events are
   therefore recorded for address management as you would expect.</li>
@@ -1354,8 +1434,23 @@
   can be reused. The only exception to this is if a network is heavily congested
   and an allocation attempt will fail. In that case the halo is temporarily
   reduced to 30 seconds and a warning log message is emitted.</li>
+<li>You can now list the addresses in use for a given network with the
+  <code>sf-client network addresses ...uuid...</code> command.</li>
+<li>In order to support the K3S Kubernetes orchestration, the concept of <em>routed
+  IPs</em> was introduced. A routed IP is an address from the floating address pool
+  which uses routing to deliver traffic to the relevant virtual network. An
+  interface on the virtual network must then have been configured by the user to
+  answer ARP requests for that address. This works well with metallb, which our
+  K3S orchestration uses to expose services.</li>
+</ul>
+<h3 id="instances">Instances</h3>
+<ul>
+<li>Shaken Fist can now capture screenshots of instance consoles.</li>
+</ul>
+<h3 id="deployment">Deployment</h3>
+<ul>
 <li>We no longer reset the authentication secret used to generate authentication
-  tokens on install. This means tokens from before install will continue to work
+  tokens on upgrade. This means tokens from before an upgrade will continue to work
   for their normal lifetime.</li>
 </ul>
 <h2 id="minor-changes">Minor changes</h2>

@@ -580,6 +580,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#screen-captures" class="md-nav__link">
+    Screen captures
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1354,6 +1361,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#screen-captures" class="md-nav__link">
+    Screen captures
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1374,27 +1388,28 @@
 
 <h1 id="consoles">Consoles</h1>
 <p>Shaken Fist supports three types of instance consoles. This page describes each
-of those consoles and their functionality.</p>
+of those consoles and their functionality. Additionally, Shaken Fist can collect
+screen captures of your instance's consoles, which is also documented here.</p>
 <h2 id="read-only-serial-console">Read only serial console</h2>
 <p>Similarly to OpenStack, we support requesting a read only copy of the content
 of the serial console via our REST API. This console is based off a log of
 console activity, so can return events which have already occurred. You can
 access the console information from the command line like this:</p>
-<div class="highlight"><pre><span></span><code>sf-client instance consoledata ca8b3e3b-f681-47a2-99c5-6ddea00cc49f 1000
-[530]: |                       Self-hosted runner registration                        |
-[   74.594732] cloud-init[530]: |                                                                              |
-[   74.596442] cloud-init[530]: --------------------------------------------------------------------------------
-[   74.602452] cloud-init[530]: # Authentication
-[   79.099457] cloud-init[530]: √ Connected to GitHub
-[   79.184807] cloud-init[530]: # Runner Registration
-[   80.283666] cloud-init[530]: √ Runner successfully added
-[   83.608069] cloud-init[530]: √ Runner connection is good
-[   83.609389] cloud-init[530]: # Runner settings
-[   83.615351] cloud-init[530]: √ Settings Saved.
-[   86.194598] cloud-init[530]: √ Connected to GitHub
-[   87.331467] cloud-init[530]: Current runner version: &#39;2.299.1&#39;
-[   87.333703] cloud-init[530]: 2023-01-21 06:54:11Z: Listening for Jobs
-[   91.102179] cloud-init[530]: 2023-01-21 06:54:15Z: Running job: ubuntu-2004-slim-primary
+<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>consoledata<span class="w"> </span>ca8b3e3b-f681-47a2-99c5-6ddea00cc49f<span class="w"> </span><span class="m">1000</span>
+<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span><span class="p">|</span><span class="w">                       </span>Self-hosted<span class="w"> </span>runner<span class="w"> </span>registration<span class="w">                        </span><span class="p">|</span>
+<span class="o">[</span><span class="w">   </span><span class="m">74</span>.594732<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span><span class="p">|</span><span class="w">                                                                              </span><span class="p">|</span>
+<span class="o">[</span><span class="w">   </span><span class="m">74</span>.596442<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span>--------------------------------------------------------------------------------
+<span class="o">[</span><span class="w">   </span><span class="m">74</span>.602452<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span><span class="c1"># Authentication</span>
+<span class="o">[</span><span class="w">   </span><span class="m">79</span>.099457<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span>√<span class="w"> </span>Connected<span class="w"> </span>to<span class="w"> </span>GitHub
+<span class="o">[</span><span class="w">   </span><span class="m">79</span>.184807<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span><span class="c1"># Runner Registration</span>
+<span class="o">[</span><span class="w">   </span><span class="m">80</span>.283666<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span>√<span class="w"> </span>Runner<span class="w"> </span>successfully<span class="w"> </span>added
+<span class="o">[</span><span class="w">   </span><span class="m">83</span>.608069<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span>√<span class="w"> </span>Runner<span class="w"> </span>connection<span class="w"> </span>is<span class="w"> </span>good
+<span class="o">[</span><span class="w">   </span><span class="m">83</span>.609389<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span><span class="c1"># Runner settings</span>
+<span class="o">[</span><span class="w">   </span><span class="m">83</span>.615351<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span>√<span class="w"> </span>Settings<span class="w"> </span>Saved.
+<span class="o">[</span><span class="w">   </span><span class="m">86</span>.194598<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span>√<span class="w"> </span>Connected<span class="w"> </span>to<span class="w"> </span>GitHub
+<span class="o">[</span><span class="w">   </span><span class="m">87</span>.331467<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span>Current<span class="w"> </span>runner<span class="w"> </span>version:<span class="w"> </span><span class="s1">&#39;2.299.1&#39;</span>
+<span class="o">[</span><span class="w">   </span><span class="m">87</span>.333703<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span><span class="m">2023</span>-01-21<span class="w"> </span><span class="m">06</span>:54:11Z:<span class="w"> </span>Listening<span class="w"> </span><span class="k">for</span><span class="w"> </span>Jobs
+<span class="o">[</span><span class="w">   </span><span class="m">91</span>.102179<span class="o">]</span><span class="w"> </span>cloud-init<span class="o">[</span><span class="m">530</span><span class="o">]</span>:<span class="w"> </span><span class="m">2023</span>-01-21<span class="w"> </span><span class="m">06</span>:54:15Z:<span class="w"> </span>Running<span class="w"> </span>job:<span class="w"> </span>ubuntu-2004-slim-primary
 </code></pre></div>
 <p>The final argument is optional. In this example we are requesting the final
 1,000 bytes of console output.</p>
@@ -1402,18 +1417,18 @@ access the console information from the command line like this:</p>
 <p>There is also interactive access to that same serial console, although it
 requires direct network access to the hypervisor node at the moment. If you lookup
 the instance with a show command, you'll see a "console port" listed:</p>
-<div class="highlight"><pre><span></span><code>sf-client instance show c301ad4a-1ad4-49d7-b1e7-cb08ad3bf23d
-uuid          : c301ad4a-1ad4-49d7-b1e7-cb08ad3bf23d
-name          : sfcbr-s2SXNcZGKaJMywSd
+<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>show<span class="w"> </span>c301ad4a-1ad4-49d7-b1e7-cb08ad3bf23d
+uuid<span class="w">          </span>:<span class="w"> </span>c301ad4a-1ad4-49d7-b1e7-cb08ad3bf23d
+name<span class="w">          </span>:<span class="w"> </span>sfcbr-s2SXNcZGKaJMywSd
 ...
-node          : sf-2
-console port  : 30049
-vdi port      : 37804
+node<span class="w">          </span>:<span class="w"> </span>sf-2
+console<span class="w"> </span>port<span class="w">  </span>:<span class="w"> </span><span class="m">30049</span>
+vdi<span class="w"> </span>port<span class="w">      </span>:<span class="w"> </span><span class="m">37804</span>
 ...
 </code></pre></div>
 <p>If you telnet to the console port on the hypervisor node's IP, you'll land in
 an interactive console for the instance. So in this example:</p>
-<div class="highlight"><pre><span></span><code>telnet sf-2 30049
+<div class="highlight"><pre><span></span><code>telnet<span class="w"> </span>sf-2<span class="w"> </span><span class="m">30049</span>
 </code></pre></div>
 <h2 id="archival-of-the-serial-console">Archival of the serial console</h2>
 <p>Optionally, the content of the serial console can be archived when an instance
@@ -1439,6 +1454,15 @@ same time is enabled. For more details about the experimental nature of concurre
 SPICE consoles, see <a href="https://www.spice-space.org/multiple-clients.html">https://www.spice-space.org/multiple-clients.html</a>.</p>
 <p>And example video specification would be:</p>
 <div class="highlight"><pre><span></span><code>--video model=qxl,memory=65536,vdi=spiceconcurrent
+</code></pre></div>
+<h2 id="screen-captures">Screen captures</h2>
+<p>Since v0.78, Shaken Fist also provides an API for collecting screen captures of
+the console. This works for either serial consoles or graphical consoles, its
+literally the same was whatever would have been displayed on the monitor if the
+instance was a physical machine.</p>
+<p>You can take a screen capture of an instance using the python command line client
+like this:</p>
+<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>screenshot<span class="w"> </span>...uuid...
 </code></pre></div>
 
 

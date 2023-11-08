@@ -912,6 +912,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#console-screen-captures" class="md-nav__link">
+    Console screen captures
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#metadata" class="md-nav__link">
     Metadata
   </a>
@@ -1468,6 +1475,13 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#console-screen-captures" class="md-nav__link">
+    Console screen captures
+  </a>
   
 </li>
       
@@ -2244,6 +2258,31 @@ which have completed execution, pass <code>all=True</code>. This script outputs:
 <span class="w">        </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="p">]</span>
+</code></pre></div>
+</details>
+<h2 id="console-screen-captures">Console screen captures</h2>
+<p>Since v0.8, Shaken Fist has provided an API for collecting screen captures of the
+instance console. This works for either serial consoles or graphical consoles, its
+literally the same was whatever would have been displayed on the monitor if the
+instance was a physical machine.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__screenshot">GET ​/instances​/{instance_ref}​/screenshot</a>: Collect a screenshot for an instance.</li>
+</ul>
+</details>
+<p>This API call returns a blob UUID, you then need to collect the contents of the
+blob using the <a href="https://openapi.shakenfist.com/#/blobs/get_blobs__blob_uuid__data">GET /blobs/{blob_uuid}/data</a>
+API call. The python Shaken Fist API client perfoms both operations for you and
+returns an iterator of binary chunks ready for you to process or write to a file.</p>
+<details class="example">
+<summary>Python API client: collect a screenshot for an instance an instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">destination</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_screenshot</span><span class="p">(</span><span class="n">instance_ref</span><span class="p">):</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
 </code></pre></div>
 </details>
 <h2 id="metadata">Metadata</h2>
