@@ -5,7 +5,6 @@ import setproctitle
 from shakenfist_utilities import logs
 import signal
 from shakenfist_agent import protocol
-import tempfile
 import time
 from versions_comparison import Comparison
 import uuid
@@ -42,68 +41,10 @@ class SFSocketAgent(protocol.SocketAgent):
     def __init__(self, inst, path, logger=None):
         super(SFSocketAgent, self).__init__(path, logger=logger)
         self.log = LOG.with_fields({'instance': inst})
-
         self.instance = inst
-
-        self.incomplete_file_get = None
-
-        self.add_command('get-file-response', self.get_file_response)
-        self.add_command('watch-file-response', self.watch_file_response)
 
     def poll(self):
         raise NotImplementedError('Please don\'t call poll() in the sidechannel monitor')
-
-    def get_file(self, path, unique):
-        self.incomplete_file_get = {
-            'flo': tempfile.NamedTemporaryFile(),
-            'source_path': path,
-            'callback': self.get_file_complete,
-            'callback_args': {},
-            'unique': unique
-        }
-        self.send_packet({
-            'command': 'get-file',
-            'path': path,
-            'unique': unique
-            })
-
-    def get_file_response(self, packet):
-        if not self.incomplete_file_get:
-            self.log.with_fields(packet).warning('Unexpected file response')
-            return
-
-        if not packet['result']:
-            self.log.with_fields(packet).warning('File get failed')
-            return
-
-        if 'chunk' not in packet:
-            # A metadata packet
-            self.incomplete_file_get.update(packet['stat_result'])
-            return
-
-        if packet['chunk'] is None:
-            self.incomplete_file_get['flo'].close()
-            self.incomplete_file_get['callback'](
-                **self.incomplete_file_get['callback_args']
-            )
-            self.incomplete_file_get = None
-            self.log.with_fields(packet).info('File get complete')
-            return
-
-        d = base64.b64decode(packet['chunk'])
-        self.incomplete_file_get['flo'].write(d)
-
-    def get_file_complete(self):
-        pass
-
-    def watch_file(self, path):
-        self.send_packet({
-            'command': 'watch-file',
-            'path': path
-            })
-
-    def watch_file_response(self, packet):
-        self.log.info('Received watch content for %s' % packet['path'])
 
 
 class Monitor(daemon.Daemon):
