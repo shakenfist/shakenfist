@@ -343,7 +343,7 @@ class Blob(dbo):
 
         # Fetch with a few retries
         attempts = 0
-        while attempts < 3:
+        while True:
             try:
                 return self._attempt_transfer(
                     locks, instance_object, partial_path, blob_path)
@@ -351,9 +351,8 @@ class Blob(dbo):
                     BlobFetchFailed) as e:
                 attempts += 1
                 if attempts > 3:
-                    raise e
-
-        raise BlobFetchFailed('Repeated attempts to fetch blob failed')
+                    raise BlobFetchFailed(
+                        'Repeated attempts to fetch blob failed: %s' % e)
 
     def _attempt_transfer(self, locks, instance_object, partial_path,
                           blob_path):
@@ -430,7 +429,10 @@ class Blob(dbo):
             if total_bytes_received != int(self.size):
                 if os.path.exists(partial_path):
                     os.unlink(partial_path)
-                raise BlobFetchFailed('Did not fetch enough data')
+                raise BlobFetchFailed(
+                    'The amount of fetched data does not match the stored size. We '
+                    'fetched %d bytes, but expected %d.'
+                    % (total_bytes_received, self.size))
 
             if not self.verify_size(partial=True):
                 if instance_object:
