@@ -120,7 +120,8 @@ jobs:
                      "invalid JWT in Authorization header"
                      "Libvirt Error: XML error"
                      "Cleaning up leaked IPAM"
-                     "Cleaning up leaked vxlan")
+                     "Cleaning up leaked vxlan"
+                     "Waiting to acquire lock")
           IFS=""
           for forbid in ${FORBIDDEN[*]}
           do

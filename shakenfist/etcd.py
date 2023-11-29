@@ -15,6 +15,7 @@ from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import exceptions
 from shakenfist.tasks import QueueTask, FetchBlobTask
+from shakenfist.util import callstack as util_callstack
 
 
 LOG, _ = logs.setup(__name__)
@@ -132,17 +133,23 @@ class ActualLock(Lock):
         self.timeout = timeout
         self.operation = op
 
+        node = config.NODE_NAME
+        pid = os.getpid()
+        caller = util_callstack.get_caller(offset=3)
+
         self.log_ctx = log_ctx.with_fields({
             'lock': self.path,
-            'node': config.NODE_NAME,
-            'pid': os.getpid(),
+            'node': node,
+            'pid': pid,
+            'line': caller,
             'operation': self.operation})
 
         # We override the UUID of the lock with something more helpful to debugging
         self._uuid = json.dumps(
             {
-                'node': config.NODE_NAME,
-                'pid': os.getpid(),
+                'node': node,
+                'pid': pid,
+                'line': caller,
                 'operation': self.operation
             },
             indent=4, sort_keys=True)
@@ -161,29 +168,30 @@ class ActualLock(Lock):
             return None, None
 
         d = json.loads(value[0][0])
-        return d['node'], d['pid']
+        return d['node'], d['pid'], d.get('line'), d.get('operation')
 
     def __enter__(self):
         start_time = time.time()
         slow_warned = False
-        threshold = int(config.SLOW_LOCK_THRESHOLD)
+        threshold = self.timeout / 2
 
         while time.time() - start_time < self.timeout:
             res = self.acquire()
+            duration = time.time() - start_time
             if res:
-                duration = time.time() - start_time
                 if duration > threshold:
                     self.log_ctx.with_fields({
                         'duration': duration}).info('Acquired lock, but it was slow')
                 return self
 
-            duration = time.time() - start_time
             if (duration > threshold and not slow_warned):
-                node, pid = self.get_holder()
+                node, pid, line, op = self.get_holder()
                 self.log_ctx.with_fields({'duration': duration,
                                           'threshold': threshold,
                                           'holder-pid': pid,
                                           'holder-node': node,
+                                          'holder-line': line,
+                                          'holder-op': op,
                                           'requesting-op': self.operation,
                                           }).info('Waiting to acquire lock')
                 slow_warned = True
@@ -192,10 +200,12 @@ class ActualLock(Lock):
 
         duration = time.time() - start_time
 
-        node, pid = self.get_holder()
+        node, pid, line, op = self.get_holder()
         self.log_ctx.with_fields({'duration': duration,
                                   'holder-pid': pid,
                                   'holder-node': node,
+                                  'holder-line': line,
+                                  'holder-op': op,
                                   'requesting-op': self.operation,
                                   }).info('Failed to acquire lock')
 
@@ -211,6 +221,10 @@ class ActualLock(Lock):
                                       }).error('Cannot release lock')
             raise exceptions.LockException(
                 'Cannot release lock: %s' % self.name)
+
+    def __str__(self):
+        return ('ActualLock(%s %s, op %s, with timeout %s)'
+                % (self.objecttype, self.objectname, self.timeout, self.operation))
 
 
 def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
