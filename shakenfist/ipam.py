@@ -60,7 +60,8 @@ class IPAM(dbo):
             self.upgrade(static_values)
 
         super(IPAM, self).__init__(static_values['uuid'],
-                                   static_values.get('version'))
+                                   static_values.get('version'),
+                                   static_values.get('in_memory_only', False))
 
         self.__namespace = static_values['namespace']
         self.__network_uuid = static_values['network_uuid']
@@ -138,16 +139,24 @@ class IPAM(dbo):
         })
 
     @classmethod
-    def new(cls, ipam_uuid, namespace, network_uuid, ipblock):
-        IPAM._db_create(ipam_uuid, {
-            'uuid': ipam_uuid,
-            'namespace': namespace,
-            'network_uuid': network_uuid,
-            'ipblock': ipblock,
-            'version': cls.current_version
-        })
+    def new(cls, ipam_uuid, namespace, network_uuid, ipblock, in_memory_only=False):
+        static_values = {
+                'uuid': ipam_uuid,
+                'namespace': namespace,
+                'network_uuid': network_uuid,
+                'ipblock': ipblock,
+                'version': cls.current_version
+            }
 
-        o = IPAM.from_db(ipam_uuid)
+        if in_memory_only:
+            static_values['in_memory_only'] = True
+            o = IPAM(static_values)
+            o.log.with_fields(static_values).info('IPAM is in-memory only')
+
+        else:
+            IPAM._db_create(ipam_uuid, static_values)
+            o = IPAM.from_db(ipam_uuid)
+
         o.state = cls.STATE_CREATED
         o.reserve(o.network_address, ('network', network_uuid), RESERVATION_TYPE_NETWORK, '')
         o.reserve(o.broadcast_address, ('network', network_uuid), RESERVATION_TYPE_BROADCAST, '')
