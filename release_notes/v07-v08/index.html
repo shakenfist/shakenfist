@@ -1458,6 +1458,12 @@
 <li>CI has been moved from relatively unreliable scraping of the instance serial
   console over telnet to using the Shaken Fist in-guest agent to inspect the
   state of instances for correctness.</li>
+<li>The slow lock warning threshold is no longer configurable (SLOW_LOCK_THRESHOLD).
+  Instead, a warning is emitted if a lot takes more than half of the specified
+  timeout period to be acquired. This change was made because in some places we
+  expect to wait a long time for a lock -- for example serialized fetches of a
+  single resource from outside the cluster, but we also wanted to enforce locks
+  didn't take a long time to acquire in CI.</li>
 </ul>
 
 
