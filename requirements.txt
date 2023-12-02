@@ -10,7 +10,7 @@ protobuf<4.0.0              # google license: https://github.com/protocolbuffers
                             # Version 4.21 and greater requires that a different version of protoc be used
                             # than that which etcd3 uses.
 
-fixtures<4.0.1              # apache2
+fixtures<4.1.1              # apache2
                             # Version 4.0.1 fails to build with "AttributeError: install_layout"
 
 # Temporary pin to due https://bugs.launchpad.net/python-stevedore/+bug/1991559
