@@ -7,4 +7,4 @@ oslo.concurrency            # apache2
 setuptools>=65.3.0          # mit
 
 testtools                   # mit
-stestr==3.2.0               # apache2
+stestr==3.2.1               # apache2
