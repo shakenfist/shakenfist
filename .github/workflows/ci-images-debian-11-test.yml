@@ -23,7 +23,7 @@ jobs:
           echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
 
       - name: Checkout shakenfist
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: shakenfist
           fetch-depth: 0

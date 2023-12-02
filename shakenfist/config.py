@@ -309,7 +309,6 @@ class SFConfig(BaseSettings):
     )
 
     # Logging
-    SLOW_LOCK_THRESHOLD: float = 5.0
     LOGLEVEL_API: str = 'info'
     LOGLEVEL_CLEANER: str = 'info'
     LOGLEVEL_MAIN: str = 'info'

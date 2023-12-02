@@ -465,8 +465,9 @@ class DatabaseBackedObjectIterator(object):
         # if the caller is slow to iterate they can end up with inconsistent
         # values as objects shift state underneath them (for example an active
         # instance shifting from created to delete-wait while you're iterating).
-        for objuuid in cache.read_object_state_cache_many(
-                self.base_object.object_type, target_states):
+        objuuids = cache.read_object_state_cache_many(
+                self.base_object.object_type, target_states)
+        for objuuid in objuuids:
             static_values = etcd.get(self.base_object.object_type, None, objuuid)
             yield objuuid, static_values
 

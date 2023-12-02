@@ -548,11 +548,16 @@ class Blob(dbo):
         blob_path = Blob.filepath(self.uuid)
         users = 0
         for pid in psutil.pids():
-            p = psutil.Process(pid)
-            for f in p.open_files():
-                if f.path.startswith(blob_path):
-                    users += 1
-                    self.log.warning('Process %d is using blob' % pid)
+            try:
+                p = psutil.Process(pid)
+                for f in p.open_files():
+                    if f.path.startswith(blob_path):
+                        users += 1
+                        self.log.warning('Process %d is using blob' % pid)
+            except FileNotFoundError:
+                # This is a race. The PID ended between us listing the PIDs and
+                # psutil trying to open its entry in /proc.
+                pass
 
         if users == 0:
             blob_path = Blob.filepath(self.uuid)

@@ -60,6 +60,18 @@ class Network(dbo):
         super(Network, self).__init__(static_values.get('uuid'),
                                       static_values.get('version'))
 
+        self.__ipam = ipam.IPAM.from_db(
+            static_values['uuid'], suppress_failure_audit=True)
+        if not self.__ipam:
+            in_memory_only = False
+            if self.state.value == dbo.STATE_DELETED:
+                in_memory_only = True
+
+            self.__ipam = ipam.IPAM.new(
+                static_values['uuid'], static_values['namespace'],
+                static_values['network_uuid'], static_values.get('netblock'),
+                in_memory_only=in_memory_only)
+
         self.__name = static_values.get('name')
         self.__namespace = static_values.get('namespace')
         self.__netblock = static_values.get('netblock')
@@ -71,12 +83,6 @@ class Network(dbo):
             'egress_nic', config.NODE_EGRESS_NIC)
         self.mesh_nic = static_values.get(
             'mesh_nic', config.NODE_MESH_NIC)
-
-        self.__ipam = ipam.IPAM.from_db(self.uuid, suppress_failure_audit=True)
-        if not self.__ipam:
-            self.log.info('Creating a new IPAM for network')
-            self.__ipam = ipam.IPAM.new(
-                self.uuid, self.namespace, self.uuid, self.__netblock)
 
         self.__ipblock = self.ipam.network_address
         self.__router = self.ipam.get_address_at_index(1)
@@ -526,8 +532,8 @@ class Network(dbo):
         # Ensure that all hypervisors remove this network. This is really
         # just catching strays, apart from on the network node where we
         # absolutely need to do this thing.
-        for hyp in Nodes([], prefilter='active'):
-            etcd.enqueue(hyp.uuid,
+        for n in Nodes([], prefilter='active'):
+            etcd.enqueue(n.uuid,
                          {'tasks': [
                              HypervisorDestroyNetworkTask(self.uuid)
                          ]})

@@ -108,7 +108,8 @@ class ImageFetchHelper(object):
     def get_image(self):
         fetched_blobs = []
         with self.artifact.get_lock(ttl=(12 * LOCK_REFRESH_SECONDS),
-                                    timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
+                                    timeout=config.MAX_IMAGE_TRANSFER_SECONDS,
+                                    op='get image') as lock:
             # Transfer the requested image, in its original format, from either
             # within the cluster (if we have it cached), or from the source. This
             # means that even if we have a cached post transcode version of the image
@@ -126,7 +127,7 @@ class ImageFetchHelper(object):
                     self._blob_get(lock, 'sf://blob/%s' % depends_on))
                 depends_on = fetched_blobs[-1].depends_on
 
-            # We might already have a trancoded version of the image cached. If so
+            # We might already have a transcoded version of the image cached. If so
             # we use that. Otherwise, we might have a transcoded version within the
             # cluster, in which case we fetch it. The final option is we do an
             # actual transcode ourselves. We need to do it this way because thin
