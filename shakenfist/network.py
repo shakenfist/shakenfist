@@ -69,7 +69,7 @@ class Network(dbo):
 
             self.__ipam = ipam.IPAM.new(
                 static_values['uuid'], static_values['namespace'],
-                static_values['network_uuid'], static_values.get('netblock'),
+                static_values['uuid'], static_values.get('netblock'),
                 in_memory_only=in_memory_only)
 
         self.__name = static_values.get('name')
