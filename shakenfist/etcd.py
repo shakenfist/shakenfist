@@ -162,13 +162,12 @@ class ActualLock(Lock):
         value = get_etcd_client().get(
             self.key, metadata=True)
         if value is None or len(value) == 0:
-            return None, NotImplementedError
+            return {'holder': None}
 
         if not value[0][0]:
-            return None, None
+            return {'holder': None}
 
-        d = json.loads(value[0][0])
-        return d['node'], d['pid'], d.get('line'), d.get('operation')
+        return json.loads(value[0][0])
 
     def __enter__(self):
         start_time = time.time()
@@ -185,29 +184,21 @@ class ActualLock(Lock):
                 return self
 
             if (duration > threshold and not slow_warned):
-                node, pid, line, op = self.get_holder()
-                self.log_ctx.with_fields({'duration': duration,
-                                          'threshold': threshold,
-                                          'holder-pid': pid,
-                                          'holder-node': node,
-                                          'holder-line': line,
-                                          'holder-op': op,
-                                          'requesting-op': self.operation,
-                                          }).info('Waiting to acquire lock')
+                self.log_ctx.with_fields(self.get_holder()).with_fields({
+                    'duration': duration,
+                    'threshold': threshold,
+                    'requesting-op': self.operation,
+                    }).info('Waiting to acquire lock')
                 slow_warned = True
 
             time.sleep(1)
 
         duration = time.time() - start_time
 
-        node, pid, line, op = self.get_holder()
-        self.log_ctx.with_fields({'duration': duration,
-                                  'holder-pid': pid,
-                                  'holder-node': node,
-                                  'holder-line': line,
-                                  'holder-op': op,
-                                  'requesting-op': self.operation,
-                                  }).info('Failed to acquire lock')
+        self.log_ctx.with_fields(self.get_holder()).with_fields({
+            'duration': duration,
+            'requesting-op': self.operation,
+            }).info('Failed to acquire lock')
 
         raise exceptions.LockException(
             'Cannot acquire lock %s, timed out after %.02f seconds'
