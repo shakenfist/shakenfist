@@ -200,14 +200,23 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         waiting_for = []
         for device in snap1:
             waiting_for.append(snap1[device]['blob_uuid'])
+        self.assertEqual(2, len(waiting_for))
         self._await_blobs_ready(waiting_for)
 
-        snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+        start_time = time.time()
+        while time.time() - start_time < 120:
+            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+            if len(snapshots) == 2:
+                break
+            time.sleep(5)
+
         snapshot_blob_uuids = []
         for s in snapshots:
             snapshot_blob_uuids.append(s['blob_uuid'])
+
         self.assertTrue(snap1['vdc']['blob_uuid'] in snapshot_blob_uuids)
-        self.assertEqual(2, len(snapshots))
+        self.assertEqual(
+            2, len(snapshots), 'Snapshot list %s is incomplete' % snapshots)
 
         snap2 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap2)
