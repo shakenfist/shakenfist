@@ -395,7 +395,7 @@ class Monitor(daemon.Daemon):
 
         # Remove old entries from the hard-deleted state caches
         for object_type in OBJECT_NAMES_TO_ITERATORS:
-            with etcd.get_lock('cache', None, object_type, op='Cache update'):
+            with etcd.get_lock('cache', None, object_type, op='Hard deleted prune'):
                 hd = etcd.get('cache', object_type, 'hard-deleted')
                 if hd:
                     for obj in list(hd.keys()):
@@ -408,7 +408,7 @@ class Monitor(daemon.Daemon):
 
     def refresh_object_state_caches(self):
         for object_type in OBJECT_NAMES_TO_ITERATORS:
-            with etcd.get_lock('cache', None, object_type, op='Cache update'):
+            with etcd.get_lock('cache', None, object_type, op='Cache refresh'):
                 by_state = {
                     '_all_': {},
                     'deleted': {}

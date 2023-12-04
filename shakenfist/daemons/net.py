@@ -99,7 +99,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             if not config.NODE_IS_NETWORK_NODE:
                 # For normal nodes, just the ones we have instances for. We need
                 # to use the more expensive interfaces_for_instance() method of
-                # looking up instance interfaces here if the instance cachce hasn't
+                # looking up instance interfaces here if the instance cache hasn't
                 # been populated yet (i.e. the instance is still being created)
                 for inst in instance.Instances([instance.this_node_filter], prefilter='healthy'):
                     ifaces = inst.interfaces
@@ -120,6 +120,16 @@ class Monitor(daemon.WorkerPoolDaemon):
                 # For network nodes, its all networks
                 for n in network.Networks([], prefilter='active'):
                     host_networks.append(n.uuid)
+
+            # Determine what routed ips should exist for a given network. We do
+            # this once to avoid doing it over and over below.
+            routed_by_network = defaultdict(list)
+            fn = network.floating_network()
+            for addr in fn.ipam.in_use:
+                resv = fn.ipam.get_reservation(addr)
+                if resv and resv['type'] == ipam.RESERVATION_TYPE_ROUTED:
+                    network_uuid = resv['user'][1]
+                    routed_by_network[network_uuid].append(addr)
 
             # Ensure we are on every network we have a host for
             for network_uuid in host_networks:
@@ -170,6 +180,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                                         }).info('Refloating interface')
                                     n.add_floating_ip(ni.floating.get(
                                         'floating_address'), ni.ipv4)
+
+                            # It also implies we should create all the routed IPs
+                            # for that network too.
+                            if n.uuid in routed_by_network:
+                                for addr in routed_by_network[n.uuid]:
+                                    n.route_address(addr)
+
                         else:
                             LOG.with_fields({'network': n}).info(
                                 'Recreating not okay network on hypervisor')
