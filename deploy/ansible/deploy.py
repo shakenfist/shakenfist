@@ -13,7 +13,7 @@ import sys
 
 PASSWORD_CHARS = ''
 for c in string.ascii_letters + string.digits + string.punctuation:
-    if c not in '\'"`,\\-?':
+    if c not in '\'"`,\\-?@':
         PASSWORD_CHARS += c
 
 
