@@ -277,13 +277,13 @@ def main():
                 None, subst['master_float'], subst['netmask'], subst['egress_bridge'])
 
             util_process.execute(None,
-                                 'iptables -A FORWARD -o %(egress_nic)s '
+                                 'iptables -w 10 -A FORWARD -o %(egress_nic)s '
                                  '-i %(egress_bridge)s -j ACCEPT' % subst)
             util_process.execute(None,
-                                 'iptables -A FORWARD -i %(egress_nic)s '
+                                 'iptables -w 10 -A FORWARD -i %(egress_nic)s '
                                  '-o %(egress_bridge)s -j ACCEPT' % subst)
             util_process.execute(None,
-                                 'iptables -t nat -A POSTROUTING '
+                                 'iptables -w 10 -t nat -A POSTROUTING '
                                  '-o %(egress_nic)s -j MASQUERADE' % subst)
 
     def _audit_daemons():
