@@ -332,7 +332,7 @@ def get(objecttype, subtype, name):
 
 
 @retry_etcd_forever
-def get_prefix(path, prefix=None, sort_order=None, sort_target='key', limit=0):
+def get_prefix(path, sort_order=None, sort_target='key', limit=0):
     for data, metadata in get_etcd_client().get_prefix(
             path, sort_order=sort_order, sort_target='key', limit=limit):
         yield str(metadata['key'].decode('utf-8')), json.loads(data)
