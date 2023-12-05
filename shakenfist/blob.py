@@ -39,7 +39,7 @@ LOG, _ = logs.setup(__name__)
 
 class Blob(dbo):
     object_type = 'blob'
-    initial_version = 3
+    initial_version = 2
     current_version = 6
 
     # docs/developer_guide/state_machine.md has a description of these states.
@@ -61,6 +61,10 @@ class Blob(dbo):
         self.__modified = static_values['modified']
         self.__fetched_at = static_values['fetched_at']
         self.__depends_on = static_values.get('depends_on')
+
+    @classmethod
+    def _upgrade_step_2_to_3(cls, static_values):
+        static_values['depends_on'] = None
 
     @classmethod
     def _upgrade_step_3_to_4(cls, static_values):
