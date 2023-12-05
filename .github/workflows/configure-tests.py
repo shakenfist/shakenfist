@@ -78,56 +78,8 @@ JOBS = {
             'branch': 'develop'
         },
         {
-            'name': 'v06-debian-10-localhost',
-            'baseimage': 'sf://label/ci-images/debian-10',
-            'baseuser': 'debian',
-            'topology': 'localhost',
-            'concurrency': 3,
-            'branch': 'v0.6-releases'
-        },
-        {
-            'name': 'v06-debian-11-slim-primary',
+            'name': 'v07-debian-11-localhost',
             'baseimage': 'sf://label/ci-images/debian-11',
-            'baseuser': 'debian',
-            'topology': 'slim-primary',
-            'concurrency': 5,
-            'branch': 'v0.6-releases'
-        },
-        {
-            'name': 'v06-ubuntu-2004-slim-primary',
-            'baseimage': 'sf://label/ci-images/ubuntu-2004',
-            'baseuser': 'ubuntu',
-            'topology': 'slim-primary',
-            'concurrency': 5,
-            'branch': 'v0.6-releases'
-        },
-        {
-            'name': 'v06-released-debian-10-localhost',
-            'baseimage': 'sf://label/ci-images/debian-10',
-            'baseuser': 'debian',
-            'topology': 'localhost-released',
-            'concurrency': 3,
-            'branch': 'v0.6-releases'
-        },
-        {
-            'name': 'v06-released-debian-11-slim-primary',
-            'baseimage': 'sf://label/ci-images/debian-11',
-            'baseuser': 'debian',
-            'topology': 'slim-primary-released',
-            'concurrency': 5,
-            'branch': 'v0.6-releases'
-        },
-        {
-            'name': 'v06-released-ubuntu-2004-slim-primary',
-            'baseimage': 'sf://label/ci-images/ubuntu-2004',
-            'baseuser': 'ubuntu',
-            'topology': 'slim-primary-released',
-            'concurrency': 5,
-            'branch': 'v0.6-releases'
-        },
-        {
-            'name': 'v07-debian-10-localhost',
-            'baseimage': 'sf://label/ci-images/debian-10',
             'baseuser': 'debian',
             'topology': 'localhost',
             'concurrency': 3,
@@ -150,8 +102,8 @@ JOBS = {
             'branch': 'v0.7-releases'
         },
         {
-            'name': 'v07-released-debian-10-localhost',
-            'baseimage': 'sf://label/ci-images/debian-10',
+            'name': 'v07-released-debian-11-localhost',
+            'baseimage': 'sf://label/ci-images/debian-11',
             'baseuser': 'debian',
             'topology': 'localhost-released',
             'concurrency': 3,
