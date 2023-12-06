@@ -13,10 +13,6 @@ protobuf<4.0.0              # google license: https://github.com/protocolbuffers
 fixtures<4.1.1              # apache2
                             # Version 4.0.1 fails to build with "AttributeError: install_layout"
 
-# Temporary pin to due https://bugs.launchpad.net/python-stevedore/+bug/1991559
-# breaking CI on python 3.7.
-importlib-metadata<8;python_version<"3.8"
-
 # Version 2.3.0 has problems importing Markup from flask
 flask<3.0.1                 # bsd
 
