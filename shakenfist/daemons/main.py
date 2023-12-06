@@ -305,6 +305,8 @@ def main():
 
     running = True
     shutdown_commenced = None
+    warned_locks = {}
+
     while True:
         time.sleep(5)
 
@@ -337,13 +339,23 @@ def main():
 
             # Check if we hold any locks for processes which don't exist any
             # more. That is, a process has ended but left a stray lock.
-            lcks = etcd.get_existing_locks()
-            for lck in lcks:
-                if lcks[lck].get('node') != config.NODE_NAME:
+            locks = etcd.get_existing_locks()
+            for lock in locks:
+                lock_details = locks[lock]
+                if lock_details.get('node') != config.NODE_NAME:
                     continue
-                if psutil.pid_exists(lcks[lck].get('pid')):
+
+                pid = lock_details.get('pid')
+                if psutil.pid_exists(pid):
                     continue
-                LOG.with_fields(lcks[lck]).error('Lock held by missing process on this node')
+                if pid not in warned_locks:
+                    LOG.with_fields(lock_details).warning(
+                        'Lock held by missing process on this node')
+                    warned_locks[pid] = time.time()
+                elif time.time() - warned_locks[pid] > 30:
+                    LOG.with_fields(lock_details).error(
+                        'Lock held by missing process on this node for more '
+                        'than 30 seconds')
 
         elif len(DAEMON_PROCS) == 0:
             n.state = Node.STATE_STOPPED
