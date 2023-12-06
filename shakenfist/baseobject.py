@@ -469,7 +469,8 @@ class DatabaseBackedObjectIterator(object):
                 self.base_object.object_type, target_states)
         for objuuid in objuuids:
             static_values = etcd.get(self.base_object.object_type, None, objuuid)
-            yield objuuid, static_values
+            if static_values:
+                yield objuuid, static_values
 
     def apply_filters(self, o):
         for f in self.filters:

@@ -205,14 +205,16 @@ def main():
         if not cache_version:
             cache_version = {'version': 0}
 
-        if cache_version['version'] != 1:
+        if cache_version['version'] != 2:
+            # We don't need to step through various upgrades, we just rebuild
+            # the entire cache from scratch instead.
             for obj_type in OBJECT_NAMES_TO_ITERATORS:
-                by_state = defaultdict(list)
+                by_state = defaultdict(dict)
                 for obj in OBJECT_NAMES_TO_ITERATORS[obj_type]([]):
-                    by_state[obj.state.value].append(obj.uuid)
+                    by_state[obj.state.value][obj.uuid] = time.time()
                 for state in by_state:
                     cache.clobber_object_state_cache(obj_type, state, by_state[state])
-            cache_version['version'] = 1
+            cache_version['version'] = 2
             etcd.put_raw('/sf/cache/_version', cache_version)
 
     # If you ran this, it means we're not shutting down any more
@@ -277,13 +279,13 @@ def main():
                 None, subst['master_float'], subst['netmask'], subst['egress_bridge'])
 
             util_process.execute(None,
-                                 'iptables -A FORWARD -o %(egress_nic)s '
+                                 'iptables -w 10 -A FORWARD -o %(egress_nic)s '
                                  '-i %(egress_bridge)s -j ACCEPT' % subst)
             util_process.execute(None,
-                                 'iptables -A FORWARD -i %(egress_nic)s '
+                                 'iptables -w 10 -A FORWARD -i %(egress_nic)s '
                                  '-o %(egress_bridge)s -j ACCEPT' % subst)
             util_process.execute(None,
-                                 'iptables -t nat -A POSTROUTING '
+                                 'iptables -w 10 -t nat -A POSTROUTING '
                                  '-o %(egress_nic)s -j MASQUERADE' % subst)
 
     def _audit_daemons():

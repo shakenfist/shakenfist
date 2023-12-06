@@ -19,9 +19,16 @@ def read_object_state_cache_many(object_type, states):
     # example of a read which holds a lock.
     out = []
     with etcd.get_lock('cache', None, object_type, op='Cache read many'):
-        for state in states:
-            for objuuid in read_object_state_cache(object_type, state):
-                out.append(objuuid)
+        for key, data in etcd.get_prefix('/sf/cache/%s' % object_type):
+            if type(data) is not dict:
+                LOG.error('Ignoring malformed cache entry %s = %s' % (key, data))
+                continue
+
+            state = key.split('/')[-1]
+            if state and state in states:
+                uuids = list(data.keys())
+                if uuids:
+                    out.extend(uuids)
     return out
 
 

@@ -196,11 +196,15 @@ class Instance(dbo):
     @classmethod
     def _upgrade_step_11_to_12(cls, static_values):
         blob_refs = defaultdict(int)
+
+        # We don't have a block devices structure until _initialize_block_devices()
+        # has been called as part of instance creation.
         bd = etcd.get('attribute/instance', static_values['uuid'], 'block_devices')
-        for d in bd.get('devices', []):
-            blob_uuid = d.get('blob_uuid')
-            if blob_uuid:
-                blob_refs[blob_uuid] += 1
+        if bd:
+            for d in bd.get('devices', []):
+                blob_uuid = d.get('blob_uuid')
+                if blob_uuid:
+                    blob_refs[blob_uuid] += 1
 
         if static_values['nvram_template']:
             blob_refs[static_values['nvram_template']] += 1

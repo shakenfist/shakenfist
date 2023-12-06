@@ -168,7 +168,7 @@ def create_interface(interface, interface_type, extra, mtu=None):
 
 
 def nat_rules_for_ipblock(ipblock):
-    out, _ = process.execute(None, 'iptables -t nat -L POSTROUTING -n -v')
+    out, _ = process.execute(None, 'iptables -w 10 -t nat -L POSTROUTING -n -v')
     # Output looks like this:
     # Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)
     # pkts bytes target     prot opt in     out     source               destination

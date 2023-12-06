@@ -110,8 +110,8 @@ JOBS = {
             'branch': 'develop'
         },
         {
-            'name': 'v07-debian-10-localhost',
-            'baseimage': 'sf://label/ci-images/debian-10',
+            'name': 'v07-debian-11-localhost',
+            'baseimage': 'sf://label/ci-images/debian-11',
             'baseuser': 'debian',
             'topology': 'localhost',
             'concurrency': 3,
@@ -134,8 +134,8 @@ JOBS = {
             'branch': 'v0.7-releases'
         },
         {
-            'name': 'v07-released-debian-10-localhost',
-            'baseimage': 'sf://label/ci-images/debian-10',
+            'name': 'v07-released-debian-11-localhost',
+            'baseimage': 'sf://label/ci-images/debian-11',
             'baseuser': 'debian',
             'topology': 'localhost-released',
             'concurrency': 3,

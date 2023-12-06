@@ -596,17 +596,17 @@ class Network(dbo):
                 None, 'echo 1 > /proc/sys/net/ipv4/ip_forward')
             util_process.execute(
                 None,
-                'iptables -A FORWARD -o %(egress_veth_inner)s '
+                'iptables -w 10 -A FORWARD -o %(egress_veth_inner)s '
                 '-i %(vx_veth_inner)s -j ACCEPT' % subst,
                 namespace=self.uuid)
             util_process.execute(
                 None,
-                'iptables -A FORWARD -i %(egress_veth_inner)s '
+                'iptables -w 10 -A FORWARD -i %(egress_veth_inner)s '
                 '-o %(vx_veth_inner)s -j ACCEPT' % subst,
                 namespace=self.uuid)
             util_process.execute(
                 None,
-                'iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
+                'iptables -w 10 -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
                 '-o %(egress_veth_inner)s -j MASQUERADE' % subst,
                 namespace=self.uuid)
 
@@ -756,7 +756,7 @@ class Network(dbo):
             self.uuid, floating_address, '32', 'flt-%(floating_address_as_hex)s-i' % subst)
         util_process.execute(
             None,
-            'iptables -t nat -A PREROUTING -d %(floating_address)s -j DNAT '
+            'iptables -w 10 -t nat -A PREROUTING -d %(floating_address)s -j DNAT '
             '--to-destination %(inner_address)s' % subst,
             namespace=self.uuid)
 
