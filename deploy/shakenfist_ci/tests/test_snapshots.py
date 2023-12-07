@@ -227,7 +227,12 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             waiting_for.append(snap2[device]['blob_uuid'])
         self._await_blobs_ready(waiting_for)
 
-        snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+        start_time = time.time()
+        while time.time() - start_time < 120:
+            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+            if len(snapshots) == 4:
+                break
+            time.sleep(5)
         self.assertEqual(4, len(snapshots))
 
         for snap in snapshots:
