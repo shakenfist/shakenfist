@@ -12,9 +12,8 @@ import sys
 
 
 PASSWORD_CHARS = ''
-for c in string.ascii_letters + string.digits + string.punctuation:
-    if c not in '\'"`,\\-?@':
-        PASSWORD_CHARS += c
+for c in string.ascii_letters + string.ascii_letters.upper() + string.digits:
+    PASSWORD_CHARS += c
 
 
 os.makedirs('/etc/sf', exist_ok=True)
