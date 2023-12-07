@@ -278,11 +278,17 @@ class Monitor(daemon.Daemon):
                         if domain.name().startswith('sf:'):
                             instance_uuid = domain.name().split(':')[1]
                             inst = instance.Instance.from_db(instance_uuid)
+                            if not inst:
+                                continue
+                            bd = inst.block_devices
+                            if not bd:
+                                continue
+
                             statistics = util_libvirt.extract_statistics(
                                 domain)
 
                             # Add in actual size on disk
-                            for disk in inst.block_devices.get('devices', [{}]):
+                            for disk in bd.get('devices', [{}]):
                                 disk_path = disk.get('path')
                                 disk_device = disk.get('device')
                                 if disk_path and disk_device and os.path.exists(disk_path):
