@@ -2,10 +2,12 @@ import errno
 import etcd3
 import json
 import os
+from oslo_concurrency import processutils
 import pathlib
 import random
 from shakenfist_utilities import logs
 import shutil
+import signal
 import time
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -74,14 +76,52 @@ class Monitor(daemon.Daemon):
                             continue
 
                         attempts = inst.enforced_deletes_increment()
-                        if attempts > 5:
+                        if attempts > 6:
+                            # I give up.
+                            pass
+
+                        elif attempts > 4:
+                            # Sometimes its all gone horribly wrong (probably a
+                            # missing apparmor profile). So the hammer isn't big
+                            # enough and we need Mr Smashy.
+                            try:
+                                stdout, _ = util_process.execute(None, 'aa-status --json')
+                                status = json.loads(stdout)
+                                profile = 'libvirt-%s' % instance_uuid
+                                for proc in status['processes']['/usr/bin/qemu-system-x86_64']:
+                                    if proc['profile'] == profile:
+                                        os.kill(proc['pid'], signal.SIGKILL)
+
+                                try:
+                                    util_process.execute(
+                                        None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
+                                except processutils.ProcessExecutionError:
+                                    pass
+
+                                self._delete_instance_files(instance_uuid)
+                                inst.add_event(
+                                    EVENT_TYPE_AUDIT,
+                                    'enforced delete via process termination succeeded')
+                            except processutils.ProcessExecutionError:
+                                inst.add_event(
+                                    EVENT_TYPE_AUDIT,
+                                    'enforced delete via process termination failed')
+
+                        elif attempts > 2:
                             # Sometimes we just can't delete the VM. Try the big
                             # hammer instead.
-                            self._delete_instance_files(instance_uuid)
-                            util_process.execute(
-                                None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
-                            inst.add_event(
-                                EVENT_TYPE_AUDIT, 'enforced delete via alternate method')
+                            try:
+                                util_process.execute(
+                                    None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
+                                self._delete_instance_files(instance_uuid)
+                                inst.add_event(
+                                    EVENT_TYPE_AUDIT,
+                                    'enforced delete via virsh method succeeded')
+                            except processutils.ProcessExecutionError:
+                                inst.add_event(
+                                    EVENT_TYPE_AUDIT,
+                                    'enforced delete via virsh method failed')
+
                         else:
                             inst.delete()
 
