@@ -578,6 +578,8 @@ class Monitor(daemon.Daemon):
                     for instance_uuid in missing_instances:
                         if instance_uuid not in instance_sidechannel_cache:
                             inst = instance.Instance.from_db(instance_uuid)
+                            if not inst:
+                                continue
                             instance_sidechannel_cache[instance_uuid] = inst.side_channels
 
                         if 'sf-agent' not in instance_sidechannel_cache[instance_uuid]:

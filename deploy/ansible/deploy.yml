@@ -559,6 +559,71 @@
         regexp: "#spice_tls_x509_cert_dir = "
         line: 'spice_tls_x509_cert_dir = "/etc/pki/libvirt-spice"'
 
+    # Ensure libvirt has BPF and perfmon capabilities (see the Debian bug
+    # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=979964 for details).
+    - name: Let libvirt use BPF
+      lineinfile:
+        path: /etc/apparmor.d/local/usr.sbin.libvirtd
+        regexp: "  capability bpf,"
+        line: '  capability bpf,'
+
+    - name: Let libvirt use perfmon
+      lineinfile:
+        path: /etc/apparmor.d/local/usr.sbin.libvirtd
+        regexp: "  capability perfmon,"
+        line: '  capability perfmon,'
+
+    - name: Let libvirt use sys_rawio
+      lineinfile:
+        path: /etc/apparmor.d/local/usr.sbin.libvirtd
+        regexp: "  capability sys_rawio,"
+        line: '  capability sys_rawio,'
+
+    - name: Check that the /etc/apparmor.d/local/abstractions/libvirt-qemu exists
+      stat:
+        path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+      register: stat_result
+
+    # NOTE(mikal): this wont work if the user has configured a different
+    # path for the instance path. We should fix that.
+    - name: Add an apparmor rule for NVMe disks (modern Debian)
+      lineinfile:
+        path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+        regexp: "/srv/shakenfist/instances.*nvme.*"
+        line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
+      when: stat_result.stat.exists
+
+    # NOTE(mikal): and fix it here too.
+    - name: Add an apparmor rule for NVMe disks (older Debian)
+      lineinfile:
+        path: /etc/apparmor.d/abstractions/libvirt-qemu
+        regexp: "/srv/shakenfist/instances.*nvme.*"
+        line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
+      when: not stat_result.stat.exists
+
+    # Let libvirt read the SSL configuration for its SPICE connections (see the
+    # Debian bug https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1030684 for
+    # details).
+    - name: Let libvirt read our openssl config
+      lineinfile:
+        path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+        regexp: "/etc/ssl/openssl.cnf r,"
+        line: '/etc/ssl/openssl.cnf r,'
+      when: stat_result.stat.exists
+
+    - name: Let libvirt read our openssl config
+      lineinfile:
+        path: /etc/apparmor.d/abstractions/libvirt-qemu
+        regexp: "/etc/ssl/openssl.cnf r,"
+        line: '/etc/ssl/openssl.cnf r,'
+      when: not stat_result.stat.exists
+
+    - name: Restart apparmor
+      service:
+        name: apparmor
+        enabled: yes
+        state: restarted
+
     - name: Restart libvirt
       service:
         name: libvirtd
@@ -896,34 +961,6 @@
     - name: Turn off default libvirt networking
       shell: virsh net-destroy default
       ignore_errors: True
-
-    - name: Check that the /etc/apparmor.d/local/abstractions/libvirt-qemu exists
-      stat:
-        path: /etc/apparmor.d/local/abstractions/libvirt-qemu
-      register: stat_result
-
-    # NOTE(mikal): this wont work if the user has configured a different
-    # path for the instance path. We should fix that.
-    - name: Add an apparmor rule for NVMe disks (modern Debian)
-      lineinfile:
-        path: /etc/apparmor.d/local/abstractions/libvirt-qemu
-        regexp: "/srv/shakenfist/instances.*nvme.*"
-        line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
-      when: stat_result.stat.exists
-
-    # NOTE(mikal): and fix it here too.
-    - name: Add an apparmor rule for NVMe disks (older Debian)
-      lineinfile:
-        path: /etc/apparmor.d/abstractions/libvirt-qemu
-        regexp: "/srv/shakenfist/instances.*nvme.*"
-        line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
-      when: not stat_result.stat.exists
-
-    - name: Restart apparmor
-      service:
-        name: apparmor
-        enabled: yes
-        state: restarted
 
 - hosts: network_node
   any_errors_fatal: true
