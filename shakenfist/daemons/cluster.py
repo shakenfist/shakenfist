@@ -15,6 +15,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobjectmapping import (
     OBJECT_NAMES_TO_CLASSES, OBJECT_NAMES_TO_ITERATORS)
 from shakenfist.blob import Blob, Blobs, placement_filter
+from shakenfist import cache
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -424,7 +425,8 @@ class Monitor(daemon.Daemon):
                         by_state['_all_'][obj.uuid] = time.time()
 
                 for state in by_state:
-                    etcd.put('cache', object_type, state, by_state[state])
+                    cache.clobber_object_state_cache(
+                        object_type, state, by_state[state])
 
     def run(self):
         LOG.info('Starting')

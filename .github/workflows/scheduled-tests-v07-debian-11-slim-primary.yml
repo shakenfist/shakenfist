@@ -184,8 +184,9 @@ jobs:
                      "Libvirt Error: XML error"
                      "Cleaning up leaked IPAM"
                      "Cleaning up leaked vxlan"
-                     "Waiting to acquire lock",
-                     'apparmor="DENIED"')
+                     "Waiting to acquire lock"
+                     'apparmor="DENIED"'
+                     "Ignoring malformed cache entry")
           IFS=""
           for forbid in ${FORBIDDEN[*]}
           do
