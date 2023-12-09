@@ -41,6 +41,59 @@ class Monitor(daemon.Daemon):
         if os.path.exists(libvirt_profile_path):
             os.unlink(libvirt_profile_path)
 
+    def _delete_with_virsh(self, instance_uuid, inst):
+        log_ctx = LOG.with_fields({'instance': instance_uuid})
+        try:
+            log_ctx.warning('Destroying instance using virsh')
+            util_process.execute(None, 'virsh destroy "sf:%s"' % instance_uuid)
+            util_process.execute(
+                None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
+            self._delete_instance_files(instance_uuid)
+            log_ctx.warning('Destroying instance using virsh succeeded')
+            if inst:
+                inst.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'enforced delete via virsh method succeeded')
+                return True
+
+        except processutils.ProcessExecutionError:
+            log_ctx.warning('Destroying instance using virsh failed')
+            if inst:
+                inst.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'enforced delete via virsh failed')
+            return False
+
+    def _delete_with_kill(self, instance_uuid, inst):
+        log_ctx = LOG.with_fields({'instance': instance_uuid})
+        try:
+            log_ctx.warning('Destroying instance using SIGKILL')
+            stdout, _ = util_process.execute(None, 'aa-status --json')
+            status = json.loads(stdout)
+            profile = 'libvirt-%s' % instance_uuid
+            for proc in status['processes']['/usr/bin/qemu-system-x86_64']:
+                if proc['profile'] == profile:
+                    os.kill(int(proc['pid']), signal.SIGKILL)
+
+            try:
+                util_process.execute(
+                    None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
+            except processutils.ProcessExecutionError:
+                pass
+
+            self._delete_instance_files(instance_uuid)
+            log_ctx.warning('Destroying instance using SIGKILL succeeded')
+            if inst:
+                inst.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'enforced delete via SIGKILL succeeded')
+        except processutils.ProcessExecutionError:
+            log_ctx.warning('Destroying instance using SIGKILL failed')
+            if inst:
+                inst.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'enforced delete via SIGKILL failed')
+
     def _update_power_states(self):
         with util_libvirt.LibvirtConnection() as lc:
             try:
@@ -56,12 +109,8 @@ class Monitor(daemon.Daemon):
                     inst = instance.Instance.from_db(instance_uuid)
                     if not inst:
                         # Instance is SF but not in database. Kill to reduce load.
-                        log_ctx.warning('Destroying unknown instance')
-                        self._delete_instance_files(instance_uuid)
-                        util_process.execute(
-                            None, 'virsh destroy "sf:%s"' % instance_uuid)
-                        util_process.execute(
-                            None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
+                        if not self._delete_with_virsh(instance_uuid, None):
+                            self._delete_with_kill(instance_uuid, None)
                         continue
 
                     inst.place_instance(config.NODE_NAME)
@@ -81,46 +130,10 @@ class Monitor(daemon.Daemon):
                             pass
 
                         elif attempts > 4:
-                            # Sometimes its all gone horribly wrong (probably a
-                            # missing apparmor profile). So the hammer isn't big
-                            # enough and we need Mr Smashy.
-                            try:
-                                stdout, _ = util_process.execute(None, 'aa-status --json')
-                                status = json.loads(stdout)
-                                profile = 'libvirt-%s' % instance_uuid
-                                for proc in status['processes']['/usr/bin/qemu-system-x86_64']:
-                                    if proc['profile'] == profile:
-                                        os.kill(proc['pid'], signal.SIGKILL)
-
-                                try:
-                                    util_process.execute(
-                                        None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
-                                except processutils.ProcessExecutionError:
-                                    pass
-
-                                self._delete_instance_files(instance_uuid)
-                                inst.add_event(
-                                    EVENT_TYPE_AUDIT,
-                                    'enforced delete via process termination succeeded')
-                            except processutils.ProcessExecutionError:
-                                inst.add_event(
-                                    EVENT_TYPE_AUDIT,
-                                    'enforced delete via process termination failed')
+                            self._delete_with_kill(instance_uuid, inst)
 
                         elif attempts > 2:
-                            # Sometimes we just can't delete the VM. Try the big
-                            # hammer instead.
-                            try:
-                                util_process.execute(
-                                    None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
-                                self._delete_instance_files(instance_uuid)
-                                inst.add_event(
-                                    EVENT_TYPE_AUDIT,
-                                    'enforced delete via virsh method succeeded')
-                            except processutils.ProcessExecutionError:
-                                inst.add_event(
-                                    EVENT_TYPE_AUDIT,
-                                    'enforced delete via virsh method failed')
+                            self._delete_with_virsh(instance_uuid, inst)
 
                         else:
                             inst.delete()

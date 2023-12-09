@@ -102,6 +102,16 @@
       retries: 100
       until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
+    - name: Install qemu
+      block:
+        - name: Attempt to install qemu-kvm
+          apt:
+            name: qemu-kvm
+      rescue:
+        - name: Attempt to install qemu-system-x86 instead
+          apt:
+            name: qemu-system-x86
+
     # We install libvirt, even on non-hypervisors, because we use it to track
     # the CPU topology and load of the node.
     - name: Install non-hypervisor dependencies
@@ -133,7 +143,6 @@
           - python3-venv
           - python3-wheel
           - pwgen
-          - qemu-kvm
           - qemu-utils
           - rsyslog
           - tox
