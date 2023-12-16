@@ -19,13 +19,14 @@ flask<3.0.1                 # bsd
 # Version 2.0 changes the API a lot
 
 
-# Our requirements.
-pyyaml>=5.1                 # mit
-oslo.concurrency            # apache2
-jinja2>=3.1.2               # bsd
-setproctitle                # bsd
-click>=8.0.0                # bsd
-Werkzeug                    # bsd
+# Our requirements -- we specify exact versions here and let renovate update
+# them for the develop branch as required. Releases never update requirements.
+pyyaml==6.0.1               # mit
+oslo-concurrency==4.5.1     # apache2
+jinja2==3.1.2               # bsd
+setproctitle==1.3.2         # bsd
+click==8.1.7                # bsd
+werkzeug==2.2.3             # bsd
 flask_restful               # bsd
 flasgger                    # mit
 psutil>=5.9.0               # bsd
