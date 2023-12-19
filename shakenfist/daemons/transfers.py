@@ -52,14 +52,21 @@ def transfer_server(name, data):
             log.warning('Blob is missing, aborting')
             return
 
+        st = os.stat(blob_path)
+        if st.st_size == 0:
+            log.warning('Blog is empty, aborting')
+            return
+
+        sent_bytes = 0
         with open(blob_path, 'rb') as f:
             d = f.read(8000)
             while d:
                 conn.send(d)
+                sent_bytes += len(d)
                 d = f.read(8000)
             conn.close()
 
-        log.info('Transfer complete')
+        log.info('Transfer complete, sent %d bytes' % sent_bytes)
 
     finally:
         etcd.delete('transfer', config.NODE_NAME, name)
