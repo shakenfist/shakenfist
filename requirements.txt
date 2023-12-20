@@ -30,12 +30,12 @@ gunicorn==21.2.0                   # mit
 python-magic==0.4.27               # mit
 flask-request-id-middleware==1.1   # mit
 webargs==8.3.0                     # mit
-clingwrap                   # apache2
-py-cpuinfo                  # mit
-distro                      # apache2
-shakenfist-agent            # apache2
-shakenfist-utilities>=0.6.1 # apache2
-pbr                         # apache2
+clingwrap==1.6.4                   # apache2
+py-cpuinfo==9.0.0                  # mit
+distro==1.8.0                      # apache2
+shakenfist-agent==0.3.18           # apache2
+shakenfist-utilities==0.6.1        # apache2
+pbr==5.11.1                        # apache2
 setuptools>=65.3.0          # mit
 symbolicmode>=1.0           # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
 pydantic                    # mit
