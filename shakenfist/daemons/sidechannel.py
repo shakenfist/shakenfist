@@ -384,7 +384,10 @@ class Monitor(daemon.Daemon):
                                                         get_done = True
                                                     else:
                                                         d = base64.b64decode(inpacket['chunk'])
-                                                        total_length += len(d)
+                                                        d_len = len(d)
+                                                        self.log.debug('Wrote %d bytes to %s.partial'
+                                                                       % (d_len, blob_path))
+                                                        total_length += d_len
                                                         f.write(d)
                                             else:
                                                 self.log.with_fields({'packet': inpacket}).error(
@@ -392,9 +395,13 @@ class Monitor(daemon.Daemon):
                                                     'response to get-file command')
 
                                 os.rename(blob_path + '.partial', blob_path)
+                                st = os.stat(blob_path)
+                                if st.st_size == 0 and total_length > 0:
+                                    self.log.error('Agent get-file blob is zero not %d bytes.'
+                                                   % total_length)
+
                                 b = blob.Blob.new(blob_uuid, total_length, time.time(), time.time())
                                 b.ref_count_inc(agentop)
-                                b.state = blob.Blob.STATE_CREATED
                                 b.observe()
                                 b.request_replication()
 
