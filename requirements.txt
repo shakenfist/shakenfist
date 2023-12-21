@@ -3,15 +3,12 @@ protobuf<4.0.0              # google license: https://github.com/protocolbuffers
                             # Version 4.21 and greater requires that a different version of protoc be used
                             # than that which etcd3 uses.
 
-fixtures<4.1.1              # apache2
-                            # Version 4.0.1 fails to build with "AttributeError: install_layout"
-
 # A bit vague because we expect this to come from an OS package
-psutil>=5.9.0               # bsd
-
+psutil>=5.9.0                      # bsd
 
 # Our requirements -- we specify exact versions here and let renovate update
 # them for the develop branch as required. Releases never update requirements.
+fixtures==4.0.0                    # apache2
 pyyaml==6.0.1                      # mit
 oslo-concurrency==5.2.0            # apache2
 jinja2==3.1.2                      # bsd
@@ -35,18 +32,18 @@ py-cpuinfo==9.0.0                  # mit
 distro==1.8.0                      # apache2
 shakenfist-agent==0.3.18           # apache2
 shakenfist-utilities==0.6.2        # apache2
-pbr==6.0.0                        # apache2
-setuptools>=65.3.0          # mit
-symbolicmode>=1.0           # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
-pydantic                    # mit
-pydantic-settings           # mit
-version-comparison          # mit
-pycdlib==1.14.0             # lgpl
+pbr==6.0.0                         # apache2
+setuptools==65.3.0                 # mit
+symbolicmode==2.0.0                # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+pydantic==2.3.0                    # mit
+pydantic-settings==2.0.3           # mit
+version-comparison==0.2            # mit
+pycdlib==1.14.0                    # lgpl
 
-requests>=2.31.0            # apache2
-requests_toolbelt>=1.0.0    # apache2
-chardet>=5.1.0              # lgpl -- required by requests with this version pin
-urllib3>=1.26.14            # mit -- required by requests with this version pin
+requests==2.31.0                   # apache2
+requests-toolbelt==1.0.0           # apache2
+chardet==5.2.0                     # lgpl
+urllib3==2.0.5                     # mit
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt
