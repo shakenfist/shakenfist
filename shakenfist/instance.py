@@ -719,7 +719,9 @@ class Instance(dbo):
                 n.remove_instance(self.uuid)
 
         # Find any agent operations for this instance and remove them
-        for agentop in AgentOperations([partial(agent_instance_filter, self)]):
+        for agentop in AgentOperations(
+                [partial(agent_instance_filter, self)],
+                suppress_failure_audit=True):
             agentop.delete()
 
         if self.state.value.endswith('-%s' % self.STATE_ERROR):

@@ -440,9 +440,10 @@ class DatabaseBackedObject(object):
 
 
 class DatabaseBackedObjectIterator(object):
-    def __init__(self, filters, prefilter=None):
+    def __init__(self, filters, prefilter=None, suppress_failure_audit=False):
         self.filters = filters
         self.prefilter = prefilter
+        self.suppress_failure_audit = suppress_failure_audit
 
     def get_iterator(self):
         if not self.prefilter:

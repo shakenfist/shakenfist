@@ -104,8 +104,9 @@ class AgentOperation(dbo):
         for result in self._db_get_attribute('results'):
             for key in result:
                 if key.endswith('_blob'):
-                    b = blob.Blob.from_db(result[key])
-                    b.ref_count_dec(self)
+                    b = blob.Blob.from_db(result[key], suppress_failure_audit=True)
+                    if b:
+                        b.ref_count_dec(self)
 
         self.state = self.STATE_DELETED
 
@@ -116,7 +117,8 @@ class AgentOperations(dbo_iter):
     def __iter__(self):
         for _, o in self.get_iterator():
             operation_uuid = o.get('uuid')
-            o = AgentOperation.from_db(operation_uuid)
+            o = AgentOperation.from_db(
+                operation_uuid, suppress_failure_audit=self.suppress_failure_audit)
             if not o:
                 continue
 
