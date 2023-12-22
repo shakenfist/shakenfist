@@ -788,7 +788,12 @@ class Instance(dbo):
         self._db_delete_attribute('ports')
 
     def _configure_block_devices(self, lock):
-        with self.get_lock_attr('block_devices', 'Initialize block devices'):
+        with self.get_lock_attr('block_devices', 'Initialize block devices') as bd_lock:
+            # Locks to refresh
+            locks = [bd_lock]
+            if lock:
+                locks.append(lock)
+
             # Create block devices if required
             block_devices = self.block_devices
             if not block_devices:
@@ -866,13 +871,13 @@ class Instance(dbo):
                             # disk. This is because we don't have a libvirt <disk/> element for
                             # them and therefore can't specify their backing store. Instead we
                             # produce a flat layer here.
-                            util_image.create_qcow2([lock], cached_image_path,
+                            util_image.create_qcow2(locks, cached_image_path,
                                                     disk['path'], disk_size=disk['size'])
 
                         else:
                             with util_general.RecordedOperation('create copy on write layer', self):
                                 util_image.create_cow(
-                                    [lock], cached_image_path, disk['path'], disk['size'])
+                                    locks, cached_image_path, disk['path'], disk['size'])
                             self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
                                 'COW layer %s created' % disk['path'])
 
@@ -914,7 +919,7 @@ class Instance(dbo):
 
                     elif not os.path.exists(disk['path']):
                         util_image.create_blank(
-                            [lock], disk['path'], disk['size'])
+                            locks, disk['path'], disk['size'])
 
                     shutil.chown(disk['path'], 'libvirt-qemu', 'libvirt-qemu')
                     modified_disks.append(disk)
