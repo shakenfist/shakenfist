@@ -1261,7 +1261,7 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, blob_uuid=None, path=None, mode=None,
              instance_from_db=None):
-        if instance_from_db.agent_state.value != 'ready':
+        if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
 
         try:
@@ -1319,7 +1319,7 @@ class InstanceAgentGetEndpoint(sf_api.Resource):
     @api_base.requires_instance_active
     @api_base.log_token_use
     def post(self, instance_ref=None, path=None, instance_from_db=None):
-        if instance_from_db.agent_state.value != 'ready':
+        if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
 
         commands = [
@@ -1356,7 +1356,7 @@ class InstanceAgentExecuteEndpoint(sf_api.Resource):
     @api_base.requires_instance_active
     @api_base.log_token_use
     def post(self, instance_ref=None, command_line=None, instance_from_db=None):
-        if instance_from_db.agent_state.value != 'ready':
+        if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
 
         commands = [
