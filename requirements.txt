@@ -8,7 +8,7 @@ psutil>=5.9.0                      # bsd
 
 # Our requirements -- we specify exact versions here and let renovate update
 # them for the develop branch as required. Releases never update requirements.
-fixtures==4.0.0                    # apache2
+fixtures==4.1.0                    # apache2
 pyyaml==6.0.1                      # mit
 oslo-concurrency==5.2.0            # apache2
 jinja2==3.1.2                      # bsd
