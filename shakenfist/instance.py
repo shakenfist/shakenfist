@@ -788,7 +788,8 @@ class Instance(dbo):
         self._db_delete_attribute('ports')
 
     def _configure_block_devices(self, lock):
-        with self.get_lock_attr('block_devices', 'Initialize block devices') as bd_lock:
+        with self.get_lock_attr(
+                'block_devices', 'Initialize block devices', ttl=300) as bd_lock:
             # Locks to refresh
             locks = [bd_lock]
             if lock:
