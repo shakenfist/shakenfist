@@ -244,15 +244,6 @@
         enabled: no
         state: stopped
 
-    - name: Use CI package cache to speed things up
-      copy:
-        content: |
-          Acquire::http::Proxy "http://192.168.1.50:8000";
-        dest: /etc/apt/apt.conf.d/00proxy
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
-
     - name: Copy getsf
       copy:
         src: "{{source_path}}/shakenfist/deploy/getsf"
