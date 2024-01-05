@@ -29,7 +29,7 @@ flask-request-id-middleware==1.1   # mit
 webargs==8.3.0                     # mit
 clingwrap==1.6.5                   # apache2
 py-cpuinfo==9.0.0                  # mit
-distro==1.8.0                      # apache2
+distro==1.9.0                      # apache2
 shakenfist-agent==0.3.18           # apache2
 shakenfist-utilities==0.6.2        # apache2
 pbr==6.0.0                         # apache2
