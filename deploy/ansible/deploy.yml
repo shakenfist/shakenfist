@@ -997,7 +997,7 @@
         group: root
         mode: "0644"
 
-- hosts: hypervisors, network_node, etcd_master, storage
+- hosts: hypervisors, network_node, etcd_master, storage, primary_node
   any_errors_fatal: true
   become: yes
   become_method: sudo

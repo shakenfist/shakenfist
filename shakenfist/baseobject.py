@@ -334,13 +334,14 @@ class DatabaseBackedObject(object):
         return etcd.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
                              log_ctx=self.log, op=op, timeout=timeout)
 
-    def get_lock_attr(self, name, op):
+    def get_lock_attr(self, name, op, ttl=60, timeout=10):
         # There is no point locking in-memory objects
         if self.in_memory_only:
             return NoopLock()
 
         return etcd.get_lock('attribute/%s' % self.object_type,
-                             self.__uuid, name, op=op, log_ctx=self.log)
+                             self.__uuid, name, op=op, ttl=ttl, timeout=timeout,
+                             log_ctx=self.log)
 
     # Properties common to all objects which are routed to attributes
     @property

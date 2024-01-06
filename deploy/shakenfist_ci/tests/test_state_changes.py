@@ -151,8 +151,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 
         # Unpause
         self.test_client.unpause_instance(inst['uuid'])
-        # No new login prompt after unpause, so just forgive a few fails while
-        # the instance is un-paused.
+        self._await_instance_ready(inst['uuid'])
         self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
 
 
