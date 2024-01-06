@@ -126,7 +126,6 @@
           - dnsmasq-utils
           - dnsutils
           - git
-          - hddtemp
           - libmagic-dev
           - libssl-dev
           - libssl-dev
