@@ -1,6 +1,7 @@
 from collections import defaultdict
 from shakenfist_utilities import logs
 import time
+import versions
 
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
@@ -17,7 +18,7 @@ LOG, _ = logs.setup(__name__)
 class Node(dbo):
     object_type = 'node'
     initial_version = 2
-    current_version = 3
+    current_version = 5
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
@@ -57,6 +58,14 @@ class Node(dbo):
     def _upgrade_step_2_to_3(cls, static_values):
         etcd.put('attribute/node',  static_values['fqdn'], 'instances-active',
                  {'instances': []})
+
+    @classmethod
+    def _upgrade_step_3_to_4(cls, static_values):
+        ...
+
+    @classmethod
+    def _upgrade_step_4_to_5(cls, static_values):
+        ...
 
     @classmethod
     def new(cls, name, ip):
@@ -161,6 +170,35 @@ class Node(dbo):
     def dependency_versions(self, value):
         if value != self.dependency_versions:
             self._db_set_attribute('dependency_versions', value)
+
+    @property
+    def qemu_version(self):
+        v = self._db_get_attribute('qemu_version')
+        return versions.version.Version.from_parts(*v)
+
+    @qemu_version.setter
+    def qemu_version(self, value):
+        if list(value) != self._db_get_attribute('qemu_version'):
+            self._db_set_attribute('qemu_version', value)
+
+    @property
+    def libvirt_version(self):
+        v = self._db_get_attribute('libvirt_version')
+        return versions.version.Version.from_parts(*v)
+
+    @libvirt_version.setter
+    def libvirt_version(self, value):
+        if list(value) != self._db_get_attribute('libvirt_version'):
+            self._db_set_attribute('libvirt_version', value)
+
+    @property
+    def process_metrics(self):
+        return self._db_get_attribute('process_metrics')
+
+    @process_metrics.setter
+    def process_metrics(self, value):
+        if value != self.process_metrics:
+            self._db_set_attribute('process_metrics', value)
 
     def delete(self):
         self.state = self.STATE_DELETED

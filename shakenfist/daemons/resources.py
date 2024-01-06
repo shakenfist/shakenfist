@@ -1,18 +1,19 @@
 import os
+from prometheus_client import Gauge
+from prometheus_client import start_http_server
 import psutil
 import re
 from shakenfist_utilities import logs
 import time
-
-from prometheus_client import Gauge
-from prometheus_client import start_http_server
+from versions import parse_version
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.config import config
 from shakenfist import etcd
-from shakenfist.eventlog import EVENT_TYPE_RESOURCES, EVENT_TYPE_USAGE
+from shakenfist.eventlog import (EVENT_TYPE_RESOURCES, EVENT_TYPE_STATUS,
+                                 EVENT_TYPE_USAGE)
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import network
@@ -34,6 +35,8 @@ class Monitor(daemon.Daemon):
         self.last_logged_resources = 0
 
     def _get_stats(self):
+        n = Node.from_db(config.NODE_NAME)
+
         with util_libvirt.LibvirtConnection() as lc:
             # What's special about this node?
             retval = {
@@ -202,6 +205,10 @@ class Monitor(daemon.Daemon):
                 return re.sub(r'[^a-zA-Z0-9]', '_', name)
 
             def _emit_process_metrics(p):
+                if time.time() - p.create_time() < 60:
+                    # Ignore new processes
+                    return {}
+
                 smn = _safe_metric_name(p.name())
                 out = {}
                 times = p.cpu_times()
@@ -209,34 +216,54 @@ class Monitor(daemon.Daemon):
                 age = time.time() - p.create_time()
                 out['process_cpu_time_%s' % smn] = usage
                 out['process_age_%s' % smn] = age
-                out['process_cpu_fraction_%s' % smn] = usage / age
+
+                fraction = usage / age
+                out['process_cpu_fraction_%s' % smn] = fraction
+                if fraction > 0.25:
+                    n.add_event(EVENT_TYPE_STATUS, 'Process %s is a CPU hog' % smn,
+                                extra={'fraction': fraction})
                 return out
 
-            me = psutil.Process(os.getpid())
-            shim = me.parent()
-            for child in shim.children():
-                try:
-                    with child.oneshot():
-                        retval.update(_emit_process_metrics(child))
-
-                        for subchild in child.children():
-                            with subchild.oneshot():
-                                retval.update(_emit_process_metrics(subchild))
-                except psutil.NoSuchProcess:
-                    ...
-
             if time.time() - self.last_logged_resources > 300:
-                # What package versions do we have?
-                n = Node.from_db(config.NODE_NAME)
+                # Record process metrics
+                process_metrics = {}
+                me = psutil.Process(os.getpid())
+                shim = me.parent()
+                for child in shim.children():
+                    try:
+                        with child.oneshot():
+                            process_metrics.update(_emit_process_metrics(child))
 
+                            for subchild in child.children():
+                                with subchild.oneshot():
+                                    process_metrics.update(_emit_process_metrics(subchild))
+                    except psutil.NoSuchProcess:
+                        ...
+
+                n.process_metrics = process_metrics
+
+                # What package versions do we have?
                 vers_out, _ = util_process.execute(
-                    None, 'dpkg-query --show --showformat=\'${Package}==${Version}\\n\' --no-pager',
+                    None,
+                    ('dpkg-query --show --showformat=\'${Package}==${Version}\\n\' '
+                     '--no-pager'),
                     suppress_command_logging=True)
                 versions = {}
                 for line in vers_out.split():
                     package, version = line.split('==')
                     versions[package] = version
                 n.dependency_versions = versions
+
+                # Some versions are especially important and we make them easier
+                # to lookup
+                for package, attr in [('qemu-utils', 'qemu_version'),
+                                      ('libvirt-daemon', 'libvirt_version')]:
+                    ver = versions.get(package, 'none')
+                    if ':' in ver:
+                        ver = ver.split(':')[1]
+                    ver = re.split('[-+]', ver)[0]
+                    ver = parse_version(ver)
+                    n.__setattr__(attr, ver.release.parts)
 
                 # Log resources
                 n.add_event(

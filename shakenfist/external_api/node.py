@@ -200,6 +200,30 @@ class NodeEventsEndpoint(sf_api.Resource):
             return list(eventdb.read_events(limit=limit, event_type=event_type))
 
 
+node_process_metrics_example = """[
+    ...,
+    ...
+]"""
+
+
+class NodeProcessMetricsEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'nodes', 'Get process metrics for a given node.',
+        [
+            ('node', 'query', 'node', 'The name of a node.', True)
+        ],
+        [(200, 'Process metrics for a single node.', node_process_metrics_example),
+         (404, 'Node not found.', None)]))
+    @api_base.verify_token
+    @sf_api.caller_is_admin
+    @api_base.log_token_use
+    def get(self, node=None):
+        n = Node.from_db(node)
+        if not n:
+            return sf_api.error(404, 'node not found')
+        return n.process_metrics
+
+
 class NodeMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Fetch metadata for a node.',

@@ -104,7 +104,7 @@ class Root(sf_api.Resource):
              'instance-put-blob, instance-execute, instance-get, instance-screenshot</li>'
              '<li>networks: list-addresses, route-addresses'
              '<li>networkinterfaces: interface-metadata</li>'
-             '<li>nodes: node-get, node-metadata</li>'
+             '<li>nodes: node-get, node-metadata, node-process-metrics</li>'
              '</ul></p></body></html>'),
             mimetype='text/html')
         resp.status_code = 200
@@ -239,6 +239,7 @@ api.add_resource(api_network.NetworkUnrouteAddressEndpoint,
 api.add_resource(api_node.NodesEndpoint, '/nodes')
 api.add_resource(api_node.NodeEndpoint, '/nodes/<node>')
 api.add_resource(api_node.NodeEventsEndpoint, '/nodes/<node>/events')
+api.add_resource(api_node.NodeProcessMetricsEndpoint, '/nodes/<node>/processmetrics')
 api.add_resource(api_node.NodeMetadatasEndpoint, '/nodes/<node>/metadata')
 api.add_resource(api_node.NodeMetadataEndpoint, '/nodes/<node>/metadata/<key>')
 

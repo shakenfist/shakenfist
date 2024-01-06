@@ -14,7 +14,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
+from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import instance
 from shakenfist import node
 from shakenfist import upload
@@ -414,12 +414,13 @@ class Monitor(daemon.Daemon):
             # a different library for compaction as our primary library does
             # not support it.
             c = etcd3.client()
-            c.put('/sf/compact',
-                  json.dumps({'compacted_at': time.time()}))
+            c.put('/sf/compact', json.dumps({'compacted_at': time.time()}))
             _, kv = c.get('/sf/compact')
             c.compact(kv.mod_revision, physical=True)
             c.defragment()
-            LOG.info('Compacted etcd')
+
+            n = node.Node.from_db(config.NODE_NAME)
+            n.add_event(EVENT_TYPE_STATUS, 'Compacted etcd')
 
         except Exception as e:
             util_general.ignore_exception('etcd compaction', e)
