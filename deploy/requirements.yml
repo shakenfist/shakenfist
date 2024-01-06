@@ -1,9 +1,17 @@
 # Ansible galaxy roles
 
+# Yes, there really are two names for unarchive-deps depending on the version
+# of the other galaxy roles you're using.
+
 # - src: andrewrothstein.unarchive-deps
 - src: https://github.com/mikalstill/ansible-unarchive-deps
   version: master
   name: andrewrothstein.unarchive-deps
+
+# - src: andrewrothstein.unarchivedeps
+- src: https://github.com/mikalstill/ansible-unarchivedeps
+  version: master
+  name: andrewrothstein.unarchivedeps
 
 # - src: andrewrothstein.etcd
 # Works with everything except Ubuntu 20.04: 2.1.43
