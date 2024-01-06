@@ -83,6 +83,13 @@ JOBS = {
             'topology': 'slim-primary',
             'concurrency': 5
         },
+        {
+            'name': 'ubuntu-2204-slim-primary',
+            'baseimage': 'sf://label/ci-images/ubuntu-2204',
+            'baseuser': 'ubuntu',
+            'topology': 'slim-primary',
+            'concurrency': 5
+        },
     ],
     'scheduled-tests': [
         {
@@ -104,6 +111,14 @@ JOBS = {
         {
             'name': 'develop-ubuntu-2004-slim-primary',
             'baseimage': 'sf://label/ci-images/ubuntu-2004',
+            'baseuser': 'ubuntu',
+            'topology': 'slim-primary',
+            'concurrency': 5,
+            'branch': 'develop'
+        },
+        {
+            'name': 'develop-ubuntu-2204-slim-primary',
+            'baseimage': 'sf://label/ci-images/ubuntu-2204',
             'baseuser': 'ubuntu',
             'topology': 'slim-primary',
             'concurrency': 5,
