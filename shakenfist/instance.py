@@ -1510,12 +1510,16 @@ class Instance(dbo):
         with util_libvirt.LibvirtConnection() as lc:
             lc.get_screenshot(self.uuid, dest_path + '.partial')
 
+        # We don't remove the partial file until we've finished registering the blob
+        # to avoid deletion races. Note that this _must_ be a hard link, which is why
+        # we don't use util_general.link().
         st = os.stat(dest_path + '.partial')
-        os.rename(dest_path + '.partial', dest_path)
+        os.link(dest_path + '.partial', dest_path)
         b = blob.Blob.new(blob_uuid, st.st_size, time.time(), time.time())
         b.state = blob.Blob.STATE_CREATED
         b.observe()
         b.request_replication()
+        os.link(dest_path + '.partial')
 
         return blob_uuid
 

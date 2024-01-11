@@ -394,7 +394,11 @@ class Monitor(daemon.Daemon):
                                                     'Unexpected sidechannel client packet in '
                                                     'response to get-file command')
 
-                                os.rename(blob_path + '.partial', blob_path)
+                                # We don't remove the partial file until we've finished
+                                # registering the blob to avoid deletion races. Note that
+                                # this _must_ be a hard link, which is why we don't use
+                                # util_general.link().
+                                os.link(blob_path + '.partial', blob_path)
                                 st = os.stat(blob_path)
                                 if st.st_size == 0 and total_length > 0:
                                     self.log.error('Agent get-file blob is zero not %d bytes.'
@@ -404,6 +408,7 @@ class Monitor(daemon.Daemon):
                                 b.ref_count_inc(agentop)
                                 b.observe()
                                 b.request_replication()
+                                os.unlink(blob_path + '.partial')
 
                             elif command['command'] == 'chmod':
                                 unique = 'agentop:%s:%d' % (agentop.uuid, count)
