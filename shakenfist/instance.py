@@ -789,7 +789,7 @@ class Instance(dbo):
 
     def _configure_block_devices(self, lock):
         with self.get_lock_attr(
-                'block_devices', 'Initialize block devices', ttl=300) as bd_lock:
+                'block_devices', 'Initialize block devices', ttl=600) as bd_lock:
             # Locks to refresh
             locks = [bd_lock]
             if lock:
@@ -817,8 +817,7 @@ class Instance(dbo):
                     # if an image had to be fetched from outside the cluster.
                     disk_base = None
                     if disk.get('blob_uuid'):
-                        disk_base = '%s%s' % (
-                            artifact.BLOB_URL, disk['blob_uuid'])
+                        disk_base = '%s%s' % (artifact.BLOB_URL, disk['blob_uuid'])
                     elif disk.get('base') and not util_general.noneish(disk.get('base')):
                         a = artifact.Artifact.from_url(
                             artifact.Artifact.TYPE_IMAGE, disk['base'],
@@ -831,13 +830,12 @@ class Instance(dbo):
                                 % (a.uuid, a.artifact_type))
 
                         disk['blob_uuid'] = mri['blob_uuid']
-                        disk_base = '%s%s' % (
-                            artifact.BLOB_URL, disk['blob_uuid'])
+                        disk_base = '%s%s' % (artifact.BLOB_URL, disk['blob_uuid'])
 
                     if disk_base:
                         cached_image_path = util_general.file_permutation_exists(
-                            os.path.join(config.STORAGE_PATH,
-                                         'image_cache', disk['blob_uuid']),
+                            os.path.join(config.STORAGE_PATH, 'image_cache',
+                                         disk['blob_uuid']),
                             ['iso', 'qcow2'])
                         if not cached_image_path:
                             raise exceptions.ImageMissingFromCache(
@@ -919,8 +917,7 @@ class Instance(dbo):
                             disk['backing'] = disk['backing'].lstrip()
 
                     elif not os.path.exists(disk['path']):
-                        util_image.create_blank(
-                            locks, disk['path'], disk['size'])
+                        util_image.create_blank(locks, disk['path'], disk['size'])
 
                     shutil.chown(disk['path'], 'libvirt-qemu', 'libvirt-qemu')
                     modified_disks.append(disk)
