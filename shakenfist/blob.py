@@ -654,7 +654,10 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     # And make the associated blob. Note that we deliberately don't calculate the
     # snapshot checksum here, as this makes large snapshots even slower for users.
     # The checksum will "catch up" when the scheduled verification occurs.
-    os.rename(dest_path + '.partial', dest_path)
+    # We don't remove the partial file until we've finished registering the blob
+    # to avoid deletion races. Note that this _must_ be a hard link, which is why
+    # we don't use util_general.link().
+    os.link(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(),
                  depends_on=depends_on)
     b.state = Blob.STATE_CREATED
@@ -662,6 +665,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
         dep_blob.ref_count_inc(b)
     b.observe()
     b.request_replication()
+    os.unlink(dest_path + '.partial')
     return b
 
 
