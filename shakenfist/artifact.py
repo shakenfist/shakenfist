@@ -125,6 +125,7 @@ class Artifact(dbo):
                 partial(type_filter, artifact_type),
                 not_dead_states_filter,
                 partial(namespace_or_shared_filter, namespace)]))
+
             if len(artifacts) == 0:
                 if create_if_new:
                     if not name:
@@ -135,6 +136,17 @@ class Artifact(dbo):
                 return None
             if len(artifacts) == 1:
                 return artifacts[0]
+
+            # We have more than one match. If only one of those is in our
+            # namespace, then use it. Otherwise give up as being ambiguous.
+            local_artifacts = []
+            for a in artifacts:
+                if a.namespace == namespace:
+                    local_artifacts.append(a)
+
+            if len(local_artifacts) == 1:
+                return local_artifacts[0]
+
             raise exceptions.TooManyMatches()
 
     # Static values
