@@ -26,7 +26,7 @@ bcrypt==4.1.2                      # apache2
 gunicorn==21.2.0                   # mit
 python-magic==0.4.27               # mit
 flask-request-id-middleware==1.1   # mit
-webargs==8.3.0                     # mit
+webargs==8.4.0                     # mit
 clingwrap==1.6.5                   # apache2
 py-cpuinfo==9.0.0                  # mit
 distro==1.9.0                      # apache2
