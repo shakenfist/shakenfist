@@ -1,3 +1,5 @@
+from shakenfist_client import apiclient
+
 from shakenfist_ci import base
 
 
@@ -24,3 +26,17 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
         self.assertEqual(0, results['return-code'])
         self.assertEqual('', results['stderr'])
         self.assertTrue('vda' in results['stdout'])
+
+    def test_bad_bus(self):
+        self.assertRaises(
+            apiclient.RequestMalformedException,
+            self.test_client.create_instance,
+            'test-bad-bus-disk', 1, 1024, None,
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://upload/system/debian-11',
+                    'type': 'disk',
+                    'bus': 'banana'
+                }
+            ], None, None)

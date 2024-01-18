@@ -65,7 +65,9 @@ def _get_disk_device(bus, index):
         'virtio': ('vd', LETTERS),
         'nvme': ('nvme', NUMBERS),
     }
-    prefix, index_scheme = bases.get(bus, 'sd')
+    if bus not in bases:
+        raise exceptions.InstanceBadDiskSpecification('Unknown bus %s' % bus)
+    prefix, index_scheme = bases.get(bus)
     return '%s%s' % (prefix, index_scheme[index])
 
 
