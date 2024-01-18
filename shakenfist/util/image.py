@@ -2,6 +2,7 @@ import os
 import re
 from shakenfist_utilities import logs
 import shutil
+import versions
 
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
@@ -9,6 +10,7 @@ import shutil
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import exceptions
+from shakenfist.node import Node
 from shakenfist.util import process as util_process
 
 
@@ -16,6 +18,7 @@ LOG, _ = logs.setup(__name__)
 
 
 VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
+QEMU_REQUIRES_BACKING_FORMAT = versions.parse_version_set(">=6.0.0")
 
 
 def convert_numeric_qemu_value(qemu_value):
@@ -92,18 +95,29 @@ def create_cow(locks, cache_file, disk_file, disk_size):
             'of the image of %s bytes.'
             % (disk_size, disk_size * constants.GiB, info['virtual size']))
 
+    qemu_command = ('qemu-img create -b %(cache_file)s '
+                    '-o cluster_size=%(cluster_size)s -f qcow2 -F qcow2 '
+                    '%(disk_file)s')
+    if Node.from_db(config.NODE_NAME).qemu_version.matches(QEMU_REQUIRES_BACKING_FORMAT):
+        qemu_command += ' -F qcow2'
+
     if disk_size:
+        qemu_command += ' %(disk_size)dG'
         util_process.execute(
-            locks,
-            ('qemu-img create -b %s -o cluster_size=%s -f qcow2 %s %dG'
-             % (cache_file, constants.QCOW2_CLUSTER_SIZE, disk_file,
-                int(disk_size))),
+            locks, qemu_command % {
+                'cache_file': cache_file,
+                'cluster_size': constants.QCOW2_CLUSTER_SIZE,
+                'disk_file': disk_file,
+                'disk_size': int(disk_size)
+            },
             iopriority=util_process.PRIORITY_LOW)
     else:
         util_process.execute(
-            locks,
-            'qemu-img create -b %s -o cluster_size=%s -f qcow2 %s'
-            % (cache_file, constants.QCOW2_CLUSTER_SIZE, disk_file),
+            locks, qemu_command % {
+                'cache_file': cache_file,
+                'cluster_size': constants.QCOW2_CLUSTER_SIZE,
+                'disk_file': disk_file
+            },
             iopriority=util_process.PRIORITY_LOW)
 
 
@@ -157,10 +171,18 @@ def snapshot(locks, source, destination, thin=False):
         temporary_location = os.path.join(config.STORAGE_PATH, 'image_cache',
                                           destination_uuid + '.partial')
 
-        cmd = ('qemu-img convert --force-share -o cluster_size=%s -O qcow2 -B %s'
-               % (constants.QCOW2_CLUSTER_SIZE, backing_uuid_with_extension))
+        qemu_command = ('qemu-img convert --force-share -o '
+                        'cluster_size=%(cluster_size)s -O qcow2 '
+                        '-B %(backing)s')
         if config.COMPRESS_SNAPSHOTS:
-            cmd += ' -c'
+            qemu_command += ' -c'
+        if Node.from_db(config.NODE_NAME).qemu_version.matches(QEMU_REQUIRES_BACKING_FORMAT):
+            qemu_command += ' -F qcow2'
+
+        cmd = qemu_command % {
+            'cluster_size': constants.QCOW2_CLUSTER_SIZE,
+            'backing': backing_uuid_with_extension
+        }
 
         util_process.execute(locks, ' '.join([cmd, source, temporary_location]),
                              iopriority=util_process.PRIORITY_LOW, cwd=backing_path)
@@ -171,10 +193,14 @@ def snapshot(locks, source, destination, thin=False):
 
     # Produce a single file with any backing files flattened. This is also the
     # fall through from the "thin" option when no backing files are present.
-    cmd = ('qemu-img convert --force-share -o cluster_size=%s -O qcow2'
-           % constants.QCOW2_CLUSTER_SIZE)
+    qemu_command = ('qemu-img convert --force-share -o '
+                    'cluster_size=%(cluster_size)s -O qcow2')
     if config.COMPRESS_SNAPSHOTS:
-        cmd += ' -c'
+        qemu_command += ' -c'
+
+    cmd = qemu_command % {
+        'cluster_size': constants.QCOW2_CLUSTER_SIZE
+    }
 
     util_process.execute(locks, ' '.join([cmd, source, destination]),
                          iopriority=util_process.PRIORITY_LOW)

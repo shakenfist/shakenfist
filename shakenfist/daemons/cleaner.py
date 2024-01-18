@@ -14,7 +14,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
+from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import instance
 from shakenfist import node
 from shakenfist import upload
@@ -414,12 +414,13 @@ class Monitor(daemon.Daemon):
             # a different library for compaction as our primary library does
             # not support it.
             c = etcd3.client()
-            c.put('/sf/compact',
-                  json.dumps({'compacted_at': time.time()}))
+            c.put('/sf/compact', json.dumps({'compacted_at': time.time()}))
             _, kv = c.get('/sf/compact')
             c.compact(kv.mod_revision, physical=True)
             c.defragment()
-            LOG.info('Compacted etcd')
+
+            n = node.Node.from_db(config.NODE_NAME)
+            n.add_event(EVENT_TYPE_STATUS, 'Compacted etcd')
 
         except Exception as e:
             util_general.ignore_exception('etcd compaction', e)
@@ -433,31 +434,43 @@ class Monitor(daemon.Daemon):
         last_stale_upload_check = time.time() + 150
         last_libvirt_log_clean = 0
 
+        n = node.Node.from_db(config.NODE_NAME)
         while not self.exit.is_set():
             # Update power state of all instances on this hypervisor
-            self._update_power_states()
+            with util_general.RecordedOperation('update power states', n,
+                                                threshold=1):
+                self._update_power_states()
 
-            self._maintain_blobs()
+            with util_general.RecordedOperation('maintain blobs', n,
+                                                threshold=1):
+                self._maintain_blobs()
 
             if time.time() - last_missing_blob_check > 300:
-                self._find_missing_blobs()
-                last_missing_blob_check = time.time()
+                with util_general.RecordedOperation('find missing blobs', n,
+                                                    threshold=1):
+                    self._find_missing_blobs()
+                    last_missing_blob_check = time.time()
 
             if time.time() - last_stale_upload_check > 300:
-                self._remove_stale_uploads()
-                last_stale_upload_check = time.time()
+                with util_general.RecordedOperation('remove stale uploads', n,
+                                                    threshold=1):
+                    self._remove_stale_uploads()
+                    last_stale_upload_check = time.time()
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:
                 if time.time() - last_compaction > 1800:
-                    LOG.info('Compacting etcd')
-                    self._compact_etcd()
-                    last_compaction = time.time()
+                    with util_general.RecordedOperation('compact etcd', n,
+                                                        threshold=1):
+                        self._compact_etcd()
+                        last_compaction = time.time()
 
             # Cleanup libvirt logs, but less frequently
             if time.time() - last_libvirt_log_clean > 1800:
-                self._clear_old_libvirt_logs()
-                last_libvirt_log_clean = time.time()
+                with util_general.RecordedOperation('libvirt log cleanup', n,
+                                                    threshold=1):
+                    self._clear_old_libvirt_logs()
+                    last_libvirt_log_clean = time.time()
 
             self.exit.wait(60)
 

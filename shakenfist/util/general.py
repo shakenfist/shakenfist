@@ -22,9 +22,10 @@ LOG, _ = logs.setup(__name__)
 
 
 class RecordedOperation():
-    def __init__(self, operation, relatedobject):
+    def __init__(self, operation, relatedobject, threshold=0):
         self.operation = operation
         self.object = relatedobject
+        self.threshold = threshold
 
     def __enter__(self):
         self.start_time = time.time()
@@ -32,6 +33,10 @@ class RecordedOperation():
 
     def __exit__(self, *args):
         duration = time.time() - self.start_time
+
+        if duration < self.threshold:
+            return
+
         object_type, object_uuid = self.unique_label()
         if object_uuid:
             if object_type:

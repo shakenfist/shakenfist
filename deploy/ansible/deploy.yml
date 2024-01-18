@@ -35,7 +35,7 @@
 
     - name: Add nodes from topology
       # This include is to work around the lack of blocks in loops
-      include: includes/topology_add_node.yml
+      include_tasks: includes/topology_add_node.yml
       loop: "{{topology}}"
 
     - name: Set configuration file location
@@ -126,7 +126,6 @@
           - dnsmasq-utils
           - dnsutils
           - git
-          - hddtemp
           - libmagic-dev
           - libssl-dev
           - libssl-dev
