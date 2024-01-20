@@ -417,6 +417,14 @@ class InstancesEndpoint(sf_api.Resource):
             if not isinstance(d, dict):
                 return sf_api.error(400, 'disk specification should contain JSON objects')
 
+            # Ensure we're using a known disk bus
+            disk_bus = instance._get_defaulted_disk_bus(d)
+            try:
+                instance._get_disk_device(disk_bus, 0)
+            except exceptions.InstanceBadDiskSpecification:
+                return sf_api.error(400, 'invalid disk bus %s' % disk_bus,
+                                    suppress_traceback=True)
+
             # Convert internal shorthand forms into specific blobs
             disk_base = d.get('base')
             if util_general.noneish(disk_base):
