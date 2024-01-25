@@ -638,12 +638,13 @@ class Instance(dbo):
             # We don't write unchanged things to the database
             dbstate = self.power_state
             if dbstate.get('power_state') == state:
-                return
+                return False
 
             dbstate['power_state_previous'] = dbstate.get('power_state')
             dbstate['power_state'] = state
             dbstate['power_state_updated'] = time.time()
             self._db_set_attribute('power_state', dbstate)
+            return True
 
     # NOTE(mikal): this method is now strictly the instance specific steps for
     # creation. It is assumed that the image sits in local cache already, and
@@ -1280,10 +1281,22 @@ class Instance(dbo):
                 raise exceptions.InvalidLifecycleState(
                     'you cannot pause a powered off instance')
 
+            attempts = 1
             inst.suspend()
+            self.add_event(EVENT_TYPE_AUDIT, 'pause', extra={'attempt': attempts})
+
+            while not self.update_power_state(lc.extract_power_state(inst)):
+                if attempts > 2:
+                    self.add_event(EVENT_TYPE_AUDIT, 'pause failed')
+                    raise exceptions.InvalidLifecycleState(
+                        'pause failed after %d attempts' % attempts)
+
+                time.sleep(1)
+                attempts += 1
+                inst.suspend()
+                self.add_event(EVENT_TYPE_AUDIT, 'pause', extra={'attempt': attempts})
+
             self.agent_state = 'not ready (instance paused)'
-            self.update_power_state(lc.extract_power_state(inst))
-            self.add_event(EVENT_TYPE_AUDIT, 'pause')
 
     def unpause(self):
         with util_libvirt.LibvirtConnection() as lc:
@@ -1295,9 +1308,20 @@ class Instance(dbo):
                 raise exceptions.InvalidLifecycleState(
                     'you cannot unpause a powered off instance')
 
+            attempts = 1
             inst.resume()
-            self.update_power_state(lc.extract_power_state(inst))
-            self.add_event(EVENT_TYPE_AUDIT, 'unpause')
+            self.add_event(EVENT_TYPE_AUDIT, 'unpause', extra={'attempt': attempts})
+
+            while not self.update_power_state(lc.extract_power_state(inst)):
+                if attempts > 2:
+                    self.add_event(EVENT_TYPE_AUDIT, 'unpause failed')
+                    raise exceptions.InvalidLifecycleState(
+                        'unpause failed after %d attempts' % attempts)
+
+                time.sleep(1)
+                attempts += 1
+                inst.resume()
+                self.add_event(EVENT_TYPE_AUDIT, 'unpause', extra={'attempt': attempts})
 
     def get_console_data(self, length):
         console_path = os.path.join(self.instance_path, 'console.log')
