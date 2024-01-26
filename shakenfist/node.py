@@ -18,7 +18,7 @@ LOG, _ = logs.setup(__name__)
 class Node(dbo):
     object_type = 'node'
     initial_version = 2
-    current_version = 5
+    current_version = 6
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
@@ -65,6 +65,10 @@ class Node(dbo):
 
     @classmethod
     def _upgrade_step_4_to_5(cls, static_values):
+        ...
+
+    @classmethod
+    def _upgrade_step_5_to_6(cls, static_values):
         ...
 
     @classmethod
@@ -190,6 +194,25 @@ class Node(dbo):
     def libvirt_version(self, value):
         if list(value) != self._db_get_attribute('libvirt_version'):
             self._db_set_attribute('libvirt_version', value)
+
+    @property
+    def python_version(self):
+        v = self._db_get_attribute('python_version')
+        return versions.version.Version.from_parts(*v)
+
+    @python_version.setter
+    def python_version(self, value):
+        if list(value) != self._db_get_attribute('python_version'):
+            self._db_set_attribute('python_version', value)
+
+    @property
+    def python_implementation(self):
+        return self._db_get_attribute('python_implementation')
+
+    @python_implementation.setter
+    def python_implementation(self, value):
+        if value != self._db_get_attribute('python_implementation'):
+            self._db_set_attribute('python_implementation', value)
 
     @property
     def process_metrics(self):
