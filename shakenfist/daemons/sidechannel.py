@@ -48,13 +48,6 @@ class SFSocketAgent(protocol.SocketAgent):
 
 
 class Monitor(daemon.Daemon):
-    NEVER_TALKED = 'not ready (no contact)'
-    STOPPED_TALKING = 'not ready (unresponsive)'
-    AGENT_STARTED = 'not ready (agent startup)'
-    AGENT_STOPPED = 'not ready (agent stopped)'
-    AGENT_TOO_OLD = 'not ready (agent too old)'
-    AGENT_READY = 'ready'
-
     def __init__(self, name):
         super(Monitor, self).__init__(name)
         self.monitors = {}
@@ -80,17 +73,17 @@ class Monitor(daemon.Daemon):
                 versions = Comparison(agent_version.split(' ')[1], MINIMUM_AGENT_VERSION)
                 lesser = versions.get_lesser()
                 if lesser and lesser == agent_version:
-                    self.instance_ready = self.AGENT_TOO_OLD
-                    self.instance.agent_state = self.AGENT_TOO_OLD
+                    self.instance_ready = constants.AGENT_TOO_OLD
+                    self.instance.agent_state = constants.AGENT_TOO_OLD
                     return True
 
-            self.instance_ready = self.AGENT_STARTED
-            self.instance.agent_state = self.AGENT_STARTED
+            self.instance_ready = constants.AGENT_STARTED
+            self.instance.agent_state = constants.AGENT_STARTED
             return True
 
         elif command == 'agent-stop':
-            self.instance_ready = self.AGENT_STOPPED
-            self.instance.agent_state = self.AGENT_STOPPED
+            self.instance_ready = constants.AGENT_STOPPED
+            self.instance.agent_state = constants.AGENT_STOPPED
             return True
 
         elif command == 'is-system-running-response':
@@ -99,7 +92,7 @@ class Monitor(daemon.Daemon):
             self._record_system_boot_time(sbt)
 
             if ready:
-                new_state = self.AGENT_READY
+                new_state = constants.AGENT_READY
             else:
                 # Special case the degraded state here, as the system is in fact
                 # as ready as it is ever going to be, but isn't entirely happy.
@@ -112,11 +105,11 @@ class Monitor(daemon.Daemon):
                            % (self.instance_ready, new_state))
 
             # We cache the agent state to reduce database load, and then
-            # trigger facts gathering when we transition into the self.AGENT_READY state.
+            # trigger facts gathering when we transition into the constants.AGENT_READY state.
             if self.instance_ready != new_state:
                 self.instance_ready = new_state
                 self.instance.agent_state = new_state
-                if new_state == self.AGENT_READY:
+                if new_state == constants.AGENT_READY:
                     self.sc_client.send_packet({
                         'command': 'gather-facts',
                         'unique': str(time.time())
@@ -216,8 +209,8 @@ class Monitor(daemon.Daemon):
         if self.instance.state.value == instance.Instance.STATE_DELETED:
             return
 
-        self.instance_ready = self.NEVER_TALKED
-        self.instance.agent_state = self.NEVER_TALKED
+        self.instance_ready = constants.AGENT_NEVER_TALKED
+        self.instance.agent_state = constants.AGENT_NEVER_TALKED
         self.system_boot_time = 0
         self.last_data = time.time()
         self.log = LOG.with_fields({'instance': instance_uuid})
@@ -265,7 +258,7 @@ class Monitor(daemon.Daemon):
                     self.log.with_fields({'packet': packet}).error(
                         'Unexpected sidechannel client packet during startup, ignoring')
 
-                if self.instance_ready == self.AGENT_READY:
+                if self.instance_ready == constants.AGENT_READY:
                     break
 
                 # Retry every now and then
@@ -293,7 +286,7 @@ class Monitor(daemon.Daemon):
 
         # If the agent is too old, then just sit here not doing the things we
         # should be doing
-        if self.instance_ready == self.AGENT_TOO_OLD:
+        if self.instance_ready == constants.AGENT_TOO_OLD:
             self.instance.add_event(
                 EVENT_TYPE_AUDIT, 'Instance agent is too old, not executing commands.')
             while not self.exit.is_set():
@@ -308,7 +301,7 @@ class Monitor(daemon.Daemon):
                         'Unexpected sidechannel client packet')
 
                 # If idle, try to do something
-                if self.instance_ready == self.AGENT_READY:
+                if self.instance_ready == constants.AGENT_READY:
                     agentop = self.instance.agent_operation_dequeue()
                     if agentop:
                         self.instance.add_event(
@@ -514,9 +507,9 @@ class Monitor(daemon.Daemon):
 
                 # If very idle, something has gone wrong
                 if time.time() - self.last_data > 15:
-                    if self.instance.agent_state.value != self.NEVER_TALKED:
-                        self.instance_ready = self.STOPPED_TALKING
-                        self.instance.agent_state = self.STOPPED_TALKING
+                    if self.instance.agent_state.value != constants.AGENT_NEVER_TALKED:
+                        self.instance_ready = constants.AGENT_STOPPED_TALKING
+                        self.instance.agent_state = constants.AGENT_STOPPED_TALKING
                     self.log.debug('Not receiving traffic, aborting.')
                     if self.system_boot_time != 0:
                         self.instance.add_event(

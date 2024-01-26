@@ -1184,6 +1184,8 @@ class Instance(dbo):
                 time.sleep(5)
                 attempts += 1
 
+            self.agent_state = constants.AGENT_NEVER_TALKED
+
     def _power_on_inner(self):
         with util_libvirt.LibvirtConnection() as lc:
             inst = lc.get_domain_from_sf_uuid(self.uuid)
@@ -1250,7 +1252,7 @@ class Instance(dbo):
                                          'domain is not running'):
                     self.log.error('Failed to delete domain: %s', e)
 
-            self.agent_state = 'not ready (instance powered off)'
+            self.agent_state = constants.AGENT_INSTANCE_OFF
             self.update_power_state('off')
             self.add_event(EVENT_TYPE_AUDIT, 'poweroff')
 
@@ -1296,7 +1298,7 @@ class Instance(dbo):
                 inst.suspend()
                 self.add_event(EVENT_TYPE_AUDIT, 'pause', extra={'attempt': attempts})
 
-            self.agent_state = 'not ready (instance paused)'
+            self.agent_state = constants.AGENT_INSTANCE_PAUSED
 
     def unpause(self):
         with util_libvirt.LibvirtConnection() as lc:
@@ -1322,6 +1324,8 @@ class Instance(dbo):
                 attempts += 1
                 inst.resume()
                 self.add_event(EVENT_TYPE_AUDIT, 'unpause', extra={'attempt': attempts})
+
+            self.agent_state = constants.AGENT_NEVER_TALKED
 
     def get_console_data(self, length):
         console_path = os.path.join(self.instance_path, 'console.log')
