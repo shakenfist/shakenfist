@@ -232,7 +232,7 @@ jobs:
               --extra-vars "base_image_user=ubuntu ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: bundle.zip
