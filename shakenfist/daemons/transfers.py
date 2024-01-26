@@ -54,7 +54,7 @@ def transfer_server(name, data):
 
         st = os.stat(blob_path)
         if st.st_size == 0:
-            log.warning('Blog is empty, aborting')
+            log.warning('Blob is empty, aborting')
             return
 
         sent_bytes = 0

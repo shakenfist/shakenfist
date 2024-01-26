@@ -387,6 +387,10 @@ class Monitor(daemon.Daemon):
                                                     'Unexpected sidechannel client packet in '
                                                     'response to get-file command')
 
+                                # This os.sync() is here because _sometimes_ we wouldn't see the
+                                # data on disk when we immediately try to replicate it.
+                                os.sync()
+
                                 # We don't remove the partial file until we've finished
                                 # registering the blob to avoid deletion races. Note that
                                 # this _must_ be a hard link, which is why we don't use
