@@ -27,6 +27,10 @@ from shakenfist.util import process as util_process
 LOG, _ = logs.setup(__name__)
 
 
+# /usr/bin/kvm -name guest=sf:ec069949-eb19-4f7a-aaf2-a6020c877b95,...
+LIBVIRT_KVM_CMDLINE_RE = re.compile('.* guest=sf:([a-z0-9\\-]+).*')
+
+
 class Monitor(daemon.Daemon):
     def __init__(self, id):
         super(Monitor, self).__init__(id)
@@ -311,8 +315,7 @@ class Monitor(daemon.Daemon):
                             if not bd:
                                 continue
 
-                            statistics = util_libvirt.extract_statistics(
-                                domain)
+                            statistics = util_libvirt.extract_statistics(domain)
 
                             # Add in actual size on disk
                             for disk in bd.get('devices', [{}]):
@@ -355,6 +358,22 @@ class Monitor(daemon.Daemon):
                     LOG.with_fields({'network': n}).info(
                         'Failed to collect network usage: %s' % e)
 
+        def identity_libvirt_processes():
+            # KVM processes are owned by init
+            init = psutil.Process(1)
+            for child in init.children():
+                try:
+                    with child.oneshot():
+                        m = LIBVIRT_KVM_CMDLINE_RE.match(' '.join(child.cmdline()))
+                        if m:
+                            instance_uuid = m.group(1)
+                            i = instance.Instance.from_db(instance_uuid)
+                            if i:
+                                i.kvm_pid = child.pid
+
+                except psutil.NoSuchProcess:
+                    ...
+
         while not self.exit.is_set():
             try:
                 if time.time() - last_metrics > config.SCHEDULER_CACHE_TIMEOUT:
@@ -363,6 +382,7 @@ class Monitor(daemon.Daemon):
 
                 if time.time() - last_billing > config.USAGE_EVENT_FREQUENCY:
                     emit_billing_statistics()
+                    identity_libvirt_processes()
                     last_billing = time.time()
 
                 self.exit.wait(1)

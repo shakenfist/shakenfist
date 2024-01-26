@@ -507,6 +507,14 @@ class Instance(dbo):
     def blob_references(self, blob_refs):
         self._db_set_attribute('blob_references', blob_refs)
 
+    @property
+    def kvm_pid(self):
+        return self._db_get_attribute('kvm_pid')
+
+    @kvm_pid.setter
+    def kvm_pid(self, pid):
+        self._db_set_attribute('kvm_pid', pid)
+
     # Implementation
     def _initialize_block_devices(self):
         blob_refs = defaultdict(int)
