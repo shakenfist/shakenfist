@@ -111,7 +111,10 @@ class AuthTestCase(base.ShakenFistTestCase):
 
     def test_auth_header_wrong(self):
         resp = self.client.post('/auth/namespaces',
-                                headers={'Authorization': 'l33thacker'},
+                                headers={
+                                    'Accept': 'application/json',
+                                    'Authorization': 'l33thacker'
+                                    },
                                 data=json.dumps({
                                     'namespace': 'foo'
                                 }))
@@ -126,7 +129,10 @@ class AuthTestCase(base.ShakenFistTestCase):
 
     def test_auth_header_bad_jwt(self):
         resp = self.client.post('/auth/namespaces',
-                                headers={'Authorization': 'Bearer l33thacker'},
+                                headers={
+                                    'Accept': 'application/json',
+                                    'Authorization': 'Bearer l33thacker'
+                                    },
                                 data=json.dumps({
                                     'namespace': 'foo'
                                 }))

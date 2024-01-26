@@ -38,3 +38,14 @@ QCOW2_CLUSTER_SIZE = '2048K'
 # This description is used to uniquely identify transcoded versions of images.
 # It is important that it be bumped when the transcode format changes.
 TRANSCODE_DESCRIPTION = 'zlib;qcow2;cluster_size'
+
+
+# Instance agent states
+AGENT_NEVER_TALKED = 'not ready (no contact)'
+AGENT_STOPPED_TALKING = 'not ready (unresponsive)'
+AGENT_STARTED = 'not ready (agent startup)'
+AGENT_STOPPED = 'not ready (agent stopped)'
+AGENT_TOO_OLD = 'not ready (agent too old)'
+AGENT_INSTANCE_PAUSED = 'not ready (instance paused)'
+AGENT_INSTANCE_OFF = 'not ready (instance powered off)'
+AGENT_READY = 'ready'
