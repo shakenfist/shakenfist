@@ -397,7 +397,14 @@
     Major changes
   </a>
   
-    <nav class="md-nav" aria-label="Major changes">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-distributions" class="md-nav__link">
+    Supported distributions
+  </a>
+  
+    <nav class="md-nav" aria-label="Supported distributions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -417,6 +424,13 @@
           <li class="md-nav__item">
   <a href="#instances" class="md-nav__link">
     Instances
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#artifacts" class="md-nav__link">
+    Artifacts
   </a>
   
 </li>
@@ -1351,7 +1365,14 @@
     Major changes
   </a>
   
-    <nav class="md-nav" aria-label="Major changes">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-distributions" class="md-nav__link">
+    Supported distributions
+  </a>
+  
+    <nav class="md-nav" aria-label="Supported distributions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1371,6 +1392,13 @@
           <li class="md-nav__item">
   <a href="#instances" class="md-nav__link">
     Instances
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#artifacts" class="md-nav__link">
+    Artifacts
   </a>
   
 </li>
@@ -1414,6 +1442,11 @@
 
 <h1 id="v07-to-v08-release-notes">v0.7 to v0.8 release notes</h1>
 <h2 id="major-changes">Major changes</h2>
+<h2 id="supported-distributions">Supported distributions</h2>
+<ul>
+<li>Ubuntu 22.04 is now supported as a host OS.</li>
+<li>Fedora 34, 38, and 29, as well as Ubuntu 22.04 now have canned guest images.</li>
+</ul>
 <h3 id="containers-and-kubernetes">Containers and Kubernetes</h3>
 <ul>
 <li>The Shaken Fist client can now orchestrate K3S Kubernetes clusters for you. The
@@ -1442,18 +1475,28 @@
   interface on the virtual network must then have been configured by the user to
   answer ARP requests for that address. This works well with metallb, which our
   K3S orchestration uses to expose services.</li>
+<li>Network orchestration now waits for <code>iptables</code> locks, instead of failing
+  commands in high load situations.</li>
 </ul>
 <h3 id="instances">Instances</h3>
 <ul>
 <li>Shaken Fist can now capture screenshots of instance consoles.</li>
 <li>Pause and unpause are now retried several times on failure, as sometimes libvirt
   does not respond correctly.</li>
+<li>Specifying an incorrect disk bus now returns a more helpful error.</li>
+</ul>
+<h3 id="artifacts">Artifacts</h3>
+<ul>
+<li>When you refer to an artifact by name, and there is more than one match then
+  the match in your local namespace (if any) is now preferred instead of returning
+  an error.</li>
 </ul>
 <h3 id="deployment">Deployment</h3>
 <ul>
 <li>We no longer reset the authentication secret used to generate authentication
   tokens on upgrade. This means tokens from before an upgrade will continue to work
   for their normal lifetime.</li>
+<li>We now lock versions of upstream Ansible Galaxy dependencies.</li>
 </ul>
 <h2 id="minor-changes">Minor changes</h2>
 <ul>
@@ -1466,6 +1509,12 @@
   expect to wait a long time for a lock -- for example serialized fetches of a
   single resource from outside the cluster, but we also wanted to enforce locks
   didn't take a long time to acquire in CI.</li>
+<li>Shaken Fist now uses <code>Renovate</code> to keep the dependencies of the <code>develop</code>
+  branch up to date. This means that locking requirements at release time is no
+  longer required, and is therefore more reliable.</li>
+<li>The <code>qemu</code> commands generated now vary based on the version of <code>qemu</code> installed
+  on the machine. This was required to support the newer <code>qemu</code> version in
+  Ubuntu 22.04.</li>
 </ul>
 
 
