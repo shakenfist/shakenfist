@@ -146,10 +146,7 @@ def get_default_routes(namespace):
 
 def get_safe_interface_name(interface):
     if len(interface) > 15:
-        orig_interface = interface
         interface = interface[:15]
-        LOG.info('Interface name truncated from %s to %s',
-                 orig_interface, interface)
     return interface
 
 

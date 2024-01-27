@@ -216,13 +216,8 @@ class Scheduler(object):
 
             # Refresh metrics if its too old, or there are no nodes.
             diff = time.time() - self.metrics_updated
-            log_ctx.debug(('Metrics are %.02f seconds old, max is %.02f seconds. '
-                           'Cache has %d elements.'),
-                          diff, config.SCHEDULER_CACHE_TIMEOUT, len(self.metrics))
             if diff > config.SCHEDULER_CACHE_TIMEOUT or len(self.metrics) == 0:
                 self.refresh_metrics()
-                log_ctx.debug('Cache has %d elements after refresh.',
-                              len(self.metrics))
 
             if candidates:
                 inst.add_event(EVENT_TYPE_AUDIT, 'schedule forced candidates',
@@ -304,9 +299,6 @@ class Scheduler(object):
                 if n:
                     affinity = 0
                     instances = n.instances
-                    node_ctx = log_ctx.with_fields({'node': c})
-                    node_ctx.with_fields({'instances': instances}).info(
-                        'Considering instances for affinity')
                     for instance_uuid in instances:
                         i = instance.Instance.from_db(instance_uuid)
                         if not i:
@@ -322,7 +314,6 @@ class Scheduler(object):
                             if tag in i.tags:
                                 affinity += int(val)
 
-                    node_ctx.info('Affinity score is %d' % affinity)
                     by_affinity[affinity].append(c)
 
             highest_affinity = sorted(by_affinity, reverse=True)[0]
