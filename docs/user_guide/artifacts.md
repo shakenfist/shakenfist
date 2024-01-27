@@ -68,12 +68,21 @@ are those listed in the top level directory listing of that site. At the time of
 * centos (shorthand for centos:8-stream)
 * centos:7
 * centos:8-stream
+* centos:9-stream
 * debian (shorthand for debian:11)
 * debian:10
 * debian:11
+* debian-docker:11 (debian 11 with docker pre-installed)
+* debian-gnome:11 (debian 11 with the gnome desktop pre-installed)
+* debian-xfce:11 (debian 11 with the xfce desktop pre-installed)
+* fedora (shorthand for fedora:39)
+* fedora:34
+* fedora:38
+* fedora:39
 * ubuntu (shorthand for ubuntu:20.04)
 * ubuntu:18.04
 * ubuntu:20.04
+* ubuntu:22.04
 
 These images are updated nightly by an automated job from https://github.com/shakenfist/images.
 

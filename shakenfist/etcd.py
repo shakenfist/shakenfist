@@ -132,17 +132,21 @@ class ActualLock(Lock):
         self.objectname = name
         self.timeout = timeout
         self.operation = op
+        self.lockid = util_random.random_id()
 
         node = config.NODE_NAME
         pid = os.getpid()
         caller = util_callstack.get_caller(offset=3)
 
-        self.log_ctx = log_ctx.with_fields({
-            'lock': self.path,
-            'node': node,
-            'pid': pid,
-            'line': caller,
-            'operation': self.operation})
+        self.log_ctx = log_ctx.with_fields(
+            {
+                'lock': self.path,
+                'node': node,
+                'pid': pid,
+                'line': caller,
+                'operation': self.operation,
+                'id': self.lockid
+            })
 
         # We override the UUID of the lock with something more helpful to debugging
         self._uuid = json.dumps(
@@ -150,7 +154,8 @@ class ActualLock(Lock):
                 'node': node,
                 'pid': pid,
                 'line': caller,
-                'operation': self.operation
+                'operation': self.operation,
+                'id': self.lockid
             },
             indent=4, sort_keys=True)
 
@@ -158,16 +163,26 @@ class ActualLock(Lock):
         self.key = LOCK_PREFIX + self.path
 
     @retry_etcd_forever
-    def get_holder(self):
-        value = get_etcd_client().get(
-            self.key, metadata=True)
+    def get_holder(self, key_prefix=''):
+        value = get_etcd_client().get(self.key, metadata=True)
         if value is None or len(value) == 0:
             return {'holder': None}
 
         if not value[0][0]:
             return {'holder': None}
 
-        return json.loads(value[0][0])
+        holder = json.loads(value[0][0])
+        if key_prefix:
+            new_holder = {}
+            for key in holder:
+                new_holder['%s-%s' % (key_prefix, key)] = holder[key]
+            return new_holder
+
+        return holder
+
+    def refresh(self):
+        super(ActualLock, self).refresh()
+        self.log_ctx.debug('Refreshed lock')
 
     def __enter__(self):
         start_time = time.time()
@@ -181,23 +196,23 @@ class ActualLock(Lock):
                 if duration > threshold:
                     self.log_ctx.with_fields({
                         'duration': duration}).info('Acquired lock, but it was slow')
+                else:
+                    self.log_ctx.debug('Acquired lock')
                 return self
 
             if (duration > threshold and not slow_warned):
-                self.log_ctx.with_fields(self.get_holder()).with_fields({
+                current = self.get_holder(key_prefix='current')
+                self.log_ctx.with_fields(current).with_fields({
                     'duration': duration,
-                    'threshold': threshold,
-                    'requesting-op': self.operation,
+                    'threshold': threshold
                     }).info('Waiting to acquire lock')
                 slow_warned = True
 
             time.sleep(1)
 
-        duration = time.time() - start_time
-
-        self.log_ctx.with_fields(self.get_holder()).with_fields({
-            'duration': duration,
-            'requesting-op': self.operation,
+        current = self.get_holder(key_prefix='current')
+        self.log_ctx.with_fields(current).with_fields({
+            'duration': time.time() - start_time
             }).info('Failed to acquire lock')
 
         raise exceptions.LockException(
@@ -212,6 +227,8 @@ class ActualLock(Lock):
                                       }).error('Cannot release lock')
             raise exceptions.LockException(
                 'Cannot release lock: %s' % self.name)
+        else:
+            self.log_ctx.debug('Released lock')
 
     def __str__(self):
         return ('ActualLock(%s %s, op %s, with timeout %s)'

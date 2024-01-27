@@ -5,11 +5,11 @@ title: Installation
 
 The purpose of this guide is to walk you through a Shaken Fist installation. Shaken Fist will work just fine on a single machine, although its also happy to run on clusters of machines. We'll discuss the general guidance for install options as we go.
 
-Shaken Fist only supports Ubuntu 20.04, and Debian 11, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. This documentation was most recently tested against Debian 11, in November 2021. Bug reports are welcome if you have any issues, and may be filed at https://github.com/shakenfist/shakenfist/issues
+Shaken Fist only supports Ubuntu 20.04, Ubuntu 22.04, and Debian 11, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. This documentation was most recently tested against Debian 11, in November 2021. Bug reports are welcome if you have any issues, and may be filed at https://github.com/shakenfist/shakenfist/issues
 
 ???+ note
     Debian 10 support was dropped in v0.8, as supporting older versions of ansible
-    became burdensome.
+    became burdensome. Ubuntu 22.04 support was added in v0.8.
 
 Each machine in the cluster should match this description:
 

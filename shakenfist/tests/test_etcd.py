@@ -42,6 +42,14 @@ class ActualLockTestCase(base.ShakenFistTestCase):
         self.assertEqual('auuid', al.objectname)
         self.assertEqual(120, al.timeout)
         self.assertEqual('Test case', al.operation)
+        self.assertIsNotNone(al.lockid)
+
+        # This is fiddly, the _uuid inside the lock is a JSON string, so we have
+        # to decode it, clean it up, and then re-encode it.
+        u = json.loads(al._uuid)
+        del u['id']
+        al._uuid = json.dumps(u, indent=4, sort_keys=True)
+
         self.assertEqual(
             json.dumps({
                 'node': 'thisnode',
@@ -80,7 +88,7 @@ class ActualLockTestCase(base.ShakenFistTestCase):
             mock_sleep.assert_has_calls(
                 [mock.call(1), mock.call(1), mock.call(1), mock.call(1)])
 
-        mock_get_holder.assert_called_with()
+        mock_get_holder.assert_called_with(key_prefix='current')
         mock_release.assert_called_with()
 
     @mock.patch('shakenfist.etcd.ActualLock.get_holder',
@@ -107,7 +115,7 @@ class ActualLockTestCase(base.ShakenFistTestCase):
         mock_acquire.assert_has_calls([mock.call(), mock.call()])
         mock_sleep.assert_has_calls([mock.call(1), mock.call(1)])
 
-        mock_get_holder.assert_called_with()
+        mock_get_holder.assert_called_with(key_prefix='current')
         mock_release.assert_not_called()
 
 
