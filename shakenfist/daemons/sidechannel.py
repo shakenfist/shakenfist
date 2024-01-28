@@ -97,19 +97,16 @@ class Monitor(daemon.Daemon):
                 # Special case the degraded state here, as the system is in fact
                 # as ready as it is ever going to be, but isn't entirely happy.
                 if packet.get('message', 'none') == 'degraded':
-                    new_state = 'ready (degraded)'
+                    new_state = constants.AGENT_READY_DEGRADED
                 else:
-                    new_state = 'not ready (%s)' % packet.get('message', 'none')
-
-            self.log.debug('Agent state: old = %s; new = %s'
-                           % (self.instance_ready, new_state))
+                    new_state = constants.AGENT_DEGRADED
 
             # We cache the agent state to reduce database load, and then
             # trigger facts gathering when we transition into the constants.AGENT_READY state.
             if self.instance_ready != new_state:
                 self.instance_ready = new_state
                 self.instance.agent_state = new_state
-                if new_state == constants.AGENT_READY:
+                if new_state in [constants.AGENT_READY, constants.AGENT_READY_DEGRADED]:
                     self.sc_client.send_packet({
                         'command': 'gather-facts',
                         'unique': str(time.time())
@@ -282,7 +279,7 @@ class Monitor(daemon.Daemon):
                 'connection setup, aborting')
             return
 
-        self.log.debug('Agent has completed startup')
+        self.instance.add_event(EVENT_TYPE_AUDIT, 'Instance agent has completed start up.')
 
         # If the agent is too old, then just sit here not doing the things we
         # should be doing
@@ -301,7 +298,8 @@ class Monitor(daemon.Daemon):
                         'Unexpected sidechannel client packet')
 
                 # If idle, try to do something
-                if self.instance_ready == constants.AGENT_READY:
+                if self.instance_ready in [constants.AGENT_READY,
+                                           constants.AGENT_READY_DEGRADED]:
                     agentop = self.instance.agent_operation_dequeue()
                     if agentop:
                         self.instance.add_event(
