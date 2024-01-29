@@ -28,13 +28,22 @@ class ActualLockTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
+    @mock.patch('shakenfist_utilities.random.random_id', return_value='fakeid')
+    @mock.patch('shakenfist.etcd.ActualLock.get_holder',
+                return_value={
+                    'node': 'foo',
+                    'pid': 43,
+                    'line': 'banana.py:43',
+                    'operation': 'bar',
+                    'id': 'fakeid'
+                })
     @mock.patch('shakenfist.util.callstack.get_caller',
                 return_value='banana.py:43')
     @mock.patch('etcd3gw.lock.Lock.release')
     @mock.patch('etcd3gw.lock.Lock.acquire', return_value=True)
     @mock.patch('os.getpid', return_value=42)
     def test_context_manager(self, mock_pid, mock_acquire, mock_release,
-                             mock_get_caller):
+                             mock_get_caller, mock_get_holder, mock_fake_id):
         al = etcd.ActualLock('instance', None, 'auuid', op='Test case')
 
         self.assertEqual('/sflocks/sf/instance/auuid', al.key)
@@ -63,8 +72,15 @@ class ActualLockTestCase(base.ShakenFistTestCase):
 
         mock_release.assert_called_with()
 
+    @mock.patch('shakenfist_utilities.random.random_id', return_value='fakeid')
     @mock.patch('shakenfist.etcd.ActualLock.get_holder',
-                return_value=('foo', '43', 'banana.py:43', 'bar'))
+                return_value={
+                    'node': 'foo',
+                    'pid': 43,
+                    'line': 'banana.py:43',
+                    'operation': 'bar',
+                    'id': 'fakeid'
+                })
     @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('time.time',
                 side_effect=[100.0, 101.0, 102.0, 103.0, 104.0, 105.0,
@@ -77,7 +93,7 @@ class ActualLockTestCase(base.ShakenFistTestCase):
     @mock.patch('os.getpid', return_value=42)
     def test_context_manager_slow(
             self, mock_pid, mock_acquire, mock_release, mock_sleep,
-            mock_time, mock_add_event, mock_get_holder):
+            mock_time, mock_add_event, mock_get_holder, mock_fake_id):
         al = etcd.ActualLock('instance', None, 'auuid', op='Test case', timeout=12)
         al.log_ctx = mock.MagicMock()
 
@@ -88,11 +104,18 @@ class ActualLockTestCase(base.ShakenFistTestCase):
             mock_sleep.assert_has_calls(
                 [mock.call(1), mock.call(1), mock.call(1), mock.call(1)])
 
-        mock_get_holder.assert_called_with(key_prefix='current')
+        mock_get_holder.assert_called_with()
         mock_release.assert_called_with()
 
+    @mock.patch('shakenfist_utilities.random.random_id', return_value='fakeid')
     @mock.patch('shakenfist.etcd.ActualLock.get_holder',
-                return_value=('foo', '43', 'banana.py:43', 'bar'))
+                return_value={
+                    'node': 'foo',
+                    'pid': 43,
+                    'line': 'banana.py:43',
+                    'operation': 'bar',
+                    'id': 'fakeid'
+                })
     @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('time.time',
                 side_effect=[100.0, 101.0, 102.0, 103.0, 104.0, 105.0,
@@ -105,7 +128,7 @@ class ActualLockTestCase(base.ShakenFistTestCase):
     @mock.patch('os.getpid', return_value=42)
     def test_context_manager_timeout(
             self, mock_pid, mock_acquire, mock_release, mock_sleep,
-            mock_time, mock_add_event, mock_get_holder):
+            mock_time, mock_add_event, mock_get_holder, mock_fake_id):
         al = etcd.ActualLock('instance', None, 'auuid', op='Test case',
                              timeout=4)
         al.log_ctx = mock.MagicMock()
