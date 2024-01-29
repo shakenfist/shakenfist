@@ -32,7 +32,7 @@ class AdminLocksEndpoint(sf_api.Resource):
           admin_locks_get_example)],
         requires_admin=True))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self):
         return etcd.get_existing_locks()

@@ -179,7 +179,7 @@ class BlobsEndpoint(sf_api.Resource):
           blobs_get_example)],
         requires_admin=True))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None):
         retval = []

@@ -136,7 +136,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
          (403, 'Illegal key name.', None)],
         requires_admin=True))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @api_base.caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
             return sf_api.error(400, 'no namespace specified')
@@ -211,7 +211,7 @@ class AuthNamespaceEndpoint(sf_api.Resource):
          (404, 'Namespace not found.', None)],
         requires_admin=True))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @api_base.caller_is_admin
     @arg_is_namespace
     @api_base.log_token_use
     def delete(self, namespace=None, namespace_from_db=None):
@@ -320,7 +320,7 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
         [(200, 'The name of the updated key.', 'newkey'),
          (404, 'Namespace or key not found.', None)]))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @api_base.caller_is_admin
     @requires_namespace_ownership
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
