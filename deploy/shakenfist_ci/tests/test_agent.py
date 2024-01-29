@@ -49,7 +49,7 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
                       % (op['uuid'], op['state']))
 
         # Request that the agent execute the file
-        data = self._await_agent_command(inst['uuid'], '/tmp/fibonacci.py')
+        _, data = self._await_agent_command(inst['uuid'], '/tmp/fibonacci.py')
         self.assertTrue(data.startswith(
             '[0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987'))
 

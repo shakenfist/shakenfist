@@ -1,4 +1,5 @@
 import os
+import platform
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
 import psutil
@@ -282,8 +283,14 @@ class Monitor(daemon.Daemon):
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
         }
 
+        # Some versions are static and only looked up at startup
+        n = Node.from_db(config.NODE_NAME)
+        n.python_version = platform.python_version_tuple()
+        n.python_implementation = platform.python_implementation()
+
         last_metrics = 0
         last_billing = 0
+        last_process_check = 0
 
         def update_metrics():
             stats = self._get_stats()
@@ -331,10 +338,21 @@ class Monitor(daemon.Daemon):
                                     statistics['disk usage'][disk_device][
                                         'actual bytes on disk'] = os.stat(disk_path).st_size
 
-                            if inst:
-                                inst.add_event(
-                                    EVENT_TYPE_USAGE, 'usage', extra=statistics,
-                                    suppress_event_logging=True)
+                            # Add in OOM details
+                            try:
+                                pid = inst.kvm_pid
+                                if pid:
+                                    with open('/proc/%s/oom_score' % pid) as f:
+                                        statistics['oom_score'] = f.read()
+                                    with open('/proc/%s/oom_score_adj' % pid) as f:
+                                        statistics['oom_score_adj'] = f.read()
+
+                            except FileNotFoundError:
+                                ...
+
+                            inst.add_event(
+                                EVENT_TYPE_USAGE, 'usage', extra=statistics,
+                                suppress_event_logging=True)
 
                 except lc.libvirt.libvirtError as e:
                     self.log.warning('Ignoring libvirt error: %s' % e)
@@ -374,6 +392,21 @@ class Monitor(daemon.Daemon):
                 except psutil.NoSuchProcess:
                     ...
 
+        def check_kvm_processess():
+            # Ensure that all instances we think are running on this instance
+            # actually have a KVM process. This catches cases where libvirt
+            # crashed during startup, which happens during unpause if the
+            # apparmor profile is missing. This is a more expensive check
+            # because it reads etcd, so we do it less frequently.
+            for i in instance.Instances(
+                    [instance.this_node_filter], prefilter='active'):
+                pid = i.kvm_pid
+                if pid:
+                    try:
+                        psutil.Process(pid)
+                    except psutil.NoSuchProcess:
+                        i.kvm_pid = None
+
         while not self.exit.is_set():
             try:
                 if time.time() - last_metrics > config.SCHEDULER_CACHE_TIMEOUT:
@@ -384,6 +417,10 @@ class Monitor(daemon.Daemon):
                     emit_billing_statistics()
                     identity_libvirt_processes()
                     last_billing = time.time()
+
+                if time.time() - last_process_check > config.USAGE_EVENT_FREQUENCY * 3:
+                    check_kvm_processess()
+                    last_process_check = time.time()
 
                 self.exit.wait(1)
 

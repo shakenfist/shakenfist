@@ -121,7 +121,8 @@ class BaseTestCase(testtools.TestCase):
 
     def _await_instance_ready(self, instance_uuid, timeout=7):
         self._await_agent_state(instance_uuid, ready=True, timeout=timeout)
-        self._await_agent_command(instance_uuid, 'cloud-init status --wait')
+        self._await_agent_command(
+            instance_uuid, 'cloud-init status --wait --long')
 
     def _await_instance_not_ready(self, instance_uuid):
         self._await_agent_state(instance_uuid, ready=False)
@@ -159,7 +160,7 @@ class BaseTestCase(testtools.TestCase):
             'in %d minutes. Agent state is %s.'
             % (instance_uuid, desired, timeout, i['agent_state']))
 
-    def _await_agent_command(self, instance_uuid, command):
+    def _await_agent_command(self, instance_uuid, command, exit_codes=[0]):
         op = self.system_client.instance_execute(instance_uuid, command)
 
         # Wait for the operation to be complete
@@ -171,8 +172,11 @@ class BaseTestCase(testtools.TestCase):
             op = self.system_client.get_agent_operation(op['uuid'])
 
         if op['state'] != 'complete':
-            self.fail('Agent execute operation %s did not complete in 120 seconds (%s)'
-                      % (op['uuid'], op['state']))
+            i = self.system_client.get_instance(instance_uuid)
+            self.fail('Agent execute operation %s did not complete in 120 seconds\n'
+                      '    Operation state: %s\n'
+                      '    Agent state: %s'
+                      % (op['uuid'], op['state'], i['agent_state']))
 
         # Wait for the operation to have results
         start_time = time.time()
@@ -182,31 +186,35 @@ class BaseTestCase(testtools.TestCase):
             time.sleep(5)
             op = self.system_client.get_agent_operation(op['uuid'])
 
+        exit_code = op['results']['0']['return-code']
         self.assertNotEqual({}, op['results'])
-        self.assertEqual(0, op['results']['0']['return-code'])
         self.assertEqual(0, len(op['results']['0']['stderr']))
 
         # Short results are directing in the operation, longer results are in
         # a blob.
         if 'stdout' in op['results']['0']:
-            return op['results']['0']['stdout']
-        self.assertTrue('stdout_blob' in op['results']['0'])
+            data = op['results']['0']['stdout']
+        else:
+            self.assertTrue('stdout_blob' in op['results']['0'])
 
-        # Wait for the blob containing stdout to be ready
-        start_time = time.time()
-        b = self.system_client.get_blob(op['results']['0']['stdout_blob'])
-        while time.time() - start_time < 60:
-            if b['state'] == 'created':
-                break
-            time.sleep(5)
+            # Wait for the blob containing stdout to be ready
+            start_time = time.time()
             b = self.system_client.get_blob(op['results']['0']['stdout_blob'])
+            while time.time() - start_time < 60:
+                if b['state'] == 'created':
+                    break
+                time.sleep(5)
+                b = self.system_client.get_blob(op['results']['0']['stdout_blob'])
 
-        # Fetch the blob containing stdout
-        data = ''
-        for chunk in self.system_client.get_blob_data(op['results']['0']['stdout_blob']):
-            data += chunk.decode('utf-8')
+            # Fetch the blob containing stdout
+            data = ''
+            for chunk in self.system_client.get_blob_data(op['results']['0']['stdout_blob']):
+                data += chunk.decode('utf-8')
 
-        return data
+        self.assertTrue(
+            exit_code in exit_codes,
+            'Exit code %d not in %s, output was "%s"' % (exit_code, exit_codes, data))
+        return exit_code, data
 
     def _await_instance_create(self, instance_uuid):
         # Wait up to 5 minutes for the instance to be created. On a slow
