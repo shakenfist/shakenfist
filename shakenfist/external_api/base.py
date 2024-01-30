@@ -225,8 +225,11 @@ def redirect_instance_request(func):
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(sf_api.flask_get_post_body()),
-                headers={'Authorization': api_token,
-                         'User-Agent': util_general.get_user_agent()})
+                headers={
+                    'Authorization': api_token,
+                    'User-Agent': util_general.get_user_agent(),
+                    'X-Request-ID': flask.request.headers.get('X-Request-ID')
+                })
 
             LOG.info('Proxied %s %s returns: %d, %s' % (
                      flask.request.environ['REQUEST_METHOD'], url,
@@ -308,8 +311,11 @@ def redirect_to_network_node(func):
                 % (config.NETWORK_NODE_IP, config.API_PORT,
                    flask.request.environ['PATH_INFO']),
                 data=flask.request.data,
-                headers={'Authorization': admin_token,
-                         'User-Agent': util_general.get_user_agent()})
+                headers={
+                    'Authorization': admin_token,
+                    'User-Agent': util_general.get_user_agent(),
+                    'X-Request-ID': flask.request.headers.get('X-Request-ID')
+                })
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))
@@ -405,8 +411,11 @@ def redirect_upload_request(func):
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=flask.request.get_data(cache=False, as_text=False,
                                             parse_form_data=False),
-                headers={'Authorization': api_token,
-                         'User-Agent': util_general.get_user_agent()})
+                headers={
+                    'Authorization': api_token,
+                    'User-Agent': util_general.get_user_agent(),
+                    'X-Request-ID': flask.request.headers.get('X-Request-ID')
+                })
 
             LOG.info('Proxied %s %s returns: %d, %s' % (
                      flask.request.environ['REQUEST_METHOD'], url,
@@ -432,8 +441,11 @@ def redirect_to_eventlog_node(func):
                 % (config.EVENTLOG_NODE_IP, config.API_PORT,
                    flask.request.environ['PATH_INFO']),
                 data=flask.request.data,
-                headers={'Authorization': admin_token,
-                         'User-Agent': util_general.get_user_agent()})
+                headers={
+                    'Authorization': admin_token,
+                    'User-Agent': util_general.get_user_agent(),
+                    'X-Request-ID': flask.request.headers.get('X-Request-ID')
+                })
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))

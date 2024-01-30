@@ -403,8 +403,11 @@ class ArtifactUploadEndpoint(sf_api.Resource):
                 r = requests.request(
                     flask.request.environ['REQUEST_METHOD'], url,
                     data=json.dumps(sf_api.flask_get_post_body()),
-                    headers={'Authorization': api_token,
-                             'User-Agent': util_general.get_user_agent()})
+                    headers={
+                        'Authorization': api_token,
+                        'User-Agent': util_general.get_user_agent(),
+                        'X-Request-ID': flask.request.headers.get('X-Request-ID')
+                    })
 
                 LOG.info('Proxied %s %s returns: %d, %s' % (
                         flask.request.environ['REQUEST_METHOD'], url,
