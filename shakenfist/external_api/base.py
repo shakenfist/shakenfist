@@ -22,6 +22,16 @@ LOG, _ = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
+def caller_is_admin(func):
+    # Ensure only users in the 'system' namespace can call this method
+    def wrapper(*args, **kwargs):
+        if get_jwt_identity()[0] != 'system':
+            return sf_api.error(401, 'unauthorized')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 # https://swagger.io/specification/v2/ defines the schema for this dictionary
 def swagger_helper(section, description, parameters, responses,
                    requires_admin=False, requires_auth=True):

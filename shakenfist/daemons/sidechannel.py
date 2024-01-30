@@ -255,7 +255,8 @@ class Monitor(daemon.Daemon):
                     self.log.with_fields({'packet': packet}).error(
                         'Unexpected sidechannel client packet during startup, ignoring')
 
-                if self.instance_ready == constants.AGENT_READY:
+                if self.instance_ready in [constants.AGENT_READY,
+                                           constants.AGENT_READY_DEGRADED]:
                     break
 
                 # Retry every now and then
@@ -279,7 +280,7 @@ class Monitor(daemon.Daemon):
                 'connection setup, aborting')
             return
 
-        self.instance.add_event(EVENT_TYPE_AUDIT, 'Instance agent has completed start up.')
+        self.instance.add_event(EVENT_TYPE_AUDIT, 'instance agent has completed start up.')
 
         # If the agent is too old, then just sit here not doing the things we
         # should be doing

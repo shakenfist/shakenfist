@@ -193,12 +193,20 @@ class ActualLock(Lock):
             res = self.acquire()
             duration = time.time() - start_time
             if res:
-                if duration > threshold:
+                current = self.get_holder()
+                current_id = current.get('id')
+                if current_id != self.lockid:
+                    self.log_ctx.with_fields({
+                        'current_id': current_id,
+                        'duration': duration
+                        }).error('We should hold lock, but do not!')
+                elif duration > threshold:
                     self.log_ctx.with_fields({
                         'duration': duration}).info('Acquired lock, but it was slow')
+                    return self
                 else:
                     self.log_ctx.debug('Acquired lock')
-                return self
+                    return self
 
             if (duration > threshold and not slow_warned):
                 current = self.get_holder(key_prefix='current')
