@@ -1,5 +1,4 @@
 import errno
-import etcd3
 import json
 import os
 from oslo_concurrency import processutils
@@ -14,6 +13,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist.daemons import daemon
+from shakenfist import etcd
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import instance
 from shakenfist import node
@@ -411,15 +411,26 @@ class Monitor(daemon.Daemon):
             # We need to determine what revision to compact to, so we keep a
             # key which stores when we last compacted and we use it's latest
             # revision number as the revision to compact to. Note that we use
-            # a different library for compaction as our primary library does
-            # not support it.
-            c = etcd3.client()
-            c.put('/sf/compact', json.dumps({'compacted_at': time.time()}))
-            _, kv = c.get('/sf/compact')
-            c.compact(kv.mod_revision, physical=True)
-            c.defragment()
+            # command lines for compaction as etcd3gw primary library does
+            # not support it. It is possible in modern etcd to have it auto
+            # compact, but this is just as good and let's us log when it occurs.
+            etcd.put_raw('/sf/compact', {'compacted_at': time.time()})
 
+            # [(
+            #     b'{"compacted_at": 1706677554.2498026}',
+            #     {
+            #         'key': b'/sf/compact',
+            #         'create_revision': '236163240',
+            #         'mod_revision': '594066920',
+            #         'version': '13372'
+            #     }
+            # )]
             n = node.Node.from_db(config.NODE_NAME)
+            kv = etcd.get_etcd_client().get('/sf/compact', metadata=True)[0][1]
+            n.add_event(EVENT_TYPE_STATUS, 'Compacting etcd',
+                        extra={'revision': kv['mod_revision']})
+            util_process.execute([], 'etcdctl compact %s' % kv['mod_revision'])
+            util_process.execute([], 'etcdctl defrag')
             n.add_event(EVENT_TYPE_STATUS, 'Compacted etcd')
 
         except Exception as e:

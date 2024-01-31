@@ -116,8 +116,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
             ETCD_HOST='127.0.0.1'
         )
 
-        self.config = mock.patch('shakenfist.instance.config',
-                                 fake_config)
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 

@@ -164,14 +164,14 @@ class ActualLock(Lock):
 
     @retry_etcd_forever
     def get_holder(self, key_prefix=''):
-        value = get_etcd_client().get(self.key, metadata=True)
+        value = get_etcd_client().get(self.key)
         if value is None or len(value) == 0:
             return {'holder': None}
 
         if not value[0][0]:
             return {'holder': None}
 
-        holder = json.loads(value[0][0])
+        holder = json.loads(value[0])
         if key_prefix:
             new_holder = {}
             for key in holder:
@@ -341,19 +341,19 @@ def create(objecttype, subtype, name, data, ttl=None):
 
 @retry_etcd_forever
 def get_raw(path):
-    value = get_etcd_client().get(path, metadata=True)
+    value = get_etcd_client().get(path)
     if value is None or len(value) == 0:
         return None
-    return json.loads(value[0][0])
+    return json.loads(value[0])
 
 
 @retry_etcd_forever
 def get(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
-    value = get_etcd_client().get(path, metadata=True)
+    value = get_etcd_client().get(path)
     if value is None or len(value) == 0:
         return None
-    return json.loads(value[0][0])
+    return json.loads(value[0])
 
 
 @retry_etcd_forever
