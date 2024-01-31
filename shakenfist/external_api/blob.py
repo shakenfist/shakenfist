@@ -41,9 +41,13 @@ def _read_remote(target, blob_uuid, offset=0):
     url = 'http://%s:%d/blobs/%s/data?offset=%d' % (
         target, config.API_PORT, blob_uuid, offset)
 
-    r = requests.request('GET', url, stream=True,
-                         headers={'Authorization': api_token,
-                                  'User-Agent': util_general.get_user_agent()})
+    r = requests.request(
+            'GET', url, stream=True,
+            headers={
+                'Authorization': api_token,
+                'User-Agent': util_general.get_user_agent(),
+                'X-Request-ID': flask.request.headers.get('X-Request-ID')
+            })
     for chunk in r.iter_content(chunk_size=8192):
         yield chunk
 
