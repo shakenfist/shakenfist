@@ -134,7 +134,7 @@ jobs:
               $source_path/shakenfist \
               debian@$primary:shakenfist
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; sudo pip3 install -r requirements.txt; set -e; stestr run --concurrency=5; stestr slowest"
+              debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency=5; stestr slowest"
 
       - name: Check logs
         if: always()

@@ -1,20 +1,15 @@
-name: Test {{name}}
+name: Retest develop-debian-12-slim-primary
 
 on:
-  push:
-    branches:
-      - develop
-      - v*-releases
-  pull_request:
-    branches:
-      - develop
-      - v*-releases
+  workflow_dispatch:
+  schedule:
+    - cron: '00 13 * * *'        # utc
 
 jobs:
-  {{name}}:
+  develop-debian-12-slim-primary:
     runs-on: self-hosted
     concurrency:
-      group: {% raw %}${{ github.workflow }}-${{ github.ref }}{% endraw %}
+      group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
 
     # NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
@@ -24,8 +19,8 @@ jobs:
     steps:
       - name: Set environment variables
         run: |
-          echo "SF_HEAD_SHA={% raw %}${{{% endraw %} github.event.pull_request.head.sha {% raw %}}}{% endraw %}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo {% raw %}${{{% endraw %} github.repository {% raw %}}}{% endraw %} | cut -f 2 -d '/' )" >> $GITHUB_ENV
+          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
           echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
 
       - name: Checkout shakenfist
@@ -33,6 +28,7 @@ jobs:
         with:
           path: shakenfist
           fetch-depth: 0
+          ref: develop
 
       - name: Determine if there is any dependency between the repositories
         run: |
@@ -43,34 +39,20 @@ jobs:
           cd ${GITHUB_WORKSPACE}/shakenfist
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
-              base_image={{baseimage}} base_image_user={{baseuser}}" \
-              deploy/ansible/ci-topology-{{topology}}.yml
-
-      - name: Copy CI tools to primary
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
-          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null -rp tools \
-              {{baseuser}}@$primary:.
-
-      - name: Log github actions buffering status
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
-          tools/run_remote ${primary} python3 tools/buffer.py
+              base_image=sf://label/ci-images/debian-12 base_image_user=debian" \
+              deploy/ansible/ci-topology-slim-primary.yml
 
       - name: Run getsf installer on primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary /tmp/getsf-wrapper
+              debian@$primary /tmp/getsf-wrapper
           echo ""
           echo ""
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary \
+              debian@$primary \
               'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
 
       - name: Wait for API to start answering
@@ -79,13 +61,13 @@ jobs:
 
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
+              debian@$primary 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
 
           count=0
           while [ $count -lt 60 ]
           do
             ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary '. /etc/sf/sfrc; sf-client instance list'
+              debian@$primary '. /etc/sf/sfrc; sf-client instance list'
             if [ $? == 0 ]; then
               exit 0
             fi
@@ -96,32 +78,52 @@ jobs:
 
           exit 1
 
-      - name: Import cached images
+      - name: Import cached images (v0.6+)
+        if: true
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary \
+              debian@$primary \
               '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04 --shared'
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary \
+              debian@$primary \
               '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04 --shared'
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary \
+              debian@$primary \
               '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11 --shared'
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary \
+              debian@$primary \
               '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros --shared'
+
+      # It turns out that scheduled tests for other branches still use the workflow from develop, so
+      # this version must handle all of those branches
+      - name: Import cached images (v0.5)
+        if: false
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros'
 
       - name: Create a base level of activity in the cluster
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary \
+              debian@$primary \
               'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
           echo ""
           echo ""
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary \
+              debian@$primary \
               '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24 > /dev/null; echo -n "."; done'
           echo ""
 
@@ -132,9 +134,9 @@ jobs:
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               $source_path/shakenfist \
-              {{baseuser}}@$primary:shakenfist
+              debian@$primary:shakenfist
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency={{concurrency}}; stestr slowest"
+              debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency=5; stestr slowest"
 
       - name: Check logs
         if: always()
@@ -146,26 +148,19 @@ jobs:
       # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
       # cost. That's not really something we can control, so just ignore the CPU
       # usage of that process instead.
-      - name: Check SF process CPU usage
+      - name: Check process CPU usage
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary '. /etc/sf/sfrc; sf-client node cpuhogs --ignore sf_cleaner'
-
-      - name: Check for reasonable data rates
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
-          tools/run_remote ${primary} sudo /home/${baseuser}/tools/ci_event_checks.sh
+              debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs --ignore sf_cleaner'
 
       - name: Fetch and tweak inventory
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary:/etc/sf/inventory.yaml /srv/github/
+              debian@$primary:/etc/sf/inventory.yaml /srv/github/
           sed -i 's|/root/.ssh|/home/debian/.ssh|g' /srv/github/inventory.yaml
 
           echo "====="
@@ -175,20 +170,49 @@ jobs:
         if: always()
         run: |
           set -x
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
 
           # We need the ssh key in the place ansible expects it to be, which isn't
           # true on the CI worker node.
           cp /srv/github/id_ci /home/debian/.ssh/id_rsa
           cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
 
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary:/etc/sf/inventory.yaml /srv/github/
           ansible-playbook -i /srv/github/inventory.yaml \
-              --extra-vars "base_image_user={{baseuser}} ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: bundle.zip
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
+
+      - name: Snapshot localhost builds for later upgrade testing
+        if: success()
+        run: |
+          if [ $(echo "slim-primary" | grep -c "localhost") -gt 1 ]; then
+            base=$(echo "sf://label/ci-images/debian-12" | cut -f 5 -d "/")
+            sf-client instance snapshot primary \
+              --label_name ci-images/$base-$GITHUB_BASE_REF \
+              --delete-snapshot-after-label --flatten
+          fi
+
+      - uses: JasonEtco/create-an-issue@v2
+        if: failure()
+        id: create-issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SF_CI_NAME: develop-debian-12-slim-primary
+          SF_BRANCH: develop
+          SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          filename: shakenfist/.github/workflows/scheduled-tests-failure.md
+          update_existing: true
+          search_existing: open
+
+      - if: failure()
+        run: 'echo Created ${{ steps.create-issue.outputs.url }}'

@@ -270,7 +270,7 @@
     # which breaks networking. So we configure this interface after cloud-init
     # has run. We also need to specify the MTU manually here because we're not
     # fetching it from dhcp any more.
-    - name: Configure the mesh interface (Debian)
+    - name: Configure the mesh interface (Debian 10 and 11)
       copy:
         content: |
           auto eth1
@@ -281,14 +281,14 @@
         owner: root
         group: root
         mode: u=r,g=r,o=r
-      when: ansible_distribution == 'Debian'
+      when: ansible_distribution == 'Debian' and (ansible_distribution_version | int) < 12
 
     # This is a bit terrible. We're doing two things here (not in order): we're
     # configuring the mesh network interface (eth1), but we're also arguing with
     # ifup / systemd networking about eth0 and whether DHCP leases should be
     # renewed. I think this is papering over a negative interaction between
     # debian and cloud-init, but I am not entirely sure what the issue is here.
-    - name: Enable networking (Debian)
+    - name: Enable networking (Debian 10 and 11)
       shell: |
         ifup --ignore-errors eth0
 
@@ -301,7 +301,20 @@
         ifup --ignore-errors eth1
 
         systemctl restart networking
-      when: ansible_distribution == 'Debian'
+      when: ansible_distribution == 'Debian' and (ansible_distribution_version | int) < 12
+
+    - name: Configure the mesh interface (Debian 12+)
+      template:
+        src: files/netplan-eth1.yaml
+        dest: /etc/netplan/99-sfci.yaml
+      vars:
+        address: "{{mesh_ip}}/24"
+        macaddr: "{{mesh_mac}}"
+      when: ansible_distribution == 'Debian' and (ansible_distribution_version | int) > 11
+
+    - name: Enable eth1 (Debian 12+)
+      shell: netplan apply
+      when: ansible_distribution == 'Debian' and (ansible_distribution_version | int) > 11
 
     - name: Configure the mesh interface (Ubuntu)
       template:
