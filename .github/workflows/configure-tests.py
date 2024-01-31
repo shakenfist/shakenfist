@@ -19,6 +19,13 @@ JOBS = {
             'scheduled': True
         },
         {
+            'name': 'debian-12',
+            'baseimage': 'debian:12',
+            'baseuser': 'debian',
+            'outputlabel': 'ci-images/debian-12',
+            'scheduled': True
+        },
+        {
             'name': 'ubuntu-2004',
             'baseimage': 'ubuntu:20.04',
             'baseuser': 'ubuntu',
@@ -44,6 +51,13 @@ JOBS = {
             'baseimage': 'debian:11',
             'baseuser': 'debian',
             'outputlabel': 'ci-images/debian-11-test',
+            'scheduled': False
+        },
+        {
+            'name': 'debian-12-test',
+            'baseimage': 'debian:12',
+            'baseuser': 'debian',
+            'outputlabel': 'ci-images/debian-12-test',
             'scheduled': False
         },
         {
