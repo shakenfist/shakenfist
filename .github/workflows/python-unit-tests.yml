@@ -26,16 +26,9 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get dist-upgrade -y
-          sudo apt-get remove -y -q python3-virtualenv
-          pip install -r test-requirements.txt
-
       - name: Lint with flake8
         run: |
-          tox -eflake8
+          /usr/bin/tox -eflake8
 
   build38:
     runs-on: self-hosted
@@ -49,13 +42,6 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get dist-upgrade -y
-          sudo apt-get remove -y -q python3-virtualenv
-          pip install -r test-requirements.txt
-
       - name: Run python3 unit tests
         run: |
-          tox -epy3
+          /usr/bin/tox -epy3
