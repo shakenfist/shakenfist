@@ -228,15 +228,22 @@ class ActualLock(Lock):
             % (self.name, self.timeout))
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
-        if not self.release():
-            locks = list(get_all(LOCK_PREFIX, None))
-            self.log_ctx.with_fields({'locks': locks,
-                                      'key': self.name,
-                                      }).error('Cannot release lock')
-            raise exceptions.LockException(
-                'Cannot release lock: %s' % self.name)
-        else:
-            self.log_ctx.info('Released lock')
+        attempts = 0
+        while attempts < 4:
+            if self.release():
+                self.log_ctx.info('Released lock')
+                return
+            else:
+                attempts += 1
+                locks = list(get_all(LOCK_PREFIX, None))
+                self.log_ctx.with_fields({
+                    'locks': locks,
+                    'key': self.name,
+                    'attempt': attempts,
+                    }).error('Failed to release lock')
+            time.sleep(0.5)
+
+        raise exceptions.LockException('Cannot release lock: %s' % self.name)
 
     def __str__(self):
         return ('ActualLock(%s %s, op %s, with timeout %s)'
