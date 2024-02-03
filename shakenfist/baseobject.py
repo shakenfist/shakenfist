@@ -119,24 +119,21 @@ class DatabaseBackedObject(object):
 
             if changed:
                 cluster_minimum = get_minimum_object_version(self.object_type)
-                LOG.with_fields({
+                upgrade_log = LOG.with_fields({
                     self.object_type: static_values['uuid'],
                     'start_version': starting_version,
                     'final_version': static_values['version'],
                     'current_version': self.current_version,
                     'cluster_minimum_version': cluster_minimum
-                }).info('Object online upgraded')
+                })
 
                 if cluster_minimum == self.current_version:
                     etcd.put(self.object_type, None, static_values.get('uuid'),
                              static_values)
-                    LOG.with_fields({
-                        self.object_type: static_values['uuid']}).info(
-                            'Online upgrade committed')
+                    upgrade_log.debug('Online upgrade committed')
                 else:
-                    LOG.with_fields({
-                        self.object_type: static_values['uuid']}).warning(
-                            'Not committing online upgrade, as not all nodes are updated')
+                    upgrade_log.info(
+                        'Not committing online upgrade, as not all nodes are updated')
 
     @property
     def uuid(self):

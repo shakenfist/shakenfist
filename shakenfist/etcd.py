@@ -182,7 +182,7 @@ class ActualLock(Lock):
 
     def refresh(self):
         super(ActualLock, self).refresh()
-        self.log_ctx.debug('Refreshed lock')
+        self.log_ctx.info('Refreshed lock')
 
     def __enter__(self):
         start_time = time.time()
@@ -205,7 +205,7 @@ class ActualLock(Lock):
                         'duration': duration}).info('Acquired lock, but it was slow')
                     return self
                 else:
-                    self.log_ctx.debug('Acquired lock')
+                    self.log_ctx.info('Acquired lock')
                     return self
 
             if (duration > threshold and not slow_warned):
@@ -228,15 +228,22 @@ class ActualLock(Lock):
             % (self.name, self.timeout))
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
-        if not self.release():
-            locks = list(get_all(LOCK_PREFIX, None))
-            self.log_ctx.with_fields({'locks': locks,
-                                      'key': self.name,
-                                      }).error('Cannot release lock')
-            raise exceptions.LockException(
-                'Cannot release lock: %s' % self.name)
-        else:
-            self.log_ctx.debug('Released lock')
+        attempts = 0
+        while attempts < 4:
+            if self.release():
+                self.log_ctx.info('Released lock')
+                return
+            else:
+                attempts += 1
+                locks = list(get_all(LOCK_PREFIX, None))
+                self.log_ctx.with_fields({
+                    'locks': locks,
+                    'key': self.name,
+                    'attempt': attempts,
+                    }).error('Failed to release lock')
+            time.sleep(0.5)
+
+        raise exceptions.LockException('Cannot release lock: %s' % self.name)
 
     def __str__(self):
         return ('ActualLock(%s %s, op %s, with timeout %s)'
@@ -264,7 +271,6 @@ def refresh_lock(lock, log_ctx=LOG):
             'The lock on %s has expired.' % lock.path)
 
     lock.refresh()
-    log_ctx.with_fields({'lock': lock.name}).debug('Refreshed lock')
 
 
 @retry_etcd_forever

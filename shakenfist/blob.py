@@ -326,7 +326,7 @@ class Blob(dbo):
             st = os.stat(partial_path)
             if time.time() - st.st_mtime > 300:
                 self.log.with_fields({
-                    'partial file age': time.time() - st.st_mtime}).warning(
+                    'partial file age': time.time() - st.st_mtime}).info(
                     'No activity on previous partial download in more than '
                     'five minutes. Removing and re-attempting.')
                 os.unlink(partial_path)
@@ -335,7 +335,7 @@ class Blob(dbo):
                     raise BlobAlreadyBeingTransferred()
 
                 self.log.with_fields({
-                    'partial file age': time.time() - st.st_mtime}).info(
+                    'partial file age': time.time() - st.st_mtime}).debug(
                     'Waiting for existing download to complete')
                 time.sleep(10)
 
@@ -443,20 +443,17 @@ class Blob(dbo):
                     instance_object.add_event(
                         EVENT_TYPE_AUDIT,
                         'Fetching required blob %s failed (incorrect size)' % self.uuid)
-                self.log.with_fields({
-                    'bytes_fetched': total_bytes_received,
-                    'size': int(self.size)
-                }).info('Fetch failed with incorrect size')
+                raise BlobFetchFailed(
+                    'Fetching required blob %s failed. We fetched %d bytes, but expected %d.'
+                    % (self.uuid, total_bytes_received, self.size))
 
             if not self.verify_checksum(sha512_hash.hexdigest()):
                 if instance_object:
                     instance_object.add_event(
                         EVENT_TYPE_AUDIT,
                         'Fetching required blob %s failed (incorrect checksum)' % self.uuid)
-                self.log.with_fields({
-                    'bytes_fetched': total_bytes_received,
-                    'size': int(self.size)
-                }).info('Fetch failed with incorrect checksum')
+                raise BlobFetchFailed(
+                    'Fetching required blob %s failed. Incorrect checksum.' % self.uuid)
 
             os.rename(partial_path, blob_path)
             if instance_object:
@@ -471,11 +468,9 @@ class Blob(dbo):
 
     def request_replication(self, allow_excess=0):
         absent_nodes = list(Nodes([], prefilter='inactive'))
-        LOG.debug('Found %d inactive nodes' % len(absent_nodes))
 
         present_nodes = list(Nodes([], prefilter='active'))
         present_nodes_len = len(present_nodes)
-        LOG.debug('Found %s active nodes' % present_nodes_len)
 
         # We take current transfers into account when replicating, to avoid
         # over replicating very large blobs
@@ -498,11 +493,6 @@ class Blob(dbo):
                        allow_excess - replica_count)
 
             if (replica_count + current_transfers) == present_nodes_len:
-                self.log.info('Desired replica count is %d, we have %d, and %d inflight, '
-                              'which is equal to the number of present nodes. Therefore '
-                              'not replicating further.'
-                              % (config.BLOB_REPLICATION_FACTOR, replica_count,
-                                 current_transfers))
                 return
 
             self.log.info('Desired replica count is %d, we have %d, and %d inflight, '
@@ -519,9 +509,6 @@ class Blob(dbo):
                 for n in self.locations:
                     if n in nodes:
                         nodes.remove(n)
-
-                self.log.with_fields({'nodes': nodes}).debug(
-                    'Considered for blob replication')
 
                 for n in nodes[:targets]:
                     etcd.enqueue(n, {
@@ -569,10 +556,7 @@ class Blob(dbo):
                 os.unlink(blob_path)
             if os.path.exists(blob_path + '.partial'):
                 os.unlink(blob_path + '.partial')
-
             self.drop_node_location(config.NODE_NAME)
-            self.log.error('Removed idle blob replica %s' % msg)
-
         else:
             self.log.error('Not removing in-use blob replica %s' % msg)
 
@@ -584,7 +568,7 @@ class Blob(dbo):
         st = os.stat(blob_path)
         if self.size != st.st_size:
             self.add_event(EVENT_TYPE_AUDIT,
-                           'blob failed checksum validation',
+                           'blob failed size validation',
                            extra={
                                'stored_size': self.size,
                                'node_size': st.st_size,
@@ -601,7 +585,6 @@ class Blob(dbo):
                 'sha512sum %s' % Blob.filepath(self.uuid),
                 iopriority=util_process.PRIORITY_LOW)
             hash = hash_out.split(' ')[0]
-        self.log.with_fields({'sha512': hash}).info('Local checksum')
 
         with self.get_lock_attr('checksums', op='update checksums'):
             c = self.checksums
@@ -648,8 +631,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
         dep_blob = Blob.from_db(depends_on)
         if not dep_blob or dep_blob.state.value != Blob.STATE_CREATED:
             raise BlobDependencyMissing(
-                'Snapshot depends on blob UUID %s, which is missing'
-                % depends_on)
+                'Snapshot depends on blob UUID %s, which is missing' % depends_on)
 
     # And make the associated blob. Note that we deliberately don't calculate the
     # snapshot checksum here, as this makes large snapshots even slower for users.
@@ -658,8 +640,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     # to avoid deletion races. Note that this _must_ be a hard link, which is why
     # we don't use util_general.link().
     os.link(dest_path + '.partial', dest_path)
-    b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(),
-                 depends_on=depends_on)
+    b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(), depends_on=depends_on)
     b.state = Blob.STATE_CREATED
     if dep_blob:
         dep_blob.ref_count_inc(b)
