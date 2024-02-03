@@ -44,7 +44,7 @@ versions==2.0.0                    # mit
 requests==2.31.0                   # apache2
 requests-toolbelt==1.0.0           # apache2
 chardet==5.2.0                     # lgpl
-urllib3==2.1.0                     # mit
+urllib3==2.2.0                     # mit
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt
