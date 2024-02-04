@@ -1,4 +1,4 @@
-name: Retest develop-ubuntu-2004-slim-primary
+name: Retest develop-ubuntu-2004-localhost
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     - cron: '00 13 * * *'        # utc
 
 jobs:
-  develop-ubuntu-2004-slim-primary:
+  develop-ubuntu-2004-localhost:
     runs-on: self-hosted
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
@@ -40,7 +40,7 @@ jobs:
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=sf://label/ci-images/ubuntu-2004 base_image_user=ubuntu" \
-              deploy/ansible/ci-topology-slim-primary.yml
+              deploy/ansible/ci-topology-localhost.yml
 
       - name: Copy CI tools to primary
         run: |
@@ -150,7 +150,7 @@ jobs:
               $source_path/shakenfist \
               ubuntu@$primary:shakenfist
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ubuntu@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency=5; stestr slowest"
+              ubuntu@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency=3; stestr slowest"
 
       - name: Check logs
         if: always()
@@ -215,7 +215,7 @@ jobs:
       - name: Snapshot localhost builds for later upgrade testing
         if: success()
         run: |
-          if [ $(echo "slim-primary" | grep -c "localhost") -gt 1 ]; then
+          if [ $(echo "localhost" | grep -c "localhost") -gt 1 ]; then
             base=$(echo "sf://label/ci-images/ubuntu-2004" | cut -f 5 -d "/")
             sf-client instance snapshot primary \
               --label_name ci-images/$base-$GITHUB_BASE_REF \
@@ -227,7 +227,7 @@ jobs:
         id: create-issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SF_CI_NAME: develop-ubuntu-2004-slim-primary
+          SF_CI_NAME: develop-ubuntu-2004-localhost
           SF_BRANCH: develop
           SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
