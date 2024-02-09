@@ -8,9 +8,9 @@ from shakenfist.baseobject import (
     DatabaseBackedObjectIterator as dbo_iter,
     get_minimum_object_version as gmov)
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist import eventlog
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist import ipmanager
 from shakenfist.util import callstack as util_callstack

@@ -12,9 +12,9 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.config import config
+from shakenfist.constants import (EVENT_TYPE_RESOURCES, EVENT_TYPE_STATUS,
+                                  EVENT_TYPE_USAGE)
 from shakenfist import etcd
-from shakenfist.eventlog import (EVENT_TYPE_RESOURCES, EVENT_TYPE_STATUS,
-                                 EVENT_TYPE_USAGE)
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import network

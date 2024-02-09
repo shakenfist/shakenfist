@@ -6,6 +6,7 @@
       export {{ svr | replace('-', '_') }}_uuid={{hostvars[svr]['sf_uuid']}}
       {% endfor %}
 
+      export baseuser={{base_image_user}}
       export identifier={{identifier}}
       export source_path={{source_path}}
       export nodes="{{ groups.sfall | join(' ') | replace('-', '_') }}"

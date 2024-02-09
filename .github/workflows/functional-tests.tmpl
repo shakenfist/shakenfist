@@ -46,16 +46,19 @@ jobs:
               base_image={{baseimage}} base_image_user={{baseuser}}" \
               deploy/ansible/ci-topology-{{topology}}.yml
 
-      - name: Log github actions buffering status
+      - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/shakenfist
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              tools/buffer.py {{baseuser}}@$primary:buffer.py
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary python3 buffer.py
+              -o UserKnownHostsFile=/dev/null -rp tools \
+              {{baseuser}}@$primary:.
+
+      - name: Log github actions buffering status
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
         run: |
@@ -207,13 +210,12 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               {{baseuser}}@$primary '. /etc/sf/sfrc; sf-client node cpuhogs --ignore sf_cleaner'
 
-      - name: Check etcd revision count
+      - name: Check for reasonable data rates
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          echo -n "Number of etcd revisions in this test run: "
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary 'etcdctl get / --write-out=json | jq .header.revision'
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          tools/run_remote ${primary} sudo /home/${baseuser}/tools/ci_event_checks.sh
 
       - name: Fetch and tweak inventory
         if: always()

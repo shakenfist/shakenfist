@@ -17,9 +17,9 @@ from shakenfist.baseobjectmapping import (
 from shakenfist.blob import Blob, Blobs, placement_filter
 from shakenfist import cache
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist import etcd
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import namespace

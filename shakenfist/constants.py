@@ -51,3 +51,22 @@ AGENT_INSTANCE_OFF = 'not ready (instance powered off)'
 AGENT_DEGRADED = 'not ready (%s)'
 AGENT_READY = 'ready'
 AGENT_READY_DEGRADED = 'ready (degraded)'
+
+
+# Event types
+# NOTE(mikal): if you add to this list, you must also update the MAX_AGE config
+# options.
+EVENT_TYPE_AUDIT = 'audit'
+EVENT_TYPE_MUTATE = 'mutate'
+EVENT_TYPE_STATUS = 'status'
+EVENT_TYPE_USAGE = 'usage'
+EVENT_TYPE_RESOURCES = 'resources'
+EVENT_TYPE_PRUNE = 'prune'
+
+# Use only for events which pre-date the type system
+EVENT_TYPE_HISTORIC = 'historic'
+
+# All event types
+EVENT_TYPES = [EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE, EVENT_TYPE_STATUS,
+               EVENT_TYPE_USAGE, EVENT_TYPE_RESOURCES, EVENT_TYPE_PRUNE,
+               EVENT_TYPE_HISTORIC]

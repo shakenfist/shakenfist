@@ -13,8 +13,8 @@ import time
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
-from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import instance
 from shakenfist import node
 from shakenfist import upload

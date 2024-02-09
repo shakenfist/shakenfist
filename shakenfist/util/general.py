@@ -14,8 +14,8 @@ import uuid
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
+from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist import eventlog
-from shakenfist.eventlog import EVENT_TYPE_STATUS
 
 
 LOG, _ = logs.setup(__name__)

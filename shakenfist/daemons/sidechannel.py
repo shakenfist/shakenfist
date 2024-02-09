@@ -12,9 +12,9 @@ import uuid
 from shakenfist.agentoperation import AgentOperation
 from shakenfist import blob
 from shakenfist import constants
+from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
 from shakenfist import eventlog
-from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import instance
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt

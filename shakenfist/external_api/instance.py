@@ -25,10 +25,10 @@ from shakenfist import baseobject
 from shakenfist.blob import Blob
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.external_api import (
     agentoperation as api_agentoperation,

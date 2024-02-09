@@ -24,9 +24,9 @@ from shakenfist.artifact import (
     namespace_or_shared_filter)
 from shakenfist.blob import Blob
 from shakenfist import constants
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist import eventlog
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist.external_api import base as api_base
 from shakenfist.config import config
 from shakenfist import etcd
