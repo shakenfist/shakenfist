@@ -39,7 +39,7 @@ pydantic==2.6.1                    # mit
 pydantic-settings==2.1.0           # mit
 version-comparison==0.2            # mit
 pycdlib==1.14.0                    # lgpl
-versions==2.0.0                    # mit
+versions==2.1.0                    # mit
 
 requests==2.31.0                   # apache2
 requests-toolbelt==1.0.0           # apache2
