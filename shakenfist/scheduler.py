@@ -8,8 +8,7 @@ import time
 import uuid
 
 from shakenfist.config import config
-from shakenfist.constants import GiB
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
+from shakenfist.constants import GiB, EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance

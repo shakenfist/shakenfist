@@ -12,9 +12,9 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.config import config
+from shakenfist.constants import (EVENT_TYPE_RESOURCES, EVENT_TYPE_STATUS,
+                                  EVENT_TYPE_USAGE)
 from shakenfist import etcd
-from shakenfist.eventlog import (EVENT_TYPE_RESOURCES, EVENT_TYPE_STATUS,
-                                 EVENT_TYPE_USAGE)
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import network
@@ -230,7 +230,7 @@ class Monitor(daemon.Daemon):
                 return out
 
             if time.time() - self.last_logged_resources > 300:
-                # Record process metrics
+                # Record SF process metrics
                 process_metrics = {}
                 me = psutil.Process(os.getpid())
                 shim = me.parent()
@@ -244,6 +244,12 @@ class Monitor(daemon.Daemon):
                                     process_metrics.update(_emit_process_metrics(subchild))
                     except psutil.NoSuchProcess:
                         ...
+
+                # Record etcd process metrics
+                if config.NODE_IS_ETCD_MASTER:
+                    for p in psutil.process_iter():
+                        if p.name().endswith('/etcd'):
+                            process_metrics.update(_emit_process_metrics(p))
 
                 n.process_metrics = process_metrics
 

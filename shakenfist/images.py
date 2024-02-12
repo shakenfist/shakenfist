@@ -10,9 +10,8 @@ from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import blob
 from shakenfist.config import config
 from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
-                                  TRANSCODE_DESCRIPTION)
+                                  TRANSCODE_DESCRIPTION, EVENT_TYPE_AUDIT)
 from shakenfist import etcd
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.util import general as util_general

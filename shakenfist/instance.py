@@ -31,8 +31,8 @@ from shakenfist import blob
 from shakenfist import cache
 from shakenfist.config import config
 from shakenfist import constants
+from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import etcd
-from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import exceptions
 from shakenfist import network
 from shakenfist import networkinterface

@@ -7,9 +7,9 @@ from shakenfist_utilities import logs
 
 from shakenfist import cache
 from shakenfist import constants
+from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
 from shakenfist import etcd
 from shakenfist import eventlog
-from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
 from shakenfist import exceptions
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general

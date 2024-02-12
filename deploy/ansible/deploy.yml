@@ -1076,26 +1076,36 @@
       shell: |
         /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
             AUTH_SECRET_SEED "{{hostvars['localhost']['auth_secret']}}"
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
 
     - name: Set ram reservation in etcd
       shell: |
         /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
             RAM_SYSTEM_RESERVATION "{{hostvars['localhost']['ram_system_reservation']}}"
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
 
     - name: Set lowest_mtu in etcd
       shell: |
         /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
             MAX_HYPERVISOR_MTU "{{hostvars[groups['primary_node'][0]]['lowest_mtu']}}"
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
 
     - name: Set DNS server in etcd
       shell: |
         /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
             DNS_SERVER "{{hostvars['localhost']['dns_server']}}"
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
 
     - name: Set HTTP proxy in etcd
       shell: |
         /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
             HTTP_PROXY "{{hostvars['localhost']['http_proxy']}}"
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
       when: "{{hostvars['localhost']['http_proxy']}}"
 
     - name: Log additional config
@@ -1106,15 +1116,21 @@
       shell: |
         /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
             "{{item['name']}}" "{{item['value']}}"
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
       loop: "{{extra_config}}"
 
     - name: Verify configuration
       shell: |
         /srv/shakenfist/venv/bin/sf-ctl verify-config
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
 
     - name: Parse back etcd configuration
       shell: |
         /srv/shakenfist/venv/bin/sf-ctl show-etcd-config
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
       register: etcd_config
 
     - name: Log etcd config

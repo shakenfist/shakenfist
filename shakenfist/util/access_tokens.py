@@ -2,7 +2,7 @@ import datetime
 from flask_jwt_extended import create_access_token
 
 from shakenfist.config import config
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_AUDIT
 
 
 def create_token(ns, keyname, nonce, duration=config.API_TOKEN_DURATION):

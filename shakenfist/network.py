@@ -17,9 +17,9 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
 from shakenfist import dhcp
 from shakenfist import etcd
-from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
 from shakenfist.exceptions import DeadNetwork, CongestedNetwork, IPManagerMissing
 from shakenfist import instance
 from shakenfist import ipam

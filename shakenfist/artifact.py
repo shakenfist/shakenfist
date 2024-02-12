@@ -10,8 +10,8 @@ from shakenfist.baseobject import (
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import blob
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_USAGE
 from shakenfist import etcd
-from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_USAGE
 from shakenfist import exceptions
 from shakenfist.namespace import namespace_is_trusted
 

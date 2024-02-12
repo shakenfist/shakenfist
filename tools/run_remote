@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# $1 is the target machine
+# $2+ is the command
+
+ssh  -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    ${baseuser}@$1 ${@:2}

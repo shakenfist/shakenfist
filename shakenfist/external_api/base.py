@@ -8,8 +8,8 @@ from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace, get_api_token

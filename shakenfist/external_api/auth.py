@@ -16,8 +16,8 @@ from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist import artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist.external_api import base as api_base
 from shakenfist import instance
 from shakenfist.namespace import Namespace, Namespaces, namespace_is_trusted

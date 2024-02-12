@@ -10,28 +10,12 @@ import sqlite3
 import time
 
 from shakenfist.config import config
+from shakenfist import constants
 from shakenfist import etcd
 from shakenfist import exceptions
 
 
 LOG, _ = logs.setup(__name__)
-
-
-# NOTE(mikal): if you add to this list, you must also update the MAX_AGE config
-# options.
-EVENT_TYPE_AUDIT = 'audit'
-EVENT_TYPE_MUTATE = 'mutate'
-EVENT_TYPE_STATUS = 'status'
-EVENT_TYPE_USAGE = 'usage'
-EVENT_TYPE_RESOURCES = 'resources'
-EVENT_TYPE_PRUNE = 'prune'
-
-# Use only for events which pre-date the type system
-EVENT_TYPE_HISTORIC = 'historic'
-
-EVENT_TYPES = [EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE, EVENT_TYPE_STATUS,
-               EVENT_TYPE_USAGE, EVENT_TYPE_RESOURCES, EVENT_TYPE_PRUNE,
-               EVENT_TYPE_HISTORIC]
 
 
 def add_event(event_type, object_type, object_uuid, message, duration=None,
@@ -239,6 +223,7 @@ class EventLog(object):
             for e in self._read_events_inner(limit=limit, event_type=event_type):
                 yield e
 
+    # Use a negative limit to read everything
     def _read_events_inner(self, limit=100, event_type=None):
         count = 0
 
@@ -250,7 +235,7 @@ class EventLog(object):
                     yield e
                 elc.close()
 
-                if count >= limit:
+                if limit > 0 and count >= limit:
                     break
 
             except sqlite3.DatabaseError:
@@ -286,18 +271,18 @@ class EventLog(object):
                     removed += this_chunk_removed
 
                     if this_chunk_removed > 0:
-                        if event_type != EVENT_TYPE_PRUNE:
+                        if event_type != constants.EVENT_TYPE_PRUNE:
                             self._write_event_inner(
-                                EVENT_TYPE_PRUNE, time.time(), config.NODE_NAME, 0,
+                                constants.EVENT_TYPE_PRUNE, time.time(), config.NODE_NAME, 0,
                                 'pruned %d events of type %s from before %f from chunk '
                                 '%04d%02d'
                                 % (removed, event_type, before_timestamp, year, month))
 
                     if elc.count_events() == 0:
                         elc.delete()
-                        if event_type != EVENT_TYPE_PRUNE:
+                        if event_type != constants.EVENT_TYPE_PRUNE:
                             self._write_event_inner(
-                                EVENT_TYPE_PRUNE, time.time(), config.NODE_NAME, 0,
+                                constants.EVENT_TYPE_PRUNE, time.time(), config.NODE_NAME, 0,
                                 'deleted event log chunk %04d%02d as it is now empty'
                                 % (year, month))
                     else:
@@ -488,7 +473,7 @@ class EventLogChunk(object):
 
         sql = 'SELECT * FROM events '
         if event_type:
-            if event_type not in EVENT_TYPES:
+            if event_type not in constants.EVENT_TYPES:
                 raise exceptions.InvalidEventType()
             sql += 'WHERE type = "%s" ' % event_type
         sql += 'ORDER BY TIMESTAMP DESC LIMIT %d' % limit

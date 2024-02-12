@@ -8,10 +8,10 @@ from prometheus_client import Counter
 from prometheus_client import start_http_server
 
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPES, EVENT_TYPE_HISTORIC
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
-from shakenfist.eventlog import EVENT_TYPES, EVENT_TYPE_HISTORIC
 from shakenfist import node
 from shakenfist.util import general as util_general
 
