@@ -1,6 +1,7 @@
 import copy
 import datetime
 import flask
+import grpc
 import json
 from oslo_concurrency import lockutils
 import os
@@ -12,6 +13,8 @@ import time
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import etcd
+from shakenfist import event_pb2
+from shakenfist import event_pb2_grpc
 from shakenfist import exceptions
 
 
@@ -41,21 +44,36 @@ def add_event(event_type, object_type, object_uuid, message, duration=None,
     if request_id and 'request-id' not in extra:
         extra['request-id'] = request_id
 
+    log = LOG.with_fields({
+            object_type: object_uuid,
+            'event_type': event_type,
+            'fqdn': config.NODE_NAME,
+            'duration': duration,
+            'message': message,
+            'extra': extra
+        })
     if not suppress_event_logging:
-        log = LOG
-        if extra:
-            log = log.with_fields(extra)
-        log = log.with_fields({
-                object_type: object_uuid,
-                'event_type': event_type,
-                'fqdn': config.NODE_NAME,
-                'duration': duration,
-                'message': message
-            })
         if log_as_error:
             log.error('Added event')
         else:
             log.info('Added event')
+
+    # Attempt to send the event with gRPC directly to the eventlog node.
+    try:
+        with grpc.insecure_channel('%s:%s' % (config.EVENTLOG_NODE_IP,
+                                              config.EVENTLOG_API_PORT)) as channel:
+            stub = event_pb2_grpc.EventServiceStub(channel)
+            request = event_pb2.EventRequest(
+                object_type=object_type, object_uuid=object_uuid,
+                event_type=event_type, timestamp=timestamp,
+                fqdn=config.NODE_NAME, duration=duration,
+                message=message, extra=json.dumps(extra))
+            response = stub.RecordEvent(request)
+            if response.ack:
+                return
+
+    except grpc._channel._InactiveRpcError as e:
+        log.info('Failed to send event with gRPC, adding to dead letter queue: %s' % e)
 
     # We use the old eventlog mechanism as a queueing system to get the logs
     # to the eventlog node.

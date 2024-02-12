@@ -200,7 +200,8 @@ jobs:
                      "Cleaning up leaked vxlan"
                      "Waiting to acquire lock"
                      'apparmor="DENIED"'
-                     "Ignoring malformed cache entry")
+                     "Ignoring malformed cache entry"
+                     "Failed to send event with gRPC")
           IFS=""
           for forbid in ${FORBIDDEN[*]}
           do

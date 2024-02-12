@@ -1,5 +1,4 @@
 import errno
-import etcd3
 import json
 import os
 from oslo_concurrency import processutils
@@ -407,23 +406,24 @@ class Monitor(daemon.Daemon):
                 os.unlink(os.path.join(upload_path, upload_uuid))
 
     def _compact_etcd(self):
-        try:
-            # We need to determine what revision to compact to, so we keep a
-            # key which stores when we last compacted and we use it's latest
-            # revision number as the revision to compact to. Note that we use
-            # a different library for compaction as our primary library does
-            # not support it.
-            c = etcd3.client()
-            c.put('/sf/compact', json.dumps({'compacted_at': time.time()}))
-            _, kv = c.get('/sf/compact')
-            c.compact(kv.mod_revision, physical=True)
-            c.defragment()
+        # try:
+        #     # We need to determine what revision to compact to, so we keep a
+        #     # key which stores when we last compacted and we use it's latest
+        #     # revision number as the revision to compact to. Note that we use
+        #     # a different library for compaction as our primary library does
+        #     # not support it.
+        #     c = etcd3.client()
+        #     c.put('/sf/compact', json.dumps({'compacted_at': time.time()}))
+        #     _, kv = c.get('/sf/compact')
+        #     c.compact(kv.mod_revision, physical=True)
+        #     c.defragment()
 
-            n = node.Node.from_db(config.NODE_NAME)
-            n.add_event(EVENT_TYPE_STATUS, 'Compacted etcd')
+        #     n = node.Node.from_db(config.NODE_NAME)
+        #     n.add_event(EVENT_TYPE_STATUS, 'Compacted etcd')
 
-        except Exception as e:
-            util_general.ignore_exception('etcd compaction', e)
+        # except Exception as e:
+        #     util_general.ignore_exception('etcd compaction', e)
+        ...
 
     def run(self):
         LOG.info('Starting')

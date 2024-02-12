@@ -200,6 +200,9 @@ class SFConfig(BaseSettings):
     EVENTLOG_NODE_IP: str = Field(
         '', description='Mesh IP of the node which stores event logs',
     )
+    EVENTLOG_API_PORT: int = Field(
+        13003, description='Port for the internal eventlog gRPC API'
+    )
     USAGE_EVENT_FREQUENCY: int = Field(
         60, description='How frequently to collect usage events.'
     )
