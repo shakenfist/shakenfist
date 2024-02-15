@@ -1,4 +1,5 @@
 import errno
+import grpc
 import json
 import os
 from oslo_concurrency import processutils
@@ -14,6 +15,9 @@ from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
+from shakenfist import etcd
+from shakenfist import etcd_pb2
+from shakenfist import etcd_pb2_grpc
 from shakenfist import instance
 from shakenfist import node
 from shakenfist import upload
@@ -406,24 +410,42 @@ class Monitor(daemon.Daemon):
                 os.unlink(os.path.join(upload_path, upload_uuid))
 
     def _compact_etcd(self):
-        # try:
-        #     # We need to determine what revision to compact to, so we keep a
-        #     # key which stores when we last compacted and we use it's latest
-        #     # revision number as the revision to compact to. Note that we use
-        #     # a different library for compaction as our primary library does
-        #     # not support it.
-        #     c = etcd3.client()
-        #     c.put('/sf/compact', json.dumps({'compacted_at': time.time()}))
-        #     _, kv = c.get('/sf/compact')
-        #     c.compact(kv.mod_revision, physical=True)
-        #     c.defragment()
+        try:
+            # We need to determine what revision to compact to, so we keep a
+            # key which stores when we last compacted and we use it's latest
+            # revision number as the revision to compact to. Note that we use
+            # command lines for compaction as etcd3gw primary library does
+            # not support it. It is possible in modern etcd to have it auto
+            # compact, but this is just as good and let's us log when it occurs.
+            etcd.put_raw('/sf/compact', {'compacted_at': time.time()})
 
-        #     n = node.Node.from_db(config.NODE_NAME)
-        #     n.add_event(EVENT_TYPE_STATUS, 'Compacted etcd')
+            # [(
+            #     b'{"compacted_at": 1706677554.2498026}',
+            #     {
+            #         'key': b'/sf/compact',
+            #         'create_revision': '236163240',
+            #         'mod_revision': '594066920',
+            #         'version': '13372'
+            #     }
+            # )]
+            n = node.Node.from_db(config.NODE_NAME)
+            kv = etcd.get_etcd_client().get('/sf/compact', metadata=True)[0][1]
 
-        # except Exception as e:
-        #     util_general.ignore_exception('etcd compaction', e)
-        ...
+            with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+                stub = etcd_pb2_grpc.KVStub(channel)
+                request = etcd_pb2.CompactionRequest(
+                    revision=int(kv['mod_revision']), physical=True
+                )
+                stub.Compact(request)
+
+                stub = etcd_pb2_grpc.MaintenanceStub(channel)
+                request = etcd_pb2.DefragmentRequest()
+                stub.Defragment(request)
+
+            n.add_event(EVENT_TYPE_STATUS, 'Compacted etcd')
+
+        except Exception as e:
+            util_general.ignore_exception('etcd compaction', e)
 
     def run(self):
         LOG.info('Starting')

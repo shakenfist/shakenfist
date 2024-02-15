@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package etcdserverpb;
+
+message ResponseHeader {
+    // cluster_id is the ID of the cluster which sent the response.
+    uint64 cluster_id = 1;
+    // member_id is the ID of the member which sent the response.
+    uint64 member_id = 2;
+    // revision is the key-value store revision when the request was applied.
+    // For watch progress responses, the header.revision indicates progress. All future events
+    // recieved in this stream are guaranteed to have a higher revision number than the
+    // header.revision number.
+    int64 revision = 3;
+    // raft_term is the raft term when the request was applied.
+    uint64 raft_term = 4;
+}
+
+service KV {
+    // Compact compacts the event history in the etcd key-value store. The key-value
+    // store should be periodically compacted or the event history will continue to grow
+    // indefinitely.
+    rpc Compact(CompactionRequest) returns (CompactionResponse) {}
+}
+
+// CompactionRequest compacts the key-value store up to a given revision. All superseded keys
+// with a revision less than the compaction revision will be removed.
+message CompactionRequest {
+    // revision is the key-value store revision for the compaction operation.
+    int64 revision = 1;
+    // physical is set so the RPC will wait until the compaction is physically
+    // applied to the local database such that compacted entries are totally
+    // removed from the backend database.
+    bool physical = 2;
+}
+
+message CompactionResponse {
+    ResponseHeader header = 1;
+}
+
+service Maintenance {
+    /// Defragment defragments a member's backend database to recover storage space.
+    rpc Defragment(DefragmentRequest) returns (DefragmentResponse) {}
+}
+
+message DefragmentRequest {}
+
+message DefragmentResponse {
+    ResponseHeader header = 1;
+}
