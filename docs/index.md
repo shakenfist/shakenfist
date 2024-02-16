@@ -57,4 +57,4 @@ as they happen. What we do have is useful links:
 ## What is Shaken Fist? Can I help?
 
 The [Shaken Fist Manifesto](/manifesto/) is our general conceptual starting
-point, ubt apart from that just reach out and have a chat.
+point, but apart from that just reach out and have a chat.
