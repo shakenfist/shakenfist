@@ -337,7 +337,7 @@ def put(objecttype, subtype, name, data):
 
 
 @retry_etcd_forever
-def create(objecttype, subtype, name, data, ttl=None):
+def create(objecttype, subtype, name, data):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderCustomTypes)

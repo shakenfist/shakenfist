@@ -48,7 +48,11 @@ def get_active_node_metrics():
         try:
             new_metrics = etcd.get('metrics', n.uuid, None)
             if new_metrics:
-                new_metrics = new_metrics.get('metrics', {})
+                if time.time() - new_metrics.get('timestamp', 0) < 120:
+                    new_metrics = new_metrics.get('metrics', {})
+                else:
+                    n.add_event(EVENT_TYPE_AUDIT, 'stale metrics from database for node')
+                    new_metrics = {}
             else:
                 n.add_event(EVENT_TYPE_AUDIT, 'empty metrics from database for node')
                 new_metrics = {}

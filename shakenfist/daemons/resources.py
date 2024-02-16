@@ -311,8 +311,7 @@ class Monitor(daemon.Daemon):
                     'fqdn': config.NODE_NAME,
                     'timestamp': time.time(),
                     'metrics': stats
-                },
-                ttl=120)
+                })
             gauges['updated_at'].set_to_current_time()
 
         def emit_billing_statistics():
