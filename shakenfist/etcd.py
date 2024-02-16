@@ -327,14 +327,13 @@ def put_raw(path, data):
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderCustomTypes)
     get_etcd_client().put(path, encoded, lease=None)
+    LOG.info('etcd put %s' % path)
 
 
 @retry_etcd_forever
-def put(objecttype, subtype, name, data, ttl=None):
+def put(objecttype, subtype, name, data):
     path = _construct_key(objecttype, subtype, name)
-    encoded = json.dumps(data, indent=4, sort_keys=True,
-                         cls=JSONEncoderCustomTypes)
-    get_etcd_client().put(path, encoded, lease=None)
+    put_raw(path, data)
 
 
 @retry_etcd_forever
@@ -342,6 +341,7 @@ def create(objecttype, subtype, name, data, ttl=None):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderCustomTypes)
+    LOG.info('etcd create %s' % path)
     return get_etcd_client().create(path, encoded, lease=None)
 
 
@@ -356,10 +356,7 @@ def get_raw(path):
 @retry_etcd_forever
 def get(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
-    value = get_etcd_client().get(path, metadata=True)
-    if value is None or len(value) == 0:
-        return None
-    return json.loads(value[0][0])
+    return get_raw(path)
 
 
 @retry_etcd_forever
@@ -389,6 +386,7 @@ def get_all_dict(objecttype, subtype=None, sort_order=None, limit=0):
 @retry_etcd_forever
 def delete_raw(path):
     get_etcd_client().delete(path)
+    LOG.info('etcd delete %s' % path)
 
 
 def delete(objecttype, subtype, name):
@@ -405,6 +403,7 @@ def delete_all(objecttype, subtype):
 @retry_etcd_forever
 def delete_prefix(path):
     get_etcd_client().delete_prefix(path)
+    LOG.info('etcd deleteprefix %s' % path)
 
 
 def enqueue(queuename, workitem, delay=0):
