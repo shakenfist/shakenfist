@@ -59,7 +59,7 @@ class Monitor(daemon.Daemon):
             per_node = defaultdict(list)
             for b in Blobs([], prefilter='active'):
                 if not b.locations:
-                    b.add_event(EVENT_TYPE_AUDIT, 'No locations for this blob, hard deleting.')
+                    b.add_event(EVENT_TYPE_AUDIT, 'no locations for this blob, hard deleting.')
                     b.hard_delete()
 
                 for node in b.locations:

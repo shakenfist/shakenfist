@@ -225,7 +225,7 @@ class Monitor(daemon.Daemon):
                 fraction = usage / age
                 out['process_cpu_fraction_%s' % smn] = fraction
                 if fraction > 0.25:
-                    n.add_event(EVENT_TYPE_STATUS, 'Process %s is a CPU hog' % smn,
+                    n.add_event(EVENT_TYPE_STATUS, 'process %s is a CPU hog' % smn,
                                 extra={'fraction': fraction})
                 return out
 

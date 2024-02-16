@@ -55,16 +55,13 @@ class Monitor(daemon.Daemon):
             log_ctx.warning('Destroying instance using virsh succeeded')
             if inst:
                 inst.add_event(
-                    EVENT_TYPE_AUDIT,
-                    'enforced delete via virsh method succeeded')
+                    EVENT_TYPE_AUDIT,  'enforced delete via virsh method succeeded')
                 return True
 
         except processutils.ProcessExecutionError:
             log_ctx.warning('Destroying instance using virsh failed')
             if inst:
-                inst.add_event(
-                    EVENT_TYPE_AUDIT,
-                    'enforced delete via virsh failed')
+                inst.add_event(EVENT_TYPE_AUDIT, 'enforced delete via virsh failed')
             return False
 
     def _delete_with_kill(self, instance_uuid, inst):
@@ -88,14 +85,12 @@ class Monitor(daemon.Daemon):
             log_ctx.warning('Destroying instance using SIGKILL succeeded')
             if inst:
                 inst.add_event(
-                    EVENT_TYPE_AUDIT,
-                    'enforced delete via SIGKILL succeeded')
+                    EVENT_TYPE_AUDIT, 'enforced delete via SIGKILL succeeded')
         except processutils.ProcessExecutionError:
             log_ctx.warning('Destroying instance using SIGKILL failed')
             if inst:
                 inst.add_event(
-                    EVENT_TYPE_AUDIT,
-                    'enforced delete via SIGKILL failed')
+                    EVENT_TYPE_AUDIT, 'enforced delete via SIGKILL failed')
 
     def _update_power_states(self):
         with util_libvirt.LibvirtConnection() as lc:
@@ -442,7 +437,8 @@ class Monitor(daemon.Daemon):
                 request = etcd_pb2.DefragmentRequest()
                 stub.Defragment(request)
 
-            n.add_event(EVENT_TYPE_STATUS, 'Compacted etcd')
+            n.add_event(EVENT_TYPE_STATUS, 'compacted etcd',
+                        extra={'mod_revision': int(kv['mod_revision'])})
 
         except Exception as e:
             util_general.ignore_exception('etcd compaction', e)

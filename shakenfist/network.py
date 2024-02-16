@@ -739,8 +739,11 @@ class Network(dbo):
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
     def add_floating_ip(self, floating_address, inner_address):
-        self.add_event(EVENT_TYPE_AUDIT, 'adding floating ip %s -> %s'
-                       % (floating_address, inner_address))
+        self.add_event(EVENT_TYPE_AUDIT, 'adding floating ip',
+                       extra={
+                           'floating': floating_address,
+                           'inner': inner_address
+                       })
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['floating_address_as_hex'] = '%08x' % int(
@@ -763,8 +766,11 @@ class Network(dbo):
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
     def remove_floating_ip(self, floating_address, inner_address):
-        self.add_event(EVENT_TYPE_AUDIT, 'removing floating ip %s -> %s'
-                       % (floating_address, inner_address))
+        self.add_event(EVENT_TYPE_AUDIT, 'removing floating',
+                       extra={
+                           'floating': floating_address,
+                           'inner': inner_address
+                       })
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['floating_address_as_hex'] = '%08x' % int(
@@ -778,7 +784,8 @@ class Network(dbo):
 
     def route_address(self, floating_address):
         self.add_event(
-            EVENT_TYPE_AUDIT, 'routing floating ip %s to network' % floating_address)
+            EVENT_TYPE_AUDIT, 'routing floating ip to network',
+            extra={'floating': floating_address})
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         util_process.execute(
@@ -786,7 +793,8 @@ class Network(dbo):
 
     def unroute_address(self, floating_address):
         self.add_event(
-            EVENT_TYPE_AUDIT, 'unrouting floating ip %s to network' % floating_address)
+            EVENT_TYPE_AUDIT, 'unrouting floating ip to network',
+            extra={'floating': floating_address})
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         util_process.execute(

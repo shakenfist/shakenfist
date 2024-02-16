@@ -159,8 +159,8 @@ class ImageFetchHelper(object):
                 except exceptions.HTTPError as e:
                     self.artifact.add_event(
                         EVENT_TYPE_AUDIT,
-                        'image fetch had HTTP error, not fetching image: %s'
-                        % e)
+                        'image fetch had HTTP error, not fetching image',
+                        extra={'error': str(e)})
                 else:
                     normalized_new_timestamp = blob.Blob.normalize_timestamp(
                         resp.headers.get('Last-Modified'))
@@ -176,8 +176,11 @@ class ImageFetchHelper(object):
                         elif most_recent_blob.modified != normalized_new_timestamp:
                             self.artifact.add_event(
                                 EVENT_TYPE_AUDIT,
-                                'image requires fetch, Last-Modified: %s -> %s'
-                                % (most_recent_blob.modified, normalized_new_timestamp))
+                                'image requires fetch, Last-Modified changed',
+                                extra={
+                                    'old': most_recent_blob.modified,
+                                    'new': normalized_new_timestamp
+                                })
                             dirty = True
 
                         response_size = resp.headers.get('Content-Length')
@@ -192,8 +195,11 @@ class ImageFetchHelper(object):
                         elif most_recent_blob.size != response_size:
                             self.artifact.add_event(
                                 EVENT_TYPE_AUDIT,
-                                'image requires fetch, Content-Length: %s -> %s'
-                                % (most_recent_blob.size, response_size))
+                                'image requires fetch, Content-Length changed',
+                                extra={
+                                    'old': most_recent_blob.size,
+                                    'new': response_size
+                                })
                             dirty = True
 
             if not dirty:
