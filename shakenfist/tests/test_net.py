@@ -24,10 +24,6 @@ class NetworkTestCase(base.ShakenFistTestCase):
         self.mock_ipmanager_persist = self.ipmanager_persist.start()
         self.addCleanup(self.ipmanager_persist.stop)
 
-        # self.etcd_client = mock.patch('etcd3.client')
-        # self.mock_etcd_client = self.etcd_client.start()
-        # self.addCleanup(self.etcd_client.stop)
-
         self.etcd_lock = mock.patch('shakenfist.etcd.ActualLock')
         self.mock_etcd_lock = self.etcd_lock.start()
         self.addCleanup(self.etcd_lock.stop)
