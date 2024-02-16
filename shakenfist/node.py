@@ -18,7 +18,7 @@ LOG, _ = logs.setup(__name__)
 class Node(dbo):
     object_type = 'node'
     initial_version = 2
-    current_version = 6
+    current_version = 7
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
@@ -56,8 +56,7 @@ class Node(dbo):
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values):
-        etcd.put('attribute/node',  static_values['fqdn'], 'instances-active',
-                 {'instances': []})
+        ...
 
     @classmethod
     def _upgrade_step_3_to_4(cls, static_values):
@@ -70,6 +69,10 @@ class Node(dbo):
     @classmethod
     def _upgrade_step_5_to_6(cls, static_values):
         ...
+
+    @classmethod
+    def _upgrade_step_6_to_7(cls, static_values):
+        etcd.delete('attribute/node',  static_values['fqdn'], 'instances-active')
 
     @classmethod
     def new(cls, name, ip):
