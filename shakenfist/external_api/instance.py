@@ -635,8 +635,7 @@ class InstancesEndpoint(sf_api.Resource):
                             netdesc['address'] = n.ipam.reserve_random_free_address(
                                 inst.unique_label(), ipam.RESERVATION_TYPE_INSTANCE, '')
                             inst.add_event(
-                                EVENT_TYPE_AUDIT,
-                                'allocated ip address', extra=netdesc)
+                                EVENT_TYPE_AUDIT, 'allocated ip address', extra=netdesc)
                         else:
                             if not n.ipam.reserve(netdesc['address'], inst.unique_label(),
                                                   ipam.RESERVATION_TYPE_INSTANCE, ''):

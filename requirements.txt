@@ -1,8 +1,3 @@
-# Pinned dependancies of our requirements, locked because of compatability issues
-protobuf<4.0.0              # google license: https://github.com/protocolbuffers/protobuf/blob/main/LICENSE
-                            # Version 4.21 and greater requires that a different version of protoc be used
-                            # than that which etcd3 uses.
-
 # A bit vague because we expect this to come from an OS package
 psutil>=5.9.0                      # bsd
 
@@ -19,7 +14,6 @@ flask==3.0.2                       # bsd
 flask-restful==0.3.10              # bsd
 flasgger==0.9.7.1                  # mit
 prometheus-client==0.19.0          # apache2
-etcd3==0.12.0                      # apache2
 etcd3gw==2.3.0                     # apache2
 flask-jwt-extended==4.6.0          # mit
 bcrypt==4.1.2                      # apache2
@@ -40,6 +34,8 @@ pydantic-settings==2.1.0           # mit
 version-comparison==0.2            # mit
 pycdlib==1.14.0                    # lgpl
 versions==2.1.0                    # mit
+grpcio-tools==1.60.1               # apache2
+protobuf==4.25.2                   # bsd
 
 requests==2.31.0                   # apache2
 requests-toolbelt==1.0.0           # apache2

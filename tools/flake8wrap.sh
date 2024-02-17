@@ -14,9 +14,9 @@ FLAKE_COMMAND="flake8 --max-line-length=120"
 
 if test "x$1" = "x-HEAD" ; then
     shift
-    files=$(git diff --name-only HEAD~1 | tr '\n' ' ')
+    files=$(git diff --name-only HEAD~1 | grep -v _pb2 | egrep ".py$" | tr '\n' ' ')
     echo "Running flake8 on ${files}"
-    diff -u --from-file /dev/null ${files} | $FLAKE_COMMAND "$@"
+    diff -u --from-file /dev/null ${files} | $FLAKE_COMMAND $files
 else
     echo "Running flake8 on all files"
     exec $FLAKE_COMMAND "$@"

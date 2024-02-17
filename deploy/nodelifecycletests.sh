@@ -95,11 +95,11 @@ echo
 # Ensure ${maintainer} is missing and ${other_victim} is stopped
 echo
 log "Check node state"
-if [ $(sf-client --json node list | jq --raw-output ".[] | select(.name==\"${maintainer}\") | .state") != "missing" ]; then
+if [ $(sf-client --json node show ${maintainer} | jq --raw-output ".state") != "missing" ]; then
     echo "${maintainer} not in missing state"
     exit 1
 fi
-if [ $(sf-client --json node list | jq --raw-output ".[] | select(.name==\"${other_victim}\") | .state") != "stopped" ]; then
+if [ $(sf-client --json node show ${other_victim} | jq --raw-output ".state") != "stopped" ]; then
     echo "${other_victim} not in stopped state"
     exit 1
 fi
@@ -118,12 +118,12 @@ sleep 420
 # Ensure ${maintainer} and ${other_victim} are now deleted
 echo
 log "Check node state"
-if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="${maintainer}") | .state') != "deleted" ]; then
+if [ $(sf-client --json node show ${maintainer} | jq --raw-output ".state") != "deleted" ]; then
     echo "${maintainer} not in deleted state"
     exit 1
 fi
-if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="${other_victim}") | .state') != "deleted" ]; then
-    echo "${maintainer} not in deleted state"
+if [ $(sf-client --json node show ${other_victim} | jq --raw-output ".state") != "deleted" ]; then
+    echo "${other_victim} not in deleted state"
     exit 1
 fi
 

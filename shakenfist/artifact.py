@@ -293,7 +293,8 @@ class Artifact(dbo):
             self._db_set_attribute('index_%012d' % index, entry)
             if not self.in_memory_only:
                 new_blob.ref_count_inc(self)
-            self.add_event(EVENT_TYPE_AUDIT, 'Added index %d to artifact' % index)
+            self.add_event(EVENT_TYPE_AUDIT, 'added index to artifact',
+                           extra={'index': index})
 
             # There is an implied billing update in delete_old_versions, so we
             # don't need one of our own here.
@@ -320,7 +321,8 @@ class Artifact(dbo):
         if b and not self.in_memory_only:
             b.ref_count_dec(self)
 
-        self.add_event(EVENT_TYPE_AUDIT, 'Deleted index %d from artifact' % index)
+        self.add_event(EVENT_TYPE_AUDIT, 'deleted index from artifact',
+                       extra={'index': index})
         if update_billing:
             self.update_billing()
 

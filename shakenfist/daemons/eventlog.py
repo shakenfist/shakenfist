@@ -1,7 +1,10 @@
 from collections import defaultdict
-from shakenfist_utilities import logs
+from concurrent import futures
+import grpc
+import json
 import os
 import pathlib
+from shakenfist_utilities import logs
 import time
 
 from prometheus_client import Counter
@@ -12,6 +15,8 @@ from shakenfist.constants import EVENT_TYPES, EVENT_TYPE_HISTORIC
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
+from shakenfist import event_pb2
+from shakenfist import event_pb2_grpc
 from shakenfist import node
 from shakenfist.util import general as util_general
 
@@ -19,9 +24,36 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 
 
+class EventService(event_pb2_grpc.EventServiceServicer):
+    def __init__(self, monitor):
+        super(EventService, self).__init__()
+        self.monitor = monitor
+
+    def RecordEvent(self, request, context):
+        try:
+            with eventlog.EventLog(request.object_type, request.object_uuid) as eventdb:
+                extra = json.loads(request.extra)
+                eventdb.write_event(
+                    request.event_type, request.timestamp, request.fqdn,
+                    request.duration, request.message, extra)
+                self.monitor.counters[request.event_type].inc()
+        except Exception as e:
+            util_general.ignore_exception(
+                'failed to write event for %s %s'
+                % (request.object_type, request.object_uuid), e)
+            return event_pb2.EventReply(ack=False)
+
+        return event_pb2.EventReply(ack=True)
+
+
 class Monitor(daemon.WorkerPoolDaemon):
     def __init__(self, id):
         super(Monitor, self).__init__(id)
+        self.counters = {
+            'pruned_events': Counter('pruned_events', 'Number of pruned events'),
+            'pruned_sweep': Counter('pruned_sweep',
+                                    'Number of databases checked for pruning')
+        }
         start_http_server(config.EVENTLOG_METRICS_PORT)
 
     def run(self):
@@ -29,13 +61,8 @@ class Monitor(daemon.WorkerPoolDaemon):
         prune_targets = []
         prune_sweep_started = 0
 
-        counters = {
-            'pruned_events': Counter('pruned_events', 'Number of pruned events'),
-            'pruned_sweep': Counter('pruned_sweep',
-                                    'Number of databases checked for pruning')
-        }
         for event_type in EVENT_TYPES:
-            counters[event_type] = Counter(
+            self.counters[event_type] = Counter(
                 '%s_events' % event_type,
                 'Number of %s events seen' % event_type)
 
@@ -49,11 +76,21 @@ class Monitor(daemon.WorkerPoolDaemon):
             with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
                 pass
 
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        event_pb2_grpc.add_EventServiceServicer_to_server(
+            EventService(self), server)
+        server.add_insecure_port('%s:%s' % (config.EVENTLOG_NODE_IP,
+                                            config.EVENTLOG_API_PORT))
+        server.start()
+
         while not self.exit.is_set():
             try:
                 did_work = False
 
-                # Fetch queued events from etcd
+                # Fetch queued events from etcd. This is how all events worked
+                # in versions older than v0.7, but is now here to catch in flight
+                # upgrades and act as a dead letter queue for when the event node
+                # isn't answering.
                 results = defaultdict(list)
                 for k, v in etcd.get_all('event', None, limit=10000):
                     try:
@@ -76,7 +113,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                                     event_type,
                                     v['timestamp'], v['fqdn'], v['duration'],
                                     v['message'], extra=v.get('extra'))
-                                counters[event_type].inc()
+                                self.counters[event_type].inc()
                                 etcd.get_etcd_client().delete(k)
                     except Exception as e:
                         util_general.ignore_exception(
@@ -113,14 +150,14 @@ class Monitor(daemon.WorkerPoolDaemon):
 
                                     c = eventdb.prune_old_events(
                                         time.time() - max_age, event_type)
-                                    counters['pruned_events'].inc(c)
+                                    self.counters['pruned_events'].inc(c)
                                     count += c
 
                                 if count > 0:
                                     self.log.with_fields({objtype: objuuid}).info(
                                         'Pruned %d events' % count)
 
-                            counters['pruned_sweep'].inc()
+                            self.counters['pruned_sweep'].inc()
                             did_work = True
 
                 if not did_work:
@@ -129,4 +166,5 @@ class Monitor(daemon.WorkerPoolDaemon):
             except Exception as e:
                 util_general.ignore_exception('eventlog daemon', e)
 
+        server.stop(1).wait()
         LOG.info('Terminated')

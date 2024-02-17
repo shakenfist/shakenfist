@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package shakenfist.protos;
+
+service EventService {
+  rpc RecordEvent (EventRequest) returns (EventReply) {}
+}
+
+message EventRequest {
+    string object_type = 1;
+    string object_uuid = 2;
+    string event_type = 3;
+    float timestamp = 4;
+    string fqdn = 5;
+    float duration = 6;
+    string message = 7;
+    string extra = 8;
+}
+
+message EventReply {
+  bool ack = 1;
+}

@@ -69,7 +69,8 @@ class Monitor(daemon.Daemon):
             agent_version = packet.get('message')
             if agent_version:
                 self.instance.add_event(
-                    EVENT_TYPE_AUDIT, 'Detected agent version %s' % agent_version)
+                    EVENT_TYPE_AUDIT, 'detected agent version',
+                    extra={'version': agent_version})
                 versions = Comparison(agent_version.split(' ')[1], MINIMUM_AGENT_VERSION)
                 lesser = versions.get_lesser()
                 if lesser and lesser == agent_version:
@@ -280,13 +281,13 @@ class Monitor(daemon.Daemon):
                 'connection setup, aborting')
             return
 
-        self.instance.add_event(EVENT_TYPE_AUDIT, 'instance agent has completed start up.')
+        self.instance.add_event(EVENT_TYPE_AUDIT, 'instance agent has completed start up')
 
         # If the agent is too old, then just sit here not doing the things we
         # should be doing
         if self.instance_ready == constants.AGENT_TOO_OLD:
             self.instance.add_event(
-                EVENT_TYPE_AUDIT, 'Instance agent is too old, not executing commands.')
+                EVENT_TYPE_AUDIT, 'instance agent is too old, not executing commands')
             while not self.exit.is_set():
                 time.sleep(1)
 
@@ -304,7 +305,7 @@ class Monitor(daemon.Daemon):
                     agentop = self.instance.agent_operation_dequeue()
                     if agentop:
                         self.instance.add_event(
-                            EVENT_TYPE_AUDIT, 'Dequeued agent operation',
+                            EVENT_TYPE_AUDIT, 'dequeued agent operation',
                             extra={'agentoperation': agentop.uuid})
 
                         agentop.state = AgentOperation.STATE_EXECUTING
@@ -486,7 +487,7 @@ class Monitor(daemon.Daemon):
                             else:
                                 self.instance.add_event(
                                     EVENT_TYPE_AUDIT,
-                                    'Unknown agent operation command, aborting operation',
+                                    'unknown agent operation command, aborting operation',
                                     extra={
                                         'agentoperation': agentop.uuid,
                                         'command': command.get('command'),
@@ -497,11 +498,11 @@ class Monitor(daemon.Daemon):
                             count += 1
 
                         if num_results == len(commands):
-                            agentop.add_event(EVENT_TYPE_STATUS, 'Commands complete')
+                            agentop.add_event(EVENT_TYPE_STATUS, 'commands complete')
                             agentop.state = AgentOperation.STATE_COMPLETE
                         else:
                             agentop.add_event(
-                                EVENT_TYPE_STATUS, 'Commands not yet complete',
+                                EVENT_TYPE_STATUS, 'commands not yet complete',
                                 extra={'commands': commands, 'results': num_results})
 
                 # Ping if we've been idle for a small while
@@ -530,7 +531,7 @@ class Monitor(daemon.Daemon):
                 FileNotFoundError, OSError, ConnectionFailed) as e:
             self.instance.add_event(
                 EVENT_TYPE_STATUS,
-                ('Unexpected sidechannel communication error post '
+                ('unexpected sidechannel communication error post '
                  'connection setup, restarting channel'), extra={'error': str(e)})
             return
 

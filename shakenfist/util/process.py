@@ -7,7 +7,6 @@ import time
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
-from shakenfist import db
 from shakenfist import etcd
 
 
@@ -16,7 +15,7 @@ LOG, _ = logs.setup(__name__)
 
 def _lock_refresher(locks):
     while True:
-        db.refresh_locks(locks)
+        etcd.refresh_locks(locks)
         time.sleep(10)
 
 

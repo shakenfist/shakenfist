@@ -247,6 +247,10 @@ class BlobTransferSetupFailed(BlobException):
     ...
 
 
+class BadCheckSum(BlobException):
+    ...
+
+
 # Events
 class EventException(Exception):
     ...

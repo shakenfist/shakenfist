@@ -190,9 +190,21 @@ signal.signal(signal.SIGUSR1, propagate_signal)
 def main():
     global DAEMON_PROCS
 
+    def _start_daemon(d):
+        DAEMON_PROCS[d] = subprocess.Popen(
+            ['/srv/shakenfist/venv/bin/sf-daemon-shim', d])
+        LOG.with_fields({'pid': DAEMON_PROCS[d].pid}).info('Started %s' % d)
+
     # This is awkward, but let's verify our configuration before we get any
     # further.
     sf_config.verify_config()
+
+    # Start the eventlog daemon very very early because basically everything
+    # else talks to it.
+    if not config.NODE_IS_EVENTLOG_NODE:
+        del shim.DAEMON_IMPLEMENTATIONS['eventlog']
+    else:
+        _start_daemon('eventlog')
 
     LOG.info('Starting...')
     setproctitle.setproctitle(
@@ -231,15 +243,6 @@ def main():
     etcd.clear_stale_locks()
     Node.observe_this_node()
     etcd.restart_queues()
-
-    def _start_daemon(d):
-        DAEMON_PROCS[d] = subprocess.Popen(
-            ['/srv/shakenfist/venv/bin/sf-daemon-shim', d])
-        LOG.with_fields({'pid': DAEMON_PROCS[d].pid}).info('Started %s' % d)
-
-    # Resource usage publisher, we need this early because scheduling decisions
-    # might happen quite early on.
-    _start_daemon('resources')
 
     # Ensure the blob data store is the most recent version
     upgrade_blob_datastore()
@@ -296,9 +299,6 @@ def main():
         for d in shim.DAEMON_IMPLEMENTATIONS:
             if d not in running_daemons:
                 _start_daemon(d)
-
-    if not config.NODE_IS_EVENTLOG_NODE:
-        del shim.DAEMON_IMPLEMENTATIONS['eventlog']
 
     _audit_daemons()
     restore_instances()

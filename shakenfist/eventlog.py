@@ -1,6 +1,7 @@
 import copy
 import datetime
 import flask
+import grpc
 import json
 from oslo_concurrency import lockutils
 import os
@@ -12,6 +13,8 @@ import time
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import etcd
+from shakenfist import event_pb2
+from shakenfist import event_pb2_grpc
 from shakenfist import exceptions
 
 
@@ -41,21 +44,36 @@ def add_event(event_type, object_type, object_uuid, message, duration=None,
     if request_id and 'request-id' not in extra:
         extra['request-id'] = request_id
 
+    log = LOG.with_fields({
+            object_type: object_uuid,
+            'event_type': event_type,
+            'fqdn': config.NODE_NAME,
+            'duration': duration,
+            'message': message,
+            'extra': extra
+        })
     if not suppress_event_logging:
-        log = LOG
-        if extra:
-            log = log.with_fields(extra)
-        log = log.with_fields({
-                object_type: object_uuid,
-                'event_type': event_type,
-                'fqdn': config.NODE_NAME,
-                'duration': duration,
-                'message': message
-            })
         if log_as_error:
             log.error('Added event')
         else:
             log.info('Added event')
+
+    # Attempt to send the event with gRPC directly to the eventlog node.
+    try:
+        with grpc.insecure_channel('%s:%s' % (config.EVENTLOG_NODE_IP,
+                                              config.EVENTLOG_API_PORT)) as channel:
+            stub = event_pb2_grpc.EventServiceStub(channel)
+            request = event_pb2.EventRequest(
+                object_type=object_type, object_uuid=object_uuid,
+                event_type=event_type, timestamp=timestamp,
+                fqdn=config.NODE_NAME, duration=duration,
+                message=message, extra=json.dumps(extra))
+            response = stub.RecordEvent(request)
+            if response.ack:
+                return
+
+    except grpc._channel._InactiveRpcError as e:
+        log.info('Failed to send event with gRPC, adding to dead letter queue: %s' % e)
 
     # We use the old eventlog mechanism as a queueing system to get the logs
     # to the eventlog node.
@@ -297,10 +315,15 @@ class EventLog(object):
 
 
 # This is the version for an individual sqlite file
-VERSION = 6
-CREATE_EVENT_TABLE = """CREATE TABLE IF NOT EXISTS events(
-    type text, timestamp real PRIMARY KEY, fqdn text, duration float, message text,
-    extra text)"""
+VERSION = 7
+CREATE_EVENT_TABLE = [
+    (
+        'CREATE TABLE IF NOT EXISTS events('
+        'type text, timestamp real, fqdn text, duration float, message text, '
+        'extra text);'
+    ),
+    'CREATE INDEX timestamp_idx ON events (timestamp);'
+]
 CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int primary key)"""
 
 
@@ -338,7 +361,8 @@ class EventLogChunk(object):
                     "type='table' AND name='version'")
         if cur.fetchone()['count(name)'] == 0:
             # We do not have a version table, skip to the latest version
-            self.con.execute(CREATE_EVENT_TABLE)
+            for statement in CREATE_EVENT_TABLE:
+                self.con.execute(statement)
             self.con.execute(CREATE_VERSION_TABLE)
             self.con.execute('INSERT INTO version VALUES (?)', (VERSION, ))
             self.con.commit()
@@ -416,7 +440,8 @@ class EventLogChunk(object):
                     # Older versions of sqlite don't have a drop column, so we
                     # have to do this the hard way.
                     self.con.execute('ALTER TABLE events RENAME TO events_old')
-                    self.con.execute(CREATE_EVENT_TABLE)
+                    for statement in CREATE_EVENT_TABLE:
+                        self.con.execute(statement)
                     self.con.execute(
                         'INSERT INTO events (type, timestamp, fqdn, duration, message, extra) '
                         'SELECT type, timestamp, fqdn, duration, message, extra '
@@ -427,6 +452,22 @@ class EventLogChunk(object):
                         'INSERT INTO events(type, timestamp, message) '
                         'VALUES ("audit", %f, "Upgraded database to version 6 in compatibility mode")'
                         % time.time())
+
+            if ver == 6:
+                # Timestamp is no longer the primary key, its an index. You can't
+                # just drop the constraint, you need to re-write the table.
+                ver = 7
+                self.log.info('Upgrading database from v6 to v7')
+                self.con.execute('ALTER TABLE events RENAME TO events_old;')
+                for statement in CREATE_EVENT_TABLE:
+                    self.con.execute(statement)
+                self.con.execute('INSERT INTO events SELECT * FROM events_old;')
+                self.con.execute('DROP TABLE events_old')
+
+                self.con.execute(
+                    'INSERT INTO events(timestamp, message) '
+                    'VALUES (%f, "Upgraded database to version 7");'
+                    % time.time())
 
             if start_ver != ver:
                 self.con.execute('UPDATE version SET version = ?', (ver,))
@@ -445,27 +486,12 @@ class EventLogChunk(object):
         if not self.bootstrapped:
             self._bootstrap()
 
-        attempts = 0
-        while attempts < 3:
-            try:
-                self.con.execute(
-                    'INSERT INTO events(type, timestamp, fqdn, duration, message, extra) '
-                    'VALUES (?, ?, ?, ?, ?, ?)',
-                    (event_type, timestamp, fqdn, duration, message,
-                     json.dumps(extra, cls=etcd.JSONEncoderCustomTypes)))
-                self.con.commit()
-                return
-            except sqlite3.IntegrityError:
-                timestamp += 0.00001
-                attempts += 1
-
-        self.log.with_fields({
-            'timestamp': timestamp,
-            'fqdn': fqdn,
-            'duration': duration,
-            'message': message,
-            'extra': extra
-        }).error('Failed to record event after 3 retries')
+        self.con.execute(
+            'INSERT INTO events(type, timestamp, fqdn, duration, message, extra) '
+            'VALUES (?, ?, ?, ?, ?, ?)',
+            (event_type, timestamp, fqdn, duration, message,
+                json.dumps(extra, cls=etcd.JSONEncoderCustomTypes)))
+        self.con.commit()
 
     def read_events(self, limit=100, event_type=None):
         if not self.bootstrapped:

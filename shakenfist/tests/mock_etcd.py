@@ -116,7 +116,11 @@ class MockEtcd():
         self._trace('MockEtcd.get() retrieving data for key %s: %s' % (path, d))
         if not d:
             return None
-        return [[d]]
+
+        if metadata:
+            return [[d]]
+        else:
+            return [d]
 
     def get_prefix(self, path, sort_order=None, sort_target=None, limit=0):
         ret = []

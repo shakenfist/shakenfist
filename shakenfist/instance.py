@@ -1115,7 +1115,8 @@ class Instance(dbo):
                     raise exceptions.NVRAMTemplateMissing(
                         'Blob %s does not exist' % self.nvram_template)
                 b.ensure_local([], instance_object=self)
-                b.add_event(EVENT_TYPE_AUDIT, 'instance %s is using blob' % self.uuid)
+                b.add_event(EVENT_TYPE_AUDIT, 'instance is using blob',
+                            extra={'instance_uuid': self.uuid})
                 shutil.copyfile(
                     blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))
                 nvram_template_attribute = ''
@@ -1484,10 +1485,12 @@ class Instance(dbo):
                 a.add_index(blob_uuid)
                 a.state = artifact.Artifact.STATE_CREATED
                 self.add_event(
-                    EVENT_TYPE_AUDIT,
-                    ('the console log for this instance was archived in namespace %s'
-                     % a.namespace),
-                    extra={'artifact': a.uuid, 'blob': b.uuid})
+                    EVENT_TYPE_AUDIT, 'the console log for this instance was archived',
+                    extra={
+                        'namespace': a.namespace,
+                        'artifact': a.uuid,
+                        'blob': b.uuid
+                        })
         else:
             self.add_event(
                 EVENT_TYPE_AUDIT,

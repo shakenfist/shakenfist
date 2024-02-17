@@ -21,7 +21,6 @@ from shakenfist.baseobject import (
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS, EVENT_TYPE_MUTATE
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent,
@@ -412,16 +411,18 @@ class Blob(dbo):
                     total_bytes_received += len(d)
 
                     if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
-                        db.refresh_locks(locks)
+                        etcd.refresh_locks(locks)
                         last_refresh = time.time()
 
                     percentage = total_bytes_received / int(self.size) * 100.0
                     if (percentage - previous_percentage) > 10.0:
                         if instance_object:
                             instance_object.add_event(
-                                EVENT_TYPE_STATUS,
-                                'Fetching required blob %s, %d%% complete'
-                                % (self.uuid, percentage))
+                                EVENT_TYPE_STATUS, 'fetching required blob',
+                                extra={
+                                    'blob_uuid': self.uuid,
+                                    'percentage': percentage
+                                })
                         self.log.with_fields({
                             'bytes_fetched': total_bytes_received,
                             'size': int(self.size)
@@ -441,8 +442,11 @@ class Blob(dbo):
             if not self.verify_size(partial=True):
                 if instance_object:
                     instance_object.add_event(
-                        EVENT_TYPE_AUDIT,
-                        'Fetching required blob %s failed (incorrect size)' % self.uuid)
+                        EVENT_TYPE_AUDIT, 'fetching required blob failed',
+                        extra={
+                            'blob_uuid': self.uuid,
+                            'error': 'incorrect size'
+                            })
                 raise BlobFetchFailed(
                     'Fetching required blob %s failed. We fetched %d bytes, but expected %d.'
                     % (self.uuid, total_bytes_received, self.size))
@@ -450,15 +454,19 @@ class Blob(dbo):
             if not self.verify_checksum(sha512_hash.hexdigest()):
                 if instance_object:
                     instance_object.add_event(
-                        EVENT_TYPE_AUDIT,
-                        'Fetching required blob %s failed (incorrect checksum)' % self.uuid)
+                        EVENT_TYPE_AUDIT, 'fetching required blob failed',
+                        extra={
+                            'blob_uuid': self.uuid,
+                            'error': 'incorrect checksum'
+                            })
                 raise BlobFetchFailed(
                     'Fetching required blob %s failed. Incorrect checksum.' % self.uuid)
 
             os.rename(partial_path, blob_path)
             if instance_object:
                 instance_object.add_event(
-                    EVENT_TYPE_STATUS, 'Fetching required blob %s, complete' % self.uuid)
+                    EVENT_TYPE_STATUS, 'fetching required blob complete',
+                    extra={'blob_uuid': self.uuid})
             self.log.with_fields({
                 'bytes_fetched': total_bytes_received,
                 'size': int(self.size)
@@ -676,24 +684,28 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
                 if (percentage - previous_percentage) > 10.0:
                     if instance_object:
                         instance_object.add_event(
-                            EVENT_TYPE_STATUS,
-                            'Fetching required HTTP resource %s into blob %s, '
-                            '%d%% complete'
-                            % (url, blob_uuid, percentage))
+                            EVENT_TYPE_STATUS, 'fetching required HTTP resource',
+                            extra={
+                                'url': url,
+                                'blob_uuid': blob_uuid,
+                                'percentage': percentage
+                            })
 
                     logs.with_fields({'bytes_fetched': fetched}).debug(
                         'Fetch %.02f percent complete' % percentage)
                     previous_percentage = percentage
 
             if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
-                db.refresh_locks(locks)
+                etcd.refresh_locks(locks)
                 last_refresh = time.time()
 
     if instance_object:
         instance_object.add_event(
-            EVENT_TYPE_STATUS,
-            'Fetching required HTTP resource %s into blob %s, complete'
-            % (url, blob_uuid))
+            EVENT_TYPE_STATUS, 'fetching required HTTP resource complete',
+            extra={
+                'url': url,
+                'blob_uuid': blob_uuid
+            })
     logs.with_fields({'bytes_fetched': fetched}).info('Fetch complete')
 
     # Make the associated blob. Note that we deliberately don't calculate the
