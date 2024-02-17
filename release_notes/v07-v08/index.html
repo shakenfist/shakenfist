@@ -448,6 +448,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    Performance
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#minor-changes" class="md-nav__link">
     Minor changes
   </a>
@@ -1416,6 +1423,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    Performance
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#minor-changes" class="md-nav__link">
     Minor changes
   </a>
@@ -1497,6 +1511,16 @@
   tokens on upgrade. This means tokens from before an upgrade will continue to work
   for their normal lifetime.</li>
 <li>We now lock versions of upstream Ansible Galaxy dependencies.</li>
+</ul>
+<h2 id="performance">Performance</h2>
+<ul>
+<li>Events are no longer queued via etcd unless the eventlog node is down at the
+  time of the event. This reduces the number of etcd writes significantly during
+  CI runs and therefore improves the reliability of etcd. The new approach is
+  to make gRPC calls directly to the eventlog node if it is available.</li>
+<li>We now use gRPC calls to compact etcd, instead of relying on a python client
+  wrapper. This means we can now update our gRPC and protobuf dependencies to
+  much more recent versions.</li>
 </ul>
 <h2 id="minor-changes">Minor changes</h2>
 <ul>
