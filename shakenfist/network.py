@@ -647,7 +647,7 @@ class Network(dbo):
         if self.uuid == 'floating':
             return
 
-        with self.get_lock(op='Network ensure mesh'):
+        with self.get_lock(op='Network ensure mesh', global_scope=False):
             # Ensure network was not deleted whilst waiting for the lock.
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)

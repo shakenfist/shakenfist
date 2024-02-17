@@ -2,6 +2,7 @@ from etcd3gw.lock import Lock
 from functools import partial
 import json
 from math import inf
+from oslo_concurrency import lockutils
 import time
 from shakenfist_utilities import logs
 
@@ -321,19 +322,29 @@ class DatabaseBackedObject(object):
                     'initialized': True
                 })
 
-    def get_lock(self, subtype=None, ttl=60, op=None,
+    def get_lock(self, subtype=None, ttl=60, op=None, global_scope=True,
                  timeout=constants.ETCD_ATTEMPT_TIMEOUT):
         # There is no point locking in-memory objects
         if self.in_memory_only:
             return NoopLock()
 
+        if not global_scope:
+            return lockutils.external_lock(
+                '%s-%s' % (self.object_type, self.uuid),
+                lock_path='/tmp', lock_file_prefix='sflock-')
+
         return etcd.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
                              log_ctx=self.log, op=op, timeout=timeout)
 
-    def get_lock_attr(self, name, op, ttl=60, timeout=10):
+    def get_lock_attr(self, name, op, ttl=60, global_scope=True, timeout=10):
         # There is no point locking in-memory objects
         if self.in_memory_only:
             return NoopLock()
+
+        if not global_scope:
+            return lockutils.external_lock(
+                '%s-%s-%s' % (self.object_type, self.uuid, name),
+                lock_path='/tmp', lock_file_prefix='sflock-')
 
         return etcd.get_lock('attribute/%s' % self.object_type,
                              self.__uuid, name, op=op, ttl=ttl, timeout=timeout,
