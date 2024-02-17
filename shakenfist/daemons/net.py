@@ -10,7 +10,6 @@ import time
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
@@ -379,8 +378,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             # have to hold a lock here to avoid races where an IP is freed while
             # we're iterating through the loop. Note that this means we can't call
             # anything which also wants to lock the ipmanager.
-            with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                             op='Cleanup leaks'):
+            with etcd.get_lock('ipmanager', None, 'floating', ttl=120,
+                               op='Cleanup leaks'):
                 floating_network = network.floating_network()
                 LOG.debug('Floating network registrations: %s'
                           % floating_network.ipam.in_use)

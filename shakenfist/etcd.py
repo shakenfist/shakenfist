@@ -273,6 +273,13 @@ def refresh_lock(lock, log_ctx=LOG):
     lock.refresh()
 
 
+def refresh_locks(locks):
+    if locks:
+        for lock in locks:
+            if lock:
+                refresh_lock(lock)
+
+
 @retry_etcd_forever
 def clear_stale_locks():
     # Remove all locks held by former processes on this node. This is required

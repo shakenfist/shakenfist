@@ -503,7 +503,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                         uuid='847b0327-9b17-4148-b4ed-be72b6722c17',
                         state=[dbo.STATE_CREATED])])
     @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.get_lock')
     def test_delete_all_instances(
             self, mock_db_get_lock, mock_etcd_put,
             mock_get_instances, mock_enqueue):
