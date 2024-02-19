@@ -322,7 +322,7 @@ CREATE_EVENT_TABLE = [
         'type text, timestamp real, fqdn text, duration float, message text, '
         'extra text);'
     ),
-    'CREATE INDEX timestamp_idx ON events (timestamp);'
+    'CREATE INDEX IF NOT EXISTS timestamp_idx ON events (timestamp);'
 ]
 CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int primary key)"""
 
