@@ -68,7 +68,7 @@ class Blob(dbo):
     @classmethod
     def _upgrade_step_3_to_4(cls, static_values):
         static_values['modified'] = cls.normalize_timestamp(
-                static_values['modified'])
+                static_values.get('modified'))
 
     @classmethod
     def _upgrade_step_4_to_5(cls, static_values):

@@ -166,6 +166,8 @@ jobs:
             failures=1
           fi
 
+          # NOTE(mikal): online upgrades are forbidden in these fresh install
+          # tests.
           FORBIDDEN=("Traceback (most recent call last):"
                      "ERROR sf"
                      "ERROR gunicorn"
@@ -185,11 +187,12 @@ jobs:
                      "Waiting to acquire lock"
                      'apparmor="DENIED"'
                      "Ignoring malformed cache entry"
-                     "Failed to send event with gRPC")
+                     "Failed to send event with gRPC"
+                     "online upgrade")
           IFS=""
           for forbid in ${FORBIDDEN[*]}
           do
-            if [ `grep -c "$forbid" ${GITHUB_WORKSPACE}/syslog || true` -gt 0 ]
+            if [ `grep -c -i "$forbid" ${GITHUB_WORKSPACE}/syslog || true` -gt 0 ]
             then
               echo "FAILURE: Forbidden string found in logs: $forbid"
               failures=1
@@ -243,7 +246,7 @@ jobs:
               --extra-vars "base_image_user=ubuntu ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: bundle.zip
