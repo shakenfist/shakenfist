@@ -110,6 +110,12 @@ def verify_config():
 def stop():
     click.echo('Gracefully stopping Shaken Fist on this node...')
     n = Node.from_db(config.NODE_NAME)
+
+    # If we were missing, we're not any more
+    if n.state.value == Node.STATE_MISSING:
+        n.state = Node.STATE_CREATED
+
+    # But we are now stopping
     n.state = Node.STATE_STOPPING
     click.echo('Placed node in stopping state')
 

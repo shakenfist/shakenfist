@@ -40,7 +40,7 @@ protobuf==4.25.2                   # bsd
 requests==2.31.0                   # apache2
 requests-toolbelt==1.0.0           # apache2
 chardet==5.2.0                     # lgpl
-urllib3==2.2.0                     # mit
+urllib3==2.2.1                     # mit
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt
