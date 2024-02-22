@@ -249,7 +249,10 @@ class Monitor(daemon.Daemon):
                 if config.NODE_IS_ETCD_MASTER:
                     for p in psutil.process_iter():
                         if p.name().endswith('/etcd'):
-                            process_metrics.update(_emit_process_metrics(p))
+                            try:
+                                process_metrics.update(_emit_process_metrics(p))
+                            except psutil.NoSuchProcess:
+                                ...
 
                 n.process_metrics = process_metrics
 
