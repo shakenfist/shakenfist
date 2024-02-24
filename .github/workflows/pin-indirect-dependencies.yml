@@ -1,0 +1,97 @@
+# NOTE(mikal): we need to pin indirect dependencies because some of our
+# dependencies don't pin things how we like to. If they're not pinned then when
+# something multiple layers away does a release and breaks us it can be super
+# confusing.
+
+name: Pin indirect dependencies
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '00 00 * * *'        # utc
+
+jobs:
+  indirect-dependencies:
+    runs-on: self-hosted
+    timeout-minutes: 60
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    # NOTE(mikal): git repos are checked out to /srv/github/_work/{org}/{repo}
+    # which is available as GITHUB_WORKSPACE. You can find other environment
+    # variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
+
+    steps:
+      - name: Set environment variables
+        run: |
+          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
+
+      - name: Checkout shakenfist
+        uses: actions/checkout@v4
+        with:
+          path: shakenfist
+          fetch-depth: 0
+
+      - name: Install the github command line
+        run: |
+          sudo apt update
+          sudo apt install -y curl
+
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+
+          sudo apt update
+          sudo apt install -y gh
+
+      - name: Install all our dependencies in a venv
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
+            install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
+
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          python3 -m venv  --system-site-packages ${RUNNER_TEMP}/venv
+          ${RUNNER_TEMP}/venv/bin/pip install -r requirements.txt
+
+      - name: List all our dependencies
+        run: |
+          ${RUNNER_TEMP}/venv/bin/pip freeze --local
+
+      - name: Ensure all dependencies are pinned
+        env:
+          GITHUB_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN }}
+        run: |
+          cd ${GITHUB_WORKSPACE}/shakenfist
+
+          datestamp=$(date "+%Y%m%d")
+          git checkout -b pin-dependencies-${datestamp}
+
+          for depver in $(${RUNNER_TEMP}/venv/bin/pip freeze --local); do
+            dep=$(echo ${depver} | sed 's/==.*//')
+
+            if [ $(egrep -ic "^${dep}==" requirements.txt) -lt 1 ]; then
+              echo "${depver}" >> requirements.txt
+            fi
+          done
+
+          # Did we find something new?
+          if [ $(git diff | wc -l) -gt 0 ]; then
+            echo "New dependencies detected..."
+            echo
+            git diff
+
+            git config --global user.name "shakenfist-bot"
+            git config --global user.email "bot@shakenfist.com"
+            git commit -a -m "Update pinned dependencies."
+            git push -f origin pin-dependencies-${datestamp}
+            echo
+            gh pr create \
+                --assignee mikalstill \
+                --reviewer mikalstill \
+                --title "Update pinned dependencies." \
+                --body "New indirect dependencies were detected." \
+                --label dependencies
+            echo
+            echo "Pull request created."
+          fi
