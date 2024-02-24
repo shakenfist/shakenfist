@@ -147,8 +147,7 @@ class Scheduler(object):
                 if not disk['size'] is None:
                     requested_disk += int(disk['size'])
 
-        disk_free = int(self.metrics[node].get(
-            'disk_free_instances', '0')) / GiB
+        disk_free = int(self.metrics[node].get('disk_free_instances', '0')) / GiB
         disk_free -= config.MINIMUM_FREE_DISK
         if requested_disk > disk_free:
             log_ctx.with_fields({

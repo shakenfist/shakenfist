@@ -104,6 +104,7 @@ class Monitor(daemon.Daemon):
             total = 0
             used = 0
 
+            log_fields = {}
             for path in ['', 'blobs', 'events', 'image_cache', 'instances', 'uploads']:
                 # We need to make the paths we check if they don't exist, otherwise
                 # they wont be included in the metrics and things get confused.
@@ -121,6 +122,8 @@ class Monitor(daemon.Daemon):
                 if path == '':
                     path = 'sfroot'
                 retval['disk_free_%s' % path] = free
+                log_fields[path] = free
+            LOG.with_fields(log_fields).debug('Disk free')
 
             retval.update({
                 'disk_total': total,
