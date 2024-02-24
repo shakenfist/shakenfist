@@ -4,18 +4,18 @@ psutil>=5.9.0                      # bsd
 # Our requirements -- we specify exact versions here and let renovate update
 # them for the develop branch as required. Releases never update requirements.
 fixtures==4.1.0                    # apache2
-pyyaml==6.0.1                      # mit
+PyYAML==6.0.1                      # mit
 oslo-concurrency==5.3.0            # apache2
-jinja2==3.1.3                      # bsd
+Jinja2==3.1.3                      # bsd
 setproctitle==1.3.3                # bsd
 click==8.1.7                       # bsd
 werkzeug==3.0.1                    # bsd
 flask==3.0.2                       # bsd
-flask-restful==0.3.10              # bsd
+Flask-RESTful==0.3.10              # bsd
 flasgger==0.9.7.1                  # mit
 prometheus-client==0.20.0          # apache2
 etcd3gw==2.3.0                     # apache2
-flask-jwt-extended==4.6.0          # mit
+Flask-JWT-Extended==4.6.0          # mit
 bcrypt==4.1.2                      # apache2
 gunicorn==21.2.0                   # mit
 python-magic==0.4.27               # mit
@@ -45,3 +45,41 @@ urllib3==2.2.1                     # mit
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt
 #libvirt-python      # lgpl
+
+# Indirect dependencies. We do not track license for these.
+aniso8601==9.0.1
+annotated-types==0.6.0
+anyio==4.3.0
+async-extensions==1.4.1
+attrs==23.2.0
+blinker==1.7.0
+coloredlogs==15.0.1
+entrypoint==2.0.0
+exceptiongroup==1.2.0
+executor==23.2
+funcs==0.8.0
+futurist==3.0.0
+grpcio==1.62.0
+humanfriendly==10.0
+importlib-metadata==7.0.1
+iters==0.15.0
+itsdangerous==2.1.2
+linux-utils==0.7
+MarkupSafe==2.1.5
+marshmallow==3.20.2
+mistune==3.0.2
+mixed-methods==1.0.2
+named==1.3.0
+orderings==1.1.0
+property-manager==3.0
+psutil==5.9.8
+pydantic-core==2.16.2
+PyJWT==2.8.0
+python-dotenv==1.0.1
+pytz==2024.1
+sniffio==1.3.0
+solus==1.1.0
+typing-aliases==1.6.0
+typing-extensions==4.9.0
+verboselogs==1.7
+wraps==0.8.0
