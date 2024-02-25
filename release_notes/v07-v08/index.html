@@ -1511,6 +1511,8 @@
   tokens on upgrade. This means tokens from before an upgrade will continue to work
   for their normal lifetime.</li>
 <li>We now lock versions of upstream Ansible Galaxy dependencies.</li>
+<li>We now lock versions of all of our indirect python dependencies.</li>
+<li>Nodes can now transition directly from the missing state to the stopping state.</li>
 </ul>
 <h2 id="performance">Performance</h2>
 <ul>
@@ -1521,6 +1523,7 @@
 <li>We now use gRPC calls to compact etcd, instead of relying on a python client
   wrapper. This means we can now update our gRPC and protobuf dependencies to
   much more recent versions.</li>
+<li>etcd traffic levels are now monitored in CI.</li>
 </ul>
 <h2 id="minor-changes">Minor changes</h2>
 <ul>
