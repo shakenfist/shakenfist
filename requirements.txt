@@ -73,7 +73,7 @@ named==1.3.0
 orderings==1.1.0
 property-manager==3.0
 psutil==5.9.8
-pydantic-core==2.16.2
+pydantic-core==2.16.3
 PyJWT==2.8.0
 python-dotenv==1.0.1
 pytz==2024.1
