@@ -34,7 +34,7 @@ pydantic-settings==2.2.1           # mit
 version-comparison==0.2            # mit
 pycdlib==1.14.0                    # lgpl
 versions==2.1.0                    # mit
-grpcio-tools==1.60.1               # apache2
+grpcio-tools==1.62.0               # apache2
 protobuf==4.25.3                   # bsd
 
 requests==2.31.0                   # apache2
