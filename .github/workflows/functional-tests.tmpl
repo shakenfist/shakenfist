@@ -154,6 +154,7 @@ jobs:
               {{baseuser}}@$primary '. /etc/sf/sfrc; sf-client node cpuhogs --ignore sf_cleaner'
 
       - name: Check for reasonable data rates
+        timeout-minutes: 5
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
