@@ -15,20 +15,21 @@ def read_object_state_cache(object_type, state):
 
 
 def read_object_state_cache_many(object_type, states):
-    # Prefilters need a consistent view across several states, so are the only
-    # example of a read which holds a lock.
+    # NOTE(mikal): this code relies on the fact that etc3gw implements get_prefix
+    # as an etcd API range request, which is atomic. It therefore does not need
+    # a lock to receive a consistent view of the cache, so long as everything
+    # can be fetched in a single etcd API request.
     out = []
-    with etcd.get_lock('cache', None, object_type, op='Cache read many'):
-        for key, data in etcd.get_prefix('/sf/cache/%s' % object_type):
-            if type(data) is not dict:
-                LOG.error('Ignoring malformed cache entry %s = %s' % (key, data))
-                continue
+    for key, data in etcd.get_prefix('/sf/cache/%s' % object_type):
+        if type(data) is not dict:
+            LOG.error('Ignoring malformed cache entry %s = %s' % (key, data))
+            continue
 
-            state = key.split('/')[-1]
-            if state and state in states:
-                uuids = list(data.keys())
-                if uuids:
-                    out.extend(uuids)
+        state = key.split('/')[-1]
+        if state and state in states:
+            uuids = list(data.keys())
+            if uuids:
+                out.extend(uuids)
     return out
 
 
