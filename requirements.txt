@@ -29,8 +29,6 @@ shakenfist-utilities==0.6.8        # apache2
 pbr==6.0.0                         # apache2
 setuptools==69.0.3                 # mit
 symbolicmode==2.0.1                # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
-pydantic==2.6.1                    # mit
-pydantic-settings==2.2.1           # mit
 version-comparison==0.2            # mit
 pycdlib==1.14.0                    # lgpl
 versions==2.1.0                    # mit
@@ -41,6 +39,11 @@ requests==2.31.0                   # apache2
 requests-toolbelt==1.0.0           # apache2
 chardet==5.2.0                     # lgpl
 urllib3==2.2.1                     # mit
+
+# These must move as a set
+pydantic==2.6.2                    # mit
+pydantic-settings==2.2.1           # mit
+pydantic-core==2.16.3              # (indirect dependency)
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt
@@ -73,7 +76,6 @@ named==1.3.0
 orderings==1.1.0
 property-manager==3.0
 psutil==5.9.8
-pydantic-core==2.16.3
 PyJWT==2.8.0
 python-dotenv==1.0.1
 pytz==2024.1
