@@ -29,7 +29,7 @@ shakenfist-utilities==0.6.8        # apache2
 pbr==6.0.0                         # apache2
 setuptools==69.1.1                 # mit
 symbolicmode==2.0.1                # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
-pydantic==2.6.1                    # mit
+pydantic==2.6.2                    # mit
 pydantic-settings==2.2.1           # mit
 version-comparison==0.2            # mit
 pycdlib==1.14.0                    # lgpl
