@@ -475,8 +475,7 @@ class BaseNamespacedTestCase(BaseTestCase):
 
         remaining_instances = list(non_blocking_client.get_instances())
         if remaining_instances:
-            self.fail('Failed to delete instances: %s'
-                      % remaining_instances)
+            self.fail('Failed to delete instances: %s' % remaining_instances)
 
         start_time = time.time()
         while time.time() - start_time < 5 * 60:
