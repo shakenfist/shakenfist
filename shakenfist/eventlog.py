@@ -490,7 +490,7 @@ class EventLogChunk(object):
             'INSERT INTO events(type, timestamp, fqdn, duration, message, extra) '
             'VALUES (?, ?, ?, ?, ?, ?)',
             (event_type, timestamp, fqdn, duration, message,
-                json.dumps(extra, cls=etcd.JSONEncoderCustomTypes)))
+             json.dumps(extra, cls=etcd.JSONEncoderCustomTypes)))
         self.con.commit()
 
     def read_events(self, limit=100, event_type=None):

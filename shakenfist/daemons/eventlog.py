@@ -33,8 +33,29 @@ class EventService(event_pb2_grpc.EventServiceServicer):
         try:
             with eventlog.EventLog(request.object_type, request.object_uuid) as eventdb:
                 extra = json.loads(request.extra)
+
+                # Handle the replacement of the timestamp field. Weirdly, HasField()
+                # raises an exception if the field is not present in the message,
+                # instead of a boolean.
+                timestamp = request.obsolete_timestamp
+                try:
+                    timestamp = request.timestamp
+                except ValueError:
+                    ...
+
+                if not timestamp or timestamp == 0:
+                    LOG.with_fields({
+                        'event_type': request.event_type,
+                        'timestamp': timestamp,
+                        'protobuf_timestamp': request.timestamp,
+                        'protobuf_obsolete_timestamp': request.obsolete_timestamp,
+                        'node': request.fqdn,
+                        'message': request.message,
+                        'extra': request.extra
+                    }).error('Event has invalid timestamp')
+
                 eventdb.write_event(
-                    request.event_type, request.timestamp, request.fqdn,
+                    request.event_type, timestamp, request.fqdn,
                     request.duration, request.message, extra)
                 self.monitor.counters[request.event_type].inc()
         except Exception as e:

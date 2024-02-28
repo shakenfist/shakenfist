@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0b\x65vent.proto\x12\x11shakenfist.protos\"\x9f\x01\n\x0c\x45ventRequest\x12\x13\n\x0bobject_type\x18\x01 \x01(\t\x12\x13\n\x0bobject_uuid\x18\x02 \x01(\t\x12\x12\n\nevent_type\x18\x03 \x01(\t\x12\x11\n\ttimestamp\x18\x04 \x01(\x02\x12\x0c\n\x04\x66qdn\x18\x05 \x01(\t\x12\x10\n\x08\x64uration\x18\x06 \x01(\x02\x12\x0f\n\x07message\x18\x07 \x01(\t\x12\r\n\x05\x65xtra\x18\x08 \x01(\t\"\x19\n\nEventReply\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\x32_\n\x0c\x45ventService\x12O\n\x0bRecordEvent\x12\x1f.shakenfist.protos.EventRequest\x1a\x1d.shakenfist.protos.EventReply\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0b\x65vent.proto\x12\x11shakenfist.protos\"\xd7\x01\n\x0c\x45ventRequest\x12\x13\n\x0bobject_type\x18\x01 \x01(\t\x12\x13\n\x0bobject_uuid\x18\x02 \x01(\t\x12\x12\n\nevent_type\x18\x03 \x01(\t\x12\x1f\n\x12obsolete_timestamp\x18\x04 \x01(\x02H\x00\x88\x01\x01\x12\x0c\n\x04\x66qdn\x18\x05 \x01(\t\x12\x10\n\x08\x64uration\x18\x06 \x01(\x02\x12\x0f\n\x07message\x18\x07 \x01(\t\x12\r\n\x05\x65xtra\x18\x08 \x01(\t\x12\x11\n\ttimestamp\x18\t \x01(\x01\x42\x15\n\x13_obsolete_timestamp\"\x19\n\nEventReply\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\x32_\n\x0c\x45ventService\x12O\n\x0bRecordEvent\x12\x1f.shakenfist.protos.EventRequest\x1a\x1d.shakenfist.protos.EventReply\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -22,9 +22,9 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'event_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
   DESCRIPTOR._options = None
   _globals['_EVENTREQUEST']._serialized_start=35
-  _globals['_EVENTREQUEST']._serialized_end=194
-  _globals['_EVENTREPLY']._serialized_start=196
-  _globals['_EVENTREPLY']._serialized_end=221
-  _globals['_EVENTSERVICE']._serialized_start=223
-  _globals['_EVENTSERVICE']._serialized_end=318
+  _globals['_EVENTREQUEST']._serialized_end=250
+  _globals['_EVENTREPLY']._serialized_start=252
+  _globals['_EVENTREPLY']._serialized_end=277
+  _globals['_EVENTSERVICE']._serialized_start=279
+  _globals['_EVENTSERVICE']._serialized_end=374
 # @@protoc_insertion_point(module_scope)

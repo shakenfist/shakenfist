@@ -17,6 +17,13 @@
         "digest"
       ],
       "automerge": true
+    },
+    {
+      "description": "Group pydantic updates together",
+      "matchPackagePatterns": [
+        "pydantic"
+      ],
+      "groupName": "pydantic"
     }
   ],
   "minimumReleaseAge": "3 days",
