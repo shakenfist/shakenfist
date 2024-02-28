@@ -31,7 +31,7 @@ setuptools==69.1.1                 # mit
 symbolicmode==2.0.1                # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
 version-comparison==0.2            # mit
 pycdlib==1.14.0                    # lgpl
-versions==2.1.0                    # mit
+versions==2.1.1                    # mit
 grpcio-tools==1.62.0               # apache2
 protobuf==4.25.3                   # bsd
 
