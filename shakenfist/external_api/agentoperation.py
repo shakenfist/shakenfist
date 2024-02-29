@@ -12,6 +12,7 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api, logs
 
 
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.agentoperation import AgentOperation
@@ -99,6 +100,8 @@ class AgentOperationEndpoint(sf_api.Resource):
     @requires_operation_ownership
     @api_base.log_token_use
     def delete(self, operation_uuid=None, operation_from_db=None):
+        operation_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'deletion request from REST API')
         operation_from_db.delete()
         return operation_from_db.external_view()
 

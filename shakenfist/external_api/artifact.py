@@ -199,6 +199,8 @@ class ArtifactEndpoint(sf_api.Resource):
     def delete(self, artifact_ref=None, artifact_from_db=None):
         if artifact_from_db.state.value == Artifact.STATE_DELETED:
             return
+        artifact_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'deletion request from REST API')
         artifact_from_db.delete()
         return artifact_from_db.external_view()
 
@@ -296,6 +298,7 @@ class ArtifactsEndpoint(sf_api.Resource):
 
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
                               create_if_new=True)
+        a.add_event(EVENT_TYPE_AUDIT, 'creation request from REST API')
 
         # Only admin can create shared artifacts
         if shared:
@@ -344,6 +347,7 @@ class ArtifactsEndpoint(sf_api.Resource):
 
         deleted = []
         for a in Artifacts([partial(namespace_exact_filter, namespace)]):
+            a.add_event(EVENT_TYPE_AUDIT, 'deletion request from REST API')
             a.delete()
             deleted.append(a.uuid)
 
@@ -432,6 +436,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
 
         a = Artifact.from_url(artifact_type_value, source_url, name=artifact_name,
                               namespace=namespace, create_if_new=True)
+        a.add_event(EVENT_TYPE_AUDIT, 'convert upload to artifact from REST API')
 
         if not namespace_is_trusted(a.namespace, get_jwt_identity()[0]):
             return sf_api.error(404, 'namespace not found')
@@ -597,6 +602,8 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
             mv = int(max_versions)
         except ValueError:
             return sf_api.error(400, 'max version is not an integer')
+        artifact_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'max versions set from REST API')
         artifact_from_db.max_versions = mv
 
 
@@ -626,6 +633,9 @@ class ArtifactVersionEndpoint(sf_api.Resource):
         indexes = list(artifact_from_db.get_all_indexes())
         for idx in indexes:
             if idx['index'] == ver_index:
+                artifact_from_db.add_event(
+                    EVENT_TYPE_AUDIT, 'index deletion request from REST API',
+                    extra={'index': idx['index']})
                 artifact_from_db.del_index(idx['index'])
                 if len(indexes) == 1:
                     artifact_from_db.state = Artifact.STATE_DELETED
@@ -650,6 +660,8 @@ class ArtifactShareEndpoint(sf_api.Resource):
         if artifact_from_db.namespace != 'system':
             return sf_api.error(
                 403, 'only artifacts in the system namespace can be shared')
+        artifact_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'artifact share request from REST API')
         artifact_from_db.shared = True
         return artifact_from_db.external_view()
 
@@ -669,6 +681,8 @@ class ArtifactUnshareEndpoint(sf_api.Resource):
     def post(self, artifact_ref=None, artifact_from_db=None):
         if not artifact_from_db.shared:
             return sf_api.error(403, 'artifact not shared')
+        artifact_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'artifact unshare request from REST API')
         artifact_from_db.shared = False
         return artifact_from_db.external_view()
 
@@ -708,6 +722,9 @@ class ArtifactMetadatasEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
+        artifact_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'post'})
         artifact_from_db.add_metadata_key(key, value)
 
 
@@ -732,6 +749,9 @@ class ArtifactMetadataEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
+        artifact_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'put'})
         artifact_from_db.add_metadata_key(key, value)
 
     @swag_from(api_base.swagger_helper(
@@ -751,4 +771,7 @@ class ArtifactMetadataEndpoint(sf_api.Resource):
     def delete(self, artifact_ref=None, key=None, value=None, artifact_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
+        artifact_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'delete metadata key request from REST API',
+            extra={'key': key})
         artifact_from_db.remove_metadata_key(key)

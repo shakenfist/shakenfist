@@ -64,6 +64,10 @@ class FakeInstance(BaseFakeObject):
         self.version = 2
         self.interfaces = []
 
+    def add_event(self, eventtype, message, duration=None, extra=None,
+                  suppress_event_logging=False, log_as_error=False):
+        ...
+
 
 class FakeNetwork(BaseFakeObject):
     object_type = 'network'

@@ -211,6 +211,8 @@ class InstanceEndpoint(sf_api.Resource):
         else:
             node = placement['node']
 
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'delete request from REST API')
         instance_from_db.enqueue_delete_remote(node)
 
         # Return UUID in case API call was made using object name
@@ -604,6 +606,7 @@ class InstancesEndpoint(sf_api.Resource):
             machine_type=machine_type,
             side_channels=side_channels
         )
+        inst.add_event(EVENT_TYPE_AUDIT, 'create request from REST API')
 
         # Initialise metadata
         if metadata:
@@ -765,6 +768,9 @@ class InstancesEndpoint(sf_api.Resource):
         waiting_for = []
         tasks_by_node = defaultdict(list)
         for inst in instance.Instances([partial(baseobject.namespace_filter, namespace)]):
+            inst.add_event(
+                EVENT_TYPE_AUDIT, 'delete request via delete all from REST API')
+
             # If this instance is not on a node, just do the DB cleanup locally
             db_placement = inst.placement
             if not db_placement.get('node'):
@@ -907,6 +913,8 @@ class InstanceRebootSoftEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
+            instance_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'soft reboot request from REST API')
             with instance_from_db.get_lock(op='Instance reboot soft'):
                 return instance_from_db.reboot(hard=False)
         except exceptions.InvalidLifecycleState as e:
@@ -928,6 +936,8 @@ class InstanceRebootHardEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
+            instance_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'hard reboot request from REST API')
             with instance_from_db.get_lock(op='Instance reboot hard'):
                 return instance_from_db.reboot(hard=True)
         except exceptions.InvalidLifecycleState as e:
@@ -949,6 +959,8 @@ class InstancePowerOffEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
+            instance_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'power off request from REST API')
             with instance_from_db.get_lock(op='Instance power off'):
                 return instance_from_db.power_off()
         except exceptions.InvalidLifecycleState as e:
@@ -970,6 +982,8 @@ class InstancePowerOnEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
+            instance_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'power on request from REST API')
             with instance_from_db.get_lock(op='Instance power on'):
                 return instance_from_db.power_on()
         except exceptions.InvalidLifecycleState as e:
@@ -991,6 +1005,8 @@ class InstancePauseEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
+            instance_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'pause request from REST API')
             with instance_from_db.get_lock(op='Instance pause'):
                 return instance_from_db.pause()
         except exceptions.InvalidLifecycleState as e:
@@ -1012,6 +1028,8 @@ class InstanceUnpauseEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
+            instance_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'unpause request from REST API')
             with instance_from_db.get_lock(op='Instance unpause'):
                 return instance_from_db.unpause()
         except exceptions.InvalidLifecycleState as e:
@@ -1052,6 +1070,9 @@ class InstanceMetadatasEndpoint(sf_api.Resource):
         err = _validate_instance_metadata(key, value)
         if err:
             return err
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'post'})
         instance_from_db.add_metadata_key(key, value)
 
 
@@ -1100,6 +1121,9 @@ class InstanceMetadataEndpoint(sf_api.Resource):
         err = _validate_instance_metadata(key, value)
         if err:
             return err
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'put'})
         instance_from_db.add_metadata_key(key, value)
 
     @swag_from(api_base.swagger_helper(
@@ -1119,6 +1143,9 @@ class InstanceMetadataEndpoint(sf_api.Resource):
     def delete(self, instance_ref=None, key=None, instance_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'delete metadata key request from REST API',
+            extra={'key': key})
         instance_from_db.remove_metadata_key(key)
 
 
@@ -1155,6 +1182,8 @@ class InstanceConsoleDataEndpoint(sf_api.Resource):
             if parsed_length is None:
                 return sf_api.error(400, 'length is not an integer')
 
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'get console data request from REST API')
         resp = flask.Response(
             instance_from_db.get_console_data(parsed_length),
             mimetype='applicaton/octet-stream')
@@ -1176,6 +1205,8 @@ class InstanceConsoleDataEndpoint(sf_api.Resource):
     @api_base.redirect_instance_request
     @api_base.log_token_use
     def delete(self, instance_ref=None, instance_from_db=None):
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'delete console data request from REST API')
         instance_from_db.delete_console_data()
 
 
@@ -1238,6 +1269,8 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
             'ca_cert': cacert
         }
 
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'vdiconsole request from REST API')
         resp = flask.Response(
             config, mimetype='application/x-virt-viewer')
         resp.status_code = 200
@@ -1296,6 +1329,8 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
             }
         ]
 
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'agent operation put-blob request from REST API')
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
                                instance_from_db.uuid, commands)
         instance_from_db.agent_operation_enqueue(o.uuid)
@@ -1336,6 +1371,8 @@ class InstanceAgentGetEndpoint(sf_api.Resource):
             }
         ]
 
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'agent operation get-file request from REST API')
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
                                instance_from_db.uuid, commands)
         instance_from_db.agent_operation_enqueue(o.uuid)
@@ -1374,6 +1411,8 @@ class InstanceAgentExecuteEndpoint(sf_api.Resource):
             }
         ]
 
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'agent operation execute request from REST API')
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
                                instance_from_db.uuid, commands)
         instance_from_db.agent_operation_enqueue(o.uuid)
@@ -1400,4 +1439,6 @@ class InstanceScreenshotEndpoint(sf_api.Resource):
     @api_base.requires_instance_active
     @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'screenshot request from REST API')
         return instance_from_db.get_screenshot()

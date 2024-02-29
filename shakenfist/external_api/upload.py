@@ -13,6 +13,7 @@ import os
 from shakenfist_utilities import api as sf_api, logs
 import uuid
 
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.config import config
@@ -37,7 +38,9 @@ class UploadCreateEndpoint(sf_api.Resource):
     @api_base.verify_token
     @api_base.log_token_use
     def post(self):
-        return Upload.new(str(uuid.uuid4()), config.NODE_NAME).external_view()
+        u = Upload.new(str(uuid.uuid4()), config.NODE_NAME)
+        u.add_event(EVENT_TYPE_AUDIT, 'create request from REST API')
+        return u.external_view()
 
 
 class UploadDataEndpoint(sf_api.Resource):
@@ -51,6 +54,8 @@ class UploadDataEndpoint(sf_api.Resource):
     @api_base.redirect_upload_request
     @api_base.log_token_use
     def post(self, upload_uuid=None, upload_from_db=None):
+        # NOTE(mikal): deliberately not audit logged because of the volume of
+        # events it would create.
         upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
         os.makedirs(upload_dir, exist_ok=True)
 
@@ -74,6 +79,7 @@ class UploadTruncateEndpoint(sf_api.Resource):
     @api_base.redirect_upload_request
     @api_base.log_token_use
     def post(self, upload_uuid=None, offset=None, upload_from_db=None):
+        upload_from_db.add_event(EVENT_TYPE_AUDIT, 'truncate request from REST API')
         upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
         os.makedirs(upload_dir, exist_ok=True)
 

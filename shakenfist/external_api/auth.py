@@ -145,6 +145,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
             return sf_api.error(403, 'namespace exists')
 
         ns = Namespace.new(namespace)
+        ns.add_event(EVENT_TYPE_AUDIT, 'creation request from REST API')
 
         # Log this special case of a token being used
         auth_header = flask.request.headers.get('Authorization', 'Bearer none')
@@ -241,9 +242,12 @@ class AuthNamespaceEndpoint(sf_api.Resource):
             return sf_api.error(400, 'you cannot delete a namespace with networks')
 
         for a in artifact.artifacts_in_namespace(namespace):
+            a.add_event(
+                EVENT_TYPE_AUDIT, 'deletion request via namespace deletion from REST API')
             a.delete()
 
         namespace_from_db.state = dbo.STATE_DELETED
+        namespace_from_db.add_event(EVENT_TYPE_AUDIT, 'deletion request from REST API')
 
     @swag_from(api_base.swagger_helper(
         'auth', 'Get namespace information.',
@@ -306,6 +310,9 @@ class AuthNamespaceKeysEndpoint(sf_api.Resource):
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def post(self, namespace=None, key_name=None, key=None, namespace_from_db=None):
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'create auth key request from REST API',
+            extra={'key': key_name})
         return _namespace_keys_putpost(namespace_from_db, key_name, key)
 
 
@@ -327,6 +334,9 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
     def put(self, namespace=None, key_name=None, key=None, namespace_from_db=None):
         if key_name not in namespace_from_db.keys:
             return sf_api.error(404, 'key does not exist')
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'update auth key request from REST API',
+            extra={'key': key_name})
         return _namespace_keys_putpost(namespace, key_name, key)
 
     @swag_from(api_base.swagger_helper(
@@ -347,6 +357,9 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key name specified')
 
         if key_name in namespace_from_db.keys.get('nonced_keys', {}):
+            namespace_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'remove auth key request from REST API',
+                extra={'key': key_name})
             namespace_from_db.remove_key(key_name)
         else:
             return sf_api.error(404, 'key name not found in namespace')
@@ -387,6 +400,9 @@ class AuthMetadatasEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'post'})
         namespace_from_db.add_metadata_key(key, value)
 
 
@@ -411,6 +427,9 @@ class AuthMetadataEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'put'})
         namespace_from_db.add_metadata_key(key, value)
 
     @swag_from(api_base.swagger_helper(
@@ -429,6 +448,9 @@ class AuthMetadataEndpoint(sf_api.Resource):
     def delete(self, namespace=None, key=None, value=None, namespace_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'delete metadata key request from REST API',
+            extra={'key': key})
         namespace_from_db.remove_metadata_key(key)
 
 
@@ -454,6 +476,8 @@ class AuthNamespaceTrustsEndpoint(sf_api.Resource):
                 'Namespace not found, trust test failed')
             return sf_api.error(404, 'namespace not found')
 
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'add trust request from REST API')
         namespace_from_db.add_trust(external_namespace)
         return namespace_from_db.external_view()
 
@@ -483,5 +507,7 @@ class AuthNamespaceTrustEndpoint(sf_api.Resource):
                 'Namespace not found, trust test failed')
             return sf_api.error(404, 'namespace not found')
 
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'remove trust request from REST API')
         namespace_from_db.remove_trust(external_namespace)
         return namespace_from_db.external_view()

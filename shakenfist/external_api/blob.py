@@ -19,6 +19,7 @@ from webargs.flaskparser import use_kwargs
 
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
@@ -252,6 +253,9 @@ class BlobMetadatasEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
+        blob_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'post'})
         blob_from_db.add_metadata_key(key, value)
 
 
@@ -275,6 +279,9 @@ class BlobMetadataEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
+        blob_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'put'})
         blob_from_db.add_metadata_key(key, value)
 
     @swag_from(api_base.swagger_helper(
@@ -293,4 +300,7 @@ class BlobMetadataEndpoint(sf_api.Resource):
     def delete(self, blob_uuid=None, key=None, value=None, blob_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
+        blob_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'delete metadata key request from REST API',
+            extra={'key': key})
         blob_from_db.remove_metadata_key(key)
