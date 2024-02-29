@@ -70,3 +70,6 @@ EVENT_TYPE_HISTORIC = 'historic'
 EVENT_TYPES = [EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE, EVENT_TYPE_STATUS,
                EVENT_TYPE_USAGE, EVENT_TYPE_RESOURCES, EVENT_TYPE_PRUNE,
                EVENT_TYPE_HISTORIC]
+
+# Fake object type for API request tracing
+API_REQUESTS = 'api-requests'
