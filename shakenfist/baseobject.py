@@ -253,7 +253,7 @@ class DatabaseBackedObject(object):
             retval = etcd.get('attribute/%s' % self.object_type,
                               self.__uuid, attribute)
         if not retval:
-            if not default:
+            if default is None:
                 return {}
             return default
         return retval
