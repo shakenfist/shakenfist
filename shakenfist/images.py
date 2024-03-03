@@ -22,7 +22,7 @@ from shakenfist.util import process as util_process
 LOG, _ = logs.setup(__name__)
 
 
-VALID_SF_IMAGES = ['centos', 'debian', 'ubuntu']
+VALID_SF_IMAGES = ['centos', 'debian', 'fedora', 'rocky', 'ubuntu']
 
 
 def _resolve_image(url):
