@@ -12,16 +12,20 @@
 # To run a local test API, use this command line:
 #     SHAKENFIST_ETCD_HOST=localhost flask --app shakenfist.external_api.app:app --debug run
 
+import base64
 import flask
 from flask_jwt_extended import JWTManager
 from flask_request_id import RequestID
 import flask_restful
 import flasgger
+import json
 from pbr.version import VersionInfo
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.config import config
+from shakenfist import constants
 from shakenfist.daemons import daemon
+from shakenfist import eventlog
 from shakenfist.external_api import (
     admin as api_admin,
     agentoperation as api_agentoperation,
@@ -66,24 +70,47 @@ app.logger.handlers = [HANDLER]
 
 @app.before_request
 def log_request_info():
-    LOG.with_fields(
-        {
-            'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
-            'headers': flask.request.headers,
-            'body': flask.request.get_data()
-        }).debug('API request received')
+    if not flask.request.content_length:
+        body = ''
+    elif flask.request.content_length > 1024:
+        body = '...body not logged as greater than 1kb...'
+    else:
+        body = flask.request.get_json(silent=True)
+        if not body:
+            body = 'base64:%s' % base64.b64encode(flask.request.get_data())
+
+    eventlog.add_event(
+        constants.EVENT_TYPE_AUDIT, constants.API_REQUESTS,
+        flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
+        '%s api request received' % flask.request.method, extra={
+            'url': str(flask.request.url),
+            'body': str(body)
+        })
 
 
 @app.after_request
 def log_response_info(response):
-    # Unfortunately the response body is too long to log here, but may be
-    # obtained with flask.response.get_data() if we ever want to grow a more
-    # complete tracing system.
-    LOG.with_fields(
-        {
-            'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
-            'headers': response.headers
-        }).debug('API response sent')
+    body = response.get_data()
+    if len(body) > 1024:
+        body = '...body not logged as greater than 1kb...'
+    else:
+        try:
+            body = json.loads(body)
+        except ValueError:
+            ...
+
+        try:
+            body = str(body)
+        except TypeError:
+            body = 'base64:%s' % base64.b64encode(body)
+
+    eventlog.add_event(
+        constants.EVENT_TYPE_AUDIT, constants.API_REQUESTS,
+        flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
+        '%s api response sent' % flask.request.method, extra={
+            'status': response.status_code,
+            'body': body
+        })
     return response
 
 

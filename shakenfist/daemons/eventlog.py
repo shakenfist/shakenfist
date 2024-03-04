@@ -11,7 +11,7 @@ from prometheus_client import Counter
 from prometheus_client import start_http_server
 
 from shakenfist.config import config
-from shakenfist.constants import EVENT_TYPES, EVENT_TYPE_HISTORIC
+from shakenfist.constants import API_REQUESTS, EVENT_TYPES, EVENT_TYPE_HISTORIC
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
@@ -58,6 +58,17 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                     request.event_type, timestamp, request.fqdn,
                     request.duration, request.message, extra)
                 self.monitor.counters[request.event_type].inc()
+
+            # Piggy back request tracing onto object events
+            if 'request-id' in extra:
+                # Add object information from the original event to extra
+                extra['object_type'] = request.object_type
+                extra['object_uuid'] = request.object_uuid
+
+                with eventlog.EventLog(API_REQUESTS, extra['request-id']) as eventdb:
+                    eventdb.write_event(
+                        request.event_type, timestamp, request.fqdn,
+                        request.duration, request.message, extra)
         except Exception as e:
             util_general.ignore_exception(
                 'failed to write event for %s %s'

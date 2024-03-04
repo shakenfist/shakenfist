@@ -12,7 +12,7 @@ from flask_restful import marshal_with
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api
 
-
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
@@ -102,6 +102,7 @@ class NodeEndpoint(sf_api.Resource):
         if not n:
             return sf_api.error(404, 'node not found')
 
+        n.add_event(EVENT_TYPE_AUDIT, 'delete request from REST API')
         n.delete()
         return n.external_view()
 
@@ -262,6 +263,9 @@ class NodeMetadatasEndpoint(sf_api.Resource):
         n = Node.from_db(node)
         if not n:
             return sf_api.error(404, 'node not found')
+        n.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'post'})
         n.add_metadata_key(key, value)
 
 
@@ -288,6 +292,9 @@ class NodeMetadataEndpoint(sf_api.Resource):
         n = Node.from_db(node)
         if not n:
             return sf_api.error(404, 'node not found')
+        n.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'put'})
         n.add_metadata_key(key, value)
 
     @swag_from(api_base.swagger_helper(
@@ -310,4 +317,7 @@ class NodeMetadataEndpoint(sf_api.Resource):
         n = Node.from_db(node)
         if not n:
             return sf_api.error(404, 'node not found')
+        n.add_event(
+            EVENT_TYPE_AUDIT, 'delete metadata key request from REST API',
+            extra={'key': key})
         n.remove_metadata_key(key)

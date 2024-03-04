@@ -15,7 +15,7 @@ FLAKE_COMMAND="flake8 --max-line-length=120"
 if test "x$1" = "x-HEAD" ; then
     shift
     files=$(git diff --name-only HEAD~1 | grep -v _pb2 | egrep ".py$" | tr '\n' ' ')
-    if [ -n $files ]; then
+    if [ -n "$files" ]; then
         echo "No python files in change."
         exit 0
     fi

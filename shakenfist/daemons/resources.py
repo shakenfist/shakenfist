@@ -387,7 +387,7 @@ class Monitor(daemon.Daemon):
                     LOG.with_fields({'network': n}).info(
                         'Failed to collect network usage: %s' % e)
 
-        def identity_libvirt_processes():
+        def identify_libvirt_processes():
             # KVM processes are owned by init
             init = psutil.Process(1)
             for child in init.children():
@@ -426,7 +426,7 @@ class Monitor(daemon.Daemon):
 
                 if time.time() - last_billing > config.USAGE_EVENT_FREQUENCY:
                     emit_billing_statistics()
-                    identity_libvirt_processes()
+                    identify_libvirt_processes()
                     last_billing = time.time()
 
                 if time.time() - last_process_check > config.USAGE_EVENT_FREQUENCY * 3:

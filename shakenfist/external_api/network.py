@@ -20,6 +20,7 @@ from shakenfist.external_api import (
     util as api_util)
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
@@ -52,6 +53,7 @@ def _delete_network(network_from_db, wait_interfaces=None):
                          }).warning('delete_network: network is dead')
         return sf_api.error(404, 'network is deleted')
 
+    network_from_db.add_event(EVENT_TYPE_AUDIT, 'delete request from REST API')
     if wait_interfaces:
         n.state = network.Network.STATE_DELETE_WAIT
         etcd.enqueue(config.NODE_NAME,
@@ -220,6 +222,7 @@ class NetworksEndpoint(sf_api.Resource):
 
         n = network.Network.new(name, namespace, netblock, provide_dhcp,
                                 provide_nat)
+        n.add_event(EVENT_TYPE_AUDIT, 'create request from REST API')
         return n.external_view()
 
     @swag_from(api_base.swagger_helper(
@@ -420,6 +423,9 @@ class NetworkMetadatasEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
+        network_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'post'})
         network_from_db.add_metadata_key(key, value)
 
 
@@ -444,6 +450,9 @@ class NetworkMetadataEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
+        network_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'put'})
         network_from_db.add_metadata_key(key, value)
 
     @swag_from(api_base.swagger_helper(
@@ -464,6 +473,9 @@ class NetworkMetadataEndpoint(sf_api.Resource):
     def delete(self, network_ref=None, key=None, network_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
+        network_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'delete metadata key request from REST API',
+            extra={'key': key})
         network_from_db.remove_metadata_key(key)
 
 
@@ -520,6 +532,8 @@ class NetworkPingEndpoint(sf_api.Resource):
         if not network_from_db.ipam.is_in_range(address):
             return sf_api.error(400, 'ping request for address outside network block')
 
+        network_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'ping request from REST API')
         out, err = util_process.execute(
             None, 'ip netns exec %s ping -c 10 %s' % (network_from_db.uuid, address),
             check_exit_code=[0, 1])
@@ -573,6 +587,7 @@ class NetworkRouteAddressEndpoint(sf_api.Resource):
         except exceptions.CongestedNetwork as e:
             return sf_api.error(507, str(e), suppress_traceback=True)
 
+        network_from_db.add_event(EVENT_TYPE_AUDIT, 'route request from REST API')
         etcd.enqueue('networknode', RouteAddressTask(network_from_db.uuid, address))
         return address
 
@@ -601,4 +616,5 @@ class NetworkUnrouteAddressEndpoint(sf_api.Resource):
         if reservation['user'] != network_from_db.unique_label():
             return sf_api.error(403, 'address not routed by this network')
 
+        network_from_db.add_event(EVENT_TYPE_AUDIT, 'unroute request from REST API')
         etcd.enqueue('networknode', UnrouteAddressTask(network_from_db.uuid, address))

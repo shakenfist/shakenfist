@@ -10,6 +10,7 @@
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api, logs
 
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
@@ -77,6 +78,7 @@ class InterfaceFloatEndpoint(sf_api.Resource):
         except exceptions.CongestedNetwork as e:
             return sf_api.error(507, str(e), suppress_traceback=True)
 
+        ni.add_event(EVENT_TYPE_AUDIT, 'float request from REST API')
         etcd.enqueue('networknode', FloatNetworkInterfaceTask(n.uuid, interface_uuid))
 
 
@@ -96,6 +98,7 @@ class InterfaceDefloatEndpoint(sf_api.Resource):
 
         # Address is freed as part of the job, so code is "unbalanced" compared
         # to above for reasons.
+        ni.add_event(EVENT_TYPE_AUDIT, 'defloat request from REST API')
         etcd.enqueue('networknode', DefloatNetworkInterfaceTask(n.uuid, interface_uuid))
 
 
@@ -135,6 +138,9 @@ class InterfaceMetadatasEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
+        ni.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'post'})
         ni.add_metadata_key(key, value)
 
 
@@ -160,6 +166,9 @@ class InterfaceMetadataEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
+        ni.add_event(
+            EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
+            extra={'key': key, 'value': value, 'method': 'put'})
         ni.add_metadata_key(key, value)
 
     @swag_from(api_base.swagger_helper(
@@ -180,4 +189,7 @@ class InterfaceMetadataEndpoint(sf_api.Resource):
             return err
         if not key:
             return sf_api.error(400, 'no key specified')
+        ni.add_event(
+            EVENT_TYPE_AUDIT, 'delete metadata key request from REST API',
+            extra={'key': key})
         ni.remove_metadata_key(key)

@@ -14,6 +14,7 @@ from shakenfist import artifact
 from shakenfist.artifact import Artifacts
 from shakenfist import blob
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
@@ -33,6 +34,9 @@ class InstanceSnapshotEndpoint(sf_api.Resource):
              device=None, max_versions=0, thin=None):
         if not thin:
             thin = config.SNAPSHOTS_DEFAULT_TO_THIN
+
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'snapshot request from REST API')
         return instance_from_db.snapshot(
             all=all, device=device, max_versions=max_versions, thin=thin)
 

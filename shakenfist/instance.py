@@ -509,11 +509,13 @@ class Instance(dbo):
 
     @property
     def kvm_pid(self):
-        return self._db_get_attribute('kvm_pid')
+        return self._db_get_attribute('kvm_pid').get('pid')
 
     @kvm_pid.setter
     def kvm_pid(self, pid):
-        self._db_set_attribute('kvm_pid', pid)
+        if self.kvm_pid == pid:
+            return
+        self._db_set_attribute('kvm_pid', {'pid': pid})
 
     # Implementation
     def _initialize_block_devices(self):
