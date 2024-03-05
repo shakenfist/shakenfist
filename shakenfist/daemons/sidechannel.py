@@ -174,8 +174,7 @@ class Monitor(daemon.Daemon):
 
         offset = 0
         with open(source_path, 'rb') as f:
-            d = f.read(1024)
-            while d:
+            while d := f.read(1024):
                 yield {
                     'command': command,
                     'path': destination_path,
@@ -185,7 +184,6 @@ class Monitor(daemon.Daemon):
                     'unique': unique
                 }
                 offset += len(d)
-                d = f.read(1024)
 
             yield {
                 'command': command,
