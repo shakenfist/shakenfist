@@ -117,14 +117,12 @@ class ImageFetchHelper(object):
             fetched_blobs.append(self.transfer_image(lock))
 
             # If the image depends on another image, we must fetch that too.
-            depends_on = fetched_blobs[-1].depends_on
-            while depends_on:
+            while depends_on := fetched_blobs[-1].depends_on:
                 self.log.with_fields({
                     'parent_blob_uuid': fetched_blobs[-1].uuid,
                     'child_blob_uuid': depends_on}).info('Fetching dependency')
                 fetched_blobs.append(
                     self._blob_get(lock, 'sf://blob/%s' % depends_on))
-                depends_on = fetched_blobs[-1].depends_on
 
             # We might already have a transcoded version of the image cached. If so
             # we use that. Otherwise, we might have a transcoded version within the

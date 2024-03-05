@@ -404,8 +404,7 @@ class Blob(dbo):
 
             sha512_hash = hashlib.sha512()
             with open(partial_path, 'wb') as f:
-                d = client.recv(8000)
-                while d:
+                while d := client.recv(8000):
                     f.write(d)
                     sha512_hash.update(d)
                     total_bytes_received += len(d)
@@ -428,8 +427,6 @@ class Blob(dbo):
                             'size': int(self.size)
                         }).debug('Fetch %.02f percent complete' % percentage)
                         previous_percentage = percentage
-
-                    d = client.recv(8000)
 
             if total_bytes_received != int(self.size):
                 if os.path.exists(partial_path):
