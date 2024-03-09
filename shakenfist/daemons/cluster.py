@@ -363,10 +363,11 @@ class Monitor(daemon.Daemon):
             elif n.state.value == Node.STATE_DELETED:
                 # Find instances on deleted nodes
                 for i in instance.healthy_instances_on_node(n):
-                    i.add_event(EVENT_TYPE_AUDIT, 'instance is on deleted node, deleting.')
                     n.add_event(
-                        EVENT_TYPE_AUDIT,
-                        'deleting instance %s as node as been deleted' % i.uuid)
+                        EVENT_TYPE_AUDIT, 'deleting instance as hosting node as been deleted',
+                        extra={'instance_uuid': i.uuid})
+                    i.add_event(
+                        EVENT_TYPE_AUDIT, 'deleting instance as hosting node as been deleted')
                     i.delete(global_only=True)
 
                     # Cleanup the instance's interfaces
@@ -377,10 +378,12 @@ class Monitor(daemon.Daemon):
                 for b in Blobs([partial(placement_filter, n.fqdn)], prefilter='active'):
                     n.add_event(
                         EVENT_TYPE_AUDIT,
-                        'deleting blob %s location as hosting node has been deleted' % b.uuid)
+                        'deleting blob location as hosting node has been deleted',
+                        extra={'blob_uuid': b.uuid})
                     b.add_event(
                         EVENT_TYPE_AUDIT,
-                        'deleting blob location as hosting node %s has been deleted' % n.uuid)
+                        'deleting blob location as hosting node has been deleted',
+                        extra={'node_uuid': n.uuid})
                     b.remove_location(n.fqdn)
                     b.request_replication()
 

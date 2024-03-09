@@ -227,6 +227,9 @@ class Node(dbo):
             self._db_set_attribute('process_metrics', value)
 
     def delete(self):
+        # NOTE(mikal): the remainder of the cleanup of deleted nodes happens
+        # in the cluster maintenance daemon because otherwise we end up in a
+        # tangled mess of circular python imports here.
         self.state = self.STATE_DELETED
 
     def hard_delete(self):
