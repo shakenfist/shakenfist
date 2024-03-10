@@ -915,7 +915,8 @@ class InstanceRebootSoftEndpoint(sf_api.Resource):
         try:
             instance_from_db.add_event(
                 EVENT_TYPE_AUDIT, 'soft reboot request from REST API')
-            with instance_from_db.get_lock(op='Instance reboot soft'):
+            with instance_from_db.get_lock(op='Instance reboot soft',
+                                           global_scope=False):
                 return instance_from_db.reboot(hard=False)
         except exceptions.InvalidLifecycleState as e:
             return sf_api.error(409, e)
@@ -938,7 +939,8 @@ class InstanceRebootHardEndpoint(sf_api.Resource):
         try:
             instance_from_db.add_event(
                 EVENT_TYPE_AUDIT, 'hard reboot request from REST API')
-            with instance_from_db.get_lock(op='Instance reboot hard'):
+            with instance_from_db.get_lock(op='Instance reboot hard',
+                                           global_scope=False):
                 return instance_from_db.reboot(hard=True)
         except exceptions.InvalidLifecycleState as e:
             return sf_api.error(409, e)
@@ -961,7 +963,8 @@ class InstancePowerOffEndpoint(sf_api.Resource):
         try:
             instance_from_db.add_event(
                 EVENT_TYPE_AUDIT, 'power off request from REST API')
-            with instance_from_db.get_lock(op='Instance power off'):
+            with instance_from_db.get_lock(op='Instance power off',
+                                           global_scope=False):
                 return instance_from_db.power_off()
         except exceptions.InvalidLifecycleState as e:
             return sf_api.error(409, e)
@@ -984,7 +987,8 @@ class InstancePowerOnEndpoint(sf_api.Resource):
         try:
             instance_from_db.add_event(
                 EVENT_TYPE_AUDIT, 'power on request from REST API')
-            with instance_from_db.get_lock(op='Instance power on'):
+            with instance_from_db.get_lock(op='Instance power on',
+                                           global_scope=False):
                 return instance_from_db.power_on()
         except exceptions.InvalidLifecycleState as e:
             return sf_api.error(409, e)
@@ -1007,7 +1011,8 @@ class InstancePauseEndpoint(sf_api.Resource):
         try:
             instance_from_db.add_event(
                 EVENT_TYPE_AUDIT, 'pause request from REST API')
-            with instance_from_db.get_lock(op='Instance pause'):
+            with instance_from_db.get_lock(op='Instance pause',
+                                           global_scope=False):
                 return instance_from_db.pause()
         except exceptions.InvalidLifecycleState as e:
             return sf_api.error(409, e)
@@ -1030,7 +1035,8 @@ class InstanceUnpauseEndpoint(sf_api.Resource):
         try:
             instance_from_db.add_event(
                 EVENT_TYPE_AUDIT, 'unpause request from REST API')
-            with instance_from_db.get_lock(op='Instance unpause'):
+            with instance_from_db.get_lock(op='Instance unpause',
+                                           global_scope=False):
                 return instance_from_db.unpause()
         except exceptions.InvalidLifecycleState as e:
             return sf_api.error(409, e)

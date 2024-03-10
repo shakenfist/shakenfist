@@ -321,7 +321,7 @@ def instance_start(inst, netdescs):
             EVENT_TYPE_STATUS, 'you cannot start an instance which has been deleted.')
         return
 
-    with inst.get_lock(ttl=900, op='Instance start') as lock:
+    with inst.get_lock(ttl=900, op='Instance start', global_scope=False):
         try:
             # Ensure networks are connected to this node
             iface_uuids = []
@@ -364,7 +364,7 @@ def instance_start(inst, netdescs):
 
             # Now we can start the instance
             with util_general.RecordedOperation('instance creation', inst):
-                inst.create(iface_uuids, lock=lock)
+                inst.create(iface_uuids)
 
         except exceptions.InvalidStateException as e:
             # This instance is in an error or deleted state. Given the check
@@ -374,7 +374,7 @@ def instance_start(inst, netdescs):
 
 
 def instance_delete(inst):
-    with inst.get_lock(op='Instance delete'):
+    with inst.get_lock(op='Instance delete', global_scope=False):
         # There are two delete state flows:
         #   - error transition states (preflight-error etc) to error
         #   - created to deleted

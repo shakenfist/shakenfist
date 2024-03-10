@@ -373,7 +373,7 @@ class Network(dbo):
         if self.uuid == 'floating':
             return
 
-        with self.get_lock(op='create_on_hypervisor'):
+        with self.get_lock(op='create_on_hypervisor', global_scope=False):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
             self._create_common()
@@ -383,7 +383,7 @@ class Network(dbo):
         if self.uuid == 'floating':
             return
 
-        with self.get_lock(op='create_on_network_node'):
+        with self.get_lock(op='create_on_network_node', global_scope=False):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
 
@@ -492,7 +492,7 @@ class Network(dbo):
         self.state = self.STATE_CREATED
 
     def delete_on_hypervisor(self):
-        with self.get_lock(op='Network delete'):
+        with self.get_lock(op='Network delete', global_scope=False):
             subst = self.subst_dict()
 
             if util_network.check_for_interface(subst['vx_bridge']):
@@ -512,7 +512,7 @@ class Network(dbo):
     # the network node. Specifically it is called by a queue task that the
     # network node listens for.
     def delete_on_network_node(self):
-        with self.get_lock(op='Network delete'):
+        with self.get_lock(op='Network delete', global_scope=False):
             subst = self.subst_dict()
 
             if util_network.check_for_interface(subst['vx_veth_outer']):
@@ -560,7 +560,7 @@ class Network(dbo):
             return
 
         if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network update DHCP'):
+            with self.get_lock(op='Network update DHCP', global_scope=False):
                 d = dhcp.DHCP(self, self._vx_veth_inner)
                 d.remove_lease(ipv4, macaddr)
         else:
@@ -572,7 +572,7 @@ class Network(dbo):
             return
 
         if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network update DHCP'):
+            with self.get_lock(op='Network update DHCP', global_scope=False):
                 d = dhcp.DHCP(self, self._vx_veth_inner)
                 d.restart_dhcpd()
         else:
@@ -580,7 +580,7 @@ class Network(dbo):
 
     def remove_dhcp(self):
         if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network remove DHCP'):
+            with self.get_lock(op='Network remove DHCP', global_scope=False):
                 d = dhcp.DHCP(self, self._vx_veth_inner)
                 d.remove_dhcpd()
         else:

@@ -119,35 +119,34 @@ class Artifact(dbo):
     @staticmethod
     def from_url(artifact_type, url, name=None, max_versions=0, namespace=None,
                  create_if_new=False):
-        with etcd.get_lock('artifact_from_url', None, url):
-            artifacts = list(Artifacts([
-                partial(url_filter, url),
-                partial(type_filter, artifact_type),
-                not_dead_states_filter,
-                partial(namespace_or_shared_filter, namespace)]))
+        artifacts = list(Artifacts([
+            partial(url_filter, url),
+            partial(type_filter, artifact_type),
+            not_dead_states_filter,
+            partial(namespace_or_shared_filter, namespace)]))
 
-            if len(artifacts) == 0:
-                if create_if_new:
-                    if not name:
-                        name = url.split('/')[-1]
-                    return Artifact.new(artifact_type, url, name=name,
-                                        max_versions=max_versions,
-                                        namespace=namespace)
-                return None
-            if len(artifacts) == 1:
-                return artifacts[0]
+        if len(artifacts) == 0:
+            if create_if_new:
+                if not name:
+                    name = url.split('/')[-1]
+                return Artifact.new(artifact_type, url, name=name,
+                                    max_versions=max_versions,
+                                    namespace=namespace)
+            return None
+        if len(artifacts) == 1:
+            return artifacts[0]
 
-            # We have more than one match. If only one of those is in our
-            # namespace, then use it. Otherwise give up as being ambiguous.
-            local_artifacts = []
-            for a in artifacts:
-                if a.namespace == namespace:
-                    local_artifacts.append(a)
+        # We have more than one match. If only one of those is in our
+        # namespace, then use it. Otherwise give up as being ambiguous.
+        local_artifacts = []
+        for a in artifacts:
+            if a.namespace == namespace:
+                local_artifacts.append(a)
 
-            if len(local_artifacts) == 1:
-                return local_artifacts[0]
+        if len(local_artifacts) == 1:
+            return local_artifacts[0]
 
-            raise exceptions.TooManyMatches()
+        raise exceptions.TooManyMatches()
 
     # Static values
     @property
