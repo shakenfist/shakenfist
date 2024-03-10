@@ -156,69 +156,8 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-                -o UserKnownHostsFile=/dev/null \
-                {{baseuser}}@$primary sudo chmod ugo+r /var/log/syslog
-          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary:/var/log/syslog \
-              ${GITHUB_WORKSPACE}/syslog
-
-          failures=0
-
-          echo
-          etcd_conns=`grep -c "Building new etcd connection" ${GITHUB_WORKSPACE}/syslog || true`
-          echo "This CI run created $etcd_conns etcd connections."
-          if [ $etcd_conns -gt 5000 ]; then
-            echo "FAILURE: Too many etcd clients!"
-            failures=1
-          fi
-
-          echo
-          sigterms=`grep -c "Sent SIGTERM to " ${GITHUB_WORKSPACE}/syslog || true`
-          echo "This CI run sent $sigterms SIGTERM signals while shutting down."
-          if [ $sigterms -gt 50 ]; then
-            echo "FAILURE: Too many SIGTERMs sent!"
-            failures=1
-          fi
-
-          # NOTE(mikal): online upgrades are forbidden in these fresh install
-          # tests.
-          FORBIDDEN=("Traceback (most recent call last):"
-                     "ERROR sf"
-                     "ERROR gunicorn"
-                     " died"
-                     "Extra vxlan present"
-                     "Fork support is only compatible with the epoll1 and poll polling strategies"
-                     "not using configured address"
-                     "Dumping thread traces"
-                     "because it is leased to"
-                     "not committing online upgrade"
-                     "Received a GOAWAY with error code ENHANCE_YOUR_CALM"
-                     "ConnectionFailedError"
-                     "invalid JWT in Authorization header"
-                     "Libvirt Error: XML error"
-                     "Cleaning up leaked IPAM"
-                     "Cleaning up leaked vxlan"
-                     "Waiting to acquire lock"
-                     'apparmor="DENIED"'
-                     "Ignoring malformed cache entry"
-                     "Failed to send event with gRPC"
-                     "online upgrade")
-          IFS=""
-          for forbid in ${FORBIDDEN[*]}
-          do
-            if [ `grep -c -i "$forbid" ${GITHUB_WORKSPACE}/syslog || true` -gt 0 ]
-            then
-              echo "FAILURE: Forbidden string found in logs: $forbid"
-              failures=1
-            fi
-          done
-
-          if [ $failures -gt 0 ]; then
-              echo "...failures detected."
-              exit 1
-          fi
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          tools/run_remote ${primary} sudo /home/${baseuser}/tools/ci_event_checks.sh
 
       # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
       # cost. That's not really something we can control, so just ignore the CPU
@@ -265,7 +204,7 @@ jobs:
               --extra-vars "base_image_user={{baseuser}} ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: bundle.zip
