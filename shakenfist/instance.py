@@ -743,7 +743,8 @@ class Instance(dbo):
             self.state = self.STATE_DELETED
 
     def delete(self, global_only=False):
-        self._delete_on_hypervisor()
+        if not global_only:
+            self._delete_on_hypervisor()
         self._delete_globally()
 
     def _allocate_console_port(self):
