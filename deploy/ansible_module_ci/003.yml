@@ -1,0 +1,108 @@
+- hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Create a unique namespace name
+      shell: pwgen 10 -n 1
+      register: unique
+
+    - name: Store unique name
+      set_fact:
+        namespace_name: "ci-003-{{ unique['stdout'] }}"
+
+    - name: Log namespace name
+      debug:
+        msg: "Test namespace is {{ namespace_name }}"
+
+    - name: Ensure the namespace doesn't exist at the start
+      sf_namespace:
+        name: "{{ namespace_name }}"
+        state: "absent"
+
+    - name: Create a namespace
+      sf_namespace:
+        name: "{{ namespace_name }}"
+        state: present
+      register: ci_namespace
+
+    - name: Assert the namespace is new
+      assert:
+        that: ci_namespace['changed']
+        fail_msg: "changed should be true in {{ ci_namespace }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_namespace['failed']
+        fail_msg: "failed should be false in {{ ci_namespace }}"
+
+    - name: Noop create the namespace
+      sf_namespace:
+        name: "{{ namespace_name }}"
+        state: present
+      register: ci_namespace
+
+    - name: Assert the namespace is unchanged
+      assert:
+        that: not ci_namespace['changed']
+        fail_msg: "changed should be false in {{ ci_namespace }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_namespace['failed']
+        fail_msg: "failed should be false in {{ ci_namespace }}"
+
+    - name: Create a test network
+      sf_network:
+        netblock: "10.0.0.0/24"
+        name: "ci-003"
+        namespace: "{{ namespace_name }}"
+        state: present
+      register: ci_network
+
+    - name: Assert the network is new
+      assert:
+        that: ci_network['changed']
+        fail_msg: "changed should be true in {{ ci_network }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network['failed']
+        fail_msg: "failed should be false in {{ ci_network }}"
+
+    - name: Assert the network is in the correct namespace
+      assert:
+        that: ci_network['meta']['namespace'] == ci_namespace
+        fail_msg: "Network namespace is {{ ci_network['meta']['namespace'] }} not {{ ci_namespace }}"
+
+    - name: Delete the network
+      sf_network:
+        uuid: "{{ ci_network['meta']['uuid'] }}"
+        namespace: "{{ namespace_name }}"
+        state: "absent"
+      register: ci_network
+
+    - name: Assert the network was changed
+      assert:
+        that: ci_network['changed']
+        fail_msg: "changed should be true in {{ ci_network }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network['failed']
+        fail_msg: "failed should be false in {{ ci_network }}"
+
+    - name: Delete the namespace
+      sf_namespace:
+        name: "{{ namespace_name }}"
+        state: absent
+      register: ci_namespace
+
+    - name: Assert the namespace was changed
+      assert:
+        that: ci_namespace['changed']
+        fail_msg: "changed should be true in {{ ci_namespace }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_namespace['failed']
+        fail_msg: "failed should be false in {{ ci_namespace }}"

@@ -1,0 +1,215 @@
+name: Ansible module testing
+
+on:
+  push:
+    branches:
+      - develop
+      - v*-releases
+  pull_request:
+    branches:
+      - develop
+      - v*-releases
+
+jobs:
+  ansible-modules:
+    runs-on: self-hosted
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    # NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
+    # which is available as GITHUB_WORKSPACE. You can find other environment
+    # variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
+
+    steps:
+      - name: Set environment variables
+        run: |
+          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
+          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
+
+      - name: Checkout shakenfist
+        uses: actions/checkout@v4
+        with:
+          path: shakenfist
+          fetch-depth: 0
+
+      - name: Determine if there is any dependency between the repositories
+        run: |
+          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+
+      - name: Build infrastructure
+        run: |
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          ansible-playbook -i /home/debian/ansible-hosts \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+              base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
+              deploy/ansible/ci-topology-slim-primary.yml
+
+      - name: Run getsf installer on primary
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@$primary /tmp/getsf-wrapper
+          echo ""
+          echo ""
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
+
+      - name: Wait for API to start answering
+        run: |
+          set +e
+
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
+
+          count=0
+          while [ $count -lt 60 ]
+          do
+            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary '. /etc/sf/sfrc; sf-client instance list'
+            if [ $? == 0 ]; then
+              exit 0
+            fi
+
+            count=$(( $count + 1 ))
+            sleep 5
+          done
+
+          exit 1
+
+      - name: Import cached images
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04 --shared'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04 --shared'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11 --shared'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros --shared'
+
+      - name: Run ansible module tests
+        timeout-minutes: 120
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              $source_path/shakenfist \
+              debian@$primary:shakenfist
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; bash ansiblemoduletests.sh"
+
+      - name: Check logs
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null \
+                debian@$primary sudo chmod ugo+r /var/log/syslog
+          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@$primary:/var/log/syslog \
+              ${GITHUB_WORKSPACE}/syslog
+
+          failures=0
+
+          echo
+          etcd_conns=`grep -c "Building new etcd connection" ${GITHUB_WORKSPACE}/syslog || true`
+          echo "This CI run created $etcd_conns etcd connections."
+          if [ $etcd_conns -gt 5000 ]; then
+            echo "FAILURE: Too many etcd clients!"
+            failures=1
+          fi
+
+          echo
+          sigterms=`grep -c "Sent SIGTERM to " ${GITHUB_WORKSPACE}/syslog || true`
+          echo "This CI run sent $sigterms SIGTERM signals while shutting down."
+          if [ $sigterms -gt 50 ]; then
+            echo "FAILURE: Too many SIGTERMs sent!"
+            failures=1
+          fi
+
+          FORBIDDEN=("Traceback (most recent call last):"
+                     "ERROR sf"
+                     "ERROR gunicorn"
+                     " died"
+                     "Extra vxlan present"
+                     "Fork support is only compatible with the epoll1 and poll polling strategies"
+                     "not using configured address"
+                     "Dumping thread traces"
+                     "because it is leased to"
+                     "not committing online upgrade"
+                     "Received a GOAWAY with error code ENHANCE_YOUR_CALM"
+                     "ConnectionFailedError"
+                     "invalid JWT in Authorization header"
+                     "Libvirt Error: XML error"
+                     "Cleaning up leaked IPAM"
+                     "Cleaning up leaked vxlan"
+                     "Waiting to acquire lock"
+                     'apparmor="DENIED"'
+                     "Ignoring malformed cache entry")
+          IFS=""
+          for forbid in ${FORBIDDEN[*]}
+          do
+            if [ `grep -c "$forbid" ${GITHUB_WORKSPACE}/syslog || true` -gt 0 ]
+            then
+              echo "FAILURE: Forbidden string found in logs: $forbid"
+              failures=1
+            fi
+          done
+
+          if [ $failures -gt 0 ]; then
+              echo "...failures detected."
+              exit 1
+          fi
+
+      - name: Check process CPU usage
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs'
+
+      - name: Fetch and tweak inventory
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary:/etc/sf/inventory.yaml /srv/github/
+          sed -i 's|/root/.ssh|/home/debian/.ssh|g' /srv/github/inventory.yaml
+
+          echo "====="
+          cat /srv/github/inventory.yaml
+
+      - name: Gather logs
+        if: always()
+        run: |
+          set -x
+
+          # We need the ssh key in the place ansible expects it to be, which isn't
+          # true on the CI worker node.
+          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
+          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
+          chown -R debian.debian /home/debian/.ssh
+
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bundle.zip
+          retention-days: 90
+          if-no-files-found: error
+          path: /srv/github/artifacts/bundle.zip

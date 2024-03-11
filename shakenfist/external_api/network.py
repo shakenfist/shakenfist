@@ -104,7 +104,7 @@ class NetworkEndpoint(sf_api.Resource):
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
-    def get(self, network_ref=None, network_from_db=None):
+    def get(self, network_ref=None, network_from_db=None, namespace=None):
         return network_from_db.external_view()
 
     @swag_from(api_base.swagger_helper(
