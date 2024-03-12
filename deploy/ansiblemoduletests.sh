@@ -16,6 +16,10 @@ for scenario in *.yml; do
     log "=== Scenario ${scenario} ==="
     echo
     ansible-playbook ${scenario}
+    if [ $? -gt 0 ]; then
+       echo "TESTS FAILED."
+       exit 1
+    fi
     echo
 done
 

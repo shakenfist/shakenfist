@@ -155,7 +155,7 @@ class Monitor(daemon.Daemon):
 
         # Cleanup old uploads which were never completed
         for upload in Uploads([]):
-            if time.time() - upload.state.update_time > 7 * 24 * 3600:
+            if time.time() - upload.created_at > 7 * 24 * 3600:
                 LOG.with_fields({
                     'upload': upload.uuid
                 }).warning('Cleaning up stale upload')

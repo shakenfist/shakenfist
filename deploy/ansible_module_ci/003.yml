@@ -71,8 +71,8 @@
 
     - name: Assert the network is in the correct namespace
       assert:
-        that: ci_network['meta']['namespace'] == ci_namespace
-        fail_msg: "Network namespace is {{ ci_network['meta']['namespace'] }} not {{ ci_namespace }}"
+        that: ci_network['meta']['namespace'] == ci_namespace['meta']['name']
+        fail_msg: "Network namespace is {{ ci_network['meta']['namespace'] }} not {{ ci_namespace['meta']['name'] }}"
 
     - name: Delete the network
       sf_network:
