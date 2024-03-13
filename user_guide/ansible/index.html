@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/user_guide/usage/">
+        <link rel="canonical" href="https://shakenfist.com/user_guide/ansible/">
       
       
-        <link rel="prev" href="../authentication/">
+        <link rel="prev" href="../usage/">
       
       
-        <link rel="next" href="../ansible/">
+        <link rel="next" href="../artifacts/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -24,7 +24,7 @@
     
     
       
-        <title>Usage guide - Shaken Fist</title>
+        <title>Ansible module - Shaken Fist</title>
       
     
     
@@ -79,7 +79,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#clients" class="md-skip">
+        <a href="#ansible-module" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Usage guide
+              Ansible module
             
           </span>
         </div>
@@ -445,6 +445,26 @@
                 
   
   
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -456,28 +476,18 @@
         
       
       
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
   
   <span class="md-ellipsis">
-    Usage
+    Ansible module
   </span>
   
 
-      </a>
+          <span class="md-nav__icon md-icon"></span>
+        </label>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../ansible/" class="md-nav__link">
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -486,6 +496,115 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    Installation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    Implementation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#namespaces" class="md-nav__link">
+    Namespaces
+  </a>
+  
+    <nav class="md-nav" aria-label="Namespaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    Parameters
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#return-value" class="md-nav__link">
+    Return value
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    Examples
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#networks" class="md-nav__link">
+    Networks
+  </a>
+  
+    <nav class="md-nav" aria-label="Networks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters_1" class="md-nav__link">
+    Parameters
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#return-value_1" class="md-nav__link">
+    Return value
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples_1" class="md-nav__link">
+    Examples
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#instances" class="md-nav__link">
+    Instances
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1282,6 +1401,103 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    Installation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    Implementation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#namespaces" class="md-nav__link">
+    Namespaces
+  </a>
+  
+    <nav class="md-nav" aria-label="Namespaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    Parameters
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#return-value" class="md-nav__link">
+    Return value
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    Examples
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#networks" class="md-nav__link">
+    Networks
+  </a>
+  
+    <nav class="md-nav" aria-label="Networks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters_1" class="md-nav__link">
+    Parameters
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#return-value_1" class="md-nav__link">
+    Return value
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples_1" class="md-nav__link">
+    Examples
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#instances" class="md-nav__link">
+    Instances
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1298,71 +1514,210 @@
   
 
 
-<h1 id="clients">Clients</h1>
-<p>There is a command line client called "sf-client" deployed by ansible. It talks to Shaken Fist via a REST API. There is also a python API client library at shakenfist.clients.apiclient, which is what the command line client uses to call the API. The apiclient module also serves as useful example code for how to write your own client.</p>
-<p>The command line client can produce output in three formats: the standard "pretty" format, a mostly-csv format called "simple" (which is aimed at being easy to parse in shell scripts), and JSON. You select the output format with a flag like this:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>--simple<span class="w"> </span>instance<span class="w"> </span>list
+<h1 id="ansible-module">Ansible module</h1>
+<p>The Shaken Fist Ansible modules were re-written in v0.8. This documentation
+covers that newer version.</p>
+<h2 id="installation">Installation</h2>
+<p>The Shaken Fist command line client also ships with an Ansible module for
+orchestration of cloud resources. <code>getsf</code> installs this in the right place on the
+primary node, but its likely that you'll need to hand install the module code
+on other client machines.</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sudo<span class="w"> </span>pip3<span class="w"> </span>install<span class="w"> </span>shakenfist-client
+$<span class="w"> </span>sudo<span class="w"> </span>cp<span class="w"> </span>venv/share/shakenfist/ansible/*<span class="w"> </span>/usr/share/ansible/plugins/modules/
+$<span class="w"> </span>sudo<span class="w"> </span>chmod<span class="w"> </span><span class="m">0644</span><span class="w"> </span>/usr/share/ansible/plugins/modules/sf_*
 </code></pre></div>
-<p>The default formatter is the "pretty" formatter, so you never need to specify that on the command line.</p>
-<p>You can explore what the command line client is capable of by asking it for help:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>--help
+<details class="note" open="open">
+<summary>Note</summary>
+<p>This example installs the Shaken Fist client in the system pip so that it
+is globally available to all Ansible users. The system pip is protected on
+modern Linux distributions, and you may need to include the
+<code>--break-system-packages</code> flag if your chosen Linux distribution does not
+package the Shaken Fist client.</p>
+<p>You'll know you need to do this if you see an error like this:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sudo<span class="w"> </span>pip3<span class="w"> </span>install<span class="w"> </span>shakenfist-client
+error:<span class="w"> </span>externally-managed-environment
+
+×<span class="w"> </span>This<span class="w"> </span>environment<span class="w"> </span>is<span class="w"> </span>externally<span class="w"> </span>managed
+╰─&gt;<span class="w"> </span>To<span class="w"> </span>install<span class="w"> </span>Python<span class="w"> </span>packages<span class="w"> </span>system-wide,<span class="w"> </span>try<span class="w"> </span>apt<span class="w"> </span>install
+<span class="w">    </span>python3-xyz,<span class="w"> </span>where<span class="w"> </span>xyz<span class="w"> </span>is<span class="w"> </span>the<span class="w"> </span>package<span class="w"> </span>you<span class="w"> </span>are<span class="w"> </span>trying<span class="w"> </span>to
+<span class="w">    </span>install.
+
+<span class="w">    </span>If<span class="w"> </span>you<span class="w"> </span>wish<span class="w"> </span>to<span class="w"> </span>install<span class="w"> </span>a<span class="w"> </span>non-Debian-packaged<span class="w"> </span>Python<span class="w"> </span>package,
+<span class="w">    </span>create<span class="w"> </span>a<span class="w"> </span>virtual<span class="w"> </span>environment<span class="w"> </span>using<span class="w"> </span>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>path/to/venv.
+<span class="w">    </span>Then<span class="w"> </span>use<span class="w"> </span>path/to/venv/bin/python<span class="w"> </span>and<span class="w"> </span>path/to/venv/bin/pip.<span class="w"> </span>Make
+<span class="w">    </span>sure<span class="w"> </span>you<span class="w"> </span>have<span class="w"> </span>python3-full<span class="w"> </span>installed.
+
+<span class="w">    </span>If<span class="w"> </span>you<span class="w"> </span>wish<span class="w"> </span>to<span class="w"> </span>install<span class="w"> </span>a<span class="w"> </span>non-Debian<span class="w"> </span>packaged<span class="w"> </span>Python<span class="w"> </span>application,
+<span class="w">    </span>it<span class="w"> </span>may<span class="w"> </span>be<span class="w"> </span>easiest<span class="w"> </span>to<span class="w"> </span>use<span class="w"> </span>pipx<span class="w"> </span>install<span class="w"> </span>xyz,<span class="w"> </span>which<span class="w"> </span>will<span class="w"> </span>manage<span class="w"> </span>a
+<span class="w">    </span>virtual<span class="w"> </span>environment<span class="w"> </span><span class="k">for</span><span class="w"> </span>you.<span class="w"> </span>Make<span class="w"> </span>sure<span class="w"> </span>you<span class="w"> </span>have<span class="w"> </span>pipx<span class="w"> </span>installed.
+
+<span class="w">    </span>See<span class="w"> </span>/usr/share/doc/python3.11/README.venv<span class="w"> </span><span class="k">for</span><span class="w"> </span>more<span class="w"> </span>information.
+
+note:<span class="w"> </span>If<span class="w"> </span>you<span class="w"> </span>believe<span class="w"> </span>this<span class="w"> </span>is<span class="w"> </span>a<span class="w"> </span>mistake,<span class="w"> </span>please<span class="w"> </span>contact<span class="w"> </span>your<span class="w"> </span>Python
+installation<span class="w"> </span>or<span class="w"> </span>OS<span class="w"> </span>distribution<span class="w"> </span>provider.<span class="w"> </span>You<span class="w"> </span>can<span class="w"> </span>override<span class="w"> </span>this,<span class="w"> </span>at
+the<span class="w"> </span>risk<span class="w"> </span>of<span class="w"> </span>breaking<span class="w"> </span>your<span class="w"> </span>Python<span class="w"> </span>installation<span class="w"> </span>or<span class="w"> </span>OS,<span class="w"> </span>by<span class="w"> </span>passing
+--break-system-packages.
+hint:<span class="w"> </span>See<span class="w"> </span>PEP<span class="w"> </span><span class="m">668</span><span class="w"> </span><span class="k">for</span><span class="w"> </span>the<span class="w"> </span>detailed<span class="w"> </span>specification.
 </code></pre></div>
-<h1 id="networking">Networking</h1>
-<p>Virtual networks / micro segmentation is provided by VXLAN meshes between the instances. Hypervisors are joined to a given mesh when they start their first instance on that network. DHCP services are optionally offered from a "network services" node, which is just a hypervisor node with some extra dnsmasq process. NAT is also optionally available from the network services node. If your network provides NAT, it consumes an IP address from the
-floating IP pool to do so, and performs NAT in a network namespace on the network node.</p>
-<p>You create a network on the command line like this:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.1.0/24
+</details>
+<h2 id="implementation">Implementation</h2>
+<p>Ansible modules can be written in any language, although they are normally in
+python. In order to centralize the code for our Ansible module, the module files
+you install are simple <code>bash</code> redirects to the Shaken Fist command line client.
+The client then does the right things to make the module work correctly.</p>
+<details class="note" open="open">
+<summary>Note</summary>
+<p>Specifically, the command line <code>sf-client ansible ...</code> is what the bash
+redirect scripts use. The ansible command line module appears in help output
+for the command line client, but is not intended for direct user use.</p>
+</details>
+<h2 id="namespaces">Namespaces</h2>
+<h3 id="parameters">Parameters</h3>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name<br/><em>string</em></td>
+<td>The name of the namespace. This must always be specified.</td>
+</tr>
+<tr>
+<td>state<br/><em>string</em></td>
+<td>The state of the resource. Valid states are <code>present</code> or <code>absent</code>, defaults to <code>present</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="return-value">Return value</h3>
+<p>Unless an error is experienced the full REST API information for the namespace is
+returned in a dictionary element called <code>meta</code>. An example returned dictionary is:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+    <span class="s2">&quot;changed&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+    <span class="s2">&quot;failed&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+    <span class="s2">&quot;log&quot;</span><span class="p">:</span> <span class="p">[</span><span class="o">...</span><span class="p">],</span>
+    <span class="s2">&quot;meta&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;keys&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;ci-003-peephie6Oo&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="s2">&quot;created&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;trust&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;full&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="s2">&quot;system&quot;</span>
+            <span class="p">]</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="mi">5</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;msg&quot;</span><span class="p">:</span> <span class="n">null</span>
+<span class="p">}</span>
 </code></pre></div>
-<p>Where "192.168.1.0/24" is the netblock to use, and "mynet" is the name of the network. You'll get back output describing the network, including the UUID of the network, which is used in later calls.</p>
-<h1 id="instances">Instances</h1>
-<p>Every instance gets a config drive. Its always an ISO9660 drive. It's always the second virtual disk attached to the VM (vdb on Linux). There is no metadata server. Additionally, there is no image service -- you specify the image to use by providing a URL. That URL is cached, but can be to any HTTP server anywhere. Even better, there are no flavors. You specify what resources your instance should have at boot time and that's what you get. No more being forced into a t-shirt sized description of your needs.</p>
-<p>Instances are always cattle. Any feature that made instances feel like pets has not been implemented. That said, you can snapshot an instance. Snapshots aren't reliable backups, just like they're not really reliable backups on OpenStack. There is a small but real chance that a snapshot will contain an inconsistent state if you're snapshotting a busy database or something like that. One minor difference from OpenStack -- when you snapshot your instance you can snapshot all of the virtual disks (except the config drive) if you want to. Snapshots are delivered as files you can download via a mechanism external to Shaken Fist (for example an HTTP server pointed at the snapshot directory).</p>
-<p>You start an instance like this:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span><span class="s2">&quot;myinstance&quot;</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span>-n<span class="w"> </span>netuuid
+<h3 id="examples">Examples</h3>
+<p>Create a namespace:</p>
+<div class="highlight"><pre><span></span><code><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Create a namespace</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">sf_namespace</span><span class="p p-Indicator">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">namespace_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">    </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">present</span>
 </code></pre></div>
-<p>Where "myinstance" is the name of the instance, it has 1 vCPU, 2048MB of RAM, a single 8gb disk (more on this in a second) and a single network interface on the network with the UUID "netuuid".</p>
-<p>"8<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/cirros" title="GitHub User: cirros">@cirros</a>" is a "short disk specification". These are in the form size@image, where the <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/image" title="GitHub User: image">@image</a> is optional. You can specify more than one disk, so this is valid:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span><span class="s2">&quot;myinstance&quot;</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-n<span class="w"> </span>netuuid
+<p>Delete a network:</p>
+<div class="highlight"><pre><span></span><code><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Delete the namespace</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">sf_namespace</span><span class="p p-Indicator">:</span>
+<span class="w">    </span><span class="nt">uuid</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">namespace_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">    </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">absent</span>
 </code></pre></div>
-<p>In this case we have three disks, all of 8gb. The boot disk is imaged with cirros. The "cirros" here is shorthand. By default, you specify a URL for the image you want, so to boot a cirros instance you might use <a href="http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img">http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img</a> -- that gets old though, so for common cloud images there is a shorthand format, where Shaken Fist knows how to generate the download URL from a short description. In this case "cirros" means "the latest release of cirros". You can also specify a version like this:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span><span class="s2">&quot;myinstance&quot;</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros:0.5.1<span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-n<span class="w"> </span>netuuid
+<h2 id="networks">Networks</h2>
+<h3 id="parameters_1">Parameters</h3>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>dhcp<br/><em>boolean</em></td>
+<td>Whether to provide DHCP services on the network. Defaults to <code>true</code>. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network.</td>
+</tr>
+<tr>
+<td>name<br/><em>string</em></td>
+<td>The name of the network. Either <code>name</code> or <code>uuid</code> must be included in all requests. When both <code>name</code> and <code>uuid</code> are specified, <code>uuid</code> is used for existing resource lookups. If a network is identified by its <code>uuid</code>, then the network will be recreated if you specify a <code>name</code> which does not match the network in the Shaken Fist cluster.</td>
+</tr>
+<tr>
+<td>nat<br/><em>boolean</em></td>
+<td>Whether to provide NAT services on the network. Defaults to <code>true</code>. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network.</td>
+</tr>
+<tr>
+<td>state<br/><em>string</em></td>
+<td>The state of the resource. Valid states are <code>present</code> or <code>absent</code>, defaults to <code>present</code>.</td>
+</tr>
+<tr>
+<td>uuid<br/><em>string</em></td>
+<td>The UUID for the network. Either <code>name</code> or <code>uuid</code> must be included in all requests with <code>state: absent</code>. You specify a UUID and the network does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="return-value_1">Return value</h3>
+<p>Unless an error is experienced the full REST API information for the network is
+returned in a dictionary element called <code>meta</code>. An example returned dictionary is:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+    <span class="s1">&#39;changed&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;failed&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">&quot;log&quot;</span><span class="p">:</span> <span class="p">[</span><span class="o">...</span><span class="p">],</span>
+    <span class="s1">&#39;msg&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s1">&#39;meta&#39;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s1">&#39;floating_gateway&#39;</span><span class="p">:</span> <span class="s1">&#39;192.168.10.230&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;metadata&#39;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;ci&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;namespace&#39;</span><span class="p">:</span> <span class="s1">&#39;system&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;netblock&#39;</span><span class="p">:</span> <span class="s1">&#39;10.0.0.0/24&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;provide_dhcp&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s1">&#39;provide_nat&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;created&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;uuid&#39;</span><span class="p">:</span> <span class="s1">&#39;a8a52ac5-49b6-4444-80d0-3ab6573343ad&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;version&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+        <span class="s1">&#39;vxid&#39;</span><span class="p">:</span> <span class="mi">1436254</span>
+    <span class="p">}</span>
+<span class="p">}</span>
 </code></pre></div>
-<p>"Common cloud images" is currently defined as cirros and Ubuntu. You can also use a "detailed disk specification", which is what fancy people use. Its syntax is similar:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span><span class="s2">&quot;myinstance&quot;</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-D<span class="w"> </span><span class="nv">size</span><span class="o">=</span><span class="m">8</span>,base<span class="o">=</span>cirros,bus<span class="o">=</span>ide,type<span class="o">=</span>cdrom<span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-n<span class="w"> </span>netuuid
+<h3 id="examples_1">Examples</h3>
+<p>Create a network:</p>
+<div class="highlight"><pre><span></span><code><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Create a network for CI infrastructure</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">sf_network</span><span class="p p-Indicator">:</span>
+<span class="w">    </span><span class="nt">netblock</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10.0.0.0/24&quot;</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ci&quot;</span>
+<span class="w">  </span><span class="nt">register</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ci_network</span>
 </code></pre></div>
-<p>The specification is composed of a series of key-value pairs. Valid keys are: size; base; bus; and type. If you don't specify a key, you'll get a reasonable default. Here's how the keys work:</p>
-<ul>
-<li><em>size</em> as per the shorthand notation.</li>
-<li><em>base</em> as per the shorthand notation, including version specification.</li>
-<li><em>bus</em> is any valid disk bus for libvirt, which is virtio, ide, scsi, usb. Use virtio unless you have a really good reason otherwise -- the performance of the others are terrible. An example of a good reason is to install virtio drivers into legacy operating systems that lack them natively.</li>
-<li><em>type</em> can be one of disk or cdrom. Note that cdroms are excluded from snapshots.</li>
-</ul>
-<p>Similarly, networks have a "short network specification", where you can specify the UUID of a network, but also optionally the IP address to use for the interface. You can also have more than one network interface, so this is valid:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span><span class="s2">&quot;myinstance&quot;</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span>-n<span class="w"> </span>netuuid1<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-n<span class="w"> </span>netuuid2@10.0.0.4
+<p>Delete a network:</p>
+<div class="highlight"><pre><span></span><code><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Delete the CI network</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">sf_network</span><span class="p p-Indicator">:</span>
+<span class="w">    </span><span class="nt">uuid</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">ci_network[&#39;meta&#39;][&#39;uuid&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">    </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">absent</span>
 </code></pre></div>
-<p>There is also a shorthand "short network specification" which implies immediately floating the interface. The details are the same as -n, except the flag is -f:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span><span class="s2">&quot;myinstance&quot;</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span>-f<span class="w"> </span>netuuid1
-</code></pre></div>
-<p>There is a "detailed network specification" as well, which is composed of the following keys:</p>
-<ul>
-<li><em>network_uuid</em> is the UUID of the network to use.</li>
-<li><em>address</em> is the IPv4 network address to use, if free. If its not free the instance will fail to start. If you don't want an address on this interface, use "none" as the value for address. If you do not specify any value for address, an address on the network will be assigned to you.</li>
-<li><em>macaddress</em> the mac address to use for the interface.</li>
-<li><em>model</em> is the model of the network device, with options being ne2k_isa, i82551, i82557b, i82559er, ne2k_pci, pcnet, rtl8139, e1000, and virtio. The default model is virtio.</li>
-<li><em>float</em> if true indicates to immediately float the interface once the instance is created.</li>
-</ul>
-<h1 id="missing-documentation">Missing documentation</h1>
-<p>I really should document these as well:</p>
-<ul>
-<li>nodes</li>
-<li>networks: delete, list</li>
-<li>instance: show, delete, list, ssh keys, user data, reboots (hard and soft), poweroff, poweron, pause, unpause, snapshot</li>
-<li>images: pre-caching</li>
-<li>metadata</li>
-<li>authentication</li>
-</ul>
-<p>Maybe one day I will.</p>
+<h2 id="instances">Instances</h2>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 
 
 
