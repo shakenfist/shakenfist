@@ -254,7 +254,7 @@ def namespace_is_trusted(namespace, requestor):
     if namespace == requestor:
         return True
 
-    ns = Namespace.from_db(namespace)
+    ns = Namespace.from_db(namespace, suppress_failure_audit=True)
     if not ns:
         return False
 

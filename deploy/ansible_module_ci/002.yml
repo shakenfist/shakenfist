@@ -1,0 +1,76 @@
+- hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Ensure network doesn't exist at the start
+      sf_network:
+        name: "ci-002"
+        state: "absent"
+
+    - name: Create a test network
+      sf_network:
+        netblock: "10.0.0.0/24"
+        name: "ci-002"
+        state: present
+      register: ci_network
+
+    - name: Assert the network is new
+      assert:
+        that: ci_network['changed']
+        fail_msg: "changed should be true in {{ ci_network }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network['failed']
+        fail_msg: "failed should be false in {{ ci_network }}"
+
+    - name: Noop create the test network
+      sf_network:
+        netblock: "10.0.0.0/24"
+        name: "ci-002"
+        state: present
+      register: ci_network
+
+    - name: Assert the network is unchanged
+      assert:
+        that: not ci_network['changed']
+        fail_msg: "changed should be false in {{ ci_network }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network['failed']
+        fail_msg: "failed should be false in {{ ci_network }}"
+
+    - name: Try to change a field
+      sf_network:
+        netblock: "10.0.0.0/24"
+        name: "ci-002"
+        state: present
+        dhcp: false
+      register: ci_network
+
+    - name: Assert the network is new
+      assert:
+        that: ci_network['changed']
+        fail_msg: "changed should be true in {{ ci_network }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network['failed']
+        fail_msg: "failed should be false in {{ ci_network }}"
+
+    - name: Delete the network
+      sf_network:
+        uuid: "{{ ci_network['meta']['uuid'] }}"
+        state: absent
+      register: ci_network
+
+    - name: Assert the network was changed
+      assert:
+        that: ci_network['changed']
+        fail_msg: "changed should be true in {{ ci_network }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network['failed']
+        fail_msg: "failed should be false in {{ ci_network }}"

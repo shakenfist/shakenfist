@@ -1199,11 +1199,20 @@
         group: root
         mode: "0644"
 
+    - name: Install ansible namespace module
+      copy:
+        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_namespace
+        remote_src: yes
+        dest: /usr/share/ansible/plugins/modules/sf_namespace
+        owner: root
+        group: root
+        mode: "0644"
+
     - name: Install ansible network module
       copy:
-        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_network.py
+        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_network
         remote_src: yes
-        dest: /usr/share/ansible/plugins/modules/sf_network.py
+        dest: /usr/share/ansible/plugins/modules/sf_network
         owner: root
         group: root
         mode: "0644"

@@ -43,6 +43,7 @@ nav:
     - User Guide:
         - "Authentication": user_guide/authentication.md
         - "Usage": user_guide/usage.md
+        - "Ansible module": user_guide/ansible.md
         - "Artifacts": user_guide/artifacts.md
         - "Affinity": user_guide/affinity.md
         - "Consoles": user_guide/consoles.md

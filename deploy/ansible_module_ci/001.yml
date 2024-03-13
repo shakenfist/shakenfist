@@ -1,0 +1,45 @@
+- hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Ensure network doesn't exist at the start
+      sf_network:
+        name: "ci-001"
+        state: "absent"
+
+    - name: Create a test network
+      sf_network:
+        netblock: "10.0.0.0/24"
+        name: "ci-001"
+        state: present
+      register: ci_network
+
+    - name: Assert the network is new
+      assert:
+        that: ci_network['changed']
+        fail_msg: "changed should be true in {{ ci_network }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network['failed']
+        fail_msg: "failed should be false in {{ ci_network }}"
+
+    - name: Log network UUID
+      debug:
+        msg: "CI network has UUID {{ ci_network['meta']['uuid'] }}"
+
+    - name: Delete the network
+      sf_network:
+        uuid: "{{ ci_network['meta']['uuid'] }}"
+        state: absent
+      register: ci_network
+
+    - name: Assert the network was changed
+      assert:
+        that: ci_network['changed']
+        fail_msg: "changed should be true in {{ ci_network }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network['failed']
+        fail_msg: "failed should be false in {{ ci_network }}"
