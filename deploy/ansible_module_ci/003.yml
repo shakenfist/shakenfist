@@ -8,7 +8,7 @@
 
     - name: Store unique name
       set_fact:
-        namespace_name: "ci-003-{{ unique['stdout'] }}"
+        namespace_name: "ansibleci-003-{{ unique['stdout'] }}"
 
     - name: Log namespace name
       debug:
@@ -54,7 +54,7 @@
     - name: Create a test network
       sf_network:
         netblock: "10.0.0.0/24"
-        name: "ci-003"
+        name: "ansibleci-003"
         namespace: "{{ namespace_name }}"
         state: present
       register: ci_network

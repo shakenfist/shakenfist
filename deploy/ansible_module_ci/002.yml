@@ -4,13 +4,13 @@
   tasks:
     - name: Ensure network doesn't exist at the start
       sf_network:
-        name: "ci-002"
+        name: "ansibleci-002"
         state: "absent"
 
     - name: Create a test network
       sf_network:
         netblock: "10.0.0.0/24"
-        name: "ci-002"
+        name: "ansibleci-002"
         state: present
       register: ci_network
 
@@ -27,7 +27,7 @@
     - name: Noop create the test network
       sf_network:
         netblock: "10.0.0.0/24"
-        name: "ci-002"
+        name: "ansibleci-002"
         state: present
       register: ci_network
 
@@ -44,7 +44,7 @@
     - name: Try to change a field
       sf_network:
         netblock: "10.0.0.0/24"
-        name: "ci-002"
+        name: "ansibleci-002"
         state: present
         dhcp: false
       register: ci_network

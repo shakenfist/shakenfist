@@ -4,13 +4,13 @@
   tasks:
     - name: Ensure network doesn't exist at the start
       sf_network:
-        name: "ci-001"
+        name: "ansibleci-001"
         state: "absent"
 
     - name: Create a test network
       sf_network:
         netblock: "10.0.0.0/24"
-        name: "ci-001"
+        name: "ansibleci-001"
         state: present
       register: ci_network
 
