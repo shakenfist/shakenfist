@@ -170,14 +170,16 @@ class InstanceEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get instance information.',
         [('instance_ref', 'query', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to contain the network.', False)],
         [(200, 'Information about a single instance.', instance_get_example),
          (404, 'Instance not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
-    def get(self, instance_ref=None, instance_from_db=None):
+    def get(self, instance_ref=None, instance_from_db=None, namespace=None):
         return instance_from_db.external_view()
 
     @swag_from(api_base.swagger_helper(
@@ -344,7 +346,7 @@ class InstancesEndpoint(sf_api.Resource):
              'to function.', False)
           ],
         [
-            (200, 'Information about a single instance.', instances_get_example),
+            (200, 'Information about a single instance.', instance_get_example),
             (400, 'Instance configuration error such as invalid name of boot '
                 'configuration.', None),
             (404, 'Namespace, network, node, blob, snapshot, or label not found.', None),

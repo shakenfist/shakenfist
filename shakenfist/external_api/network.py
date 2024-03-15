@@ -97,7 +97,9 @@ class NetworkEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network information.',
         [('artifact_ref', 'query', 'uuidorname',
-          'The UUID or name of the network.', True)],
+          'The UUID or name of the network.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to contain the network.', False)],
         [(200, 'Information about a single network.', network_get_example),
          (404, 'Network not found.', None)]))
     @api_base.verify_token

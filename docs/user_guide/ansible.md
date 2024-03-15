@@ -129,7 +129,7 @@ Delete a network:
 | name<br/>*string* | The name of the network. Either `name` or `uuid` must be included in all requests. When both `name` and `uuid` are specified, `uuid` is used for existing resource lookups. If a network is identified by its `uuid`, then the network will be recreated if you specify a `name` which does not match the network in the Shaken Fist cluster. |
 | nat<br/>*boolean* | Whether to provide NAT services on the network. Defaults to `true`. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network. |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
-| uuid<br/>*string* | The UUID for the network. Either `name` or `uuid` must be included in all requests with `state: absent`. You specify a UUID and the network does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation. |
+| uuid<br/>*string* | The UUID for the network. Either `name` or `uuid` must be included in all requests with `state: absent`. If you specify a UUID and the network does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation. |
 
 ### Return value
 
@@ -181,8 +181,14 @@ Delete a network:
 
 ## Instances
 
+### Parameters
+
 | **Parameter** | **Comments** |
 |---|---|
-|               |              |
-|               |              |
-|               |              |
+| cpu<br/>*integer* | The number of vCPUs the instance should have. |
+| disks<br/>*list of strings* | A simpler format for specifying what disks an instance has that follows the same behaviour as the `-d` flag in the command line client. Specifications are of the form: `size@base` where base is optional and size is in GB. That is, `100@debian:11` is valid, but so is `100` for an empty 100gb disk. |
+| diskspecs<br/>*list of strings* | A more verbose format for specifying what disks an instance has that models the `-D` flag in the command line client. Specifications are of the form: `size=20,base=debian:11,bus=sata;type=cdrom` where all elements are optional except for `size`. A more complete definition of this format is in the [developer reference documentation](/developer_guide/api_reference/instances/#diskspec). |
+| name<br/>*string* | The name of the instance. Either `name` or `uuid` must be included in all requests. When both `name` and `uuid` are specified, `uuid` is used for existing resource lookups. If a instance is identified by its `uuid`, then the instance will be recreated if you specify a `name` which does not match the instance in the Shaken Fist cluster. |
+| ram<br/>*integer* | The amount of RAM the instance should have, in MB. |
+| state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
+| uuid<br/>*string* | The UUID for the instance. Either `name` or `uuid` must be included in all requests with `state: absent`. If you specify a UUID and the instance does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation. |
