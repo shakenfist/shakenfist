@@ -599,6 +599,19 @@
     Instances
   </a>
   
+    <nav class="md-nav" aria-label="Instances">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters_2" class="md-nav__link">
+    Parameters
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -1494,6 +1507,19 @@
     Instances
   </a>
   
+    <nav class="md-nav" aria-label="Instances">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters_2" class="md-nav__link">
+    Parameters
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -1654,7 +1680,7 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 </tr>
 <tr>
 <td>uuid<br/><em>string</em></td>
-<td>The UUID for the network. Either <code>name</code> or <code>uuid</code> must be included in all requests with <code>state: absent</code>. You specify a UUID and the network does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation.</td>
+<td>The UUID for the network. Either <code>name</code> or <code>uuid</code> must be included in all requests with <code>state: absent</code>. If you specify a UUID and the network does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation.</td>
 </tr>
 </tbody>
 </table>
@@ -1696,6 +1722,7 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <span class="w">    </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">absent</span>
 </code></pre></div>
 <h2 id="instances">Instances</h2>
+<h3 id="parameters_2">Parameters</h3>
 <table>
 <thead>
 <tr>
@@ -1705,16 +1732,32 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 </thead>
 <tbody>
 <tr>
-<td></td>
-<td></td>
+<td>cpu<br/><em>integer</em></td>
+<td>The number of vCPUs the instance should have.</td>
 </tr>
 <tr>
-<td></td>
-<td></td>
+<td>disks<br/><em>list of strings</em></td>
+<td>A simpler format for specifying what disks an instance has that follows the same behaviour as the <code>-d</code> flag in the command line client. Specifications are of the form: <code>size@base</code> where base is optional and size is in GB. That is, <code>100@debian:11</code> is valid, but so is <code>100</code> for an empty 100gb disk.</td>
 </tr>
 <tr>
-<td></td>
-<td></td>
+<td>diskspecs<br/><em>list of strings</em></td>
+<td>A more verbose format for specifying what disks an instance has that models the <code>-D</code> flag in the command line client. Specifications are of the form: <code>size=20,base=debian:11,bus=sata;type=cdrom</code> where all elements are optional except for <code>size</code>. A more complete definition of this format is in the <a href="/developer_guide/api_reference/instances/#diskspec">developer reference documentation</a>.</td>
+</tr>
+<tr>
+<td>name<br/><em>string</em></td>
+<td>The name of the instance. Either <code>name</code> or <code>uuid</code> must be included in all requests. When both <code>name</code> and <code>uuid</code> are specified, <code>uuid</code> is used for existing resource lookups. If a instance is identified by its <code>uuid</code>, then the instance will be recreated if you specify a <code>name</code> which does not match the instance in the Shaken Fist cluster.</td>
+</tr>
+<tr>
+<td>ram<br/><em>integer</em></td>
+<td>The amount of RAM the instance should have, in MB.</td>
+</tr>
+<tr>
+<td>state<br/><em>string</em></td>
+<td>The state of the resource. Valid states are <code>present</code> or <code>absent</code>, defaults to <code>present</code>.</td>
+</tr>
+<tr>
+<td>uuid<br/><em>string</em></td>
+<td>The UUID for the instance. Either <code>name</code> or <code>uuid</code> must be included in all requests with <code>state: absent</code>. If you specify a UUID and the instance does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation.</td>
 </tr>
 </tbody>
 </table>
