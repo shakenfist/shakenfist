@@ -1192,9 +1192,9 @@
 
     - name: Install ansible instance module
       copy:
-        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance.py
+        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance
         remote_src: yes
-        dest: /usr/share/ansible/plugins/modules/sf_instance.py
+        dest: /usr/share/ansible/plugins/modules/sf_instance
         owner: root
         group: root
         mode: "0644"
