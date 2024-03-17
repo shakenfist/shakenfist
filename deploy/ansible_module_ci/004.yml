@@ -83,7 +83,7 @@
         cpu: 2
         ram: 2048
         disks:
-          - 100@debian:11
+          - 10@debian:11
         diskspecs:
           - size=20,type=cdrom
         networks:
@@ -110,7 +110,7 @@
         cpu: 2
         ram: 2048
         disks:
-          - 100@debian:11
+          - 10@debian:11
         diskspecs:
           - size=20,type=cdrom
         networks:
@@ -144,7 +144,7 @@
         cpu: 2
         ram: 2048
         disks:
-          - 100@debian:11
+          - 10@debian:11
         diskspecs:
           - size=30,type=cdrom
         networks:
