@@ -1,0 +1,213 @@
+- hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Create a unique namespace name
+      shell: pwgen 10 -n 1
+      register: unique
+
+    - name: Store unique name
+      set_fact:
+        namespace_name: "ansibleci-003-{{ unique['stdout'] }}"
+
+    - name: Log namespace name
+      debug:
+        msg: "Test namespace is {{ namespace_name }}"
+
+    - name: Ensure the namespace doesn't exist at the start
+      sf_namespace:
+        name: "{{ namespace_name }}"
+        state: "absent"
+
+    - name: Create a namespace
+      sf_namespace:
+        name: "{{ namespace_name }}"
+        state: present
+      register: ci_namespace
+
+    - name: Assert the namespace is new
+      assert:
+        that: ci_namespace['changed']
+        fail_msg: "changed should be true in {{ ci_namespace }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_namespace['failed']
+        fail_msg: "failed should be false in {{ ci_namespace }}"
+
+    - name: Ensure network doesn't exist at the start
+      sf_network:
+        name: "ansibleci-002"
+        state: "absent"
+
+    - name: Create the first test network
+      sf_network:
+        netblock: "10.0.0.0/24"
+        name: "ansibleci-004-1"
+        namespace: "{{ namespace_name }}"
+        state: present
+      register: ci_network_a
+
+    - name: Assert the network is new
+      assert:
+        that: ci_network_a['changed']
+        fail_msg: "changed should be true in {{ ci_network_a }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network_a['failed']
+        fail_msg: "failed should be false in {{ ci_network_a }}"
+
+    - name: Create the second test network
+      sf_network:
+        netblock: "10.1.0.0/24"
+        name: "ansibleci-004-2"
+        namespace: "{{ namespace_name }}"
+        state: present
+      register: ci_network_b
+
+    - name: Assert the network is new
+      assert:
+        that: ci_network_b['changed']
+        fail_msg: "changed should be true in {{ ci_network_b }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network_b['failed']
+        fail_msg: "failed should be false in {{ ci_network_b }}"
+
+    - name: Create a test instance that uses those networks
+      sf_instance:
+        name: "ansibleci-004"
+        namespace: "{{ namespace_name }}"
+        cpu: 2
+        ram: 2048
+        disks:
+          - 10@debian:11
+        diskspecs:
+          - size=20,type=cdrom
+        networks:
+          - "{{ ci_network_a['meta']['uuid'] }}"
+        networkspecs:
+          - "network_uuid={{ ci_network_b['meta']['uuid'] }},address=10.1.0.5,float=True"
+        state: present
+      register: ci_instance
+
+    - name: Assert the instance is new
+      assert:
+        that: ci_instance['changed']
+        fail_msg: "changed should be true in {{ ci_instance }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_instance['failed']
+        fail_msg: "failed should be false in {{ ci_instance }}"
+
+    - name: Create the same test instance and check it hasn't changed
+      sf_instance:
+        name: "ansibleci-004"
+        namespace: "{{ namespace_name }}"
+        cpu: 2
+        ram: 2048
+        disks:
+          - 10@debian:11
+        diskspecs:
+          - size=20,type=cdrom
+        networks:
+          - "{{ ci_network_a['meta']['uuid'] }}"
+        networkspecs:
+          - "network_uuid={{ ci_network_b['meta']['uuid'] }},address=10.1.0.5,float=True"
+        state: present
+      register: ci_instance
+
+    - name: Assert the instance is not new
+      assert:
+        that: not ci_instance['changed']
+        fail_msg: "changed should be true in {{ ci_instance }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_instance['failed']
+        fail_msg: "failed should be false in {{ ci_instance }}"
+
+    - name: Assert we have instance details
+      assert:
+        that: ci_instance['meta']
+        fail_msg: "meta should be populated in {{ ci_instance }}"
+
+    # NOTE(mikal): we need to change the IP address here as well, otherwise we
+    # bump into the deletion halo around the previous IP address.
+    - name: Change the instance and check for replacement
+      sf_instance:
+        name: "ansibleci-004"
+        namespace: "{{ namespace_name }}"
+        cpu: 2
+        ram: 2048
+        disks:
+          - 10@debian:11
+        diskspecs:
+          - size=30,type=cdrom
+        networks:
+          - "{{ ci_network_a['meta']['uuid'] }}"
+        networkspecs:
+          - "network_uuid={{ ci_network_b['meta']['uuid'] }},address=10.1.0.6,float=True"
+        state: present
+      register: ci_instance
+
+    - name: Assert the instance is new
+      assert:
+        that: ci_instance['changed']
+        fail_msg: "changed should be true in {{ ci_instance }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_instance['failed']
+        fail_msg: "failed should be false in {{ ci_instance }}"
+
+    - name: Delete the instance
+      sf_instance:
+        uuid: "{{ ci_instance['meta']['uuid'] }}"
+        state: "absent"
+      register: ci_instance
+
+    - name: Assert the instance was changed
+      assert:
+        that: ci_instance['changed']
+        fail_msg: "changed should be true in {{ ci_instance }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_instance['failed']
+        fail_msg: "failed should be false in {{ ci_instance }}"
+
+    - name: Delete the first network
+      sf_network:
+        uuid: "{{ ci_network_a['meta']['uuid'] }}"
+        state: absent
+      register: ci_network_a
+
+    - name: Assert the network was changed
+      assert:
+        that: ci_network_a['changed']
+        fail_msg: "changed should be true in {{ ci_network_a }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network_a['failed']
+        fail_msg: "failed should be false in {{ ci_network_a }}"
+
+    - name: Delete the second network
+      sf_network:
+        uuid: "{{ ci_network_b['meta']['uuid'] }}"
+        state: absent
+      register: ci_network_b
+
+    - name: Assert the network was changed
+      assert:
+        that: ci_network_b['changed']
+        fail_msg: "changed should be true in {{ ci_network_b }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_network_b['failed']
+        fail_msg: "failed should be false in {{ ci_network_b }}"
