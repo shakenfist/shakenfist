@@ -1503,6 +1503,12 @@ class Instance(dbo):
         return self._db_get_attribute('agent_operations')
 
     def agent_operation_dequeue(self):
+        # First check cheaply if there are any agent operations queued. This is
+        # likely to be the case 99% of the time.
+        if not self._db_get_attribute('agent_operations', {}).get('queue', []):
+            return None
+
+        # Now do it safely with the lock held
         with self.get_lock_attr('agent_operations', 'Dequeue agent operation'):
             db_data = self._db_get_attribute('agent_operations')
             if 'queue' not in db_data:
