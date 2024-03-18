@@ -60,7 +60,7 @@ coloredlogs==15.0.1
 entrypoint==2.0.2
 exceptiongroup==1.2.0
 executor==23.2
-funcs==0.9.1
+funcs==0.9.2
 futurist==3.0.0
 grpcio==1.62.1
 humanfriendly==10.0
