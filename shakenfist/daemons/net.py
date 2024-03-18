@@ -320,10 +320,15 @@ class Monitor(daemon.WorkerPoolDaemon):
             return
 
         if isinstance(workitem, DefloatNetworkInterfaceTask):
-            n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
-            fn = network.floating_network()
-            fn.ipam.release(ni.floating.get('floating_address'))
-            ni.floating = None
+            floating = ni.floating.get('floating_address')
+            if not floating:
+                self.log.warning(
+                    'Not defloating an interface with no floating address')
+            else:
+                n.remove_floating_ip(floating, ni.ipv4)
+                fn = network.floating_network()
+                fn.ipam.release(ni.floating.get('floating_address'))
+                ni.floating = None
             return
 
         # Tasks that should not operate on a dead network
@@ -334,7 +339,13 @@ class Monitor(daemon.WorkerPoolDaemon):
             return
 
         if isinstance(workitem, FloatNetworkInterfaceTask):
-            n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
+            floating = ni.floating.get('floating_address')
+            if not floating:
+                self.log.warning(
+                    'Not floating an interface with no floating address')
+            else:
+                n.add_floating_ip(floating, ni.ipv4)
+            return
 
     def _process_network_node_workitems(self):
         while not self.exit.is_set():
