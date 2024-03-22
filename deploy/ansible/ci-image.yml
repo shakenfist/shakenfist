@@ -14,7 +14,7 @@
         cpu: 4
         ram: 4096
         disks:
-          - "30@{{base_image}}"
+          - "100@{{base_image}}"
         networkspecs:
           - network_uuid="{{identifier}}"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
@@ -157,7 +157,7 @@
       when: ansible_distribution == 'Debian' and (ansible_distribution_version | int) > 10
 
     - name: Cleanup cloud-init
-      shell: cloud-init clean
+      shell: cloud-init clean --logs
 
     - name: Try and avoid the disk being corrupt when snapshot
       shell: |
@@ -202,7 +202,7 @@
         cpu: 4
         ram: 4096
         disks:
-          - "30@sf://blob/{{hostvars['localhost']['snapshot_uuid']}}"
+          - "100@sf://blob/{{hostvars['localhost']['snapshot_uuid']}}"
         networkspecs:
           - network_uuid="{{identifier}}"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
