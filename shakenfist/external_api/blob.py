@@ -29,10 +29,8 @@ from shakenfist.util import general as util_general
 def _read_file(filename, offset):
     with open(filename, 'rb') as f:
         f.seek(offset)
-        d = f.read(8192)
-        while d:
+        while d := f.read(8192):
             yield d
-            d = f.read(8192)
 
 
 def _read_remote(target, blob_uuid, offset=0):

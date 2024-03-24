@@ -104,10 +104,8 @@ class LibvirtConnection():
         domain.screenshot(stream, 0)
 
         with open(dest_path, 'wb') as f:
-            d = stream.recv(262120)
-            while d:
+            while d := stream.recv(262120):
                 f.write(d)
-                d = stream.recv(262120)
 
         stream.finish()
 

@@ -87,31 +87,30 @@ class DHCP(object):
         return allowed_leases
 
     def _remove_invalid_leases(self, allowed_leases):
-        leases_file = os.path.join(self.subst['config_dir'], 'leases')
-        if not os.path.exists(leases_file):
+        lf = os.path.join(self.subst['config_dir'], 'leases')
+        if not os.path.exists(lf):
             return False
 
         needs_restart = False
-        with open(leases_file + '.new', 'w') as leases_out:
-            with open(leases_file, 'r') as leases_in:
-                for line in leases_in.readlines():
-                    # 1672899136 02:00:00:55:04:a2 172.10.0.8 client *
-                    # ^--expiry  ^--mac            ^--ip      ^-- hostname
-                    elems = line.split(' ')
+        with open(lf, 'r') as lin, open(lf + '.new', 'w') as lout:
+            for line in lin.readlines():
+                # 1672899136 02:00:00:55:04:a2 172.10.0.8 client *
+                # ^--expiry  ^--mac            ^--ip      ^-- hostname
+                elems = line.split(' ')
 
-                    # The lease is expired, so we don't care
-                    if time.time() > int(elems[0]):
-                        leases_out.write(line)
-                        continue
+                # The lease is expired, so we don't care
+                if time.time() > int(elems[0]):
+                    lout.write(line)
+                    continue
 
-                    # The lease is valid, so keep it
-                    if elems[1] in allowed_leases:
-                        leases_out.write(line)
-                        continue
+                # The lease is valid, so keep it
+                if elems[1] in allowed_leases:
+                    lout.write(line)
+                    continue
 
-                    # Otherwise, this lease is invalid and we'll need to do a
-                    # hard restart
-                    needs_restart = True
+                # Otherwise, this lease is invalid and we'll need to do a
+                # hard restart
+                needs_restart = True
 
         return needs_restart
 

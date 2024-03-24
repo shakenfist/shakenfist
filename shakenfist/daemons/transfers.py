@@ -59,11 +59,9 @@ def transfer_server(name, data):
 
         sent_bytes = 0
         with open(blob_path, 'rb') as f:
-            d = f.read(8000)
-            while d:
+            while d := f.read(8000):
                 conn.send(d)
                 sent_bytes += len(d)
-                d = f.read(8000)
             conn.close()
 
         log.info('Transfer complete, sent %d bytes' % sent_bytes)
