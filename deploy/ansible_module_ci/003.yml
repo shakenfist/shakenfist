@@ -1,3 +1,5 @@
+# Tests: sf_namespace, sf_network where a namespace is specified
+
 - hosts: localhost
   gather_facts: no
 
