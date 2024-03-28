@@ -1,0 +1,126 @@
+# Tests: sf_instance metadata, instance affinity
+
+- hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Create a test instance with metadata
+      sf_instance:
+        name: "ansibleci-005-a"
+        cpu: 2
+        ram: 2048
+        disks:
+          - 10@debian:11
+        metadata:
+          affinity:
+            ci-worker: -10
+          tags:
+            - ci-worker
+        state: present
+      register: ci_instance_one
+
+    - name: Assert the instance is new
+      assert:
+        that: ci_instance_one['changed']
+        fail_msg: "changed should be true in {{ ci_instance_one }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_instance_one['failed']
+        fail_msg: "failed should be false in {{ ci_instance_one }}"
+
+    - name: Create the same test instance and check it hasn't changed
+      sf_instance:
+        name: "ansibleci-005-a"
+        cpu: 2
+        ram: 2048
+        disks:
+          - 10@debian:11
+        metadata:
+          affinity:
+            ci-worker: -10
+          tags:
+            - ci-worker
+        state: present
+      register: ci_instance_one
+
+    - name: Assert the instance is not new
+      assert:
+        that: not ci_instance_one['changed']
+        fail_msg: "changed should be true in {{ ci_instance_one }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_instance_one['failed']
+        fail_msg: "failed should be false in {{ ci_instance_one }}"
+
+    - name: Assert we have instance details
+      assert:
+        that: ci_instance_one['meta']
+        fail_msg: "meta should be populated in {{ ci_instance_one }}"
+
+    - name: Create a second instance using affinity via metadata
+      sf_instance:
+        name: "ansibleci-005-b"
+        cpu: 2
+        ram: 2048
+        disks:
+          - 10@debian:11
+        metadata:
+          affinity:
+            ci-worker: -10
+          tags:
+            - ci-worker
+        state: present
+      register: ci_instance_two
+
+    - name: Assert the instance is new
+      assert:
+        that: ci_instance_two['changed']
+        fail_msg: "changed should be true in {{ ci_instance_two }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_instance_two['failed']
+        fail_msg: "failed should be false in {{ ci_instance_two }}"
+
+    - name: Log instance
+      debug:
+        msg: "{{ ci_instance_one }}"
+
+    - name: Assert the two instances are on different hypervisors
+      assert:
+        that: ci_instance_one['meta']['node'] != ci_instance_two['meta']['node']
+        fail_msg: "instances are both on {{ ci_instance_one['meta']['node'] }}, hypervisor should differ"
+
+    - name: Delete the second instance
+      sf_instance:
+        uuid: "{{ ci_instance_two['meta']['uuid'] }}"
+        state: "absent"
+      register: ci_instance_two
+
+    - name: Assert the instance was changed
+      assert:
+        that: ci_instance_two['changed']
+        fail_msg: "changed should be true in {{ ci_instance_two }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_instance_two['failed']
+        fail_msg: "failed should be false in {{ ci_instance_two }}"
+
+    - name: Delete the first instance
+      sf_instance:
+        uuid: "{{ ci_instance_one['meta']['uuid'] }}"
+        state: "absent"
+      register: ci_instance_one
+
+    - name: Assert the instance was changed
+      assert:
+        that: ci_instance_one['changed']
+        fail_msg: "changed should be true in {{ ci_instance_one }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_instance_one['failed']
+        fail_msg: "failed should be false in {{ ci_instance_one }}"
