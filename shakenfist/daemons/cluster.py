@@ -361,8 +361,8 @@ class Monitor(daemon.Daemon):
                     n.state = Node.STATE_CREATED
                     n.add_event(EVENT_TYPE_AUDIT, 'node returned from being missing')
             elif n.state.value == Node.STATE_DELETED:
-                # Find instances on deleted nodes
-                for i in instance.healthy_instances_on_node(n):
+                # Find instances on deleted nodes, including those not healthy
+                for i in instance.Instances([partial(placement_filter, n.uuid)]):
                     n.add_event(
                         EVENT_TYPE_AUDIT, 'deleting instance as hosting node as been deleted',
                         extra={'instance_uuid': i.uuid})
@@ -408,7 +408,9 @@ class Monitor(daemon.Daemon):
                     etcd.put('cache', object_type, 'hard-deleted', hd)
 
         # And we're done
-        LOG.info('Cluster maintenance loop complete')
+        LOG.with_fields({
+            'duration': time.time() - last_loop_run
+        }).info('Cluster maintenance loop complete')
 
     def refresh_object_state_caches(self):
         for object_type in OBJECT_NAMES_TO_ITERATORS:
@@ -454,8 +456,6 @@ class Monitor(daemon.Daemon):
 
             # And then do regular cluster maintenance things
             while self.is_elected and not self.exit.is_set():
-                self.lock.refresh()
-
                 setproctitle.setproctitle(
                     daemon.process_name('cluster') + ' active')
                 self.lock.refresh()
