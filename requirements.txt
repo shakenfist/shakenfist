@@ -73,7 +73,7 @@ marshmallow==3.21.1
 mistune==3.0.2
 mixed-methods==1.1.1
 named==1.4.2
-orderings==1.3.2
+orderings==1.4.0
 property-manager==3.0
 psutil==5.9.8
 PyJWT==2.8.0
