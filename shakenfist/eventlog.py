@@ -201,8 +201,10 @@ class EventLog(object):
             elc.write_event(event_type, timestamp, fqdn, duration, message,
                             extra=extra)
         except sqlite3.DatabaseError as e:
-            self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
-                'Chunk corrupt, moving aside: %s.' % e)
+            self.log.with_fields({
+                'chunk': '%04d%02d' % (year, month),
+                'error': e
+            }).error('Chunk corrupt on write, moving aside: %s.' % e)
             os.rename(elc.dbpath, elc.dbpath + '.corrupt')
             del self.write_elc_cache[(year, month)]
 
@@ -256,9 +258,11 @@ class EventLog(object):
                 if limit > 0 and count >= limit:
                     break
 
-            except sqlite3.DatabaseError:
-                self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
-                    'Chunk corrupt, moving aside.')
+            except sqlite3.DatabaseError as e:
+                self.log.with_fields({
+                    'chunk': '%04d%02d' % (year, month),
+                    'error': e
+                }).error('Chunk corrupt on read, moving aside: %s.' % e)
                 os.rename(elc.dbpath, elc.dbpath + '.corrupt')
 
     def delete(self):
@@ -305,9 +309,11 @@ class EventLog(object):
                                 % (year, month))
                     else:
                         elc.close()
-                except sqlite3.DatabaseError:
-                    self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
-                        'Chunk corrupt, moving aside.')
+                except sqlite3.DatabaseError as e:
+                    self.log.with_fields({
+                        'chunk': '%04d%02d' % (year, month),
+                        'error': e
+                    }).error('Chunk corrupt on prune, moving aside: %s.' % e)
                     os.rename(elc.dbpath, elc.dbpath + '.corrupt')
                     this_chunk_removed = 0
 

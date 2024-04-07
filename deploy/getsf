@@ -771,7 +771,8 @@ DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Option
     install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
 echo
 
-# Operating system version specific installation fixups
+# We use Ansible from pypi for Debian 10, and the OS Ansible for everyone else.
+has_ansible=0
 if [ -e /etc/os-release ]; then
     source /etc/os-release
     status "Target OS is ${ID} ${VERSION_ID}."
@@ -780,23 +781,27 @@ if [ -e /etc/os-release ]; then
             # This is Debian 10, we also need to install python2 for ansible to work
             status "... Ensuring Debian 10 has python 2 installed."
             DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
-            install python
+                install python
+            pip install ansible
+            has_ansible=1
             echo
         fi
     fi
 fi
 
-echo
-status "Install ansible from pip"
-pip3 install ansible
-echo
+if [ ${has_ansible} == 0]; then
+    echo
+    status "Install ansible"
+    DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
+        install ansible
+    echo
+fi
 
 # We _have_ to have Shaken Fist installed on the primary to boostrap the installer,
 # so we do that separately now. That primary venv needs a modern pip on Debian 10
 # for bcrypt installation to work.
 echo
 status "Setup primary venv."
-mkdir -p /srv/shakenfist/venv
 python3 -m venv --system-site-packages /srv/shakenfist/venv
 /srv/shakenfist/venv/bin/pip install -U pip
 
@@ -817,6 +822,7 @@ fi
 # own.
 echo
 status "Install client package in system pip on the primary node."
+export PIP_BREAK_SYSTEM_PACKAGES=1
 pip3 install -U ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
 echo
 

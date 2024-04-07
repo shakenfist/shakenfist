@@ -5,11 +5,11 @@ title: Installation
 
 The purpose of this guide is to walk you through a Shaken Fist installation. Shaken Fist will work just fine on a single machine, although its also happy to run on clusters of machines. We'll discuss the general guidance for install options as we go.
 
-Shaken Fist only supports Ubuntu 20.04, Ubuntu 22.04, and Debian 11, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. This documentation was most recently tested against Debian 11, in November 2021. Bug reports are welcome if you have any issues, and may be filed at https://github.com/shakenfist/shakenfist/issues
+Shaken Fist only supports Ubuntu 20.04, Ubuntu 22.04, Debian 11, and Debian 12, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. Bug reports are welcome if you have any issues, and may be filed at https://github.com/shakenfist/shakenfist/issues
 
 ???+ note
     Debian 10 support was dropped in v0.8, as supporting older versions of ansible
-    became burdensome. Ubuntu 22.04 support was added in v0.8.
+    became burdensome. Ubuntu 22.04 and Debian 12 support was added in v0.8.
 
 Each machine in the cluster should match this description:
 
@@ -18,7 +18,7 @@ Each machine in the cluster should match this description:
 * Have at least 1 gigabit connectivity on the "mesh interface". This is a requirement of etcd.
 * Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement, although the exact username is configurable in the SSH_USER variable.
 
-We now have a fancy helper to help you install your first localhost cluster, so let's give that a go:
+We now have a fancy helper to help you install your first cluster, so let's give that a go:
 
 ```bash
 curl https://raw.githubusercontent.com/shakenfist/shakenfist/develop/deploy/getsf -o getsf
@@ -39,68 +39,6 @@ export GETSF_WARNING=yes
 sudo --preserve-env ./getsf
 ```
 
-## Sample configuration for a multi-node deploy
-
-However, if you're performing a multinode deploy, the process is currently much more manual. The intent is to expand `getsf` to handle multiple nodes, but that work is not yet complete.
-
-For now, you'll need to write a configuration file a bit like this on the primary node:
-
-```
-export ADMIN_PASSWORD=engeeF1o
-export FLOATING_IP_BLOCK="192.168.10.0/24"
-export DEPLOY_NAME="bonkerslab"
-export SSH_USER="cloudadmin"
-export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
-
-export KSM_ENABLED=1
-
-# Topology is in JSON
-read -r -d '' TOPOLOGY <<'EOF'
-[
-  {
-    "name": "sf-primary",
-    "node_egress_ip": "192.168.1.50",
-    "node_egress_nic": "enp0s31f6",
-    "node_mesh_ip": "192.168.21.50",
-    "node_mesh_nic": "enp0s31f6:1",
-    "primary_node": true,
-    "api_url": "https://...your...install...here.com/api"
-  },
-  {
-    "name": "sf-1",
-    "node_egress_ip": "192.168.1.51",
-    "node_egress_nic": "enp5s0",
-    "node_mesh_ip": "192.168.21.51",
-    "node_mesh_nic": "eno1",
-    "etcd_master": true,
-    "network_node": true,
-    "hypervisor": true
-  },
-  {
-    "name": "sf-2",
-    "node_egress_ip": "192.168.1.52",
-    "node_egress_nic": "enp5s0",
-    "node_mesh_ip": "192.168.21.52",
-    "node_mesh_nic": "eno1",
-    "etcd_master": true,
-    "hypervisor": true
-  },
-  {
-    "name": "sf-3",
-    "node_egress_ip": "192.168.1.53",
-    "node_egress_nic": "enp5s0",
-    "node_mesh_ip": "192.168.21.53",
-    "node_mesh_nic": "eno1",
-    "etcd_master": true,
-    "hypervisor": true
-  },
-]
-EOF
-export TOPOLOGY
-
-/srv/shakenfist/venv/share/shakenfist/installer/install
-```
-
 ## Notes for multi-node installations
 
 Not every node needs to be an etcd_master. I'd select three in most situations. One node must be marked as the primary node, and one must be marked as the network node. It is not currently supported having more than one of each of those node types.
@@ -110,7 +48,7 @@ Not every node needs to be an etcd_master. I'd select three in most situations. 
 
 Some of the considerations here can be subtle. Please reach out if you need a hand.
 
-For a node complicated installation, `sf-deploy` might like this:
+`getsf` writes a configuration file called `sf-deploy`. For a more complicated installation, `sf-deploy` might like this:
 
 ```
 #!/bin/bash
