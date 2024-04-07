@@ -1157,13 +1157,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#sample-configuration-for-a-multi-node-deploy" class="md-nav__link">
-    Sample configuration for a multi-node deploy
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#notes-for-multi-node-installations" class="md-nav__link">
     Notes for multi-node installations
   </a>
@@ -1360,13 +1353,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#sample-configuration-for-a-multi-node-deploy" class="md-nav__link">
-    Sample configuration for a multi-node deploy
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#notes-for-multi-node-installations" class="md-nav__link">
     Notes for multi-node installations
   </a>
@@ -1420,11 +1406,11 @@
 
 <h1 id="installing-shaken-fist">Installing Shaken Fist</h1>
 <p>The purpose of this guide is to walk you through a Shaken Fist installation. Shaken Fist will work just fine on a single machine, although its also happy to run on clusters of machines. We'll discuss the general guidance for install options as we go.</p>
-<p>Shaken Fist only supports Ubuntu 20.04, Ubuntu 22.04, and Debian 11, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. This documentation was most recently tested against Debian 11, in November 2021. Bug reports are welcome if you have any issues, and may be filed at <a href="https://github.com/shakenfist/shakenfist/issues">https://github.com/shakenfist/shakenfist/issues</a></p>
+<p>Shaken Fist only supports Ubuntu 20.04, Ubuntu 22.04, Debian 11, and Debian 12, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. Bug reports are welcome if you have any issues, and may be filed at <a href="https://github.com/shakenfist/shakenfist/issues">https://github.com/shakenfist/shakenfist/issues</a></p>
 <details class="note" open="open">
 <summary>Note</summary>
 <p>Debian 10 support was dropped in v0.8, as supporting older versions of ansible
-became burdensome. Ubuntu 22.04 support was added in v0.8.</p>
+became burdensome. Ubuntu 22.04 and Debian 12 support was added in v0.8.</p>
 </details>
 <p>Each machine in the cluster should match this description:</p>
 <ul>
@@ -1433,7 +1419,7 @@ became burdensome. Ubuntu 22.04 support was added in v0.8.</p>
 <li>Have at least 1 gigabit connectivity on the "mesh interface". This is a requirement of etcd.</li>
 <li>Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement, although the exact username is configurable in the SSH_USER variable.</li>
 </ul>
-<p>We now have a fancy helper to help you install your first localhost cluster, so let's give that a go:</p>
+<p>We now have a fancy helper to help you install your first cluster, so let's give that a go:</p>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>https://raw.githubusercontent.com/shakenfist/shakenfist/develop/deploy/getsf<span class="w"> </span>-o<span class="w"> </span>getsf
 chmod<span class="w"> </span>ugo+rx<span class="w"> </span>getsf
 sudo<span class="w"> </span>./getsf
@@ -1447,63 +1433,6 @@ sudo<span class="w"> </span>./getsf
 <span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_WARNING</span><span class="o">=</span>yes
 sudo<span class="w"> </span>--preserve-env<span class="w"> </span>./getsf
 </code></pre></div>
-<h2 id="sample-configuration-for-a-multi-node-deploy">Sample configuration for a multi-node deploy</h2>
-<p>However, if you're performing a multinode deploy, the process is currently much more manual. The intent is to expand <code>getsf</code> to handle multiple nodes, but that work is not yet complete.</p>
-<p>For now, you'll need to write a configuration file a bit like this on the primary node:</p>
-<div class="highlight"><pre><span></span><code>export ADMIN_PASSWORD=engeeF1o
-export FLOATING_IP_BLOCK=&quot;192.168.10.0/24&quot;
-export DEPLOY_NAME=&quot;bonkerslab&quot;
-export SSH_USER=&quot;cloudadmin&quot;
-export SSH_KEY_FILENAME=&quot;/root/.ssh/id_rsa&quot;
-
-export KSM_ENABLED=1
-
-# Topology is in JSON
-read -r -d &#39;&#39; TOPOLOGY &lt;&lt;&#39;EOF&#39;
-[
-  {
-    &quot;name&quot;: &quot;sf-primary&quot;,
-    &quot;node_egress_ip&quot;: &quot;192.168.1.50&quot;,
-    &quot;node_egress_nic&quot;: &quot;enp0s31f6&quot;,
-    &quot;node_mesh_ip&quot;: &quot;192.168.21.50&quot;,
-    &quot;node_mesh_nic&quot;: &quot;enp0s31f6:1&quot;,
-    &quot;primary_node&quot;: true,
-    &quot;api_url&quot;: &quot;https://...your...install...here.com/api&quot;
-  },
-  {
-    &quot;name&quot;: &quot;sf-1&quot;,
-    &quot;node_egress_ip&quot;: &quot;192.168.1.51&quot;,
-    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
-    &quot;node_mesh_ip&quot;: &quot;192.168.21.51&quot;,
-    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
-    &quot;etcd_master&quot;: true,
-    &quot;network_node&quot;: true,
-    &quot;hypervisor&quot;: true
-  },
-  {
-    &quot;name&quot;: &quot;sf-2&quot;,
-    &quot;node_egress_ip&quot;: &quot;192.168.1.52&quot;,
-    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
-    &quot;node_mesh_ip&quot;: &quot;192.168.21.52&quot;,
-    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
-    &quot;etcd_master&quot;: true,
-    &quot;hypervisor&quot;: true
-  },
-  {
-    &quot;name&quot;: &quot;sf-3&quot;,
-    &quot;node_egress_ip&quot;: &quot;192.168.1.53&quot;,
-    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
-    &quot;node_mesh_ip&quot;: &quot;192.168.21.53&quot;,
-    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
-    &quot;etcd_master&quot;: true,
-    &quot;hypervisor&quot;: true
-  },
-]
-EOF
-export TOPOLOGY
-
-/srv/shakenfist/venv/share/shakenfist/installer/install
-</code></pre></div>
 <h2 id="notes-for-multi-node-installations">Notes for multi-node installations</h2>
 <p>Not every node needs to be an etcd_master. I'd select three in most situations. One node must be marked as the primary node, and one must be marked as the network node. It is not currently supported having more than one of each of those node types.</p>
 <ul>
@@ -1511,7 +1440,7 @@ export TOPOLOGY
 <li>The network node is the ingress and egress point for all virtual networks, and is where floating IPs live, so it needs to be setup as the gateway fro your floating IP block.</li>
 </ul>
 <p>Some of the considerations here can be subtle. Please reach out if you need a hand.</p>
-<p>For a node complicated installation, <code>sf-deploy</code> might like this:</p>
+<p><code>getsf</code> writes a configuration file called <code>sf-deploy</code>. For a more complicated installation, <code>sf-deploy</code> might like this:</p>
 <div class="highlight"><pre><span></span><code>#!/bin/bash
 
 export ADMIN_PASSWORD=engeeF1o
