@@ -41,9 +41,9 @@ chardet==5.2.0                     # lgpl
 urllib3==2.2.1                     # mit
 
 # These must move as a set
-pydantic==2.6.4                    # mit
+pydantic==2.7.0                    # mit
 pydantic-settings==2.2.1           # mit
-pydantic-core==2.16.3              # (indirect dependency)
+pydantic-core==2.18.1              # (indirect dependency)
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt
