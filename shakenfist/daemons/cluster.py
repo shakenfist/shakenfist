@@ -388,14 +388,13 @@ class Monitor(daemon.Daemon):
                     b.request_replication()
 
                 # Clean up any lingering queue tasks
-                jobname, workitem = etcd.dequeue(n.uuid)
-                while workitem:
+                while jobname_workitem := etcd.dequeue(n.uuid):
+                    jobname, workitem = jobname_workitem
                     LOG.with_fields({
                         'jobname': jobname,
                         'node': n.uuid
                     }).info('Deleting work item for deleted node')
                     etcd.resolve(n.uuid, jobname)
-                    jobname, workitem = etcd.dequeue(n.uuid)
 
         # Remove old entries from the hard-deleted state caches
         for object_type in OBJECT_NAMES_TO_ITERATORS:
