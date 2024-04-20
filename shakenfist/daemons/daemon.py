@@ -88,7 +88,7 @@ class WorkerPoolDaemon(Daemon):
         if len(self.workers) > self.present_cpus / 2:
             return False
 
-        jobname, workitem = etcd.dequeue(queue_name)
-        if not workitem:
+        jobname_workitem = etcd.dequeue(queue_name)
+        if not jobname_workitem:
             return False
-        self.start_workitem(processing_callback, (jobname, workitem), 'worker')
+        self.start_workitem(processing_callback, jobname_workitem, 'worker')
