@@ -66,7 +66,7 @@ grpcio==1.62.1
 humanfriendly==10.0
 importlib-metadata==7.1.0
 iters==0.17.0
-itsdangerous==2.1.2
+itsdangerous==2.2.0
 linux-utils==0.7
 MarkupSafe==2.1.5
 marshmallow==3.21.1
