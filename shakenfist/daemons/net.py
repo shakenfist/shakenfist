@@ -349,11 +349,12 @@ class Monitor(daemon.WorkerPoolDaemon):
 
     def _process_network_node_workitems(self):
         while not self.exit.is_set():
-            jobname, workitem = etcd.dequeue('networknode')
-            if not workitem:
+            jobname_workitem = etcd.dequeue('networknode')
+            if not jobname_workitem:
                 time.sleep(0.2)
 
             else:
+                jobname, workitem = jobname_workitem
                 setproctitle.setproctitle(
                     '%s-%s' % (daemon.process_name('net'), jobname))
 

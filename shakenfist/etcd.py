@@ -474,7 +474,7 @@ def dequeue(queuename):
 
         # Ensure that this task isn't in the future
         if float(jobname.split('-')[0]) > time.time():
-            return None, None
+            return None
 
         workitem = json.loads(data, object_hook=decodeTasks)
         put('processing', queuename, jobname, workitem)
@@ -487,7 +487,7 @@ def dequeue(queuename):
 
         return jobname, workitem
 
-    return None, None
+    return None
 
 
 def resolve(queuename, jobname):
