@@ -62,7 +62,7 @@ exceptiongroup==1.2.0
 executor==23.2
 funcs==0.10.0
 futurist==3.0.0
-grpcio==1.62.1
+grpcio==1.62.2
 humanfriendly==10.0
 importlib-metadata==7.1.0
 iters==0.17.0
