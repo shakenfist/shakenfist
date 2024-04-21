@@ -26,6 +26,13 @@ JOBS = {
             'scheduled': True
         },
         {
+            'name': 'rocky-9',
+            'baseimage': 'rocky:9',
+            'baseuser': 'cloud-user',
+            'outputlabel': 'ci-images/rocky-9',
+            'scheduled': True
+        },
+        {
             'name': 'ubuntu-2004',
             'baseimage': 'ubuntu:20.04',
             'baseuser': 'ubuntu',
@@ -72,6 +79,13 @@ JOBS = {
             'baseimage': 'ubuntu:22.04',
             'baseuser': 'ubuntu',
             'outputlabel': 'ci-images/ubuntu-2204-test',
+            'scheduled': False
+        },
+        {
+            'name': 'rocky-9-test',
+            'baseimage': 'rocky:9',
+            'baseuser': 'cloud-user',
+            'outputlabel': 'ci-images/rocky-9-test',
             'scheduled': False
         },
     ],
