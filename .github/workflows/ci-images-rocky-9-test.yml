@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - deploy/ansible/ci-image.yml
+      - .github/workflows/ci-images-*
 
 jobs:
   rocky-9-test:
