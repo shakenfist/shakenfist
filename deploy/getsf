@@ -924,7 +924,7 @@ for node in ${GETSF_NODES[@]}; do
 
     if [ ${node} == "localhost" ]; then
         primary_node="true"
-        api_stanza='"api_url": "http://127.0.0.1:13000"'
+        api_stanza='"api_url": "http://127.0.0.1/api"'
         api_comma=','
         network_node="true"
         eventlog_node="true"
@@ -934,7 +934,7 @@ for node in ${GETSF_NODES[@]}; do
     else
         if [ $(echo "${GETSF_NODE_PRIMARY}" | grep -c ${node}) -gt 0 ]; then
             primary_node="true"
-            api_stanza='"api_url": "http://127.0.0.1:13000"'
+            api_stanza='"api_url": "http://127.0.0.1/api"'
             api_comma=','
         else
             primary_node="false"

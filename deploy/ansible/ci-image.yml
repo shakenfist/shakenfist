@@ -77,65 +77,126 @@
     source_path: "/home/jenkins/src/shakenfist/"
 
   tasks:
-    # As recommended on the ansible apt module documentation...
-    - name: Install packages only when the apt process is not locked
-      apt:
-        name: bash
-        state: present
-      register: apt_action
-      retries: 100
-      until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+    # Debian derived distributions
+    - when: ansible_pkg_mgr == "apt"
+      block:
+        # As recommended on the ansible apt module documentation...
+        - name: Install packages only when the apt process is not locked
+          apt:
+            name: bash
+            state: present
+          register: apt_action
+          retries: 100
+          until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
-    # I am unsure why I need to manually force this, but I do need to.
-    - name: Force an apt-get update
-      shell: apt-get update
+        # I am unsure why I need to manually force this, but I do need to.
+        - name: Force an apt-get update
+          shell: apt-get update
 
-    - name: apt-get dist-upgrade
-      apt:
-        update_cache: yes
-        upgrade: dist
-        autoremove: yes
+        - name: apt-get dist-upgrade
+          apt:
+            update_cache: yes
+            upgrade: dist
+            autoremove: yes
 
-    # NOTE(mikal): I don't love this, as it increases the risk that we will
-    # miss a package in getsf, but its so slow to install these without
-    # pre-caching that doing this saves an hour off the CI job duration.
-    - name: Install packages which CI uses, to make CI runs faster
-      apt:
-        name:
-          - ack
-          - ansible
-          - arping
-          - bridge-utils
-          - build-essential
-          - cpu-checker
-          - dnsmasq
-          - dnsutils
-          - git
-          - jq
-          - libffi-dev
-          - libmagic-dev
-          - libssl-dev
-          - libvirt-daemon-system
-          - libvirt-dev
-          - lm-sensors
-          - net-tools
-          - ovmf
-          - prometheus-node-exporter
-          - pwgen
-          - python3
-          - python3-cffi
-          - python3-dev
-          - python3-fixtures
-          - python3-git
-          - python3-grpcio
-          - python3-libvirt
-          - python3-pip
-          - python3-venv
-          - python3-wheel
-          - qemu-kvm
-          - unzip
-          - zip
-        state: latest
+        # NOTE(mikal): I don't love this, as it increases the risk that we will
+        # miss a package in getsf, but its so slow to install these without
+        # pre-caching that doing this saves an hour off the CI job duration.
+        - name: Install packages which CI uses, to make CI runs faster
+          apt:
+            name:
+              - ack
+              - ansible
+              - arping
+              - bridge-utils
+              - build-essential
+              - cpu-checker
+              - dnsmasq
+              - dnsutils
+              - git
+              - jq
+              - libffi-dev
+              - libmagic-dev
+              - libssl-dev
+              - libvirt-daemon-system
+              - libvirt-dev
+              - lm-sensors
+              - net-tools
+              - ovmf
+              - prometheus-node-exporter
+              - pwgen
+              - python3
+              - python3-cffi
+              - python3-dev
+              - python3-fixtures
+              - python3-git
+              - python3-grpcio
+              - python3-libvirt
+              - python3-pip
+              - python3-venv
+              - python3-wheel
+              - qemu-kvm
+              - unzip
+              - zip
+            state: latest
+
+    # Red Hat derived distributions, but we like dnf because we aren't from 1990
+    - when: ansible_pkg_mgr == "dnf"
+      block:
+        - name: Enable EPEL
+          dnf:
+            name: epel-release
+            state: present
+
+        - name: Enable CRB
+          shell: dnf config-manager --set-enabled crb
+
+        # Yes, I hate this too
+        - name: Add the prometheus package repository
+          shell: curl -s https://packagecloud.io/install/repositories/prometheus-rpm/release/script.rpm.sh | bash
+
+        - name: DNF update the system
+          dnf:
+            name: "*"
+            state: latest
+
+        # NOTE(mikal): I don't love this, as it increases the risk that we will
+        # miss a package in getsf, but its so slow to install these without
+        # pre-caching that doing this saves an hour off the CI job duration.
+        - name: Install packages which CI uses, to make CI runs faster
+          dnf:
+            name:
+              - ack
+              - ansible
+              - iputils
+              - bridge-utils
+              - dnsmasq
+              - dnsutils
+              - git
+              - jq
+              - libffi-devel
+              - file-devel
+              - openssl-devel
+              - libvirt
+              - libvirt-devel
+              - lm_sensors
+              - net-tools
+              - edk2-ovmf
+              - node_exporter
+              - pwgen
+              - python3
+              - python3-cffi
+              - python3-devel
+              - python3-fixtures
+              - python3-grpcio
+              - python3-libvirt
+              - python3-pip
+              - python3-virtualenv
+              - python3-wheel
+              - qemu-kvm
+              - unzip
+              - zip
+            state: latest
 
     # This is driven by issues with the version of tox packaged on Debian 10
     - name: Install tox and dependencies via apt on Ubuntu
@@ -143,7 +204,7 @@
         name:
           - tox
           - python3-filelock
-      when: ansible_distribution != 'Debian'
+      when: ansible_distribution == 'Ubuntu'
 
     - name: Install tox and dependencies via pip on Debian 10
       shell: pip3 install -U tox filelock
@@ -155,6 +216,14 @@
           - tox
           - python3-filelock
       when: ansible_distribution == 'Debian' and (ansible_distribution_version | int) > 10
+
+    - name: Install tox and dependencies on RHEL derived OSes
+      dnf:
+        name:
+          - tox
+          - python3-filelock
+        state: present
+      when: ansible_pkg_mgr == "dnf"
 
     - name: Cleanup cloud-init
       shell: cloud-init clean --logs
@@ -259,7 +328,7 @@
       until: result.rc == 0
 
 - hosts: imagetest
-  gather_facts: no
+  gather_facts: yes
   become: true
 
   tasks:
@@ -272,6 +341,13 @@
       retries: 10
       delay: 30
       until: apt_action is success
+      when: ansible_pkg_mgr == "apt"
+
+    - name: Do a dnf update to ensure that we can sudo and manage packages
+      dnf:
+        name: "*"
+        state: latest
+      when: ansible_pkg_mgr == "dnf"
 
 - hosts: localhost
   gather_facts: no

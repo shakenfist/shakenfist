@@ -1,13 +1,12 @@
-name: Rebuild debian-11-test
+name: Rebuild rocky-9
 
 on:
-  pull_request:
-    paths:
-      - deploy/ansible/ci-image.yml
-      - .github/workflows/ci-images-*
+  workflow_dispatch:
+  schedule:
+    - cron: '00 16 * * *'        # utc
 
 jobs:
-  debian-11-test:
+  rocky-9:
     runs-on: self-hosted
     timeout-minutes: 120
     concurrency:
@@ -34,7 +33,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/shakenfist
           ansible-playbook -i /home/debian/ansible-hosts \
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
-              base_image=debian:11 base_image_user=debian label=ci-images/debian-11-test" \
+              base_image=rocky:9 base_image_user=cloud-user label=ci-images/rocky-9" \
             deploy/ansible/ci-image.yml
 
       - uses: JasonEtco/create-an-issue@v2
@@ -42,7 +41,7 @@ jobs:
         id: create-issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SF_CI_NAME: debian-11-test
+          SF_CI_NAME: rocky-9
           SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           filename: shakenfist/.github/workflows/ci-images-failure.md
