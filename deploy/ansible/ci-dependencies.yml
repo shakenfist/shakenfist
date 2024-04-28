@@ -13,7 +13,7 @@
         cpu: 4
         ram: 4096
         disks:
-          - "30@{{base_image}}"
+          - "100@{{base_image}}"
           - "30"
         networkspecs:
           - network_uuid="{{identifier}}"
