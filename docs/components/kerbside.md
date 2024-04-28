@@ -69,3 +69,15 @@ from a client network to TCP ports on the hypervisor, and so Kerbside acts as
 an intermediary to protect those hypervisors. There is a sample implementation
 of Kerbside deployment using Kolla-Ansible in the
 [Kerbside Patches repository](https://github.com/shakenfist/kerbside-patches).
+
+### What about Bumblebee?
+
+The folks over at the NECTAR research cloud developed
+[Bumblebee VDI](https://github.com/NeCTAR-RC/bumblebee), which is superficially
+similar to Kerbside in that it provides a mechanism to make it easier to obtain
+a virtual desktop as a user. The Kerbside description above would classify
+Bumblebee as a Broker to our model -- it orchestrates the creation and then
+access to virtual desktops for users. However, Bumblebee exclusive orchestrates
+HTML5 consoles using Apache Guacamole as its HTML5 proxy at the moment, so misses
+out on some of the richer features of SPICE and has the performance implications
+of a HTML5 desktop environment.
