@@ -36,6 +36,9 @@ markdown_extensions:
 nav:
     - Introduction: index.md
     - Manifesto: manifesto.md
+    - Components:
+        - "Overview": components/overview.md
+        - "Kerbside": components/kerbside.md
     - Features: features.md
     - Release notes:
         - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
