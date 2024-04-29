@@ -134,13 +134,6 @@ jobs:
           done
           sleep 90
 
-      - name: Check process CPU usage
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs'
-
       - name: Fetch and tweak inventory
         if: always()
         run: |
