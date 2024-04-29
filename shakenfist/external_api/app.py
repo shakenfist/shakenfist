@@ -121,7 +121,7 @@ class Root(sf_api.Resource):
              '<body><h1>Shaken Fist REST API service</h1>'
              '<p>You might be interested in the <a href="/apidocs">apidocs</a>.</p>'
              '<p>Machine searchable API capabilities:</p><ul>'
-             '<li>admin: cluster-cacert</li>'
+             '<li>admin: cluster-cacert, cluster-resources</li>'
              '<li>agent-operations: agentoperations-crud, instance-agentoperations, '
              'instance-agentoperations-all</li>'
              '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
