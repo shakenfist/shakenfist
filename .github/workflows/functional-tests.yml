@@ -38,7 +38,7 @@ jobs:
     needs: lint
     runs-on: self-hosted
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}
+      group: ${{ github.workflow }}-${{ github.ref }}-requirements
       cancel-in-progress: true
 
     steps:
@@ -295,7 +295,7 @@ jobs:
     needs: requirements-check
     runs-on: self-hosted
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}
+      group: ${{ github.workflow }}-${{ github.ref }}-ansiblemodules
       cancel-in-progress: true
 
     steps:
@@ -496,7 +496,7 @@ jobs:
     needs: requirements-check
     runs-on: self-hosted
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}
+      group: ${{ github.workflow }}-${{ github.ref }}-nodelifecycle
       cancel-in-progress: true
 
     steps:
@@ -651,7 +651,7 @@ jobs:
     needs: requirements-check
     runs-on: self-hosted
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}
+      group: ${{ github.workflow }}-${{ github.ref }}-upgrade-0-6-15
       cancel-in-progress: true
 
     steps:
