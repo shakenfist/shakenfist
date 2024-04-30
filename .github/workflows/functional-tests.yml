@@ -34,7 +34,7 @@ jobs:
   # NOTE(mikal): we need this one early because renovate creates a lot of PRs
   # where the proposed combination of dependencies doesn't actually install and
   # I don't want to waste a lot of CI resources on them.
-  requirements_check:
+  requirements-check:
     needs: lint
     runs-on: self-hosted
     concurrency:
@@ -72,7 +72,7 @@ jobs:
           /usr/bin/tox -epy3
 
   functional_matrix:
-    needs: requirements_check
+    needs: requirements-check
     strategy:
       matrix:
         os: [
@@ -281,7 +281,7 @@ jobs:
           path: /srv/github/artifacts/bundle.zip
 
   ansible-modules:
-    needs: requirements_check
+    needs: requirements-check
     runs-on: self-hosted
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
@@ -482,7 +482,7 @@ jobs:
 
 
   node-lifecycle:
-    needs: requirements_check
+    needs: requirements-check
     runs-on: self-hosted
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
@@ -637,7 +637,7 @@ jobs:
 
 
   upgrade-0-6-15:
-    needs: requirements_check
+    needs: requirements-check
     runs-on: self-hosted
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
