@@ -114,7 +114,7 @@ jobs:
       - name: Log matrix details
         run: |
           echo "base_image: ${{ matrix.os.base_image }}"
-          echo "base_image_user: ${{ matrixo.s.base_image_user }}"
+          echo "base_image_user: ${{ matrix.os.base_image_user }}"
           echo "topology: ${{ matrix.os.topology }}"
           echo "concurrency: ${{ matrix.os.concurrency }}"
 
