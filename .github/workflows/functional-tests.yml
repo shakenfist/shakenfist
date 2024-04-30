@@ -15,7 +15,24 @@ on:
       - v*-releases
 
 jobs:
+  lint:
+    runs-on: self-hosted
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-lint
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code with two commits
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Lint with flake8
+        run: |
+          /usr/bin/tox -eflake8
+
   requirements_check:
+    needs: lint
     runs-on: self-hosted
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}
@@ -34,12 +51,52 @@ jobs:
           python3 -mvenv venv
           venv/bin/pip3 install -r shakenfist/requirements.txt
 
+  build38:
+    needs: lint
+    runs-on: self-hosted
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-build38
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code with two commits
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Run python3 unit tests
+        run: |
+          /usr/bin/tox -epy3
+
   functional_matrix:
     needs: requirements_check
     strategy:
       matrix:
         os: [
-          {base_image: 'debian:12', base_image_user: 'debian', topology: 'localhost'}
+          {
+            base_image: 'sf://label/ci-images/debian-11',
+            base_image_user: 'debian',
+            topology: 'localhost',
+            concurrency: 3
+          },
+          {
+            base_image: 'sf://label/ci-images/debian-12',
+            base_image_user: 'debian',
+            topology: 'slim-primary',
+            concurrency: 5
+          },
+          {
+            base_image: 'sf://label/ci-images/ubuntu-2004',
+            base_image_user: 'ubuntu',
+            topology: 'localhost',
+            concurrency: 3
+          },
+          {
+            base_image: 'sf://label/ci-images/ubuntu-2204',
+            base_image_user: 'ubuntu',
+            topology: 'slim-primary',
+            concurrency: 5
+          },
         ]
     runs-on: self-hosted
     concurrency:
@@ -159,7 +216,7 @@ jobs:
               $source_path/shakenfist \
               {{ matrix.os.base_image_user }}@${primary}:shakenfist
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency={{concurrency}}; stestr slowest"
+              {{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency={{ matix.os.concurrency}}; stestr slowest"
 
       - name: Check logs
         if: always()
