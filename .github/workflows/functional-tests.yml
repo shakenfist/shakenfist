@@ -107,6 +107,13 @@ jobs:
       cancel-in-progress: true
 
     steps:
+      - name: Log matrix details
+        run: |
+          echo "base_image: {{ matrix.os.base_image }}"
+          echo "base_image_user: {{ matrixo.s.base_image_user }}"
+          echo "topology: {{ matrix.os.topology }}"
+          echo "concurrency: {{ matrix.os.concurrency }}"
+
       - name: Set environment variables
         run: |
           echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
