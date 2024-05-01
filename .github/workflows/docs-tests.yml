@@ -1,0 +1,40 @@
+name: Documentation tests
+
+# NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
+# which is available as GITHUB_WORKSPACE. You can find other environment
+# variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - v*-releases
+    paths:
+      - 'docs/**'
+
+jobs:
+  lint:
+    runs-on: self-hosted
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-lint
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code with two commits
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Ensure the docs build
+        run: |
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          /usr/bin/tox -edocs
+          zip site.zip site
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: site.zip
+          retention-days: 90
+          if-no-files-found: error
+          path: site.zip
