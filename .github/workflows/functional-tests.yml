@@ -111,7 +111,7 @@ jobs:
     steps:
       - name: Log matrix details
         run: |
-          echo "job_name: ${{ matrix.os.job_name }}""
+          echo "job_name: ${{ matrix.os.job_name }}"
           echo "base_image: ${{ matrix.os.base_image }}"
           echo "base_image_user: ${{ matrix.os.base_image_user }}"
           echo "topology: ${{ matrix.os.topology }}"
