@@ -26,6 +26,8 @@ LOG, _ = logs.setup(__name__)
 # the cache is populated by the first caller.
 CACHED_NETWORK_NODE = None
 
+UNREASONABLE_QUEUE_LENGTH = 20
+
 
 def get_network_node():
     global CACHED_NETWORK_NODE
@@ -82,7 +84,7 @@ class Scheduler(object):
 
     def _has_reasonable_queue_state(self, log_ctx, node):
         waiting = self.metrics[node].get('node_queue_waiting', 0)
-        if waiting > 20:
+        if waiting > UNREASONABLE_QUEUE_LENGTH:
             log_ctx.with_fields({
                 'node': node,
                 'node_queue_waiting': waiting
@@ -339,3 +341,71 @@ class Scheduler(object):
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule final candidates',
                            extra={'candidates': candidates})
             return candidates
+
+    def summarize_resources(self):
+        # Refresh metrics if its too old, or there are no nodes.
+        diff = time.time() - self.metrics_updated
+        if diff > config.SCHEDULER_CACHE_TIMEOUT or len(self.metrics) == 0:
+            self.refresh_metrics()
+
+        # Only hypervisors with reasonable queue lengths are candidates
+        resources = {
+            'total': {
+                'cpu_available': 0,
+                'ram_available': 0
+            },
+            'per_node': {}
+        }
+
+        for n in self.metrics.keys():
+            if not self.metrics[n].get('is_hypervisor', False):
+                continue
+
+            if (self.metrics[n].get('node_queue_waiting', 0) >
+                    UNREASONABLE_QUEUE_LENGTH):
+                continue
+
+            resources['per_node'][n] = {}
+
+            # CPU
+            resources['per_node'][n]['cpu_max_per_instance'] = \
+                self.metrics[n].get('cpu_max_per_instance', 0)
+
+            hard_max_cpus = (self.metrics[n].get(
+                'cpu_max', 0) * config.CPU_OVERCOMMIT_RATIO)
+            current_cpu = self.metrics[n].get('cpu_total_instance_vcpus', 0)
+            resources['per_node'][n]['cpu_available'] = hard_max_cpus - current_cpu
+            resources['total']['cpu_available'] += resources['per_node'][n]['cpu_available']
+
+            resources['per_node'][n]['cpu_load_1'] = self.metrics[n].get(
+                'cpu_load_1', 0)
+            resources['per_node'][n]['cpu_load_5'] = self.metrics[n].get(
+                'cpu_load_5', 0)
+            resources['per_node'][n]['cpu_load_15'] = self.metrics[n].get(
+                'cpu_load_15', 0)
+
+            # Memory
+            resources['per_node'][n]['ram_max_per_instance'] = \
+                (self.metrics[n].get('memory_available', 0) -
+                 (config.RAM_SYSTEM_RESERVATION * 1024))
+            resources['per_node'][n]['ram_max'] = \
+                self.metrics[n].get('memory_max', 0) * \
+                config.RAM_OVERCOMMIT_RATIO
+            resources['per_node'][n]['ram_available'] = \
+                (self.metrics[n].get('memory_max', 0) * config.RAM_OVERCOMMIT_RATIO -
+                 self.metrics[n].get('memory_total_instance_actual', 0))
+            resources['total']['ram_available'] += resources['per_node'][n]['ram_available']
+
+            # Disk
+            disk_free = int(self.metrics[n].get(
+                'disk_free_instances', '0')) / GiB
+            disk_free -= config.MINIMUM_FREE_DISK
+            resources['per_node'][n]['disk_available'] = disk_free
+
+            # Instance count
+            resources['per_node'][n]['instances_total'] = self.metrics[n].get(
+                'instances_total', 0)
+            resources['per_node'][n]['instances_active'] = self.metrics[n].get(
+                'instances_active', 0)
+
+        return resources
