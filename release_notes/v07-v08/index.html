@@ -400,6 +400,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rest-api" class="md-nav__link">
+    REST API
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#supported-distributions" class="md-nav__link">
     Supported distributions
   </a>
@@ -1402,6 +1409,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rest-api" class="md-nav__link">
+    REST API
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#supported-distributions" class="md-nav__link">
     Supported distributions
   </a>
@@ -1490,8 +1504,14 @@
 
 <h1 id="v07-to-v08-release-notes">v0.7 to v0.8 release notes</h1>
 <h2 id="major-changes">Major changes</h2>
+<h2 id="rest-api">REST API</h2>
+<ul>
+<li>There is now an API call (<code>GET /admin/resources</code>) which exposes the resource
+  utilization of the cluster to admin users.</li>
+</ul>
 <h2 id="supported-distributions">Supported distributions</h2>
 <ul>
+<li>Debian 12 is now supported as a host OS.</li>
 <li>Ubuntu 22.04 is now supported as a host OS.</li>
 <li>Fedora 34, 38, and 29, as well as Ubuntu 22.04 now have canned guest images.</li>
 <li>Rocky 8 and 9 now have canned guest images.</li>
@@ -1566,7 +1586,8 @@
 <li>We now use gRPC calls to compact etcd, instead of relying on a python client
   wrapper. This means we can now update our gRPC and protobuf dependencies to
   much more recent versions.</li>
-<li>etcd traffic levels are now monitored in CI.</li>
+<li>etcd traffic levels are now monitored in CI and we attempt to hold fewer
+  cluster level locks for local operations.</li>
 </ul>
 <h2 id="minor-changes">Minor changes</h2>
 <ul>
@@ -1585,6 +1606,7 @@
 <li>The <code>qemu</code> commands generated now vary based on the version of <code>qemu</code> installed
   on the machine. This was required to support the newer <code>qemu</code> version in
   Ubuntu 22.04.</li>
+<li>The ansible modules have been rewritten to be more reliable.</li>
 </ul>
 
 
