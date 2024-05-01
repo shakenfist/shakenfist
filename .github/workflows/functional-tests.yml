@@ -72,6 +72,7 @@ jobs:
   functional_matrix:
     needs: requirements-check
     strategy:
+      fail-fast: false
       matrix:
         os: [
           {
