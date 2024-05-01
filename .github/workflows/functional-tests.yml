@@ -113,6 +113,7 @@ jobs:
     steps:
       - name: Log matrix details
         run: |
+          echo "job_name: ${{ matrix.os.job_name }}""
           echo "base_image: ${{ matrix.os.base_image }}"
           echo "base_image_user: ${{ matrix.os.base_image_user }}"
           echo "topology: ${{ matrix.os.topology }}"
@@ -230,7 +231,7 @@ jobs:
               $source_path/shakenfist \
               ${{ matrix.os.base_image_user }}@${primary}:shakenfist
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency={{ matix.os.concurrency}}; stestr slowest"
+              ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency=${{ matrix.os.concurrency}}; stestr slowest"
 
       - name: Check logs
         if: always()
@@ -286,7 +287,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle.zip
+          name: bundle-${{ matrix.os.job_name }}.zip
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
@@ -486,7 +487,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle.zip
+          name: bundle-ansible-modules.zip
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
@@ -641,7 +642,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle.zip
+          name: bundle-node-lifecycle.zip
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
@@ -752,7 +753,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle.zip
+          name: bundle-upgrade-0-6-15.zip
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
