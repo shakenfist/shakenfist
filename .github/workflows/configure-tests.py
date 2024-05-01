@@ -89,36 +89,6 @@ JOBS = {
             'scheduled': False
         },
     ],
-    'functional-tests': [
-        {
-            'name': 'debian-11-localhost',
-            'baseimage': 'sf://label/ci-images/debian-11',
-            'baseuser': 'debian',
-            'topology': 'localhost',
-            'concurrency': 3
-        },
-        {
-            'name': 'debian-12-slim-primary',
-            'baseimage': 'sf://label/ci-images/debian-12',
-            'baseuser': 'debian',
-            'topology': 'slim-primary',
-            'concurrency': 5
-        },
-        {
-            'name': 'ubuntu-2004-localhost',
-            'baseimage': 'sf://label/ci-images/ubuntu-2004',
-            'baseuser': 'ubuntu',
-            'topology': 'localhost',
-            'concurrency': 3
-        },
-        {
-            'name': 'ubuntu-2204-slim-primary',
-            'baseimage': 'sf://label/ci-images/ubuntu-2204',
-            'baseuser': 'ubuntu',
-            'topology': 'slim-primary',
-            'concurrency': 5
-        },
-    ],
     'scheduled-tests': [
         {
             'name': 'develop-debian-11-localhost',
