@@ -5,10 +5,6 @@ name: Functional tests
 # variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
 
 on:
-  push:
-    branches:
-      - develop
-      - v*-releases
   pull_request:
     branches:
       - develop
