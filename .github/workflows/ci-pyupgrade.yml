@@ -60,8 +60,12 @@ jobs:
           # We only want to change five files at a time
           changed=0
           for file in $( find shakenfist -type f -name "*.py"); do
-            ${RUNNER_TEMP}/venv/bin/pyupgrade --py38-plus ${file}
-            changed=$(( ${changed} + $? ))
+            out=$( ${RUNNER_TEMP}/venv/bin/pyupgrade --py38-plus --exit-zero-even-if-changed ${file} )
+            rewrites=$( echo ${out} | grep -c "Rewriting" )
+            if [ ${rewrites} -gt 0 ]; then
+              echo "${file} was modified"
+            fi
+            changed=$(( ${changed} + $rewrites ))
 
             if [ ${changed} -gt 4 ]; then
               break
