@@ -31,8 +31,7 @@ class Namespace(dbo):
         self.upgrade(static_values)
 
         # We treat a namespace name as a UUID here for historical reasons
-        super().__init__(static_values['uuid'],
-                                        static_values['version'])
+        super().__init__(static_values['uuid'], static_values['version'])
 
     @classmethod
     def _upgrade_step_1_to_2(cls, static_values):
