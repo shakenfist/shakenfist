@@ -5,7 +5,7 @@ import grpc
 from shakenfist import event_pb2 as event__pb2
 
 
-class EventServiceStub(object):
+class EventServiceStub:
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -21,7 +21,7 @@ class EventServiceStub(object):
                 )
 
 
-class EventServiceServicer(object):
+class EventServiceServicer:
     """Missing associated documentation comment in .proto file."""
 
     def RecordEvent(self, request, context):
@@ -45,7 +45,7 @@ def add_EventServiceServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class EventService(object):
+class EventService:
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
