@@ -40,12 +40,11 @@ jobs:
           sudo apt update
           sudo apt install -y gh
 
-      - name: Install formatting in a venv
+      - name: Install formatting tools in a venv
         run: |
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
             install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
 
-          cd ${GITHUB_WORKSPACE}/shakenfist
           python3 -m venv  --system-site-packages ${RUNNER_TEMP}/venv
           ${RUNNER_TEMP}/venv/bin/pip install pyupgrade
 
@@ -61,7 +60,7 @@ jobs:
           # We only want to change five files at a time
           changed=0
           for file in $( find shakenfist -type f -name "*.py"); do
-            pyupgrade --py38-plus ${file}
+            ${RUNNER_TEMP}/venv/bin/pyupgrade --py38-plus ${file}
             changed=$(( ${changed} + $? ))
 
             if [ ${changed} -gt 4 ]; then
