@@ -5,13 +5,13 @@ responsible for providing rich VDI experiences to users of Shaken Fist, oVirt,
 OpenStack, or any other cloud where the hypervisor is capable of providing SPICE
 consoles over the network.
 
-The SPICE protocol has existed for a long time ago, and still represents the
+The SPICE protocol has existed for a long time, and still represents the
 richest and most performant option for remote desktops using Open Source
-technologies. However before Kerbside, SPICE adoption was limited because the
-console was generally provided in the form of a HTML5 transcoded interface in
-a web client. Unfortunately these HTML5 interfaces do not support many of the
-more novel features of the SPICE protocol, nor do they support high resolution
-desktops. By avoiding transcoding to a HTML5 client, we avoid these problems.
+technologies. Before Kerbside, consoles were generally provided by a HTML5
+transcoded interface in a web client. Unfortunately, HTML5 interfaces do not
+support many of the more novel features of the SPICE protocol, nor do they
+support high resolution desktops. By avoiding transcoding to a HTML5 client,
+we avoid these problems.
 
 Novel features of SPICE include high resolution desktops, multi-screen desktops,
 USB device passthrough, sound, multiple user connections to a single console,
