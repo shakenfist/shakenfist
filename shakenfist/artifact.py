@@ -50,8 +50,8 @@ class Artifact(dbo):
         self.upgrade(static_values)
 
         super().__init__(static_values.get('uuid'),
-                                       static_values.get('version'),
-                                       static_values.get('in_memory_only', False))
+                         static_values.get('version'),
+                         static_values.get('in_memory_only', False))
 
         self.__artifact_type = static_values['artifact_type']
         self.__source_url = static_values['source_url']
