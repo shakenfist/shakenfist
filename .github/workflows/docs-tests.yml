@@ -14,7 +14,7 @@ on:
       - mkdocs.yml
 
 jobs:
-  lint:
+  build-docs:
     runs-on: self-hosted
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-lint
