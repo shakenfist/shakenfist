@@ -14,7 +14,7 @@ from shakenfist import networkinterface
 from shakenfist.util import process as util_process
 
 
-class DHCP(object):
+class DHCP:
     def __init__(self, network, interface):
         self.network = network
 
@@ -92,7 +92,7 @@ class DHCP(object):
             return False
 
         needs_restart = False
-        with open(lf, 'r') as lin, open(lf + '.new', 'w') as lout:
+        with open(lf) as lin, open(lf + '.new', 'w') as lout:
             for line in lin.readlines():
                 # 1672899136 02:00:00:55:04:a2 172.10.0.8 client *
                 # ^--expiry  ^--mac            ^--ip      ^-- hostname

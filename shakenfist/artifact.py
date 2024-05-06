@@ -49,9 +49,9 @@ class Artifact(dbo):
     def __init__(self, static_values):
         self.upgrade(static_values)
 
-        super(Artifact, self).__init__(static_values.get('uuid'),
-                                       static_values.get('version'),
-                                       static_values.get('in_memory_only', False))
+        super().__init__(static_values.get('uuid'),
+                         static_values.get('version'),
+                         static_values.get('in_memory_only', False))
 
         self.__artifact_type = static_values['artifact_type']
         self.__source_url = static_values['source_url']
@@ -381,7 +381,7 @@ def type_filter(artifact_type, a):
 def instance_snapshot_filter(instance_uuid, a):
     if a.artifact_type != Artifact.TYPE_SNAPSHOT:
         return False
-    return a.source_url.startswith('%s%s' % (INSTANCE_URL, instance_uuid))
+    return a.source_url.startswith('{}{}'.format(INSTANCE_URL, instance_uuid))
 
 
 not_dead_states_filter = partial(

@@ -341,7 +341,7 @@ def _config_failure(failures):
     print()
     print('Configuration as read:')
     for key, value in config.dict().items():
-        print('    %s = %s' % (key, value))
+        print('    {} = {}'.format(key, value))
     print()
     print('Errors:')
     for failure in failures:
