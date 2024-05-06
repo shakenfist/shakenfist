@@ -55,13 +55,13 @@ jobs:
           cd ${GITHUB_WORKSPACE}/shakenfist
 
           datestamp=$(date "+%Y%m%d")
-          git checkout -b formatting-${datestamp}
+          git checkout -b formatting-automations
 
           # We only want to change five files at a time
           changed=0
           for file in $( find shakenfist -type f -name "*.py"); do
-            out=$( ${RUNNER_TEMP}/venv/bin/pyupgrade --py38-plus --exit-zero-even-if-changed ${file} || true )
-            rewrites=$( echo ${out} | grep -c "Rewriting" )
+            out=$( ${RUNNER_TEMP}/venv/bin/pyupgrade --py38-plus --exit-zero-even-if-changed ${file} 2>&1 || true )
+            rewrites=$( echo ${out} | grep -c "Rewriting" || true )
             if [ ${rewrites} -gt 0 ]; then
               echo "${file} was modified"
             fi
@@ -81,7 +81,7 @@ jobs:
             git config --global user.name "shakenfist-bot"
             git config --global user.email "bot@shakenfist.com"
             git commit -a -m "Automated code formatting for ${datestamp}."
-            git push -f origin formatting-${datestamp}
+            git push -f origin formatting-automations
             echo
             gh pr create \
                 --assignee mikalstill \
