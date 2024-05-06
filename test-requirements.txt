@@ -5,3 +5,5 @@ stestr              # apache2
 flake8              # mit
 tox>3.17            # mit
 testtools           # mit
+mkdocs              # bsd
+mkdocs-material     # mit
