@@ -16,7 +16,7 @@ flasgger==0.9.7.1                  # mit
 prometheus-client==0.20.0          # apache2
 etcd3gw==2.4.0                     # apache2
 Flask-JWT-Extended==4.6.0          # mit
-bcrypt==4.1.2                      # apache2
+bcrypt==4.1.3                      # apache2
 gunicorn==22.0.0                   # mit
 python-magic==0.4.27               # mit
 flask-request-id-middleware==1.1   # mit
