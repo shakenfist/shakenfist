@@ -53,7 +53,7 @@ class Blob(dbo):
     def __init__(self, static_values):
         self.upgrade(static_values)
 
-        super(Blob, self).__init__(static_values.get('uuid'),
+        super().__init__(static_values.get('uuid'),
                                    static_values.get('version'))
 
         self.__size = static_values['size']
