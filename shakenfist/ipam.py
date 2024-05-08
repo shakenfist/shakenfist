@@ -59,7 +59,7 @@ class IPAM(dbo):
         if cluster_minimum > 3:
             self.upgrade(static_values)
 
-        super(IPAM, self).__init__(static_values['uuid'],
+        super().__init__(static_values['uuid'],
                                    static_values.get('version'),
                                    static_values.get('in_memory_only', False))
 
@@ -366,7 +366,7 @@ class IPAM(dbo):
 
         etcd.delete('ipmanager', None, self.uuid)
         etcd.delete_prefix(self.reservations_path)
-        super(IPAM, self).hard_delete()
+        super().hard_delete()
 
 
 class IPAMs(dbo_iter):
