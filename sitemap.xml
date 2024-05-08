@@ -21,6 +21,16 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/</loc>
+         <lastmod>2024-05-08</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/overview/</loc>
+         <lastmod>2024-05-08</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://shakenfist.com/developer_guide/authentication/</loc>
          <lastmod>2024-05-08</lastmod>
          <changefreq>daily</changefreq>
