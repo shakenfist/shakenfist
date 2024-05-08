@@ -11,6 +11,7 @@ on:
       - v*-releases
     paths-ignore:
       - 'docs/**'
+      - mkdocs.yml
 
 jobs:
   lint:
