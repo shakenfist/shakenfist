@@ -42,7 +42,7 @@ class WrappedEtcdClient(Etcd3Client):
 
         if config.LOG_ETCD_CONNECTIONS:
             LOG.info('Building new etcd connection')
-        return super(WrappedEtcdClient, self).__init__(
+        return super().__init__(
             host=host, port=port, protocol=protocol, ca_cert=ca_cert,
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
             api_path=api_path)
@@ -68,7 +68,7 @@ class WrappedEtcdClient(Etcd3Client):
     # connections sometimes being dropped.
     def post(self, *args, **kwargs):
         try:
-            return super(WrappedEtcdClient, self).post(*args, **kwargs)
+            return super().post(*args, **kwargs)
         except Exception as e:
             LOG.info('Retrying after receiving etcd error: %s' % e)
 
@@ -79,7 +79,7 @@ class WrappedEtcdClient(Etcd3Client):
                 self.session.verify = self.ca_cert
             if self.cert_cert is not None and self.cert_key is not None:
                 self.session.cert = (self.cert_cert, self.cert_key)
-            return super(WrappedEtcdClient, self).post(*args, **kwargs)
+            return super().post(*args, **kwargs)
 
 
 # This module stores some state in thread local storage.
@@ -126,7 +126,7 @@ class ActualLock(Lock):
                  client=None, timeout=120, log_ctx=LOG,
                  op=None):
         self.path = _construct_key(objecttype, subtype, name)
-        super(ActualLock, self).__init__(self.path, ttl=ttl, client=client)
+        super().__init__(self.path, ttl=ttl, client=client)
 
         self.objecttype = objecttype
         self.objectname = name
@@ -175,13 +175,13 @@ class ActualLock(Lock):
         if key_prefix:
             new_holder = {}
             for key in holder:
-                new_holder['%s-%s' % (key_prefix, key)] = holder[key]
+                new_holder['{}-{}'.format(key_prefix, key)] = holder[key]
             return new_holder
 
         return holder
 
     def refresh(self):
-        super(ActualLock, self).refresh()
+        super().refresh()
         self.log_ctx.info('Refreshed lock')
 
     def __enter__(self):
@@ -312,11 +312,11 @@ def get_existing_locks():
 
 def _construct_key(objecttype, subtype, name):
     if subtype and name:
-        return '/sf/%s/%s/%s' % (objecttype, subtype, name)
+        return '/sf/{}/{}/{}'.format(objecttype, subtype, name)
     if name:
-        return '/sf/%s/%s' % (objecttype, name)
+        return '/sf/{}/{}'.format(objecttype, name)
     if subtype:
-        return '/sf/%s/%s/' % (objecttype, subtype)
+        return '/sf/{}/{}/'.format(objecttype, subtype)
     return '/sf/%s/' % objecttype
 
 
@@ -415,7 +415,7 @@ def delete_prefix(path):
 
 def enqueue(queuename, workitem, delay=0):
     entry_time = time.time() + delay
-    jobname = '%s-%s' % (entry_time, util_random.random_id())
+    jobname = '{}-{}'.format(entry_time, util_random.random_id())
     put('queue', queuename, jobname, workitem)
     LOG.with_fields({
         'jobname': jobname,
