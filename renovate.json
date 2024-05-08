@@ -28,7 +28,8 @@
     {
       "description": "Group grpcio updates together",
       "matchPackagePatterns": [
-        "grpcio"
+        "grpcio",
+        "protobuf"
       ],
       "groupName": "grpcio"
     }
