@@ -29,8 +29,12 @@ jobs:
       - name: Ensure the docs build
         run: |
           cd ${GITHUB_WORKSPACE}/shakenfist
-          /usr/bin/tox -edocs
-          zip site.zip site
+
+          mkdir -p /srv/github/artifacts/site
+          /usr/bin/tox -edocs -- --site-dir /srv/github/artifacts/site | tee /srv/github/artifacts/site/build.log
+
+          cd /srv/github/artifacts/
+          zip -r /srv/github/artifacts/site.zip site
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -38,4 +42,4 @@ jobs:
           name: site.zip
           retention-days: 90
           if-no-files-found: error
-          path: site.zip
+          path: /srv/github/artifacts/site.zip
