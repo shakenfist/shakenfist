@@ -61,7 +61,7 @@ def add_event(event_type, object_type, object_uuid, message, duration=None,
     # Attempt to send the event with gRPC directly to the eventlog node.
     try:
         with grpc.insecure_channel('{}:{}'.format(config.EVENTLOG_NODE_IP,
-                                              config.EVENTLOG_API_PORT)) as channel:
+                                                  config.EVENTLOG_API_PORT)) as channel:
             stub = event_pb2_grpc.EventServiceStub(channel)
             request = event_pb2.EventRequest(
                 object_type=object_type, object_uuid=object_uuid,
