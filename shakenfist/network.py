@@ -57,7 +57,7 @@ class Network(dbo):
     def __init__(self, static_values):
         self.upgrade(static_values)
 
-        super(Network, self).__init__(static_values.get('uuid'),
+        super().__init__(static_values.get('uuid'),
                                       static_values.get('version'))
 
         self.__ipam = ipam.IPAM.from_db(
@@ -543,7 +543,7 @@ class Network(dbo):
 
     def hard_delete(self):
         etcd.delete('vxlan', None, self.vxid)
-        super(Network, self).hard_delete()
+        super().hard_delete()
 
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""
