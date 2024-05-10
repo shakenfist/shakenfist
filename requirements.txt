@@ -84,4 +84,4 @@ solus==1.2.2
 typing-aliases==1.10.1
 typing-extensions==4.11.0
 verboselogs==1.7
-wraps==0.9.2
+wraps==0.12.0
