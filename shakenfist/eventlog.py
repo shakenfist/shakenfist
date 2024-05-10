@@ -60,8 +60,8 @@ def add_event(event_type, object_type, object_uuid, message, duration=None,
 
     # Attempt to send the event with gRPC directly to the eventlog node.
     try:
-        with grpc.insecure_channel('%s:%s' % (config.EVENTLOG_NODE_IP,
-                                              config.EVENTLOG_API_PORT)) as channel:
+        with grpc.insecure_channel('{}:{}'.format(config.EVENTLOG_NODE_IP,
+                                                  config.EVENTLOG_API_PORT)) as channel:
             stub = event_pb2_grpc.EventServiceStub(channel)
             request = event_pb2.EventRequest(
                 object_type=object_type, object_uuid=object_uuid,
@@ -160,7 +160,7 @@ def _timestamp_to_year_month(timestamp):
     return dt.year, dt.month
 
 
-class EventLog(object):
+class EventLog:
     # An EventLog is a meta object which manages a chain of EventLogChunks,
     # which are per-month sqlite databases. This is done to keep individual
     # database sizes manageable, and provide a form of simple log rotation.
@@ -240,8 +240,7 @@ class EventLog(object):
 
     def read_events(self, limit=100, event_type=None):
         with self.lock:
-            for e in self._read_events_inner(limit=limit, event_type=event_type):
-                yield e
+            yield from self._read_events_inner(limit=limit, event_type=event_type)
 
     # Use a negative limit to read everything
     def _read_events_inner(self, limit=100, event_type=None):
@@ -333,7 +332,7 @@ CREATE_EVENT_TABLE = [
 CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int primary key)"""
 
 
-class EventLogChunk(object):
+class EventLogChunk:
     # An event log chunk is a single sqlite database which covers a specific
     # calendar month. Note that locking is done at the EventLog level, not the
     # EventLogChunk level to reduce the number of lock files we are storing
