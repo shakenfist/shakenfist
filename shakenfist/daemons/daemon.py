@@ -48,7 +48,7 @@ def set_log_level(log, name):
     log.setLevel(numeric_level)
 
 
-class Daemon(object):
+class Daemon:
     def __init__(self, name):
         setproctitle.setproctitle(process_name(name))
         self.log, _ = logs.setup(name)
@@ -67,7 +67,7 @@ class Daemon(object):
 
 class WorkerPoolDaemon(Daemon):
     def __init__(self, name):
-        super(WorkerPoolDaemon, self).__init__(name)
+        super().__init__(name)
         self.workers = {}
         self.present_cpus = util_libvirt.get_cpu_count()
 
@@ -80,7 +80,7 @@ class WorkerPoolDaemon(Daemon):
 
     def start_workitem(self, processing_callback, args, name):
         p = util_process.fork(processing_callback, args,
-                              '%s-%s' % (process_name('queues'), name))
+                              '{}-{}'.format(process_name('queues'), name))
         self.workers[name] = p
         return p.pid
 
