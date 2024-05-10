@@ -37,7 +37,8 @@
       "description": "Group things entangled with wraps",
       "matchPackagePatterns": [
         "wraps",
-        "iters"
+        "iters",
+        "async-extensions"
       ],
       "groupName": "entangled-wraps"
     },
