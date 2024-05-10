@@ -34,8 +34,7 @@ class NetworkInterface(dbo):
     def __init__(self, static_values):
         self.upgrade(static_values)
 
-        super(NetworkInterface, self).__init__(static_values.get('uuid'),
-                                               static_values.get('version'))
+        super().__init__(static_values.get('uuid'), static_values.get('version'))
 
         self.__network_uuid = static_values['network_uuid']
         self.__instance_uuid = static_values['instance_uuid']
@@ -155,7 +154,7 @@ class NetworkInterface(dbo):
 
     def hard_delete(self):
         etcd.delete('macaddress', None, self.macaddr)
-        super(NetworkInterface, self).hard_delete()
+        super().hard_delete()
 
 
 class NetworkInterfaces(dbo_iter):

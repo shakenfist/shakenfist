@@ -236,7 +236,7 @@ def main():
 
     # Log configuration on startup
     for key, value in config.dict().items():
-        LOG.info('Configuration item {} = {}'.format(key, value))
+        LOG.info(f'Configuration item {key} = {value}')
 
     daemon.set_log_level(LOG, 'main')
 

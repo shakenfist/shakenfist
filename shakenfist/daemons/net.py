@@ -356,7 +356,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             else:
                 jobname, workitem = jobname_workitem
                 setproctitle.setproctitle(
-                    '%s-%s' % (daemon.process_name('net'), jobname))
+                    '{}-{}'.format(daemon.process_name('net'), jobname))
 
                 try:
                     log_ctx = LOG.with_fields({'workitem': workitem})

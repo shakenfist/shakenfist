@@ -34,7 +34,7 @@ LOG, _ = logs.setup(__name__)
 
 class Monitor(daemon.Daemon):
     def __init__(self, name):
-        super(Monitor, self).__init__(name)
+        super().__init__(name)
         self.lock = None
         self.is_elected = False
 
