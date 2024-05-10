@@ -32,7 +32,15 @@
         "protobuf"
       ],
       "groupName": "grpcio"
-    }
+    },
+    {
+      "description": "Group things entangled with wraps",
+      "matchPackagePatterns": [
+        "wraps",
+        "iters"
+      ],
+      "groupName": "entangled-wraps"
+    },
   ],
   "minimumReleaseAge": "3 days",
   "rollbackPrs": "true"
