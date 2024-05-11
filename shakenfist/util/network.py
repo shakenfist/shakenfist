@@ -215,8 +215,8 @@ def discover_interfaces():
 
 def random_macaddr():
     return '02:00:00:{:02x}:{:02x}:{:02x}'.format(random.randint(0, 255),
-                                        random.randint(0, 255),
-                                        random.randint(0, 255))
+                                                  random.randint(0, 255),
+                                                  random.randint(0, 255))
 
 
 def add_address_to_interface(namespace, address, netmask, device):
