@@ -29,7 +29,7 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
             namespace=None, iopriority=None, cwd=None,
             suppress_command_logging=False):
     if namespace:
-        command = 'ip netns exec %s %s' % (namespace, command)
+        command = 'ip netns exec {} {}'.format(namespace, command)
 
     if iopriority:
         current_iopriority = psutil.Process().ionice()
