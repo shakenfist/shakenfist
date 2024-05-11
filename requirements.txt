@@ -53,7 +53,7 @@ pydantic-core==2.18.2              # (indirect dependency)
 aniso8601==9.0.1
 annotated-types==0.6.0
 anyio==4.3.0
-async-extensions==3.1.2
+async-extensions==4.0.0
 attrs==23.2.0
 blinker==1.8.2
 coloredlogs==15.0.1
@@ -65,7 +65,7 @@ futurist==3.0.0
 grpcio==1.63.0
 humanfriendly==10.0
 importlib-metadata==7.1.0
-iters==0.17.0
+iters==0.18.0
 itsdangerous==2.2.0
 linux-utils==0.7
 MarkupSafe==2.1.5
@@ -84,4 +84,4 @@ solus==1.2.2
 typing-aliases==1.10.1
 typing-extensions==4.11.0
 verboselogs==1.7
-wraps==0.9.2
+wraps==0.12.0
