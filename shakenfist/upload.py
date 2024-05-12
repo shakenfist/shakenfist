@@ -28,8 +28,7 @@ class Upload(dbo):
     def __init__(self, static_values):
         self.upgrade(static_values)
 
-        super().__init__(static_values.get('uuid'),
-                                     static_values.get('version'))
+        super().__init__(static_values.get('uuid'), static_values.get('version'))
         self.__node = static_values['node']
         self.__created_at = static_values['created_at']
 
