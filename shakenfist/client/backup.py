@@ -53,7 +53,7 @@ def cli(ctx, verbose=None):
 def backup(ctx, output, anonymise=False):
     with tarfile.open(output, 'w:gz') as tar:
         for data, metadata in etcd.get_etcd_client().get_prefix('/'):
-            if metadata['key'].startswith('/sf/namespace'.encode('utf-8')):
+            if metadata['key'].startswith(b'/sf/namespace'):
                 d = json.loads(data)
                 for k in d['keys']:
                     d['keys'][k] = '...'

@@ -95,7 +95,7 @@ def set_etcd_config(flag, value):
         except ValueError:
             pass
 
-    click.echo('Setting %s to %s(%s)' % (flag, type(value), value))
+    click.echo('Setting {} to {}({})'.format(flag, type(value), value))
     config[flag] = value
     client.put('/sf/config', json.dumps(config, indent=4, sort_keys=True))
 

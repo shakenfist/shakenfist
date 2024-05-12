@@ -175,7 +175,7 @@ class ActualLock(Lock):
         if key_prefix:
             new_holder = {}
             for key in holder:
-                new_holder['{}-{}'.format(key_prefix, key)] = holder[key]
+                new_holder[f'{key_prefix}-{key}'] = holder[key]
             return new_holder
 
         return holder
@@ -312,11 +312,11 @@ def get_existing_locks():
 
 def _construct_key(objecttype, subtype, name):
     if subtype and name:
-        return '/sf/{}/{}/{}'.format(objecttype, subtype, name)
+        return f'/sf/{objecttype}/{subtype}/{name}'
     if name:
-        return '/sf/{}/{}'.format(objecttype, name)
+        return f'/sf/{objecttype}/{name}'
     if subtype:
-        return '/sf/{}/{}/'.format(objecttype, subtype)
+        return f'/sf/{objecttype}/{subtype}/'
     return '/sf/%s/' % objecttype
 
 
@@ -415,7 +415,7 @@ def delete_prefix(path):
 
 def enqueue(queuename, workitem, delay=0):
     entry_time = time.time() + delay
-    jobname = '{}-{}'.format(entry_time, util_random.random_id())
+    jobname = f'{entry_time}-{util_random.random_id()}'
     put('queue', queuename, jobname, workitem)
     LOG.with_fields({
         'jobname': jobname,

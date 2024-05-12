@@ -214,9 +214,9 @@ def discover_interfaces():
 
 
 def random_macaddr():
-    return '02:00:00:%02x:%02x:%02x' % (random.randint(0, 255),
-                                        random.randint(0, 255),
-                                        random.randint(0, 255))
+    return '02:00:00:{:02x}:{:02x}:{:02x}'.format(random.randint(0, 255),
+                                                  random.randint(0, 255),
+                                                  random.randint(0, 255))
 
 
 def add_address_to_interface(namespace, address, netmask, device):
@@ -235,11 +235,11 @@ def add_address_to_interface(namespace, address, netmask, device):
         try:
             process.execute(
                 None,
-                'ip addr add %(address)s/%(netmask)s dev %(device)s' % {
-                    'address': address,
-                    'netmask': netmask,
-                    'device': device
-                },
+                'ip addr add {address}/{netmask} dev {device}'.format(
+                    address=address,
+                    netmask=netmask,
+                    device=device
+                ),
                 namespace=namespace)
             process.execute(None, 'ip link set %s up' % device, namespace=namespace)
 
