@@ -36,7 +36,7 @@ def _resolve_image(url):
 
     for valid in VALID_SF_IMAGES:
         if url.startswith(valid):
-            return '{}{}/latest.qcow2'.format(config.IMAGE_DOWNLOAD_URL, url)
+            return f'{config.IMAGE_DOWNLOAD_URL}{url}/latest.qcow2'
 
     return url
 
@@ -201,7 +201,7 @@ class ImageFetchHelper:
                             dirty = True
 
             if not dirty:
-                url = '{}{}'.format(BLOB_URL, most_recent_blob.uuid)
+                url = f'{BLOB_URL}{most_recent_blob.uuid}'
 
         # Ensure that we have the blob in the local store. This blob is in the
         # "original format" if downloaded from an HTTP source.
@@ -273,7 +273,7 @@ class ImageFetchHelper:
                     config.STORAGE_PATH, 'image_cache', b.uuid)
                 with util_general.RecordedOperation('decompress image', self.instance):
                     util_process.execute(
-                        [lock], 'gunzip -k -q -c {} > {}'.format(blob_path, cache_path))
+                        [lock], f'gunzip -k -q -c {blob_path} > {cache_path}')
                 blob_path = cache_path
 
             cache_path = os.path.join(
@@ -292,7 +292,7 @@ class ImageFetchHelper:
             else:
                 with util_general.RecordedOperation('transcode image', self.instance):
                     self.log.with_fields({'blob': b}).info(
-                        'Transcoding {} -> {}'.format(blob_path, cache_path))
+                        f'Transcoding {blob_path} -> {cache_path}')
                     util_image.create_qcow2([lock], blob_path, cache_path)
 
             # We will cache this transcode, but we do it later as part of a
