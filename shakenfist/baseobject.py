@@ -69,7 +69,7 @@ def get_minimum_object_version(objname):
     return VERSION_CACHE[objname]
 
 
-class DatabaseBackedObject(object):
+class DatabaseBackedObject:
     object_type = 'unknown'
     initial_version = 1
     current_version = None
@@ -149,7 +149,7 @@ class DatabaseBackedObject(object):
         return self.__in_memory_only
 
     def __str__(self):
-        return '%s(%s)' % (self.object_type, self.__uuid)
+        return '{}({})'.format(self.object_type, self.__uuid)
 
     def unique_label(self):
         return (self.object_type, self.__uuid)
@@ -234,7 +234,7 @@ class DatabaseBackedObject(object):
         if o.get('version', 0) != cls.current_version:
             if not cls.upgrade_supported:
                 raise exceptions.BadObjectVersion(
-                    'Unsupported object version - %s: %s' % (cls.object_type, o))
+                    'Unsupported object version - {}: {}'.format(cls.object_type, o))
         return o
 
     @classmethod
@@ -330,7 +330,7 @@ class DatabaseBackedObject(object):
 
         if not global_scope:
             return lockutils.external_lock(
-                '%s-%s' % (self.object_type, self.uuid),
+                '{}-{}'.format(self.object_type, self.uuid),
                 lock_path='/tmp', lock_file_prefix='sflock-')
 
         return etcd.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
@@ -343,7 +343,7 @@ class DatabaseBackedObject(object):
 
         if not global_scope:
             return lockutils.external_lock(
-                '%s-%s-%s' % (self.object_type, self.uuid, name),
+                '{}-{}-{}'.format(self.object_type, self.uuid, name),
                 lock_path='/tmp', lock_file_prefix='sflock-')
 
         return etcd.get_lock('attribute/%s' % self.object_type,
@@ -447,7 +447,7 @@ class DatabaseBackedObject(object):
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
 
 
-class DatabaseBackedObjectIterator(object):
+class DatabaseBackedObjectIterator:
     def __init__(self, filters, prefilter=None, suppress_failure_audit=False):
         self.filters = filters
         self.prefilter = prefilter
@@ -503,7 +503,7 @@ def namespace_filter(namespace, o):
     return o.namespace == namespace
 
 
-class State(object):
+class State:
     def __init__(self, value, update_time):
         self.__value = value
         self.__update_time = update_time

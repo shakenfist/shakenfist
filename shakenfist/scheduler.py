@@ -66,7 +66,7 @@ def get_active_node_metrics():
     return metrics
 
 
-class Scheduler(object):
+class Scheduler:
     def __init__(self):
         # This UUID doesn't really mean much, except as a way of tracing the
         # behaviour of a single instance of the scheduler object in logs.

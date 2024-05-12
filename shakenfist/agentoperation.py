@@ -37,7 +37,7 @@ class AgentOperation(dbo):
     def __init__(self, static_values):
         self.upgrade(static_values)
 
-        super(AgentOperation, self).__init__(static_values['uuid'],
+        super().__init__(static_values['uuid'],
                                              static_values.get('version'))
 
         self.__namespace = static_values['namespace']
