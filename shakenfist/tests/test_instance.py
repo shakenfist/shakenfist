@@ -1,7 +1,7 @@
 import base64
 from functools import partial
 import json
-import mock
+from unittest import mock
 import os
 import pycdlib
 import tempfile
@@ -20,7 +20,7 @@ from shakenfist.tests.mock_etcd import MockEtcd
 
 class VirtMetaTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(VirtMetaTestCase, self).setUp()
+        super().setUp()
         fake_config = SFConfig(
             STORAGE_PATH='/a/b/c',
             DISK_BUS='virtio',
@@ -51,7 +51,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                     'requested_placement': None,
                     'ssh_key': 'thisisasshkey',
                     'user_data': str(base64.b64encode(
-                        'thisisuserdata'.encode('utf-8')), 'utf-8'),
+                        b'thisisuserdata'), 'utf-8'),
                     'video': {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
                     'uefi': False,
                     'configdrive': 'openstack-disk',
@@ -107,7 +107,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
 
 class InstanceTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(InstanceTestCase, self).setUp()
+        super().setUp()
         fake_config = SFConfig(
             STORAGE_PATH='/a/b/c',
             DISK_BUS='virtio',
@@ -215,7 +215,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
             instance_uuid=instance_uuid, order=1)
         self.mock_etcd.create_instance(
             'cirros', instance_uuid, 1, ssh_key='thisisasshkey',
-            user_data=str(base64.b64encode('thisisuserdata'.encode('utf-8')), 'utf-8'))
+            user_data=str(base64.b64encode(b'thisisuserdata'), 'utf-8'))
 
         i = instance.Instance.from_db(instance_uuid)
         i.interfaces = [iface_uuid_one, iface_uuid_two]
@@ -337,7 +337,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
 
 class InstancesTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(InstancesTestCase, self).setUp()
+        super().setUp()
 
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()

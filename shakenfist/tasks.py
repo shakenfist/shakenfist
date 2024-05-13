@@ -6,7 +6,7 @@ from shakenfist.exceptions import (NoURLImageFetchTaskException,
                                    )
 
 
-class QueueTask(object):
+class QueueTask:
     """QueueTask defines a validated task placed on the job queue."""
     _name = None
     _version = 1  # Enable future upgrades to existing tasks
@@ -44,7 +44,7 @@ class QueueTask(object):
 #
 class InstanceTask(QueueTask):
     def __init__(self, instance_uuid, network=None):
-        super(InstanceTask, self).__init__()
+        super().__init__()
         self._instance_uuid = instance_uuid
 
         # Only set network if deliberately set in function paramater. This
@@ -69,7 +69,7 @@ class InstanceTask(QueueTask):
         return self._network
 
     def obj_dict(self):
-        return {**super(InstanceTask, self).obj_dict(),
+        return {**super().obj_dict(),
                 'instance_uuid': self._instance_uuid,
                 'network': self._network}
 
@@ -91,7 +91,7 @@ class DeleteInstanceTask(InstanceTask):
 #
 class NetworkTask(QueueTask):
     def __init__(self, network_uuid):
-        super(NetworkTask, self).__init__()
+        super().__init__()
         self._network_uuid = network_uuid
 
         # General checks
@@ -105,7 +105,7 @@ class NetworkTask(QueueTask):
         return self._network_uuid
 
     def obj_dict(self):
-        return {**super(NetworkTask, self).obj_dict(),
+        return {**super().obj_dict(),
                 'network_uuid': self._network_uuid}
 
 
@@ -133,7 +133,7 @@ class RemoveDHCPLeaseNetworkTask(NetworkTask):
     _name = 'network_remove_dhcp_lease'
 
     def __init__(self, network_uuid, ipv4, macaddr):
-        super(RemoveDHCPLeaseNetworkTask, self).__init__(network_uuid)
+        super().__init__(network_uuid)
         self._ipv4 = ipv4
         self._macaddr = macaddr
 
@@ -144,7 +144,7 @@ class RemoveDHCPLeaseNetworkTask(NetworkTask):
         return self._macaddr
 
     def obj_dict(self):
-        return {**super(RemoveDHCPLeaseNetworkTask, self).obj_dict(),
+        return {**super().obj_dict(),
                 'ipv4': self._ipv4, 'macaddr': self._macaddr}
 
 
@@ -156,14 +156,14 @@ class DeleteNetworkWhenClean(NetworkTask):
     _name = 'network_delete_when_clean'
 
     def __init__(self, network_uuid, wait_interfaces):
-        super(DeleteNetworkWhenClean, self).__init__(network_uuid)
+        super().__init__(network_uuid)
         self._wait_interfaces = wait_interfaces
 
     def wait_interfaces(self):
         return self._wait_interfaces
 
     def obj_dict(self):
-        return {**super(DeleteNetworkWhenClean, self).obj_dict(),
+        return {**super().obj_dict(),
                 'wait_interfaces': self._wait_interfaces}
 
 
@@ -171,14 +171,14 @@ class RouteAddressTask(NetworkTask):
     _name = 'network_route_address'
 
     def __init__(self, network_uuid, ipv4):
-        super(RouteAddressTask, self).__init__(network_uuid)
+        super().__init__(network_uuid)
         self._ipv4 = ipv4
 
     def ipv4(self):
         return self._ipv4
 
     def obj_dict(self):
-        return {**super(RouteAddressTask, self).obj_dict(),
+        return {**super().obj_dict(),
                 'ipv4': self._ipv4}
 
 
@@ -191,7 +191,7 @@ class UnrouteAddressTask(RouteAddressTask):
 #
 class NetworkInterfaceTask(QueueTask):
     def __init__(self, network_uuid, interface_uuid):
-        super(NetworkInterfaceTask, self).__init__()
+        super().__init__()
         self._network_uuid = network_uuid
         self._interface_uuid = interface_uuid
 
@@ -216,7 +216,7 @@ class NetworkInterfaceTask(QueueTask):
         return self._interface_uuid
 
     def obj_dict(self):
-        return {**super(NetworkInterfaceTask, self).obj_dict(),
+        return {**super().obj_dict(),
                 'network_uuid': self._network_uuid,
                 'interface_uuid': self._interface_uuid}
 
@@ -235,7 +235,7 @@ class DefloatNetworkInterfaceTask(NetworkInterfaceTask):
 
 class ImageTask(QueueTask):
     def __init__(self, url, namespace=None):
-        super(ImageTask, self).__init__()
+        super().__init__()
         self._url = url
         self._namespace = namespace
 
@@ -243,7 +243,7 @@ class ImageTask(QueueTask):
             raise NoURLImageFetchTaskException
 
     def obj_dict(self):
-        return {**super(ImageTask, self).obj_dict(),
+        return {**super().obj_dict(),
                 'url': self._url,
                 'namespace': self._namespace}
 
@@ -259,11 +259,11 @@ class FetchImageTask(ImageTask):
     _name = 'image_fetch'
 
     def __init__(self, url, namespace=None, instance_uuid=None):
-        super(FetchImageTask, self).__init__(url, namespace=namespace)
+        super().__init__(url, namespace=namespace)
         self._instance_uuid = instance_uuid
 
     def obj_dict(self):
-        return {**super(FetchImageTask, self).obj_dict(),
+        return {**super().obj_dict(),
                 'instance_uuid': self._instance_uuid}
 
     # Data methods
@@ -279,7 +279,7 @@ class SnapshotTask(QueueTask):
     _name = 'snapshot'
 
     def __init__(self, instance_uuid, disk, artifact_uuid, blob_uuid, thin=False):
-        super(SnapshotTask, self).__init__()
+        super().__init__()
         self._instance_uuid = instance_uuid
         self._disk = disk
         self._artifact_uuid = artifact_uuid
@@ -288,7 +288,7 @@ class SnapshotTask(QueueTask):
 
     def obj_dict(self):
         return {
-            **super(SnapshotTask, self).obj_dict(),
+            **super().obj_dict(),
             'instance_uuid': self._instance_uuid,
             'disk': self._disk,
             'artifact_uuid': self._artifact_uuid,
@@ -319,12 +319,12 @@ class SnapshotTask(QueueTask):
 
 class BlobTask(QueueTask):
     def __init__(self, blob_uuid):
-        super(BlobTask, self).__init__()
+        super().__init__()
         self._blob_uuid = blob_uuid
 
     def obj_dict(self):
         return {
-            **super(BlobTask, self).obj_dict(),
+            **super().obj_dict(),
             'blob_uuid': self._blob_uuid
         }
 
@@ -345,14 +345,14 @@ class ArchiveTranscodeTask(QueueTask):
     _name = 'archive_transcode'
 
     def __init__(self, blob_uuid, cache_path, transcode_description):
-        super(ArchiveTranscodeTask, self).__init__()
+        super().__init__()
         self._blob_uuid = blob_uuid
         self._cache_path = cache_path
         self._transcode_description = transcode_description
 
     def obj_dict(self):
         return {
-            **super(ArchiveTranscodeTask, self).obj_dict(),
+            **super().obj_dict(),
             'blob_uuid': self._blob_uuid,
             'cache_path': self._cache_path,
             'transcode_description': self._transcode_description
@@ -377,12 +377,12 @@ class PreflightAgentOperationTask(QueueTask):
     _name = 'preflight_agent_operation'
 
     def __init__(self, agentop_uuid):
-        super(PreflightAgentOperationTask, self).__init__()
+        super().__init__()
         self._agentop_uuid = agentop_uuid
 
     def obj_dict(self):
         return {
-            **super(PreflightAgentOperationTask, self).obj_dict(),
+            **super().obj_dict(),
             'agentop_uuid': self._agentop_uuid
         }
 

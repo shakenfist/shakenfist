@@ -48,7 +48,7 @@ class Node(dbo):
         self.upgrade(static_values)
 
         # We treat a node name as a UUID here for historical reasons
-        super(Node, self).__init__(static_values['fqdn'],
+        super().__init__(static_values['fqdn'],
                                    static_values.get('version'))
 
         self.__ip = static_values['ip']
@@ -259,8 +259,7 @@ class Nodes(dbo_iter):
 
 def _sort_by_key(d):
     for k in sorted(d, reverse=True):
-        for v in d[k]:
-            yield v
+        yield from d[k]
 
 
 def nodes_by_free_disk_descending(minimum=0, maximum=-1, intention=None):
