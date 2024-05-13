@@ -48,8 +48,7 @@ class Node(dbo):
         self.upgrade(static_values)
 
         # We treat a node name as a UUID here for historical reasons
-        super().__init__(static_values['fqdn'],
-                                   static_values.get('version'))
+        super().__init__(static_values['fqdn'], static_values.get('version'))
 
         self.__ip = static_values['ip']
         self.__fqdn = static_values['fqdn']
