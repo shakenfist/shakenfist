@@ -438,7 +438,7 @@ class InstancesEndpoint(sf_api.Resource):
                 label = disk_base[len('label:'):]
                 a = Artifact.from_url(
                     Artifact.TYPE_LABEL,
-                    '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label),
+                    '{}{}/{}'.format(LABEL_URL, get_jwt_identity()[0], label),
                     name=label, namespace=namespace)
                 err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
                 if err:
@@ -496,7 +496,7 @@ class InstancesEndpoint(sf_api.Resource):
             original_template = nvram_template
             if nvram_template.startswith('label:'):
                 label = nvram_template[len('label:'):]
-                url = '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label)
+                url = '{}{}/{}'.format(LABEL_URL, get_jwt_identity()[0], label)
                 a = Artifact.from_url(Artifact.TYPE_LABEL, url, name=label,
                                       namespace=namespace)
                 err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
@@ -562,7 +562,7 @@ class InstancesEndpoint(sf_api.Resource):
 
                 if n.state.value != sfnet.Network.STATE_CREATED:
                     return sf_api.error(
-                        406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
+                        406, 'network {} is not ready ({})'.format(n.uuid, n.state.value))
                 if n.namespace != namespace:
                     return sf_api.error(404, 'network %s does not exist' % n.uuid)
 
@@ -725,7 +725,7 @@ class InstancesEndpoint(sf_api.Resource):
             disk_base = disk.get('base')
             if disk.get('blob_uuid'):
                 tasks.append(FetchImageTask(
-                    '%s%s' % (BLOB_URL, disk['blob_uuid']),
+                    '{}{}'.format(BLOB_URL, disk['blob_uuid']),
                     namespace=namespace, instance_uuid=inst.uuid))
             elif not util_general.noneish(disk_base):
                 tasks.append(FetchImageTask(

@@ -47,8 +47,7 @@ def _read_remote(target, blob_uuid, offset=0):
                 'User-Agent': util_general.get_user_agent(),
                 'X-Request-ID': flask.request.headers.get('X-Request-ID')
             })
-    for chunk in r.iter_content(chunk_size=8192):
-        yield chunk
+    yield from r.iter_content(chunk_size=8192)
 
 
 def arg_is_blob_uuid(func):

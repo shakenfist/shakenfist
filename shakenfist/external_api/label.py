@@ -35,7 +35,7 @@ def _label_url(label_name):
     else:
         namespace = get_jwt_identity()[0]
         label = label_name
-    return (namespace, '%s%s/%s' % (LABEL_URL, namespace, label))
+    return (namespace, '{}{}/{}'.format(LABEL_URL, namespace, label))
 
 
 label_example = """{
