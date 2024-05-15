@@ -537,7 +537,7 @@ class NetworkPingEndpoint(sf_api.Resource):
         network_from_db.add_event(
             EVENT_TYPE_AUDIT, 'ping request from REST API')
         out, err = util_process.execute(
-            None, 'ip netns exec {} ping -c 10 {}'.format(network_from_db.uuid, address),
+            None, f'ip netns exec {network_from_db.uuid} ping -c 10 {address}',
             check_exit_code=[0, 1])
         return {
             'stdout': out.split('\n'),

@@ -273,7 +273,7 @@ def requires_instance_active(func):
         if i.state.value != Instance.STATE_CREATED:
             LOG.with_fields({'instance': i}).info(
                 'Instance not ready (%s)' % i.state.value)
-            return sf_api.error(406, 'instance {} is not ready ({})'.format(i.uuid, i.state.value))
+            return sf_api.error(406, f'instance {i.uuid} is not ready ({i.state.value})')
 
         return func(*args, **kwargs)
     return wrapper

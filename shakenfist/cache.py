@@ -22,7 +22,7 @@ def read_object_state_cache_many(object_type, states):
     out = []
     for key, data in etcd.get_prefix('/sf/cache/%s' % object_type):
         if type(data) is not dict:
-            LOG.error('Ignoring malformed cache entry {} = {}'.format(key, data))
+            LOG.error(f'Ignoring malformed cache entry {key} = {data}')
             continue
 
         state = key.split('/')[-1]
