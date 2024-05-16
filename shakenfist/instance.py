@@ -135,8 +135,7 @@ class Instance(dbo):
     def __init__(self, static_values):
         self.upgrade(static_values)
 
-        super().__init__(static_values.get('uuid'),
-                                       static_values.get('version'))
+        super().__init__(static_values.get('uuid'), static_values.get('version'))
 
         self.__cpus = static_values.get('cpus')
         self.__disk_spec = static_values.get('disk_spec')
