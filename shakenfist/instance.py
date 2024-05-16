@@ -68,7 +68,7 @@ def _get_disk_device(bus, index):
     if bus not in bases:
         raise exceptions.InstanceBadDiskSpecification('Unknown bus %s' % bus)
     prefix, index_scheme = bases.get(bus)
-    return '%s%s' % (prefix, index_scheme[index])
+    return '{}{}'.format(prefix, index_scheme[index])
 
 
 def _get_defaulted_disk_type(disk):
@@ -135,7 +135,7 @@ class Instance(dbo):
     def __init__(self, static_values):
         self.upgrade(static_values)
 
-        super(Instance, self).__init__(static_values.get('uuid'),
+        super().__init__(static_values.get('uuid'),
                                        static_values.get('version'))
 
         self.__cpus = static_values.get('cpus')
@@ -769,7 +769,7 @@ class Instance(dbo):
                     })
                 if allocatedPort:
                     return port
-            except socket.error:
+            except OSError:
                 LOG.with_fields({'instance': self.uuid}).info(
                     'Collided with in use port %d, selecting another' % port)
                 consumed.append(port)
@@ -830,7 +830,7 @@ class Instance(dbo):
                     # if an image had to be fetched from outside the cluster.
                     disk_base = None
                     if disk.get('blob_uuid'):
-                        disk_base = '%s%s' % (artifact.BLOB_URL, disk['blob_uuid'])
+                        disk_base = '{}{}'.format(artifact.BLOB_URL, disk['blob_uuid'])
                     elif disk.get('base') and not util_general.noneish(disk.get('base')):
                         a = artifact.Artifact.from_url(
                             artifact.Artifact.TYPE_IMAGE, disk['base'],
@@ -843,7 +843,7 @@ class Instance(dbo):
                                 % (a.uuid, a.artifact_type))
 
                         disk['blob_uuid'] = mri['blob_uuid']
-                        disk_base = '%s%s' % (artifact.BLOB_URL, disk['blob_uuid'])
+                        disk_base = '{}{}'.format(artifact.BLOB_URL, disk['blob_uuid'])
 
                     if disk_base:
                         cached_image_path = util_general.file_permutation_exists(
@@ -1022,7 +1022,7 @@ class Instance(dbo):
                 n = network.Network.from_db(iface.network_uuid)
                 nd['networks'].append(
                     {
-                        'id': '%s-%s' % (iface.network_uuid, iface.order),
+                        'id': '{}-{}'.format(iface.network_uuid, iface.order),
                         'link': devname,
                         'type': 'ipv4',
                         'network_id': iface.network_uuid
@@ -1059,7 +1059,7 @@ class Instance(dbo):
                    joliet_path='/openstack/2017-02-22/vendor_data.json')
 
         # empty vendor_data.json and vendor_data2.json
-        vd = '{}'.encode('ascii')
+        vd = b'{}'
         iso.add_fp(io.BytesIO(vd), len(vd),
                    '/openstack/latest/vendor_data.json;5',
                    rr_name='vendor_data.json',
@@ -1132,7 +1132,7 @@ class Instance(dbo):
             for channel in side_channels:
                 extradevices.append("<channel type='unix'>")
                 extradevices.append(
-                    "  <source mode='bind' path='%s/sc-%s'/>" % (self.instance_path, channel))
+                    "  <source mode='bind' path='{}/sc-{}'/>".format(self.instance_path, channel))
                 extradevices.append(
                     "  <target type='virtio' name='%s' state='connected'/>" % channel)
                 extradevices.append("</channel>")
@@ -1415,8 +1415,8 @@ class Instance(dbo):
 
             a = artifact.Artifact.from_url(
                 artifact.Artifact.TYPE_SNAPSHOT,
-                '%s%s/%s' % (artifact.INSTANCE_URL, self.uuid, disk['device']),
-                name='%s/%s' % (self.uuid, disk['device']),
+                '{}{}/{}'.format(artifact.INSTANCE_URL, self.uuid, disk['device']),
+                name='{}/{}'.format(self.uuid, disk['device']),
                 max_versions=max_versions, namespace=self.namespace,
                 create_if_new=True)
 
@@ -1465,12 +1465,12 @@ class Instance(dbo):
             if self.namespace != 'system':
                 artifacts.append(artifact.Artifact.new(
                     artifact.Artifact.TYPE_OTHER,
-                    '%s%s/console' % (artifact.INSTANCE_URL, self.uuid),
+                    '{}{}/console'.format(artifact.INSTANCE_URL, self.uuid),
                     name='%s/console' % self.uuid, max_versions=1,
                     namespace='system'))
             artifacts.append(artifact.Artifact.new(
                     artifact.Artifact.TYPE_OTHER,
-                    '%s%s/console' % (artifact.INSTANCE_URL, self.uuid),
+                    '{}{}/console'.format(artifact.INSTANCE_URL, self.uuid),
                     name='%s/console' % self.uuid, max_versions=1,
                     namespace=self.namespace))
 

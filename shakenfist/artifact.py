@@ -381,7 +381,7 @@ def type_filter(artifact_type, a):
 def instance_snapshot_filter(instance_uuid, a):
     if a.artifact_type != Artifact.TYPE_SNAPSHOT:
         return False
-    return a.source_url.startswith('{}{}'.format(INSTANCE_URL, instance_uuid))
+    return a.source_url.startswith(f'{INSTANCE_URL}{instance_uuid}')
 
 
 not_dead_states_filter = partial(

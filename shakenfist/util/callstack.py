@@ -11,6 +11,6 @@ def get_caller(offset=-2):
     f_match = FILENAME_RE.match(filename)
     if f_match:
         filename = f_match.group(1)
-    return '%s:%s:%s()' % (filename,
+    return '{}:{}:{}()'.format(filename,
                            traceback.extract_stack()[offset].lineno,
                            traceback.extract_stack()[offset].name)
