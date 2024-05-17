@@ -11,7 +11,7 @@ LOG, _ = logs.setup(__name__)
 # NOTE(mikal): IPManager should _always_ return addresses as strings,
 # not as ipaddress.IPv4Address.
 
-class IPManager(object):
+class IPManager:
     def __init__(self, uuid=None, ipblock=None, in_use=None):
         self.uuid = uuid
         self.ipblock = ipblock

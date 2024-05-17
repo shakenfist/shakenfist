@@ -149,7 +149,7 @@ class DatabaseBackedObject:
         return self.__in_memory_only
 
     def __str__(self):
-        return '{}({})'.format(self.object_type, self.__uuid)
+        return f'{self.object_type}({self.__uuid})'
 
     def unique_label(self):
         return (self.object_type, self.__uuid)
@@ -234,7 +234,7 @@ class DatabaseBackedObject:
         if o.get('version', 0) != cls.current_version:
             if not cls.upgrade_supported:
                 raise exceptions.BadObjectVersion(
-                    'Unsupported object version - {}: {}'.format(cls.object_type, o))
+                    f'Unsupported object version - {cls.object_type}: {o}')
         return o
 
     @classmethod
@@ -330,7 +330,7 @@ class DatabaseBackedObject:
 
         if not global_scope:
             return lockutils.external_lock(
-                '{}-{}'.format(self.object_type, self.uuid),
+                f'{self.object_type}-{self.uuid}',
                 lock_path='/tmp', lock_file_prefix='sflock-')
 
         return etcd.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
@@ -343,7 +343,7 @@ class DatabaseBackedObject:
 
         if not global_scope:
             return lockutils.external_lock(
-                '{}-{}-{}'.format(self.object_type, self.uuid, name),
+                f'{self.object_type}-{self.uuid}-{name}',
                 lock_path='/tmp', lock_file_prefix='sflock-')
 
         return etcd.get_lock('attribute/%s' % self.object_type,

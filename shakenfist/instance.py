@@ -68,7 +68,7 @@ def _get_disk_device(bus, index):
     if bus not in bases:
         raise exceptions.InstanceBadDiskSpecification('Unknown bus %s' % bus)
     prefix, index_scheme = bases.get(bus)
-    return '{}{}'.format(prefix, index_scheme[index])
+    return f'{prefix}{index_scheme[index]}'
 
 
 def _get_defaulted_disk_type(disk):
@@ -1021,7 +1021,7 @@ class Instance(dbo):
                 n = network.Network.from_db(iface.network_uuid)
                 nd['networks'].append(
                     {
-                        'id': '{}-{}'.format(iface.network_uuid, iface.order),
+                        'id': f'{iface.network_uuid}-{iface.order}',
                         'link': devname,
                         'type': 'ipv4',
                         'network_id': iface.network_uuid
@@ -1131,7 +1131,7 @@ class Instance(dbo):
             for channel in side_channels:
                 extradevices.append("<channel type='unix'>")
                 extradevices.append(
-                    "  <source mode='bind' path='{}/sc-{}'/>".format(self.instance_path, channel))
+                    f"  <source mode='bind' path='{self.instance_path}/sc-{channel}'/>")
                 extradevices.append(
                     "  <target type='virtio' name='%s' state='connected'/>" % channel)
                 extradevices.append("</channel>")
@@ -1464,12 +1464,12 @@ class Instance(dbo):
             if self.namespace != 'system':
                 artifacts.append(artifact.Artifact.new(
                     artifact.Artifact.TYPE_OTHER,
-                    '{}{}/console'.format(artifact.INSTANCE_URL, self.uuid),
+                    f'{artifact.INSTANCE_URL}{self.uuid}/console',
                     name='%s/console' % self.uuid, max_versions=1,
                     namespace='system'))
             artifacts.append(artifact.Artifact.new(
                     artifact.Artifact.TYPE_OTHER,
-                    '{}{}/console'.format(artifact.INSTANCE_URL, self.uuid),
+                    f'{artifact.INSTANCE_URL}{self.uuid}/console',
                     name='%s/console' % self.uuid, max_versions=1,
                     namespace=self.namespace))
 
