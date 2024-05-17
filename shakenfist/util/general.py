@@ -85,7 +85,7 @@ def get_user_agent():
 
 
 def ignore_exception(processname, e):
-    msg = '[Exception] Ignored error in {}: {}'.format(processname, e)
+    msg = f'[Exception] Ignored error in {processname}: {e}'
     _, _, tb = sys.exc_info()
     if tb:
         msg += '\n%s' % traceback.format_exc()
@@ -114,7 +114,7 @@ def stat_log_fields(path):
 def file_permutation_exists(basename, extensions):
     """ Find if any of the possible extensions exists. """
     for extn in extensions:
-        filename = '{}.{}'.format(basename, extn)
+        filename = f'{basename}.{extn}'
         if os.path.exists(filename):
             return filename
     return None
