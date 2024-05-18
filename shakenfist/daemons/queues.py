@@ -1,4 +1,3 @@
-
 import os
 import requests
 import setproctitle
@@ -48,7 +47,7 @@ def handle(jobname, workitem):
     log = LOG.with_fields({'workitem': jobname})
     log.info('Processing workitem')
 
-    setproctitle.setproctitle('%s-%s' % (daemon.process_name('queues'), jobname))
+    setproctitle.setproctitle('{}-{}'.format(daemon.process_name('queues'), jobname))
 
     inst = None
     task = None
@@ -170,7 +169,7 @@ def handle(jobname, workitem):
                         transcode_blob_uuid = str(uuid.uuid4())
                         transcode_blob_path = blob.Blob.filepath(transcode_blob_uuid)
                         util_process.execute(
-                            [], 'cp %s %s' % (task.cache_path(), transcode_blob_path))
+                            [], 'cp {} {}'.format(task.cache_path(), transcode_blob_path))
                         st = os.stat(transcode_blob_path)
 
                         transcode_blob = blob.Blob.new(
@@ -262,7 +261,7 @@ def image_fetch(url, namespace, inst):
             a.state = Artifact.STATE_ERROR
             a.error = msg
             raise exceptions.ImageFetchTaskFailedException(
-                'Failed to fetch image: %s Exception: %s' % (url, e))
+                'Failed to fetch image: {} Exception: {}'.format(url, e))
         else:
             a.add_event(
                 EVENT_TYPE_AUDIT, 'updating image failed, using already cached version',

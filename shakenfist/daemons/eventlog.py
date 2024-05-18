@@ -26,7 +26,7 @@ LOG, _ = logs.setup(__name__)
 
 class EventService(event_pb2_grpc.EventServiceServicer):
     def __init__(self, monitor):
-        super(EventService, self).__init__()
+        super().__init__()
         self.monitor = monitor
 
     def RecordEvent(self, request, context):
@@ -80,7 +80,7 @@ class EventService(event_pb2_grpc.EventServiceServicer):
 
 class Monitor(daemon.WorkerPoolDaemon):
     def __init__(self, id):
-        super(Monitor, self).__init__(id)
+        super().__init__(id)
         self.counters = {
             'pruned_events': Counter('pruned_events', 'Number of pruned events'),
             'pruned_sweep': Counter('pruned_sweep',
@@ -111,8 +111,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         event_pb2_grpc.add_EventServiceServicer_to_server(
             EventService(self), server)
-        server.add_insecure_port('%s:%s' % (config.EVENTLOG_NODE_IP,
-                                            config.EVENTLOG_API_PORT))
+        server.add_insecure_port('{}:{}'.format(config.EVENTLOG_NODE_IP, config.EVENTLOG_API_PORT))
         server.start()
 
         while not self.exit.is_set():
@@ -149,7 +148,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 etcd.get_etcd_client().delete(k)
                     except Exception as e:
                         util_general.ignore_exception(
-                            'failed to write event for %s %s' % (objtype, objuuid), e)
+                            'failed to write event for {} {}'.format(objtype, objuuid), e)
 
                 if results:
                     did_work = True
