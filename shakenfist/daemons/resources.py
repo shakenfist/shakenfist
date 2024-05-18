@@ -34,7 +34,7 @@ LIBVIRT_KVM_CMDLINE_RE = re.compile('.* guest=sf:([a-z0-9\\-]+).*')
 
 class Monitor(daemon.Daemon):
     def __init__(self, id):
-        super(Monitor, self).__init__(id)
+        super().__init__(id)
         start_http_server(config.RESOURCES_METRICS_PORT)
 
         self.last_logged_resources = 0

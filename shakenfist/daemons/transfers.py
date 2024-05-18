@@ -85,7 +85,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                         if name not in self.workers:
                             p = util_process.fork(
                                 transfer_server, [name, data],
-                                '%s-%s' % (daemon.process_name('transfers'), name))
+                                '{}-{}'.format(daemon.process_name('transfers'), name))
                             self.workers[name] = p
                     self.exit.wait(0.2)
                 elif len(self.workers) > 0:

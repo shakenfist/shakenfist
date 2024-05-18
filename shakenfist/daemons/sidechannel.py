@@ -39,7 +39,7 @@ class PutException(Exception):
 
 class SFSocketAgent(protocol.SocketAgent):
     def __init__(self, inst, path, logger=None):
-        super(SFSocketAgent, self).__init__(path, logger=logger)
+        super().__init__(path, logger=logger)
         self.log = LOG.with_fields({'instance': inst})
         self.instance = inst
 
@@ -49,7 +49,7 @@ class SFSocketAgent(protocol.SocketAgent):
 
 class Monitor(daemon.Daemon):
     def __init__(self, name):
-        super(Monitor, self).__init__(name)
+        super().__init__(name)
         self.monitors = {}
 
     def _record_system_boot_time(self, sbt):
