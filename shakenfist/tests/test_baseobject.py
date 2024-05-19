@@ -1,4 +1,4 @@
-import mock
+from unittest import mock
 import testtools
 
 from shakenfist.baseobject import DatabaseBackedObject, State

@@ -2,7 +2,7 @@ import base64
 import bcrypt
 import json
 import logging
-import mock
+from unittest import mock
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo, State
 from shakenfist.config import config, BaseSettings, SFConfig
@@ -11,7 +11,7 @@ from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
 
-class FakeResponse(object):
+class FakeResponse:
     def __init__(self, status_code, text):
         self.status_code = status_code
         self.text = text
@@ -20,12 +20,12 @@ class FakeResponse(object):
         return json.loads(self.text)
 
 
-class FakeScheduler(object):
+class FakeScheduler:
     def find_candidates(self, *args, **kwargs):
         return config.NODE_NAME
 
 
-class BaseFakeObject(object):
+class BaseFakeObject:
     def __init__(self, state=None):
         self._state = state
 
@@ -55,7 +55,7 @@ class FakeInstance(BaseFakeObject):
     def __init__(self, uuid=None, namespace=None,
                  state=dbo.STATE_CREATED, power_state='on',
                  placement='node1'):
-        super(FakeInstance, self).__init__(state)
+        super().__init__(state)
 
         self.uuid = uuid
         self.namespace = namespace
@@ -74,7 +74,7 @@ class FakeNetwork(BaseFakeObject):
 
     def __init__(self, uuid=None, vxid=None, namespace=None,
                  name=None, netblock=None, state=dbo.STATE_CREATED):
-        super(FakeNetwork, self).__init__(state)
+        super().__init__(state)
         self.uuid = uuid
         self.vxid = vxid
         self.namespace = namespace
@@ -100,7 +100,7 @@ def _encode_key(key):
 
 class ExternalApiTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(ExternalApiTestCase, self).setUp()
+        super().setUp()
 
         self.recorded_op = mock.patch('shakenfist.util.general.RecordedOperation')
         self.recorded_op.start()
@@ -475,7 +475,7 @@ class ExternalApiNetworkInterfaceTestCase(ExternalApiTestCase):
 
 class ExternalApiInstanceTestCase(ExternalApiTestCase):
     def setUp(self):
-        super(ExternalApiInstanceTestCase, self).setUp()
+        super().setUp()
 
         def fake_virt_from_db(uuid):
             return {'uuid': uuid}

@@ -1,4 +1,4 @@
-import mock
+from unittest import mock
 import testtools
 import uuid
 
@@ -12,7 +12,7 @@ from shakenfist.tests.mock_etcd import MockEtcd
 
 class NetworkTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(NetworkTestCase, self).setUp()
+        super().setUp()
 
         self.ipmanager_get = mock.patch(
             'shakenfist.ipmanager.IPManager.from_db')
@@ -42,7 +42,7 @@ class NetworkGeneralTestCase(NetworkTestCase):
 
 class NetworkNormalNodeTestCase(NetworkTestCase):
     def setUp(self):
-        super(NetworkNormalNodeTestCase, self).setUp()
+        super().setUp()
         fake_config = SFConfig(NODE_EGRESS_IP='1.1.1.2',
                                NODE_MESH_IP='1.1.1.2',
                                NETWORK_NODE_IP='1.1.1.2',
@@ -93,7 +93,7 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
 
 class NetworkNetNodeTestCase(NetworkTestCase):
     def setUp(self):
-        super(NetworkNetNodeTestCase, self).setUp()
+        super().setUp()
 
         fake_config = SFConfig(NODE_EGRESS_IP='1.1.1.2',
                                NODE_MESH_IP='1.1.1.2',

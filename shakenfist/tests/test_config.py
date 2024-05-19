@@ -1,4 +1,4 @@
-import mock
+from unittest import mock
 
 from shakenfist.config import SFConfig
 from shakenfist.tests import base

@@ -1,5 +1,5 @@
 import json
-import mock
+from unittest import mock
 from shakenfist_utilities import logs
 
 from shakenfist import etcd
@@ -21,7 +21,7 @@ fake_config = FakeConfig()
 
 class ActualLockTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(ActualLockTestCase, self).setUp()
+        super().setUp()
 
         self.config = mock.patch('shakenfist.etcd.config',
                                  fake_config)
