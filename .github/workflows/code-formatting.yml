@@ -53,4 +53,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN }}
         run: |
           cd ${GITHUB_WORKSPACE}/shakenfist/shakenfist
-          ${GITHUB_WORKSPACE}/shakenfist/tools/ci_code_formatting.sh
+          ${GITHUB_WORKSPACE}/shakenfist/tools/ci_code_formatting.sh 38

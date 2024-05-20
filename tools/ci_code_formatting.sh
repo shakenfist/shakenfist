@@ -1,12 +1,14 @@
 #!/bin/bash
 
+# $1 is the minimum python version, as a small string. For example "36".
+
 datestamp=$(date "+%Y%m%d")
 git checkout -b formatting-automations
 
 # We only want to change five files at a time
 changed=0
 for file in $( find . -type f -name "*.py" | egrep -v "(_pb2.py|pb2_grpc.py)"); do
-out=$( ${RUNNER_TEMP}/venv/bin/pyupgrade --py38-plus --exit-zero-even-if-changed ${file} 2>&1 || true )
+out=$( ${RUNNER_TEMP}/venv/bin/pyupgrade --py${1}-plus --exit-zero-even-if-changed ${file} 2>&1 || true )
 rewrites=$( echo ${out} | grep -c "Rewriting" || true )
 if [ ${rewrites} -gt 0 ]; then
     echo "${file} was modified"
