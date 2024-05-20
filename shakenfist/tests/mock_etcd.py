@@ -7,7 +7,7 @@
 from collections import defaultdict
 from itertools import count
 import json
-import mock
+from unittest import mock
 import os
 import time
 
@@ -108,12 +108,12 @@ class MockEtcd():
 
     def create(self, path, encoded, lease=None):
         self.db[path] = encoded
-        self._trace('MockEtcd.create() %s: %s' % (path, encoded))
+        self._trace('MockEtcd.create() {}: {}'.format(path, encoded))
         return True
 
     def get(self, path, metadata=False, sort_order=None, sort_target=None):
         d = self.db.get(path)
-        self._trace('MockEtcd.get() retrieving data for key %s: %s' % (path, d))
+        self._trace('MockEtcd.get() retrieving data for key {}: {}'.format(path, d))
         if not d:
             return None
 
@@ -132,7 +132,7 @@ class MockEtcd():
 
     def put(self, path, encoded, lease=None):
         self.db[path] = encoded
-        self._trace('MockEtcd.put() %s: %s' % (path, encoded))
+        self._trace('MockEtcd.put() {}: {}'.format(path, encoded))
 
     def delete(self, path):
         if path in self.db:

@@ -1,4 +1,4 @@
-import mock
+from unittest import mock
 
 from shakenfist.ipmanager import IPManager
 from shakenfist.tests import base

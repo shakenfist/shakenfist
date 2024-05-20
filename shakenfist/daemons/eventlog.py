@@ -111,7 +111,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         event_pb2_grpc.add_EventServiceServicer_to_server(
             EventService(self), server)
-        server.add_insecure_port('{}:{}'.format(config.EVENTLOG_NODE_IP, config.EVENTLOG_API_PORT))
+        server.add_insecure_port(f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}')
         server.start()
 
         while not self.exit.is_set():
@@ -148,7 +148,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 etcd.get_etcd_client().delete(k)
                     except Exception as e:
                         util_general.ignore_exception(
-                            'failed to write event for {} {}'.format(objtype, objuuid), e)
+                            f'failed to write event for {objtype} {objuuid}', e)
 
                 if results:
                     did_work = True
