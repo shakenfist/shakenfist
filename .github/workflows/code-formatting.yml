@@ -4,6 +4,12 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '00 00 * * *'        # utc
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - '.github/workflows/code-formatting.yml'
+      - 'tools/ci_code_formatting.sh'
 
 jobs:
   code-formatters:
