@@ -125,16 +125,23 @@ jobs:
           echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
           echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
 
-      - name: Checkout shakenfist
+      - name: Checkout shakenfist target branch
         uses: actions/checkout@v4
         with:
           path: shakenfist
           fetch-depth: 0
           ref: ${{ matrix.os.branch }}
 
+      - name: Checkout shakenfist develop branch for tooling
+        uses: actions/checkout@v4
+        with:
+          path: shakenfist-develop
+          fetch-depth: 0
+          ref: develop
+
       - name: Determine if there is any dependency between the repositories
         run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+          python3 ${GITHUB_WORKSPACE}/shakenfist-develop/tools/clone_with_depends.py
 
       - name: Build infrastructure
         run: |
@@ -147,7 +154,7 @@ jobs:
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/shakenfist-develop
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
               ${{ matrix.os.base_image_user }}@${primary}:.
@@ -155,7 +162,7 @@ jobs:
       - name: Log github actions buffering status
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/shakenfist-develop
           tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
@@ -238,7 +245,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/shakenfist-develop
           tools/run_remote ${primary} sudo /home/${{ matrix.os.base_image_user }}/tools/ci_event_checks.sh
 
       # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
@@ -256,7 +263,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/shakenfist-develop
           tools/run_remote ${primary} sudo /home/${{ matrix.os.base_image_user }}/tools/ci_event_checks.sh
 
       - name: Fetch and tweak inventory
@@ -283,7 +290,7 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/shakenfist-develop/deploy/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()
