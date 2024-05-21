@@ -145,7 +145,7 @@ jobs:
 
       - name: Build infrastructure
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/shakenfist-develop
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
