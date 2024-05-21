@@ -8,6 +8,11 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '00 13 * * *'        # utc
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - '.github/workflows/scheduled-tests.yml'
 
 jobs:
   functional_matrix:
