@@ -44,21 +44,17 @@ def main():
     primary_repo_path = os.path.join(
         os.environ['GITHUB_WORKSPACE'], os.environ['SF_PRIMARY_REPO'])
     primary_repo = git.Repo(primary_repo_path)
-    primary_base_reference = os.environ.get('GITHUB_BASE_REF')
 
     print('Primary repo: %s' % os.environ['SF_PRIMARY_REPO'])
     print('Primary commit: %s' % os.environ['SF_HEAD_SHA'])
-    print('Primary base reference: %s' % primary_base_reference)
     print('Github event name: %s' % os.environ.get('GITHUB_EVENT_NAME'))
 
     primary_commit_sha = os.environ['SF_HEAD_SHA']
     primary_commit = primary_repo.commit(primary_commit_sha)
     handled_repos = [os.environ['SF_PRIMARY_REPO']]
 
-    if not primary_base_reference:
-        print('No github provided base ref, using the current branch')
-        primary_base_reference = str(primary_repo.active_branch)
-        print('Primary base reference: %s' % primary_base_reference)
+    primary_base_reference = str(primary_repo.active_branch)
+    print('Primary base reference: %s' % primary_base_reference)
 
     # We looks for depends on syntax, but only for PRs. Otherwise we just
     # make sure that we have matching branches ("develop", "v0.6-releases", etc).
