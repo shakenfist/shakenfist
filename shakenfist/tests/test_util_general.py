@@ -1,4 +1,4 @@
-import mock
+from unittest import mock
 
 from shakenfist.tests import base
 from shakenfist.util import general as util_general

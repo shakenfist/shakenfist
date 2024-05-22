@@ -1,4 +1,4 @@
-import mock
+from unittest import mock
 import time
 
 from shakenfist.constants import GiB
@@ -22,7 +22,7 @@ fake_config = SFConfig(
 
 class SchedulerTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(SchedulerTestCase, self).setUp()
+        super().setUp()
 
         self.recorded_op = mock.patch(
             'shakenfist.util.general.RecordedOperation')
@@ -171,7 +171,7 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
     """Test when we force candidates."""
 
     def setUp(self):
-        super(ForcedCandidatesTestCase, self).setUp()
+        super().setUp()
         self.mock_etcd.set_node_metrics_same()
 
     def test_only_two(self):
