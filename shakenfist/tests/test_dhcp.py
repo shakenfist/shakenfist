@@ -1,5 +1,5 @@
 import jinja2
-import mock
+from unittest import mock
 import os
 from pydantic import AnyHttpUrl, IPvAnyAddress
 import signal
@@ -19,7 +19,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class DHCPTestCase(testtools.TestCase):
     def setUp(self):
-        super(DHCPTestCase, self).setUp()
+        super().setUp()
 
         class FakeConfig(BaseSettings):
             DNS_SERVER: str = '8.8.8.8'
@@ -316,7 +316,7 @@ class DHCPTestCase(testtools.TestCase):
                 None, 'dnsmasq --conf-file=%s/config' % dir,
                 namespace=network_uuid)
 
-            with open(os.path.join(dir, 'leases'), 'r') as f:
+            with open(os.path.join(dir, 'leases')) as f:
                 leases = f.read()
 
             # Expired lease stays
@@ -358,6 +358,6 @@ class DHCPTestCase(testtools.TestCase):
 
             mock_signal.assert_called_with(signal.SIGHUP)
 
-            with open(os.path.join(dir, 'leases'), 'r') as f:
+            with open(os.path.join(dir, 'leases')) as f:
                 leases = f.read()
             self.assertTrue('1a:91:64:d2:15:39' in leases)

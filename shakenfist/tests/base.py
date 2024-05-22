@@ -1,11 +1,11 @@
 import logging
-import mock
+from unittest import mock
 import testtools
 
 
 class ShakenFistTestCase(testtools.TestCase):
     def setUp(self):
-        super(ShakenFistTestCase, self).setUp()
+        super().setUp()
 
         # Remove any syslog handlers
         for name, v in logging.Logger.manager.loggerDict.items():
