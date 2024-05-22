@@ -141,7 +141,7 @@ jobs:
 
       - name: Determine if there is any dependency between the repositories
         run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist-develop/tools/clone_with_depends.py
+          python3 ${GITHUB_WORKSPACE}/shakenfist-develop/tools/clone_with_depends.py ${{ matrix.os.branch }}
 
       - name: Build infrastructure
         run: |
