@@ -1,4 +1,4 @@
-import mock
+from unittest import mock
 
 from shakenfist.baseobject import State
 from shakenfist.config import BaseSettings
@@ -6,7 +6,7 @@ from shakenfist.daemons import cleaner
 from shakenfist.tests import base
 
 
-class FakeLibvirt(object):
+class FakeLibvirt:
     VIR_DOMAIN_BLOCKED = 1
     VIR_DOMAIN_CRASHED = 2
     VIR_DOMAIN_NOSTATE = 3
@@ -20,7 +20,7 @@ class FakeLibvirt(object):
         return FakeLibvirtConnection()
 
 
-class FakeLibvirtConnection(object):
+class FakeLibvirtConnection:
     def listDomainsID(self):
         return ['id1', 'id2', 'id3', 'id4', 'id5', 'id6']
 
@@ -43,7 +43,7 @@ class FakeLibvirtConnection(object):
         pass
 
 
-class FakeLibvirtDomain(object):
+class FakeLibvirtDomain:
     def __init__(self, name, state):
         self._name = name
         self._state = state
@@ -80,7 +80,7 @@ FAKE_ETCD_STATE = {}
 def fake_instance_get(uuid):
     global FAKE_ETCD_STATE
     return FAKE_ETCD_STATE.get(
-        '%s/%s/%s' % ('instance', None, uuid),
+        '{}/{}/{}'.format('instance', None, uuid),
         {
             'uuid': uuid,
             'node': 'abigcomputer',
@@ -95,18 +95,18 @@ def fake_instance_get(uuid):
 
 def fake_put(objecttype, subtype, name, v):
     global FAKE_ETCD_STATE
-    FAKE_ETCD_STATE['%s/%s/%s' % (objecttype, subtype, name)] = v
+    FAKE_ETCD_STATE['{}/{}/{}'.format(objecttype, subtype, name)] = v
 
 
 def fake_get(objecttype, subtype, name):
     global FAKE_ETCD_STATE
-    val = FAKE_ETCD_STATE.get('%s/%s/%s' % (objecttype, subtype, name))
+    val = FAKE_ETCD_STATE.get('{}/{}/{}'.format(objecttype, subtype, name))
     return val
 
 
 class CleanerTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(CleanerTestCase, self).setUp()
+        super().setUp()
 
         self.libvirt = mock.patch(
             'shakenfist.util.libvirt.get_libvirt',
