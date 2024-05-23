@@ -1,6 +1,6 @@
 import json
 import logging
-import mock
+from unittest import mock
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config, SFConfig
@@ -9,14 +9,14 @@ from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
 
-class FakeScheduler(object):
+class FakeScheduler:
     def find_candidates(self, *args, **kwargs):
         return config.NODE_NAME
 
 
 class NetworksDeleteNoneTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(NetworksDeleteNoneTestCase, self).setUp()
+        super().setUp()
 
         external_api.TESTING = True
         external_api.app.testing = True
@@ -70,7 +70,7 @@ class NetworksDeleteNoneTestCase(base.ShakenFistTestCase):
 
 class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(NetworksDeleteAllTestCase, self).setUp()
+        super().setUp()
 
         external_api.TESTING = True
         external_api.app.testing = True

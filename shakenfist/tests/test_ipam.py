@@ -1,4 +1,4 @@
-import mock
+from unittest import mock
 import time
 import uuid
 
@@ -10,7 +10,7 @@ from shakenfist.tests.mock_etcd import MockEtcd
 
 class IPAMTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(IPAMTestCase, self).setUp()
+        super().setUp()
 
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()

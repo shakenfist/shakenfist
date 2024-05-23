@@ -1,6 +1,6 @@
 import json
 import logging
-import mock
+from unittest import mock
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config, SFConfig
@@ -16,14 +16,14 @@ def _clean_traceback(resp):
     return resp
 
 
-class FakeScheduler(object):
+class FakeScheduler:
     def find_candidates(self, *args, **kwargs):
         return config.NODE_NAME
 
 
 class AuthTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(AuthTestCase, self).setUp()
+        super().setUp()
 
         external_api.TESTING = True
         external_api.app.testing = True
@@ -147,7 +147,7 @@ class AuthTestCase(base.ShakenFistTestCase):
 
 class AuthWithServiceKeyTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(AuthWithServiceKeyTestCase, self).setUp()
+        super().setUp()
 
         external_api.TESTING = True
         external_api.app.testing = True
@@ -178,7 +178,7 @@ class AuthWithServiceKeyTestCase(base.ShakenFistTestCase):
 
 class AuthWithLingeringInstance(base.ShakenFistTestCase):
     def setUp(self):
-        super(AuthWithLingeringInstance, self).setUp()
+        super().setUp()
 
         external_api.TESTING = True
         external_api.app.testing = True
@@ -219,7 +219,7 @@ class AuthWithLingeringInstance(base.ShakenFistTestCase):
 
 class AuthWithLingeringNetwork(base.ShakenFistTestCase):
     def setUp(self):
-        super(AuthWithLingeringNetwork, self).setUp()
+        super().setUp()
 
         external_api.TESTING = True
         external_api.app.testing = True
@@ -260,7 +260,7 @@ class AuthWithLingeringNetwork(base.ShakenFistTestCase):
 
 class AuthKeysTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(AuthKeysTestCase, self).setUp()
+        super().setUp()
 
         external_api.TESTING = True
         external_api.app.testing = True
@@ -366,7 +366,7 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
 
 class ExternalApiTestCase(base.ShakenFistTestCase):
     def setUp(self):
-        super(ExternalApiTestCase, self).setUp()
+        super().setUp()
 
         self.recorded_op = mock.patch(
             'shakenfist.util.general.RecordedOperation')
@@ -601,7 +601,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
 
     @mock.patch('shakenfist.etcd.get_lock')
-    @mock.patch('bcrypt.hashpw', return_value='terminator'.encode('utf-8'))
+    @mock.patch('bcrypt.hashpw', return_value=b'terminator')
     def test_auth_add_key_new_namespace(self, mock_hashpw, mock_lock):
         resp = self.client.post('/auth/namespaces',
                                 headers={'Authorization': self.auth_token},
