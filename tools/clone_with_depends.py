@@ -47,7 +47,7 @@ def main():
     primary_repo = git.Repo(primary_repo_path)
 
     if len(sys.argv) > 1:
-        primary_base_reference = sys.argv[2]
+        primary_base_reference = sys.argv[1]
     else:
         primary_base_reference = os.environ.get('GITHUB_BASE_REF')
 
