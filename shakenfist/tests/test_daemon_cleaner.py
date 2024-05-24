@@ -95,12 +95,12 @@ def fake_instance_get(uuid):
 
 def fake_put(objecttype, subtype, name, v):
     global FAKE_ETCD_STATE
-    FAKE_ETCD_STATE['{}/{}/{}'.format(objecttype, subtype, name)] = v
+    FAKE_ETCD_STATE[f'{objecttype}/{subtype}/{name}'] = v
 
 
 def fake_get(objecttype, subtype, name):
     global FAKE_ETCD_STATE
-    val = FAKE_ETCD_STATE.get('{}/{}/{}'.format(objecttype, subtype, name))
+    val = FAKE_ETCD_STATE.get(f'{objecttype}/{subtype}/{name}')
     return val
 
 
