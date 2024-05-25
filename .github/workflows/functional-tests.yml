@@ -71,12 +71,14 @@ jobs:
           /usr/bin/tox -epy3
 
   functional_matrix:
+    name: "${{ matrix.os.description }}"
     needs: requirements-check
     strategy:
       fail-fast: false
       matrix:
         os: [
           {
+            description: 'debian 11 single machine',
             job_name: 'debian-11-localhost',
             base_image: 'sf://label/ci-images/debian-11',
             base_image_user: 'debian',
@@ -84,6 +86,7 @@ jobs:
             concurrency: 3
           },
           {
+            description: 'debian 12 cluster',
             job_name: 'debian-12-slim-primary',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
@@ -91,6 +94,7 @@ jobs:
             concurrency: 5
           },
           {
+            description: 'ubuntu 20.04 single machine',
             job_name: 'ubuntu-2004-localhost',
             base_image: 'sf://label/ci-images/ubuntu-2004',
             base_image_user: 'ubuntu',
@@ -98,6 +102,7 @@ jobs:
             concurrency: 3
           },
           {
+            description: 'ubuntu 22.04 cluster',
             job_name: 'ubuntu-2204-slim-primary',
             base_image: 'sf://label/ci-images/ubuntu-2204',
             base_image_user: 'ubuntu',

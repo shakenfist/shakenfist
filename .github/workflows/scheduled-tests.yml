@@ -16,11 +16,13 @@ on:
 
 jobs:
   functional_matrix:
+    name: "${{ matrix.os.description }}"
     strategy:
       fail-fast: false
       matrix:
         os: [
           {
+            description: 'develop branch on debian 11 single machine',
             job_name: 'develop-debian-11-localhost',
             base_image: 'sf://label/ci-images/debian-11',
             base_image_user: 'debian',
@@ -29,6 +31,7 @@ jobs:
             branch: 'develop'
           },
           {
+            description: 'develop branch on debian 12 cluster',
             job_name: 'develop-debian-12-slim-primary',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
@@ -37,6 +40,7 @@ jobs:
             branch: 'develop'
           },
           {
+            description: 'develop branch on ubuntu 20.04 single machine',
             job_name: 'develop-ubuntu-2004-localhost',
             base_image: 'sf://label/ci-images/ubuntu-2004',
             base_image_user: 'ubuntu',
@@ -45,6 +49,7 @@ jobs:
             branch: 'develop'
           },
           {
+            description: 'develop branch on ubuntu 22.04 cluster',
             job_name: 'develop-ubuntu-2204-slim-primary',
             base_image: 'sf://label/ci-images/ubuntu-2204',
             base_image_user: 'ubuntu',
@@ -55,6 +60,7 @@ jobs:
 
           # v0.7
           {
+            description: 'v0.7 branch on debian 11 single machine',
             job_name: 'v07-debian-11-localhost',
             base_image: 'sf://label/ci-images/debian-11',
             base_image_user: 'debian',
@@ -63,6 +69,7 @@ jobs:
             branch: 'v0.7-releases'
           },
           {
+            description: 'v0.7 branch on debian 11 cluster',
             job_name: 'v07-debian-11-slim-primary',
             base_image: 'sf://label/ci-images/debian-11',
             base_image_user: 'debian',
@@ -71,6 +78,7 @@ jobs:
             branch: 'v0.7-releases'
           },
           {
+            description: 'v0.7 branch on ubuntu 20.04 cluster',
             job_name: 'v07-ubuntu-2004-slim-primary',
             base_image: 'sf://label/ci-images/ubuntu-2004',
             base_image_user: 'ubuntu',
@@ -81,6 +89,7 @@ jobs:
 
           # v0.7 released
           {
+            description: 'v0.7 as released on debian 11 single machine',
             job_name: 'v07-released-debian-11-localhost',
             base_image: 'sf://label/ci-images/debian-11',
             base_image_user: 'debian',
@@ -89,6 +98,7 @@ jobs:
             branch: 'v0.7-releases'
           },
           {
+            description: 'v0.7 as released on debian 11 cluster',
             job_name: 'v07-released-debian-11-slim-primary',
             base_image: 'sf://label/ci-images/debian-11',
             base_image_user: 'debian',
@@ -97,6 +107,7 @@ jobs:
             branch: 'v0.7-releases'
           },
           {
+            description: 'v0.7 as released on ubuntu 20.04 cluster',
             job_name: 'v07-released-ubuntu-2004-slim-primary',
             base_image: 'sf://label/ci-images/ubuntu-2004',
             base_image_user: 'ubuntu',
