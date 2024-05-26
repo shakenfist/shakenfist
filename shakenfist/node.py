@@ -114,7 +114,7 @@ class Node(dbo):
         # expect
         retval = self._external_view()
         retval.update({
-            'fqdn': self.fqdn,
+            'name': self.fqdn,
             'ip': self.ip,
             'lastseen': self.last_seen,
             'release': self.installed_version

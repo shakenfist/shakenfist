@@ -7,8 +7,6 @@
 #        - and include examples: yes
 #   - Has complete CI coverage:
 
-from flask_restful import fields
-from flask_restful import marshal_with
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api
 
@@ -56,19 +54,6 @@ class NodeEndpoint(sf_api.Resource):
          (404, 'Node not found.', None)]))
     @api_base.verify_token
     @api_base.caller_is_admin
-    @marshal_with({
-        'name': fields.String(attribute='fqdn'),
-        'ip': fields.String,
-        'state': fields.String,
-        'lastseen': fields.Float,
-        'version': fields.String,
-        'release': fields.String,
-        'is_etcd_master': fields.Boolean,
-        'is_hypervisor': fields.Boolean,
-        'is_network_node': fields.Boolean,
-        'is_eventlog_node': fields.Boolean,
-        'is_cluster_maintainer': fields.Boolean
-    })
     @api_base.log_token_use
     def get(self, node=None):
         n = Node.from_db(node)
@@ -83,19 +68,6 @@ class NodeEndpoint(sf_api.Resource):
          (404, 'Node not found.', None)]))
     @api_base.verify_token
     @api_base.caller_is_admin
-    @marshal_with({
-        'name': fields.String(attribute='fqdn'),
-        'ip': fields.String,
-        'state': fields.String,
-        'lastseen': fields.Float,
-        'version': fields.String,
-        'release': fields.String,
-        'is_etcd_master': fields.Boolean,
-        'is_hypervisor': fields.Boolean,
-        'is_network_node': fields.Boolean,
-        'is_eventlog_node': fields.Boolean,
-        'is_cluster_maintainer': fields.Boolean
-    })
     @api_base.log_token_use
     def delete(self, node=None):
         n = Node.from_db(node)
@@ -133,19 +105,6 @@ class NodesEndpoint(sf_api.Resource):
          (404, 'Node not found.', None)]))
     @api_base.verify_token
     @api_base.caller_is_admin
-    @marshal_with({
-        'name': fields.String(attribute='fqdn'),
-        'ip': fields.String,
-        'state': fields.String,
-        'lastseen': fields.Float,
-        'version': fields.String,
-        'release': fields.String,
-        'is_etcd_master': fields.Boolean,
-        'is_hypervisor': fields.Boolean,
-        'is_network_node': fields.Boolean,
-        'is_eventlog_node': fields.Boolean,
-        'is_cluster_maintainer': fields.Boolean
-    })
     @api_base.log_token_use
     def get(self):
         # This is a little terrible. The way to work out which node is currently
@@ -156,7 +115,7 @@ class NodesEndpoint(sf_api.Resource):
         out = []
         for n in Nodes([]):
             node_out = n.external_view()
-            node_out['is_cluster_maintainer'] = node_out['fqdn'] == maintainer
+            node_out['is_cluster_maintainer'] = node_out['name'] == maintainer
             out.append(node_out)
         return out
 
@@ -172,7 +131,7 @@ node_events_example = """[
             "cpu_load_5": 7.1,
             ...
         },
-        "fqdn": "sf-1",
+        "name": "sf-1",
         "message": "updated node resources and package versions",
         "timestamp": 1685330702.492032,
         "type": "resources"

@@ -165,7 +165,7 @@ class Network(dbo):
             'provide_dhcp': self.__provide_dhcp,
             'provide_nat': self.__provide_nat,
             'floating_gateway': self.floating_gateway,
-            'vxid': self.__vxid
+            'vxlan_id': self.__vxid
         })
 
         for attrname in ['routing']:

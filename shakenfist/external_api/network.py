@@ -10,7 +10,6 @@
 from functools import partial
 from flask_jwt_extended import get_jwt_identity
 from flasgger import swag_from
-from flask_restful import fields, marshal_with
 import ipaddress
 from shakenfist_utilities import api as sf_api, logs
 
@@ -163,16 +162,6 @@ class NetworksEndpoint(sf_api.Resource):
         'networks', 'Get a list of all networks visible to the authenticated namespace.',
         [('all', 'body', 'boolean', 'Include deleted networks.', False)],
         [(200, 'A list of information about visible networks.', networks_get_example)]))
-    @marshal_with({
-        'uuid': fields.String,
-        'vxlan_id': fields.Integer,
-        'netblock': fields.String,
-        'provide_dhcp': fields.Boolean,
-        'provide_nat': fields.Boolean,
-        'namespace': fields.String,
-        'name': fields.String,
-        'state': fields.String
-    })
     @api_base.verify_token
     @api_base.log_token_use
     def get(self, all=False):
