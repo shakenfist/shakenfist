@@ -252,6 +252,13 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency=${{ matrix.os.concurrency}}; stestr slowest"
 
+      - name: List failing tests
+        if: failure()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist; stestr failing"
+
       - name: Check logs
         if: always()
         run: |
@@ -303,10 +310,29 @@ jobs:
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/shakenfist-develop/deploy/ansible/ci-gather-logs.yml
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: bundle-${{ matrix.os.job_name }}.zip
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
+
+      - name: Create an issue if tests failed
+        uses: JasonEtco/create-an-issue@v2
+        if: failure()
+        id: create-issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SF_CI_NAME: develop-debian-11-localhost
+          SF_BRANCH: develop
+          SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          filename: shakenfist/.github/workflows/scheduled-tests-failure.md
+          update_existing: true
+          search_existing: open
+
+      - name: Debug output
+        if: failure()
+        run: 'echo Created ${{ steps.create-issue.outputs.url }}'
