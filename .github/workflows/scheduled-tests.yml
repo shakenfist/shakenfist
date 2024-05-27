@@ -170,6 +170,12 @@ jobs:
               -o UserKnownHostsFile=/dev/null -rp tools \
               ${{ matrix.os.base_image_user }}@${primary}:.
 
+          echo ""
+          echo "Copied tools:"
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} "ls tools"
+
       - name: Log github actions buffering status
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
@@ -257,14 +263,14 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist; stestr failing"
+              ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; stestr failing"
 
       - name: Check logs
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/shakenfist-develop
-          tools/run_remote ${primary} sudo /home/${{ matrix.os.base_image_user }}/tools/ci_event_checks.sh
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh ${{ matrix.os.branch }}"
 
       # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
       # cost. That's not really something we can control, so just ignore the CPU
@@ -282,7 +288,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/shakenfist-develop
-          tools/run_remote ${primary} sudo /home/${{ matrix.os.base_image_user }}/tools/ci_event_checks.sh
+          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh ${{ matrix.os.branch }}"
 
       - name: Fetch and tweak inventory
         if: always()
