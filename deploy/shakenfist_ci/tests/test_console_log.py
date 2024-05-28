@@ -7,10 +7,10 @@ from shakenfist_ci import base
 class TestConsoleLog(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'console'
-        super(TestConsoleLog, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestConsoleLog, self).setUp()
+        super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace)
         self._await_networks_ready([self.net['uuid']])

@@ -40,13 +40,13 @@ NETWORK_PATIENCE_FACTOR = 3
 
 def load_userdata(name):
     test_dir = os.path.dirname(os.path.abspath(__file__))
-    with open('%s/tests/files/%s_userdata' % (test_dir, name)) as f:
+    with open('{}/tests/files/{}_userdata'.format(test_dir, name)) as f:
         return base64.b64encode(f.read().encode('utf-8')).decode('utf-8')
 
 
 class BaseTestCase(testtools.TestCase):
     def setUp(self):
-        super(BaseTestCase, self).setUp()
+        super().setUp()
 
         self.system_client = apiclient.Client(async_strategy=apiclient.ASYNC_PAUSE)
 
@@ -258,7 +258,7 @@ class BaseTestCase(testtools.TestCase):
         self._log_console(instance_uuid)
         self._log_instance_events(instance_uuid)
         raise TimeoutException(
-            'After time %s, instance %s had no event "%s:%s"' % (
+            'After time {}, instance {} had no event "{}:{}"'.format(
                 after, instance_uuid, operation, message))
 
     def _await_image_download_success(self, image_uuid, after=None):
@@ -443,19 +443,19 @@ class BaseNamespacedTestCase(BaseTestCase):
     def __init__(self, *args, **kwargs):
         namespace_prefix = kwargs.get('namespace_prefix')
         del kwargs['namespace_prefix']
-        self.namespace = 'ci-%s-%s' % (namespace_prefix,
+        self.namespace = 'ci-{}-{}'.format(namespace_prefix,
                                        self._uniquifier())
         self.namespace_key = self._uniquifier()
 
-        super(BaseNamespacedTestCase, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def setUp(self):
-        super(BaseNamespacedTestCase, self).setUp()
+        super().setUp()
         self.test_client = self._make_namespace(
             self.namespace, self.namespace_key)
 
     def tearDown(self):
-        super(BaseNamespacedTestCase, self).tearDown()
+        super().tearDown()
 
         non_blocking_client = apiclient.Client(
             base_url=self.system_client.base_url,
@@ -502,7 +502,7 @@ class BaseNamespacedTestCase(BaseTestCase):
 
 class TestDistroBoots(BaseNamespacedTestCase):
     def setUp(self):
-        super(TestDistroBoots, self).setUp()
+        super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self._await_networks_ready([self.net['uuid']])
