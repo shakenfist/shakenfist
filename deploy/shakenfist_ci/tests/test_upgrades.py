@@ -13,7 +13,7 @@ class TestUpgrades(base.BaseTestCase):
         networks_by_name = {}
         networks_by_uuid = {}
         for net in self.system_client.get_networks():
-            networks_by_name['%s/%s' % (net['namespace'], net['name'])] = net
+            networks_by_name['{}/{}'.format(net['namespace'], net['name'])] = net
             networks_by_uuid[net['uuid']] = net
 
         self.assertIn('upgrade/upgrade-fe', networks_by_name)
@@ -25,7 +25,7 @@ class TestUpgrades(base.BaseTestCase):
         # Collect instances and check
         instances = {}
         for inst in self.system_client.get_instances():
-            instances['%s/%s' % (inst['namespace'], inst['name'])] = inst
+            instances['{}/{}'.format(inst['namespace'], inst['name'])] = inst
 
         sys.stderr.write(
             'Discovered instances post upgrade: %s\n' % instances)
@@ -36,10 +36,10 @@ class TestUpgrades(base.BaseTestCase):
             sys.stderr.write('Looking up interfaces for %s\n' % name)
             self.assertIn(name, instances)
             for iface in self.system_client.get_instance_interfaces(instances[name]['uuid']):
-                sys.stderr.write('%s has interface %s\n' % (name, iface))
+                sys.stderr.write('{} has interface {}\n'.format(name, iface))
                 net_name = networks_by_uuid.get(
                     iface['network_uuid'], {'name': 'unknown'})['name']
-                addresses['%s/%s' % (name, net_name)] = iface['ipv4']
+                addresses['{}/{}'.format(name, net_name)] = iface['ipv4']
 
         sys.stderr.write(
             'Discovered addresses post upgrade: %s\n' % addresses)
