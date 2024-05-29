@@ -21,8 +21,8 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
     def log_write(s):
         s = s.rstrip()
         timestamp = datetime.datetime.now()
-        print('%s %s' % (timestamp, s))
-        logfile.write('%s %s\n' % (timestamp, s.rstrip()))
+        print('{} {}'.format(timestamp, s))
+        logfile.write('{} {}\n'.format(timestamp, s.rstrip()))
 
     variables = {}
     if os.path.exists('/etc/sf/deploy-vars.json'):
@@ -36,10 +36,10 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
 
         if v:
             variables[varname] = v
-            log_write('Changed configuration value %s to %s' % (varname, v))
+            log_write('Changed configuration value {} to {}'.format(varname, v))
         elif varname not in variables:
             variables[varname] = default
-            log_write('Defaulted configuration value %s to %s' % (varname, v))
+            log_write('Defaulted configuration value {} to {}'.format(varname, v))
 
     def update_if_specified_bool(varname, default):
         v = os.environ.get(varname.upper())
@@ -49,10 +49,10 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
             elif v.lower() == 'false':
                 v = '0'
             variables[varname] = v
-            log_write('Changed configuration value %s to %s' % (varname, v))
+            log_write('Changed configuration value {} to {}'.format(varname, v))
         elif varname not in variables:
             variables[varname] = default
-            log_write('Defaulted configuration value %s to %s' % (varname, v))
+            log_write('Defaulted configuration value {} to {}'.format(varname, v))
 
     update_if_specified('server_package', 'shakenfist')
     update_if_specified('client_package', 'shakenfist-client')
