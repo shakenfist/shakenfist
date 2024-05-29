@@ -395,7 +395,9 @@ class Blob(dbo):
                 time.sleep(1)
 
             if data['server_state'] != dbo.STATE_CREATED:
-                raise BlobTransferSetupFailed('transfer %s failed to setup' % name)
+                raise BlobTransferSetupFailed(
+                    'transfer %s failed to setup, state is %s'
+                    % (name, data['server_state']))
 
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect((locations[0], data['port']))

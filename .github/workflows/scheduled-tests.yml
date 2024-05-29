@@ -262,8 +262,15 @@ jobs:
         if: failure()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
+          touch ${GITHUB_WORKSPACE}/failed
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; stestr failing"
+              ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; stestr failing" | tee ${GITHUB_WORKSPACE}/failed
+
+          echo
+          failed=$(cat ${GITHUB_WORKSPACE}/failed | grep "FAILED: " | sed 's/FAILED: //')
+          for f in ${failed}; do
+              echo "Test ${f} failed"
+          done
 
       - name: Check logs
         if: always()
