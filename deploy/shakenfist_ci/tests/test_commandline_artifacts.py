@@ -24,7 +24,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
 
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'artifact-commandline'
-        super(TestArtifactCommandLine, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def _exec_client(self, cmd):
         return _exec('sf-client --apiurl %s --namespace %s --key %s %s'
@@ -37,7 +37,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
 
         # Ensure that cirros appears in the list of artifacts
         cirros_uuid = None
-        self.assertRegexpMatches(
+        self.assertRegex(
             self._exec_client('artifact list'), '.*cirros.*')
         for a in json.loads(self._exec_client('--json artifact list')):
             if a['source_url'] == 'cirros':
@@ -46,7 +46,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         self.assertIsNotNone(cirros_uuid)
 
         # Show the artifact
-        self.assertRegexpMatches(
+        self.assertRegex(
             self._exec_client('artifact show %s' % cirros_uuid), '.*image.*')
 
         # Wait until we have a blob_uuid

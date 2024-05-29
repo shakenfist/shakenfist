@@ -9,10 +9,10 @@ from shakenfist_ci import base
 class TestImages(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'images'
-        super(TestImages, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestImages, self).setUp()
+        super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self._await_networks_ready([self.net['uuid']])
@@ -239,7 +239,7 @@ class TestImages(base.BaseNamespacedTestCase):
 class TestSharedImages(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'sharedimages'
-        super(TestSharedImages, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def test_sharing(self):
         url = ('https://sfcbr.shakenfist.com/gw-basic-shared.qcow2')
@@ -269,7 +269,7 @@ class TestSharedImages(base.BaseNamespacedTestCase):
 class TestTrusts(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'trusts'
-        super(TestTrusts, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def test_trusts(self):
         url = ('https://sfcbr.shakenfist.com/gw-basic-trust.qcow2')
@@ -312,7 +312,7 @@ class TestTrusts(base.BaseNamespacedTestCase):
 class TestTypoedLabel(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'sharedimages'
-        super(TestTypoedLabel, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def test_typo_is_error(self):
         self.assertRaises(apiclient.ResourceNotFoundException,

@@ -6,7 +6,7 @@ from shakenfist_ci import base
 class TestArtifactMetadata(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'artifact-metadata'
-        super(TestArtifactMetadata, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def test_simple(self):
         img = self.test_client.cache_artifact(
@@ -24,7 +24,7 @@ class TestArtifactMetadata(base.BaseNamespacedTestCase):
 class TestBlobMetadata(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'blob-metadata'
-        super(TestBlobMetadata, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def test_simple(self):
         img = self.test_client.cache_artifact(
@@ -49,10 +49,10 @@ class TestBlobMetadata(base.BaseNamespacedTestCase):
 class TestInstanceMetadata(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'instance-metadata'
-        super(TestInstanceMetadata, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestInstanceMetadata, self).setUp()
+        super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self._await_networks_ready([self.net['uuid']])
@@ -86,10 +86,10 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
 class TestInterfaceMetadata(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'interface-metadata'
-        super(TestInterfaceMetadata, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestInterfaceMetadata, self).setUp()
+        super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self._await_networks_ready([self.net['uuid']])
@@ -125,7 +125,7 @@ class TestInterfaceMetadata(base.BaseNamespacedTestCase):
 class TestNamespaceMetadata(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'namespace-metadata'
-        super(TestNamespaceMetadata, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def test_simple(self):
         # The name of the namespace is uniqified by the test runner, so we need
@@ -143,10 +143,10 @@ class TestNamespaceMetadata(base.BaseNamespacedTestCase):
 class TestNetworkMetadata(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'network-metadata'
-        super(TestNetworkMetadata, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestNetworkMetadata, self).setUp()
+        super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self._await_networks_ready([self.net['uuid']])
@@ -163,7 +163,7 @@ class TestNetworkMetadata(base.BaseNamespacedTestCase):
 class TestNodeMetadata(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'node-metadata'
-        super(TestNodeMetadata, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def test_simple(self):
         n = self.system_client.get_nodes()[0]
