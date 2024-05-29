@@ -36,10 +36,10 @@ class TestUpgrades(base.BaseTestCase):
             sys.stderr.write('Looking up interfaces for %s\n' % name)
             self.assertIn(name, instances)
             for iface in self.system_client.get_instance_interfaces(instances[name]['uuid']):
-                sys.stderr.write('{} has interface {}\n'.format(name, iface))
+                sys.stderr.write(f'{name} has interface {iface}\n')
                 net_name = networks_by_uuid.get(
                     iface['network_uuid'], {'name': 'unknown'})['name']
-                addresses['{}/{}'.format(name, net_name)] = iface['ipv4']
+                addresses[f'{name}/{net_name}'] = iface['ipv4']
 
         sys.stderr.write(
             'Discovered addresses post upgrade: %s\n' % addresses)
