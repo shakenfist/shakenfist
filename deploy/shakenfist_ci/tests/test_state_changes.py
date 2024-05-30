@@ -11,10 +11,10 @@ LOG = logging.getLogger()
 class TestStateChanges(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'statechanges'
-        super(TestStateChanges, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestStateChanges, self).setUp()
+        super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, self.namespace)
         self._await_networks_ready([self.net['uuid']])
@@ -158,10 +158,10 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 class TestDetectReboot(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'detectreboot'
-        super(TestDetectReboot, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestDetectReboot, self).setUp()
+        super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, self.namespace)
         self._await_networks_ready([self.net['uuid']])

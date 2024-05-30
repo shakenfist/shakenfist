@@ -6,10 +6,10 @@ from shakenfist_ci import base
 class TestNetworking(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'net'
-        super(TestNetworking, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestNetworking, self).setUp()
+        super().setUp()
         self.net_one = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace)
         self.net_two = self.test_client.allocate_network(

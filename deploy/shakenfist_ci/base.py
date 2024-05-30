@@ -40,7 +40,7 @@ NETWORK_PATIENCE_FACTOR = 3
 
 def load_userdata(name):
     test_dir = os.path.dirname(os.path.abspath(__file__))
-    with open('{}/tests/files/{}_userdata'.format(test_dir, name)) as f:
+    with open(f'{test_dir}/tests/files/{name}_userdata') as f:
         return base64.b64encode(f.read().encode('utf-8')).decode('utf-8')
 
 
