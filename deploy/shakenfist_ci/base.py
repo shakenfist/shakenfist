@@ -443,8 +443,7 @@ class BaseNamespacedTestCase(BaseTestCase):
     def __init__(self, *args, **kwargs):
         namespace_prefix = kwargs.get('namespace_prefix')
         del kwargs['namespace_prefix']
-        self.namespace = 'ci-{}-{}'.format(namespace_prefix,
-                                       self._uniquifier())
+        self.namespace = 'ci-{}-{}'.format(namespace_prefix, self._uniquifier())
         self.namespace_key = self._uniquifier()
 
         super().__init__(*args, **kwargs)
