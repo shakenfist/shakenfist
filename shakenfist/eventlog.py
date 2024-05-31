@@ -312,8 +312,7 @@ class EventLog:
                     self.log.with_fields({
                         'chunk': '%04d%02d' % (year, month),
                         'error': e
-                    }).error('Chunk corrupt on prune, moving aside: %s.' % e)
-                    os.rename(elc.dbpath, elc.dbpath + '.corrupt')
+                    }).warning('Chunk corrupt on prune, will retry later: %s.' % e)
                     this_chunk_removed = 0
 
             return removed
