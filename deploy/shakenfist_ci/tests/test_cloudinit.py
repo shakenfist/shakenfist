@@ -7,10 +7,10 @@ from shakenfist_ci import base
 class TestCloudInit(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'cloudinit'
-        super(TestCloudInit, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestCloudInit, self).setUp()
+        super().setUp()
         self.net_one = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-1' % self.namespace)
         self.net_two = self.test_client.allocate_network(
