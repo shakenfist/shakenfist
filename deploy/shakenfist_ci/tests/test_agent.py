@@ -7,7 +7,7 @@ from shakenfist_ci import base
 class TestAgentFileOperations(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'agentfileops'
-        super(TestAgentFileOperations, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def test_put_and_exec_large_stdout(self):
         # Create an instance to run our script on

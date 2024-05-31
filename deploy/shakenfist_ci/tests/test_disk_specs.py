@@ -6,7 +6,7 @@ from shakenfist_ci import base
 class TestDiskSpecifications(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'diskspecs'
-        super(TestDiskSpecifications, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def test_default(self):
         inst = self.test_client.create_instance(
