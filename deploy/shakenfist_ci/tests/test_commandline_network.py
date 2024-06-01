@@ -24,7 +24,7 @@ class TestNetworkCommandLine(base.BaseNamespacedTestCase):
 
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'network-commandline'
-        super(TestNetworkCommandLine, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def _exec_client(self, cmd):
         return _exec('sf-client --apiurl %s --namespace %s --key %s %s'
@@ -38,39 +38,39 @@ class TestNetworkCommandLine(base.BaseNamespacedTestCase):
             'network create %s-net 192.168.1.2/24' % self.namespace)
 
         # Create
-        self.assertRegexpMatches(
+        self.assertRegex(
             self._exec_client('network create %s-net 192.168.1.0/24'
                               % self.namespace),
             '.*uuid .*')
 
         # List
-        self.assertRegexpMatches(
+        self.assertRegex(
             self._exec_client('network list'), '.*192.168.1.0/24.*')
         out = json.loads(self._exec_client('--json network list'))
         net_uuid = out[0]['uuid']
-        self.assertRegexpMatches(
+        self.assertRegex(
             self._exec_client('--simple network list'),
             '.*%s,.*' % net_uuid)
 
         # Show
-        self.assertRegexpMatches(
+        self.assertRegex(
             self._exec_client('network show %s' % net_uuid),
             '.*provide dhcp.*')
-        self.assertRegexpMatches(
+        self.assertRegex(
             self._exec_client('--simple network show %s' % net_uuid),
             '.*%s.*' % net_uuid)
         json.loads(self._exec_client('--json network show %s' % net_uuid))
 
         # Metadata
-        self.assertNotRegexpMatches(
+        self.assertNotRegex(
             self._exec_client('network show %s' % net_uuid),
             '.*gibbon.*')
         self._exec_client('network set-metadata %s funky gibbon' % net_uuid)
-        self.assertRegexpMatches(
+        self.assertRegex(
             self._exec_client('network show %s' % net_uuid),
             '.*gibbon.*')
         self._exec_client('network delete-metadata %s funky' % net_uuid)
-        self.assertNotRegexpMatches(
+        self.assertNotRegex(
             self._exec_client('network show %s' % net_uuid),
             '.*gibbon.*')
 
