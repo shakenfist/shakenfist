@@ -267,7 +267,7 @@ jobs:
               ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; stestr failing" | tee ${GITHUB_WORKSPACE}/failed
 
           echo
-          failed=$(cat ${GITHUB_WORKSPACE}/failed | grep "FAILED: " | sed 's/FAILED: //')
+          failed=$(cat ${GITHUB_WORKSPACE}/failed | grep "FAIL: " | sed 's/FAIL: //')
           for f in ${failed}; do
               echo "Test ${f} failed"
           done
