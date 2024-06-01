@@ -864,7 +864,10 @@ cat - > /root/sf-deploy << DEPLOYEOF
 #!/bin/bash
 
 echo "Upgrading ansible-galaxy dependancies..."
-ansible-galaxy install --force -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml | cat -
+ansible-galaxy install --force -v -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml | cat -
+
+echo "Current state of ansible-galaxy roles:"
+ansible-galaxy role list
 
 export ADMIN_PASSWORD=${GETSF_ADMIN_PASSWORD}
 export FLOATING_IP_BLOCK="${GETSF_FLOATING_BLOCK}"
