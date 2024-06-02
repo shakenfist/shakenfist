@@ -6,7 +6,7 @@ from shakenfist_ci import base
 class TestUploads(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'uploads'
-        super(TestUploads, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def test_upload(self):
         upl = self.test_client.create_upload()

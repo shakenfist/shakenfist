@@ -7,10 +7,10 @@ from shakenfist_ci import base
 class TestHTTPFetch(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'httpfetch'
-        super(TestHTTPFetch, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestHTTPFetch, self).setUp()
+        super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self._await_networks_ready([self.net['uuid']])
@@ -22,7 +22,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
-            'Command failed:\n\tstdout = %s\n\tstderr = %s\n' % (p.stdout, p.stderr))
+            'Command failed:\n\tstdout = {}\n\tstderr = {}\n'.format(p.stdout, p.stderr))
 
         url = 'http://10.0.0.10/debian-11-disappearing-cache'
         img = self.system_client.cache_artifact(url)
@@ -49,7 +49,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
-            'Command failed:\n\tstdout = %s\n\tstderr = %s\n' % (p.stdout, p.stderr))
+            'Command failed:\n\tstdout = {}\n\tstderr = {}\n'.format(p.stdout, p.stderr))
         self.system_client.cache_artifact(url)
         time.sleep(10)
 
@@ -64,7 +64,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
-            'Command failed:\n\tstdout = %s\n\tstderr = %s\n' % (p.stdout, p.stderr))
+            'Command failed:\n\tstdout = {}\n\tstderr = {}\n'.format(p.stdout, p.stderr))
 
         url = 'http://10.0.0.10/debian-11-disappearing-instance'
         inst = self.test_client.create_instance(
@@ -84,7 +84,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
-            'Command failed:\n\tstdout = %s\n\tstderr = %s\n' % (p.stdout, p.stderr))
+            'Command failed:\n\tstdout = {}\n\tstderr = {}\n'.format(p.stdout, p.stderr))
 
         # Ensure we can still start an instance
         inst = self.test_client.create_instance(
