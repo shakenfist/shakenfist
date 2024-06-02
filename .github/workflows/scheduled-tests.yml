@@ -286,8 +286,16 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs --ignore sf_cleaner'
+
+          if [ $(echo ${1} | egrep -c "^0.[1234567]") -eq 0 ]; then
+          echo
+              # Older versions of Shaken Fist can't ignore some processes
+              ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                  ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs'
+          else
+              ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                  ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs --ignore sf_cleaner'
+          fi
 
       - name: Check for reasonable data rates
         timeout-minutes: 5
