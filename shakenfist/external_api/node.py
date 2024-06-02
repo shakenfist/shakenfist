@@ -56,7 +56,7 @@ class NodeEndpoint(sf_api.Resource):
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None):
-        n = Node.from_db(node)
+        n = Node.from_db(node, suppress_failure_audit=True)
         if not n:
             return sf_api.error(404, 'node not found')
         return n.external_view()
@@ -70,7 +70,7 @@ class NodeEndpoint(sf_api.Resource):
     @api_base.caller_is_admin
     @api_base.log_token_use
     def delete(self, node=None):
-        n = Node.from_db(node)
+        n = Node.from_db(node, suppress_failure_audit=True)
         if not n:
             return sf_api.error(404, 'node not found')
 
@@ -178,7 +178,7 @@ class NodeProcessMetricsEndpoint(sf_api.Resource):
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None):
-        n = Node.from_db(node)
+        n = Node.from_db(node, suppress_failure_audit=True)
         if not n:
             return sf_api.error(404, 'node not found')
         return n.process_metrics
@@ -195,7 +195,7 @@ class NodeMetadatasEndpoint(sf_api.Resource):
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None):
-        n = Node.from_db(node)
+        n = Node.from_db(node, suppress_failure_audit=True)
         if not n:
             return sf_api.error(404, 'node not found')
         return n.metadata
@@ -219,7 +219,7 @@ class NodeMetadatasEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
-        n = Node.from_db(node)
+        n = Node.from_db(node, suppress_failure_audit=True)
         if not n:
             return sf_api.error(404, 'node not found')
         n.add_event(
@@ -248,7 +248,7 @@ class NodeMetadataEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key specified')
         if not value:
             return sf_api.error(400, 'no value specified')
-        n = Node.from_db(node)
+        n = Node.from_db(node, suppress_failure_audit=True)
         if not n:
             return sf_api.error(404, 'node not found')
         n.add_event(
@@ -273,7 +273,7 @@ class NodeMetadataEndpoint(sf_api.Resource):
     def delete(self, node=None, key=None, value=None):
         if not key:
             return sf_api.error(400, 'no key specified')
-        n = Node.from_db(node)
+        n = Node.from_db(node, suppress_failure_audit=True)
         if not n:
             return sf_api.error(404, 'node not found')
         n.add_event(
