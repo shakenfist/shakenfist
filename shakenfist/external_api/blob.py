@@ -14,17 +14,22 @@ import math
 import os
 import random
 import requests
-from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import api as sf_api, logs
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
 from shakenfist.util import general as util_general
+
+
+LOG, HANDLER = logs.setup(__name__)
+daemon.set_log_level(LOG, 'api')
 
 
 def _read_file(filename, offset, limit=0):
@@ -151,12 +156,14 @@ class BlobDataEndpoint(sf_api.Resource):
         # Fast path if we have the blob locally
         blob_path = Blob.filepath(blob_uuid)
         if os.path.exists(blob_path):
+            LOG.debug('Returning direct result')
             return flask.Response(
                 flask.stream_with_context(_read_file(blob_path, offset,
                                                      limit=limit)),
                 mimetype='text/plain', status=200)
 
         # Otherwise find a node which has the blob and proxy.
+        LOG.debug('Returning proxied result')
         locations = blob_from_db.locations
         if not locations:
             return sf_api.error(404, 'blob missing')
