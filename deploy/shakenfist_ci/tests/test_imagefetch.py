@@ -22,7 +22,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
-            'Command failed:\n\tstdout = {}\n\tstderr = {}\n'.format(p.stdout, p.stderr))
+            f'Command failed:\n\tstdout = {p.stdout}\n\tstderr = {p.stderr}\n')
 
         url = 'http://10.0.0.10/debian-11-disappearing-cache'
         img = self.system_client.cache_artifact(url)
@@ -49,7 +49,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
-            'Command failed:\n\tstdout = {}\n\tstderr = {}\n'.format(p.stdout, p.stderr))
+            f'Command failed:\n\tstdout = {p.stdout}\n\tstderr = {p.stderr}\n')
         self.system_client.cache_artifact(url)
         time.sleep(10)
 
@@ -64,7 +64,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
-            'Command failed:\n\tstdout = {}\n\tstderr = {}\n'.format(p.stdout, p.stderr))
+            f'Command failed:\n\tstdout = {p.stdout}\n\tstderr = {p.stderr}\n')
 
         url = 'http://10.0.0.10/debian-11-disappearing-instance'
         inst = self.test_client.create_instance(
@@ -84,7 +84,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
-            'Command failed:\n\tstdout = {}\n\tstderr = {}\n'.format(p.stdout, p.stderr))
+            f'Command failed:\n\tstdout = {p.stdout}\n\tstderr = {p.stderr}\n')
 
         # Ensure we can still start an instance
         inst = self.test_client.create_instance(
