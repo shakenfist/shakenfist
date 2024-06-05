@@ -3,6 +3,8 @@
 failures=0
 
 echo
+echo "Running log checks for branch ${1} and job ${2}."
+echo
 etcd_conns=`grep -c "Building new etcd connection" /var/log/syslog || true`
 echo "This CI run created $etcd_conns etcd connections."
 if [ $etcd_conns -gt 5000 ]; then
@@ -20,6 +22,7 @@ fi
 
 # NOTE(mikal): online upgrades are forbidden in these fresh install
 # tests.
+echo
 FORBIDDEN=("Traceback (most recent call last):"
             "ERROR sf"
             "ERROR gunicorn"
@@ -35,19 +38,31 @@ FORBIDDEN=("Traceback (most recent call last):"
             "invalid JWT in Authorization header"
             "Libvirt Error: XML error"
             "Cleaning up leaked IPAM"
-            "Cleaning up leaked vxlan"
-            "Waiting to acquire lock"
-            'apparmor="DENIED"'
-            "Ignoring malformed cache entry"
-            "online upgrade")
+            "Cleaning up leaked vxlan")
+
+if [ $(echo "${1}" | grep -c "v0.7" || true) -lt 1 ]; then
+    echo "INFO: Including forbidden strings for v0.8 onwards."
+    FORBIDDEN+=("Waiting to acquire lock")
+    FORBIDDEN+=('apparmor="DENIED"')
+    FORBIDDEN+=("Ignoring malformed cache entry")
+    FORBIDDEN+=("WORKER TIMEOUT")
+fi
+
+if [ $(echo "${2}" | grep -c "upgrade" || true) -lt 1 ]; then
+    echo "INFO: Including forbidden strings for non-upgrade jobs."
+    FORBIDDEN+=("online upgrade")
+fi
+
 IFS=""
 for forbid in ${FORBIDDEN[*]}
 do
-if [ `grep -c -i "$forbid" /var/log/syslog || true` -gt 0 ]
-then
-    echo "FAILURE: Forbidden string found in logs: $forbid"
-    failures=1
-fi
+    echo "Check for ${forbid} in logs."
+    count=$(grep -c -i "$forbid" /var/log/syslog || true)
+    if [ ${count} -gt 0 ]
+    then
+        echo "FAILURE: Forbidden string found in logs ${count} times."
+        failures=1
+    fi
 done
 
 # Forbidden once stable, which we currently define as after the first 1,000
@@ -56,13 +71,16 @@ FORBIDDEN_ONCE_STABLE=("Failed to send event with gRPC")
 IFS=""
 for forbid in ${FORBIDDEN_ONCE_STABLE[*]}
 do
-if [ `tail -n +1000 /var/log/syslog | grep -c -i "$forbid" || true` -gt 0 ]
-then
-    echo "FAILURE: Forbidden once stable string found in logs: $forbid"
-    failures=1
-fi
+    echo "Check for ${forbid} in stable logs."
+    count=$(tail -n +1000 /var/log/syslog | grep -c -i "$forbid" || true)
+    if [ ${count} -gt 0 ]
+    then
+        echo "FAILURE: Forbidden once stable string found ${count} times."
+        failures=1
+    fi
 done
 
+echo
 if [ $failures -gt 0 ]; then
     echo "...failures detected."
     exit 1
