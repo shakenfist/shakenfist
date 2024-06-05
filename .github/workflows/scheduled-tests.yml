@@ -136,6 +136,18 @@ jobs:
           echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
           echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
 
+      - name: Install the github command line
+        run: |
+          sudo apt update
+          sudo apt install -y curl
+
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+
+          sudo apt update
+          sudo apt install -y gh
+
       - name: Checkout shakenfist target branch
         uses: actions/checkout@v4
         with:
@@ -264,12 +276,14 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           touch ${GITHUB_WORKSPACE}/failed
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; stestr failing" | tee ${GITHUB_WORKSPACE}/failed
+              ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; stestr failing" > ${GITHUB_WORKSPACE}/failed
 
           echo
-          failed=$(cat ${GITHUB_WORKSPACE}/failed | grep "FAIL: " | sed 's/FAIL: //')
+          failed=$(cat ${GITHUB_WORKSPACE}/failed | grep "FAIL: " | sed -e 's/FAIL: //' -e 's/shakenfist_ci\.tests\.//')
           for f in ${failed}; do
               echo "Test ${f} failed"
+              gh search issues --state=open "Failure in CI: ${f}"
+              echo
           done
 
       - name: Check logs
@@ -339,20 +353,6 @@ jobs:
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
-
-      - name: Create an issue if tests failed
-        uses: JasonEtco/create-an-issue@v2
-        if: failure()
-        id: create-issue
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SF_CI_NAME: develop-debian-11-localhost
-          SF_BRANCH: develop
-          SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        with:
-          filename: shakenfist/.github/workflows/scheduled-tests-failure.md
-          update_existing: true
-          search_existing: open
 
       - name: Debug output
         if: failure()
