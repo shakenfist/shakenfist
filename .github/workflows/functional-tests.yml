@@ -238,7 +238,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/shakenfist
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop"
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.os.job_name }}"
 
       # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
       # cost. That's not really something we can control, so just ignore the CPU
@@ -392,7 +392,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/shakenfist
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop"
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ansible-modules"
 
       - name: Check process CPU usage
         if: always()
@@ -544,7 +544,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/shakenfist
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop"
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop node-lifecycle"
 
       - name: Restart Shaken Fist nodes so we can collect logs
         if: always()
@@ -666,7 +666,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/shakenfist
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop"
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop upgrade-0-6-15"
 
       - name: Fetch and tweak inventory
         if: always()
