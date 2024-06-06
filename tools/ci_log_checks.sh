@@ -38,7 +38,8 @@ FORBIDDEN=("Traceback (most recent call last):"
             "invalid JWT in Authorization header"
             "Libvirt Error: XML error"
             "Cleaning up leaked IPAM"
-            "Cleaning up leaked vxlan")
+            "Cleaning up leaked vxlan"
+            "invalid salt")
 
 if [ $(echo "${1}" | grep -c "v0.7" || true) -lt 1 ]; then
     echo "INFO: Including forbidden strings for v0.8 onwards."
@@ -56,7 +57,7 @@ fi
 IFS=""
 for forbid in ${FORBIDDEN[*]}
 do
-    echo "Check for ${forbid} in logs."
+    echo "    Check for >>${forbid}<< in logs."
     count=$(grep -c -i "$forbid" /var/log/syslog || true)
     if [ ${count} -gt 0 ]
     then
@@ -71,7 +72,7 @@ FORBIDDEN_ONCE_STABLE=("Failed to send event with gRPC")
 IFS=""
 for forbid in ${FORBIDDEN_ONCE_STABLE[*]}
 do
-    echo "Check for ${forbid} in stable logs."
+    echo "    Check for >>${forbid}<< in stable logs."
     count=$(tail -n +1000 /var/log/syslog | grep -c -i "$forbid" || true)
     if [ ${count} -gt 0 ]
     then
