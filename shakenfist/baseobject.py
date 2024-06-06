@@ -1,3 +1,4 @@
+from collections import defaultdict
 from etcd3gw.lock import Lock
 from functools import partial
 import json
@@ -51,21 +52,59 @@ def get_minimum_object_version(objname):
 
     # Ignore metrics for deleted nodes, but include nodes in an error state
     # as they may return.
-    for _, d in etcd.get_all('metrics', None):
+    for k, d in etcd.get_all('metrics', None):
         node_name = d['fqdn']
+        d['metrics']['metrics_age'] = time.time() - d.get('timestamp', 0)
+
+        # Discard very old metrics
+        if d['metrics']['metrics_age'] > 24 * 7 * 3600:
+            LOG.with_fields({
+                'node_name': node_name,
+                'from_key': k,
+                'metrics_age': d['metrics']['metrics_age']
+            }).debug('Ignoring very old metrics entry')
+            continue
+
         state = etcd.get('attribute/node', node_name, 'state')
         if state and state['value'] != DatabaseBackedObject.STATE_DELETED:
             metrics[node_name] = d['metrics']
+            LOG.with_fields({
+                'node_name': node_name,
+                'from_key': k,
+                'metrics_age': d['metrics']['metrics_age']
+            }).debug('Considering metrics entry')
+        else:
+            LOG.with_fields({
+                'node_name': node_name,
+                'from_key': k,
+                'metrics_age': d['metrics']['metrics_age']
+            }).debug('Ignoring metrics entry for deleted node')
 
     for possible_objname in OBJECT_NAMES:
+        nodes_by_version = defaultdict(list, [])
+        node_metric_age = {}
         minimum = inf
+
         for node_name in metrics:
+            node_metric_age[f'metrics age {node_name}'] = \
+                metrics[node_name]['metrics_age']
             ver = metrics[node_name].get('object_version_%s' % possible_objname)
             if ver:
                 minimum = min(minimum, ver)
+                nodes_by_version[f'version {ver}'].append(node_name)
+            else:
+                nodes_by_version['no version reported'].append(node_name)
+
+        LOG.with_fields(nodes_by_version).with_fields(node_metric_age).with_fields({
+            'object_type': possible_objname}).debug('Object versions reported')
         VERSION_CACHE[possible_objname] = minimum
 
-    VERSION_CACHE_AGE = time.time()
+    if VERSION_CACHE[objname] == inf:
+        LOG.with_fields({
+            'object_type': possible_objname
+        }).debug('No object versions reported, so discarding version cache')
+    else:
+        VERSION_CACHE_AGE = time.time()
     return VERSION_CACHE[objname]
 
 

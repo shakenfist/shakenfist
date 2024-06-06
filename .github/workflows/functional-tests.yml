@@ -666,6 +666,22 @@ jobs:
               -o UserKnownHostsFile=/dev/null \
               debian@$primary 'sudo chmod ugo+r /etc/sf/*'
 
+      # The sf-backup script deliberately clobbers keys in its output, so we need
+      # to repair the system key before we can use command line tools.
+      - name: Repair clobbered system key
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@$primary '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-ctl bootstrap-system-key deploy ${SHAKENFIST_KEY}'
+
+      - name: List current nodes
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@$primary '. /etc/sf/sfrc; sf-client node list'
+
       - name: Wait for five minutes
         run: sleep 300
 

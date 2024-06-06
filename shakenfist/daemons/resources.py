@@ -295,6 +295,12 @@ class Monitor(daemon.Daemon):
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
         }
 
+        # Clear out any old metrics entries for this node
+        for k, d in etcd.get_all('metrics', None):
+            node_name = d['fqdn']
+            if node_name == config.NODE_NAME:
+                etcd.delete_raw(k)
+
         # Some versions are static and only looked up at startup
         n = Node.from_db(config.NODE_NAME)
         n.python_version = platform.python_version_tuple()

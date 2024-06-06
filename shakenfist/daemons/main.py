@@ -13,7 +13,8 @@ import signal
 import subprocess
 import time
 
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_ITERATORS
+from shakenfist.baseobjectmapping import (
+    OBJECT_NAMES_TO_ITERATORS, OBJECT_NAMES_TO_CLASSES)
 from shakenfist.blob import Blob, Blobs, placement_filter
 from shakenfist import cache
 from shakenfist import config as sf_config
@@ -199,6 +200,20 @@ def main():
     # This is awkward, but let's verify our configuration before we get any
     # further.
     sf_config.verify_config()
+
+    # We need to report object versions very early before the resources daemon
+    # has started. This code is duplicated from the resources daemon code. Sorry.
+    stats = {}
+    for obj in OBJECT_NAMES_TO_CLASSES:
+        stats['object_version_%s' % obj] = \
+            OBJECT_NAMES_TO_CLASSES[obj].current_version
+    etcd.put(
+        'metrics', config.NODE_NAME, None,
+        {
+            'fqdn': config.NODE_NAME,
+            'timestamp': time.time(),
+            'metrics': stats
+        })
 
     # Start the eventlog daemon very very early because basically everything
     # else talks to it.
