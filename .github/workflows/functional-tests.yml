@@ -324,6 +324,14 @@ jobs:
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
               deploy/ansible/ci-topology-slim-primary.yml
 
+      - name: Copy CI tools to primary
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null -rp tools \
+              debian@$primary:.
+
       - name: Run getsf installer on primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
