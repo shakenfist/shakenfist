@@ -54,9 +54,23 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                         'extra': request.extra
                     }).error('Event has invalid timestamp')
 
-                eventdb.write_event(
-                    request.event_type, timestamp, request.fqdn,
-                    request.duration, request.message, extra)
+                if not eventdb.write_event(
+                        request.event_type, timestamp, request.fqdn,
+                        request.duration, request.message, extra):
+                    # Write the event failed, queue it to etcd instead
+                    LOG.info('Failed to write event via gRPC path, adding to dead '
+                             'letter queue')
+                    etcd.put('event/%s' % request.object_type, request.object_uuid,
+                             timestamp,
+                             {
+                                 'timestamp': timestamp,
+                                 'event_type': request.event_type,
+                                 'object_type': request.object_type,
+                                 'object_uuid': request.object_uuid,
+                                 'fqdn': request.fqdn,
+                                 'message': request.message,
+                                 'extra': request.extra
+                             })
                 self.monitor.counters[request.event_type].inc()
 
             # Piggy back request tracing onto object events
@@ -148,7 +162,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 etcd.get_etcd_client().delete(k)
                     except Exception as e:
                         util_general.ignore_exception(
-                            f'failed to write event for {objtype} {objuuid}', e)
+                            f'Failed to write event for {objtype} {objuuid}, will retry', e)
 
                 if results:
                     did_work = True
