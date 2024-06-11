@@ -91,9 +91,18 @@ class AuthEndpoint(sf_api.Resource):
         keys = namespace_from_db.keys.get('nonced_keys', {})
         for keyname in keys:
             possible_key = base64.b64decode(keys[keyname]['key'])
-            if bcrypt.checkpw(key.encode('utf-8'), possible_key):
-                return access_tokens.create_token(
-                    namespace_from_db, keyname, keys[keyname]['nonce'])
+            try:
+                if bcrypt.checkpw(key.encode('utf-8'), possible_key):
+                    return access_tokens.create_token(
+                        namespace_from_db, keyname, keys[keyname]['nonce'])
+            except ValueError as e:
+                namespace_from_db.add_event(
+                    EVENT_TYPE_AUDIT, 'namespace key is invalid',
+                    extra={
+                        'error': str(e),
+                        'key_name': keyname,
+                        'key-body': keys[keyname]
+                    })
 
         namespace_from_db.add_event(
             EVENT_TYPE_AUDIT, 'attempt to use incorrect namespace key')

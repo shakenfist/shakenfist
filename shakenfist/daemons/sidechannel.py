@@ -100,7 +100,8 @@ class Monitor(daemon.Daemon):
                 if packet.get('message', 'none') == 'degraded':
                     new_state = constants.AGENT_READY_DEGRADED
                 else:
-                    new_state = constants.AGENT_DEGRADED
+                    new_state = (
+                        constants.AGENT_DEGRADED % packet.get('message', 'none'))
 
             # We cache the agent state to reduce database load, and then
             # trigger facts gathering when we transition into the constants.AGENT_READY state.

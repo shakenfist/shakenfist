@@ -183,10 +183,11 @@ class EventLog:
         for (year, month) in self.write_elc_cache:
             self.write_elc_cache[(year, month)].close()
 
-    def write_event(self, event_type, timestamp, fqdn, duration, message, extra=None):
+    def write_event(self, event_type, timestamp, fqdn, duration, message,
+                    extra=None):
         with self.lock:
-            self._write_event_inner(event_type, timestamp, fqdn, duration, message,
-                                    extra=extra)
+            return self._write_event_inner(
+                event_type, timestamp, fqdn, duration, message, extra=extra)
 
     def _write_event_inner(self, event_type, timestamp, fqdn, duration, message,
                            extra=None):
@@ -200,19 +201,27 @@ class EventLog:
         try:
             elc.write_event(event_type, timestamp, fqdn, duration, message,
                             extra=extra)
+            return True
         except sqlite3.DatabaseError as e:
-            self.log.with_fields({
-                'chunk': '%04d%02d' % (year, month),
-                'error': e
-            }).error('Chunk corrupt on write, moving aside: %s.' % e)
-            os.rename(elc.dbpath, elc.dbpath + '.corrupt')
-            del self.write_elc_cache[(year, month)]
+            if str(e) == 'database is locked':
+                return False
 
-            # Make a new chunk for this event
-            elc = EventLogChunk(self.objtype, self.objuuid, year, month)
-            self.write_elc_cache[(year, month)] = elc
-            elc.write_event(event_type, timestamp, fqdn, duration, message,
-                            extra=extra)
+            else:
+                self.log.with_fields({
+                    'chunk': '%04d%02d' % (year, month),
+                    'error': e
+                }).error('Chunk corrupt on write, moving aside: %s.' % e)
+                os.rename(elc.dbpath, elc.dbpath + '.corrupt')
+                del self.write_elc_cache[(year, month)]
+
+                # Make a new chunk for this event
+                elc = EventLogChunk(self.objtype, self.objuuid, year, month)
+                self.write_elc_cache[(year, month)] = elc
+                try:
+                    elc.write_event(event_type, timestamp, fqdn, duration, message,
+                                    extra=extra)
+                except sqlite3.DatabaseError:
+                    return False
 
     def _get_all_chunks(self):
         p = pathlib.Path(self.dbdir)
@@ -312,8 +321,7 @@ class EventLog:
                     self.log.with_fields({
                         'chunk': '%04d%02d' % (year, month),
                         'error': e
-                    }).error('Chunk corrupt on prune, moving aside: %s.' % e)
-                    os.rename(elc.dbpath, elc.dbpath + '.corrupt')
+                    }).warning('Chunk corrupt on prune, will retry later: %s.' % e)
                     this_chunk_removed = 0
 
             return removed

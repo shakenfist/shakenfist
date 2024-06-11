@@ -53,8 +53,7 @@ class Blob(dbo):
     def __init__(self, static_values):
         self.upgrade(static_values)
 
-        super().__init__(static_values.get('uuid'),
-                                   static_values.get('version'))
+        super().__init__(static_values.get('uuid'), static_values.get('version'))
 
         self.__size = static_values['size']
         self.__modified = static_values['modified']
@@ -494,10 +493,15 @@ class Blob(dbo):
                     locations.remove(node_name)
 
             replica_count = len(locations)
+            if replica_count == 0:
+                self.log.debug('No available replicas, giving up')
+                return
+
             targets = (config.BLOB_REPLICATION_FACTOR + current_transfers +
                        allow_excess - replica_count)
 
             if (replica_count + current_transfers) == present_nodes_len:
+                self.log.debug('Run out of nodes to replicate to, giving up')
                 return
 
             self.log.info('Desired replica count is %d, we have %d, and %d inflight, '
