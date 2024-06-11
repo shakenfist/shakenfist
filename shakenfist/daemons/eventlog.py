@@ -156,7 +156,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 event_type = v.get('event_type', EVENT_TYPE_HISTORIC)
                                 eventdb.write_event(
                                     event_type,
-                                    v['timestamp'], v['fqdn'], v['duration'],
+                                    v['timestamp'], v['fqdn'],
+                                    v.get('duration'),
                                     v['message'], extra=v.get('extra'))
                                 self.counters[event_type].inc()
                                 etcd.get_etcd_client().delete(k)
