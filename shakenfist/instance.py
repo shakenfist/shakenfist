@@ -433,14 +433,21 @@ class Instance(dbo):
     # so skipping for now.
     @property
     def interfaces(self):
-        return self._db_get_attribute('interfaces')
+        return self._db_get_attribute('interfaces', [])
 
     # NOTE(mikal): this really should use the newer _add_item / _remove_item
     # stuff, but I can't immediately think of an online upgrade path for this
     # so skipping for now.
     @interfaces.setter
     def interfaces(self, interfaces):
-        self._db_set_attribute('interfaces', interfaces)
+        with self.get_lock_attr('interfaces', 'Set interface'):
+            self._db_set_attribute('interfaces', interfaces)
+
+    def interfaces_append(self, interface):
+        with self.get_lock_attr('interfaces', 'Append interface'):
+            ifaces = self._db_get_attribute('interfaces', [])
+            ifaces.append(interface)
+            self._db_set_attribute('interfaces', ifaces)
 
     @property
     def tags(self):
@@ -1570,9 +1577,46 @@ class Instance(dbo):
         os.unlink(dest_path + '.partial')
 
         self.add_event(EVENT_TYPE_AUDIT, 'acquired screenshot of instance console',
-                       extra={'blob_uuid': blob_uuid})
+                       extra={'blob': blob_uuid})
 
         return blob_uuid
+
+    def hot_plug_interface(self, network_uuid, interface_uuid):
+        n = network.Network.from_db(network_uuid)
+        if not n:
+            raise exceptions.NetworkMissing(network_uuid)
+
+        iface = networkinterface.NetworkInterface.from_db(interface_uuid)
+        if not iface:
+            raise exceptions.NetworkInterfaceException(interface_uuid)
+
+        n.create_on_hypervisor()
+        n.ensure_mesh()
+        n.update_dhcp()
+
+        with util_libvirt.LibvirtConnection() as lc:
+            device_xml = """    <interface type='bridge'>
+      <mac address='%(macaddr)s'/>
+      <source bridge='%(bridge)s'/>
+      <model type='%(model)s'/>
+      <mtu size='%(mtu)s'/>
+      </interface>
+      """ % {
+                'macaddr': iface.macaddr,
+                'bridge': n.subst_dict()['vx_bridge'],
+                'model': iface.model,
+                'mtu': config.MAX_HYPERVISOR_MTU - 50
+            }
+
+            flags = (lc.libvirt.VIR_DOMAIN_AFFECT_CONFIG |
+                     lc.libvirt.VIR_DOMAIN_AFFECT_LIVE)
+            inst = lc.get_domain_from_sf_uuid(self.uuid)
+            inst.attachDeviceFlags(device_xml, flags=flags)
+            self.add_event(
+                EVENT_TYPE_AUDIT, 'hot plugged interface', extra={
+                    'networkinterface': interface_uuid,
+                    'network': network_uuid
+                })
 
 
 class Instances(dbo_iter):

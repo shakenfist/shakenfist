@@ -1,7 +1,9 @@
 import importlib
+from shakenfist_utilities import logs
 from xml.etree import ElementTree
 
 
+LOG, _ = logs.setup(__name__)
 LIBVIRT = None
 
 
@@ -39,7 +41,8 @@ class LibvirtConnection():
     def get_domain_from_sf_uuid(self, u):
         try:
             return self.conn.lookupByName('sf:' + u)
-        except self.libvirt.libvirtError:
+        except self.libvirt.libvirtError as e:
+            LOG.debug(f'SF libvirt domain {u} not found: {e}')
             return None
 
     def extract_power_state(self, domain):

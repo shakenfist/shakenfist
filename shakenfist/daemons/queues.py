@@ -29,7 +29,8 @@ from shakenfist.tasks import (QueueTask,
                               SnapshotTask,
                               FetchBlobTask,
                               ArchiveTranscodeTask,
-                              PreflightAgentOperationTask)
+                              PreflightAgentOperationTask,
+                              HotPlugInstanceInterfaceTask)
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist import scheduler
@@ -53,6 +54,8 @@ def handle(jobname, workitem):
     task = None
     try:
         for task in workitem.get('tasks', []):
+            log = log.with_fields({'task': task})
+
             if not QueueTask.__subclasscheck__(type(task)):
                 raise exceptions.UnknownTaskException(
                     'Task was not decoded: %s' % task)
@@ -63,18 +66,15 @@ def handle(jobname, workitem):
                     raise exceptions.InstanceNotInDBException(
                         task.instance_uuid())
 
-            if isinstance(task, FetchImageTask):
-                inst = instance.Instance.from_db(task.instance_uuid())
-
-            if isinstance(task, SnapshotTask):
-                inst = instance.Instance.from_db(task.instance_uuid())
+            for t in [FetchImageTask, SnapshotTask, HotPlugInstanceInterfaceTask]:
+                if isinstance(task, t):
+                    inst = instance.Instance.from_db(task.instance_uuid())
+                    break
 
             if inst:
-                log_i = log.with_fields({'instance': inst})
-            else:
-                log_i = log
+                log = log.with_fields({'instance': inst})
 
-            log_i.with_fields({'task_name': task.name()}).info('Starting task')
+            log.with_fields({'task_name': task.name()}).info('Starting task')
 
             if isinstance(task, FetchImageTask):
                 n = task.namespace()
@@ -85,25 +85,22 @@ def handle(jobname, workitem):
             elif isinstance(task, PreflightInstanceTask):
                 s = inst.state.value
                 if s == dbo.STATE_DELETED or s.endswith('-error'):
-                    log_i.warning(
+                    log.warning(
                         'You cannot preflight an instance in state %s, skipping task' % s)
                     continue
 
                 redirect_to = instance_preflight(inst, task.network())
                 if redirect_to:
-                    log_i.info('Redirecting instance start to %s'
-                               % redirect_to)
+                    log.info(f'Redirecting instance start to {redirect_to}')
                     etcd.enqueue(redirect_to, workitem)
                     return
 
             elif isinstance(task, StartInstanceTask):
-                s = inst.state.value
-                if s == dbo.STATE_DELETED or s.endswith('-error'):
-                    log_i.warning(
-                        'You cannot start an instance in state %s, skipping task' % s)
-                    continue
-
                 instance_start(inst, task.network())
+
+            elif isinstance(task, HotPlugInstanceInterfaceTask):
+                inst.hot_plug_interface(
+                    task.network_uuid(), task.interface_uuid())
 
             elif isinstance(task, DeleteInstanceTask):
                 try:
@@ -192,10 +189,9 @@ def handle(jobname, workitem):
                 preflight_agent_operation(task.agentop_uuid())
 
             else:
-                log_i.with_fields({'task': task}).error(
-                    'Unhandled task - dropped')
+                log.error('Unhandled task was dropped')
 
-            log_i.info('Task complete')
+            log.info('Task complete')
 
     except exceptions.BlobAlreadyBeingTransferred:
         # Re-enqueue this job to run in a minute
@@ -311,11 +307,12 @@ def instance_preflight(inst, netdescs):
 
 
 def instance_start(inst, netdescs):
-    if inst.state.value.endswith('-error'):
+    s = inst.state.value
+    if s.endswith('-error'):
         inst.add_event(
             EVENT_TYPE_STATUS, 'you cannot start an instance in an error state.')
         return
-    if inst.state.value in (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED):
+    if s in (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED):
         inst.add_event(
             EVENT_TYPE_STATUS, 'you cannot start an instance which has been deleted.')
         return
