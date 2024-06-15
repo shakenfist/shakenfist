@@ -1567,7 +1567,10 @@ class Instance(dbo):
         b.state = blob.Blob.STATE_CREATED
         b.observe()
         b.request_replication()
-        os.link(dest_path + '.partial')
+        os.unlink(dest_path + '.partial')
+
+        self.add_event(EVENT_TYPE_AUDIT, 'acquired screenshot of instance console',
+                       extra={'blob_uuid': blob_uuid})
 
         return blob_uuid
 
