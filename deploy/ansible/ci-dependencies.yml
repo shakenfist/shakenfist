@@ -103,6 +103,10 @@
             name: "debian:11",
           }
         - {
+            url: "https://images.shakenfist.com/debian:12/latest.qcow2",
+            name: "debian:12",
+          }
+        - {
             url: "{{ actions_url }}",
             name: "github-actions-runner.tar.gz",
           }

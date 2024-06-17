@@ -47,7 +47,7 @@ class InstanceTask(QueueTask):
         super().__init__()
         self._instance_uuid = instance_uuid
 
-        # Only set network if deliberately set in function paramater. This
+        # Only set network if deliberately set in function parameter. This
         # avoids setting _network to None which is not iterable.
         self._network = []
         if network:
@@ -84,6 +84,51 @@ class StartInstanceTask(InstanceTask):
 
 class DeleteInstanceTask(InstanceTask):
     _name = 'instance_delete'
+
+
+class HotPlugInstanceInterfaceTask(QueueTask):
+    _name = 'instance_hotplug_interface'
+
+    def __init__(self, instance_uuid, network_uuid, interface_uuid):
+        super().__init__()
+        self._instance_uuid = instance_uuid
+        self._network_uuid = network_uuid
+        self._interface_uuid = interface_uuid
+
+        # General checks
+        if not instance_uuid:
+            raise NoInstanceTaskException(
+                'No instance specified for HotPlugInstanceInterfaceTask')
+        if not isinstance(instance_uuid, str):
+            raise NoInstanceTaskException('Instance UUID is not a string')
+
+        if not network_uuid:
+            raise NoNetworkTaskException(
+                'No network specified for HotPlugInstanceInterfaceTask')
+        if not isinstance(network_uuid, str):
+            raise NoNetworkTaskException('Network UUID is not a string')
+
+        if not interface_uuid:
+            raise NoNetworkInterfaceTaskException(
+                'No network interface specified for HotPlugInstanceInterfaceTask')
+        if not isinstance(interface_uuid, str):
+            raise NoNetworkInterfaceTaskException(
+                'Network interface UUID is not a string')
+
+    def instance_uuid(self):
+        return self._instance_uuid
+
+    def network_uuid(self):
+        return self._network_uuid
+
+    def interface_uuid(self):
+        return self._interface_uuid
+
+    def obj_dict(self):
+        return {**super().obj_dict(),
+                'instance_uuid': self._instance_uuid,
+                'network_uuid': self._network_uuid,
+                'interface_uuid': self._interface_uuid}
 
 
 #

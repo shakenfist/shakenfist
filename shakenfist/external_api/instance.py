@@ -47,7 +47,8 @@ from shakenfist.tasks import (
     PreflightInstanceTask,
     StartInstanceTask,
     FloatNetworkInterfaceTask,
-    PreflightAgentOperationTask
+    PreflightAgentOperationTask,
+    HotPlugInstanceInterfaceTask
 )
 from shakenfist.util import general as util_general
 
@@ -243,6 +244,115 @@ def _artifact_safety_checks(a, instance_uuid=None):
 
     log.info('Artifact not owned or trusted by requestor and not shared')
     return sf_api.error(404, 'artifact not found')
+
+
+def _netdesc_safety_checks(netdesc, namespace):
+    if not isinstance(netdesc, dict):
+        return sf_api.error(
+            400, 'network specification should contain JSON objects')
+
+    if 'network_uuid' not in netdesc:
+        return sf_api.error(
+            400, 'network specification is missing network_uuid')
+
+    # Allow network to be specified by name or UUID (and error early
+    # if not found)
+    try:
+        n = sfnet.Network.from_db_by_ref(netdesc['network_uuid'],
+                                         get_jwt_identity()[0])
+    except exceptions.MultipleObjects as e:
+        return sf_api.error(400, str(e), suppress_traceback=True)
+
+    if not n:
+        return sf_api.error(
+            404, 'network %s not found' % netdesc['network_uuid'])
+    netdesc['network_uuid'] = n.uuid
+
+    if netdesc.get('address') and not util_general.noneish(netdesc.get('address')):
+        # The requested address must be within the ip range specified
+        # for that virtual network, unless it is equivalent to "none".
+        if not n.ipam.is_in_range(netdesc['address']):
+            return sf_api.error(
+                400,
+                'network specification requests an address outside the '
+                'range of the network')
+
+    if n.state.value != sfnet.Network.STATE_CREATED:
+        return sf_api.error(
+            406, f'network {n.uuid} is not ready ({n.state.value})')
+    if n.namespace != namespace:
+        return sf_api.error(404, 'network %s does not exist' % n.uuid)
+
+    return
+
+
+def _netdesc_allocate_address(inst, netdesc, order):
+    n = sfnet.Network.from_db(netdesc['network_uuid'])
+    if not n:
+        inst.enqueue_delete_due_error(
+            'missing network %s during IP allocation phase'
+            % netdesc['network_uuid'])
+        return None, None, sf_api.error(
+            404, 'network %s not found' % netdesc['network_uuid'])
+
+    # NOTE(mikal): we now support interfaces with no address on them
+    # (thanks OpenStack Kolla), which are special cased here. To not
+    # have an address, you use a detailed netdesc and specify
+    # address=none.
+    try:
+        if 'address' in netdesc and util_general.noneish(netdesc['address']):
+            netdesc['address'] = None
+        else:
+            if 'address' not in netdesc or not netdesc['address']:
+                netdesc['address'] = n.ipam.reserve_random_free_address(
+                    inst.unique_label(), ipam.RESERVATION_TYPE_INSTANCE, '')
+                inst.add_event(
+                    EVENT_TYPE_AUDIT, 'allocated ip address', extra=netdesc)
+            else:
+                if not n.ipam.reserve(netdesc['address'], inst.unique_label(),
+                                      ipam.RESERVATION_TYPE_INSTANCE, ''):
+                    inst.enqueue_delete_due_error(
+                        'failed to reserve an IP on network %s'
+                        % netdesc['network_uuid'])
+                    return None, None, sf_api.error(
+                        409, 'address %s in use' % netdesc['address'])
+    except exceptions.CongestedNetwork as e:
+        inst.enqueue_delete_due_error(
+            'cannot allocate address: %s' % e)
+        return None, None, sf_api.error(507, str(e), suppress_traceback=True)
+
+    if 'model' not in netdesc or not netdesc['model']:
+        netdesc['model'] = 'virtio'
+
+    iface_uuid = str(uuid.uuid4())
+    LOG.with_fields({
+        'networkinterface': iface_uuid,
+        'instance': inst,
+        'network': n
+    }).with_fields(netdesc).info('Interface allocated')
+    ni = NetworkInterface.new(iface_uuid, netdesc, inst.uuid, order)
+
+    float_task = None
+    try:
+        if 'float' in netdesc and netdesc['float']:
+            err = api_util.assign_floating_ip(ni)
+            if err:
+                inst.enqueue_delete_due_error(
+                    'interface float failed: %s' % err)
+                return None, None, err
+
+            float_task = FloatNetworkInterfaceTask(
+                netdesc['network_uuid'], iface_uuid)
+    except exceptions.CongestedNetwork as e:
+        inst.enqueue_delete_due_error(
+            'cannot allocate address: %s' % e)
+        return None, None, sf_api.error(507, str(e), suppress_traceback=True)
+
+    # Include the interface uuid in the network description we
+    # pass through to the instance start task.
+    netdesc['iface_uuid'] = iface_uuid
+
+    return float_task, netdesc, None
 
 
 instances_get_example = """[
@@ -530,41 +640,9 @@ class InstancesEndpoint(sf_api.Resource):
 
         if network:
             for netdesc in network:
-                if not isinstance(netdesc, dict):
-                    return sf_api.error(
-                        400, 'network specification should contain JSON objects')
-
-                if 'network_uuid' not in netdesc:
-                    return sf_api.error(
-                        400, 'network specification is missing network_uuid')
-
-                # Allow network to be specified by name or UUID (and error early
-                # if not found)
-                try:
-                    n = sfnet.Network.from_db_by_ref(netdesc['network_uuid'],
-                                                     get_jwt_identity()[0])
-                except exceptions.MultipleObjects as e:
-                    return sf_api.error(400, str(e), suppress_traceback=True)
-
-                if not n:
-                    return sf_api.error(
-                        404, 'network %s not found' % netdesc['network_uuid'])
-                netdesc['network_uuid'] = n.uuid
-
-                if netdesc.get('address') and not util_general.noneish(netdesc.get('address')):
-                    # The requested address must be within the ip range specified
-                    # for that virtual network, unless it is equivalent to "none".
-                    if not n.ipam.is_in_range(netdesc['address']):
-                        return sf_api.error(
-                            400,
-                            'network specification requests an address outside the '
-                            'range of the network')
-
-                if n.state.value != sfnet.Network.STATE_CREATED:
-                    return sf_api.error(
-                        406, f'network {n.uuid} is not ready ({n.state.value})')
-                if n.namespace != namespace:
-                    return sf_api.error(404, 'network %s does not exist' % n.uuid)
+                err = _netdesc_safety_checks(netdesc, namespace)
+                if err:
+                    return err
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'}
@@ -620,72 +698,14 @@ class InstancesEndpoint(sf_api.Resource):
         updated_networks = []
         if network:
             for netdesc in network:
-                n = sfnet.Network.from_db(netdesc['network_uuid'])
-                if not n:
-                    inst.enqueue_delete_due_error(
-                        'missing network %s during IP allocation phase'
-                        % netdesc['network_uuid'])
-                    return sf_api.error(
-                        404, 'network %s not found' % netdesc['network_uuid'])
-
-                # NOTE(mikal): we now support interfaces with no address on them
-                # (thanks OpenStack Kolla), which are special cased here. To not
-                # have an address, you use a detailed netdesc and specify
-                # address=none.
-                try:
-                    if 'address' in netdesc and util_general.noneish(netdesc['address']):
-                        netdesc['address'] = None
-                    else:
-                        if 'address' not in netdesc or not netdesc['address']:
-                            netdesc['address'] = n.ipam.reserve_random_free_address(
-                                inst.unique_label(), ipam.RESERVATION_TYPE_INSTANCE, '')
-                            inst.add_event(
-                                EVENT_TYPE_AUDIT, 'allocated ip address', extra=netdesc)
-                        else:
-                            if not n.ipam.reserve(netdesc['address'], inst.unique_label(),
-                                                  ipam.RESERVATION_TYPE_INSTANCE, ''):
-                                inst.enqueue_delete_due_error(
-                                    'failed to reserve an IP on network %s'
-                                    % netdesc['network_uuid'])
-                                return sf_api.error(
-                                    409, 'address %s in use' % netdesc['address'])
-                except exceptions.CongestedNetwork as e:
-                    inst.enqueue_delete_due_error(
-                        'cannot allocate address: %s' % e)
-                    return sf_api.error(507, str(e), suppress_traceback=True)
-
-                if 'model' not in netdesc or not netdesc['model']:
-                    netdesc['model'] = 'virtio'
-
-                iface_uuid = str(uuid.uuid4())
-                LOG.with_fields({
-                    'networkinterface': iface_uuid,
-                    'instance': inst,
-                    'network': n
-                }).info('Interface allocated')
-                ni = NetworkInterface.new(
-                    iface_uuid, netdesc, inst.uuid, order)
-                order += 1
-
-                try:
-                    if 'float' in netdesc and netdesc['float']:
-                        err = api_util.assign_floating_ip(ni)
-                        if err:
-                            inst.enqueue_delete_due_error(
-                                'interface float failed: %s' % err)
-                            return err
-
-                        float_tasks.append(FloatNetworkInterfaceTask(
-                            netdesc['network_uuid'], iface_uuid))
-                except exceptions.CongestedNetwork as e:
-                    inst.enqueue_delete_due_error(
-                        'cannot allocate address: %s' % e)
-                    return sf_api.error(507, str(e), suppress_traceback=True)
-
-                # Include the interface uuid in the network description we
-                # pass through to the instance start task.
-                netdesc['iface_uuid'] = iface_uuid
+                float_task, netdesc, err = _netdesc_allocate_address(
+                    inst, netdesc, order)
+                if err:
+                    return err
+                if float_task:
+                    float_tasks.append(float_task)
                 updated_networks.append(netdesc)
+                order += 1
 
         # Store interfaces soon as they are allocated to the instance
         inst.interfaces = [i['iface_uuid'] for i in updated_networks]
@@ -806,6 +826,21 @@ instance_interfaces_example = """[
 ]"""
 
 
+instance_interface_create_example = """{
+    "floating": "192.168.10.73",
+    "instance_uuid": "c0d52a77-0f8a-4f19-bec7-0c05efb03cb4",
+    "ipv4": "10.0.0.47",
+    "macaddr": "02:00:00:6d:e5:e0",
+    "metadata": {},
+    "model": "virtio",
+    "network_uuid": "1bed1aa5-10f0-45cc-ae58-4a94761bef59",
+    "order": 1,
+    "state": "created",
+    "uuid": "8e7b2f39-c652-4ec2-88ff-2791b503fc65",
+    "version": 3
+}"""
+
+
 class InstanceInterfacesEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'List network interfaces for an instance.',
@@ -826,6 +861,61 @@ class InstanceInterfacesEndpoint(sf_api.Resource):
                 return err
             out.append(ni.external_view())
         return out
+
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Create a new network interface on an instance',
+        [
+            ('instance_ref', 'query', 'uuidorname',
+             'The UUID or name of the instance.', True),
+            ('network', 'body', 'dict',
+             'A networkspec defining the new interface. '
+             'See https://shakenfist.com/developer_guide/api_reference/instances/#networkspec '
+             'for more details on networkspecs.', True)
+        ],
+        [
+            (200, 'The new interface details.', instance_interface_create_example),
+            (400, 'Network description invalid.', None),
+            (404, 'Instance or network not found.', None),
+            (406, 'Instance or network not ready.', None),
+            (409, 'Address in use.', None)
+        ]))
+    @api_base.verify_token
+    @api_base.arg_is_instance_ref
+    @api_base.requires_instance_ownership
+    @api_base.log_token_use
+    def post(self, instance_ref=None, network=None, instance_from_db=None):
+        s = instance_from_db.state.value
+        if s == dbo.STATE_DELETED or s.endswith('-error'):
+            return sf_api.error(406, 'instance in invalid state for hot plug')
+
+        err = _netdesc_safety_checks(network, instance_from_db.namespace)
+        if err:
+            return err
+
+        ifaces = instance_from_db.interfaces
+        if not ifaces or len(ifaces) == 0:
+            order = 0
+        else:
+            last_iface_uuid = ifaces[-1]
+            last_iface = NetworkInterface.from_db(last_iface_uuid)
+            if not last_iface:
+                return sf_api.error(406, 'instance interfae list invalid')
+            order = last_iface.order + 1
+
+        float_task, netdesc, err = _netdesc_allocate_address(
+            instance_from_db, network, order)
+        if err:
+            return err
+
+        tasks = [HotPlugInstanceInterfaceTask(
+            instance_from_db.uuid, netdesc['network_uuid'], netdesc['iface_uuid'])]
+
+        if float_task:
+            tasks.append(float_task)
+        instance_from_db.interfaces_append(netdesc['iface_uuid'])
+
+        etcd.enqueue(instance_from_db.placement['node'], {'tasks': tasks})
+        return NetworkInterface.from_db(netdesc['iface_uuid']).external_view()
 
 
 instance_events_example = """[

@@ -129,7 +129,7 @@ class Root(sf_api.Resource):
              '<li>events: events-by-type</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
              'instance-put-blob, instance-execute, instance-get, instance-screenshot, '
-             'get-instance-namespace</li>'
+             'get-instance-namespace, hot-plug-interface</li>'
              '<li>networks: list-addresses, route-addresses, get-network-namespace'
              '<li>networkinterfaces: interface-metadata</li>'
              '<li>nodes: node-get, node-metadata, node-process-metrics</li>'

@@ -39,7 +39,8 @@ FORBIDDEN=("Traceback (most recent call last):"
             "Libvirt Error: XML error"
             "Cleaning up leaked IPAM"
             "Cleaning up leaked vxlan"
-            "invalid salt")
+            "invalid salt"
+            "unable to execute QEMU command")
 
 if [ $(echo "${1}" | grep -c "v0.7" || true) -lt 1 ]; then
     echo "INFO: Including forbidden strings for v0.8 onwards."

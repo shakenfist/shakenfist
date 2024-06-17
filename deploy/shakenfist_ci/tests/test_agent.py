@@ -155,3 +155,37 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
             data += chunk.decode('utf-8')
 
         self.assertTrue(data.startswith('PRETTY_NAME='))
+
+    def test_interface_plug_and_exec_dhcp(self):
+        # Create a network to hot plug to
+        hotnet = self.test_client.allocate_network(
+            '10.0.0.0/24', True, True, '%s-hotplug' % self.namespace)
+
+        # Create an instance to run our command on
+        inst = self.test_client.create_instance(
+            'test-hotplug', 1, 1024, None,
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://upload/system/debian-11',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        # Wait for the instance agent to report in
+        self._await_instance_ready(inst['uuid'])
+
+        # Hot plug an interface in
+        netdesc = {
+            'network_uuid': hotnet['uuid'],
+            'address': '10.0.0.5',
+            'macaddress': '02:00:00:ea:3a:28'
+        }
+        self.test_client.add_instance_interface(inst['uuid'], netdesc)
+        time.sleep(10)
+
+        # List interfaces
+        _, data = self._await_agent_command(inst['uuid'], 'ip a')
+        self.assertNotEqual(
+            -1, data.find('02:00:00:ea:3a:28'),
+            'Interface not found in `ip a` output:\n%s' % data)

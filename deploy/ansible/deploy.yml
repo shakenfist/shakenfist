@@ -626,6 +626,24 @@
         line: '/etc/ssl/openssl.cnf r,'
       when: not stat_result.stat.exists
 
+    # For instances which are started with no network interface, but then hotplug
+    # one later, we need to ensure that we always have access to /dev/vhost-net.
+    # See https://bugs.launchpad.net/ubuntu/+source/libvirt/+bug/1815910 for
+    # details.
+    - name: Add an apparmor rule to always allow vhost-net access
+      lineinfile:
+        path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+        regexp: "/dev/vhost-net rw,"
+        line: '/dev/vhost-net rw,'
+      when: stat_result.stat.exists
+
+    - name: Add an apparmor rule to always allow vhost-net access
+      lineinfile:
+        path: /etc/apparmor.d/abstractions/libvirt-qemu
+        regexp: "/dev/vhost-net rw,"
+        line: '/dev/vhost-net rw,'
+      when: not stat_result.stat.exists
+
     - name: Restart apparmor
       service:
         name: apparmor
