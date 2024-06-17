@@ -1605,6 +1605,12 @@
 
 <h1 id="v07-to-v08-release-notes">v0.7 to v0.8 release notes</h1>
 <h2 id="major-changes">Major changes</h2>
+<ul>
+<li>You can now hot plug (add) a network interface to a running instance. This is
+  exposed by a POST to the <code>/instance/...instanceref.../interfaces</code> endpoint, passing
+  a network specification like you would at boot time. More details are available
+  in the</li>
+</ul>
 <h2 id="rest-api">REST API</h2>
 <ul>
 <li>There is now an API call (<code>GET /admin/resources</code>) which exposes the resource
@@ -1628,7 +1634,7 @@
   lifecycle support is relatively simple at the moment, with cluster creation and
   deletion supported, as well as fetching the kubectl configuration from the
   cluster. This will be expanded over time. This support is implemented entirely
-  in the Shaken Fist python client, and heavily utilises the in guest agent
+  in the Shaken Fist python client, and heavily utilizes the in guest agent
   added in v0.7. The client side nature of the orchestration makes it easy for you
   to customize the orchestration if desired without having to alter the main
   server code.</li>
