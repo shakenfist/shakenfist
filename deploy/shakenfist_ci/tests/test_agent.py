@@ -1,3 +1,4 @@
+import json
 import os
 import time
 
@@ -185,7 +186,26 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         time.sleep(10)
 
         # List interfaces
-        _, data = self._await_agent_command(inst['uuid'], 'ip a')
+        _, data = self._await_agent_command(inst['uuid'], 'ip -json link')
         self.assertNotEqual(
             -1, data.find('02:00:00:ea:3a:28'),
-            'Interface not found in `ip a` output:\n%s' % data)
+            'Interface not found in `ip -json link` output:\n%s' % data)
+
+        # Determine which interface the new one was added as
+        d = json.loads(data)
+        new_interface = None
+        for i in d:
+            if i['address'] == '02:00:00:ea:3a:28':
+                new_interface = i['ifname']
+        self.assertNotEqual(None, new_interface)
+
+        # DHCP on the new interface
+        _, data = self._await_agent_command(
+            inst['uuid'], f'dhclient {new_interface}')
+
+        # Ensure interface picked up the right address
+        _, data = self._await_agent_command(
+            inst['uuid'], f'ip -json -o addr show dev {new_interface}')
+        d = json.loads(data)
+        self.assertEqual('10.0.0.5', d[0]['addr_info'][0]['local'],
+                         'Wrong address in {data}')
