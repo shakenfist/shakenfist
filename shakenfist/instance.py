@@ -1596,17 +1596,17 @@ class Instance(dbo):
 
         with util_libvirt.LibvirtConnection() as lc:
             device_xml = """    <interface type='bridge'>
-      <mac address='%(macaddr)s'/>
-      <source bridge='%(bridge)s'/>
-      <model type='%(model)s'/>
-      <mtu size='%(mtu)s'/>
+      <mac address='{macaddr}'/>
+      <source bridge='{bridge}'/>
+      <model type='{model}'/>
+      <mtu size='{mtu}'/>
       </interface>
-      """ % {
-                'macaddr': iface.macaddr,
-                'bridge': n.subst_dict()['vx_bridge'],
-                'model': iface.model,
-                'mtu': config.MAX_HYPERVISOR_MTU - 50
-            }
+      """.format(
+                macaddr=iface.macaddr,
+                bridge=n.subst_dict()['vx_bridge'],
+                model=iface.model,
+                mtu=config.MAX_HYPERVISOR_MTU - 50
+            )
 
             flags = (lc.libvirt.VIR_DOMAIN_AFFECT_CONFIG |
                      lc.libvirt.VIR_DOMAIN_AFFECT_LIVE)
