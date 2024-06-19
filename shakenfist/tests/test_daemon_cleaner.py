@@ -1,9 +1,11 @@
+import json
 from unittest import mock
 
-from shakenfist.baseobject import State
 from shakenfist.config import BaseSettings
 from shakenfist.daemons import cleaner
+from shakenfist import instance
 from shakenfist.tests import base
+from shakenfist.tests.mock_etcd import MockEtcd
 
 
 class FakeLibvirt:
@@ -15,6 +17,8 @@ class FakeLibvirt:
     VIR_DOMAIN_SHUTDOWN = 6
     VIR_DOMAIN_SHUTOFF = 7
     VIR_DOMAIN_PMSUSPENDED = 8
+
+    libvirtError = Exception
 
     def open(self, _ignored):
         return FakeLibvirtConnection()
@@ -74,36 +78,6 @@ class FakeConfig(BaseSettings):
 fake_config = FakeConfig()
 
 
-FAKE_ETCD_STATE = {}
-
-
-def fake_instance_get(uuid):
-    global FAKE_ETCD_STATE
-    return FAKE_ETCD_STATE.get(
-        '{}/{}/{}'.format('instance', None, uuid),
-        {
-            'uuid': uuid,
-            'node': 'abigcomputer',
-            'name': 'bob',
-            'cpus': 1,
-            'memory': 1024,
-            'namespace': 'space',
-            'disk_spec': [{'base': 'cirros', 'size': 8}],
-            'version': 13
-        })
-
-
-def fake_put(objecttype, subtype, name, v):
-    global FAKE_ETCD_STATE
-    FAKE_ETCD_STATE[f'{objecttype}/{subtype}/{name}'] = v
-
-
-def fake_get(objecttype, subtype, name):
-    global FAKE_ETCD_STATE
-    val = FAKE_ETCD_STATE.get(f'{objecttype}/{subtype}/{name}')
-    return val
-
-
 class CleanerTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
@@ -122,49 +96,27 @@ class CleanerTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-    @mock.patch('shakenfist.instance.Instance.state',
-                new_callable=mock.PropertyMock)
-    @mock.patch('shakenfist.baseobject.State.value',
-                new_callable=mock.PropertyMock)
-    @mock.patch('shakenfist.instance.Instance.error',
-                new_callable=mock.PropertyMock)
-    @mock.patch('shakenfist.etcd.get', side_effect=fake_get)
-    @mock.patch('shakenfist.etcd.get_lock')
-    @mock.patch('shakenfist.node.Node.observe_this_node')
-    @mock.patch('shakenfist.instance.Instance._db_get', side_effect=fake_instance_get)
-    @mock.patch('shakenfist.etcd.put', side_effect=fake_put)
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
     @mock.patch('os.path.exists', side_effect=fake_exists)
     @mock.patch('time.time', return_value=7)
     @mock.patch('os.listdir', return_value=[])
-    def test_update_power_states(self, mock_listdir, mock_time, mock_exists,
-                                 mock_put, mock_get_instance, mock_see,
-                                 mock_lock, mock_etcd_get, mock_error,
-                                 mock_state_value, mock_state):
-        mock_state_value.return_value = 'created'
+    def test_update_power_states(self, mock_listdir, mock_time, mock_exists):
+        for id in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
+            self.mock_etcd.create_instance(
+                id, id, set_state=instance.Instance.STATE_CREATED)
 
         m = cleaner.Monitor('cleaner')
         m._update_power_states()
 
-        result = []
-        for c in mock_put.mock_calls:
-            if type(c[1][3]) is dict and 'placement_attempts' in c[1][3]:
-                continue
-            if type(c[1][3]) is State:
-                val = c[1][3]
-            else:
-                val = {'power_state': c[1][3]['power_state']}
-            result.append((c[1][0], c[1][1], c[1][2], val))
-
-        self.assertEqual(
-            [
-                ('attribute/instance', 'running',
-                 'power_state', {'power_state': 'on'}),
-                ('attribute/instance', 'shutoff',
-                 'power_state', {'power_state': 'off'}),
-                ('attribute/instance', 'crashed',
-                 'power_state', {'power_state': 'crashed'}),
-                ('attribute/instance', 'paused',
-                 'power_state', {'power_state': 'paused'}),
-                ('attribute/instance', 'suspended',
-                 'power_state', {'power_state': 'paused'})
-            ], result)
+        for id, state in [('running', 'on'),
+                          ('shutoff', 'off'),
+                          ('crashed', 'crashed'),
+                          ('paused', 'paused'),
+                          ('suspended', 'paused')]:
+            read_state = json.loads(self.mock_etcd.get(
+                f'/sf/attribute/instance/{id}/power_state')[0])
+            self.assertEqual(
+                state, read_state['power_state'],
+                f'State for instance "{id}" does not match "{state}"')

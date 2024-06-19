@@ -160,7 +160,8 @@ class BaseTestCase(testtools.TestCase):
             'in %d minutes. Agent state is %s.'
             % (instance_uuid, desired, timeout, i['agent_state']))
 
-    def _await_agent_command(self, instance_uuid, command, exit_codes=[0]):
+    def _await_agent_command(self, instance_uuid, command, exit_codes=[0],
+                             ignore_stderr=False):
         op = self.system_client.instance_execute(instance_uuid, command)
 
         # Wait for the operation to be complete
@@ -187,8 +188,12 @@ class BaseTestCase(testtools.TestCase):
             op = self.system_client.get_agent_operation(op['uuid'])
 
         exit_code = op['results']['0']['return-code']
+        stderr = op['results']['0']['stderr']
         self.assertNotEqual({}, op['results'])
-        self.assertEqual(0, len(op['results']['0']['stderr']))
+
+        if not ignore_stderr:
+            self.assertEqual(
+                0, len(stderr), f'stderr should be empty, not {stderr}')
 
         # Short results are directing in the operation, longer results are in
         # a blob.
@@ -215,6 +220,48 @@ class BaseTestCase(testtools.TestCase):
             exit_code in exit_codes,
             'Exit code %d not in %s, output was "%s"' % (exit_code, exit_codes, data))
         return exit_code, data
+
+    def _await_agent_fetch(self, instance_uuid, path):
+        op = self.test_client.instance_get(instance_uuid, path)
+
+        # Wait for the operation to be complete
+        start_time = time.time()
+        while time.time() - start_time < 120:
+            if op['state'] == 'complete':
+                break
+            time.sleep(5)
+            op = self.test_client.get_agent_operation(op['uuid'])
+
+        if op['state'] != 'complete':
+            self.fail('Agent execute operation %s did not complete in 120 seconds (%s)'
+                      % (op['uuid'], op['state']))
+
+        # Wait for the operation to have results
+        start_time = time.time()
+        while time.time() - start_time < 60:
+            if op['results'] != {}:
+                break
+            time.sleep(5)
+            op = self.test_client.get_agent_operation(op['uuid'])
+
+        self.assertNotEqual({}, op['results'])
+        self.assertTrue('content_blob' in op['results']['0'])
+
+        # Wait for the blob containing the file to be ready
+        start_time = time.time()
+        b = self.test_client.get_blob(op['results']['0']['content_blob'])
+        while time.time() - start_time < 60:
+            if b['state'] == 'created':
+                break
+            time.sleep(5)
+            b = self.test_client.get_blob(op['results']['0']['content_blob'])
+
+        # Fetch the blob containing the file
+        data = ''
+        for chunk in self.test_client.get_blob_data(op['results']['0']['content_blob']):
+            data += chunk.decode('utf-8')
+
+        return data
 
     def _await_instance_create(self, instance_uuid):
         # Wait up to 5 minutes for the instance to be created. On a slow
@@ -349,18 +396,6 @@ class BaseTestCase(testtools.TestCase):
             aop = self.system_client.get_agent_operation(aop['uuid'])
 
         return aop['results']['0']
-
-    def _await_agent_fetch(self, instance_ref, path):
-        aop = self.system_client.instance_get(instance_ref, path)
-        while aop['state'] != 'complete':
-            time.sleep(1)
-            aop = self.system_client.get_agent_operation(aop['uuid'])
-
-        blob_uuid = aop['results']['0']['content_blob']
-        data = b''
-        for chunk in self.system_client.get_blob_data(blob_uuid):
-            data += chunk
-        return data.decode('utf-8')
 
     def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
         packet_loss_re = re.compile(r'.* ([0-9\.]+)% packet loss.*')

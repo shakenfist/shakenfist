@@ -86,7 +86,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 13
+    current_version = 14
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -216,6 +216,19 @@ class Instance(dbo):
     @classmethod
     def _upgrade_step_12_to_13(cls, static_values):
         pass
+
+    @classmethod
+    def _upgrade_step_13_to_14(cls, static_values):
+        if static_values.get('configdrive', 'openstack-disk') == 'openstack-disk':
+            bd = etcd.get(
+                'attribute/instance', static_values['uuid'], 'block_devices')
+            if bd:
+                devices = bd.get('devices', [])
+                if len(devices) > 1:
+                    bd['devices'][1]['is_configdrive'] = True
+                    etcd.put(
+                        'attribute/instance', static_values['uuid'],
+                        'block_devices', bd)
 
     @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
@@ -563,7 +576,8 @@ class Instance(dbo):
                     'path': os.path.join(self.instance_path, config_device),
                     'present_as': 'disk',
                     'snapshot_ignores': True,
-                    'cache_mode': constants.DISK_CACHE_MODE
+                    'cache_mode': constants.DISK_CACHE_MODE,
+                    'is_configdrive': True
                 }
             )
             i += 1
@@ -673,7 +687,8 @@ class Instance(dbo):
         # Ensure we have state on disk
         os.makedirs(self.instance_path, exist_ok=True)
 
-        # Configure block devices, include config drive creation
+        # Configure block devices, not including config drive creation which is
+        # done in power_on().
         self._configure_block_devices(lock)
 
         self.power_on()
@@ -819,10 +834,12 @@ class Instance(dbo):
             if not block_devices:
                 block_devices = self._initialize_block_devices()
 
-            # Generate a config drive
+            # Create an empty config drive file as a place holder here until we
+            # get to power on
             if self.configdrive == 'openstack-disk':
-                self._make_config_drive_openstack_disk(
-                    os.path.join(self.instance_path, block_devices['devices'][1]['path']))
+                disk_path = os.path.join(self.instance_path,
+                                         block_devices['devices'][1]['path'])
+                pathlib.Path(disk_path).touch(exist_ok=True)
 
             # Prepare disks. A this point we have a file for each blob in the image
             # cache at a well known location (the blob uuid with .qcow2 appended).
@@ -1084,6 +1101,8 @@ class Instance(dbo):
                    joliet_path='/openstack/2017-02-22/vendor_data2.json')
 
         # Dump to disk
+        if os.path.exists(disk_path):
+            os.unlink(disk_path)
         iso.write(disk_path)
         iso.close()
 
@@ -1189,6 +1208,15 @@ class Instance(dbo):
             return lc.extract_power_state(inst)
 
     def power_on(self):
+        # Generate a config drive. It is deliberate that this is in power_on now,
+        # as a hard power off / on cycle should imply the re-creation of the
+        # config drive. This is useful for hotplugged devices, because subsequent
+        # cloud-init runs will now know about the new devices.
+        if self.configdrive == 'openstack-disk':
+            self._make_config_drive_openstack_disk(
+                os.path.join(self.instance_path,
+                             self.block_devices['devices'][1]['path']))
+
         # Create the actual instance. Sometimes on Ubuntu 20.04 we need to wait
         # for port binding to work. Revisiting this is tracked by issue 320 on
         # github. Additionally, sometimes ports are not released correctly by a
