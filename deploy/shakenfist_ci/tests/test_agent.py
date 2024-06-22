@@ -50,7 +50,8 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
                       % (op['uuid'], op['state']))
 
         # Request that the agent execute the file
-        _, data = self._await_agent_command(inst['uuid'], '/tmp/fibonacci.py')
+        _, data = self.test_client.await_agent_command(
+            inst['uuid'], '/tmp/fibonacci.py')
         self.assertTrue(data.startswith(
             '[0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987'))
 
@@ -70,7 +71,8 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
 
         # Run a simple command
-        op = self.test_client.instance_execute(inst['uuid'], 'cat /etc/os-release')
+        op = self.test_client.instance_execute(
+            inst['uuid'], 'cat /etc/os-release')
 
         # Wait for the operation to be complete
         start_time = time.time()
@@ -116,7 +118,8 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
 
         # Run a simple fetch command
-        data = self._await_agent_fetch(inst['uuid'], '/etc/os-release')
+        data = self.test_client.await_agent_fetch(
+            inst['uuid'], '/etc/os-release')
         self.assertTrue(data.startswith('PRETTY_NAME='))
 
     def test_interface_plug_and_exec_dhcp(self):
@@ -148,7 +151,8 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         time.sleep(10)
 
         # List interfaces
-        _, data = self._await_agent_command(inst['uuid'], 'ip -json link')
+        _, data = self.test_client.await_agent_command(
+            inst['uuid'], 'ip -json link')
         self.assertNotEqual(
             -1, data.find('02:00:00:ea:3a:28'),
             'Interface not found in `ip -json link` output:\n%s' % data)
@@ -162,11 +166,11 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         self.assertNotEqual(None, new_interface)
 
         # DHCP on the new interface
-        _, data = self._await_agent_command(
+        _, data = self.test_client.await_agent_command(
             inst['uuid'], f'dhclient {new_interface}')
 
         # Ensure interface picked up the right address
-        _, data = self._await_agent_command(
+        _, data = self.test_client.await_agent_command(
             inst['uuid'], f'ip -4 -json -o addr show dev {new_interface}')
         d = json.loads(data)
         self.assertEqual('10.0.0.5', d[0]['addr_info'][0]['local'],
@@ -201,7 +205,8 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         time.sleep(10)
 
         # List interfaces
-        _, data = self._await_agent_command(inst['uuid'], 'ip -json link')
+        _, data = self.test_client.await_agent_command(
+            inst['uuid'], 'ip -json link')
         self.assertNotEqual(
             -1, data.find('02:00:00:ea:3a:28'),
             'Interface not found in `ip -json link` output:\n%s' % data)
@@ -222,25 +227,27 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
 
         # List interfaces to ensure the device persisted
-        _, data = self._await_agent_command(inst['uuid'], 'ip -json link')
+        _, data = self.test_client.await_agent_command(
+            inst['uuid'], 'ip -json link')
         self.assertNotEqual(
             -1, data.find('02:00:00:ea:3a:28'),
             'Interface not found in `ip -json link` output:\n%s' % data)
 
         # Collect the config drive network configuration to ensure that the new
         # device is listed
-        self._await_agent_command(inst['uuid'], 'mount /dev/vdb /mnt',
-                                  ignore_stderr=True)
-        data = self._await_agent_fetch(
+        self.test_client.await_agent_command(
+            inst['uuid'], 'mount /dev/vdb /mnt', ignore_stderr=True)
+        data = self.test_client.await_agent_fetch(
             inst['uuid'], '/mnt/openstack/latest/network_data.json')
         self.assertTrue('02:00:00:ea:3a:28' in data,
                         f'Expected mac address not present in {data}')
 
         # DHCP the new interface to ensure that works too
-        self._await_agent_command(inst['uuid'], f'dhclient {new_interface}')
+        self.test_client.await_agent_command(
+            inst['uuid'], f'dhclient {new_interface}')
 
         # Ensure interface picked up the right address
-        _, data = self._await_agent_command(
+        _, data = self.test_client.await_agent_command(
             inst['uuid'], f'ip -4 -json -o addr show dev {new_interface}')
         d = json.loads(data)
         self.assertNotEqual(0, len(d),
