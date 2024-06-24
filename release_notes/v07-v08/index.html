@@ -1615,6 +1615,8 @@
 <ul>
 <li>There is now an API call (<code>GET /admin/resources</code>) which exposes the resource
   utilization of the cluster to admin users.</li>
+<li>You can now POST to <code>/instance/...instanceref.../interfaces</code> as described
+  above to hot plug new network interfaces into an existing instance.</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions</h2>
 <ul>
@@ -1665,6 +1667,9 @@
 <li>Pause and unpause are now retried several times on failure, as sometimes libvirt
   does not respond correctly.</li>
 <li>Specifying an incorrect disk bus now returns a more helpful error.</li>
+<li>Power on now implies creation of a config drive is one is specified for the
+  instance. That is, you can force re-creation of the config drive by powering
+  an instance off and then on again.</li>
 </ul>
 <h3 id="artifacts">Artifacts</h3>
 <ul>
