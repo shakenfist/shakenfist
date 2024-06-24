@@ -50,7 +50,8 @@ echo 'Floating IPs work!' > /var/www/html/index.html
         # Wait for boot and cloud-init
         time.sleep(120)
 
-        out = self._await_agent_fetch(inst['uuid'], '/var/www/html/index.html')
+        out = self.test_client.await_agent_fetch(
+            inst['uuid'], '/var/www/html/index.html')
         self.assertEqual('Floating IPs work!', out.rstrip())
 
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])

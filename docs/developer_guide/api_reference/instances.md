@@ -162,7 +162,10 @@ The power management actions available are:
   likely to cause disk corruption on the instance.
 * hard reboot: the equivalent of holding the reset switch down on a physical machine
   until it reboots without operating system involvement.
-* power on: turn the instance on, as if the power switch was pressed.
+* power on: turn the instance on, as if the power switch was pressed. Since v0.8
+  power on operations have the side effect of creating the config drive if one is
+  specified by the instance configuration. That is, you can recreate the config
+  drive by powering the instance off and then on again.
 * power off: turn the instance immediately off, as if the power switch was held
   down on a physical machine.
 * pause: suspend execution of the instance, but leave it hot in RAM ready to

@@ -55,10 +55,11 @@ sudo echo 'banana' >  /tmp/output"""
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
 
-        out = self._await_agent_fetch(inst['uuid'], '/tmp/output')
+        out = self.test_client.await_agent_fetch(inst['uuid'], '/tmp/output')
         self.assertEqual('banana', out.rstrip())
 
-        out = self._await_agent_fetch(inst['uuid'], '/home/debian/.ssh/authorized_keys')
+        out = self.test_client.await_agent_fetch(
+            inst['uuid'], '/home/debian/.ssh/authorized_keys')
         self.assertTrue('elLwq/bpzBWsg0JjjGvtuuKMM' in out)
 
     def test_cloudinit_no_tracebacks(self):
