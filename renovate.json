@@ -41,7 +41,7 @@
         "async-extensions"
       ],
       "groupName": "entangled-wraps"
-    },
+    }
   ],
   "minimumReleaseAge": "3 days",
   "rollbackPrs": "true"
