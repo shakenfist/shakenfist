@@ -232,6 +232,9 @@ def add_address_to_interface(namespace, address, netmask, device):
     })
 
     def _add_address(namespace, address, netmask, device):
+        if not address:
+            raise exceptions.InvalidAddress(address)
+
         try:
             process.execute(
                 None,

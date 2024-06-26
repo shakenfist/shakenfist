@@ -372,6 +372,8 @@ class Network(dbo):
         if self.uuid == 'floating':
             return
 
+        self.add_event(EVENT_TYPE_AUDIT, 'creating network on hypervisor')
+
         with self.get_lock(op='create_on_hypervisor', global_scope=False):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
@@ -381,6 +383,12 @@ class Network(dbo):
         # The floating network does not have a vxlan mesh
         if self.uuid == 'floating':
             return
+
+        if self.state.value == dbo.STATE_DELETED:
+            self.add_event(
+                EVENT_TYPE_AUDIT, 'refusing to create deleted network on network node')
+            return
+        self.add_event(EVENT_TYPE_AUDIT, 'creating network on network node')
 
         with self.get_lock(op='create_on_network_node', global_scope=False):
             if self.is_dead():

@@ -184,6 +184,10 @@ class IPManagerMissing(NetworkException):
     ...
 
 
+class InvalidAddress(NetworkException):
+    ...
+
+
 # NetworkInterface
 class NetworkInterfaceException(Exception):
     ...
