@@ -10,11 +10,7 @@ if [ ${revisions} -gt 175000 ]; then
     failures=1
 fi
 
-# We only check etcd statistics for version 0.8.0 onwards
-version=$(sf-client --simple node show primary | grep release | cut -f 2 -d ":")
-echo "Detected version ${version}"
-
-if [ $(echo ${version} | egrep -c "^0.[1234567]") -eq 0 ]; then
+if [ $(echo ${1} | egrep -c "^0.[1234567]") -eq 0 ]; then
     echo
     export SHAKENFIST_ETCD_HOST=10.0.0.10
     /srv/shakenfist/venv/bin/python3 tools/event_statistics.py

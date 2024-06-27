@@ -10,35 +10,47 @@
 import flask
 from flask_jwt_extended import get_jwt_identity
 from flasgger import swag_from
+import math
 import os
 import random
 import requests
-from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import api as sf_api, logs
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
 from shakenfist.util import general as util_general
 
 
-def _read_file(filename, offset):
+LOG, HANDLER = logs.setup(__name__)
+daemon.set_log_level(LOG, 'api')
+
+
+def _read_file(filename, offset, limit=0):
+    remaining = limit
+    if limit == 0:
+        remaining = math.inf
+
     with open(filename, 'rb') as f:
         f.seek(offset)
-        while d := f.read(8192):
+        while d := f.read(min(8192, remaining)):
             yield d
+            remaining -= len(d)
 
 
-def _read_remote(target, blob_uuid, offset=0):
+def _read_remote(target, blob_uuid, offset=0, limit=0):
     api_token = get_api_token(
         'http://%s:%d' % (target, config.API_PORT),
         namespace=get_jwt_identity()[0])
-    url = 'http://%s:%d/blobs/%s/data?offset=%d' % (
-        target, config.API_PORT, blob_uuid, offset)
+
+    url = 'http://%s:%d/blobs/%s/data?offset=%d&limit=%d' % (
+        target, config.API_PORT, blob_uuid, offset, limit)
 
     r = requests.request(
             'GET', url, stream=True,
@@ -120,7 +132,8 @@ class BlobDataEndpoint(sf_api.Resource):
     # are not included in the webargs schema because webargs doesn't appear to
     # know how to find them.
     get_args = {
-        'offset': fields.Int(missing=0)
+        'offset': fields.Int(missing=0),
+        'limit': fields.Int(missing=0)
     }
 
     @swag_from(api_base.swagger_helper(
@@ -128,7 +141,10 @@ class BlobDataEndpoint(sf_api.Resource):
         [
             ('blob_uuid', 'query', 'uuid', 'The UUID of the blob.', True),
             ('offset', 'query', 'integer',
-             'The offset into the file to start reading from.', False)
+             'The offset into the file to start reading from.', False),
+            ('limit', 'query', 'integer',
+             ('The maximum amount of data to return in one response. '
+              '0 means no limit.'), False)
         ],
         [(200, 'Content of a blob as a streaming binary HTTP result.', 'n/a'),
          (404, 'Blob not found.', None)]))
@@ -136,22 +152,25 @@ class BlobDataEndpoint(sf_api.Resource):
     @use_kwargs(get_args, location='query')
     @api_base.log_token_use
     @arg_is_blob_uuid
-    def get(self, blob_uuid=None, offset=0, blob_from_db=None):
+    def get(self, blob_uuid=None, offset=0, limit=0, blob_from_db=None):
         # Fast path if we have the blob locally
         blob_path = Blob.filepath(blob_uuid)
         if os.path.exists(blob_path):
+            LOG.debug('Returning direct result')
             return flask.Response(
-                flask.stream_with_context(_read_file(blob_path, offset)),
+                flask.stream_with_context(_read_file(blob_path, offset,
+                                                     limit=limit)),
                 mimetype='text/plain', status=200)
 
         # Otherwise find a node which has the blob and proxy.
+        LOG.debug('Returning proxied result')
         locations = blob_from_db.locations
         if not locations:
             return sf_api.error(404, 'blob missing')
 
         random.shuffle(locations)
         return flask.Response(flask.stream_with_context(
-            _read_remote(locations[0], blob_uuid, offset=offset)),
+            _read_remote(locations[0], blob_uuid, offset=offset, limit=limit)),
             mimetype='text/plain', status=200)
 
 
