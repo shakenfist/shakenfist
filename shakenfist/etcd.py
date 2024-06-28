@@ -138,9 +138,13 @@ class ActualLock(Lock):
         pid = os.getpid()
         caller = util_callstack.get_caller(offset=3)
 
+        # We also override the location of the lock so that we're in our own spot
+        self.key = LOCK_PREFIX + self.path
+
         self.log_ctx = log_ctx.with_fields(
             {
                 'lock': self.path,
+                'key': self.key,
                 'node': node,
                 'pid': pid,
                 'line': caller,
@@ -158,9 +162,6 @@ class ActualLock(Lock):
                 'id': self.lockid
             },
             indent=4, sort_keys=True)
-
-        # We also override the location of the lock so that we're in our own spot
-        self.key = LOCK_PREFIX + self.path
 
     @retry_etcd_forever
     def get_holder(self, key_prefix=''):
@@ -180,6 +181,9 @@ class ActualLock(Lock):
 
         return holder
 
+    def get_lease(self):
+        return self.lease
+
     def refresh(self):
         super().refresh()
         self.log_ctx.info('Refreshed lock')
@@ -191,6 +195,10 @@ class ActualLock(Lock):
 
         while time.time() - start_time < self.timeout:
             res = self.acquire()
+            self.log_ctx = self.log_ctx.with_fields({
+                'leased_keys': self.get_lease().keys()
+            })
+
             duration = time.time() - start_time
             if res:
                 current = self.get_holder()
@@ -238,8 +246,11 @@ class ActualLock(Lock):
                 locks = list(get_all(LOCK_PREFIX, None))
                 self.log_ctx.with_fields({
                     'locks': locks,
-                    'key': self.name,
+                    'path': self.path,
+                    'name': self.name,
+                    'key': self.key,
                     'attempt': attempts,
+                    'leased_keys': self.get_lease().keys()
                     }).error('Failed to release lock')
             time.sleep(0.5)
 
@@ -317,7 +328,7 @@ def _construct_key(objecttype, subtype, name):
         return f'/sf/{objecttype}/{name}'
     if subtype:
         return f'/sf/{objecttype}/{subtype}/'
-    return '/sf/%s/' % objecttype
+    return f'/sf/{objecttype}/'
 
 
 class JSONEncoderCustomTypes(json.JSONEncoder):

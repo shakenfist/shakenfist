@@ -41,8 +41,9 @@ class ActualLockTestCase(base.ShakenFistTestCase):
                 return_value='banana.py:43')
     @mock.patch('etcd3gw.lock.Lock.release')
     @mock.patch('etcd3gw.lock.Lock.acquire', return_value=True)
+    @mock.patch('shakenfist.etcd.ActualLock.get_lease')
     @mock.patch('os.getpid', return_value=42)
-    def test_context_manager(self, mock_pid, mock_acquire, mock_release,
+    def test_context_manager(self, mock_pid, mock_lease, mock_acquire, mock_release,
                              mock_get_caller, mock_get_holder, mock_fake_id):
         al = etcd.ActualLock('instance', None, 'auuid', op='Test case')
 
@@ -90,9 +91,10 @@ class ActualLockTestCase(base.ShakenFistTestCase):
     @mock.patch('etcd3gw.lock.Lock.release')
     @mock.patch('etcd3gw.lock.Lock.acquire',
                 side_effect=[False, False, False, False, False, True])
+    @mock.patch('shakenfist.etcd.ActualLock.get_lease')
     @mock.patch('os.getpid', return_value=42)
     def test_context_manager_slow(
-            self, mock_pid, mock_acquire, mock_release, mock_sleep,
+            self, mock_pid, mock_lease, mock_acquire, mock_release, mock_sleep,
             mock_time, mock_add_event, mock_get_holder, mock_fake_id):
         al = etcd.ActualLock('instance', None, 'auuid', op='Test case', timeout=12)
         al.log_ctx = mock.MagicMock()
@@ -125,9 +127,10 @@ class ActualLockTestCase(base.ShakenFistTestCase):
     @mock.patch('etcd3gw.lock.Lock.release')
     @mock.patch('etcd3gw.lock.Lock.acquire',
                 side_effect=[False, False, False, False, False, True])
+    @mock.patch('shakenfist.etcd.ActualLock.get_lease')
     @mock.patch('os.getpid', return_value=42)
     def test_context_manager_timeout(
-            self, mock_pid, mock_acquire, mock_release, mock_sleep,
+            self, mock_pid, mock_lease, mock_acquire, mock_release, mock_sleep,
             mock_time, mock_add_event, mock_get_holder, mock_fake_id):
         al = etcd.ActualLock('instance', None, 'auuid', op='Test case',
                              timeout=4)
