@@ -52,7 +52,7 @@ pydantic-core==2.18.2              # (indirect dependency)
 # Indirect dependencies. We do not track license for these.
 aniso8601==9.0.1
 annotated-types==0.6.0
-anyio==4.3.0
+anyio==4.4.0
 async-extensions==4.0.0
 attrs==23.2.0
 blinker==1.8.2
