@@ -52,6 +52,11 @@ def _read_remote(target, blob_uuid, offset=0, limit=0):
     url = 'http://%s:%d/blobs/%s/data?offset=%d&limit=%d' % (
         target, config.API_PORT, blob_uuid, offset, limit)
 
+    LOG.with_fields({
+        'blob': blob_uuid,
+        'offset': offset,
+        'host': target
+    }).info('Requesting blob from remote host')
     r = requests.request(
             'GET', url, stream=True,
             headers={
