@@ -44,8 +44,8 @@ nav:
         - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
     - Community: community.md
     - User Guide:
-        - "Authentication": user_guide/authentication.md
         - "Usage": user_guide/usage.md
+        - "Authentication": user_guide/authentication.md
         - "Ansible module": user_guide/ansible.md
         - "Artifacts": user_guide/artifacts.md
         - "Affinity": user_guide/affinity.md
