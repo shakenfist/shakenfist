@@ -46,7 +46,7 @@ that on the command line.
 
 You can explore what the command line client is capable of by asking it for help:
 
-```bash
+```text
 $ sf-client --help
 Usage: sf-client [OPTIONS] COMMAND [ARGS]...
 
@@ -79,7 +79,7 @@ Commands:
 
 This help is present at several levels, such as:
 
-```bash
+```text
 $ sf-client instance --help
 Usage: sf-client instance [OPTIONS] COMMAND [ARGS]...
 
@@ -90,7 +90,8 @@ Options:
 
 Commands:
   add-interface    Add a network interface to an instance
-  await            Await an agent ready from the specified instance
+  await            Await an agent ready from the specified
+                   instance
   consoledata      Get console data for an instance
   consoledelete    Clear the console log for this instance
   create           Create an instance.
@@ -105,7 +106,8 @@ Commands:
   poweroff         Power off an instance
   poweron          Power on an instance
   reboot           Reboot instance
-  screenshot       Download a screenshot of the console of an instance
+  screenshot       Download a screenshot of the console of
+                   an instance
   set-metadata     Set a metadata item
   show             Show an instance
   snapshot         Snapshot instance
@@ -177,7 +179,8 @@ downloaded via the REST API and command line client.
 You start an instance like this:
 
 ```bash
-sf-client instance create myinstance 1 2048 -d 8@cirros -n netuuid
+sf-client instance create myinstance 1 2048 -d 8@cirros \
+    -n netuuid
 ```
 
 Where myinstance is the name of the instance, in this example it has 1 vCPU,
@@ -191,7 +194,8 @@ where the `@image` is optional. You can specify more than one disk, so this is
 valid:
 
 ```bash
-sf-client instance create myinstance 1 2048 -d 8@cirros -d 8 -d 8 -n netuuid
+sf-client instance create myinstance 1 2048 -d 8@cirros \
+    -d 8 -d 8 -n netuuid
 ```
 
 In this case we have three disks, all of 8gb. The boot disk is imaged with
@@ -204,7 +208,8 @@ In this case "cirros" means "the latest release of cirros". You can also specify
 a version like this:
 
 ```bash
-sf-client instance create myinstance 1 2048 -d 8@cirros:0.5.1 -d 8 -d 8 -n netuuid
+sf-client instance create myinstance 1 2048 -d 8@cirros:0.5.1 \
+    -d 8 -d 8 -n netuuid
 ```
 
 While Cirros is special cased, there are a variety of other images you can use
@@ -219,7 +224,8 @@ Its syntax is similar:
 
 ```bash
 sf-client instance create myinstance 1 2048 \
-    -D size=8,base=cirros,bus=ide,type=cdrom -d 8 -d 8 -n netuuid
+    -D size=8,base=cirros,bus=ide,type=cdrom -d 8 -d 8 \
+    -n netuuid
 ```
 
 The specification is composed of a series of key-value pairs. Valid keys are:
@@ -241,8 +247,8 @@ the UUID or name of a network, but also optionally the IP address to use for the
 interface. You can also have more than one network interface, so this is valid:
 
 ```bash
-sf-client instance create myinstance 1 2048 -d 8@cirros -n netuuid1 \
-    -n netuuid2@10.0.0.4
+sf-client instance create myinstance 1 2048 -d 8@cirros \
+    -n netuuid1 -n netuuid2@10.0.0.4
 ```
 
 Where netuuid1 and netuuid2 are both UUIDs of networks. You can also use the
@@ -251,7 +257,8 @@ operating in. So for example, this is valid too:
 
 ```bash
 sf-client network create testnet 10.0.0.0/24
-sf-client instance create testinstance 2 2048 -d 20@debian:12 -n testnet
+sf-client instance create testinstance 2 2048 -d 20@debian:12 \
+    -n testnet
 ```
 
 Again, you can still assign a network address while using the network name, such
@@ -263,7 +270,8 @@ packet mangled to arrive at your virtual network address, much like in
 OpenStack. The details are the same as `-n`, except the flag is `-f`:
 
 ```bash
-sf-client instance create myinstance 1 2048 -d 8@cirros -f netuuid1
+sf-client instance create myinstance 1 2048 -d 8@cirros \
+    -f netuuid1
 ```
 
 There is a "detailed network specification" as well at `-N`, which is composed
