@@ -38,7 +38,7 @@ protobuf==5.26.1                   # bsd
 requests==2.31.0                   # apache2
 requests-toolbelt==1.0.0           # apache2
 chardet==5.2.0                     # lgpl
-urllib3==2.2.1                     # mit
+urllib3==2.2.2                     # mit
 
 # These must move as a set
 pydantic==2.7.4                    # mit
