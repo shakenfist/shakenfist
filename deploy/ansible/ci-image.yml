@@ -198,24 +198,12 @@
               - zip
             state: latest
 
-    # This is driven by issues with the version of tox packaged on Debian 10
     - name: Install tox and dependencies via apt on Ubuntu
       apt:
         name:
           - tox
           - python3-filelock
-      when: ansible_distribution == 'Ubuntu'
-
-    - name: Install tox and dependencies via pip on Debian 10
-      shell: pip3 install -U tox filelock
-      when: ansible_distribution == 'Debian' and (ansible_distribution_version | int) == 10
-
-    - name: Install tox and dependencies via apt on Debian > 10
-      apt:
-        name:
-          - tox
-          - python3-filelock
-      when: ansible_distribution == 'Debian' and (ansible_distribution_version | int) > 10
+      when: ansible_pkg_mgr == "apt"
 
     - name: Install tox and dependencies on RHEL derived OSes
       dnf:
