@@ -17,7 +17,7 @@
           - "100@{{base_image}}"
           - "30@sf://label/ci-images/dependencies"
         networkspecs:
-          - network_uuid="{{identifier}}",address=10.0.0.10
+          - network_uuid={{identifier}},address=10.0.0.10
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
@@ -26,8 +26,8 @@
     - name: Add primary node to ansible
       add_host:
         hostname: primary
-        egress_ip: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
-        ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
+        egress_ip: "{{primary['meta']['interfaces'][0]['ipv4']}}"
+        ansible_ssh_host: "{{primary['meta']['interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
@@ -37,7 +37,7 @@
     - name: Log instance details
       debug:
         msg:
-          - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['network_interfaces'][0]['ipv4']}}"
+          - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['interfaces'][0]['ipv4']}}"
 
     - include_tasks: ci-include-common-localhost.yml
 

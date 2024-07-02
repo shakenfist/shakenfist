@@ -16,16 +16,37 @@
           - "100@{{base_image}}"
           - "30"
         networkspecs:
-          - network_uuid="{{identifier}}"
+          - "network_uuid={{identifier}}"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
       register: imagerebuild_instance
 
+    - name: Log instance
+      debug:
+        msg: "{{imagerebuild_instance}}"
+
+    - name: Wait for instance to be created
+      shell: |
+        count=0
+        while true; do
+          state=$(sf-client --json instance show rebuild | jq -r ".state")
+          if [ ${state} == "created" ]; then
+            exit 0
+          fi
+
+          sleep 10
+          count=$(( $count + 1))
+          if [ ${count} -gt 30 ]; then
+            echo "Instance not created after five minutes"
+            exit 1
+          fi
+        done
+
     - name: Add to ansible (force python3)
       add_host:
         hostname: imagerebuild
-        ansible_ssh_host: "{{imagerebuild_instance['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_host: "{{imagerebuild_instance['meta']['interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
@@ -37,7 +58,7 @@
     - name: Add to ansible (detect system python)
       add_host:
         hostname: imagerebuild
-        ansible_ssh_host: "{{imagerebuild_instance['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_host: "{{imagerebuild_instance['meta']['interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
