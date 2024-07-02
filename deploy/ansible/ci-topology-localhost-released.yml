@@ -21,6 +21,8 @@
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
+        await: true
+        await_timeout: 600
       register: primary
 
     - name: Add primary node to ansible

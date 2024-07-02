@@ -20,28 +20,13 @@
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
+        await: true
+        await_timeout: 600
       register: imagerebuild_instance
 
     - name: Log instance
       debug:
         msg: "{{imagerebuild_instance}}"
-
-    - name: Wait for instance to be created
-      shell: |
-        count=0
-        while true; do
-          state=$(sf-client --json instance show rebuild | jq -r ".state")
-          if [ ${state} == "created" ]; then
-            exit 0
-          fi
-
-          sleep 10
-          count=$(( $count + 1))
-          if [ ${count} -gt 30 ]; then
-            echo "Instance not created after five minutes"
-            exit 1
-          fi
-        done
 
     - name: Add to ansible (force python3)
       add_host:
@@ -286,6 +271,8 @@
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
+        await: true
+        await_timeout: 600
       register: imagetest_instance
 
     - name: Add to ansible (force python3)
@@ -312,23 +299,6 @@
     - name: Log instance
       debug:
         msg: "{{hostvars['imagetest']}}"
-
-    - name: Wait for instance to be created
-      shell: |
-        count=0
-        while true; do
-          state=$(sf-client --json instance show rebuild | jq -r ".state")
-          if [ ${state} == "created" ]; then
-            exit 0
-          fi
-
-          sleep 10
-          count=$(( $count + 1))
-          if [ ${count} -gt 30 ]; then
-            echo "Instance not created after five minutes"
-            exit 1
-          fi
-        done
 
     - name: Wait for instance to present an "OpenSSH" prompt
       wait_for:
