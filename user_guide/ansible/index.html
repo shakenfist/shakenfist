@@ -1860,6 +1860,14 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <td>uuid<br/><em>string</em></td>
 <td>The UUID for the instance. Either <code>name</code> or <code>uuid</code> must be included in all requests with <code>state: absent</code>. If you specify a UUID and the instance does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation.</td>
 </tr>
+<tr>
+<td>await<br/><em>boolean</em></td>
+<td>Whether to wait for the instance to be created. Only works for when state is <code>present</code>. Default is <code>false</code>.</td>
+</tr>
+<tr>
+<td>await_timeout<br/><em>integer</em></td>
+<td>How many seconds to wait in an <code>await</code>. Defaults to 600.</td>
+</tr>
 </tbody>
 </table>
 
