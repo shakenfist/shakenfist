@@ -5,13 +5,6 @@ import jinja2
 JOBS = {
     'ci-images': [
         {
-            'name': 'debian-10',
-            'baseimage': 'debian:10',
-            'baseuser': 'debian',
-            'outputlabel': 'ci-images/debian-10',
-            'scheduled': True
-        },
-        {
             'name': 'debian-11',
             'baseimage': 'debian:11',
             'baseuser': 'debian',
@@ -45,13 +38,6 @@ JOBS = {
             'baseuser': 'ubuntu',
             'outputlabel': 'ci-images/ubuntu-2204',
             'scheduled': True
-        },
-        {
-            'name': 'debian-10-test',
-            'baseimage': 'debian:10',
-            'baseuser': 'debian',
-            'outputlabel': 'ci-images/debian-10-test',
-            'scheduled': False
         },
         {
             'name': 'debian-11-test',

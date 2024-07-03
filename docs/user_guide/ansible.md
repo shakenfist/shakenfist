@@ -192,3 +192,5 @@ Delete a network:
 | ram<br/>*integer* | The amount of RAM the instance should have, in MB. |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
 | uuid<br/>*string* | The UUID for the instance. Either `name` or `uuid` must be included in all requests with `state: absent`. If you specify a UUID and the instance does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation. |
+| await<br/>*boolean* | Whether to wait for the instance to be created. Only works for when state is `present`. Default is `false`. |
+| await_timeout<br/>*integer* | How many seconds to wait in an `await`. Defaults to 600. |

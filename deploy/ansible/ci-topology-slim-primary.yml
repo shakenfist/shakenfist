@@ -30,20 +30,22 @@
           - "100@{{base_image}}"
           - "30@sf://label/ci-images/dependencies"
         networkspecs:
-          - network_uuid="{{identifier}}",address=10.0.0.10
-          - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
+          - network_uuid={{identifier}},address=10.0.0.10
+          - network_uuid={{meshnetwork['meta']['uuid']}},address=none
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
+        await: true
+        await_timeout: 600
       register: primary
 
     - name: Add primary to ansible
       add_host:
         hostname: primary
-        egress_ip: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
+        egress_ip: "{{primary['meta']['interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.10"
-        mesh_mac: "{{primary['meta']['network_interfaces'][1]['macaddr']}}"
-        ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
+        mesh_mac: "{{primary['meta']['interfaces'][1]['macaddr']}}"
+        ansible_ssh_host: "{{primary['meta']['interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
@@ -58,8 +60,8 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}",address=10.0.0.20
-          - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
+          - network_uuid={{identifier}},address=10.0.0.20
+          - network_uuid={{meshnetwork['meta']['uuid']}},address=none
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
@@ -68,10 +70,10 @@
     - name: Add sf-1 to ansible
       add_host:
         hostname: sf1
-        egress_ip: "{{sf1['meta']['network_interfaces'][0]['ipv4']}}"
+        egress_ip: "{{sf1['meta']['interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.11"
-        mesh_mac: "{{sf1['meta']['network_interfaces'][1]['macaddr']}}"
-        ansible_ssh_host: "{{sf1['meta']['network_interfaces'][0]['ipv4']}}"
+        mesh_mac: "{{sf1['meta']['interfaces'][1]['macaddr']}}"
+        ansible_ssh_host: "{{sf1['meta']['interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
@@ -86,8 +88,8 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}",address=10.0.0.21
-          - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
+          - network_uuid={{identifier}},address=10.0.0.21
+          - network_uuid={{meshnetwork['meta']['uuid']}},address=none
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
@@ -96,10 +98,10 @@
     - name: Add sf-2 to ansible
       add_host:
         hostname: sf2
-        egress_ip: "{{sf2['meta']['network_interfaces'][0]['ipv4']}}"
+        egress_ip: "{{sf2['meta']['interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.12"
-        mesh_mac: "{{sf2['meta']['network_interfaces'][1]['macaddr']}}"
-        ansible_ssh_host: "{{sf2['meta']['network_interfaces'][0]['ipv4']}}"
+        mesh_mac: "{{sf2['meta']['interfaces'][1]['macaddr']}}"
+        ansible_ssh_host: "{{sf2['meta']['interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
@@ -114,8 +116,8 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}",address=10.0.0.22
-          - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
+          - network_uuid={{identifier}},address=10.0.0.22
+          - network_uuid={{meshnetwork['meta']['uuid']}},address=none
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
@@ -124,10 +126,10 @@
     - name: Add sf-3 to ansible
       add_host:
         hostname: sf3
-        egress_ip: "{{sf3['meta']['network_interfaces'][0]['ipv4']}}"
+        egress_ip: "{{sf3['meta']['interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.13"
-        mesh_mac: "{{sf3['meta']['network_interfaces'][1]['macaddr']}}"
-        ansible_ssh_host: "{{sf3['meta']['network_interfaces'][0]['ipv4']}}"
+        mesh_mac: "{{sf3['meta']['interfaces'][1]['macaddr']}}"
+        ansible_ssh_host: "{{sf3['meta']['interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
@@ -142,8 +144,8 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}",address=10.0.0.23
-          - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
+          - network_uuid={{identifier}},address=10.0.0.23
+          - network_uuid={{meshnetwork['meta']['uuid']}},address=none
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
@@ -152,10 +154,10 @@
     - name: Add sf-4 to ansible
       add_host:
         hostname: sf4
-        egress_ip: "{{sf4['meta']['network_interfaces'][0]['ipv4']}}"
+        egress_ip: "{{sf4['meta']['interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.14"
-        mesh_mac: "{{sf4['meta']['network_interfaces'][1]['macaddr']}}"
-        ansible_ssh_host: "{{sf4['meta']['network_interfaces'][0]['ipv4']}}"
+        mesh_mac: "{{sf4['meta']['interfaces'][1]['macaddr']}}"
+        ansible_ssh_host: "{{sf4['meta']['interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
@@ -170,8 +172,8 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{identifier}}",address=10.0.0.24
-          - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
+          - network_uuid={{identifier}},address=10.0.0.24
+          - network_uuid={{meshnetwork['meta']['uuid']}},address=none
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
@@ -180,10 +182,10 @@
     - name: Add sf-5 to ansible
       add_host:
         hostname: sf5
-        egress_ip: "{{sf5['meta']['network_interfaces'][0]['ipv4']}}"
+        egress_ip: "{{sf5['meta']['interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.15"
-        mesh_mac: "{{sf5['meta']['network_interfaces'][1]['macaddr']}}"
-        ansible_ssh_host: "{{sf5['meta']['network_interfaces'][0]['ipv4']}}"
+        mesh_mac: "{{sf5['meta']['interfaces'][1]['macaddr']}}"
+        ansible_ssh_host: "{{sf5['meta']['interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
@@ -193,12 +195,12 @@
     - name: Log instance details
       debug:
         msg:
-          - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['network_interfaces'][0]['ipv4']}}"
-          - "   sf-1: is {{sf1['meta']['uuid']}} at {{sf1['meta']['network_interfaces'][0]['ipv4']}}"
-          - "   sf-2: is {{sf2['meta']['uuid']}} at {{sf2['meta']['network_interfaces'][0]['ipv4']}}"
-          - "   sf-3: is {{sf3['meta']['uuid']}} at {{sf3['meta']['network_interfaces'][0]['ipv4']}}"
-          - "   sf-4: is {{sf4['meta']['uuid']}} at {{sf4['meta']['network_interfaces'][0]['ipv4']}}"
-          - "   sf-5: is {{sf5['meta']['uuid']}} at {{sf5['meta']['network_interfaces'][0]['ipv4']}}"
+          - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['interfaces'][0]['ipv4']}}"
+          - "   sf-1: is {{sf1['meta']['uuid']}} at {{sf1['meta']['interfaces'][0]['ipv4']}}"
+          - "   sf-2: is {{sf2['meta']['uuid']}} at {{sf2['meta']['interfaces'][0]['ipv4']}}"
+          - "   sf-3: is {{sf3['meta']['uuid']}} at {{sf3['meta']['interfaces'][0]['ipv4']}}"
+          - "   sf-4: is {{sf4['meta']['uuid']}} at {{sf4['meta']['interfaces'][0]['ipv4']}}"
+          - "   sf-5: is {{sf5['meta']['uuid']}} at {{sf5['meta']['interfaces'][0]['ipv4']}}"
 
     - include_tasks: ci-include-common-localhost.yml
 
