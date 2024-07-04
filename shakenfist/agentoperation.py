@@ -1,38 +1,17 @@
 from shakenfist_utilities import logs
 
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.baseoperation import BaseOperation
 from shakenfist import blob
 
 
 LOG, _ = logs.setup(__name__)
 
 
-class AgentOperation(dbo):
+class AgentOperation(BaseOperation):
     object_type = 'agentoperation'
     initial_version = 1
     current_version = 1
-
-    # docs/developer_guide/state_machine.md has a description of these states.
-    STATE_QUEUED = 'queued'
-    STATE_PREFLIGHT = 'preflight'
-    STATE_EXECUTING = 'executing'
-    STATE_COMPLETE = 'complete'
-
-    ACTIVE_STATES = {dbo.STATE_CREATED, STATE_QUEUED, STATE_EXECUTING, STATE_COMPLETE}
-
-    state_targets = {
-        None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
-        dbo.STATE_INITIAL: (STATE_PREFLIGHT, STATE_QUEUED, dbo.STATE_DELETED,
-                            dbo.STATE_ERROR),
-        STATE_PREFLIGHT: (STATE_QUEUED, dbo.STATE_DELETED, dbo.STATE_ERROR),
-        STATE_QUEUED: (STATE_EXECUTING, dbo.STATE_DELETED, dbo.STATE_ERROR),
-        STATE_EXECUTING: (STATE_COMPLETE, dbo.STATE_DELETED, dbo.STATE_ERROR),
-        STATE_COMPLETE: (dbo.STATE_DELETED),
-        dbo.STATE_ERROR: (dbo.STATE_DELETED),
-        dbo.STATE_DELETED: None,
-    }
 
     def __init__(self, static_values):
         self.upgrade(static_values)
