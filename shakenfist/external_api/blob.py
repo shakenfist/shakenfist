@@ -32,6 +32,9 @@ LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
+CHUNK_SIZE = 128 * 1024
+
+
 def _read_file(filename, offset, limit=0):
     remaining = limit
     if limit == 0:
@@ -39,7 +42,7 @@ def _read_file(filename, offset, limit=0):
 
     with open(filename, 'rb') as f:
         f.seek(offset)
-        while d := f.read(min(8192, remaining)):
+        while d := f.read(min(CHUNK_SIZE, remaining)):
             yield d
             remaining -= len(d)
 
@@ -64,7 +67,7 @@ def _read_remote(target, blob_uuid, offset=0, limit=0):
                 'User-Agent': util_general.get_user_agent(),
                 'X-Request-ID': flask.request.headers.get('X-Request-ID')
             })
-    yield from r.iter_content(chunk_size=8192)
+    yield from r.iter_content(chunk_size=CHUNK_SIZE)
 
 
 def arg_is_blob_uuid(func):
