@@ -23,7 +23,7 @@ class TestUbuntu(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/ubuntu-1804',
+                    'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
             ], None, None)
