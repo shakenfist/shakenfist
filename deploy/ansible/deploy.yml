@@ -1221,7 +1221,7 @@
         owner: root
         group: root
         mode: "0644"
-      when: new_style_sf_instance.exists
+      when: new_style_sf_instance.stat.exists
 
     - name: Install ansible instance module (old style)
       copy:
@@ -1231,7 +1231,7 @@
         owner: root
         group: root
         mode: "0644"
-      when: not new_style_sf_instance.exists
+      when: not new_style_sf_instance.stat.exists
 
     - name: Check which sf_network module we're using
       stat:
@@ -1246,7 +1246,7 @@
         owner: root
         group: root
         mode: "0644"
-      when: new_style_sf_network.exists
+      when: new_style_sf_network.stat.exists
 
     - name: Install ansible network module (old style)
       copy:
@@ -1256,7 +1256,7 @@
         owner: root
         group: root
         mode: "0644"
-      when: not new_style_sf_network.exists
+      when: not new_style_sf_network.stat.exists
 
     - name: Check which sf_namespace module we're using
       stat:
@@ -1271,7 +1271,7 @@
         owner: root
         group: root
         mode: "0644"
-      when: new_style_sf_namespace.exists
+      when: new_style_sf_namespace.stat.exists
 
     - name: Install ansible namespace module (old style)
       copy:
@@ -1281,7 +1281,7 @@
         owner: root
         group: root
         mode: "0644"
-      when: not new_style_sf_namespace.exists
+      when: not new_style_sf_namespace.stat.exists
 
     - name: Check which sf_snapshot module we're using
       stat:
@@ -1296,7 +1296,7 @@
         owner: root
         group: root
         mode: "0644"
-      when: new_style_sf_snapshot.exists
+      when: new_style_sf_snapshot.stat.exists
 
     - name: Install ansible snapshot module (old style)
       copy:
@@ -1306,4 +1306,4 @@
         owner: root
         group: root
         mode: "0644"
-      when: not new_style_sf_snapshot.exists
+      when: not new_style_sf_snapshot.stat.exists
