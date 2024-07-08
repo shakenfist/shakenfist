@@ -3,11 +3,6 @@
   gather_facts: no
 
   tasks:
-    - name: Delete bundle directory
-      file:
-        path: /srv/github/bundle
-        state: absent
-
     - name: Create artifacts directory
       file:
         path: /srv/github/artifacts
