@@ -1133,7 +1133,22 @@
         state: directory
         mode: "0755"
 
-    - name: Install ansible instance module
+    - name: Check which sf_instance module we're using
+      stat:
+        path: /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance
+      register: new_style_sf_instance
+
+    - name: Install ansible instance module (new style)
+      copy:
+        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance
+        remote_src: yes
+        dest: /usr/share/ansible/plugins/modules/sf_instance
+        owner: root
+        group: root
+        mode: "0644"
+      when: new_style_sf_instance.stat.exists
+
+    - name: Install ansible instance module (old style)
       copy:
         src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance.py
         remote_src: yes
@@ -1141,8 +1156,24 @@
         owner: root
         group: root
         mode: "0644"
+      when: not new_style_sf_instance.stat.exists
 
-    - name: Install ansible network module
+    - name: Check which sf_network module we're using
+      stat:
+        path: /srv/shakenfist/venv/share/shakenfist/ansible/sf_network
+      register: new_style_sf_network
+
+    - name: Install ansible network module (new style)
+      copy:
+        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_network
+        remote_src: yes
+        dest: /usr/share/ansible/plugins/modules/sf_network.py
+        owner: root
+        group: root
+        mode: "0644"
+      when: new_style_sf_network.stat.exists
+
+    - name: Install ansible network module (old style)
       copy:
         src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_network.py
         remote_src: yes
@@ -1150,8 +1181,49 @@
         owner: root
         group: root
         mode: "0644"
+      when: not new_style_sf_network.stat.exists
 
-    - name: Install ansible snapshot module
+    - name: Check which sf_namespace module we're using
+      stat:
+        path: /srv/shakenfist/venv/share/shakenfist/ansible/sf_namespace
+      register: new_style_sf_namespace
+
+    - name: Install ansible namespace module (new style)
+      copy:
+        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_namespace
+        remote_src: yes
+        dest: /usr/share/ansible/plugins/modules/sf_namespace
+        owner: root
+        group: root
+        mode: "0644"
+      when: new_style_sf_namespace.stat.exists
+
+    - name: Install ansible namespace module (old style)
+      copy:
+        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_namespace.py
+        remote_src: yes
+        dest: /usr/share/ansible/plugins/modules/sf_namespace.py
+        owner: root
+        group: root
+        mode: "0644"
+      when: not new_style_sf_namespace.stat.exists
+
+    - name: Check which sf_snapshot module we're using
+      stat:
+        path: /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot
+      register: new_style_sf_snapshot
+
+    - name: Install ansible snapshot module (new style)
+      copy:
+        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot
+        remote_src: yes
+        dest: /usr/share/ansible/plugins/modules/sf_snapshot
+        owner: root
+        group: root
+        mode: "0644"
+      when: new_style_sf_snapshot.stat.exists
+
+    - name: Install ansible snapshot module (old style)
       copy:
         src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot.py
         remote_src: yes
@@ -1159,3 +1231,4 @@
         owner: root
         group: root
         mode: "0644"
+      when: not new_style_sf_snapshot.stat.exists
