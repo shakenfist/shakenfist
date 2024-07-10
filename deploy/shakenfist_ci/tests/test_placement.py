@@ -21,7 +21,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
         self.assertRaises(
             apiclient.ResourceNotFoundException,
             self.test_client.create_instance,
-            'ubuntu-1804', 1, 1024,
+            'ubuntu-2004', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -30,7 +30,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/ubuntu-1804',
+                    'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
             ], None, None, force_placement='sf-nosuchnode')
@@ -39,7 +39,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
         # Create an instance, force it to be on the name node as us.
         try:
             inst = self.test_client.create_instance(
-                'ubuntu-1804', 1, 1024,
+                'ubuntu-2004', 1, 1024,
                 [
                     {
                         'network_uuid': self.net['uuid']
@@ -48,7 +48,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
                 [
                     {
                         'size': 8,
-                        'base': 'sf://upload/system/ubuntu-1804',
+                        'base': 'sf://upload/system/ubuntu-2004',
                         'type': 'disk'
                     }
                 ], None, None, force_placement=socket.getfqdn())
@@ -75,7 +75,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
         # Create another instance, force it to be on a remote node.
         try:
             inst = self.test_client.create_instance(
-                'ubuntu-1804', 1, 1024,
+                'ubuntu-2004', 1, 1024,
                 [
                     {
                         'network_uuid': self.net['uuid']
@@ -84,7 +84,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
                 [
                     {
                         'size': 8,
-                        'base': 'sf://upload/system/ubuntu-1804',
+                        'base': 'sf://upload/system/ubuntu-2004',
                         'type': 'disk'
                     }
                 ], None, None, force_placement='sf-2')
