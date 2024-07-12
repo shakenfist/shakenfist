@@ -35,8 +35,15 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst1['uuid'])
 
         # Take a snapshot
+        self._emit_tracing_event({
+            'msg': 'Start snapshot'
+        })
         snap1 = self.test_client.snapshot_instance(inst1['uuid'])
         self.assertIsNotNone(snap1)
+        self._emit_tracing_event({
+            'msg': 'Finished snapshot',
+            'snapshot': snap1
+        })
 
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
@@ -51,6 +58,10 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertEqual(
             'created', snapshots[0]['state'],
             'snapshot %s is not in a created state' % snapshots[0]['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Snapshot in created state',
+            'snapshots': snapshots
+        })
 
         # Check blob exists and has correct reference count
         snapshot_uuid = snapshots[-1]['uuid']
@@ -71,9 +82,20 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertEqual(None, snap1_info['blobs'][1]['depends_on'],
                          'blob %s should not depend on another blob'
                          % snap1_info['blobs'][1]['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Snapshot blob in created state',
+            'snapshots': snapshots
+        })
 
         # Take another snapshot, we only get the new snapshot returned
+        self._emit_tracing_event({
+            'msg': 'Start snapshot'
+        })
         snap2 = self.test_client.snapshot_instance(inst1['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Finished snapshot',
+            'snapshot': snap2
+        })
 
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
@@ -87,6 +109,10 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertEqual(2, len(snapshots))
         self.assertEqual('sf://instance/%s/vda'
                          % inst1['uuid'], snapshots[0]['source_url'])
+        self._emit_tracing_event({
+            'msg': 'New snapshot is current snapshot',
+            'snapshots': snapshots
+        })
 
         # Now attempt to boot the snapshot via blob uuid
         inst2 = self.test_client.create_instance(
@@ -103,6 +129,10 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self._emit_tracing_event({
+            'msg': 'Start instance from snapshot blob uuid',
+            'instance_uuid': inst2['uuid']
+        })
 
         self.assertIsNotNone(inst2['uuid'])
         self.assertIsNotNone(inst2['node'])
@@ -123,6 +153,10 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self._emit_tracing_event({
+            'msg': 'Start instance from snapshot artifact uuid',
+            'instance_uuid': inst2['uuid']
+        })
 
         self.assertIsNotNone(inst3['uuid'])
         self.assertIsNotNone(inst3['node'])
@@ -135,9 +169,19 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.test_client.delete_artifact_version(snapshot_uuid, 2)
         versions = self.test_client.get_artifact_versions(snapshot_uuid)
         self.assertEqual(1, len(versions))
+        self._emit_tracing_event({
+            'msg': 'Deleted a snapshot'
+        })
 
         # Take another snapshot
-        self.test_client.snapshot_instance(inst1['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Start snapshot'
+        })
+        snap2 = self.test_client.snapshot_instance(inst1['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Finished snapshot',
+            'snapshot': snap2
+        })
 
         # Wait for the index to increment (it happens after the snapshot IO)
         start_time = time.time()
@@ -147,6 +191,10 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
         self.assertEqual(2, len(versions))
+        self._emit_tracing_event({
+            'msg': 'New snapshot is current snapshot',
+            'snapshots': snapshots
+        })
 
         # Delete that new snapshot -- note it's index 3 because we deleted
         # index 2 above and indexes shouldn't be reused.

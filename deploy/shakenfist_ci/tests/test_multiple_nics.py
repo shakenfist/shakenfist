@@ -57,4 +57,4 @@ sudo /etc/init.d/S40network restart"""
 
         for iface in ifaces:
             self._test_ping(
-                inst['uuid'], iface['network_uuid'], iface['ipv4'], 0)
+                inst['uuid'], iface['network_uuid'], iface['ipv4'], True)

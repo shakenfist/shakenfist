@@ -35,11 +35,15 @@ class TestStateChanges(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
-        LOG.info('Started keep network alive instance')
+        self._emit_tracing_event({
+            'msg': 'Started keep network alive instance'
+        })
         self.node = inst['node']
 
     def _start_target(self, suffix):
-        # Start our test instance
+        self._emit_tracing_event({
+            'msg': 'Starting target instance'
+        })
         inst = self.test_client.create_instance(
             'test-statechanges-%s' % suffix, 1, 1024,
             [
@@ -55,11 +59,13 @@ class TestStateChanges(base.BaseNamespacedTestCase):
                 }
             ], None, None,
             force_placement=self.node)
-        LOG.info('Started test instance %s', inst['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Started target instance',
+            'instance_uuid': inst['uuid']
+        })
 
         # Wait for our test instance to boot
         self.assertIsNotNone(inst['uuid'])
-
         self._await_instance_ready(inst['uuid'])
 
         # We need to refetch the instance to get a complete view of its state.
@@ -70,8 +76,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # The network can be slow to start and may not be available after the
         # instance "system ready" event. We are willing to forgive a few fails
         # while the network starts.
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
-
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
         return inst
 
     def test_lifecycle_soft_reboot(self):
@@ -90,7 +95,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             this_boot, [None, 0, last_boot],
             'Instance %s failed soft reboot' % inst['uuid'])
         last_boot = this_boot
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
     def test_lifecycle_hard_reboot(self):
         inst = self._start_target('hardreboot')
@@ -107,7 +112,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.assertNotIn(this_boot, [None, 0, last_boot],
                          'Instance %s failed hard reboot' % inst['uuid'])
         last_boot = this_boot
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
     def test_lifecycle_power_cycle(self):
         inst = self._start_target('powercycle')
@@ -120,7 +125,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # Once the API returns the libvirt has powered off the instance or an
         # error has occurred (which CI will catch).
         time.sleep(5)
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, 100)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, False)
 
         # Rapidly powering on an instance has been showing to confuse libvirt
         # in some cases. Let's see if being more patient here makes it work
@@ -137,7 +142,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.assertNotIn(this_boot, [None, 0, last_boot],
                          'Instance %s failed power cycle' % inst['uuid'])
         last_boot = this_boot
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
     def test_lifecycle_pause_cycle(self):
         inst = self._start_target('pausecycle')
@@ -147,12 +152,29 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 
         # Pause
         self.test_client.pause_instance(inst['uuid'])
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, 100, 10)
+        self._emit_tracing_event({
+            'msg': 'Paused instance',
+            'instance_uuid': inst['uuid']
+        })
+        self._await_instance_not_ready(inst['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Instance not ready',
+            'instance_uuid': inst['uuid']
+        })
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, False)
 
         # Unpause
         self.test_client.unpause_instance(inst['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Unpaused instance',
+            'instance_uuid': inst['uuid']
+        })
         self._await_instance_ready(inst['uuid'])
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
+        self._emit_tracing_event({
+            'msg': 'Instance ready',
+            'instance_uuid': inst['uuid']
+        })
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
 
 class TestDetectReboot(base.BaseNamespacedTestCase):

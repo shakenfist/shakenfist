@@ -18,6 +18,7 @@ from shakenfist_client import apiclient
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 LOG = logging.getLogger()
+TRACE_PATH = '/srv/ci/traces'
 
 
 class TimeoutException(Exception):
@@ -49,6 +50,15 @@ class BaseTestCase(testtools.TestCase):
         super().setUp()
 
         self.system_client = apiclient.Client(async_strategy=apiclient.ASYNC_PAUSE)
+        self._emit_tracing_event({
+            'msg': 'Test starts'
+        })
+
+    def tearDown(self):
+        super().tearDown()
+        self._emit_tracing_event({
+            'msg': 'Test ends'
+        })
 
     def _make_namespace(self, name, key):
         self._remove_namespace(name)
@@ -67,6 +77,17 @@ class BaseTestCase(testtools.TestCase):
 
     def _uniquifier(self):
         return ''.join(random.choice(string.ascii_lowercase) for i in range(8))
+
+    def _emit_tracing_event(self, event):
+        # This method implements a simple tracing scheme to help work out what
+        # the slow bits of a unit test are. This isn't really a complete thing,
+        # its more of a proof of concept at this point.
+        os.makedirs(TRACE_PATH, exist_ok=True)
+        with open(os.path.join(TRACE_PATH, f'{self._testMethodName}.json'), 'a') as f:
+            event['ts'] = time.time()
+            event['ts_pretty'] = str(datetime.datetime.now())
+            f.write(json.dumps(event))
+            f.write('\n')
 
     def _log_console(self, instance_uuid):
         """ Log the console of the instance so that we can debug. """
@@ -121,8 +142,17 @@ class BaseTestCase(testtools.TestCase):
 
     def _await_instance_ready(self, instance_uuid, timeout=7):
         self._await_agent_state(instance_uuid, ready=True, timeout=timeout)
+        self._emit_tracing_event({
+            'msg': 'Instance ready (agent ready state)',
+            'instance_uuid': instance_uuid
+        })
+
         self.system_client.await_agent_command(
             instance_uuid, 'cloud-init status --wait --long')
+        self._emit_tracing_event({
+            'msg': 'Instance ready (cloud-init status)',
+            'instance_uuid': instance_uuid
+        })
 
     def _await_instance_not_ready(self, instance_uuid):
         self._await_agent_state(instance_uuid, ready=False)
@@ -294,29 +324,41 @@ class BaseTestCase(testtools.TestCase):
 
         return aop['results']['0']
 
-    def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
+    def _test_ping(self, instance_uuid, network_uuid, ip, expected):
+        # NOTE(mikal): each call to client.ping() sends 10 ICMP packets
         packet_loss_re = re.compile(r'.* ([0-9\.]+)% packet loss.*')
+        self._emit_tracing_event({
+            'msg': 'Executing test ping',
+            'instance_uuid': instance_uuid,
+            'network_uuid': network_uuid,
+            'ip': ip,
+            'expected': expected
+        })
 
         packet_loss = None
-        while attempts:
-            sys.stderr.write('    _test_ping()  attempts=%s\n' % attempts)
-            attempts -= 1
-
-            output = self.system_client.ping(network_uuid, ip)
-            for line in output.get('stdout', []):
-                m = packet_loss_re.match(line)
-                if m:
-                    packet_loss = int(m.group(1))
-                    break
-
-            # Almost unnecessary due to the slowness of execute()
-            time.sleep(1)
+        output = self.system_client.ping(network_uuid, ip)
+        for line in output.get('stdout', []):
+            m = packet_loss_re.match(line)
+            if m:
+                packet_loss = int(m.group(1))
+                break
 
         failed = False
-        if expected == 0 and packet_loss > 10:
+        if expected and packet_loss > 10:
             failed = True
-        elif expected == 100 and packet_loss != 100:
+        elif not expected and packet_loss != 100:
             failed = True
+
+        self._emit_tracing_event({
+            'msg': 'Executed test ping',
+            'output': output,
+            'packet_loss': packet_loss,
+            'failed': failed,
+            'expected': {
+                True: 'pass',
+                False: 'failure'
+            }
+        })
 
         if failed:
             self._log_console(instance_uuid)
@@ -457,7 +499,7 @@ class TestDistroBoots(BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
 
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
         self.test_client.delete_instance(inst['uuid'])
         inst_uuids = []
