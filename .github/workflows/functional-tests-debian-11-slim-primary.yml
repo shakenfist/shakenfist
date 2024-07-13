@@ -119,6 +119,12 @@ jobs:
               '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24 > /dev/null; echo -n "."; done'
           echo ""
 
+      - name: Make the traces directory
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@${primary} "sudo mkdir -p /srv/ci/traces; sudo chown -R debian:debian /srv/ci/traces"
+
       - name: Run functional tests
         timeout-minutes: 120
         run: |
@@ -211,6 +217,12 @@ jobs:
         if: always()
         run: |
           set -x
+
+          # Fetch unit test tracing
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          mkdir -p /srv/github/bundle/
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -rp \
+              debian@${primary}:/srv/ci/traces /srv/github/bundle/
 
           # We need the ssh key in the place ansible expects it to be, which isn't
           # true on the CI worker node.
