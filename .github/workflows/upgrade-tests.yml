@@ -149,6 +149,7 @@ jobs:
         if: always()
         run: |
           set -x
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
 
           # We need the ssh key in the place ansible expects it to be, which isn't
           # true on the CI worker node.
