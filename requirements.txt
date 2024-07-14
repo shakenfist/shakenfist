@@ -57,7 +57,7 @@ async-extensions==4.0.0
 attrs==23.2.0
 blinker==1.8.2
 coloredlogs==15.0.1
-entrypoint==2.0.3
+entrypoint==2.1.0
 exceptiongroup==1.2.1
 executor==23.2
 funcs==0.10.1
