@@ -1011,7 +1011,7 @@ class InstanceRebootSoftEndpoint(sf_api.Resource):
                                            global_scope=False):
                 return instance_from_db.reboot(hard=False)
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, e)
+            return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
 class InstanceRebootHardEndpoint(sf_api.Resource):
@@ -1035,7 +1035,7 @@ class InstanceRebootHardEndpoint(sf_api.Resource):
                                            global_scope=False):
                 return instance_from_db.reboot(hard=True)
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, e)
+            return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
 class InstancePowerOffEndpoint(sf_api.Resource):
@@ -1059,7 +1059,7 @@ class InstancePowerOffEndpoint(sf_api.Resource):
                                            global_scope=False):
                 return instance_from_db.power_off()
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, e)
+            return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
 class InstancePowerOnEndpoint(sf_api.Resource):
@@ -1083,7 +1083,7 @@ class InstancePowerOnEndpoint(sf_api.Resource):
                                            global_scope=False):
                 return instance_from_db.power_on()
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, e)
+            return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
 class InstancePauseEndpoint(sf_api.Resource):
@@ -1107,7 +1107,7 @@ class InstancePauseEndpoint(sf_api.Resource):
                                            global_scope=False):
                 return instance_from_db.pause()
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, e)
+            return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
 class InstanceUnpauseEndpoint(sf_api.Resource):
@@ -1131,7 +1131,7 @@ class InstanceUnpauseEndpoint(sf_api.Resource):
                                            global_scope=False):
                 return instance_from_db.unpause()
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, e)
+            return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
 class InstanceMetadatasEndpoint(sf_api.Resource):
