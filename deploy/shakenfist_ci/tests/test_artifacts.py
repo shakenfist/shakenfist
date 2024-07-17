@@ -311,7 +311,7 @@ class TestTrusts(base.BaseNamespacedTestCase):
 
 class TestTypoedLabel(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
-        kwargs['namespace_prefix'] = 'sharedimages'
+        kwargs['namespace_prefix'] = 'typolabel'
         super().__init__(*args, **kwargs)
 
     def test_typo_is_error(self):
@@ -325,4 +325,36 @@ class TestTypoedLabel(base.BaseNamespacedTestCase):
                                   'type': 'disk'
                               }
                           ],
-                          None, None)
+                          None, None, side_channels=['sf-agent'])
+
+
+class TestArtifactUndelete(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'undeleteartifact'
+        super().__init__(*args, **kwargs)
+
+    def test_artifacts_can_undelete(self):
+        # We should be able to transition from created to soft deleted
+        # and back to created. If the artifact has been hard deleted, then
+        # re-creation would just treat it as new.
+        url = ('https://sfcbr.shakenfist.com/gw-basic-shared.qcow2')
+        img = self.test_client.cache_artifact(url)
+        orig_img_uuid = img['uuid']
+        self._await_artifacts_ready([orig_img_uuid])
+
+        # Delete the artifact. The API should return for this immediately.
+        img = self.test_client.delete_artifact(orig_img_uuid)
+        self.assertEqual('deleted', img['state'], img)
+
+        img = self.test_client.cache_artifact(url)
+        self.assertEqual(orig_img_uuid, img['uuid'])
+
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            img = self.test_client.get_artifact(img['uuid'])
+            if img['state'] == 'created':
+                break
+            time.sleep(5)
+        self.assertEqual('created', img['state'], img)
+
+        self.fail(img['uuid'])
