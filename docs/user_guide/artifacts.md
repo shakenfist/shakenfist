@@ -63,26 +63,33 @@ image in the specification for an instance.
 There is also a shorthand form of image URLs where you are using an image from
 https://images.shakenfist.com -- in that case you can use urls like `debian:11`
 so specify the latest version of a Debian 11 base image. The valid shorthands
-are those listed in the top level directory listing of that site. At the time of writing this is:
+are those listed in the top level directory listing of that site. At the time of
+writing this is:
 
 * centos (shorthand for centos:8-stream)
 * centos:7
 * centos:8-stream
 * centos:9-stream
-* debian (shorthand for debian:11)
+* debian (shorthand for debian:12)
 * debian:10
 * debian:11
+* debian:12
 * debian-docker:11 (debian 11 with docker pre-installed)
+* debian-docker:12 (debian 12 with docker pre-installed)
 * debian-gnome:11 (debian 11 with the gnome desktop pre-installed)
+* debian-gnome:12 (debian 12 with the gnome desktop pre-installed)
 * debian-xfce:11 (debian 11 with the xfce desktop pre-installed)
-* fedora (shorthand for fedora:39)
+* debian-xfce:12 (debian 12 with the xfce desktop pre-installed)
+* fedora (shorthand for fedora:40)
 * fedora:34
 * fedora:38
 * fedora:39
-* ubuntu (shorthand for ubuntu:20.04)
+* fedora:40
+* ubuntu (shorthand for ubuntu:24.04)
 * ubuntu:18.04
 * ubuntu:20.04
 * ubuntu:22.04
+* ubnutu:24.04
 
 These images are updated nightly by an automated job from https://github.com/shakenfist/images.
 

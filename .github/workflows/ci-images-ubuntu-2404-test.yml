@@ -1,4 +1,4 @@
-name: Rebuild ubuntu-2004-test
+name: Rebuild ubuntu-2404-test
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
       - .github/workflows/ci-images-*
 
 jobs:
-  ubuntu-2004-test:
+  ubuntu-2404-test:
     runs-on: self-hosted
     timeout-minutes: 120
     concurrency:
@@ -34,7 +34,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/shakenfist
           ansible-playbook -i /home/debian/ansible-hosts \
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
-              base_image=ubuntu:20.04 base_image_user=ubuntu label=ci-images/ubuntu-2004-test" \
+              base_image=ubuntu:24.04 base_image_user=ubuntu label=ci-images/ubuntu-2404-test" \
             deploy/ansible/ci-image.yml
 
       - uses: JasonEtco/create-an-issue@v2
@@ -42,7 +42,7 @@ jobs:
         id: create-issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SF_CI_NAME: ubuntu-2004-test
+          SF_CI_NAME: ubuntu-2404-test
           SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           filename: shakenfist/.github/workflows/ci-images-failure.md
