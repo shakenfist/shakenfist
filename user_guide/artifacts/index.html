@@ -1593,26 +1593,33 @@ image in the specification for an instance.</p>
 <p>There is also a shorthand form of image URLs where you are using an image from
 <a href="https://images.shakenfist.com">https://images.shakenfist.com</a> -- in that case you can use urls like <code>debian:11</code>
 so specify the latest version of a Debian 11 base image. The valid shorthands
-are those listed in the top level directory listing of that site. At the time of writing this is:</p>
+are those listed in the top level directory listing of that site. At the time of
+writing this is:</p>
 <ul>
 <li>centos (shorthand for centos:8-stream)</li>
 <li>centos:7</li>
 <li>centos:8-stream</li>
 <li>centos:9-stream</li>
-<li>debian (shorthand for debian:11)</li>
+<li>debian (shorthand for debian:12)</li>
 <li>debian:10</li>
 <li>debian:11</li>
+<li>debian:12</li>
 <li>debian-docker:11 (debian 11 with docker pre-installed)</li>
+<li>debian-docker:12 (debian 12 with docker pre-installed)</li>
 <li>debian-gnome:11 (debian 11 with the gnome desktop pre-installed)</li>
+<li>debian-gnome:12 (debian 12 with the gnome desktop pre-installed)</li>
 <li>debian-xfce:11 (debian 11 with the xfce desktop pre-installed)</li>
-<li>fedora (shorthand for fedora:39)</li>
+<li>debian-xfce:12 (debian 12 with the xfce desktop pre-installed)</li>
+<li>fedora (shorthand for fedora:40)</li>
 <li>fedora:34</li>
 <li>fedora:38</li>
 <li>fedora:39</li>
-<li>ubuntu (shorthand for ubuntu:20.04)</li>
+<li>fedora:40</li>
+<li>ubuntu (shorthand for ubuntu:24.04)</li>
 <li>ubuntu:18.04</li>
 <li>ubuntu:20.04</li>
 <li>ubuntu:22.04</li>
+<li>ubnutu:24.04</li>
 </ul>
 <p>These images are updated nightly by an automated job from <a href="https://github.com/shakenfist/images">https://github.com/shakenfist/images</a>.</p>
 <p>Whenever you specify a URL for an image (either a new <code>cache</code> command or at
