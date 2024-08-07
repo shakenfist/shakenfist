@@ -42,7 +42,7 @@ urllib3==2.2.2                     # mit
 
 # These must move as a set
 pydantic==2.8.2                    # mit
-pydantic-settings==2.3.4           # mit
+pydantic-settings==2.4.0           # mit
 pydantic-core==2.20.1              # (indirect dependency)
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
