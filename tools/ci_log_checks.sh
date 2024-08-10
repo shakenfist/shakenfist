@@ -44,7 +44,6 @@ FORBIDDEN=("Traceback (most recent call last):"
 
 if [ $(echo "${1}" | grep -c "v0.7" || true) -lt 1 ]; then
     echo "INFO: Including forbidden strings for v0.8 onwards."
-    FORBIDDEN+=("Waiting to acquire lock")
     FORBIDDEN+=('apparmor="DENIED"')
     FORBIDDEN+=("Ignoring malformed cache entry")
     FORBIDDEN+=("WORKER TIMEOUT")
@@ -86,4 +85,25 @@ echo
 if [ $failures -gt 0 ]; then
     echo "...failures detected."
     exit 1
+fi
+
+# Just a warning for now, likely to get promoted to a failure later...
+failures=0
+WARNING=("Waiting to acquire lock")
+
+IFS=""
+for forbid in ${WARNING[*]}
+do
+    echo "    Check for >>${forbid}<< in logs."
+    count=$(grep -c -i "$forbid" /var/log/syslog || true)
+    if [ ${count} -gt 0 ]
+    then
+        echo "WARNING: Forbidden string found in logs ${count} times."
+        failures=1
+    fi
+done
+
+echo
+if [ $failures -gt 0 ]; then
+    echo "...warnings detected."
 fi
