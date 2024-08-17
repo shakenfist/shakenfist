@@ -231,6 +231,45 @@
   connection: ssh
 
   tasks:
+    - name: Check if the host certificate is already created
+      stat:
+        path: /etc/pki/libvirt-spice/server_cert.pem
+      register: host_cert
+
+    - name: Check certificate lifetime
+      shell: |
+        openssl x509 -checkend $(( 3600 * 24 * 30 )) -noout \
+            -in /etc/pki/libvirt-spice/server_cert.pem || true
+      register: host_cert_expires
+      when: host_cert.stat.exists
+
+    - name: Log certificate expiry result
+      debug:
+        msg: "{{ host_cert_expires }}"
+      when: host_cert.stat.exists
+
+    - name: Move aside old certificate
+      shell:
+        mv /etc/pki/CA/{{inventory_hostname}}_server_key.pem \
+          /etc/pki/CA/{{inventory_hostname}}_server_key.$(date +%Y%m%d).pem
+      delegate_to: localhost
+      delegate_facts: true
+      when: host_cert.stat.exists and not host_cert_expires.meta.stdout == "Certificate will expire"
+
+    - name: Check if the host certificate still exists
+      stat:
+        path: /etc/pki/CA/{{inventory_hostname}}_server_key.pem
+      delegate_to: localhost
+      delegate_facts: true
+      register: host_cert
+
+    - name: Check if the host key exists
+      stat:
+        path: /etc/pki/CA/{{inventory_hostname}}_server_key.pem
+      delegate_to: localhost
+      delegate_facts: true
+      register: host_key
+
     - name: Write host certificate template
       copy:
         content: |
@@ -244,34 +283,15 @@
         mode: u=r
       delegate_to: localhost
       delegate_facts: true
-
-    - name: Check if the host certificate is already created
-      stat:
-        path: /etc/pki/CA/{{inventory_hostname}}_server_cert.pem
-      register: host_cert
-
-    - name: Check certificate lifetime
-      shell: |
-        if openssl x509 -checkend $(( 3600 * 24 * 30 )) -noout -in /etc/pki/CA/{{inventory_hostname}}_server_cert.pem; then
-          echo "Certificate has at least 30 days lifetime"
-        else
-          echo "Certificate will expire too soon, moving aside"
-          mv /etc/pki/CA/{{inventory_hostname}}_server_cert.pem \
-              /etc/pki/CA/{{inventory_hostname}}_server_cert.old.pem
-        fi
-      when: host_cert.stat.exists
-
-    - name: Check if the host certificate still exists
-      stat:
-        path: /etc/pki/CA/{{inventory_hostname}}_server_cert.pem
-      register: host_cert
+      when: not host_cert.stat.exists
 
     - name: Create host key
       shell:
-        umask 277 && certtool --generate-privkey > /etc/pki/CA/{{inventory_hostname}}_server_key.pem
+        umask 277 && certtool --generate-privkey > \
+            /etc/pki/CA/{{inventory_hostname}}_server_key.pem
       delegate_to: localhost
       delegate_facts: true
-      when: not host_cert.stat.exists
+      when: not host_key.stat.exists
 
     - name: Create host certificate
       shell:
@@ -319,12 +339,6 @@
         owner: root
         group: root
         mode: '0444'
-      when: not ca_cert.stat.exists
-
-    - name: Check if the host certificate is already setup
-      stat:
-        path: /etc/pki/libvirt-spice/server-cert.pem
-      register: host_cert
 
     - name: Copy host key to host
       copy:
@@ -333,7 +347,6 @@
         owner: root
         group: root
         mode: '0444'
-      when: not host_cert.stat.exists
 
     - name: Copy host certificate to host
       copy:
@@ -342,7 +355,6 @@
         owner: root
         group: root
         mode: '0444'
-      when: not host_cert.stat.exists
 
 - hosts: hypervisors, network_node, eventlog_node
   any_errors_fatal: true
