@@ -250,6 +250,22 @@
         path: /etc/pki/CA/{{inventory_hostname}}_server_cert.pem
       register: host_cert
 
+    - name: Check certificate lifetime
+      shell: |
+        if openssl x509 -checkend $(( 3600 * 24 * 30 )) -noout -in /etc/pki/CA/{{inventory_hostname}}_server_cert.pem; then
+          echo "Certificate has at least 30 days lifetime"
+        else
+          echo "Certificate will expire too soon, moving aside"
+          mv /etc/pki/CA/{{inventory_hostname}}_server_cert.pem \
+              /etc/pki/CA/{{inventory_hostname}}_server_cert.old.pem
+        fi
+      when: host_cert.stat.exists
+
+    - name: Check if the host certificate still exists
+      stat:
+        path: /etc/pki/CA/{{inventory_hostname}}_server_cert.pem
+      register: host_cert
+
     - name: Create host key
       shell:
         umask 277 && certtool --generate-privkey > /etc/pki/CA/{{inventory_hostname}}_server_key.pem
