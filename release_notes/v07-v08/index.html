@@ -1610,6 +1610,10 @@
   exposed by a POST to the <code>/instance/...instanceref.../interfaces</code> endpoint, passing
   a network specification like you would at boot time. More details are available
   in the</li>
+<li>The Shaken Fist client now has a plugin system, which allows additional commands
+  that may not be of interest to all users to be added without cluttering the
+  main codebase. Orchestration of k3s clusters via the <code>shakenfist-client-k3s</code>
+  plugin is the first example of one of these plugins.</li>
 </ul>
 <h2 id="rest-api">REST API</h2>
 <ul>
@@ -1632,7 +1636,7 @@
 </ul>
 <h3 id="containers-and-kubernetes">Containers and Kubernetes</h3>
 <ul>
-<li>The Shaken Fist client can now orchestrate K3S Kubernetes clusters for you. The
+<li>The Shaken Fist client can now orchestrate k3s Kubernetes clusters for you. The
   lifecycle support is relatively simple at the moment, with cluster creation and
   deletion supported, as well as fetching the kubectl configuration from the
   cluster. This will be expanded over time. This support is implemented entirely
