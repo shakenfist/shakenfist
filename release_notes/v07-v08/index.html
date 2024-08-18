@@ -1689,9 +1689,11 @@
 <li>We now lock versions of upstream Ansible Galaxy dependencies.</li>
 <li>We now lock versions of all of our indirect python dependencies.</li>
 <li>Nodes can now transition directly from the missing state to the stopping state.</li>
-<li>The Ansible modules have been re-written to skip resoures that are already in
+<li>The Ansible modules have been re-written to skip resources that are already in
   existence and ask described by your request. The Ansible module is also <a href="/user_guide/ansible">now
   documented at the user guide</a>.</li>
+<li>TLS certificates on hypervisors which are within 30 days of expiry are now
+  automatically replaced.</li>
 </ul>
 <h2 id="performance">Performance</h2>
 <ul>
