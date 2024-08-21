@@ -195,6 +195,99 @@ class Monitor(daemon.Daemon):
                 'unique': unique
             }
 
+    def _handle_get_file(self, agentop, count, command):
+        unique = 'agentop:%s:%d' % (agentop.uuid, count)
+        self.sc_client.send_packet({
+            'command': 'get-file',
+            'path': command['path'],
+            'unique': unique
+        })
+        get_done = False
+        get_successful = False
+
+        blob_uuid = str(uuid.uuid4())
+        blob_path = blob.Blob.filepath(blob_uuid)
+        stat_result = {}
+        total_length = 0
+
+        with open(blob_path + '.partial', 'wb') as f:
+            while not get_done:
+                for inpacket in self._await_client():
+                    if not inpacket.get('command') == 'get-file-response':
+                        self.log.with_fields({'packet': inpacket}).error(
+                            'Unexpected sidechannel client packet in '
+                            'response to get-file command '
+                            '(unexpected command type)')
+                        continue
+
+                    if not inpacket.get('unique') == unique:
+                        self.log.with_fields({'packet': inpacket}).error(
+                            'Unexpected sidechannel client packet in '
+                            'response to get-file command '
+                            '(unexpected transaction identifier)')
+                        continue
+
+                    if 'result' in inpacket and not inpacket['result']:
+                        # Fetch failed!
+                        agentop.add_result(count, inpacket)
+                        agentop.state = AgentOperation.STATE_ERROR
+                        agentop.error = inpacket.get(
+                            'message', 'unknown error')
+                        get_done = True
+                        self.log.with_fields({'packet': inpacket}).info(
+                            'get-file command failed')
+                        continue
+
+                    if 'stat_result' in inpacket:
+                        stat_result = inpacket['stat_result']
+
+                    if 'chunk' in inpacket:
+                        if not inpacket['chunk']:
+                            # An empty chunk indicates completion
+                            del inpacket['chunk']
+                            del inpacket['offset']
+                            del inpacket['encoding']
+                            inpacket['stat_result'] = stat_result
+                            inpacket['content_blob'] = blob_uuid
+
+                            agentop.add_result(count, inpacket)
+                            get_done = True
+                            get_successful = True
+                            self.log.with_fields({'packet': inpacket}).info(
+                                'get-file command succeeded')
+                        else:
+                            d = base64.b64decode(inpacket['chunk'])
+                            d_len = len(d)
+                            self.log.debug('Wrote %d bytes to %s.partial'
+                                           % (d_len, blob_path))
+                            total_length += d_len
+                            f.write(d)
+
+        if get_successful:
+            self.log.info('finalizing blob')
+
+            # This os.sync() is here because _sometimes_ we wouldn't see the
+            # data on disk when we immediately try to replicate it.
+            os.sync()
+
+            # We don't remove the partial file until we've finished
+            # registering the blob to avoid deletion races. Note that
+            # this _must_ be a hard link, which is why we don't use
+            # util_general.link().
+            os.link(blob_path + '.partial', blob_path)
+            st = os.stat(blob_path)
+            if st.st_size == 0 and total_length > 0:
+                self.log.error('Agent get-file blob is zero not %d bytes.'
+                               % total_length)
+
+            b = blob.Blob.new(blob_uuid, total_length,
+                              time.time(), time.time())
+            b.ref_count_inc(agentop)
+            b.observe()
+            b.request_replication()
+
+        os.unlink(blob_path + '.partial')
+
     def single_instance_monitor(self, instance_uuid):
         setproctitle.setproctitle('sf-sidechannel-%s' % instance_uuid)
 
@@ -316,10 +409,12 @@ class Monitor(daemon.Daemon):
                             if command['command'] == 'put-blob':
                                 b = blob.Blob.from_db(command['blob_uuid'])
                                 if not b:
+                                    agentop.state = AgentOperation.STATE_ERROR
                                     agentop.error = 'blob missing: %s' % command['blob_uuid']
                                     break
                                 blob_path = blob.Blob.filepath(b.uuid)
                                 if not os.path.exists(blob_path):
+                                    agentop.state = AgentOperation.STATE_ERROR
                                     agentop.error = 'blob file missing: %s' % command['blob_uuid']
                                     break
 
@@ -342,69 +437,8 @@ class Monitor(daemon.Daemon):
                                 num_results += 1
 
                             elif command['command'] == 'get-file':
-                                unique = 'agentop:%s:%d' % (agentop.uuid, count)
-                                self.sc_client.send_packet({
-                                    'command': 'get-file',
-                                    'path': command['path'],
-                                    'unique': unique
-                                    })
-                                get_done = False
-                                blob_uuid = str(uuid.uuid4())
-                                blob_path = blob.Blob.filepath(blob_uuid)
-                                stat_result = {}
-                                total_length = 0
-
-                                while not get_done:
-                                    with open(blob_path + '.partial', 'wb') as f:
-                                        for inpacket in self._await_client():
-                                            if (inpacket.get('command') == 'get-file-response'
-                                                    and inpacket.get('unique') == unique):
-                                                if 'stat_result' in inpacket:
-                                                    stat_result = inpacket['stat_result']
-
-                                                if 'chunk' in inpacket:
-                                                    if not inpacket['chunk']:
-                                                        # An empty chunk indicates completion
-                                                        del inpacket['chunk']
-                                                        del inpacket['offset']
-                                                        del inpacket['encoding']
-                                                        inpacket['stat_result'] = stat_result
-                                                        inpacket['content_blob'] = blob_uuid
-
-                                                        agentop.add_result(count, inpacket)
-                                                        num_results += 1
-                                                        get_done = True
-                                                    else:
-                                                        d = base64.b64decode(inpacket['chunk'])
-                                                        d_len = len(d)
-                                                        self.log.debug('Wrote %d bytes to %s.partial'
-                                                                       % (d_len, blob_path))
-                                                        total_length += d_len
-                                                        f.write(d)
-                                            else:
-                                                self.log.with_fields({'packet': inpacket}).error(
-                                                    'Unexpected sidechannel client packet in '
-                                                    'response to get-file command')
-
-                                # This os.sync() is here because _sometimes_ we wouldn't see the
-                                # data on disk when we immediately try to replicate it.
-                                os.sync()
-
-                                # We don't remove the partial file until we've finished
-                                # registering the blob to avoid deletion races. Note that
-                                # this _must_ be a hard link, which is why we don't use
-                                # util_general.link().
-                                os.link(blob_path + '.partial', blob_path)
-                                st = os.stat(blob_path)
-                                if st.st_size == 0 and total_length > 0:
-                                    self.log.error('Agent get-file blob is zero not %d bytes.'
-                                                   % total_length)
-
-                                b = blob.Blob.new(blob_uuid, total_length, time.time(), time.time())
-                                b.ref_count_inc(agentop)
-                                b.observe()
-                                b.request_replication()
-                                os.unlink(blob_path + '.partial')
+                                self._handle_get_file(agentop, count, command)
+                                num_results += 1
 
                             elif command['command'] == 'chmod':
                                 unique = 'agentop:%s:%d' % (agentop.uuid, count)
@@ -498,7 +532,8 @@ class Monitor(daemon.Daemon):
 
                         if num_results == len(commands):
                             agentop.add_event(EVENT_TYPE_STATUS, 'commands complete')
-                            agentop.state = AgentOperation.STATE_COMPLETE
+                            if agentop.state.value != AgentOperation.STATE_ERROR:
+                                agentop.state = AgentOperation.STATE_COMPLETE
                         else:
                             agentop.add_event(
                                 EVENT_TYPE_STATUS, 'commands not yet complete',
