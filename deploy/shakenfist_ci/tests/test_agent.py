@@ -3,6 +3,7 @@ import os
 import time
 
 from shakenfist_ci import base
+from shakenfist_client import apiclient
 
 
 class TestAgentFileOperations(base.BaseNamespacedTestCase):
@@ -121,6 +122,26 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         data = self.test_client.await_agent_fetch(
             inst['uuid'], '/etc/os-release')
         self.assertTrue(data.startswith('PRETTY_NAME='))
+
+    def test_get_missing_file(self):
+        # Create an instance to fetch files from
+        inst = self.test_client.create_instance(
+            'test-put-and-get-file-missing', 1, 1024, None,
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://upload/system/debian-11',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        # Wait for the instance agent to report in
+        self._await_instance_ready(inst['uuid'])
+
+        # Run a fetch command which should fail
+        self.assertRaises(
+            apiclient.AgentCommandError, self.test_client.await_agent_fetch,
+            inst['uuid'], '/tmp/nosuch')
 
     def test_interface_plug_and_exec_dhcp(self):
         # Create a network to hot plug to
