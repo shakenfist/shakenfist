@@ -69,7 +69,7 @@ iters==0.18.0
 itsdangerous==2.2.0
 linux-utils==0.7
 MarkupSafe==2.1.5
-marshmallow==3.21.3
+marshmallow==3.22.0
 mistune==3.0.2
 mixed-methods==1.1.1
 named==1.4.2
