@@ -9,7 +9,7 @@ oslo-concurrency==6.1.0            # apache2
 Jinja2==3.1.4                      # bsd
 setproctitle==1.3.3                # bsd
 click==8.1.7                       # bsd
-werkzeug==3.0.3                    # bsd
+werkzeug==3.0.4                    # bsd
 flask==3.0.3                       # bsd
 Flask-RESTful==0.3.10              # bsd
 flasgger==0.9.7.1                  # mit
