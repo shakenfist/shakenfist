@@ -14,7 +14,7 @@ flask==3.0.3                       # bsd
 Flask-RESTful==0.3.10              # bsd
 flasgger==0.9.7.1                  # mit
 prometheus-client==0.20.0          # apache2
-etcd3gw==2.4.1                     # apache2
+etcd3gw==2.4.2                     # apache2
 Flask-JWT-Extended==4.6.0          # mit
 bcrypt==4.2.0                      # apache2
 gunicorn==21.2.0                   # mit
