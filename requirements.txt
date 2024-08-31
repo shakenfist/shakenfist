@@ -26,7 +26,7 @@ py-cpuinfo==9.0.0                  # mit
 distro==1.9.0                      # apache2
 shakenfist-agent==0.3.18           # apache2
 shakenfist-utilities==0.6.9        # apache2
-pbr==6.0.0                         # apache2
+pbr==6.1.0                         # apache2
 setuptools==74.0.0                 # mit
 symbolicmode==2.0.1                # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
 version-comparison==0.2            # mit
