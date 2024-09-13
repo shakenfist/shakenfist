@@ -150,6 +150,39 @@ passed as a list. You only have one `videospec` per instance. Once again, a
     i = sf_client.delete_instance(i['uuid'])
     ```
 
+## Adding network interfaces after instance creation
+
+As of Shaken Fist v0.8, it is also possible to add network interfaces to an
+existing instance, assuming that your guest operating system supports device hot
+plugging (all modern Linux versions do).
+
+???+ tip "REST API calls"
+
+    * [POST /instances/{instance_ref}/interfaces](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__interfaces)
+
+??? example "Python API client: hot plug a network interface"
+
+    Note that this example assumes the instance is running an image with the
+    Shaken Fist in guest agent installed.
+
+    ```python
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+
+    # Create a network to hot plug to
+    hotnet = sf_client.allocate_network('10.0.0.0/24', True, True, 'hotplug')
+
+    ...
+
+    # Hot plug the interface in
+    netdesc = {
+        'network_uuid': hotnet['uuid'],
+        'address': '10.0.0.5',
+        'macaddress': '02:00:00:ea:3a:28'
+    }
+    sf_client.add_instance_interface(inst['uuid'], netdesc)
+
 ## Other instance lifecycle operations
 
 A variety of other lifecycle operations are available on instances, including
