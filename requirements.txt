@@ -64,7 +64,7 @@ funcs==0.11.0
 futurist==3.0.0
 grpcio==1.66.1
 humanfriendly==10.0
-importlib-metadata==8.4.0
+importlib-metadata==8.5.0
 iters==0.18.0
 itsdangerous==2.2.0
 linux-utils==0.7
