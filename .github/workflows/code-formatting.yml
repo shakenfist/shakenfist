@@ -52,7 +52,7 @@ jobs:
             install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
 
           python3 -m venv  --system-site-packages ${RUNNER_TEMP}/venv
-          ${RUNNER_TEMP}/venv/bin/pip install pyupgrade
+          ${RUNNER_TEMP}/venv/bin/pip install pyupgrade reorder-python-imports
 
       - name: Scan for obsolete syntax
         env:
