@@ -1,17 +1,18 @@
 import os
 import re
-from shakenfist_utilities import logs
 import shutil
-import versions
 
+import versions
+from shakenfist_utilities import logs
+
+from shakenfist import constants
+from shakenfist import exceptions
+from shakenfist.config import config
+from shakenfist.node import Node
+from shakenfist.util import process as util_process
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
-from shakenfist.config import config
-from shakenfist import constants
-from shakenfist import exceptions
-from shakenfist.node import Node
-from shakenfist.util import process as util_process
 
 
 LOG, _ = logs.setup(__name__)

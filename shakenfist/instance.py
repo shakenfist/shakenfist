@@ -1,43 +1,44 @@
 # Copyright 2019 Michael Still
-
 # Please note: instances are a "compositional" baseobject type, which means
 # part of their role is to combine foundational baseobjects into something more
 # useful.
-
 import base64
-from collections import defaultdict
-from functools import partial
-import jinja2
 import io
 import json
 import os
 import pathlib
-import pycdlib
 import random
-from shakenfist_utilities import logs
 import shutil
 import socket
 import time
+from collections import defaultdict
+from functools import partial
 from uuid import uuid4
 
-from shakenfist.agentoperation import (
-    AgentOperation, AgentOperations, instance_filter as agent_instance_filter)
+import jinja2
+import pycdlib
+from shakenfist_utilities import logs
+
 from shakenfist import artifact
 from shakenfist import baseobject
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import blob
 from shakenfist import cache
-from shakenfist.config import config
 from shakenfist import constants
-from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import network
 from shakenfist import networkinterface
+from shakenfist.agentoperation import AgentOperation
+from shakenfist.agentoperation import AgentOperations
+from shakenfist.agentoperation import instance_filter as agent_instance_filter
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
-from shakenfist.tasks import DeleteInstanceTask, SnapshotTask
+from shakenfist.tasks import DeleteInstanceTask
+from shakenfist.tasks import SnapshotTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import libvirt as util_libvirt

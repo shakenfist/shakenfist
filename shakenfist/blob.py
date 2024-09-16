@@ -1,36 +1,44 @@
 # Copyright 2021 Michael Still
-
 # Please note: blobs are a "foundational" baseobject type, which means they
 # should not rely on any other baseobjects for their implementation. This is
 # done to help minimize circular import problems.
-
 import hashlib
-import magic
 import numbers
 import os
-import psutil
 import random
-from shakenfist_utilities import logs, random as sf_random
 import socket
 import time
 import uuid
 
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
-from shakenfist.config import config
-from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS, EVENT_TYPE_MUTATE
-from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
+import magic
+import psutil
+from shakenfist_utilities import logs
+from shakenfist_utilities import random as sf_random
+
 from shakenfist import etcd
-from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
-                                   BlobDependencyMissing, BlobsMustHaveContent,
-                                   BlobAlreadyBeingTransferred, BlobTransferSetupFailed)
-from shakenfist.node import Node, Nodes, nodes_by_free_disk_descending
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_MUTATE
+from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.constants import GiB
+from shakenfist.constants import LOCK_REFRESH_SECONDS
+from shakenfist.exceptions import BlobAlreadyBeingTransferred
+from shakenfist.exceptions import BlobDeleted
+from shakenfist.exceptions import BlobDependencyMissing
+from shakenfist.exceptions import BlobFetchFailed
+from shakenfist.exceptions import BlobMissing
+from shakenfist.exceptions import BlobsMustHaveContent
+from shakenfist.exceptions import BlobTransferSetupFailed
+from shakenfist.node import Node
+from shakenfist.node import Nodes
+from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
-from shakenfist.util import process as util_process
 from shakenfist.util import image as util_image
+from shakenfist.util import process as util_process
 
 
 LOG, _ = logs.setup(__name__)

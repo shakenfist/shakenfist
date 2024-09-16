@@ -1,18 +1,18 @@
 import ipaddress
 import random
-from shakenfist_utilities import logs
 import time
 
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter,
-    get_minimum_object_version as gmov)
-from shakenfist.config import config
-from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist_utilities import logs
+
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import ipmanager
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.baseobject import get_minimum_object_version as gmov
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.util import callstack as util_callstack
 
 
