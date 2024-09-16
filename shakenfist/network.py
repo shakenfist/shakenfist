@@ -3,7 +3,6 @@
 from functools import partial
 import ipaddress
 import os
-import psutil
 import random
 import re
 from shakenfist_utilities import logs
@@ -18,7 +17,7 @@ from shakenfist.baseobject import (
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
-from shakenfist import dhcp
+from shakenfist.managed_executables import dhcp
 from shakenfist import etcd
 from shakenfist.exceptions import DeadNetwork, CongestedNetwork, IPManagerMissing
 from shakenfist import instance
@@ -293,6 +292,9 @@ class Network(dbo):
             'netmask': self.netmask,
             'router': self.router,
             'broadcast': self.broadcast,
+
+            'dhcp_start': self.dhcp_start,
+            'provide_nat': self.provide_nat,
         }
         return retval
 
@@ -554,13 +556,8 @@ class Network(dbo):
 
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""
-        d = dhcp.DHCP(self, self._vx_veth_inner)
-        pid = d.get_pid()
-        if pid and psutil.pid_exists(pid):
-            return True
-
-        self.log.warning('dnsmasq is not running')
-        return False
+        d = dhcp.DHCP.new(self)
+        return d.is_running()
 
     def remove_dhcp_lease(self, ipv4, macaddr):
         if not self.provide_dhcp:
@@ -568,7 +565,7 @@ class Network(dbo):
 
         if config.NODE_IS_NETWORK_NODE:
             with self.get_lock(op='Network update DHCP', global_scope=False):
-                d = dhcp.DHCP(self, self._vx_veth_inner)
+                d = dhcp.DHCP.new(self)
                 d.remove_lease(ipv4, macaddr)
         else:
             etcd.enqueue('networknode',
@@ -580,16 +577,17 @@ class Network(dbo):
 
         if config.NODE_IS_NETWORK_NODE:
             with self.get_lock(op='Network update DHCP', global_scope=False):
-                d = dhcp.DHCP(self, self._vx_veth_inner)
-                d.restart_dhcpd()
+                d = dhcp.DHCP.new(self)
+                d.restart()
         else:
             etcd.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
 
     def remove_dhcp(self):
         if config.NODE_IS_NETWORK_NODE:
             with self.get_lock(op='Network remove DHCP', global_scope=False):
-                d = dhcp.DHCP(self, self._vx_veth_inner)
-                d.remove_dhcpd()
+                d = dhcp.DHCP.new(self)
+                d.terminate()
+                d.state = dhcp.DHCP.STATE_DELETED
         else:
             etcd.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
 
