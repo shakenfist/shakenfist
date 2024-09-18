@@ -33,7 +33,7 @@ version-comparison==0.2            # mit
 pycdlib==1.14.0                    # lgpl
 versions==2.1.2                    # mit
 grpcio-tools==1.66.1               # apache2
-protobuf==5.28.0                   # bsd
+protobuf==5.28.1                   # bsd
 
 requests==2.32.3                   # apache2
 requests-toolbelt==1.0.0           # apache2
