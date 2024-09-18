@@ -2,14 +2,33 @@
 
 # $1 is the minimum python version, as a small string. For example "36".
 
+pyupgrade --help > /dev/null
+reorder-python-imports --help > /dev/null
+
 datestamp=$(date "+%Y%m%d")
 git checkout -b formatting-automations
 
 # We only want to change five files at a time
 changed=0
 for file in $( find . -type f -name "*.py" | egrep -v "(_pb2.py|pb2_grpc.py|.github)"); do
-    out=$( ${RUNNER_TEMP}/venv/bin/pyupgrade --py${1}-plus --exit-zero-even-if-changed ${file} 2>&1 || true )
+    # pyupgrade
+    out=$( ${RUNNER_TEMP}/venv/bin/pyupgrade --py${1}-plus \
+        --exit-zero-even-if-changed ${file} 2>&1 || true )
     rewrites=$( echo ${out} | grep -c "Rewriting" || true )
+    if [ ${rewrites} -gt 0 ]; then
+        echo "${file} was modified"
+    fi
+    changed=$(( ${changed} + $rewrites ))
+
+    if [ ${changed} -gt 4 ]; then
+        break
+    fi
+
+    # reorder imports
+    out=$( ${RUNNER_TEMP}/venv/bin/reorder-python-imports --py${1}-plus \
+        --application-directories=.:shakenfist \
+        --exit-zero-even-if-changed ${file} 2>&1 || true )
+    rewrites=$( echo ${out} | grep -c "Reordering" || true )
     if [ ${rewrites} -gt 0 ]; then
         echo "${file} was modified"
     fi
