@@ -1,13 +1,14 @@
 import multiprocessing
-from oslo_concurrency import processutils
-import psutil
-from shakenfist_utilities import logs
 import time
 
+import psutil
+from oslo_concurrency import processutils
+from shakenfist_utilities import logs
+
+from shakenfist import etcd
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
-from shakenfist import etcd
 
 
 LOG, _ = logs.setup(__name__)

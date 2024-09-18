@@ -1,6 +1,7 @@
 import importlib
-from shakenfist_utilities import logs
 from xml.etree import ElementTree
+
+from shakenfist_utilities import logs
 
 
 LOG, _ = logs.setup(__name__)

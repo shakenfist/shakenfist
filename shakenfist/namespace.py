@@ -1,14 +1,15 @@
 import base64
-import bcrypt
 import secrets
-from shakenfist_utilities import logs, random as sfrandom
 import string
 import time
 
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
+import bcrypt
+from shakenfist_utilities import logs
+from shakenfist_utilities import random as sfrandom
+
 from shakenfist import etcd
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.util import access_tokens
 
 
