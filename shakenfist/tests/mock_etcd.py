@@ -3,13 +3,12 @@
 #
 # Mock the Etcd store with a Python dict.
 #
-
-from collections import defaultdict
-from itertools import count
 import json
-from unittest import mock
 import os
 import time
+from collections import defaultdict
+from itertools import count
+from unittest import mock
 
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace

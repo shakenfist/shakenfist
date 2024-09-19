@@ -1,10 +1,9 @@
 # Emit statistics about how many events we create for CI runs.
-
-from collections import defaultdict
 import os
+from collections import defaultdict
 
-from shakenfist.config import config
 from shakenfist import eventlog
+from shakenfist.config import config
 
 
 if __name__ == '__main__':
