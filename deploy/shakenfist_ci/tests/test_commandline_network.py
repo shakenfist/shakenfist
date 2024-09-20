@@ -3,7 +3,6 @@ import sys
 import time
 
 from oslo_concurrency import processutils
-
 from shakenfist_ci import base
 
 
