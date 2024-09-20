@@ -1,9 +1,9 @@
 #!/usr/bin/python3
+import os
+import re
+import sys
 
 import git
-import re
-import os
-import sys
 
 # Clone all the required repositories, with handling for dependencies between
 # them. This script assumes it is being called by a github action and that
