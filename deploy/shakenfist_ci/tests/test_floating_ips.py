@@ -1,7 +1,7 @@
 import base64
-import requests
 import time
 
+import requests
 from shakenfist_ci import base
 
 

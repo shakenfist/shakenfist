@@ -1,6 +1,5 @@
-from shakenfist_client import apiclient
-
 from shakenfist_ci import base
+from shakenfist_client import apiclient
 
 
 class TestNodes(base.BaseNamespacedTestCase):
