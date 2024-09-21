@@ -1,5 +1,4 @@
 import requests
-
 from shakenfist_ci import base
 
 

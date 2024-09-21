@@ -8,9 +8,9 @@ import random
 import re
 import string
 import sys
-import testtools
 import time
 
+import testtools
 from oslo_concurrency import processutils
 from prettytable import PrettyTable
 from shakenfist_client import apiclient
