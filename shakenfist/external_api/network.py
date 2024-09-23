@@ -69,6 +69,7 @@ network_get_example = """{
     "netblock": "10.0.0.0/24",
     "provide_dhcp": true,
     "provide_nat": true,
+    "provide_dns": false,
     "state": "created",
     "uuid": "1e9222c5-2d11-4ada-b258-ed1838bd774b",
     "version": 4,
@@ -83,6 +84,7 @@ network_delete_example = """
     "namespace": "system",
     "netblock": "10.0.0.0/24",
     "provide_dhcp": true,
+    "provide_dns": false,
     "provide_nat": true,
     "state": "deleted",
     "uuid": "d56ae6e4-2592-43cd-b614-2dc7ca04970a",
@@ -149,6 +151,7 @@ networks_get_example = """[
         "netblock": "10.0.0.0/24",
         "provide_dhcp": true,
         "provide_nat": true,
+        "provide_dns": false,
         "state": "created",
         "uuid": "759b742d-6140-475e-9553-ac120b56c1ef",
         "vxlan_id": 0
@@ -182,9 +185,15 @@ class NetworksEndpoint(sf_api.Resource):
             ('netblock', 'body', 'string',
              'A CIDR netblock to use for address allocation on the network.', True),
             ('provide_dhcp', 'body', 'boolean',
-             'Whether or not to provide DHCP services on the network.', True),
+             'Whether or not to provide DHCP services on the network. Defaults '
+             'to enabled.', False),
             ('provide_nat', 'body', 'boolean',
-             'Whether or not to NAT for egress traffic on the network.', True),
+             'Whether or not to NAT for egress traffic on the network. Defaults '
+             'to enabled.', False),
+            ('provide_dns', 'body', 'boolean',
+             'Whether or not to provide a DNS server with hosts from this '
+             'virtual network configured as a domain. Defaults to disabled.',
+             False),
             ('name', 'body', 'string', 'The name of the network.', True),
             ('namespace', 'body', 'namespace', 'The namespace to contain the network.', False)
         ],
@@ -194,7 +203,14 @@ class NetworksEndpoint(sf_api.Resource):
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
-             namespace=None):
+             namespace=None, provide_dns=None):
+        if not provide_dhcp:
+            provide_dhcp = True
+        if not provide_nat:
+            provide_nat = True
+        if not provide_dns:
+            provide_dns = False
+
         try:
             n = ipaddress.ip_network(netblock)
             if n.num_addresses < 8:
@@ -212,7 +228,7 @@ class NetworksEndpoint(sf_api.Resource):
                 401, 'only admins can create resources in a different namespace')
 
         n = network.Network.new(name, namespace, netblock, provide_dhcp,
-                                provide_nat)
+                                provide_nat, provide_dns)
         n.add_event(EVENT_TYPE_AUDIT, 'create request from REST API')
         return n.external_view()
 

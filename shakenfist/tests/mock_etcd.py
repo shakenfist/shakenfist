@@ -230,6 +230,7 @@ class MockEtcd():
                        netblock='10.9.8.0/24',
                        provide_dhcp=False,
                        provide_nat=False,
+                       provide_dns=False,
                        vxid=None,
                        metadata=None,
                        set_state=Network.STATE_CREATED,
@@ -243,6 +244,7 @@ class MockEtcd():
                               netblock=netblock,
                               provide_dhcp=provide_dhcp,
                               provide_nat=provide_nat,
+                              provide_dns=provide_dns,
                               network_uuid=uuid,
                               vxid=vxid,
                               )

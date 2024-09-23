@@ -41,7 +41,7 @@ LOG, _ = logs.setup(__name__)
 class Network(dbo):
     object_type = 'network'
     initial_version = 2
-    current_version = 4
+    current_version = 5
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -75,6 +75,7 @@ class Network(dbo):
         self.__netblock = static_values.get('netblock')
         self.__provide_dhcp = static_values.get('provide_dhcp')
         self.__provide_nat = static_values.get('provide_nat')
+        self.__provide_dns = static_values.get('provide_dns', False)
         self.__vxid = static_values.get('vxid')
 
         self.egress_nic = static_values.get(
@@ -106,6 +107,10 @@ class Network(dbo):
                      'initialized': True
                  })
 
+    @classmethod
+    def _upgrade_step_4_to_5(cls, static_values):
+        static_values['provide_dns'] = False
+
     @staticmethod
     def allocate_vxid(net_id):
         reservation = {
@@ -120,7 +125,8 @@ class Network(dbo):
 
     @classmethod
     def new(cls, name, namespace, netblock, provide_dhcp=False,
-            provide_nat=False, network_uuid=None, vxid=None):
+            provide_nat=False, network_uuid=None, vxid=None,
+            provide_dns=False):
 
         if not network_uuid:
             # uuid should only be specified in testing
@@ -141,6 +147,7 @@ class Network(dbo):
                 'netblock': netblock,
                 'provide_dhcp': provide_dhcp,
                 'provide_nat': provide_nat,
+                'provide_dns': provide_dns,
                 'version': cls.current_version
             }
         )
@@ -163,6 +170,7 @@ class Network(dbo):
             'netblock': self.__netblock,
             'provide_dhcp': self.__provide_dhcp,
             'provide_nat': self.__provide_nat,
+            'provide_dns': self.__provide_dns,
             'floating_gateway': self.floating_gateway,
             'vxlan_id': self.__vxid
         })
@@ -211,6 +219,10 @@ class Network(dbo):
     @property
     def provide_nat(self):
         return self.__provide_nat
+
+    @property
+    def provide_dns(self):
+        return self.__provide_dns
 
     @property
     def vxid(self):
@@ -305,7 +317,10 @@ class Network(dbo):
         if not self.is_created():
             return False
 
-        if self.provide_dhcp and config.NODE_IS_NETWORK_NODE:
+        if not config.NODE_IS_NETWORK_NODE:
+            return True
+
+        if self.provide_dhcp or self.provide_dns:
             if not self.is_dnsmasq_running():
                 return False
 
@@ -560,7 +575,7 @@ class Network(dbo):
         return d.is_running()
 
     def remove_dhcp_lease(self, ipv4, macaddr):
-        if not self.provide_dhcp:
+        if not self.provide_dhcp and not self.provide_dns:
             return
 
         if config.NODE_IS_NETWORK_NODE:
@@ -572,7 +587,7 @@ class Network(dbo):
                          RemoveDHCPLeaseNetworkTask(self.uuid, ipv4, macaddr))
 
     def update_dnsmasq(self):
-        if not self.provide_dhcp:
+        if not self.provide_dhcp and not self.provide_dns:
             return
 
         if config.NODE_IS_NETWORK_NODE:
@@ -839,6 +854,7 @@ def floating_network():
                     netblock=config.FLOATING_NETWORK,
                     provide_dhcp=False,
                     provide_nat=False,
+                    provide_dns=False,
                     namespace=None,
                     name='floating')
     return floating_network
