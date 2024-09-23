@@ -1621,7 +1621,7 @@ class Instance(dbo):
 
         n.create_on_hypervisor()
         n.ensure_mesh()
-        n.update_dhcp()
+        n.update_dnsmasq()
 
         with util_libvirt.LibvirtConnection() as lc:
             device_xml = """    <interface type='bridge'>

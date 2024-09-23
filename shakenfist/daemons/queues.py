@@ -353,7 +353,7 @@ def instance_start(inst, netdescs):
                 ni.state = dbo.STATE_CREATED
                 n.create_on_hypervisor()
                 n.ensure_mesh()
-                n.update_dhcp()
+                n.update_dnsmasq()
 
             # Allocate console and VDI ports
             inst.allocate_instance_ports()
@@ -423,7 +423,7 @@ def instance_delete(inst):
             if n.state.value == dbo.STATE_DELETE_WAIT:
                 continue
 
-            n.update_dhcp()
+            n.update_dnsmasq()
 
             if not config.NODE_IS_NETWORK_NODE and network_uuid not in host_networks:
                 # We are not the network node and the network not used by any

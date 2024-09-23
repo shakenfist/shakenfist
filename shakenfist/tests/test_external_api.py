@@ -86,7 +86,7 @@ class FakeNetwork(BaseFakeObject):
     def is_dead(self):
         return False
 
-    def remove_dhcp(self):
+    def remove_dnsmasq(self):
         pass
 
     def networkinterfaces(self):

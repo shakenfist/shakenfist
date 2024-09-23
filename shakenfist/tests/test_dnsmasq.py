@@ -9,14 +9,14 @@ import time
 import uuid
 
 from shakenfist.config import BaseSettings
-from shakenfist.managed_executables import dhcp
+from shakenfist.managed_executables import dnsmasq
 from shakenfist import network
 from shakenfist.tests.mock_etcd import MockEtcd
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-class DHCPTestCase(testtools.TestCase):
+class DnsMasqTestCase(testtools.TestCase):
     def setUp(self):
         super().setUp()
 
@@ -53,7 +53,7 @@ class DHCPTestCase(testtools.TestCase):
         self.mock_etcd.create_network('bobnet', network_uuid)
         n = network.Network.from_db(network_uuid)
 
-        d = dhcp.DHCP.new(n)
+        d = dnsmasq.DnsMasq.new(n)
         self.assertEqual(f'{TEST_DIR}/files/dhcp/{network_uuid}',
                          d.config_directory)
 
@@ -65,7 +65,7 @@ class DHCPTestCase(testtools.TestCase):
         self.mock_etcd.create_network('bobnet', network_uuid)
         n = network.Network.from_db(network_uuid)
 
-        d = dhcp.DHCP.new(n)
+        d = dnsmasq.DnsMasq.new(n)
         s = str(d)
         self.assertEqual(
             f'dhcp({network_uuid}, as owned by network({network_uuid}))', s)
@@ -80,7 +80,7 @@ class DHCPTestCase(testtools.TestCase):
         n = network.Network.from_db(network_uuid)
 
         with tempfile.TemporaryDirectory() as dir:
-            d = dhcp.DHCP.new(n)
+            d = dnsmasq.DnsMasq.new(n)
             d.config_directory = dir
             self.assertEqual(dir, d.config_directory)
 
@@ -93,7 +93,7 @@ class DHCPTestCase(testtools.TestCase):
         self.mock_etcd.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
-        d = dhcp.DHCP.new(n)
+        d = dnsmasq.DnsMasq.new(n)
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
@@ -164,7 +164,7 @@ class DHCPTestCase(testtools.TestCase):
         self.mock_etcd.create_instance('inst2', instance_uuid_two)
 
         n = network.Network.from_db(network_uuid)
-        d = dhcp.DHCP.new(n)
+        d = dnsmasq.DnsMasq.new(n)
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
@@ -189,7 +189,7 @@ class DHCPTestCase(testtools.TestCase):
         self.mock_etcd.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
-        d = dhcp.DHCP.new(n)
+        d = dnsmasq.DnsMasq.new(n)
 
         d._remove_config()
         mock_exists.assert_called_with(f'{TEST_DIR}/files/dhcp/{network_uuid}')
@@ -208,7 +208,7 @@ class DHCPTestCase(testtools.TestCase):
         self.mock_etcd.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
-        d = dhcp.DHCP.new(n)
+        d = dnsmasq.DnsMasq.new(n)
 
         mock_open = mock.mock_open(read_data='424242')
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
@@ -231,7 +231,7 @@ class DHCPTestCase(testtools.TestCase):
         self.mock_etcd.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
-        d = dhcp.DHCP.new(n)
+        d = dnsmasq.DnsMasq.new(n)
 
         mock_open = mock.mock_open(read_data='424242')
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
@@ -242,8 +242,8 @@ class DHCPTestCase(testtools.TestCase):
             f'{TEST_DIR}/files/dhcp/{network_uuid}/pid')
         mock_kill.assert_not_called()
 
-    @mock.patch('shakenfist.managed_executables.dhcp.DHCP._send_signal')
-    @mock.patch('shakenfist.managed_executables.dhcp.DHCP._remove_config')
+    @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._send_signal')
+    @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._remove_config')
     def test_remove_dhcpd(self, mock_remove_config, mock_signal):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
@@ -252,7 +252,7 @@ class DHCPTestCase(testtools.TestCase):
         self.mock_etcd.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
-        d = dhcp.DHCP.new(n)
+        d = dnsmasq.DnsMasq.new(n)
 
         d.terminate()
         mock_remove_config.assert_called()
@@ -260,9 +260,9 @@ class DHCPTestCase(testtools.TestCase):
 
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('os.makedirs')
-    @mock.patch('shakenfist.managed_executables.dhcp.DHCP._send_signal',
+    @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._send_signal',
                 return_value=False)
-    @mock.patch('shakenfist.managed_executables.dhcp.DHCP._make_config')
+    @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._make_config')
     @mock.patch('shakenfist.util.process.execute')
     def test_restart(self, mock_execute, mock_config, mock_signal,
                      mock_makedirs, mock_exists):
@@ -278,7 +278,7 @@ class DHCPTestCase(testtools.TestCase):
             with open(os.path.join(dir, 'leases'), 'w') as f:
                 f.write('')
 
-            d = dhcp.DHCP.new(n)
+            d = dnsmasq.DnsMasq.new(n)
             d.config_directory = dir
             d.restart()
             mock_signal.assert_called_with(signal.SIGHUP)
@@ -287,10 +287,10 @@ class DHCPTestCase(testtools.TestCase):
                 namespace=network_uuid)
 
     @mock.patch('os.path.exists', return_value=True)
-    @mock.patch('shakenfist.managed_executables.dhcp.DHCP._send_signal',
+    @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._send_signal',
                 return_value=False)
-    @mock.patch('shakenfist.managed_executables.dhcp.DHCP._make_config')
-    @mock.patch('shakenfist.managed_executables.dhcp.DHCP._enumerate_leases',
+    @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._make_config')
+    @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._enumerate_leases',
                 return_value=(
                     None, {
                         '02:00:00:55:04:a2': '172.10.0.8',
@@ -317,7 +317,7 @@ class DHCPTestCase(testtools.TestCase):
                 f.write('%d 1a:91:64:d2:15:39 127.0.0.5 client3 *'
                         % (time.time() + 3600))
 
-            d = dhcp.DHCP.new(n)
+            d = dnsmasq.DnsMasq.new(n)
             d.config_directory = dir
             d.restart()
 
@@ -339,10 +339,10 @@ class DHCPTestCase(testtools.TestCase):
             self.assertTrue('1a:91:64:d2:15:39' in leases)
 
     @mock.patch('os.path.exists', return_value=True)
-    @mock.patch('shakenfist.managed_executables.dhcp.DHCP._send_signal',
+    @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._send_signal',
                 return_value=True)
-    @mock.patch('shakenfist.managed_executables.dhcp.DHCP._make_config')
-    @mock.patch('shakenfist.managed_executables.dhcp.DHCP._enumerate_leases',
+    @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._make_config')
+    @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._enumerate_leases',
                 return_value=(
                     None, {
                         '02:00:00:55:04:a2': '172.10.0.8',
@@ -365,7 +365,7 @@ class DHCPTestCase(testtools.TestCase):
                 f.write('%d 1a:91:64:d2:15:39 127.0.0.5 client3 *'
                         % (time.time() + 3600))
 
-            d = dhcp.DHCP.new(n)
+            d = dnsmasq.DnsMasq.new(n)
             d.config_directory = dir
 
             d.restart()

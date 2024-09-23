@@ -17,7 +17,7 @@ from shakenfist.baseobject import (
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
-from shakenfist.managed_executables import dhcp
+from shakenfist.managed_executables import dnsmasq
 from shakenfist import etcd
 from shakenfist.exceptions import DeadNetwork, CongestedNetwork, IPManagerMissing
 from shakenfist import instance
@@ -27,8 +27,8 @@ from shakenfist.node import Node, Nodes
 from shakenfist.tasks import (
     DeployNetworkTask,
     HypervisorDestroyNetworkTask,
-    UpdateDHCPNetworkTask,
-    RemoveDHCPNetworkTask,
+    UpdateDnsMasqNetworkTask,
+    RemoveDnsMasqNetworkTask,
     RemoveDHCPLeaseNetworkTask,
     RemoveNATNetworkTask)
 from shakenfist.util import network as util_network
@@ -493,7 +493,7 @@ class Network(dbo):
 
                 self.enable_nat()
 
-        self.update_dhcp()
+        self.update_dnsmasq()
 
         # A final check to ensure we haven't raced with a delete
         if self.is_dead():
@@ -547,7 +547,7 @@ class Network(dbo):
                              HypervisorDestroyNetworkTask(self.uuid)
                          ]})
 
-        self.remove_dhcp()
+        self.remove_dnsmasq()
         self.remove_nat()
 
     def hard_delete(self):
@@ -556,7 +556,7 @@ class Network(dbo):
 
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""
-        d = dhcp.DHCP.new(self)
+        d = dnsmasq.DnsMasq.new(self)
         return d.is_running()
 
     def remove_dhcp_lease(self, ipv4, macaddr):
@@ -564,32 +564,32 @@ class Network(dbo):
             return
 
         if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network update DHCP', global_scope=False):
-                d = dhcp.DHCP.new(self)
+            with self.get_lock(op='Network update DnsMasq', global_scope=False):
+                d = dnsmasq.DnsMasq.new(self)
                 d.remove_lease(ipv4, macaddr)
         else:
             etcd.enqueue('networknode',
                          RemoveDHCPLeaseNetworkTask(self.uuid, ipv4, macaddr))
 
-    def update_dhcp(self):
+    def update_dnsmasq(self):
         if not self.provide_dhcp:
             return
 
         if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network update DHCP', global_scope=False):
-                d = dhcp.DHCP.new(self)
+            with self.get_lock(op='Network update DnsMasq', global_scope=False):
+                d = dnsmasq.DnsMasq.new(self)
                 d.restart()
         else:
-            etcd.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
+            etcd.enqueue('networknode', UpdateDnsMasqNetworkTask(self.uuid))
 
-    def remove_dhcp(self):
+    def remove_dnsmasq(self):
         if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network remove DHCP', global_scope=False):
-                d = dhcp.DHCP.new(self)
+            with self.get_lock(op='Network remove DnsMasq', global_scope=False):
+                d = dnsmasq.DnsMasq.new(self)
                 d.terminate()
-                d.state = dhcp.DHCP.STATE_DELETED
+                d.state = dnsmasq.DnsMasq.STATE_DELETED
         else:
-            etcd.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
+            etcd.enqueue('networknode', RemoveDnsMasqNetworkTask(self.uuid))
 
     def enable_nat(self):
         if not config.NODE_IS_NETWORK_NODE:

@@ -21,9 +21,9 @@ from shakenfist.tasks import (
     DeployNetworkTask,
     DestroyNetworkTask,
     NetworkTask,
-    RemoveDHCPNetworkTask,
+    RemoveDnsMasqNetworkTask,
     RemoveNATNetworkTask,
-    UpdateDHCPNetworkTask,
+    UpdateDnsMasqNetworkTask,
     RemoveDHCPLeaseNetworkTask,
     NetworkInterfaceTask,
     FloatNetworkInterfaceTask,
@@ -235,8 +235,8 @@ class Monitor(daemon.WorkerPoolDaemon):
         #
         # Tasks valid for a network in ANY STATE
         #
-        if isinstance(workitem, RemoveDHCPNetworkTask):
-            n.remove_dhcp()
+        if isinstance(workitem, RemoveDnsMasqNetworkTask):
+            n.remove_dnsmasq()
             return
 
         if isinstance(workitem, RemoveNATNetworkTask):
@@ -284,7 +284,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 n.create_on_network_node()
                 n.ensure_mesh()
 
-            elif isinstance(workitem, UpdateDHCPNetworkTask):
+            elif isinstance(workitem, UpdateDnsMasqNetworkTask):
                 n.create_on_network_node()
                 n.ensure_mesh()
 
