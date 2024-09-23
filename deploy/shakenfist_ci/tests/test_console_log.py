@@ -1,7 +1,7 @@
-from shakenfist_client import apiclient
 import time
 
 from shakenfist_ci import base
+from shakenfist_client import apiclient
 
 
 class TestConsoleLog(base.BaseNamespacedTestCase):
