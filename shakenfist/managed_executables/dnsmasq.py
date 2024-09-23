@@ -9,7 +9,10 @@ from shakenfist import networkinterface
 from shakenfist.util import process as util_process
 
 
-class DHCP(managedexecutable.ManagedExecutable):
+class DnsMasq(managedexecutable.ManagedExecutable):
+    # Note that this slightly confusing object type is required for historical
+    # reasons so that objects and config files don't need to be renamed on
+    # upgrade.
     object_type = 'dhcp'
     initial_version = 1
     current_version = 1
@@ -122,8 +125,8 @@ class DHCP(managedexecutable.ManagedExecutable):
             'macaddr': macaddr
         })
         util_process.execute(
-                None, 'dhcp_release %(interface)s %(ipv4)s %(macaddr)s' % subst,
-                namespace=self.network.uuid)
+            None, 'dhcp_release %(interface)s %(ipv4)s %(macaddr)s' % subst,
+            namespace=self.network.uuid)
 
     def restart(self):
         if not os.path.exists('/var/run/netns/%s' % self.network.uuid):

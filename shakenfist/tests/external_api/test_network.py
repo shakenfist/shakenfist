@@ -111,11 +111,12 @@ class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
 
-    @mock.patch('shakenfist.network.Network.remove_dhcp')
+    @mock.patch('shakenfist.network.Network.remove_dnsmasq')
     @mock.patch('shakenfist.network.Network.delete_on_network_node')
     @mock.patch('shakenfist.network.Network.delete_on_hypervisor')
     def test_delete_all_networks(self, mock_delete_on_hypervisor,
-                                 mock_delete_on_network_node, mock_remove_dhcp):
+                                 mock_delete_on_network_node,
+                                 mock_remove_dnsmasq):
         self.client = external_api.app.test_client()
         resp = self.client.delete('/networks',
                                   headers={'Authorization': self.auth_token},
