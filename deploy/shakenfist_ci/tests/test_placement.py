@@ -1,8 +1,7 @@
 import socket
 
-from shakenfist_client import apiclient
-
 from shakenfist_ci import base
+from shakenfist_client import apiclient
 
 
 class TestPlacement(base.BaseNamespacedTestCase):
