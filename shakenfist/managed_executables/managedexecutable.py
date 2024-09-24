@@ -58,24 +58,6 @@ class ManagedExecutable(dbo):
                 f'{self.owner_type}({self.owner_uuid}))')
 
     # Helpers
-    @classmethod
-    def new(cls, object_uuid, owner):
-        n = cls.from_db(object_uuid, suppress_failure_audit=True)
-        if n:
-            return n
-
-        uniq = owner.unique_label()
-        cls._db_create(object_uuid, {
-            'uuid': object_uuid,
-            'namespace': owner.namespace,
-            'owner_type': uniq[0],
-            'owner_uuid': uniq[1],
-            'version': cls.current_version
-        })
-        n = cls.from_db(object_uuid)
-        n.state = cls.STATE_CREATED
-        return n
-
     def _read_template(self, config_path, template):
         with open(os.path.join(config.STORAGE_PATH, template)) as f:
             self.__config_templates[config_path] = jinja2.Template(f.read())

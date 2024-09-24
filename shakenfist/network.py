@@ -569,9 +569,14 @@ class Network(dbo):
         etcd.delete('vxlan', None, self.vxid)
         super().hard_delete()
 
+    def _get_dnsmasq_object(self):
+        return dnsmasq.DnsMasq.new(self, provide_dhcp=self.provide_dhcp,
+                                   provide_nat=self.provide_nat,
+                                   provide_dns=self.provide_dns)
+
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""
-        d = dnsmasq.DnsMasq.new(self)
+        d = self._get_dnsmasq_object()
         return d.is_running()
 
     def remove_dhcp_lease(self, ipv4, macaddr):
@@ -580,7 +585,7 @@ class Network(dbo):
 
         if config.NODE_IS_NETWORK_NODE:
             with self.get_lock(op='Network update DnsMasq', global_scope=False):
-                d = dnsmasq.DnsMasq.new(self)
+                d = self._get_dnsmasq_object()
                 d.remove_lease(ipv4, macaddr)
         else:
             etcd.enqueue('networknode',
@@ -592,15 +597,18 @@ class Network(dbo):
 
         if config.NODE_IS_NETWORK_NODE:
             with self.get_lock(op='Network update DnsMasq', global_scope=False):
-                d = dnsmasq.DnsMasq.new(self)
+                d = self._get_dnsmasq_object()
                 d.restart()
         else:
             etcd.enqueue('networknode', UpdateDnsMasqNetworkTask(self.uuid))
 
     def remove_dnsmasq(self):
+        if not self.provide_dhcp and not self.provide_dns:
+            return
+
         if config.NODE_IS_NETWORK_NODE:
             with self.get_lock(op='Network remove DnsMasq', global_scope=False):
-                d = dnsmasq.DnsMasq.new(self)
+                d = self._get_dnsmasq_object()
                 d.terminate()
                 d.state = dnsmasq.DnsMasq.STATE_DELETED
         else:
