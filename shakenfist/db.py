@@ -1,7 +1,7 @@
 # Copyright 2020 Michael Still
+import uuid
 
 from shakenfist_utilities import logs
-import uuid
 
 from shakenfist import etcd
 from shakenfist.exceptions import IPManagerMissing
