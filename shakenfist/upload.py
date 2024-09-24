@@ -1,11 +1,10 @@
 # Copyright 2021 Michael Still
-
-from shakenfist_utilities import logs
 import time
 
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist_utilities import logs
+
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 
 
 LOG, _ = logs.setup(__name__)

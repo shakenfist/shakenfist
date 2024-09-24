@@ -1,9 +1,8 @@
-from shakenfist.exceptions import (NoURLImageFetchTaskException,
-                                   NetworkNotListTaskException,
-                                   NoInstanceTaskException,
-                                   NoNetworkTaskException,
-                                   NoNetworkInterfaceTaskException
-                                   )
+from shakenfist.exceptions import NetworkNotListTaskException
+from shakenfist.exceptions import NoInstanceTaskException
+from shakenfist.exceptions import NoNetworkInterfaceTaskException
+from shakenfist.exceptions import NoNetworkTaskException
+from shakenfist.exceptions import NoURLImageFetchTaskException
 
 
 class QueueTask:

@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-
 # A silly little demo to calculate some Fibonacci sequence numbers.
 
 if __name__ == '__main__':
