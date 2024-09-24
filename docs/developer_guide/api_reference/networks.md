@@ -48,6 +48,7 @@ also implemented on the network node.
         "netblock": "10.0.0.0/24",
         "provide_dhcp": true,
         "provide_nat": true,
+        "provide_dns": false,
         "state": "created",
         "uuid": "1e9222c5-2d11-4ada-b258-ed1838bd774b",
         "version": 4,
@@ -84,6 +85,7 @@ also implemented on the network node.
         "netblock": "10.0.0.0/24",
         "provide_dhcp": true,
         "provide_nat": true,
+        "provide_dns": false,
         "state": "deleted",
         "uuid": "d56ae6e4-2592-43cd-b614-2dc7ca04970a",
         "version": 4,
@@ -118,6 +120,7 @@ also implemented on the network node.
             "netblock": "10.0.0.0/24",
             "provide_dhcp": true,
             "provide_nat": true,
+            "provide_dns": false,
             "state": "created",
             "uuid": "759b742d-6140-475e-9553-ac120b56c1ef",
             "vxlan_id": 0

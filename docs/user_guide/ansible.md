@@ -150,6 +150,7 @@ returned in a dictionary element called `meta`. An example returned dictionary i
         'netblock': '10.0.0.0/24',
         'provide_dhcp': True,
         'provide_nat': True,
+        'provide_dns': False,
         'state': 'created',
         'uuid': 'a8a52ac5-49b6-4444-80d0-3ab6573343ad',
         'version': 4,
