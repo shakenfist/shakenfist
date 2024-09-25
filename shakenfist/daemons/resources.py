@@ -1,23 +1,25 @@
 import os
 import platform
+import re
+import time
+
+import psutil
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
-import psutil
-import re
 from shakenfist_utilities import logs
-import time
 from versions import parse_version
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
-from shakenfist.daemons import daemon
-from shakenfist.config import config
-from shakenfist.constants import (EVENT_TYPE_RESOURCES, EVENT_TYPE_STATUS,
-                                  EVENT_TYPE_USAGE)
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import network
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_RESOURCES
+from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.constants import EVENT_TYPE_USAGE
+from shakenfist.daemons import daemon
 from shakenfist.node import Node
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt

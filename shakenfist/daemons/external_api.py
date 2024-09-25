@@ -1,6 +1,7 @@
 import os
-from shakenfist_utilities import logs
 import signal
+
+from shakenfist_utilities import logs
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
