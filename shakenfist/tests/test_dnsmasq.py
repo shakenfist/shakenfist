@@ -9,6 +9,7 @@ import time
 import uuid
 
 from shakenfist.config import BaseSettings
+from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.managed_executables import dnsmasq
 from shakenfist import network
 from shakenfist.tests.mock_etcd import MockEtcd
@@ -85,7 +86,7 @@ class DnsMasqTestCase(testtools.TestCase):
             self.assertEqual(dir, d.config_directory)
 
     @mock.patch('os.makedirs')
-    def test_make_config(self, mock_makedir):
+    def test_make_config_just_dhcp(self, mock_makedir):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
 
@@ -93,7 +94,8 @@ class DnsMasqTestCase(testtools.TestCase):
         self.mock_etcd.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
-        d = dnsmasq.DnsMasq.new(n)
+        d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=False,
+                                provide_dns=False)
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
@@ -107,30 +109,137 @@ class DnsMasqTestCase(testtools.TestCase):
                 'no-hosts         # Do not use /etc/hosts',
                 'no-resolv        # Do not use /etc/resolv.conf',
                 'filterwin2k      # Filter weird windows 2000 queries',
-                '',
-                '# Disable DNS',
-                'port=0',
+                'port=0           # Disable DNS',
                 '',
                 f'pid-file={TEST_DIR}/files/dhcp/{network_uuid}/pid',
-                f'dhcp-leasefile={TEST_DIR}/files/dhcp/{network_uuid}/leases',
                 '',
                 f'interface={d.interface}',
                 'listen-address=10.0.0.1',
                 '',
                 'domain=shakenfist',
                 'local=/shakenfist/',
-                '',
+                f'dhcp-leasefile={TEST_DIR}/files/dhcp/{network_uuid}/leases',
                 f'dhcp-range={d.interface},10.0.0.2,static,255.0.0.0,10.255.255.255,1h',
                 f'dhcp-option={d.interface},1,255.0.0.0',
-                f'dhcp-option={d.interface},3,10.0.0.1',
-                f'dhcp-option={d.interface},6,8.8.8.8',
                 f'dhcp-option={d.interface},15,shakenfist',
-                f'dhcp-hostsfile={TEST_DIR}/files/dhcp/{network_uuid}/hosts',
+                f'dhcp-option={d.interface},26,7950',
+                f'dhcp-hostsfile={TEST_DIR}/files/dhcp/{network_uuid}/hosts'
             ])
         )
 
     @mock.patch('os.makedirs')
-    def test_make_hosts(self, mock_makedir):
+    def test_make_config_just_dns(self, mock_makedir):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n, provide_dhcp=False, provide_nat=False,
+                                provide_dns=True)
+
+        mock_open = mock.mock_open()
+        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+            d._make_config(just_this_path='config')
+
+        handle = mock_open()
+        handle.write.assert_called_with(
+            '\n'.join([
+                'domain-needed    # Do not forward DNS lookups for unqualified names',
+                'bogus-priv       # Do not forward DNS lookups for RFC1918 blocks',
+                'no-hosts         # Do not use /etc/hosts',
+                'no-resolv        # Do not use /etc/resolv.conf',
+                'filterwin2k      # Filter weird windows 2000 queries',
+                'port=53          # Enable DNS',
+                'server=8.8.8.8',
+                f'addn-hosts={TEST_DIR}/files/dhcp/{network_uuid}/dnshosts',
+                'expand-hosts',
+                '',
+                f'pid-file={TEST_DIR}/files/dhcp/{network_uuid}/pid',
+                '',
+                f'interface={d.interface}',
+                'listen-address=10.0.0.1',
+                '',
+                'domain=shakenfist',
+                'local=/shakenfist/'
+            ])
+        )
+
+    @mock.patch('os.makedirs')
+    def test_make_config_just_nat(self, mock_makedir):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        self.assertRaises(
+            NatOnlyNetworksShouldNotHaveDnsMasq, dnsmasq.DnsMasq.new, n,
+            provide_dhcp=False, provide_nat=True, provide_dns=False)
+
+    @mock.patch('os.makedirs')
+    def test_make_config_nothing(self, mock_makedir):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        self.assertRaises(
+            NatOnlyNetworksShouldNotHaveDnsMasq, dnsmasq.DnsMasq.new, n,
+            provide_dhcp=False, provide_nat=False, provide_dns=False)
+
+    @mock.patch('os.makedirs')
+    def test_make_config_everything(self, mock_makedir):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=True,
+                                provide_dns=True)
+
+        mock_open = mock.mock_open()
+        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+            d._make_config(just_this_path='config')
+
+        handle = mock_open()
+        handle.write.assert_called_with(
+            '\n'.join([
+                'domain-needed    # Do not forward DNS lookups for unqualified names',
+                'bogus-priv       # Do not forward DNS lookups for RFC1918 blocks',
+                'no-hosts         # Do not use /etc/hosts',
+                'no-resolv        # Do not use /etc/resolv.conf',
+                'filterwin2k      # Filter weird windows 2000 queries',
+                'port=53          # Enable DNS',
+                'server=8.8.8.8',
+                f'addn-hosts={TEST_DIR}/files/dhcp/{network_uuid}/dnshosts',
+                'expand-hosts',
+                f'dhcp-option={d.interface},6,10.0.0.1',
+                '',
+                f'pid-file={TEST_DIR}/files/dhcp/{network_uuid}/pid',
+                '',
+                f'interface={d.interface}',
+                'listen-address=10.0.0.1',
+                '',
+                'domain=shakenfist',
+                'local=/shakenfist/',
+                f'dhcp-leasefile={TEST_DIR}/files/dhcp/{network_uuid}/leases',
+                f'dhcp-range={d.interface},10.0.0.2,static,255.0.0.0,10.255.255.255,1h',
+                f'dhcp-option={d.interface},1,255.0.0.0',
+                f'dhcp-option={d.interface},15,shakenfist',
+                f'dhcp-option={d.interface},26,7950',
+                f'dhcp-hostsfile={TEST_DIR}/files/dhcp/{network_uuid}/hosts'
+            ])
+        )
+
+    @mock.patch('os.makedirs')
+    def test_make_dhcp_hosts(self, mock_makedir):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
 
@@ -176,6 +285,56 @@ class DnsMasqTestCase(testtools.TestCase):
                 '',
                 '1a:91:64:d2:15:39,inst1,127.0.0.5',
                 '1a:91:64:d2:15:40,inst2,127.0.0.6',
+            ])
+        )
+
+    @mock.patch('os.makedirs')
+    def test_make_dns_hosts(self, mock_makedir):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        instance_uuid_one = str(uuid.uuid4())
+        instance_uuid_two = str(uuid.uuid4())
+        network_uuid = str(uuid.uuid4())
+        iface_uuid_one = str(uuid.uuid4())
+        iface_uuid_two = str(uuid.uuid4())
+
+        self.mock_etcd.create_network(
+            'testing', network_uuid, netblock='127.0.0.0/8')
+        self.mock_etcd.create_network_interface(
+            iface_uuid_one,
+            {
+                'network_uuid': network_uuid,
+                'address': '127.0.0.5',
+                'model': None,
+                'macaddress': '1a:91:64:d2:15:39',
+            },
+            instance_uuid=instance_uuid_one, order=0)
+        self.mock_etcd.create_network_interface(
+            iface_uuid_two,
+            {
+                'network_uuid': network_uuid,
+                'address': '127.0.0.6',
+                'model': None,
+                'macaddress': '1a:91:64:d2:15:40',
+            },
+            instance_uuid=instance_uuid_two, order=0)
+        self.mock_etcd.create_instance('inst1', instance_uuid_one)
+        self.mock_etcd.create_instance('inst2', instance_uuid_two)
+
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n, provide_dns=True)
+
+        mock_open = mock.mock_open()
+        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+            d._make_config(just_this_path='dnshosts')
+
+        handle = mock_open()
+        handle.write.assert_called_with(
+            '\n'.join([
+                '',
+                '127.0.0.5 inst1',
+                '127.0.0.6 inst2',
             ])
         )
 

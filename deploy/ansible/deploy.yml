@@ -1042,6 +1042,15 @@
         group: root
         mode: "0644"
 
+    - name: Copy DNS hosts template
+      copy:
+        src: "{{hostvars['localhost']['template_path']}}/dnshosts.tmpl"
+        remote_src: yes
+        dest: /srv/shakenfist/dnshosts.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
 - hosts: hypervisors, network_node, etcd_master, storage, primary_node
   any_errors_fatal: true
   become: yes

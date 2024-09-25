@@ -188,6 +188,10 @@ class InvalidAddress(NetworkException):
     ...
 
 
+class NatOnlyNetworksShouldNotHaveDnsMasq(NetworkException):
+    ...
+
+
 # NetworkInterface
 class NetworkInterfaceException(Exception):
     ...

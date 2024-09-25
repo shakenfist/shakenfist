@@ -4,11 +4,22 @@ no-hosts         # Do not use /etc/hosts
 no-resolv        # Do not use /etc/resolv.conf
 filterwin2k      # Filter weird windows 2000 queries
 
-# Disable DNS
-port=0
+{%- if provide_dns %}
+port=53          # Enable DNS
+server={{dns_server}}
+addn-hosts={{config_dir}}/dnshosts
+expand-hosts
+{%- if provide_dhcp %}
+dhcp-option={{interface}},6,{{router}}
+{%- endif %}
+{%- else %}
+port=0           # Disable DNS
+{%- if provide_nat and provide_dhcp %}
+dhcp-option={{interface}},6,{{dns_server}}
+{%- endif %}
+{%- endif %}
 
 pid-file={{config_dir}}/pid
-dhcp-leasefile={{config_dir}}/leases
 
 interface={{interface}}
 listen-address={{router}}
@@ -16,9 +27,11 @@ listen-address={{router}}
 domain={{zone}}
 local=/{{zone}}/
 
+{%- if provide_dhcp %}
+dhcp-leasefile={{config_dir}}/leases
 dhcp-range={{interface}},{{dhcp_start}},static,{{netmask}},{{broadcast}},1h
 dhcp-option={{interface}},1,{{netmask}}
-dhcp-option={{interface}},3,{{router}}
-dhcp-option={{interface}},6,8.8.8.8
 dhcp-option={{interface}},15,{{zone}}
+dhcp-option={{interface}},26,{{mtu}}
 dhcp-hostsfile={{config_dir}}/hosts
+{%- endif %}

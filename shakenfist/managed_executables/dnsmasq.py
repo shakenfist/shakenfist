@@ -3,6 +3,7 @@ import signal
 import time
 
 from shakenfist.config import config
+from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist import instance
 from shakenfist.managed_executables import managedexecutable
 from shakenfist import networkinterface
@@ -15,17 +16,30 @@ class DnsMasq(managedexecutable.ManagedExecutable):
     # upgrade.
     object_type = 'dhcp'
     initial_version = 1
-    current_version = 1
+    current_version = 2
 
     def __init__(self, static_values):
+        self.upgrade(static_values)
+
         super().__init__(static_values)
+
+        self.__provide_dhcp = static_values['provide_dhcp']
+        self.__provide_dns = static_values['provide_dns']
 
         # These aren't really static values as they're not stored in the db
         self.__interface = None
         self.__network = None
 
         self._read_template('config', 'dhcp.tmpl')
-        self._read_template('hosts', 'dhcphosts.tmpl')
+        if self.provide_dhcp:
+            self._read_template('hosts', 'dhcphosts.tmpl')
+        if self.provide_dns:
+            self._read_template('dnshosts', 'dnshosts.tmpl')
+
+    @classmethod
+    def _upgrade_step_1_to_2(cls, static_values):
+        static_values['provide_dhcp'] = True
+        static_values['provide_dns'] = False
 
     # Static values
     @property
@@ -44,12 +58,43 @@ class DnsMasq(managedexecutable.ManagedExecutable):
     def network(self, value):
         self.__network = value
 
+    @property
+    def provide_dhcp(self):
+        return self.__provide_dhcp
+
+    @property
+    def provide_dns(self):
+        return self.__provide_dns
+
     # Helpers
     @classmethod
-    def new(cls, owner):
-        n = super().new(owner.uuid, owner)
-        n.interface = owner._vx_veth_inner
-        n.network = owner
+    def new(cls, owner_network, provide_dhcp=True, provide_nat=True,
+            provide_dns=False):
+        if not provide_dhcp and not provide_dns:
+            raise NatOnlyNetworksShouldNotHaveDnsMasq()
+
+        u = owner_network.uuid
+        n = cls.from_db(u, suppress_failure_audit=True)
+        if n:
+            n.interface = owner_network._vx_veth_inner
+            n.network = owner_network
+            return n
+
+        uniq = owner_network.unique_label()
+        cls._db_create(u, {
+            'uuid': u,
+            'namespace': owner_network.namespace,
+            'owner_type': uniq[0],
+            'owner_uuid': uniq[1],
+            'provide_dhcp': provide_dhcp,
+            'provide_nat': provide_nat,
+            'provide_dns': provide_dns,
+            'version': cls.current_version
+        })
+        n = cls.from_db(u)
+        n.state = cls.STATE_CREATED
+        n.interface = owner_network._vx_veth_inner
+        n.network = owner_network
         return n
 
     def subst_dict(self):
@@ -62,6 +107,8 @@ class DnsMasq(managedexecutable.ManagedExecutable):
             'mtu': config.MAX_HYPERVISOR_MTU - 50,
             'interface': self.interface,
             'instances': instances,
+            'provide_dhcp': self.provide_dhcp,
+            'provide_dns': self.provide_dns
         })
         d.update(self.network.subst_dict())
         return d
