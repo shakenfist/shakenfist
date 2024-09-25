@@ -1,34 +1,36 @@
 # Copyright 2019 Michael Still
-
-from collections import defaultdict
 import faulthandler
-from functools import partial
 import json
 import os
 import pathlib
-import psutil
-import setproctitle
-from shakenfist_utilities import logs
 import signal
 import subprocess
 import time
+from collections import defaultdict
+from functools import partial
 
-from shakenfist.baseobjectmapping import (
-    OBJECT_NAMES_TO_ITERATORS, OBJECT_NAMES_TO_CLASSES)
-from shakenfist.blob import Blob, Blobs, placement_filter
+import psutil
+import setproctitle
+from shakenfist_utilities import logs
+
 from shakenfist import cache
 from shakenfist import config as sf_config
-from shakenfist.config import config
-from shakenfist.daemons import daemon
-from shakenfist.daemons import shim
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import network
+from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
+from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_ITERATORS
+from shakenfist.blob import Blob
+from shakenfist.blob import Blobs
+from shakenfist.blob import placement_filter
+from shakenfist.config import config
+from shakenfist.daemons import daemon
+from shakenfist.daemons import shim
 from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
 from shakenfist.util import general as util_general
-from shakenfist.util import process as util_process
 from shakenfist.util import network as util_network
+from shakenfist.util import process as util_process
 
 
 LOG, HANDLER = logs.setup('main')

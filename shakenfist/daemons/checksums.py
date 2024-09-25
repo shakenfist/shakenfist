@@ -5,10 +5,10 @@
 # more bytes of blob on a node than we can checksum before the checksum renewal
 # interval, we will never catch up. Our blob store isn't intended to be huge, so
 # that is ok for now.
-
-from functools import partial
 import os
 import time
+from functools import partial
+
 from shakenfist_utilities import logs
 
 from shakenfist import blob

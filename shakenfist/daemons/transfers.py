@@ -1,12 +1,13 @@
 import os
-from shakenfist_utilities import logs
 import socket
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist_utilities import logs
+
 from shakenfist import blob
+from shakenfist import etcd
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import etcd
 from shakenfist.util import general as util_general
 from shakenfist.util import process as util_process
 
