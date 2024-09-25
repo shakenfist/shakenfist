@@ -671,7 +671,7 @@ if [ \$(whoami) != "root" ]; then
     error "You need to run this script as root."
 fi
 
-# Are we on Ubuntu >= 20.04 or Debian >= 10?
+# Are we on Ubuntu >= 22.04 or Debian >= 10?
 osok=0
 isdebian=0
 isubuntu=0
@@ -689,7 +689,7 @@ if [ -e /etc/os-release ]; then
         isubuntu=1
 
         MAJOR_VERSION=\$(echo \${VERSION_ID} | cut -f 1 -d ".")
-        if [ \${MAJOR_VERSION} -gt 19 ]; then
+        if [ \${MAJOR_VERSION} -gt 21 ]; then
             osok=1
         fi
     else
@@ -698,7 +698,7 @@ if [ -e /etc/os-release ]; then
 fi
 
 if [ \${osok} != 1 ]; then
-    error "Sorry, this does not look like a supported Linux distribution.\nWe currently support Ubuntu 20.04 and onwards, and Debian 10\nonwards."
+    error "Sorry, this does not look like a supported Linux distribution.\nWe currently support Ubuntu 22.04 and onwards, and Debian 10\nonwards."
 fi
 echo
 
@@ -1030,7 +1030,8 @@ if [ -z $1 ]; then
     . /etc/sf/sfrc
 
     if [ -z GETSF_SKIP_COMMON_IMAGES ]; then
-        sf-client artifact cache ubuntu:20.04 --shared
+        sf-client artifact cache ubuntu:24.04 --shared
+        sf-client artifact cache debian:12 --shared
         sf-client artifact cache cirros --shared
     fi
 

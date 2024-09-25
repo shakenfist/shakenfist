@@ -94,17 +94,18 @@ jobs:
             concurrency: 5
           },
           {
-            description: 'ubuntu 20.04 single machine',
-            job_name: 'ubuntu-2004-localhost',
-            base_image: 'sf://label/ci-images/ubuntu-2004',
+            description: 'ubuntu 22.04 single machine',
+            job_name: 'ubuntu-2204-localhost',
+            base_image: 'sf://label/ci-images/ubuntu-2204',
             base_image_user: 'ubuntu',
             topology: 'localhost',
             concurrency: 3
           },
           {
-            description: 'ubuntu 22.04 cluster',
-            job_name: 'ubuntu-2204-slim-primary',
-            base_image: 'sf://label/ci-images/ubuntu-2204',
+            description: 'ubuntu 24.04 cluster',
+            job_name: 'ubuntu-2404-slim-primary',
+            base_image: 'sf://label/ci-images/ubuntu-24cccccbgvtigkeuvigbkkbubgtbfhkujcjnegvrbfhnff
+            04',
             base_image_user: 'ubuntu',
             topology: 'slim-primary',
             concurrency: 5
