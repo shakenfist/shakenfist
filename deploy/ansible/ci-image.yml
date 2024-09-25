@@ -4,7 +4,7 @@
   vars:
     identifier: unknown
     source_path: "/home/jenkins/src/shakenfist/"
-    base_image: "ubuntu:20.04"
+    base_image: "ubuntu:22.04"
     base_image_user: "ubuntu"
 
   tasks:
