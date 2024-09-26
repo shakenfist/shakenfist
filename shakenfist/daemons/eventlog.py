@@ -1,23 +1,25 @@
-from collections import defaultdict
-from concurrent import futures
-import grpc
 import json
 import os
 import pathlib
-from shakenfist_utilities import logs
 import time
+from collections import defaultdict
+from concurrent import futures
 
+import grpc
 from prometheus_client import Counter
 from prometheus_client import start_http_server
+from shakenfist_utilities import logs
 
-from shakenfist.config import config
-from shakenfist.constants import API_REQUESTS, EVENT_TYPES, EVENT_TYPE_HISTORIC
-from shakenfist.daemons import daemon
 from shakenfist import etcd
-from shakenfist import eventlog
 from shakenfist import event_pb2
 from shakenfist import event_pb2_grpc
+from shakenfist import eventlog
 from shakenfist import node
+from shakenfist.config import config
+from shakenfist.constants import API_REQUESTS
+from shakenfist.constants import EVENT_TYPE_HISTORIC
+from shakenfist.constants import EVENT_TYPES
+from shakenfist.daemons import daemon
 from shakenfist.util import general as util_general
 
 

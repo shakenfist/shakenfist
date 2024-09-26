@@ -1,21 +1,23 @@
 import base64
 import os
 import select
-import setproctitle
-from shakenfist_utilities import logs
 import signal
-from shakenfist_agent import protocol
 import time
-from versions_comparison import Comparison
 import uuid
 
-from shakenfist.agentoperation import AgentOperation
+import setproctitle
+from shakenfist_agent import protocol
+from shakenfist_utilities import logs
+from versions_comparison import Comparison
+
 from shakenfist import blob
 from shakenfist import constants
-from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
-from shakenfist.daemons import daemon
 from shakenfist import eventlog
 from shakenfist import instance
+from shakenfist.agentoperation import AgentOperation
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.daemons import daemon
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import process as util_process

@@ -1,39 +1,41 @@
 import os
-import requests
-import setproctitle
-from shakenfist_utilities import logs
 import time
 import uuid
 
-from shakenfist.agentoperation import AgentOperation
-from shakenfist.artifact import Artifact
+import requests
+import setproctitle
+from shakenfist_utilities import logs
+
 from shakenfist import blob
-from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.config import config
-from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
-from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import instance
-from shakenfist.tasks import (QueueTask,
-                              DeleteInstanceTask,
-                              FetchImageTask,
-                              HypervisorDestroyNetworkTask,
-                              InstanceTask,
-                              PreflightInstanceTask,
-                              StartInstanceTask,
-                              DestroyNetworkTask,
-                              DeleteNetworkWhenClean,
-                              FloatNetworkInterfaceTask,
-                              SnapshotTask,
-                              FetchBlobTask,
-                              ArchiveTranscodeTask,
-                              PreflightAgentOperationTask,
-                              HotPlugInstanceInterfaceTask)
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist import scheduler
+from shakenfist.agentoperation import AgentOperation
+from shakenfist.artifact import Artifact
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.daemons import daemon
+from shakenfist.tasks import ArchiveTranscodeTask
+from shakenfist.tasks import DeleteInstanceTask
+from shakenfist.tasks import DeleteNetworkWhenClean
+from shakenfist.tasks import DestroyNetworkTask
+from shakenfist.tasks import FetchBlobTask
+from shakenfist.tasks import FetchImageTask
+from shakenfist.tasks import FloatNetworkInterfaceTask
+from shakenfist.tasks import HotPlugInstanceInterfaceTask
+from shakenfist.tasks import HypervisorDestroyNetworkTask
+from shakenfist.tasks import InstanceTask
+from shakenfist.tasks import PreflightAgentOperationTask
+from shakenfist.tasks import PreflightInstanceTask
+from shakenfist.tasks import QueueTask
+from shakenfist.tasks import SnapshotTask
+from shakenfist.tasks import StartInstanceTask
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import process as util_process
