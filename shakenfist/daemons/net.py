@@ -1,34 +1,35 @@
-from collections import defaultdict
 import itertools
 import os
-from oslo_concurrency import processutils
-import setproctitle
-from shakenfist_utilities import logs
 import signal
 import time
+from collections import defaultdict
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.config import config
-from shakenfist.daemons import daemon
+import setproctitle
+from oslo_concurrency import processutils
+from shakenfist_utilities import logs
+
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import network
 from shakenfist import networkinterface
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.config import config
+from shakenfist.daemons import daemon
 from shakenfist.networkinterface import NetworkInterface
-from shakenfist.tasks import (
-    DeployNetworkTask,
-    DestroyNetworkTask,
-    NetworkTask,
-    RemoveDnsMasqNetworkTask,
-    RemoveNATNetworkTask,
-    UpdateDnsMasqNetworkTask,
-    RemoveDHCPLeaseNetworkTask,
-    NetworkInterfaceTask,
-    FloatNetworkInterfaceTask,
-    DefloatNetworkInterfaceTask,
-    RouteAddressTask, UnrouteAddressTask)
+from shakenfist.tasks import DefloatNetworkInterfaceTask
+from shakenfist.tasks import DeployNetworkTask
+from shakenfist.tasks import DestroyNetworkTask
+from shakenfist.tasks import FloatNetworkInterfaceTask
+from shakenfist.tasks import NetworkInterfaceTask
+from shakenfist.tasks import NetworkTask
+from shakenfist.tasks import RemoveDHCPLeaseNetworkTask
+from shakenfist.tasks import RemoveDnsMasqNetworkTask
+from shakenfist.tasks import RemoveNATNetworkTask
+from shakenfist.tasks import RouteAddressTask
+from shakenfist.tasks import UnrouteAddressTask
+from shakenfist.tasks import UpdateDnsMasqNetworkTask
 from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
 

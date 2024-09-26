@@ -1,12 +1,13 @@
 import faulthandler
 import logging
-import setproctitle
-from shakenfist_utilities import logs
 import signal
 from threading import Event
 
-from shakenfist.config import config
+import setproctitle
+from shakenfist_utilities import logs
+
 from shakenfist import etcd
+from shakenfist.config import config
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import process as util_process
 
