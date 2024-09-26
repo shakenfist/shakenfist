@@ -105,6 +105,14 @@
             name: "ubuntu:20.04",
           }
         - {
+            url: "https://images.shakenfist.com/ubuntu:22.04/latest.qcow2",
+            name: "ubuntu:22.04",
+          }
+        - {
+            url: "https://images.shakenfist.com/ubuntu:24.04/latest.qcow2",
+            name: "ubuntu:24.04",
+          }
+        - {
             url: "https://images.shakenfist.com/debian:11/latest.qcow2",
             name: "debian:11",
           }
