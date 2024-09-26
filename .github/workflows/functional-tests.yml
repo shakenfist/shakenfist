@@ -104,8 +104,7 @@ jobs:
           {
             description: 'ubuntu 24.04 cluster',
             job_name: 'ubuntu-2404-slim-primary',
-            base_image: 'sf://label/ci-images/ubuntu-24cccccbgvtigkeuvigbkkbubgtbfhkujcjnegvrbfhnff
-            04',
+            base_image: 'sf://label/ci-images/ubuntu-2404',
             base_image_user: 'ubuntu',
             topology: 'slim-primary',
             concurrency: 5
