@@ -16,11 +16,11 @@
 # - src: andrewrothstein.etcd
 # Works with everything except Ubuntu 20.04: 2.1.43
 - src: https://github.com/mikalstill/ansible-etcd
-  version: 2.1.43
+  version: 2.3.10
   name: andrewrothstein.etcd
 
 # - src: andrewrothstein.etcd-cluster
 # Works with everything except Ubuntu 20.04: 3.0.1.1
 - src: https://github.com/mikalstill/ansible-etcd-cluster
-  version: 3.0.1.3
+  version: 3.0.7
   name: andrewrothstein.etcd-cluster
