@@ -6,30 +6,31 @@
 #        - and link to OpenAPI docs: yes
 #        - and include examples: yes
 #   - Has complete CI coverage:
-
-from functools import partial
-from flask_jwt_extended import get_jwt_identity
-from flasgger import swag_from
 import ipaddress
-from shakenfist_utilities import api as sf_api, logs
+from functools import partial
 
-from shakenfist.config import config
-from shakenfist.external_api import (
-    base as api_base,
-    util as api_util)
+from flasgger import swag_from
+from flask_jwt_extended import get_jwt_identity
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
+
 from shakenfist import baseobject
-from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.daemons import daemon
 from shakenfist import etcd
-from shakenfist import exceptions
 from shakenfist import eventlog
+from shakenfist import exceptions
 from shakenfist import network
 from shakenfist import networkinterface
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.daemons import daemon
+from shakenfist.external_api import base as api_base
+from shakenfist.external_api import util as api_util
+from shakenfist.tasks import DeleteNetworkWhenClean
+from shakenfist.tasks import DestroyNetworkTask
+from shakenfist.tasks import RouteAddressTask
+from shakenfist.tasks import UnrouteAddressTask
 from shakenfist.util import process as util_process
-from shakenfist.tasks import (
-    DestroyNetworkTask, DeleteNetworkWhenClean, RouteAddressTask,
-    UnrouteAddressTask)
 
 
 LOG, HANDLER = logs.setup(__name__)

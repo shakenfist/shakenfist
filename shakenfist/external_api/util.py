@@ -1,10 +1,11 @@
 from flask_jwt_extended import get_jwt_identity
-from shakenfist_utilities import api as sf_api, logs
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
 
-from shakenfist.daemons import daemon
-from shakenfist.instance import Instance
 from shakenfist import ipam
 from shakenfist import network
+from shakenfist.daemons import daemon
+from shakenfist.instance import Instance
 from shakenfist.networkinterface import NetworkInterface
 
 

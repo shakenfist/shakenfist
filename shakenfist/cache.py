@@ -1,5 +1,6 @@
-from shakenfist_utilities import logs
 import time
+
+from shakenfist_utilities import logs
 
 from shakenfist import etcd
 

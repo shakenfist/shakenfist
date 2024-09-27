@@ -1,15 +1,14 @@
 # Copyright 2020 Michael Still
-
 from functools import partial
-from shakenfist_utilities import logs
 from uuid import uuid4
 
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist_utilities import logs
+
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import network
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.tasks import DefloatNetworkInterfaceTask
 from shakenfist.util import network as util_network
 
