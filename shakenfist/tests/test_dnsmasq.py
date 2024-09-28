@@ -1,17 +1,19 @@
-from unittest import mock
 import os
-from pydantic import AnyHttpUrl, IPvAnyAddress
 import signal
-import six
 import tempfile
-import testtools
 import time
 import uuid
+from unittest import mock
 
+import six
+import testtools
+from pydantic import AnyHttpUrl
+from pydantic import IPvAnyAddress
+
+from shakenfist import network
 from shakenfist.config import BaseSettings
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.managed_executables import dnsmasq
-from shakenfist import network
 from shakenfist.tests.mock_etcd import MockEtcd
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
