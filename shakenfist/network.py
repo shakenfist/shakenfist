@@ -1,36 +1,37 @@
 # Copyright 2020 Michael Still
-
-from functools import partial
 import ipaddress
 import os
 import random
 import re
-from shakenfist_utilities import logs
 import time
+from functools import partial
 from uuid import uuid4
 
 from oslo_concurrency import processutils
+from shakenfist_utilities import logs
 
 from shakenfist import baseobject
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
-from shakenfist.config import config
-from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
-from shakenfist.managed_executables import dnsmasq
 from shakenfist import etcd
-from shakenfist.exceptions import DeadNetwork, CongestedNetwork, IPManagerMissing
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import networkinterface
-from shakenfist.node import Node, Nodes
-from shakenfist.tasks import (
-    DeployNetworkTask,
-    HypervisorDestroyNetworkTask,
-    UpdateDnsMasqNetworkTask,
-    RemoveDnsMasqNetworkTask,
-    RemoveDHCPLeaseNetworkTask,
-    RemoveNATNetworkTask)
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_MUTATE
+from shakenfist.exceptions import CongestedNetwork
+from shakenfist.exceptions import DeadNetwork
+from shakenfist.exceptions import IPManagerMissing
+from shakenfist.managed_executables import dnsmasq
+from shakenfist.node import Node
+from shakenfist.node import Nodes
+from shakenfist.tasks import DeployNetworkTask
+from shakenfist.tasks import HypervisorDestroyNetworkTask
+from shakenfist.tasks import RemoveDHCPLeaseNetworkTask
+from shakenfist.tasks import RemoveDnsMasqNetworkTask
+from shakenfist.tasks import RemoveNATNetworkTask
+from shakenfist.tasks import UpdateDnsMasqNetworkTask
 from shakenfist.util import network as util_network
 from shakenfist.util import process as util_process
 
