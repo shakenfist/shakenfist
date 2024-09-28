@@ -229,7 +229,7 @@ class NetworksEndpoint(sf_api.Resource):
                 401, 'only admins can create resources in a different namespace')
 
         n = network.Network.new(name, namespace, netblock, provide_dhcp,
-                                provide_nat, provide_dns)
+                                provide_nat, provide_dns=provide_dns)
         n.add_event(EVENT_TYPE_AUDIT, 'create request from REST API')
         return n.external_view()
 

@@ -10,7 +10,8 @@ class TestNetworking(base.BaseNamespacedTestCase):
     def setUp(self):
         super().setUp()
         self.net_one = self.test_client.allocate_network(
-            '192.168.242.0/24', True, True, '%s-net-one' % self.namespace)
+            '192.168.242.0/24', True, True, '%s-net-one' % self.namespace,
+            provide_dns=True)
         self.net_two = self.test_client.allocate_network(
             '192.168.243.0/24', True, True, '%s-net-two' % self.namespace)
         self.net_three = self.test_client.allocate_network(
@@ -364,3 +365,39 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertEqual(0, results['return-code'])
         self.assertEqual('', results['stderr'])
         self.assertFalse('DUP' in results['stdout'])
+
+    def test_provided_dns(self):
+        inst = self.test_client.create_instance(
+            'test-provided-dns', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net_one['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://upload/system/debian-11',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        # Wait for the instance agent to report in
+        self._await_instance_ready(inst['uuid'])
+
+        # Lookup our address
+        nics = self.test_client.get_instance_interfaces(inst['uuid'])
+        self.assertEqual(1, len(nics))
+        address = nics[0]['ipv4']
+
+        # Do a DNS lookup for our local network
+        _, data = self.test_client.await_agent_command(
+            inst['uuid'], 'getent ahostsv4 test-provided-dns')
+        if data.find(address) == -1:
+            self.fail(
+                f'Did not find address "{address}" in getent output:\n\n{data}')
+
+        # Do a DNS lookup for a public address
+        _, data = self.test_client.await_agent_command(
+            inst['uuid'], 'host 8.8.8.8')
+        self.assertTrue(data.find('dns.google') != -1)
