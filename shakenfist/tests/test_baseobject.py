@@ -1,8 +1,10 @@
 from unittest import mock
+
 import testtools
 
-from shakenfist.baseobject import DatabaseBackedObject, State
 from shakenfist import exceptions
+from shakenfist.baseobject import DatabaseBackedObject
+from shakenfist.baseobject import State
 from shakenfist.tests import base
 
 

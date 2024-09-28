@@ -1,6 +1,6 @@
-from unittest import mock
 import time
 import uuid
+from unittest import mock
 
 from shakenfist import exceptions
 from shakenfist import ipam
