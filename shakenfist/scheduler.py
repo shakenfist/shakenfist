@@ -1,19 +1,21 @@
 # Make scheduling decisions
-
-from collections import defaultdict
 import math
 import random
-from shakenfist_utilities import logs
 import time
 import uuid
+from collections import defaultdict
 
-from shakenfist.config import config
-from shakenfist.constants import GiB, EVENT_TYPE_AUDIT
+from shakenfist_utilities import logs
+
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import networkinterface
-from shakenfist.node import Node, Nodes
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import GiB
+from shakenfist.node import Node
+from shakenfist.node import Nodes
 from shakenfist.util import general as util_general
 
 
