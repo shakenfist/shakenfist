@@ -367,8 +367,22 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertFalse('DUP' in results['stdout'])
 
     def test_provided_dns(self):
-        inst = self.test_client.create_instance(
+        inst1 = self.test_client.create_instance(
             'test-provided-dns', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net_one['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://upload/system/debian-11',
+                    'type': 'disk'
+                }
+            ], None, None)
+        inst2 = self.test_client.create_instance(
+            'test-provided-dns-2', 1, 1024,
             [
                 {
                     'network_uuid': self.net_one['uuid']
@@ -383,21 +397,62 @@ class TestNetworking(base.BaseNamespacedTestCase):
             ], None, None)
 
         # Wait for the instance agent to report in
-        self._await_instance_ready(inst['uuid'])
+        self._await_instance_ready(inst1['uuid'])
 
-        # Lookup our address
-        nics = self.test_client.get_instance_interfaces(inst['uuid'])
+        # Ensure the gateway is set as the DNS server in /etc/resolv.conf
+        data = self.test_client.await_agent_fetch(
+            inst1['uuid'], '/etc/resolv.conf')
+        if data.find('192.168.242.1') == -1:
+            self.fail(
+                '/etc/resolv.conf did not have the gateway set as the '
+                f'DNS address:\n\n{data}')
+
+        # Lookup our addresses
+        nics = self.test_client.get_instance_interfaces(inst1['uuid'])
         self.assertEqual(1, len(nics))
-        address = nics[0]['ipv4']
+        address1 = nics[0]['ipv4']
+
+        nics = self.test_client.get_instance_interfaces(inst2['uuid'])
+        self.assertEqual(1, len(nics))
+        address2 = nics[0]['ipv4']
+
+        # Do a DNS lookup for a public address. getent is included in the base
+        # distro, whereas host and nslookup are not.
+        _, data = self.test_client.await_agent_command(
+            inst1['uuid'], 'getent hosts 8.8.8.8')
+        self.assertTrue(data.find('dns.google') != -1)
+
+        # Do a DNS lookup for google
+        _, data = self.test_client.await_agent_command(
+            inst1['uuid'], 'getent ahostsv4 www.google.com || true')
+        if data.find('www.google.com') == -1:
+            self.fail(
+                f'Did not find "www.google.com" in getent output:\n\n{data}')
+
+        # Do a DNS lookup for an internal address.
+        _, data = self.test_client.await_agent_command(
+            inst1['uuid'], f'getent hosts {address1} || true')
+        if data.find('test-provided-dns') == -1:
+            self.fail(
+                f'Did not find address "test-provided-dns" for instance 1 at '
+                f'{address1} via getent ahosts output:\n\n{data}')
 
         # Do a DNS lookup for our local network
         _, data = self.test_client.await_agent_command(
-            inst['uuid'], 'getent ahostsv4 test-provided-dns')
-        if data.find(address) == -1:
+            inst1['uuid'],
+            f'getent ahostsv4 test-provided-dns.{self.namespace} || true')
+        if data.find(address1) == -1:
             self.fail(
-                f'Did not find address "{address}" in getent output:\n\n{data}')
+                f'Did not find address "{address1}" for instance 1 at '
+                f'test-provided-dns.{self.namespace} via getent ahostsv4 '
+                f'output:\n\n{data}')
 
-        # Do a DNS lookup for a public address
+        # Do another DNS lookup for our local network for someone other than us
         _, data = self.test_client.await_agent_command(
-            inst['uuid'], 'host 8.8.8.8')
-        self.assertTrue(data.find('dns.google') != -1)
+            inst1['uuid'],
+            f'getent ahostsv4 test-provided-dns-2.{self.namespace} || true')
+        if data.find(address2) == -1:
+            self.fail(
+                f'Did not find address "{address2}" for instance 1 at '
+                f'test-provided-dns-2.{self.namespace} via getent ahostsv4 '
+                f'output:\n\n{data}')
