@@ -1,18 +1,22 @@
 import os
 import pathlib
 import re
-import requests
-from shakenfist_utilities import logs
 import shutil
 import uuid
 
-from shakenfist.artifact import Artifact, BLOB_URL
+import requests
+from shakenfist_utilities import logs
+
 from shakenfist import blob
-from shakenfist.config import config
-from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
-                                  TRANSCODE_DESCRIPTION, EVENT_TYPE_AUDIT)
 from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist.artifact import Artifact
+from shakenfist.artifact import BLOB_URL
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import LOCK_REFRESH_SECONDS
+from shakenfist.constants import QCOW2_CLUSTER_SIZE
+from shakenfist.constants import TRANSCODE_DESCRIPTION
 from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image

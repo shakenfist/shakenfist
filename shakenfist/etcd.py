@@ -1,20 +1,24 @@
+import json
+import os
+import threading
+import time
 from collections import defaultdict
+
+import psutil
+import requests
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
-from etcd3gw.utils import _encode, _increment_last_byte
-import json
-import os
-import psutil
-import requests
-from shakenfist_utilities import (logs, random as util_random)
-import threading
-import time
+from etcd3gw.utils import _encode
+from etcd3gw.utils import _increment_last_byte
+from shakenfist_utilities import logs
+from shakenfist_utilities import random as util_random
 
 from shakenfist import baseobject
-from shakenfist.config import config
 from shakenfist import exceptions
-from shakenfist.tasks import QueueTask, FetchBlobTask
+from shakenfist.config import config
+from shakenfist.tasks import FetchBlobTask
+from shakenfist.tasks import QueueTask
 from shakenfist.util import callstack as util_callstack
 
 

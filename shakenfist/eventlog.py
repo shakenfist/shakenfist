@@ -1,21 +1,22 @@
 import copy
 import datetime
-import flask
-import grpc
 import json
-from oslo_concurrency import lockutils
 import os
 import pathlib
-from shakenfist_utilities import logs
 import sqlite3
 import time
 
-from shakenfist.config import config
+import flask
+import grpc
+from oslo_concurrency import lockutils
+from shakenfist_utilities import logs
+
 from shakenfist import constants
 from shakenfist import etcd
 from shakenfist import event_pb2
 from shakenfist import event_pb2_grpc
 from shakenfist import exceptions
+from shakenfist.config import config
 
 
 LOG, _ = logs.setup(__name__)
