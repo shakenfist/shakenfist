@@ -1,5 +1,6 @@
 import json
 from unittest import mock
+
 from shakenfist_utilities import logs
 
 from shakenfist import etcd

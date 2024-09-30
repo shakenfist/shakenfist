@@ -1,18 +1,19 @@
 import base64
-from functools import partial
 import json
-from unittest import mock
 import os
-import pycdlib
 import tempfile
-import testtools
 import time
 import uuid
+from functools import partial
+from unittest import mock
+
+import pycdlib
+import testtools
 
 from shakenfist import baseobject
-from shakenfist.baseobject import State
 from shakenfist import exceptions
 from shakenfist import instance
+from shakenfist.baseobject import State
 from shakenfist.config import SFConfig
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
