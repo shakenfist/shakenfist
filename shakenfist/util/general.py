@@ -1,21 +1,21 @@
-import cpuinfo
-import distro
 import os
 import pathlib
-from pbr.version import VersionInfo
-from shakenfist_utilities import logs
 import stat
 import sys
 import time
 import traceback
 import uuid
 
+import cpuinfo
+import distro
+from pbr.version import VersionInfo
+from shakenfist_utilities import logs
 
+from shakenfist import eventlog
+from shakenfist.constants import EVENT_TYPE_STATUS
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
-from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist import eventlog
 
 
 LOG, _ = logs.setup(__name__)

@@ -6,13 +6,14 @@
 #        - and link to OpenAPI docs:
 #        - and include examples:
 #   - Has complete CI coverage:
-
 from functools import partial
-from shakenfist_utilities import api as sf_api, logs
+
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
 
 from shakenfist import artifact
-from shakenfist.artifact import Artifacts
 from shakenfist import blob
+from shakenfist.artifact import Artifacts
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon

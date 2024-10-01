@@ -1,14 +1,14 @@
-from collections import defaultdict
-from shakenfist_utilities import logs
 import time
-import versions
+from collections import defaultdict
 
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
+import versions
+from shakenfist_utilities import logs
+
+from shakenfist import etcd
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import GiB
-from shakenfist import etcd
 from shakenfist.util import general as util_general
 
 

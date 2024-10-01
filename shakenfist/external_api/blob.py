@@ -6,19 +6,21 @@
 #        - and link to OpenAPI docs: yes
 #        - and include examples: yes
 #   - Has complete CI coverage:
-
-import flask
-from flask_jwt_extended import get_jwt_identity
-from flasgger import swag_from
 import math
 import os
 import random
+
+import flask
 import requests
-from shakenfist_utilities import api as sf_api, logs
+from flasgger import swag_from
+from flask_jwt_extended import get_jwt_identity
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 
-from shakenfist.blob import Blob, Blobs
+from shakenfist.blob import Blob
+from shakenfist.blob import Blobs
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
