@@ -1,10 +1,11 @@
-from unittest import mock
-import testtools
 import uuid
+from unittest import mock
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo
+import testtools
+
 from shakenfist import exceptions
 from shakenfist import network
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd

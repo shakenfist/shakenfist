@@ -1,12 +1,12 @@
 # Copyright 2020 Michael Still
-
-import click
 import importlib
 import json
 import logging
 import os
-from shakenfist_utilities import logs
 import time
+
+import click
+from shakenfist_utilities import logs
 
 
 LOG = logs.setup_console(__name__)
