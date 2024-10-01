@@ -1021,7 +1021,7 @@ if [ -z $1 ]; then
     status "Write a .shakenfist file to the current user's home directory."
     homedir=$(getent passwd ${SUDO_USER} | cut -d ":" -f 6)
     cp /etc/sf/shakenfist.json ${home_dir}/.shakenfist
-    chown ${SUDO_USER}.${SUDO_USER} ${home_dir}/.shakenfist
+    chown ${SUDO_USER}:${SUDO_USER} ${home_dir}/.shakenfist
 
     status "Pause briefly to let Shaken Fist settle."
     sleep 5
