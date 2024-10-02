@@ -1,9 +1,9 @@
 import json
 from unittest import mock
 
+from shakenfist import instance
 from shakenfist.config import BaseSettings
 from shakenfist.daemons import cleaner
-from shakenfist import instance
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 

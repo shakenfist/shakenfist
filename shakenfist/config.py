@@ -1,14 +1,15 @@
 # Copyright 2019 Michael Still
-
-from etcd3gw.client import Etcd3Client
-from etcd3gw.exceptions import Etcd3Exception, ConnectionFailedError
 import json
-from pydantic import Field, AnyHttpUrl
-from pydantic_settings import BaseSettings
 import os
-
 import socket
 import sys
+
+from etcd3gw.client import Etcd3Client
+from etcd3gw.exceptions import ConnectionFailedError
+from etcd3gw.exceptions import Etcd3Exception
+from pydantic import AnyHttpUrl
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 def get_node_name():

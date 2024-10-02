@@ -2,11 +2,11 @@ import os
 import signal
 import time
 
+from shakenfist import instance
+from shakenfist import networkinterface
 from shakenfist.config import config
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
-from shakenfist import instance
 from shakenfist.managed_executables import managedexecutable
-from shakenfist import networkinterface
 from shakenfist.util import process as util_process
 
 
