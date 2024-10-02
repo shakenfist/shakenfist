@@ -583,7 +583,7 @@ if [ ! -z ${GETSF_SERVER_REPO} ]; then
     DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 \
         -o Dpkg::Options::="--force-confold" -y install \
         python3 python3-pip python3-wheel python3-setuptools \
-        python3-readme-renderer twine git
+        python3-readme-renderer twine git ansible
 
     echo
     status "Building server package"
@@ -1021,7 +1021,7 @@ if [ -z $1 ]; then
     status "Write a .shakenfist file to the current user's home directory."
     homedir=$(getent passwd ${SUDO_USER} | cut -d ":" -f 6)
     cp /etc/sf/shakenfist.json ${home_dir}/.shakenfist
-    chown ${SUDO_USER}.${SUDO_USER} ${home_dir}/.shakenfist
+    chown ${SUDO_USER}:${SUDO_USER} ${home_dir}/.shakenfist
 
     status "Pause briefly to let Shaken Fist settle."
     sleep 5
