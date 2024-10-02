@@ -1,9 +1,9 @@
-import jinja2
 import os
-import psutil
 import shutil
 import signal
 
+import jinja2
+import psutil
 from shakenfist_utilities import logs
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
