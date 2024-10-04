@@ -1,6 +1,5 @@
 # A simple shim to start internal daemons. This should only be called from
 # main.py.
-
 import sys
 
 from shakenfist.daemons import checksums as checksums_daemon
@@ -8,8 +7,8 @@ from shakenfist.daemons import cleaner as cleaner_daemon
 from shakenfist.daemons import cluster as cluster_daemon
 from shakenfist.daemons import eventlog as eventlog_daemon
 from shakenfist.daemons import external_api as external_api_daemon
-from shakenfist.daemons import queues as queues_daemon
 from shakenfist.daemons import net as net_daemon
+from shakenfist.daemons import queues as queues_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import sidechannel as sidechannel_daemon
 from shakenfist.daemons import transfers as transfers_daemon

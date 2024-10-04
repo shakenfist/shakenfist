@@ -2,30 +2,34 @@
 # urgent. Hard deleting data for example. Its therefore pretty relaxed about
 # obtaining the lock to do work et cetera. There is only one active cluster
 # maintenance daemon per cluster.
-
+import json
+import time
 from collections import defaultdict
 from functools import partial
-import json
+
 import setproctitle
 from shakenfist_utilities import logs
-import time
 
 from shakenfist import artifact
-from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.baseobjectmapping import (
-    OBJECT_NAMES_TO_CLASSES, OBJECT_NAMES_TO_ITERATORS)
-from shakenfist.blob import Blob, Blobs, placement_filter
 from shakenfist import cache
-from shakenfist.config import config
-from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import namespace
 from shakenfist import network
 from shakenfist import networkinterface
-from shakenfist.node import Node, Nodes, nodes_by_free_disk_descending
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
+from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_ITERATORS
+from shakenfist.blob import Blob
+from shakenfist.blob import Blobs
+from shakenfist.blob import placement_filter
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.daemons import daemon
+from shakenfist.node import Node
+from shakenfist.node import Nodes
+from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.upload import Uploads
 
 

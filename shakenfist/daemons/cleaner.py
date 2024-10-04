@@ -1,26 +1,29 @@
 import errno
-import grpc
 import json
 import os
-from oslo_concurrency import processutils
 import pathlib
 import random
-from shakenfist_utilities import logs
 import shutil
 import signal
 import time
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob, Blobs
-from shakenfist.config import config
-from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
-from shakenfist.daemons import daemon
+import grpc
+from oslo_concurrency import processutils
+from shakenfist_utilities import logs
+
 from shakenfist import etcd
 from shakenfist import etcd_pb2
 from shakenfist import etcd_pb2_grpc
 from shakenfist import instance
 from shakenfist import node
 from shakenfist import upload
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.blob import Blob
+from shakenfist.blob import Blobs
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.daemons import daemon
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import process as util_process
