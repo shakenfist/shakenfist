@@ -1,7 +1,7 @@
 import testtools
 
-from shakenfist import tasks
 from shakenfist import exceptions
+from shakenfist import tasks
 from shakenfist.tests import base
 
 

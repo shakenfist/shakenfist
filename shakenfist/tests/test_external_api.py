@@ -1,11 +1,15 @@
 import base64
-import bcrypt
 import json
 import logging
 from unittest import mock
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo, State
-from shakenfist.config import config, BaseSettings, SFConfig
+import bcrypt
+
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import State
+from shakenfist.config import BaseSettings
+from shakenfist.config import config
+from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
