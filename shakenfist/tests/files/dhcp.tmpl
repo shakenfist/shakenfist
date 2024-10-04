@@ -24,8 +24,8 @@ pid-file={{config_dir}}/pid
 interface={{interface}}
 listen-address={{router}}
 
-domain={{zone}}
-local=/{{zone}}/
+domain={{namespace}}.{{zone}}
+local=/{{namespace}}.{{zone}}/
 
 {%- if provide_dhcp %}
 dhcp-leasefile={{config_dir}}/leases

@@ -406,6 +406,10 @@ class TestNetworking(base.BaseNamespacedTestCase):
             self.fail(
                 '/etc/resolv.conf did not have the gateway set as the '
                 f'DNS address:\n\n{data}')
+        if data.find(f'{self.namespace}.bonkerslab') == -1:
+            self.fail(
+                '/etc/resolv.conf did not have the namespace set as the '
+                f'DNS search domain:\n\n{data}')
 
         # Lookup our addresses
         nics = self.test_client.get_instance_interfaces(inst1['uuid'])
@@ -418,41 +422,46 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
         # Do a DNS lookup for a public address. getent is included in the base
         # distro, whereas host and nslookup are not.
-        _, data = self.test_client.await_agent_command(
+        ec, data = self.test_client.await_agent_command(
             inst1['uuid'], 'getent hosts 8.8.8.8')
+        self.assertEquals(0, ec)
         self.assertTrue(data.find('dns.google') != -1)
 
         # Do a DNS lookup for google
-        _, data = self.test_client.await_agent_command(
+        ec, data = self.test_client.await_agent_command(
             inst1['uuid'], 'getent ahostsv4 www.google.com || true')
+        self.assertEquals(0, ec)
         if data.find('www.google.com') == -1:
             self.fail(
                 f'Did not find "www.google.com" in getent output:\n\n{data}')
 
         # Do a DNS lookup for an internal address.
-        _, data = self.test_client.await_agent_command(
+        ec, data = self.test_client.await_agent_command(
             inst1['uuid'], f'getent hosts {address1} || true')
+        self.assertEquals(0, ec)
         if data.find('test-provided-dns') == -1:
             self.fail(
                 f'Did not find address "test-provided-dns" for instance 1 at '
                 f'{address1} via getent ahosts output:\n\n{data}')
 
         # Do a DNS lookup for our local network
-        _, data = self.test_client.await_agent_command(
+        ec, data = self.test_client.await_agent_command(
             inst1['uuid'],
-            f'getent ahostsv4 test-provided-dns.{self.namespace} || true')
+            f'getent ahostsv4 test-provided-dns.{self.namespace}.bonkerslab || true')
+        self.assertEquals(0, ec)
         if data.find(address1) == -1:
             self.fail(
                 f'Did not find address "{address1}" for instance 1 at '
-                f'test-provided-dns.{self.namespace} via getent ahostsv4 '
+                f'test-provided-dns.{self.namespace}.bonkerslab via getent ahostsv4 '
                 f'output:\n\n{data}')
 
         # Do another DNS lookup for our local network for someone other than us
-        _, data = self.test_client.await_agent_command(
+        ec, data = self.test_client.await_agent_command(
             inst1['uuid'],
-            f'getent ahostsv4 test-provided-dns-2.{self.namespace} || true')
+            f'getent ahostsv4 test-provided-dns-2.{self.namespace}.bonkerslab || true')
+        self.assertEquals(0, ec)
         if data.find(address2) == -1:
             self.fail(
                 f'Did not find address "{address2}" for instance 1 at '
-                f'test-provided-dns-2.{self.namespace} via getent ahostsv4 '
+                f'test-provided-dns-2.{self.namespace}.bonkerslab via getent ahostsv4 '
                 f'output:\n\n{data}')

@@ -98,7 +98,8 @@ class ManagedExecutable(dbo):
 
     def subst_dict(self):
         return {
-            'config_dir': self.config_directory
+            'config_dir': self.config_directory,
+            'namespace': self.namespace
         }
 
     def get_pid(self):

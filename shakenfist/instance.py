@@ -1045,7 +1045,8 @@ class Instance(dbo):
                         'id': f'{iface.network_uuid}-{iface.order}',
                         'link': devname,
                         'type': 'ipv4',
-                        'network_id': iface.network_uuid
+                        'network_id': iface.network_uuid,
+                        'dns_search': f'{self.namespace}.{config.ZONE}'
                     }
                 )
 
