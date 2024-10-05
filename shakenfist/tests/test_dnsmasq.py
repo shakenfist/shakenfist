@@ -118,8 +118,8 @@ class DnsMasqTestCase(testtools.TestCase):
                 f'interface={d.interface}',
                 'listen-address=10.0.0.1',
                 '',
-                'domain=shakenfist',
-                'local=/shakenfist/',
+                'domain=unittest.shakenfist',
+                'local=/unittest.shakenfist/',
                 f'dhcp-leasefile={TEST_DIR}/files/dhcp/{network_uuid}/leases',
                 f'dhcp-range={d.interface},10.0.0.2,static,255.0.0.0,10.255.255.255,1h',
                 f'dhcp-option={d.interface},1,255.0.0.0',
@@ -163,8 +163,8 @@ class DnsMasqTestCase(testtools.TestCase):
                 f'interface={d.interface}',
                 'listen-address=10.0.0.1',
                 '',
-                'domain=shakenfist',
-                'local=/shakenfist/'
+                'domain=unittest.shakenfist',
+                'local=/unittest.shakenfist/'
             ])
         )
 
@@ -229,8 +229,8 @@ class DnsMasqTestCase(testtools.TestCase):
                 f'interface={d.interface}',
                 'listen-address=10.0.0.1',
                 '',
-                'domain=shakenfist',
-                'local=/shakenfist/',
+                'domain=unittest.shakenfist',
+                'local=/unittest.shakenfist/',
                 f'dhcp-leasefile={TEST_DIR}/files/dhcp/{network_uuid}/leases',
                 f'dhcp-range={d.interface},10.0.0.2,static,255.0.0.0,10.255.255.255,1h',
                 f'dhcp-option={d.interface},1,255.0.0.0',

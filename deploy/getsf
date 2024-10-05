@@ -562,8 +562,10 @@ question_end
 
 question_start
 echo "What should this deployment be called? This name is used"
-echo "for Prometheus metrics labels, as well as being visible to"
-echo "end users via API and DNS."
+echo "for Prometheus metrics labels, the OU for the TLS CA,"
+echo "as well as being visible to end users via API and DNS."
+echo "This includes it being used as the DNS domain for within"
+echo "virtual networks if DNS services are enabled."
 echo
 if [ -z ${GETSF_DEPLOY_NAME} ]; then
     echo -n "(a single word name) >> "

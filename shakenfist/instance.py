@@ -1019,14 +1019,10 @@ class Instance(dbo):
         nd = {
             'links': [],
             'networks': [],
-            'services': [
-                {
-                    'address': config.DNS_SERVER,
-                    'type': 'dns'
-                }
-            ]
+            'services': []
         }
 
+        have_dns_server = False
         have_default_route = False
         for iface_uuid in self.interfaces:
             iface = networkinterface.NetworkInterface.from_db(iface_uuid)
@@ -1049,7 +1045,8 @@ class Instance(dbo):
                         'id': f'{iface.network_uuid}-{iface.order}',
                         'link': devname,
                         'type': 'ipv4',
-                        'network_id': iface.network_uuid
+                        'network_id': iface.network_uuid,
+                        'dns_search': f'{self.namespace}.{config.ZONE}'
                     }
                 )
 
@@ -1071,6 +1068,20 @@ class Instance(dbo):
                     ]
                 })
                 have_default_route = True
+
+            # Do we have a DNS server?
+            if n.provide_dns:
+                nd['services'].append({
+                    'address': str(n.router),
+                    'type': 'dns'
+                })
+                have_dns_server = True
+
+        if not have_dns_server:
+            nd['services'].append({
+                'address': config.DNS_SERVER,
+                'type': 'dns'
+            })
 
         nd_encoded = json.dumps(nd).encode('ascii')
         iso.add_fp(io.BytesIO(nd_encoded), len(nd_encoded),

@@ -10,6 +10,7 @@ SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
 SHAKENFIST_NODE_MESH_IP="{{node_mesh_ip}}"
 SHAKENFIST_NODE_MESH_NIC="{{node_mesh_nic}}"
 SHAKENFIST_NODE_NAME="{{node_name}}"
+SHAKENFIST_ZONE="{{deploy_name}}"
 
 {% if inventory_hostname in groups['etcd_master'] %}
 SHAKENFIST_NODE_IS_ETCD_MASTER=True

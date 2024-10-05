@@ -251,7 +251,9 @@ class SFConfig(BaseSettings):
         'shakenfist',
         description=('What nova called an availability zone. Note that this '
                      'value is also used as the issuer name for JWT authentication '
-                     'tokens and should be unique to each Shaken Fist cluster.')
+                     'tokens and should be unique to each Shaken Fist cluster. '
+                     'This value is also used as the DNS domain for DNS within '
+                     'virtual networks.')
     )
 
     #################
