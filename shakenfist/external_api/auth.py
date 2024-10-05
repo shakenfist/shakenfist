@@ -6,22 +6,25 @@
 #        - and link to OpenAPI docs: yes
 #        - and include examples: yes
 #   - Has complete CI coverage: yes
-
 import base64
+
 import bcrypt
 import flask
-from flask_jwt_extended import get_jwt_identity
 from flasgger import swag_from
-from shakenfist_utilities import api as sf_api, logs
+from flask_jwt_extended import get_jwt_identity
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
 
 from shakenfist import artifact
+from shakenfist import instance
+from shakenfist import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
-from shakenfist import instance
-from shakenfist.namespace import Namespace, Namespaces, namespace_is_trusted
-from shakenfist import network
+from shakenfist.namespace import Namespace
+from shakenfist.namespace import namespace_is_trusted
+from shakenfist.namespace import Namespaces
 from shakenfist.util import access_tokens
 
 
