@@ -6,50 +6,51 @@
 #        - and link to OpenAPI docs: yes
 #        - and include examples: yes
 #   - Has complete CI coverage:
-
-from collections import defaultdict
-from functools import partial
-import flask
-from flask_jwt_extended import get_jwt_identity
-from flasgger import swag_from
 import os
 import re
-from shakenfist_utilities import api as sf_api, logs
-import symbolicmode
 import uuid
+from collections import defaultdict
+from functools import partial
 
-from shakenfist.agentoperation import AgentOperation
-from shakenfist.artifact import (
-    Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL, UPLOAD_URL)
+import flask
+import symbolicmode
+from flasgger import swag_from
+from flask_jwt_extended import get_jwt_identity
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
+
 from shakenfist import baseobject
-from shakenfist.blob import Blob
-from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.config import config
-from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
-from shakenfist.external_api import (
-    agentoperation as api_agentoperation,
-    base as api_base,
-    util as api_util)
 from shakenfist import instance
 from shakenfist import ipam
-from shakenfist.namespace import namespace_is_trusted
 from shakenfist import network as sfnet
+from shakenfist import scheduler
+from shakenfist.agentoperation import AgentOperation
+from shakenfist.artifact import Artifact
+from shakenfist.artifact import BLOB_URL
+from shakenfist.artifact import LABEL_URL
+from shakenfist.artifact import SNAPSHOT_URL
+from shakenfist.artifact import UPLOAD_URL
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.blob import Blob
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.daemons import daemon
+from shakenfist.external_api import agentoperation as api_agentoperation
+from shakenfist.external_api import base as api_base
+from shakenfist.external_api import util as api_util
+from shakenfist.namespace import namespace_is_trusted
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
-from shakenfist import scheduler
-from shakenfist.tasks import (
-    DeleteInstanceTask,
-    FetchImageTask,
-    PreflightInstanceTask,
-    StartInstanceTask,
-    FloatNetworkInterfaceTask,
-    PreflightAgentOperationTask,
-    HotPlugInstanceInterfaceTask
-)
+from shakenfist.tasks import DeleteInstanceTask
+from shakenfist.tasks import FetchImageTask
+from shakenfist.tasks import FloatNetworkInterfaceTask
+from shakenfist.tasks import HotPlugInstanceInterfaceTask
+from shakenfist.tasks import PreflightAgentOperationTask
+from shakenfist.tasks import PreflightInstanceTask
+from shakenfist.tasks import StartInstanceTask
 from shakenfist.util import general as util_general
 
 

@@ -1,18 +1,20 @@
-from collections import defaultdict
-from etcd3gw.lock import Lock
-from functools import partial
 import json
-from math import inf
-from oslo_concurrency import lockutils
 import time
+from collections import defaultdict
+from functools import partial
+from math import inf
+
+from etcd3gw.lock import Lock
+from oslo_concurrency import lockutils
 from shakenfist_utilities import logs
 
 from shakenfist import cache
 from shakenfist import constants
-from shakenfist.constants import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 

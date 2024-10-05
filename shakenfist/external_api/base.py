@@ -1,19 +1,22 @@
-import flask
-from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
-from flask_jwt_extended.exceptions import NoAuthorizationError
 import json
+
+import flask
 import requests
-from shakenfist_utilities import api as sf_api, logs
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import verify_jwt_in_request
+from flask_jwt_extended.exceptions import NoAuthorizationError
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
 
-
+from shakenfist import exceptions
+from shakenfist import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
-from shakenfist import exceptions
 from shakenfist.instance import Instance
-from shakenfist.namespace import Namespace, get_api_token
-from shakenfist import network
+from shakenfist.namespace import get_api_token
+from shakenfist.namespace import Namespace
 from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
 
