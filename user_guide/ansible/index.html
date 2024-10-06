@@ -1768,6 +1768,10 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <td>Whether to provide DHCP services on the network. Defaults to <code>true</code>. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network.</td>
 </tr>
 <tr>
+<td>dns<br/><em>boolean</em></td>
+<td>Whether to provide DNS services on the network. Defaults to <code>false</code>. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network.</td>
+</tr>
+<tr>
 <td>name<br/><em>string</em></td>
 <td>The name of the network. Either <code>name</code> or <code>uuid</code> must be included in all requests. When both <code>name</code> and <code>uuid</code> are specified, <code>uuid</code> is used for existing resource lookups. If a network is identified by its <code>uuid</code>, then the network will be recreated if you specify a <code>name</code> which does not match the network in the Shaken Fist cluster.</td>
 </tr>
