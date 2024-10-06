@@ -126,6 +126,7 @@ Delete a network:
 | **Parameter** | **Comments** |
 |---|---|
 | dhcp<br/>*boolean* | Whether to provide DHCP services on the network. Defaults to `true`. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network. |
+| dns<br/>*boolean* | Whether to provide DNS services on the network. Defaults to `false`. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network. |
 | name<br/>*string* | The name of the network. Either `name` or `uuid` must be included in all requests. When both `name` and `uuid` are specified, `uuid` is used for existing resource lookups. If a network is identified by its `uuid`, then the network will be recreated if you specify a `name` which does not match the network in the Shaken Fist cluster. |
 | nat<br/>*boolean* | Whether to provide NAT services on the network. Defaults to `true`. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network. |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
