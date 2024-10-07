@@ -1,3 +1,6 @@
+# dnsmasq configuration is documented at
+# https://thekelleys.org.uk/dnsmasq/docs/setup.html
+
 domain-needed    # Do not forward DNS lookups for unqualified names
 bogus-priv       # Do not forward DNS lookups for RFC1918 blocks
 no-hosts         # Do not use /etc/hosts
@@ -9,14 +12,8 @@ port=53          # Enable DNS
 server={{dns_server}}
 addn-hosts={{config_dir}}/dnshosts
 expand-hosts
-{%- if provide_dhcp %}
-dhcp-option={{interface}},6,{{router}}
-{%- endif %}
 {%- else %}
 port=0           # Disable DNS
-{%- if provide_nat and provide_dhcp %}
-dhcp-option={{interface}},6,{{dns_server}}
-{%- endif %}
 {%- endif %}
 
 pid-file={{config_dir}}/pid
@@ -30,8 +27,17 @@ local=/{{zone}}/
 {%- if provide_dhcp %}
 dhcp-leasefile={{config_dir}}/leases
 dhcp-range={{interface}},{{dhcp_start}},static,{{netmask}},{{broadcast}},1h
+
+# DHCP options are documented at
+# https://blog.abysm.org/2020/06/human-readable-dhcp-options-for-dnsmasq/
+{% if provide_dns %}
+dhcp-option={{interface}},6,{{router}}
+{% elif provide_nat %}
+dhcp-option={{interface}},6,{{dns_server}}
+{% endif %}
+
 dhcp-option={{interface}},1,{{netmask}}
-dhcp-option={{interface}},15,{{zone}}
+dhcp-option={{interface}},15,{{namespace}}.{{zone}}
 dhcp-option={{interface}},26,{{mtu}}
 dhcp-hostsfile={{config_dir}}/hosts
 {%- endif %}
