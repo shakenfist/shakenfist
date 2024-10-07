@@ -1,11 +1,20 @@
+# dnsmasq configuration is documented at
+# https://thekelleys.org.uk/dnsmasq/docs/setup.html
+
 domain-needed    # Do not forward DNS lookups for unqualified names
 bogus-priv       # Do not forward DNS lookups for RFC1918 blocks
 no-hosts         # Do not use /etc/hosts
 no-resolv        # Do not use /etc/resolv.conf
 filterwin2k      # Filter weird windows 2000 queries
 
-# Disable DNS
-port=0
+{%- if provide_dns %}
+port=53          # Enable DNS
+server={{dns_server}}
+addn-hosts={{config_dir}}/dnshosts
+expand-hosts
+{%- else %}
+port=0           # Disable DNS
+{%- endif %}
 
 pid-file={{config_dir}}/pid
 dhcp-leasefile={{config_dir}}/leases
@@ -17,11 +26,16 @@ domain={{zone}}
 local=/{{zone}}/
 
 dhcp-range={{interface}},{{dhcp_start}},static,{{netmask}},{{broadcast}},1h
-dhcp-option={{interface}},1,{{netmask}}
-{% if provide_nat %}
-dhcp-option={{interface}},3,{{router}}
+
+# DHCP options are documented at
+# https://blog.abysm.org/2020/06/human-readable-dhcp-options-for-dnsmasq/
+{% if provide_dns %}
+dhcp-option={{interface}},6,{{router}}
+{% elif provide_nat %}
 dhcp-option={{interface}},6,{{dns_server}}
 {% endif %}
-dhcp-option={{interface}},15,{{zone}}
+
+dhcp-option={{interface}},1,{{netmask}}
+dhcp-option={{interface}},15,{{namespace}}.{{zone}}
 dhcp-option={{interface}},26,{{mtu}}
 dhcp-hostsfile={{config_dir}}/hosts
