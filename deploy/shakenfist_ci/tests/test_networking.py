@@ -424,13 +424,13 @@ class TestNetworking(base.BaseNamespacedTestCase):
         # distro, whereas host and nslookup are not.
         ec, data = self.test_client.await_agent_command(
             inst1['uuid'], 'getent hosts 8.8.8.8')
-        self.assertEquals(0, ec)
+        self.assertEqual(0, ec)
         self.assertTrue(data.find('dns.google') != -1)
 
         # Do a DNS lookup for google
         ec, data = self.test_client.await_agent_command(
             inst1['uuid'], 'getent ahostsv4 www.google.com || true')
-        self.assertEquals(0, ec)
+        self.assertEqual(0, ec)
         if data.find('www.google.com') == -1:
             self.fail(
                 f'Did not find "www.google.com" in getent output:\n\n{data}')
@@ -438,7 +438,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         # Do a DNS lookup for an internal address.
         ec, data = self.test_client.await_agent_command(
             inst1['uuid'], f'getent hosts {address1} || true')
-        self.assertEquals(0, ec)
+        self.assertEqual(0, ec)
         if data.find('test-provided-dns') == -1:
             self.fail(
                 f'Did not find address "test-provided-dns" for instance 1 at '
@@ -448,7 +448,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         ec, data = self.test_client.await_agent_command(
             inst1['uuid'],
             f'getent ahostsv4 test-provided-dns.{self.namespace}.bonkerslab || true')
-        self.assertEquals(0, ec)
+        self.assertEqual(0, ec)
         if data.find(address1) == -1:
             self.fail(
                 f'Did not find address "{address1}" for instance 1 at '
@@ -459,7 +459,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         ec, data = self.test_client.await_agent_command(
             inst1['uuid'],
             f'getent ahostsv4 test-provided-dns-2.{self.namespace}.bonkerslab || true')
-        self.assertEquals(0, ec)
+        self.assertEqual(0, ec)
         if data.find(address2) == -1:
             self.fail(
                 f'Did not find address "{address2}" for instance 1 at '

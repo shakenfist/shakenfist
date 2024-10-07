@@ -8,37 +8,36 @@
 # which exist inside an expected exception block, otherwise we'll log a stray   #
 # traceback.                                                                    #
 #################################################################################
-
 # To run a local test API, use this command line:
 #     SHAKENFIST_ETCD_HOST=localhost flask --app shakenfist.external_api.app:app --debug run
-
 import base64
+import json
+
+import flasgger
 import flask
+import flask_restful
 from flask_jwt_extended import JWTManager
 from flask_request_id import RequestID
-import flask_restful
-import flasgger
-import json
 from pbr.version import VersionInfo
-from shakenfist_utilities import api as sf_api, logs
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
 
-from shakenfist.config import config
 from shakenfist import constants
-from shakenfist.daemons import daemon
 from shakenfist import eventlog
-from shakenfist.external_api import (
-    admin as api_admin,
-    agentoperation as api_agentoperation,
-    auth as api_auth,
-    blob as api_blob,
-    artifact as api_artifact,
-    interface as api_interface,
-    instance as api_instance,
-    label as api_label,
-    network as api_network,
-    node as api_node,
-    snapshot as api_snapshot,
-    upload as api_upload)
+from shakenfist.config import config
+from shakenfist.daemons import daemon
+from shakenfist.external_api import admin as api_admin
+from shakenfist.external_api import agentoperation as api_agentoperation
+from shakenfist.external_api import artifact as api_artifact
+from shakenfist.external_api import auth as api_auth
+from shakenfist.external_api import blob as api_blob
+from shakenfist.external_api import instance as api_instance
+from shakenfist.external_api import interface as api_interface
+from shakenfist.external_api import label as api_label
+from shakenfist.external_api import network as api_network
+from shakenfist.external_api import node as api_node
+from shakenfist.external_api import snapshot as api_snapshot
+from shakenfist.external_api import upload as api_upload
 
 
 LOG, HANDLER = logs.setup(__name__)

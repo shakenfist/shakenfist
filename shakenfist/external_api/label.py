@@ -6,13 +6,18 @@
 #        - and link to OpenAPI docs:
 #        - and include examples:
 #   - Has complete CI coverage:
-
 from functools import partial
-from flask_jwt_extended import get_jwt_identity
-from flasgger import swag_from
-from shakenfist_utilities import api as sf_api, logs
 
-from shakenfist.artifact import Artifact, Artifacts, LABEL_URL, type_filter, url_filter
+from flasgger import swag_from
+from flask_jwt_extended import get_jwt_identity
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
+
+from shakenfist.artifact import Artifact
+from shakenfist.artifact import Artifacts
+from shakenfist.artifact import LABEL_URL
+from shakenfist.artifact import type_filter
+from shakenfist.artifact import url_filter
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.constants import EVENT_TYPE_AUDIT

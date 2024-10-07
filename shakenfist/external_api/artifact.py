@@ -6,33 +6,37 @@
 #        - and link to OpenAPI docs: yes
 #        - and include examples: yes
 #   - Has complete CI coverage:
-
-import flask
-from flask_jwt_extended import get_jwt_identity
-from flasgger import swag_from
-from functools import partial
 import json
 import os
-import requests
-from shakenfist_utilities import api as sf_api, logs
 import shutil
 import time
 import uuid
+from functools import partial
 
-from shakenfist.artifact import (
-    Artifact, Artifacts, UPLOAD_URL, namespace_exact_filter,
-    namespace_or_shared_filter)
-from shakenfist.blob import Blob
+import flask
+import requests
+from flasgger import swag_from
+from flask_jwt_extended import get_jwt_identity
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
+
 from shakenfist import constants
+from shakenfist import etcd
+from shakenfist import eventlog
+from shakenfist import exceptions
+from shakenfist.artifact import Artifact
+from shakenfist.artifact import Artifacts
+from shakenfist.artifact import namespace_exact_filter
+from shakenfist.artifact import namespace_or_shared_filter
+from shakenfist.artifact import UPLOAD_URL
+from shakenfist.blob import Blob
+from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
-from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
-from shakenfist.config import config
-from shakenfist import etcd
-from shakenfist import exceptions
 from shakenfist.instance import instance_usage_for_blob_uuid
-from shakenfist.namespace import get_api_token, namespace_is_trusted
+from shakenfist.namespace import get_api_token
+from shakenfist.namespace import namespace_is_trusted
 from shakenfist.tasks import FetchImageTask
 from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
