@@ -5,16 +5,15 @@
 #        - and link to OpenAPI docs: yes
 #        - and include examples: yes
 #   - Has complete CI coverage:
-
-from flasgger import swag_from
-import flask
 import os
+
+import flask
+from flasgger import swag_from
 from shakenfist_utilities import api as sf_api
 
-
 from shakenfist import etcd
-from shakenfist.external_api import base as api_base
 from shakenfist import scheduler
+from shakenfist.external_api import base as api_base
 
 
 admin_locks_get_example = """{
