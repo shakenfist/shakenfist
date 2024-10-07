@@ -384,13 +384,21 @@ class TestNetworking(base.BaseNamespacedTestCase):
         # Wait for the instance agent to report in
         self._await_instance_ready(inst1['uuid'])
 
-        # Ensure the gateway is not set as the DNS server in /etc/resolv.conf
-        data = self.test_client.await_agent_fetch(
-            inst1['uuid'], '/etc/resolv.conf')
+        # Ensure the gateway is not set as the DNS server in /etc/resolv.conf.
+        # Debian 12 uses resolvectl not /etc/resolv.conf
+        _, data = self.test_client.await_agent_command(
+            inst1['uuid'], 'resolvectl status')
         if data.find('192.168.242.1') != -1:
             self.fail(
-                '/etc/resolv.conf should not have the gateway set as the '
+                '"resolvectl status" should not have the gateway set as the '
                 f'DNS address:\n\n{data}')
+        if data.find('8.8.8.8') == -1:
+            self.fail(
+                '"resolvectl status" should have 8.8.8.8 set as the '
+                f'DNS address:\n\n{data}')
+
+        data = self.test_client.await_agent_fetch(
+            inst1['uuid'], '/etc/resolv.conf')
         if data.find(f'{self.namespace}.bonkerslab') != -1:
             self.fail(
                 '/etc/resolv.conf should not have the namespace set as the '
@@ -400,8 +408,11 @@ class TestNetworking(base.BaseNamespacedTestCase):
         _, data = self.test_client.await_agent_command(
             inst1['uuid'], 'grep WARNING /var/log/cloud-init.log || true')
         if data.find('WARNING') != -1:
+            _, schema_warnings = self.test_client.await_agent_command(
+                inst1['uuid'], 'cloud-init schema --system || true')
             self.fail(
-                f'cloud-init.log contained warnings:\n\n{data}')
+                f'cloud-init.log contained warnings:\n\n{data}\n\n'
+                f'"cloud-init schema --system" says:\n\n{schema_warnings}')
 
         # Do a DNS lookup for google
         ec, data = self.test_client.await_agent_command(
