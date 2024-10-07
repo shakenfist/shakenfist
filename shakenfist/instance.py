@@ -1045,10 +1045,14 @@ class Instance(dbo):
                         'id': f'{iface.network_uuid}-{iface.order}',
                         'link': devname,
                         'type': 'ipv4',
-                        'network_id': iface.network_uuid,
-                        'dns_search': f'{self.namespace}.{config.ZONE}'
+                        'network_id': iface.network_uuid
                     }
                 )
+
+                if n.provide_dns:
+                    nd['networks'][-1].update({
+                        'dns_search': [f'{self.namespace}.{config.ZONE}']
+                    })
 
                 nd['networks'][-1].update({
                     'ip_address': iface.ipv4,

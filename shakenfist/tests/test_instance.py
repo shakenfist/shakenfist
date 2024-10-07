@@ -276,7 +276,6 @@ class InstanceTestCase(base.ShakenFistTestCase):
                             ],
                             'networks': [
                                 {
-                                    'dns_search': 'unittest.sfzone',
                                     'id': '%s-0' % network_uuid,
                                     'ip_address': '127.0.0.5',
                                           'link': 'eth0',
@@ -288,7 +287,6 @@ class InstanceTestCase(base.ShakenFistTestCase):
                                           'type': 'ipv4'
                                 },
                                 {
-                                    'dns_search': 'unittest.sfzone',
                                     'id': '%s-1' % network_uuid,
                                     'ip_address': '127.0.0.6',
                                     'link': 'eth1',

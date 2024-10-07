@@ -216,6 +216,9 @@ jobs:
               '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11 --shared'
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} \
+              '. /etc/sf/sfrc; sf-client artifact upload debian-12 /srv/ci/debian:12 --shared'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} \
               '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros --shared'
 
       - name: Create a base level of activity in the cluster
