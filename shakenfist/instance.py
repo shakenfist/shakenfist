@@ -1005,15 +1005,22 @@ class Instance(dbo):
                    rr_name='meta_data.json',
                    joliet_path='/openstack/2017-02-22/meta_data.json')
 
-        # user_data
+        # user_data: we used to only write this if there was some user data
+        # specified, but that reports a schema error with cloud-init like this:
+        #
+        # Cloud config schema errors: format-l1.c1: File None needs to begin
+        # with "#cloud-config"
         if self.user_data:
             user_data = base64.b64decode(self.user_data)
-            iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/latest/user_data',
-                       rr_name='user_data',
-                       joliet_path='/openstack/latest/user_data.json')
-            iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/2017-02-22/user_data',
-                       rr_name='user_data',
-                       joliet_path='/openstack/2017-02-22/user_data.json')
+        else:
+            user_data = '#cloud-config\n'.encode('utf-8')
+
+        iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/latest/user_data',
+                   rr_name='user_data',
+                   joliet_path='/openstack/latest/user_data.json')
+        iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/2017-02-22/user_data',
+                   rr_name='user_data',
+                   joliet_path='/openstack/2017-02-22/user_data.json')
 
         # network_data.json
         nd = {
