@@ -411,15 +411,22 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 '/etc/resolv.conf did not have the namespace set as the '
                 f'DNS search domain:\n\n{data}')
 
-        # Ensure cloud-init didn't report any warnings
+        # Ensure cloud-init didn't report any warnings. This is annoying because
+        # cloud-init treats not having user data as a warning even though it
+        # isn't a schema error. https://github.com/canonical/cloud-init/issues/5803
+        # asserts that v23.4 fixes this so maybe one day I can remove this hack.
         _, data = self.test_client.await_agent_command(
-            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log || true')
+            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log 2>&1 || true')
         if data.find('WARNING') != -1:
             _, schema_warnings = self.test_client.await_agent_command(
-                inst1['uuid'], 'cloud-init schema --system || true')
-            self.fail(
-                f'cloud-init.log contained warnings:\n\n{data}\n\n'
-                f'"cloud-init schema --system" says:\n\n{schema_warnings}')
+                inst1['uuid'], 'cloud-init schema --system 2>&1 || true')
+            for line in schema_warnings.split('\n'):
+                if line.find('File None needs to begin with "#cloud-config"') != -1:
+                    pass
+                elif line.find('schema error') != -1:
+                    self.fail(
+                        f'cloud-init.log contained warnings:\n\n{data}\n\n'
+                        f'"cloud-init schema --system" says:\n\n{schema_warnings}')
 
         # Lookup our addresses
         nics = self.test_client.get_instance_interfaces(inst1['uuid'])
@@ -507,15 +514,22 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 '/etc/resolv.conf should not have the namespace set as the '
                 f'DNS search domain:\n\n{data}')
 
-        # Ensure cloud-init didn't report any warnings
+        # Ensure cloud-init didn't report any warnings. This is annoying because
+        # cloud-init treats not having user data as a warning even though it
+        # isn't a schema error. https://github.com/canonical/cloud-init/issues/5803
+        # asserts that v23.4 fixes this so maybe one day I can remove this hack.
         _, data = self.test_client.await_agent_command(
-            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log || true')
+            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log 2>&1 || true')
         if data.find('WARNING') != -1:
             _, schema_warnings = self.test_client.await_agent_command(
-                inst1['uuid'], 'cloud-init schema --system || true')
-            self.fail(
-                f'cloud-init.log contained warnings:\n\n{data}\n\n'
-                f'"cloud-init schema --system" says:\n\n{schema_warnings}')
+                inst1['uuid'], 'cloud-init schema --system 2>&1 || true')
+            for line in schema_warnings.split('\n'):
+                if line.find('File None needs to begin with "#cloud-config"') != -1:
+                    pass
+                elif line.find('schema error') != -1:
+                    self.fail(
+                        f'cloud-init.log contained warnings:\n\n{data}\n\n'
+                        f'"cloud-init schema --system" says:\n\n{schema_warnings}')
 
         # Do a DNS lookup for google
         ec, data = self.test_client.await_agent_command(
@@ -565,15 +579,22 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 '/etc/resolv.conf should have the namespace set as the '
                 f'DNS search domain:\n\n{data}')
 
-        # Ensure cloud-init didn't report any warnings
+        # Ensure cloud-init didn't report any warnings. This is annoying because
+        # cloud-init treats not having user data as a warning even though it
+        # isn't a schema error. https://github.com/canonical/cloud-init/issues/5803
+        # asserts that v23.4 fixes this so maybe one day I can remove this hack.
         _, data = self.test_client.await_agent_command(
-            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log || true')
+            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log 2>&1 || true')
         if data.find('WARNING') != -1:
             _, schema_warnings = self.test_client.await_agent_command(
-                inst1['uuid'], 'cloud-init schema --system || true')
-            self.fail(
-                f'cloud-init.log contained warnings:\n\n{data}\n\n'
-                f'"cloud-init schema --system" says:\n\n{schema_warnings}')
+                inst1['uuid'], 'cloud-init schema --system 2>&1 || true')
+            for line in schema_warnings.split('\n'):
+                if line.find('File None needs to begin with "#cloud-config"') != -1:
+                    pass
+                elif line.find('schema error') != -1:
+                    self.fail(
+                        f'cloud-init.log contained warnings:\n\n{data}\n\n'
+                        f'"cloud-init schema --system" says:\n\n{schema_warnings}')
 
         # Lookup our addresses
         nics = self.test_client.get_instance_interfaces(inst1['uuid'])
@@ -654,15 +675,22 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 '/etc/resolv.conf should not have the namespace set as the '
                 f'DNS search domain:\n\n{data}')
 
-        # Ensure cloud-init didn't report any warnings
+        # Ensure cloud-init didn't report any warnings. This is annoying because
+        # cloud-init treats not having user data as a warning even though it
+        # isn't a schema error. https://github.com/canonical/cloud-init/issues/5803
+        # asserts that v23.4 fixes this so maybe one day I can remove this hack.
         _, data = self.test_client.await_agent_command(
-            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log || true')
+            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log 2>&1 || true')
         if data.find('WARNING') != -1:
             _, schema_warnings = self.test_client.await_agent_command(
-                inst1['uuid'], 'cloud-init schema --system || true')
-            self.fail(
-                f'cloud-init.log contained warnings:\n\n{data}\n\n'
-                f'"cloud-init schema --system" says:\n\n{schema_warnings}')
+                inst1['uuid'], 'cloud-init schema --system 2>&1 || true')
+            for line in schema_warnings.split('\n'):
+                if line.find('File None needs to begin with "#cloud-config"') != -1:
+                    pass
+                elif line.find('schema error') != -1:
+                    self.fail(
+                        f'cloud-init.log contained warnings:\n\n{data}\n\n'
+                        f'"cloud-init schema --system" says:\n\n{schema_warnings}')
 
         # Do a DNS lookup for google
         ec, data = self.test_client.await_agent_command(
