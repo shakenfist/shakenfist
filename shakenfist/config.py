@@ -230,6 +230,13 @@ class SFConfig(BaseSettings):
         3600 * 24 * 90, description='How long to retain historic events.'
     )
 
+    MAX_API_REQUEST_EVENT_AGE: int = Field(
+        3600 * 24, description=(
+            'How long to retain events for the api-request object type. These '
+            'events are very verbose, so are special cased for cleanup.'
+        )
+    )
+
     # Blob options
     BLOB_REPLICATION_FACTOR: int = Field(
         2, description='How many copies of each blob we like to have.'

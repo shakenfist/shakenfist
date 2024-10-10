@@ -203,7 +203,7 @@ class EventLog:
             elc.write_event(event_type, timestamp, fqdn, duration, message,
                             extra=extra)
             return True
-        except sqlite3.DatabaseError as e:
+        except (sqlite3.DatabaseError, exceptions.CorruptEventChunk) as e:
             if str(e) == 'database is locked':
                 return False
 
@@ -267,7 +267,7 @@ class EventLog:
                 if limit > 0 and count >= limit:
                     break
 
-            except sqlite3.DatabaseError as e:
+            except (sqlite3.DatabaseError, exceptions.CorruptEventChunk) as e:
                 self.log.with_fields({
                     'chunk': '%04d%02d' % (year, month),
                     'error': e
@@ -318,7 +318,7 @@ class EventLog:
                                 % (year, month))
                     else:
                         elc.close()
-                except sqlite3.DatabaseError as e:
+                except (sqlite3.DatabaseError, exceptions.CorruptEventChunk) as e:
                     self.log.with_fields({
                         'chunk': '%04d%02d' % (year, month),
                         'error': e
@@ -384,7 +384,12 @@ class EventLogChunk:
         else:
             # Open an existing database, which _might_ require upgrade
             cur.execute('SELECT * FROM version')
-            ver = cur.fetchone()['version']
+            row = cur.fetchone()
+            if not row:
+                raise exceptions.CorruptEventChunk('No version rows')
+            ver = dict(row).get('version')
+            if not ver:
+                raise exceptions.CorruptEventChunk('No version recorded')
             start_ver = ver
 
             if ver == 1:

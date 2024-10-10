@@ -266,3 +266,7 @@ class EventException(Exception):
 
 class InvalidEventType(EventException):
     ...
+
+
+class CorruptEventChunk(EventException):
+    ...

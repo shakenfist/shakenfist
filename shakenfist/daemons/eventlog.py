@@ -196,6 +196,12 @@ class Monitor(daemon.WorkerPoolDaemon):
                                     if max_age == -1:
                                         continue
 
+                                    # API requests are super verbose, so we can
+                                    # also prune them especially vigorously.
+                                    if objtype == 'api-request':
+                                        max_age = max(
+                                            max_age, config.MAX_API_REQUEST_EVENT_AGE)
+
                                     c = eventdb.prune_old_events(
                                         time.time() - max_age, event_type)
                                     self.counters['pruned_events'].inc(c)
