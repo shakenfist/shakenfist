@@ -6,17 +6,18 @@
 #        - and link to OpenAPI docs:
 #        - and include examples:
 #   - Has complete CI coverage:
+import os
+import uuid
 
 import flask
 from flasgger import swag_from
-import os
-from shakenfist_utilities import api as sf_api, logs
-import uuid
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
 
+from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
-from shakenfist.config import config
 from shakenfist.upload import Upload
 
 

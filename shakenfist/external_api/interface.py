@@ -6,20 +6,18 @@
 #        - and link to OpenAPI docs: yes
 #        - and include examples: yes
 #   - Has complete CI coverage:
-
 from flasgger import swag_from
-from shakenfist_utilities import api as sf_api, logs
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
 
-from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist.external_api import (
-    base as api_base,
-    util as api_util)
-from shakenfist.tasks import (
-    DefloatNetworkInterfaceTask,
-    FloatNetworkInterfaceTask)
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.daemons import daemon
+from shakenfist.external_api import base as api_base
+from shakenfist.external_api import util as api_util
+from shakenfist.tasks import DefloatNetworkInterfaceTask
+from shakenfist.tasks import FloatNetworkInterfaceTask
 
 
 LOG, HANDLER = logs.setup(__name__)
