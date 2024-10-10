@@ -6,15 +6,15 @@
 #        - and link to OpenAPI docs: yes
 #        - and include examples: yes
 #   - Has complete CI coverage:
-
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api
 
-from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist import eventlog
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.external_api import base as api_base
-from shakenfist.node import Node, Nodes
+from shakenfist.node import Node
+from shakenfist.node import Nodes
 
 
 node_get_example = """{
