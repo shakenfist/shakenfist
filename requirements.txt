@@ -68,7 +68,7 @@ importlib-metadata==8.5.0
 iters==0.18.0
 itsdangerous==2.2.0
 linux-utils==0.7
-MarkupSafe==3.0.0
+MarkupSafe==3.0.1
 marshmallow==3.22.0
 mistune==3.0.2
 mixed-methods==1.1.1
