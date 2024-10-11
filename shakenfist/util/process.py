@@ -42,17 +42,31 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
         LOG.info('Executing %s with locks %s', command, locks)
 
     if not locks:
-        return processutils.execute(
+        start_time = time.time()
+        stdout, stderr = processutils.execute(
             command, check_exit_code=check_exit_code,
             env_variables=env_variables, shell=True, cwd=cwd)
+        LOG.with_fields({
+            'stdout': stdout,
+            'stderr': stderr,
+            'execution_time': time.time() - start_time
+            }).debug('Command output')
+        return stdout, stderr
 
     else:
         p = fork(_lock_refresher, [locks], 'lock-refresher')
 
         try:
-            return processutils.execute(
+            start_time = time.time()
+            stdout, stderr = processutils.execute(
                 command, check_exit_code=check_exit_code,
                 env_variables=env_variables, shell=True)
+            LOG.with_fields({
+                'stdout': stdout,
+                'stderr': stderr,
+                'execution_time': time.time() - start_time
+                }).debug('Command output')
+            return stdout, stderr
         finally:
             p.kill()
             p.join()
