@@ -399,18 +399,6 @@ class TestNetworking(base.BaseNamespacedTestCase):
         # Wait for the instance agent to report in
         self._await_instance_ready(inst1['uuid'])
 
-        # Ensure the gateway is set as the DNS server in /etc/resolv.conf
-        data = self.test_client.await_agent_fetch(
-            inst1['uuid'], '/etc/resolv.conf')
-        if data.find('192.168.242.1') == -1:
-            self.fail(
-                '/etc/resolv.conf did not have the gateway set as the '
-                f'DNS address:\n\n{data}')
-        if data.find(f'{self.namespace}.bonkerslab') == -1:
-            self.fail(
-                '/etc/resolv.conf did not have the namespace set as the '
-                f'DNS search domain:\n\n{data}')
-
         # Ensure cloud-init didn't report any warnings. This is annoying because
         # cloud-init treats not having user data as a warning even though it
         # isn't a schema error. https://github.com/canonical/cloud-init/issues/5803
@@ -427,6 +415,18 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     self.fail(
                         f'cloud-init.log contained warnings:\n\n{data}\n\n'
                         f'"cloud-init schema --system" says:\n\n{schema_warnings}')
+
+        # Ensure the gateway is set as the DNS server in /etc/resolv.conf
+        data = self.test_client.await_agent_fetch(
+            inst1['uuid'], '/etc/resolv.conf')
+        if data.find('192.168.242.1') == -1:
+            self.fail(
+                '/etc/resolv.conf did not have the gateway set as the '
+                f'DNS address:\n\n{data}')
+        if data.find(f'{self.namespace}.bonkerslab') == -1:
+            self.fail(
+                '/etc/resolv.conf did not have the namespace set as the '
+                f'DNS search domain:\n\n{data}')
 
         # Lookup our addresses
         nics = self.test_client.get_instance_interfaces(inst1['uuid'])
@@ -502,18 +502,6 @@ class TestNetworking(base.BaseNamespacedTestCase):
         # Wait for the instance agent to report in
         self._await_instance_ready(inst1['uuid'])
 
-        # Ensure the gateway is not set as the DNS server in /etc/resolv.conf
-        data = self.test_client.await_agent_fetch(
-            inst1['uuid'], '/etc/resolv.conf')
-        if data.find('192.168.242.1') != -1:
-            self.fail(
-                '/etc/resolv.conf should not have the gateway set as the '
-                f'DNS address:\n\n{data}')
-        if data.find(f'{self.namespace}.bonkerslab') != -1:
-            self.fail(
-                '/etc/resolv.conf should not have the namespace set as the '
-                f'DNS search domain:\n\n{data}')
-
         # Ensure cloud-init didn't report any warnings. This is annoying because
         # cloud-init treats not having user data as a warning even though it
         # isn't a schema error. https://github.com/canonical/cloud-init/issues/5803
@@ -530,6 +518,18 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     self.fail(
                         f'cloud-init.log contained warnings:\n\n{data}\n\n'
                         f'"cloud-init schema --system" says:\n\n{schema_warnings}')
+
+        # Ensure the gateway is not set as the DNS server in /etc/resolv.conf
+        data = self.test_client.await_agent_fetch(
+            inst1['uuid'], '/etc/resolv.conf')
+        if data.find('192.168.242.1') != -1:
+            self.fail(
+                '/etc/resolv.conf should not have the gateway set as the '
+                f'DNS address:\n\n{data}')
+        if data.find(f'{self.namespace}.bonkerslab') != -1:
+            self.fail(
+                '/etc/resolv.conf should not have the namespace set as the '
+                f'DNS search domain:\n\n{data}')
 
         # Do a DNS lookup for google
         ec, data = self.test_client.await_agent_command(
@@ -559,6 +559,23 @@ class TestNetworking(base.BaseNamespacedTestCase):
         # Wait for the instance agent to report in
         self._await_instance_ready(inst1['uuid'])
 
+        # Ensure cloud-init didn't report any warnings. This is annoying because
+        # cloud-init treats not having user data as a warning even though it
+        # isn't a schema error. https://github.com/canonical/cloud-init/issues/5803
+        # asserts that v23.4 fixes this so maybe one day I can remove this hack.
+        _, data = self.test_client.await_agent_command(
+            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log 2>&1 || true')
+        if data.find('WARNING') != -1:
+            _, schema_warnings = self.test_client.await_agent_command(
+                inst1['uuid'], 'cloud-init schema --system 2>&1 || true')
+            for line in schema_warnings.split('\n'):
+                if line.find('File None needs to begin with "#cloud-config"') != -1:
+                    pass
+                elif line.find('schema error') != -1:
+                    self.fail(
+                        f'cloud-init.log contained warnings:\n\n{data}\n\n'
+                        f'"cloud-init schema --system" says:\n\n{schema_warnings}')
+
         # Ensure the gateway is set as the DNS server in /etc/resolv.conf.
         # Debian 12 uses resolvectl not /etc/resolv.conf
         _, data = self.test_client.await_agent_command(
@@ -578,23 +595,6 @@ class TestNetworking(base.BaseNamespacedTestCase):
             self.fail(
                 '/etc/resolv.conf should have the namespace set as the '
                 f'DNS search domain:\n\n{data}')
-
-        # Ensure cloud-init didn't report any warnings. This is annoying because
-        # cloud-init treats not having user data as a warning even though it
-        # isn't a schema error. https://github.com/canonical/cloud-init/issues/5803
-        # asserts that v23.4 fixes this so maybe one day I can remove this hack.
-        _, data = self.test_client.await_agent_command(
-            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log 2>&1 || true')
-        if data.find('WARNING') != -1:
-            _, schema_warnings = self.test_client.await_agent_command(
-                inst1['uuid'], 'cloud-init schema --system 2>&1 || true')
-            for line in schema_warnings.split('\n'):
-                if line.find('File None needs to begin with "#cloud-config"') != -1:
-                    pass
-                elif line.find('schema error') != -1:
-                    self.fail(
-                        f'cloud-init.log contained warnings:\n\n{data}\n\n'
-                        f'"cloud-init schema --system" says:\n\n{schema_warnings}')
 
         # Lookup our addresses
         nics = self.test_client.get_instance_interfaces(inst1['uuid'])
@@ -655,6 +655,23 @@ class TestNetworking(base.BaseNamespacedTestCase):
         # Wait for the instance agent to report in
         self._await_instance_ready(inst1['uuid'])
 
+        # Ensure cloud-init didn't report any warnings. This is annoying because
+        # cloud-init treats not having user data as a warning even though it
+        # isn't a schema error. https://github.com/canonical/cloud-init/issues/5803
+        # asserts that v23.4 fixes this so maybe one day I can remove this hack.
+        _, data = self.test_client.await_agent_command(
+            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log 2>&1 || true')
+        if data.find('WARNING') != -1:
+            _, schema_warnings = self.test_client.await_agent_command(
+                inst1['uuid'], 'cloud-init schema --system 2>&1 || true')
+            for line in schema_warnings.split('\n'):
+                if line.find('File None needs to begin with "#cloud-config"') != -1:
+                    pass
+                elif line.find('schema error') != -1:
+                    self.fail(
+                        f'cloud-init.log contained warnings:\n\n{data}\n\n'
+                        f'"cloud-init schema --system" says:\n\n{schema_warnings}')
+
         # Ensure the gateway is not set as the DNS server in /etc/resolv.conf.
         # Debian 12 uses resolvectl not /etc/resolv.conf
         _, data = self.test_client.await_agent_command(
@@ -674,23 +691,6 @@ class TestNetworking(base.BaseNamespacedTestCase):
             self.fail(
                 '/etc/resolv.conf should not have the namespace set as the '
                 f'DNS search domain:\n\n{data}')
-
-        # Ensure cloud-init didn't report any warnings. This is annoying because
-        # cloud-init treats not having user data as a warning even though it
-        # isn't a schema error. https://github.com/canonical/cloud-init/issues/5803
-        # asserts that v23.4 fixes this so maybe one day I can remove this hack.
-        _, data = self.test_client.await_agent_command(
-            inst1['uuid'], 'grep WARNING /var/log/cloud-init.log 2>&1 || true')
-        if data.find('WARNING') != -1:
-            _, schema_warnings = self.test_client.await_agent_command(
-                inst1['uuid'], 'cloud-init schema --system 2>&1 || true')
-            for line in schema_warnings.split('\n'):
-                if line.find('File None needs to begin with "#cloud-config"') != -1:
-                    pass
-                elif line.find('schema error') != -1:
-                    self.fail(
-                        f'cloud-init.log contained warnings:\n\n{data}\n\n'
-                        f'"cloud-init schema --system" says:\n\n{schema_warnings}')
 
         # Do a DNS lookup for google
         ec, data = self.test_client.await_agent_command(
