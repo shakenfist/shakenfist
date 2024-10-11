@@ -576,6 +576,12 @@ class TestNetworking(base.BaseNamespacedTestCase):
                         f'cloud-init.log contained warnings:\n\n{data}\n\n'
                         f'"cloud-init schema --system" says:\n\n{schema_warnings}')
 
+        # Ensure the cloud-init logged our nameserver
+        _, data = self.test_client.await_agent_command(
+            inst1['uuid'], 'grep -i nameserver /var/log/cloud-init* 2>&1 || true')
+        if data.find("{'address': '192.168.242.1', 'type': 'nameserver'}") == -1:
+            self.fail('cloud-init did not log the correct nameserver:\n\n{data}')
+
         # Ensure the gateway is set as the DNS server in /etc/resolv.conf.
         # Debian 12 uses resolvectl not /etc/resolv.conf
         _, data = self.test_client.await_agent_command(
@@ -671,6 +677,12 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     self.fail(
                         f'cloud-init.log contained warnings:\n\n{data}\n\n'
                         f'"cloud-init schema --system" says:\n\n{schema_warnings}')
+
+        # Ensure the cloud-init logged our nameserver
+        _, data = self.test_client.await_agent_command(
+            inst1['uuid'], 'grep -i nameserver /var/log/cloud-init* 2>&1 || true')
+        if data.find("{'address': '8.8.8.8', 'type': 'nameserver'}") == -1:
+            self.fail('cloud-init did not log the correct nameserver:\n\n{data}')
 
         # Ensure the gateway is not set as the DNS server in /etc/resolv.conf.
         # Debian 12 uses resolvectl not /etc/resolv.conf
