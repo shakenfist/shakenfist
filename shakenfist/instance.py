@@ -1029,7 +1029,7 @@ class Instance(dbo):
             'services': []
         }
 
-        have_dns_server = False
+        detected_dns_servers = []
         have_default_route = False
         for iface_uuid in self.interfaces:
             iface = networkinterface.NetworkInterface.from_db(iface_uuid)
@@ -1081,14 +1081,15 @@ class Instance(dbo):
                 have_default_route = True
 
             # Do we have a DNS server?
-            if n.provide_dns:
+            router_as_string = str(n.router)
+            if n.provide_dns and router_as_string not in detected_dns_servers:
                 nd['services'].append({
-                    'address': str(n.router),
+                    'address': router_as_string,
                     'type': 'dns'
                 })
-                have_dns_server = True
+                detected_dns_servers.append(router_as_string)
 
-        if not have_dns_server:
+        if not detected_dns_servers:
             nd['services'].append({
                 'address': config.DNS_SERVER,
                 'type': 'dns'
