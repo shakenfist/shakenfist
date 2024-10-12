@@ -1056,11 +1056,6 @@ class Instance(dbo):
                     }
                 )
 
-                if n.provide_dns:
-                    nd['networks'][-1].update({
-                        'dns_search': [f'{self.namespace}.{config.ZONE}']
-                    })
-
                 nd['networks'][-1].update({
                     'ip_address': iface.ipv4,
                     'netmask': str(n.netmask),
@@ -1085,7 +1080,8 @@ class Instance(dbo):
             if n.provide_dns and router_as_string not in detected_dns_servers:
                 nd['services'].append({
                     'address': router_as_string,
-                    'type': 'dns'
+                    'type': 'dns',
+                    'search': [f'{self.namespace}.{config.ZONE}']
                 })
                 detected_dns_servers.append(router_as_string)
 
