@@ -580,7 +580,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         _, data = self.test_client.await_agent_command(
             inst1['uuid'], 'grep -i nameserver /var/log/cloud-init* 2>&1 || true')
         if data.find("{'address': '192.168.242.1', 'type': 'nameserver'}") == -1:
-            self.fail('cloud-init did not log the correct nameserver:\n\n{data}')
+            self.fail(f'cloud-init did not log the correct nameserver:\n\n{data}')
 
         # Ensure the gateway is set as the DNS server in /etc/resolv.conf.
         # Debian 12 uses resolvectl not /etc/resolv.conf
@@ -682,7 +682,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         _, data = self.test_client.await_agent_command(
             inst1['uuid'], 'grep -i nameserver /var/log/cloud-init* 2>&1 || true')
         if data.find("{'address': '8.8.8.8', 'type': 'nameserver'}") == -1:
-            self.fail('cloud-init did not log the correct nameserver:\n\n{data}')
+            self.fail(f'cloud-init did not log the correct nameserver:\n\n{data}')
 
         # Ensure the gateway is not set as the DNS server in /etc/resolv.conf.
         # Debian 12 uses resolvectl not /etc/resolv.conf
