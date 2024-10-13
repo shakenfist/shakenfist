@@ -166,11 +166,12 @@ class HypervisorDestroyNetworkTask(NetworkTask):
 
 
 class UpdateDnsMasqNetworkTask(NetworkTask):
-    _name = 'network_update_dnsmasq'
+    # Slightly wrong name for historical reasons
+    _name = 'network_update_dhcp'
 
 
 class RemoveDnsMasqNetworkTask(NetworkTask):
-    _name = 'network_remove_dnsmasq'
+    _name = 'network_remove_dhcp'
 
 
 class RemoveDHCPLeaseNetworkTask(NetworkTask):
