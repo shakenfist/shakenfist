@@ -84,11 +84,8 @@ def get_interface_addresses(name, namespace=None):
 
     addresses = []
     for elem in _clean_ip_json(stdout):
-        if 'addr_info' in elem:
-            try:
-                addresses.append(elem['addr_info'][0]['local'])
-            except IndexError:
-                pass
+        for addr_info in elem.get('addr_info', []):
+            addresses.append(addr_info['local'])
 
     LOG.with_fields({
         'namespace': namespace,

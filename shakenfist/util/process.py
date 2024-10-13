@@ -30,7 +30,7 @@ def _log_results(stdout, stderr, execution_time):
     fields = {
         'stdout': stdout,
         'stderr': stderr,
-        'execution_time': execution_time
+        'execution_time': f'{execution_time:.2f}'
         }
 
     try:
