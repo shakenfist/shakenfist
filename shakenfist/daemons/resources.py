@@ -247,7 +247,7 @@ class Monitor(daemon.Daemon):
                             for subchild in child.children():
                                 with subchild.oneshot():
                                     process_metrics.update(_emit_process_metrics(subchild))
-                    except psutil.NoSuchProcess:
+                    except (psutil.NoSuchProcess, FileNotFoundError):
                         ...
 
                 # Record etcd process metrics
@@ -256,7 +256,7 @@ class Monitor(daemon.Daemon):
                         if p.name().endswith('/etcd'):
                             try:
                                 process_metrics.update(_emit_process_metrics(p))
-                            except psutil.NoSuchProcess:
+                            except (psutil.NoSuchProcess, FileNotFoundError):
                                 ...
 
                 n.process_metrics = process_metrics
@@ -408,7 +408,7 @@ class Monitor(daemon.Daemon):
                             if i:
                                 i.kvm_pid = child.pid
 
-                except psutil.NoSuchProcess:
+                except (psutil.NoSuchProcess, FileNotFoundError):
                     ...
 
         def check_kvm_processess():
@@ -423,7 +423,7 @@ class Monitor(daemon.Daemon):
                 if pid:
                     try:
                         psutil.Process(pid)
-                    except psutil.NoSuchProcess:
+                    except (psutil.NoSuchProcess, FileNotFoundError):
                         i.kvm_pid = None
 
         while not self.exit.is_set():
