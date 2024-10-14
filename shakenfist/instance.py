@@ -1005,15 +1005,22 @@ class Instance(dbo):
                    rr_name='meta_data.json',
                    joliet_path='/openstack/2017-02-22/meta_data.json')
 
-        # user_data
+        # user_data: we used to only write this if there was some user data
+        # specified, but that reports a schema error with cloud-init like this:
+        #
+        # Cloud config schema errors: format-l1.c1: File None needs to begin
+        # with "#cloud-config"
         if self.user_data:
             user_data = base64.b64decode(self.user_data)
-            iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/latest/user_data',
-                       rr_name='user_data',
-                       joliet_path='/openstack/latest/user_data.json')
-            iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/2017-02-22/user_data',
-                       rr_name='user_data',
-                       joliet_path='/openstack/2017-02-22/user_data.json')
+        else:
+            user_data = '#cloud-config\n'.encode('utf-8')
+
+        iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/latest/user_data',
+                   rr_name='user_data',
+                   joliet_path='/openstack/latest/user_data.json')
+        iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/2017-02-22/user_data',
+                   rr_name='user_data',
+                   joliet_path='/openstack/2017-02-22/user_data.json')
 
         # network_data.json
         nd = {
@@ -1022,7 +1029,7 @@ class Instance(dbo):
             'services': []
         }
 
-        have_dns_server = False
+        detected_dns_servers = []
         have_default_route = False
         for iface_uuid in self.interfaces:
             iface = networkinterface.NetworkInterface.from_db(iface_uuid)
@@ -1045,8 +1052,7 @@ class Instance(dbo):
                         'id': f'{iface.network_uuid}-{iface.order}',
                         'link': devname,
                         'type': 'ipv4',
-                        'network_id': iface.network_uuid,
-                        'dns_search': f'{self.namespace}.{config.ZONE}'
+                        'network_id': iface.network_uuid
                     }
                 )
 
@@ -1070,14 +1076,16 @@ class Instance(dbo):
                 have_default_route = True
 
             # Do we have a DNS server?
-            if n.provide_dns:
+            router_as_string = str(n.router)
+            if n.provide_dns and router_as_string not in detected_dns_servers:
                 nd['services'].append({
-                    'address': str(n.router),
-                    'type': 'dns'
+                    'address': router_as_string,
+                    'type': 'dns',
+                    'search': [f'{self.namespace}.{config.ZONE}']
                 })
-                have_dns_server = True
+                detected_dns_servers.append(router_as_string)
 
-        if not have_dns_server:
+        if not detected_dns_servers:
             nd['services'].append({
                 'address': config.DNS_SERVER,
                 'type': 'dns'

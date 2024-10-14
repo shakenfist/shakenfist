@@ -100,6 +100,8 @@ class DnsMasq(managedexecutable.ManagedExecutable):
     def subst_dict(self):
         instances, _ = self._enumerate_leases()
 
+        # NOTE(mikal): provide_nat comes from the network subst dictionary, not
+        # the dnsmasq one.
         d = super().subst_dict()
         d.update({
             'zone': config.ZONE,

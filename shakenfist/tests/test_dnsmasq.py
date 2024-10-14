@@ -57,8 +57,8 @@ class DnsMasqTestCase(testtools.TestCase):
         n = network.Network.from_db(network_uuid)
 
         d = dnsmasq.DnsMasq.new(n)
-        self.assertEqual(f'{TEST_DIR}/files/dhcp/{network_uuid}',
-                         d.config_directory)
+        self.assertEqual(
+            f'{TEST_DIR}/files/dhcp/{network_uuid}', d.config_directory)
 
     def test_str(self):
         self.mock_etcd = MockEtcd(self, node_count=4)
@@ -87,6 +87,132 @@ class DnsMasqTestCase(testtools.TestCase):
             d.config_directory = dir
             self.assertEqual(dir, d.config_directory)
 
+    def test_subst_just_dhcp(self):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=False,
+                                provide_dns=False)
+        s = d.subst_dict()
+
+        del s['egress_bridge']
+        del s['egress_veth_inner']
+        del s['egress_veth_outer']
+        del s['interface']
+        del s['vx_bridge']
+        del s['vx_id']
+        del s['vx_interface']
+        del s['vx_veth_inner']
+        del s['vx_veth_outer']
+
+        self.assertEqual(
+            {
+                'broadcast': '10.255.255.255',
+                'config_dir': f'{TEST_DIR}/files/dhcp/{network_uuid}',
+                'dhcp_start': '10.0.0.2',
+                'dns_server': '8.8.8.8',
+                'instances': [],
+                'ipblock': '10.0.0.0',
+                'mesh_interface': 'eth0',
+                'mtu': 7950,
+                'namespace': 'unittest',
+                'netmask': '255.0.0.0',
+                'netns': network_uuid,
+                'provide_dhcp': True,
+                'provide_dns': False,
+                'provide_nat': False,
+                'router': '10.0.0.1',
+                'zone': 'shakenfist'
+            }, s)
+
+    def test_subst_just_dhcp_and_nat(self):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8', provide_nat=True)
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=True,
+                                provide_dns=False)
+        s = d.subst_dict()
+
+        del s['egress_bridge']
+        del s['egress_veth_inner']
+        del s['egress_veth_outer']
+        del s['interface']
+        del s['vx_bridge']
+        del s['vx_id']
+        del s['vx_interface']
+        del s['vx_veth_inner']
+        del s['vx_veth_outer']
+
+        self.assertEqual(
+            {
+                'broadcast': '10.255.255.255',
+                'config_dir': f'{TEST_DIR}/files/dhcp/{network_uuid}',
+                'dhcp_start': '10.0.0.2',
+                'dns_server': '8.8.8.8',
+                'instances': [],
+                'ipblock': '10.0.0.0',
+                'mesh_interface': 'eth0',
+                'mtu': 7950,
+                'namespace': 'unittest',
+                'netmask': '255.0.0.0',
+                'netns': network_uuid,
+                'provide_dhcp': True,
+                'provide_dns': False,
+                'provide_nat': True,
+                'router': '10.0.0.1',
+                'zone': 'shakenfist'
+            }, s)
+
+    def test_subst_just_dns(self):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n, provide_dhcp=False, provide_nat=False,
+                                provide_dns=True)
+        s = d.subst_dict()
+
+        del s['egress_bridge']
+        del s['egress_veth_inner']
+        del s['egress_veth_outer']
+        del s['interface']
+        del s['vx_bridge']
+        del s['vx_id']
+        del s['vx_interface']
+        del s['vx_veth_inner']
+        del s['vx_veth_outer']
+
+        self.assertEqual(
+            {
+                'broadcast': '10.255.255.255',
+                'config_dir': f'{TEST_DIR}/files/dhcp/{network_uuid}',
+                'dhcp_start': '10.0.0.2',
+                'dns_server': '8.8.8.8',
+                'instances': [],
+                'ipblock': '10.0.0.0',
+                'mesh_interface': 'eth0',
+                'mtu': 7950,
+                'namespace': 'unittest',
+                'netmask': '255.0.0.0',
+                'netns': network_uuid,
+                'provide_dhcp': False,
+                'provide_dns': True,
+                'provide_nat': False,
+                'router': '10.0.0.1',
+                'zone': 'shakenfist'
+            }, s)
+
     @mock.patch('os.makedirs')
     def test_make_config_just_dhcp(self, mock_makedir):
         self.mock_etcd = MockEtcd(self, node_count=4)
@@ -106,6 +232,14 @@ class DnsMasqTestCase(testtools.TestCase):
         handle = mock_open()
         handle.write.assert_called_with(
             '\n'.join([
+                '# dnsmasq configuration is documented at',
+                '# https://thekelleys.org.uk/dnsmasq/docs/setup.html',
+                '#',
+                '# Enabled features:',
+                '#    provide_dhcp: True',
+                '#    provide_nat:  False',
+                '#    provide_dns:  False',
+                '',
                 'domain-needed    # Do not forward DNS lookups for unqualified names',
                 'bogus-priv       # Do not forward DNS lookups for RFC1918 blocks',
                 'no-hosts         # Do not use /etc/hosts',
@@ -121,10 +255,67 @@ class DnsMasqTestCase(testtools.TestCase):
                 'domain=unittest.shakenfist',
                 'local=/unittest.shakenfist/',
                 f'dhcp-leasefile={TEST_DIR}/files/dhcp/{network_uuid}/leases',
-                f'dhcp-range={d.interface},10.0.0.2,static,255.0.0.0,10.255.255.255,1h',
-                f'dhcp-option={d.interface},1,255.0.0.0',
-                f'dhcp-option={d.interface},15,shakenfist',
-                f'dhcp-option={d.interface},26,7950',
+                'dhcp-range=10.0.0.2,static,255.0.0.0,10.255.255.255,1h',
+                '',
+                '# DHCP options are documented at',
+                '# https://blog.abysm.org/2020/06/human-readable-dhcp-options-for-dnsmasq/',
+                'dhcp-option=1,255.0.0.0',
+                'dhcp-option=15,unittest.shakenfist',
+                'dhcp-option=26,7950',
+                f'dhcp-hostsfile={TEST_DIR}/files/dhcp/{network_uuid}/hosts'
+            ])
+        )
+
+    @mock.patch('os.makedirs')
+    def test_make_config_just_dhcp_and_nat(self, mock_makedir):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8', provide_nat=True)
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=True,
+                                provide_dns=False)
+
+        mock_open = mock.mock_open()
+        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+            d._make_config(just_this_path='config')
+
+        handle = mock_open()
+        handle.write.assert_called_with(
+            '\n'.join([
+                '# dnsmasq configuration is documented at',
+                '# https://thekelleys.org.uk/dnsmasq/docs/setup.html',
+                '#',
+                '# Enabled features:',
+                '#    provide_dhcp: True',
+                '#    provide_nat:  True',
+                '#    provide_dns:  False',
+                '',
+                'domain-needed    # Do not forward DNS lookups for unqualified names',
+                'bogus-priv       # Do not forward DNS lookups for RFC1918 blocks',
+                'no-hosts         # Do not use /etc/hosts',
+                'no-resolv        # Do not use /etc/resolv.conf',
+                'filterwin2k      # Filter weird windows 2000 queries',
+                'port=0           # Disable DNS',
+                '',
+                f'pid-file={TEST_DIR}/files/dhcp/{network_uuid}/pid',
+                '',
+                f'interface={d.interface}',
+                'listen-address=10.0.0.1',
+                '',
+                'domain=unittest.shakenfist',
+                'local=/unittest.shakenfist/',
+                f'dhcp-leasefile={TEST_DIR}/files/dhcp/{network_uuid}/leases',
+                'dhcp-range=10.0.0.2,static,255.0.0.0,10.255.255.255,1h',
+                '',
+                '# DHCP options are documented at',
+                '# https://blog.abysm.org/2020/06/human-readable-dhcp-options-for-dnsmasq/',
+                'dhcp-option=6,8.8.8.8',
+                'dhcp-option=1,255.0.0.0',
+                'dhcp-option=15,unittest.shakenfist',
+                'dhcp-option=26,7950',
                 f'dhcp-hostsfile={TEST_DIR}/files/dhcp/{network_uuid}/hosts'
             ])
         )
@@ -148,6 +339,14 @@ class DnsMasqTestCase(testtools.TestCase):
         handle = mock_open()
         handle.write.assert_called_with(
             '\n'.join([
+                '# dnsmasq configuration is documented at',
+                '# https://thekelleys.org.uk/dnsmasq/docs/setup.html',
+                '#',
+                '# Enabled features:',
+                '#    provide_dhcp: False',
+                '#    provide_nat:  False',
+                '#    provide_dns:  True',
+                '',
                 'domain-needed    # Do not forward DNS lookups for unqualified names',
                 'bogus-priv       # Do not forward DNS lookups for RFC1918 blocks',
                 'no-hosts         # Do not use /etc/hosts',
@@ -201,7 +400,7 @@ class DnsMasqTestCase(testtools.TestCase):
 
         network_uuid = str(uuid.uuid4())
         self.mock_etcd.create_network(
-            'bobnet', network_uuid, netblock='10.0.0.0/8')
+            'bobnet', network_uuid, netblock='10.0.0.0/8', provide_nat=True)
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=True,
                                 provide_dns=True)
@@ -213,6 +412,14 @@ class DnsMasqTestCase(testtools.TestCase):
         handle = mock_open()
         handle.write.assert_called_with(
             '\n'.join([
+                '# dnsmasq configuration is documented at',
+                '# https://thekelleys.org.uk/dnsmasq/docs/setup.html',
+                '#',
+                '# Enabled features:',
+                '#    provide_dhcp: True',
+                '#    provide_nat:  True',
+                '#    provide_dns:  True',
+                '',
                 'domain-needed    # Do not forward DNS lookups for unqualified names',
                 'bogus-priv       # Do not forward DNS lookups for RFC1918 blocks',
                 'no-hosts         # Do not use /etc/hosts',
@@ -222,7 +429,6 @@ class DnsMasqTestCase(testtools.TestCase):
                 'server=8.8.8.8',
                 f'addn-hosts={TEST_DIR}/files/dhcp/{network_uuid}/dnshosts',
                 'expand-hosts',
-                f'dhcp-option={d.interface},6,10.0.0.1',
                 '',
                 f'pid-file={TEST_DIR}/files/dhcp/{network_uuid}/pid',
                 '',
@@ -232,10 +438,14 @@ class DnsMasqTestCase(testtools.TestCase):
                 'domain=unittest.shakenfist',
                 'local=/unittest.shakenfist/',
                 f'dhcp-leasefile={TEST_DIR}/files/dhcp/{network_uuid}/leases',
-                f'dhcp-range={d.interface},10.0.0.2,static,255.0.0.0,10.255.255.255,1h',
-                f'dhcp-option={d.interface},1,255.0.0.0',
-                f'dhcp-option={d.interface},15,shakenfist',
-                f'dhcp-option={d.interface},26,7950',
+                'dhcp-range=10.0.0.2,static,255.0.0.0,10.255.255.255,1h',
+                '',
+                '# DHCP options are documented at',
+                '# https://blog.abysm.org/2020/06/human-readable-dhcp-options-for-dnsmasq/',
+                'dhcp-option=6,10.0.0.1',
+                'dhcp-option=1,255.0.0.0',
+                'dhcp-option=15,unittest.shakenfist',
+                'dhcp-option=26,7950',
                 f'dhcp-hostsfile={TEST_DIR}/files/dhcp/{network_uuid}/hosts'
             ])
         )

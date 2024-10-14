@@ -26,6 +26,24 @@ PRIORITY_LOW = (2, 7)
 PRIORITY_HIGH = (2, 0)
 
 
+def _log_results(stdout, stderr, execution_time):
+    fields = {
+        'stdout': stdout,
+        'stderr': stderr,
+        'execution_time': f'{execution_time:.2f}'
+        }
+
+    try:
+        LOG.with_fields(fields).debug('Command output')
+    except OSError:
+        # This happens when the log message is too long...
+        if len(stdout) > 512:
+            fields['stdout'] = stdout[:512] + '...'
+        if len(stderr) > 512:
+            fields['stderr'] = stderr[:512] + '...'
+        LOG.with_fields(fields).debug('Command output (truncated)')
+
+
 def execute(locks, command, check_exit_code=[0], env_variables=None,
             namespace=None, iopriority=None, cwd=None,
             suppress_command_logging=False):
@@ -42,17 +60,23 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
         LOG.info('Executing %s with locks %s', command, locks)
 
     if not locks:
-        return processutils.execute(
+        start_time = time.time()
+        stdout, stderr = processutils.execute(
             command, check_exit_code=check_exit_code,
             env_variables=env_variables, shell=True, cwd=cwd)
+        _log_results(stdout, stderr, time.time() - start_time)
+        return stdout, stderr
 
     else:
         p = fork(_lock_refresher, [locks], 'lock-refresher')
 
         try:
-            return processutils.execute(
+            start_time = time.time()
+            stdout, stderr = processutils.execute(
                 command, check_exit_code=check_exit_code,
                 env_variables=env_variables, shell=True)
+            _log_results(stdout, stderr, time.time() - start_time)
+            return stdout, stderr
         finally:
             p.kill()
             p.join()

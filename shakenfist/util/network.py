@@ -82,12 +82,17 @@ def get_interface_addresses(name, namespace=None):
         None, 'ip -pretty -json addr show %s' % name,
         check_exit_code=[0, 1], namespace=namespace)
 
+    addresses = []
     for elem in _clean_ip_json(stdout):
-        if 'addr_info' in elem:
-            try:
-                yield elem['addr_info'][0]['local']
-            except IndexError:
-                pass
+        for addr_info in elem.get('addr_info', []):
+            addresses.append(addr_info['local'])
+
+    LOG.with_fields({
+        'namespace': namespace,
+        'device': name,
+        'addresses': addresses
+    }).debug('Found addresses')
+    return addresses
 
 
 def get_interface_statistics(name, namespace=None):
@@ -252,15 +257,13 @@ def add_address_to_interface(namespace, address, netmask, device):
                 raise e
 
     attempts = 0
+    _add_address(namespace, address, netmask, device)
     while address not in list(get_interface_addresses(device, namespace=namespace)):
-        _add_address(namespace, address, netmask, device)
         time.sleep(0.5)
         attempts += 1
-
-        if attempts < 5:
-            log.with_fields({'attempt': attempts}).info(
-                'Repeated failures to add address to device')
-        else:
+        if attempts == 5:
             log.with_fields({'attempt': attempts}).warning(
                 'Repeated failures to add address to device')
             return
+
+        _add_address(namespace, address, netmask, device)

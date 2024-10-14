@@ -188,7 +188,6 @@ class InstanceTestCase(base.ShakenFistTestCase):
         s = str(i)
         self.assertEqual('instance(%s)' % instance_uuid, s)
 
-    # create, delete
     def test_make_config_drive(self):
         instance_uuid = str(uuid.uuid4())
         network_uuid = str(uuid.uuid4())
@@ -276,7 +275,6 @@ class InstanceTestCase(base.ShakenFistTestCase):
                             ],
                             'networks': [
                                 {
-                                    'dns_search': 'unittest.sfzone',
                                     'id': '%s-0' % network_uuid,
                                     'ip_address': '127.0.0.5',
                                           'link': 'eth0',
@@ -288,7 +286,6 @@ class InstanceTestCase(base.ShakenFistTestCase):
                                           'type': 'ipv4'
                                 },
                                 {
-                                    'dns_search': 'unittest.sfzone',
                                     'id': '%s-1' % network_uuid,
                                     'ip_address': '127.0.0.6',
                                     'link': 'eth1',
@@ -301,6 +298,154 @@ class InstanceTestCase(base.ShakenFistTestCase):
                                 {
                                     'address': '8.8.8.8',
                                     'type': 'dns'
+                                }
+                            ]
+                        },
+                        nd, '%s does not match' % entry
+                    )
+                    del entries[entry]
+
+                if entry.endswith('meta_data.json'):
+                    md = json.loads(entries[entry])
+                    if 'random_seed' in md:
+                        md['random_seed'] = '...lol...'
+                    self.assertEqual(
+                        {
+                            'availability_zone': 'sfzone',
+                            'devices': [],
+                            'hostname': 'cirros.local',
+                            'launch_index': 0,
+                            'name': 'cirros',
+                            'project_id': None,
+                            'public_keys': {
+                                'mykey': 'thisisasshkey'
+                            },
+                            'random_seed': '...lol...',
+                            'uuid': instance_uuid
+                        },
+                        md, '%s does not match' % entry
+                    )
+                    del entries[entry]
+
+            self.assertEqual({}, entries)
+            cd.close()
+
+        finally:
+            if os.path.exists(cd_file):
+                os.unlink(cd_file)
+
+    def test_make_config_drive_provide_dns(self):
+        instance_uuid = str(uuid.uuid4())
+        network_uuid = str(uuid.uuid4())
+        iface_uuid_one = str(uuid.uuid4())
+        iface_uuid_two = str(uuid.uuid4())
+
+        self.mock_etcd.create_network(
+            'testing', network_uuid, netblock='10.0.0.0/8', provide_dns=True)
+        self.mock_etcd.create_network_interface(
+            iface_uuid_one,
+            {
+                'network_uuid': network_uuid,
+                'address': '10.0.0.5',
+                'model': None,
+                'macaddress': '1a:91:64:d2:15:39',
+            },
+            instance_uuid=instance_uuid, order=0)
+        self.mock_etcd.create_network_interface(
+            iface_uuid_two,
+            {
+                'network_uuid': network_uuid,
+                'address': '10.0.0.6',
+                'model': None,
+                'macaddress': '1a:91:64:d2:15:40',
+            },
+            instance_uuid=instance_uuid, order=1)
+        self.mock_etcd.create_instance(
+            'cirros', instance_uuid, 1, ssh_key='thisisasshkey',
+            user_data=str(base64.b64encode(b'thisisuserdata'), 'utf-8'))
+
+        i = instance.Instance.from_db(instance_uuid)
+        i.interfaces = [iface_uuid_one, iface_uuid_two]
+
+        (fd, cd_file) = tempfile.mkstemp()
+        os.close(fd)
+
+        try:
+            i._make_config_drive_openstack_disk(cd_file)
+            cd = pycdlib.PyCdlib()
+            cd.open(cd_file)
+
+            entries = {}
+            for dirname, _, filelist in cd.walk(rr_path='/'):
+                for filename in filelist:
+                    cd_file_path = os.path.join(dirname, filename)
+                    with cd.open_file_from_iso(rr_path=cd_file_path) as f:
+                        entries[cd_file_path] = f.read()
+
+            for entry in list(entries.keys()):
+                if entry.endswith('vendor_data.json'):
+                    self.assertEqual(b'{}', entries[entry],
+                                     '%s does not match' % entry)
+                    del entries[entry]
+
+                if entry.endswith('vendor_data2.json'):
+                    self.assertEqual(b'{}', entries[entry],
+                                     '%s does not match' % entry)
+                    del entries[entry]
+
+                if entry.endswith('user_data'):
+                    self.assertEqual(b'thisisuserdata', entries[entry],
+                                     '%s does not match' % entry)
+                    del entries[entry]
+
+                if entry.endswith('network_data.json'):
+                    nd = json.loads(entries[entry])
+                    self.assertEqual(
+                        {
+                            'links': [
+                                {
+                                    'ethernet_mac_address': '1a:91:64:d2:15:39',
+                                    'id': 'eth0',
+                                    'mtu': 7950,
+                                    'name': 'eth0',
+                                    'type': 'vif',
+                                    'vif_id': iface_uuid_one
+                                },
+                                {
+                                    'ethernet_mac_address': '1a:91:64:d2:15:40',
+                                    'id': 'eth1',
+                                    'mtu': 7950,
+                                    'name': 'eth1',
+                                    'type': 'vif',
+                                    'vif_id': iface_uuid_two
+                                }
+                            ],
+                            'networks': [
+                                {
+                                    'id': '%s-0' % network_uuid,
+                                    'ip_address': '10.0.0.5',
+                                          'link': 'eth0',
+                                          'netmask': '255.0.0.0',
+                                          'network_id': network_uuid,
+                                          'routes': [{'gateway': '10.0.0.1',
+                                                      'netmask': '0.0.0.0',
+                                                      'network': '0.0.0.0'}],
+                                          'type': 'ipv4'
+                                },
+                                {
+                                    'id': '%s-1' % network_uuid,
+                                    'ip_address': '10.0.0.6',
+                                    'link': 'eth1',
+                                    'netmask': '255.0.0.0',
+                                    'network_id': network_uuid,
+                                    'type': 'ipv4'
+                                }
+                            ],
+                            'services': [
+                                {
+                                    'address': '10.0.0.1',
+                                    'type': 'dns',
+                                    'search': ['unittest.sfzone'],
                                 }
                             ]
                         },
