@@ -360,6 +360,29 @@ class EventLogChunk:
         self.dbpath = os.path.join(self.dbdir, self.objuuid + '.' + self.chunk)
         self.bootstrapped = False
 
+    def _create_version_table(self, cur):
+        # Check if we already have a version table with data
+        cur.execute("SELECT count(name) FROM sqlite_master WHERE "
+                    "type='table' AND name='version'")
+        if cur.fetchone()['count(name)'] == 0:
+            # We do not have a version table, skip to the latest version
+            try:
+                for statement in CREATE_EVENT_TABLE:
+                    self.con.execute(statement)
+                self.con.execute(CREATE_VERSION_TABLE)
+                self.con.execute('INSERT INTO version VALUES (?)', (VERSION, ))
+                self.con.commit()
+
+            except sqlite3.DatabaseError as e:
+                if str(e).startswith('UNIQUE constraint failed'):
+                    # I'm not sure how we get here because we're protected by
+                    # a lock, but this sure does feel like a race to me...
+                    return False
+
+                raise e
+
+        return True
+
     def _bootstrap(self):
         sqlite_ver = sqlite3.sqlite_version_info
         os.makedirs(self.dbdir, exist_ok=True)
@@ -370,132 +393,129 @@ class EventLogChunk:
         self.con.row_factory = sqlite3.Row
         cur = self.con.cursor()
 
-        # Check if we already have a version table with data
-        cur.execute("SELECT count(name) FROM sqlite_master WHERE "
-                    "type='table' AND name='version'")
-        if cur.fetchone()['count(name)'] == 0:
-            # We do not have a version table, skip to the latest version
-            for statement in CREATE_EVENT_TABLE:
-                self.con.execute(statement)
-            self.con.execute(CREATE_VERSION_TABLE)
-            self.con.execute('INSERT INTO version VALUES (?)', (VERSION, ))
-            self.con.commit()
+        # Ensure there's a version table in the chunk at all
+        attempts = 0
+        while not self._create_version_table(cur):
+            attempts += 1
+            if attempts > 3:
+                raise exceptions.CorruptEventChunk(
+                    'Failed to initialize version table three times')
+            time.sleep(0.2)
 
-        else:
-            # Open an existing database, which _might_ require upgrade
-            cur.execute('SELECT * FROM version')
-            row = cur.fetchone()
-            if not row:
-                raise exceptions.CorruptEventChunk('No version rows')
-            ver = dict(row).get('version')
-            if not ver:
-                raise exceptions.CorruptEventChunk('No version recorded')
-            start_ver = ver
+        # Open an existing database, which _might_ require upgrade
+        cur.execute('SELECT * FROM version')
+        row = cur.fetchone()
+        if not row:
+            raise exceptions.CorruptEventChunk('No version rows')
+        ver = dict(row).get('version')
+        if not ver:
+            raise exceptions.CorruptEventChunk('No version recorded')
+        start_ver = ver
 
-            if ver == 1:
-                ver = 2
-                self.log.info('Upgrading database from v1 to v2')
+        if ver == 1:
+            ver = 2
+            self.log.info('Upgrading database from v1 to v2')
+            self.con.execute(
+                'ALTER TABLE events ADD COLUMN extra text')
+            self.con.execute(
+                'INSERT INTO events(timestamp, message) '
+                'VALUES (%f, "Upgraded database to version 2")'
+                % time.time())
+
+        if ver == 2:
+            ver = 3
+            self.log.info('Upgrading database from v2 to v3')
+            if self.objtype == 'node':
                 self.con.execute(
-                    'ALTER TABLE events ADD COLUMN extra text')
+                    'DELETE FROM events WHERE timestamp < %d AND '
+                    'message = "Updated node resources"'
+                    % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
+
+            self.con.execute(
+                'INSERT INTO events(timestamp, message) '
+                'VALUES (%f, "Upgraded database to version 3")'
+                % time.time())
+
+        if ver == 3:
+            ver = 4
+            self.log.info('Upgrading database from v3 to v4')
+            if self.objtype == 'node':
                 self.con.execute(
-                    'INSERT INTO events(timestamp, message) '
-                    'VALUES (%f, "Upgraded database to version 2")'
-                    % time.time())
+                    'DELETE FROM events WHERE timestamp < %d AND '
+                    'message = "Updated node resources and package versions";'
+                    % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
 
-            if ver == 2:
-                ver = 3
-                self.log.info('Upgrading database from v2 to v3')
-                if self.objtype == 'node':
-                    self.con.execute(
-                        'DELETE FROM events WHERE timestamp < %d AND '
-                        'message = "Updated node resources"'
-                        % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
+            self.con.execute(
+                'INSERT INTO events(timestamp, message) '
+                'VALUES (%f, "Upgraded database to version 4");'
+                % time.time())
 
-                self.con.execute(
-                    'INSERT INTO events(timestamp, message) '
-                    'VALUES (%f, "Upgraded database to version 3")'
-                    % time.time())
+        if ver == 4:
+            ver = 5
+            self.log.info('Upgrading database from v4 to v5')
+            self.con.execute(
+                'ALTER TABLE events ADD COLUMN type text')
+            self.con.execute('UPDATE events SET type="historic"')
+            self.con.execute(
+                'INSERT INTO events(type, timestamp, message) '
+                'VALUES ("audit", %f, "Upgraded database to version 5")'
+                % time.time())
 
-            if ver == 3:
-                ver = 4
-                self.log.info('Upgrading database from v3 to v4')
-                if self.objtype == 'node':
-                    self.con.execute(
-                        'DELETE FROM events WHERE timestamp < %d AND '
-                        'message = "Updated node resources and package versions";'
-                        % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
+        if ver == 5:
+            # Support for dropping columns in sqlite is relative recent, so
+            # we end up having to do a bit of a dance here.
+            ver = 6
+            self.log.info('Upgrading database from v5 to v6 using sqlite version %s'
+                          % str(sqlite_ver))
+            if sqlite_ver[1] >= 35:
+                self.con.execute('ALTER TABLE events DROP COLUMN operation')
+                self.con.execute('ALTER TABLE events DROP COLUMN phase')
 
-                self.con.execute(
-                    'INSERT INTO events(timestamp, message) '
-                    'VALUES (%f, "Upgraded database to version 4");'
-                    % time.time())
-
-            if ver == 4:
-                ver = 5
-                self.log.info('Upgrading database from v4 to v5')
-                self.con.execute(
-                    'ALTER TABLE events ADD COLUMN type text')
-                self.con.execute('UPDATE events SET type="historic"')
                 self.con.execute(
                     'INSERT INTO events(type, timestamp, message) '
-                    'VALUES ("audit", %f, "Upgraded database to version 5")'
+                    'VALUES ("audit", %f, "Upgraded database to version 6 in modern mode")'
                     % time.time())
-
-            if ver == 5:
-                # Support for dropping columns in sqlite is relative recent, so
-                # we end up having to do a bit of a dance here.
-                ver = 6
-                self.log.info('Upgrading database from v5 to v6 using sqlite version %s'
-                              % str(sqlite_ver))
-                if sqlite_ver[1] >= 35:
-                    self.con.execute('ALTER TABLE events DROP COLUMN operation')
-                    self.con.execute('ALTER TABLE events DROP COLUMN phase')
-
-                    self.con.execute(
-                        'INSERT INTO events(type, timestamp, message) '
-                        'VALUES ("audit", %f, "Upgraded database to version 6 in modern mode")'
-                        % time.time())
-                else:
-                    # Older versions of sqlite don't have a drop column, so we
-                    # have to do this the hard way.
-                    self.con.execute('ALTER TABLE events RENAME TO events_old')
-                    for statement in CREATE_EVENT_TABLE:
-                        self.con.execute(statement)
-                    self.con.execute(
-                        'INSERT INTO events (type, timestamp, fqdn, duration, message, extra) '
-                        'SELECT type, timestamp, fqdn, duration, message, extra '
-                        'FROM events_old')
-                    self.con.execute('DROP TABLE events_old')
-
-                    self.con.execute(
-                        'INSERT INTO events(type, timestamp, message) '
-                        'VALUES ("audit", %f, "Upgraded database to version 6 in compatibility mode")'
-                        % time.time())
-
-            if ver == 6:
-                # Timestamp is no longer the primary key, its an index. You can't
-                # just drop the constraint, you need to re-write the table.
-                ver = 7
-                self.log.info('Upgrading database from v6 to v7')
-                self.con.execute('ALTER TABLE events RENAME TO events_old;')
+            else:
+                # Older versions of sqlite don't have a drop column, so we
+                # have to do this the hard way.
+                self.con.execute('ALTER TABLE events RENAME TO events_old')
                 for statement in CREATE_EVENT_TABLE:
                     self.con.execute(statement)
-                self.con.execute('INSERT INTO events SELECT * FROM events_old;')
+                self.con.execute(
+                    'INSERT INTO events (type, timestamp, fqdn, duration, message, extra) '
+                    'SELECT type, timestamp, fqdn, duration, message, extra '
+                    'FROM events_old')
                 self.con.execute('DROP TABLE events_old')
 
                 self.con.execute(
-                    'INSERT INTO events(timestamp, message) '
-                    'VALUES (%f, "Upgraded database to version 7");'
+                    'INSERT INTO events(type, timestamp, message) '
+                    'VALUES ("audit", %f, "Upgraded database to version 6 in compatibility mode")'
                     % time.time())
 
-            if start_ver != ver:
-                self.con.execute('UPDATE version SET version = ?', (ver,))
-                self.con.commit()
-                self.con.execute('VACUUM')
-                self.con.execute(
-                        'INSERT INTO events(type, timestamp, message) '
-                        'VALUES ("audit", %f, "Compacted database")'
-                        % time.time())
+        if ver == 6:
+            # Timestamp is no longer the primary key, its an index. You can't
+            # just drop the constraint, you need to re-write the table.
+            ver = 7
+            self.log.info('Upgrading database from v6 to v7')
+            self.con.execute('ALTER TABLE events RENAME TO events_old;')
+            for statement in CREATE_EVENT_TABLE:
+                self.con.execute(statement)
+            self.con.execute('INSERT INTO events SELECT * FROM events_old;')
+            self.con.execute('DROP TABLE events_old')
+
+            self.con.execute(
+                'INSERT INTO events(timestamp, message) '
+                'VALUES (%f, "Upgraded database to version 7");'
+                % time.time())
+
+        if start_ver != ver:
+            self.con.execute('UPDATE version SET version = ?', (ver,))
+            self.con.commit()
+            self.con.execute('VACUUM')
+            self.con.execute(
+                    'INSERT INTO events(type, timestamp, message) '
+                    'VALUES ("audit", %f, "Compacted database")'
+                    % time.time())
 
     def close(self):
         if self.bootstrapped:
