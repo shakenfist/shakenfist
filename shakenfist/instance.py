@@ -1013,7 +1013,7 @@ class Instance(dbo):
         if self.user_data:
             user_data = base64.b64decode(self.user_data)
         else:
-            user_data = '#cloud-config\n'.encode('utf-8')
+            user_data = b'#cloud-config\n'
 
         iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/latest/user_data',
                    rr_name='user_data',
