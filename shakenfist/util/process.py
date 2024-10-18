@@ -64,7 +64,8 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
         stdout, stderr = processutils.execute(
             command, check_exit_code=check_exit_code,
             env_variables=env_variables, shell=True, cwd=cwd)
-        _log_results(stdout, stderr, time.time() - start_time)
+        if not suppress_command_logging:
+            _log_results(stdout, stderr, time.time() - start_time)
         return stdout, stderr
 
     else:
@@ -75,7 +76,8 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
             stdout, stderr = processutils.execute(
                 command, check_exit_code=check_exit_code,
                 env_variables=env_variables, shell=True)
-            _log_results(stdout, stderr, time.time() - start_time)
+            if not suppress_command_logging:
+                _log_results(stdout, stderr, time.time() - start_time)
             return stdout, stderr
         finally:
             p.kill()

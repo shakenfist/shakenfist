@@ -79,7 +79,12 @@ class Blob(dbo):
 
     @classmethod
     def _upgrade_step_4_to_5(cls, static_values):
-        cls._upgrade_metadata_to_attribute(static_values['uuid'])
+        try:
+            cls._upgrade_metadata_to_attribute(static_values['uuid'])
+        except KeyError as e:
+            # I am currently unsure why you'd end up here, but am seeing it in
+            # CI. Let's gather some more information so we can chase it down.
+            LOG.with_fields(static_values).error('UUID for blob missing!')
 
     @classmethod
     def _upgrade_step_5_to_6(cls, static_values):
