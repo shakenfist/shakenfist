@@ -481,7 +481,9 @@ class Network(dbo):
                     subst['floating_gateway'] = self.floating_gateway
                     subst['floating_netmask'] = fn.netmask
                 except CongestedNetwork:
-                    self.error('Unable to allocate floating gateway IP')
+                    self.error = 'Unable to allocate floating gateway IP'
+                    self.state = self.STATE_ERROR
+                    return
 
                 addresses = list(util_network.get_interface_addresses(
                     subst['egress_veth_inner'], namespace=subst['netns']))
