@@ -30,13 +30,15 @@ class Artifact(dbo):
     object_type = 'artifact'
     current_version = 6
 
-    # docs/developer_guide/state_machine.md has a description of these states.
+    # Artifacts are special in that they can return from ERROR or DELETED to the
+    # CREATED state. This is because you can correct an artifact error by forcing
+    # another download.
     state_targets = {
         None: (dbo.STATE_INITIAL),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR),
-        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
-        dbo.STATE_DELETED: (),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR, dbo.STATE_CREATED),
+        dbo.STATE_DELETED: (dbo.STATE_CREATED),
     }
 
     ACTIVE_STATES = {dbo.STATE_INITIAL, dbo.STATE_CREATED, dbo.STATE_ERROR}
@@ -117,36 +119,19 @@ class Artifact(dbo):
         return a
 
     @staticmethod
-    def from_url(artifact_type, url, name=None, max_versions=0, namespace=None,
-                 create_if_new=False):
-        artifacts = list(Artifacts([
-            partial(url_filter, url),
-            partial(type_filter, artifact_type),
-            not_dead_states_filter,
-            partial(namespace_or_shared_filter, namespace)]))
-
-        if len(artifacts) == 0:
-            if create_if_new:
-                if not name:
-                    name = url.split('/')[-1]
-                return Artifact.new(artifact_type, url, name=name,
-                                    max_versions=max_versions,
-                                    namespace=namespace)
-            return None
-        if len(artifacts) == 1:
-            return artifacts[0]
-
-        # We have more than one match. If only one of those is in our
-        # namespace, then use it. Otherwise give up as being ambiguous.
-        local_artifacts = []
-        for a in artifacts:
-            if a.namespace == namespace:
-                local_artifacts.append(a)
-
-        if len(local_artifacts) == 1:
-            return local_artifacts[0]
-
-        raise exceptions.TooManyMatches()
+    def from_url(artifact_type, url, max_versions=0, namespace=None, create_if_new=False):
+        with etcd.get_lock('artifact_from_url', None, url):
+            artifacts = list(Artifacts([partial(url_filter, url),
+                                        partial(type_filter, artifact_type),
+                                        partial(namespace_exact_filter, namespace)]))
+            if len(artifacts) == 0:
+                if create_if_new:
+                    return Artifact.new(artifact_type, url, max_versions=max_versions,
+                                        namespace=namespace)
+                return None
+            if len(artifacts) == 1:
+                return artifacts[0]
+            raise exceptions.TooManyMatches()
 
     # Static values
     @property
@@ -382,14 +367,6 @@ def instance_snapshot_filter(instance_uuid, a):
     if a.artifact_type != Artifact.TYPE_SNAPSHOT:
         return False
     return a.source_url.startswith(f'{INSTANCE_URL}{instance_uuid}')
-
-
-not_dead_states_filter = partial(
-    baseobject.state_filter, [
-        Artifact.STATE_INITIAL,
-        Artifact.STATE_CREATING,
-        Artifact.STATE_CREATED,
-    ])
 
 
 def namespace_exact_filter(namespace, o):
