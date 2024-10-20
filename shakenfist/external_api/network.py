@@ -13,6 +13,7 @@ from flasgger import swag_from
 from flask_jwt_extended import get_jwt_identity
 from shakenfist_utilities import api as sf_api
 from shakenfist_utilities import logs
+import validators
 
 from shakenfist import baseobject
 from shakenfist import etcd
@@ -626,3 +627,65 @@ class NetworkUnrouteAddressEndpoint(sf_api.Resource):
 
         network_from_db.add_event(EVENT_TYPE_AUDIT, 'unroute request from REST API')
         etcd.enqueue('networknode', UnrouteAddressTask(network_from_db.uuid, address))
+
+
+class NetworkDNSAddressEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Add a custom DNS entry for this network.',
+        [
+            ('network_ref', 'query', 'uuidorname',
+             ('The network to add a DNS record for, which must have provide_dns '
+              'enabled.'),
+             True),
+            ('name', 'body', 'string', 'The DNS entry', True),
+            ('value', 'body', 'ipv4',
+             'The IP address the DNS entry resolves to', True)
+        ],
+        [(200, 'DNS entry created', None),
+         (400, 'Network does not have provide_dns enabled', None),
+         (404, 'Network not found.', None),
+         (406, 'The provided DNS entry is invalid', None)]))
+    @api_base.verify_token
+    @api_base.arg_is_network_ref
+    @api_base.requires_network_ownership
+    @api_base.requires_network_active
+    @api_base.log_token_use
+    def post(self, network_ref=None, network_from_db=None, name=None, value=None):
+        if not network_from_db.provide_dns:
+            return sf_api.error(406, 'network does not provide DNS')
+
+        valid_hostname = validators.hostname(
+            name, skip_ipv4_addr=True, skip_ipv6_add=True, may_have_port=False)
+        if not valid_hostname:
+            return sf_api.error(406, 'invalid DNS name')
+
+        network_from_db.update_dns_entry(name, value)
+
+
+class NetworkUnDNSAddressEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Remove a custom DNS entry for this network.',
+        [
+            ('network_ref', 'query', 'uuidorname',
+             'The network route the address to.', True),
+            ('name', 'body', 'string', 'The DNS entry', True)
+        ],
+        [(200, 'DNS entry removed', None),
+         (400, 'Network does not have provide_dns enabled or name not found', None),
+         (404, 'Network not found.', None),
+         (406, 'The provided DNS entry is invalid', None)]))
+    @api_base.verify_token
+    @api_base.arg_is_network_ref
+    @api_base.requires_network_ownership
+    @api_base.requires_network_active
+    @api_base.log_token_use
+    def delete(self, network_ref=None, network_from_db=None, name=None):
+        if not network_from_db.provide_dns:
+            return sf_api.error(406, 'network does not provide DNS')
+
+        valid_hostname = validators.hostname(
+            name, skip_ipv4_addr=True, skip_ipv6_add=True, may_have_port=False)
+        if not valid_hostname:
+            return sf_api.error(406, 'invalid DNS name')
+
+        network_from_db.remove_dns_entry(name)

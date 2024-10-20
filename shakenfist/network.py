@@ -42,7 +42,7 @@ LOG, _ = logs.setup(__name__)
 class Network(dbo):
     object_type = 'network'
     initial_version = 2
-    current_version = 5
+    current_version = 6
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -111,6 +111,10 @@ class Network(dbo):
     @classmethod
     def _upgrade_step_4_to_5(cls, static_values):
         static_values['provide_dns'] = False
+
+    @classmethod
+    def _upgrade_step_5_to_6(cls, static_values):
+        etcd.put('attribute/network', static_values['uuid'], 'hosteddns', {})
 
     @staticmethod
     def allocate_vxid(net_id):
@@ -284,7 +288,7 @@ class Network(dbo):
     def subst_dict(self):
         # NOTE(mikal): it should be noted that the maximum interface name length
         # on Linux is 15 user visible characters, we therefore use hex for vxids
-        # where they appear in an interface name. Note that vx_id does not appear
+        # where they appear in an interface name. Note that vxid does not appear
         # in an interface name and is therefore in decimal (as required by) the
         # "ip" command.
         retval = {
@@ -309,6 +313,13 @@ class Network(dbo):
             'dhcp_start': self.dhcp_start,
             'provide_nat': self.provide_nat,
         }
+
+        # Hosted DNS entries
+        if self.provide_dns:
+            retval['hosted_dns'] = self._db_get_attribute('hosteddns', {})
+        else:
+            retval['hosted_dns'] = {}
+
         return retval
 
     def is_okay(self):
@@ -651,6 +662,39 @@ class Network(dbo):
         else:
             etcd.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
 
+    def update_dns_entry(self, name, value):
+        if not self.provide_dns:
+            return
+
+        with self.get_lock_attr('hosteddns', 'Update hosted DNS entry'):
+            entries = self._db_get_attribute('hosteddns', {})
+            entries[name] = value
+            self._db_set_attribute('hosteddns', entries)
+
+        if config.NODE_IS_NETWORK_NODE:
+            with self.get_lock(op='Network update DnsMasq', global_scope=False):
+                d = self._get_dnsmasq_object()
+                d.restart()
+        else:
+            etcd.enqueue('networknode', UpdateDnsMasqNetworkTask(self.uuid))
+
+    def remove_dns_entry(self, name):
+        if not self.provide_dns:
+            return
+
+        with self.get_lock_attr('hosteddns', 'Remove hosted DNS entry'):
+            entries = self._db_get_attribute('hosteddns', {})
+            if name in entries:
+                del entries[name]
+                self._db_set_attribute('hosteddns', entries)
+
+        if config.NODE_IS_NETWORK_NODE:
+            with self.get_lock(op='Network update DnsMasq', global_scope=False):
+                d = self._get_dnsmasq_object()
+                d.restart()
+        else:
+            etcd.enqueue('networknode', UpdateDnsMasqNetworkTask(self.uuid))
+
     def discover_mesh(self):
         # The floating network does not have a vxlan mesh
         if self.uuid == 'floating':
@@ -813,6 +857,8 @@ class Network(dbo):
                                  'ip link del flt-%(floating_address_as_hex)s-o'
                                  % subst)
 
+    # NOTE(mikal): this call only works on the network node, the API
+    # server redirects there.
     def route_address(self, floating_address):
         self.add_event(
             EVENT_TYPE_AUDIT, 'routing floating ip to network',
@@ -822,6 +868,8 @@ class Network(dbo):
         util_process.execute(
             None, 'ip route add %(floating_address)s/32 dev %(vx_bridge)s' % subst)
 
+    # NOTE(mikal): this call only works on the network node, the API
+    # server redirects there.
     def unroute_address(self, floating_address):
         self.add_event(
             EVENT_TYPE_AUDIT, 'unrouting floating ip to network',
