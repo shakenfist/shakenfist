@@ -467,8 +467,7 @@ class NetworkMetadataEndpoint(sf_api.Resource):
         'networks', 'Delete a metadata key for a network.',
         [
             ('network_ref', 'query', 'uuidorname', 'The network to remove a key from.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('key', 'query', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
