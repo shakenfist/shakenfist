@@ -260,8 +260,7 @@ class NodeMetadataEndpoint(sf_api.Resource):
         'nodes', 'Delete a metadata key for a node.',
         [
             ('node', 'query', 'node', 'The node to remove a key from.', True),
-            ('key', 'query', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('key', 'query', 'string', 'The metadata key to set', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
