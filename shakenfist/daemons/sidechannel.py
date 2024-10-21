@@ -49,6 +49,16 @@ class SFSocketAgent(protocol.SocketAgent):
         raise NotImplementedError('Please don\'t call poll() in the sidechannel monitor')
 
 
+def _sanitize_packet(in_packet):
+    out_packet = {}
+    for key, value in in_packet.items():
+        if isinstance(value, (str, bytes, bytearray)):
+            out_packet[key] = value[:100]
+        else:
+            out_packet[key] = value
+    return out_packet
+
+
 class Monitor(daemon.Daemon):
     def __init__(self, name):
         super().__init__(name)
@@ -142,6 +152,9 @@ class Monitor(daemon.Daemon):
             self.last_data = time.time()
             try:
                 for packet in self.sc_client.find_packets():
+                    self.log.with_fields(_sanitize_packet(packet)).debug(
+                        'Handling packet')
+
                     if not self.agent_has_talked:
                         self.instance.add_event(EVENT_TYPE_AUDIT, 'sidechannel connected')
                         self.agent_has_talked = True

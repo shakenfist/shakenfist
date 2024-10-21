@@ -34,6 +34,7 @@ pycdlib==1.14.0                    # lgpl
 versions==2.1.2                    # mit
 grpcio-tools==1.67.0               # apache2
 protobuf==5.28.2                   # bsd
+validators==0.34.0                 # mit
 
 requests==2.32.3                   # apache2
 requests-toolbelt==1.0.0           # apache2

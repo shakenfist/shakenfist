@@ -115,6 +115,7 @@ class DnsMasqTestCase(testtools.TestCase):
                 'config_dir': f'{TEST_DIR}/files/dhcp/{network_uuid}',
                 'dhcp_start': '10.0.0.2',
                 'dns_server': '8.8.8.8',
+                'hosted_dns': {},
                 'instances': [],
                 'ipblock': '10.0.0.0',
                 'mesh_interface': 'eth0',
@@ -157,6 +158,7 @@ class DnsMasqTestCase(testtools.TestCase):
                 'config_dir': f'{TEST_DIR}/files/dhcp/{network_uuid}',
                 'dhcp_start': '10.0.0.2',
                 'dns_server': '8.8.8.8',
+                'hosted_dns': {},
                 'instances': [],
                 'ipblock': '10.0.0.0',
                 'mesh_interface': 'eth0',
@@ -199,6 +201,7 @@ class DnsMasqTestCase(testtools.TestCase):
                 'config_dir': f'{TEST_DIR}/files/dhcp/{network_uuid}',
                 'dhcp_start': '10.0.0.2',
                 'dns_server': '8.8.8.8',
+                'hosted_dns': {},
                 'instances': [],
                 'ipblock': '10.0.0.0',
                 'mesh_interface': 'eth0',
@@ -547,6 +550,60 @@ class DnsMasqTestCase(testtools.TestCase):
                 '',
                 '127.0.0.5 inst1',
                 '127.0.0.6 inst2',
+            ])
+        )
+
+    @mock.patch('os.makedirs')
+    def test_make_dns_hosts_with_extras(self, mock_makedir):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        instance_uuid_one = str(uuid.uuid4())
+        instance_uuid_two = str(uuid.uuid4())
+        network_uuid = str(uuid.uuid4())
+        iface_uuid_one = str(uuid.uuid4())
+        iface_uuid_two = str(uuid.uuid4())
+
+        self.mock_etcd.create_network(
+            'testing', network_uuid, netblock='127.0.0.0/8', provide_dns=True)
+        self.mock_etcd.create_network_interface(
+            iface_uuid_one,
+            {
+                'network_uuid': network_uuid,
+                'address': '127.0.0.5',
+                'model': None,
+                'macaddress': '1a:91:64:d2:15:39',
+            },
+            instance_uuid=instance_uuid_one, order=0)
+        self.mock_etcd.create_network_interface(
+            iface_uuid_two,
+            {
+                'network_uuid': network_uuid,
+                'address': '127.0.0.6',
+                'model': None,
+                'macaddress': '1a:91:64:d2:15:40',
+            },
+            instance_uuid=instance_uuid_two, order=0)
+        self.mock_etcd.create_instance('inst1', instance_uuid_one)
+        self.mock_etcd.create_instance('inst2', instance_uuid_two)
+
+        n = network.Network.from_db(network_uuid)
+        n.update_dns_entry('www.shakenfist.com', '1.2.3.4')
+        n.update_dns_entry('www.google.com', '6.6.6.6')
+        n.remove_dns_entry('www.google.com')
+        d = dnsmasq.DnsMasq.new(n, provide_dns=True)
+
+        mock_open = mock.mock_open()
+        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+            d._make_config(just_this_path='dnshosts')
+
+        handle = mock_open()
+        handle.write.assert_called_with(
+            '\n'.join([
+                '',
+                '127.0.0.5 inst1',
+                '127.0.0.6 inst2',
+                '1.2.3.4 www.shakenfist.com'
             ])
         )
 

@@ -1,3 +1,7 @@
 {%- for vm in instances %}
 {{vm.ipv4}} {{vm.name}}
 {%- endfor %}
+
+{%- for name, value in hosted_dns.items() %}
+{{value}} {{name}}
+{%- endfor %}

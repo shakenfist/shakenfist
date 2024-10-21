@@ -7,7 +7,6 @@
 #        - and include examples: yes
 #   - Has complete CI coverage:
 import os
-import re
 import uuid
 from collections import defaultdict
 from functools import partial
@@ -18,6 +17,7 @@ from flasgger import swag_from
 from flask_jwt_extended import get_jwt_identity
 from shakenfist_utilities import api as sf_api
 from shakenfist_utilities import logs
+import validators
 
 from shakenfist import baseobject
 from shakenfist import etcd
@@ -496,7 +496,10 @@ class InstancesEndpoint(sf_api.Resource):
             return sf_api.error(404, 'namespace not found')
 
         # Check that the instance name is safe for use as a DNS host name
-        if name != re.sub(r'([^a-zA-Z0-9\-])', '', name) or len(name) > 63:
+        valid_hostname = validators.hostname(
+            name, skip_ipv4_addr=True, skip_ipv6_addr=True, may_have_port=False)
+        contains_domain = '.' in name
+        if not valid_hostname or contains_domain or len(name) > 63:
             return sf_api.error(
                 400, ('instance name %s is not useable as a DNS and Linux host name. '
                       'That is, less than 63 characters and in the character set: '
