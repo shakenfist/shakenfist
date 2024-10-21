@@ -75,7 +75,7 @@ mixed-methods==1.1.1
 named==1.4.2
 orderings==1.6.0
 property-manager==3.0
-psutil==6.0.0
+psutil==6.1.0
 PyJWT==2.9.0
 python-dotenv==1.0.1
 pytz==2024.2
