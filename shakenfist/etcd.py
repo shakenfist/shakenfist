@@ -556,6 +556,8 @@ def get_current_blob_transfers(absent_nodes=[]):
         _, _, phase, node, _ = workname.split('/')
         if node == 'networknode':
             continue
+        if node.endswith('-background'):
+            node = node[:-len('-background')]
 
         for task in workitem:
             if isinstance(task, FetchBlobTask):

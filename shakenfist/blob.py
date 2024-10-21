@@ -15,10 +15,12 @@ import psutil
 from shakenfist_utilities import logs
 from shakenfist_utilities import random as sf_random
 
+from shakenfist import cache
 from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
+from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
@@ -35,6 +37,7 @@ from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.tasks import FetchBlobTask
+from shakenfist.tasks import HashBlobTask
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -536,8 +539,11 @@ class Blob(dbo):
                         nodes.remove(n)
 
                 for n in nodes[:targets]:
-                    etcd.enqueue(n, {
-                        'tasks': [FetchBlobTask(self.uuid)]
+                    etcd.enqueue(f'{n}-background', {
+                        'tasks': [
+                            FetchBlobTask(self.uuid),
+                            HashBlobTask(self.uuid)
+                            ]
                     })
                     self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
@@ -603,25 +609,56 @@ class Blob(dbo):
             return False
         return True
 
-    def verify_checksum(self, hash=None, locks=None):
-        if not hash:
-            hash_out, _ = util_process.execute(
-                locks,
-                'sha512sum %s' % Blob.filepath(self.uuid),
-                iopriority=util_process.PRIORITY_LOW)
-            hash = hash_out.split(' ')[0]
+    def _get_hash(self, hashtype='sha512', locks=None):
+        hash_out, _ = util_process.execute(
+            locks,
+            f'{hashtype}sum {Blob.filepath(self.uuid)}',
+            iopriority=util_process.PRIORITY_LOW)
+        return hash_out.split(' ')[0]
 
+    def verify_checksum(self, hash=None, locks=None, urgent=True):
+        # This method is focussed on sha512 hashes at the moment, but I also
+        # want it to be able to do other hash types later -- for example OVA
+        # support needs sha1 or sha256, and xxhash is a lot faster. So for now
+        # we always make sure there is a sha512, but if we're not in a hurry
+        # we'll calculate a few others just once as well.
+        if hash:
+            sha512_hash = hash
+        if not hash:
+            sha512_hash = self._get_hash(hashtype='sha512', locks=locks)
+
+        # If we're not in a hurry, calculate missing extra hashes
+        extra_hashes = {}
+        needs_rehashing = False
+        c = self.checksums
+        for alg in BLOB_HASH_ALGORITHMS:
+            if alg not in c:
+                if not urgent:
+                    extra_hashes[alg] = self._get_hash(
+                        hashtype=alg, locks=locks)
+                else:
+                    needs_rehashing = True
+
+        # If we're in a hurry but extra hashes are missing, enqueue those as
+        # background tasks
+        if needs_rehashing:
+            etcd.enqueue(f'{config.NODE_NAME}-background', {
+                    'tasks': [HashBlobTask(self.uuid)]
+                })
+
+        # Validate / update our stored checksums
         with self.get_lock_attr('checksums', op='update checksums'):
             c = self.checksums
             if 'sha512' not in c:
-                c['sha512'] = hash
+                c['sha512'] = sha512_hash
+                cache.update_blob_hash_cache('sha512', sha512_hash, self.uuid)
             else:
-                if c['sha512'] != hash:
+                if c['sha512'] != sha512_hash:
                     self.add_event(EVENT_TYPE_AUDIT,
                                    'blob failed checksum validation',
                                    extra={
                                        'stored_hash': c['sha512'],
-                                       'node_hash': hash,
+                                       'node_hash': sha512_hash,
                                        'node': config.NODE_NAME
                                    })
                     self._remove_if_idle('with incorrect checksum')
@@ -631,6 +668,12 @@ class Blob(dbo):
                 c['nodes'] = {config.NODE_NAME: time.time()}
             else:
                 c['nodes'][config.NODE_NAME] = time.time()
+
+            for alg in extra_hashes:
+                if alg not in c:
+                    c[alg] = extra_hashes[alg]
+                    cache.update_blob_hash_cache(
+                        alg, extra_hashes[alg], self.uuid)
 
             self._db_set_attribute('checksums', c)
 
@@ -725,13 +768,12 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
             })
     logs.with_fields({'bytes_fetched': fetched}).info('Fetch complete')
 
-    # Make the associated blob. Note that we deliberately don't calculate the
-    # artifact checksum here, as this makes large snapshots even slower for users.
-    # The checksum will "catch up" when the scheduled verification occurs.
+    # Import the newly fetched blob
     os.rename(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, fetched, resp.headers.get('Last-Modified'),
                  time.time())
     b.state = Blob.STATE_CREATED
+    b.verify_checksum(hash=sha512_hash.hexdigest())
     b.observe()
     b.request_replication()
     return b

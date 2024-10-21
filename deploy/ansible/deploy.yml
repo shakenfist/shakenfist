@@ -146,6 +146,7 @@
           - rsyslog
           - tox
           - unzip
+          - xxhash
         state: latest
 
     - name: Create python venv and install Shaken Fist packages

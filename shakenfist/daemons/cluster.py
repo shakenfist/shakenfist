@@ -392,13 +392,15 @@ class Monitor(daemon.Daemon):
                     b.request_replication()
 
                 # Clean up any lingering queue tasks
-                while jobname_workitem := etcd.dequeue(n.uuid):
-                    jobname, workitem = jobname_workitem
-                    LOG.with_fields({
-                        'jobname': jobname,
-                        'node': n.uuid
-                    }).info('Deleting work item for deleted node')
-                    etcd.resolve(n.uuid, jobname)
+                for queue_name in [n.uuid, f'{n.uuid}-background']:
+                    while jobname_workitem := etcd.dequeue(queue_name):
+                        jobname, _ = jobname_workitem
+                        LOG.with_fields({
+                            'jobname': jobname,
+                            'node': n.uuid,
+                            'queue': queue_name
+                        }).info('Deleting work item for deleted node')
+                        etcd.resolve(queue_name, jobname)
 
         # Remove old entries from the hard-deleted state caches
         for object_type in OBJECT_NAMES_TO_ITERATORS:

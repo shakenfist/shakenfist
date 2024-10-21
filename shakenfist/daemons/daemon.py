@@ -86,10 +86,28 @@ class WorkerPoolDaemon(Daemon):
         return p.pid
 
     def dequeue_work_item(self, queue_name, processing_callback):
-        if len(self.workers) > self.present_cpus / 2:
+        max_workers = self.present_cpus / 2
+        num_workers = len(self.workers)
+
+        if num_workers > max_workers:
             return False
 
+        # High priority jobs
         jobname_workitem = etcd.dequeue(queue_name)
-        if not jobname_workitem:
+        if jobname_workitem:
+            args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
+            self.start_workitem(processing_callback, args, 'worker')
+            return True
+
+        # Low priority jobs
+        if num_workers > max_workers - 2:
             return False
-        self.start_workitem(processing_callback, jobname_workitem, 'worker')
+
+        jobname_workitem = etcd.dequeue(f'{queue_name}-background')
+        if jobname_workitem:
+            args = [f'{queue_name}-background', jobname_workitem[0],
+                    jobname_workitem[1]]
+            self.start_workitem(processing_callback, args, 'worker')
+            return True
+
+        return False

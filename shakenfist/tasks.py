@@ -382,6 +382,10 @@ class FetchBlobTask(BlobTask):
     _name = 'blob_fetch'
 
 
+class HashBlobTask(BlobTask):
+    _name = 'blob_hash'
+
+
 #
 # Image cache tasks
 #
