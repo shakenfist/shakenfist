@@ -15,6 +15,7 @@ import psutil
 from shakenfist_utilities import logs
 from shakenfist_utilities import random as sf_random
 
+from shakenfist import cache
 from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
@@ -640,10 +641,12 @@ class Blob(dbo):
                     'tasks': [HashBlobTask(self.uuid)]
                 })
 
+        # Validate / update our stored checksums
         with self.get_lock_attr('checksums', op='update checksums'):
             c = self.checksums
             if 'sha512' not in c:
                 c['sha512'] = sha512_hash
+                cache.update_blob_hash_cache('sha512', sha512_hash, self.uuid)
             else:
                 if c['sha512'] != sha512_hash:
                     self.add_event(EVENT_TYPE_AUDIT,
@@ -664,6 +667,8 @@ class Blob(dbo):
             for alg in extra_hashes:
                 if alg not in c:
                     c[alg] = extra_hashes[alg]
+                    cache.update_blob_hash_cache(
+                        alg, extra_hashes[alg], self.uuid)
 
             self._db_set_attribute('checksums', c)
 
