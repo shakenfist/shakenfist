@@ -35,6 +35,7 @@ from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.tasks import FetchBlobTask
+from shakenfist.tasks import HashBlobTask
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -603,25 +604,53 @@ class Blob(dbo):
             return False
         return True
 
-    def verify_checksum(self, hash=None, locks=None):
+    def _get_hash(self, hashtype='sha512', locks=None):
+        hash_out, _ = util_process.execute(
+            locks,
+            f'{hashtype}sum {Blob.filepath(self.uuid)}',
+            iopriority=util_process.PRIORITY_LOW)
+        return hash_out.split(' ')[0]
+
+    def verify_checksum(self, hash=None, locks=None, urgent=True):
+        # This method is focussed on sha512 hashes at the moment, but I also
+        # want it to be able to do other hash types later -- for example OVA
+        # support needs sha1, and xxhash is a lot faster. So for now we always
+        # make sure there is a sha512, but if we're not in a hurry we'll
+        # calculate a few others just once as well.
+        if hash:
+            sha512_hash = hash
         if not hash:
-            hash_out, _ = util_process.execute(
-                locks,
-                'sha512sum %s' % Blob.filepath(self.uuid),
-                iopriority=util_process.PRIORITY_LOW)
-            hash = hash_out.split(' ')[0]
+            sha512_hash = self._get_hash(hashtype='sha512', locks=locks)
+
+        # If we're not in a hurry, calculate missing extra hashes
+        extra_hashes = {}
+        needs_rehashing = False
+        c = self.checksums
+        for alg in ['sha1', 'xxh128']:
+            if alg not in c:
+                if not urgent:
+                    extra_hashes[alg] = self._get_hash(
+                        hashtype=alg, locks=locks)
+                else:
+                    needs_rehashing = True
+
+        # If we're in a hurry but extra hashes are missing, enqueue those
+        if needs_rehashing:
+            etcd.enqueue(config.NODE_NAME, {
+                    'tasks': [HashBlobTask(self.uuid)]
+                })
 
         with self.get_lock_attr('checksums', op='update checksums'):
             c = self.checksums
             if 'sha512' not in c:
-                c['sha512'] = hash
+                c['sha512'] = sha512_hash
             else:
-                if c['sha512'] != hash:
+                if c['sha512'] != sha512_hash:
                     self.add_event(EVENT_TYPE_AUDIT,
                                    'blob failed checksum validation',
                                    extra={
                                        'stored_hash': c['sha512'],
-                                       'node_hash': hash,
+                                       'node_hash': sha512_hash,
                                        'node': config.NODE_NAME
                                    })
                     self._remove_if_idle('with incorrect checksum')
@@ -631,6 +660,10 @@ class Blob(dbo):
                 c['nodes'] = {config.NODE_NAME: time.time()}
             else:
                 c['nodes'][config.NODE_NAME] = time.time()
+
+            for alg in extra_hashes:
+                if alg not in c:
+                    c[alg] = extra_hashes[alg]
 
             self._db_set_attribute('checksums', c)
 
