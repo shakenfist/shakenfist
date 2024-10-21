@@ -125,7 +125,7 @@ class Root(sf_api.Resource):
              'instance-agentoperations-all</li>'
              '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
-             'blob-hash-sha1, blob-hash-xxh128</li>'
+             'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128</li>'
              '<li>events: events-by-type</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
              'instance-put-blob, instance-execute, instance-get, instance-screenshot, '

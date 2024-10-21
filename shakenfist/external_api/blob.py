@@ -23,6 +23,7 @@ from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist import cache
 from shakenfist.config import config
+from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
@@ -242,7 +243,7 @@ class BlobChecksumsEndpoint(sf_api.Resource):
     @api_base.verify_token
     @api_base.log_token_use
     def get(self, algorithm=None, hash=None):
-        if algorithm not in ['sha1', 'sha512', 'xxh128']:
+        if algorithm not in BLOB_HASH_ALGORITHMS:
             return sf_api.error(400, 'unknown hash algorithm')
         if not hash:
             return sf_api.error(400, 'you must specify a hash')
