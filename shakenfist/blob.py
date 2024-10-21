@@ -20,6 +20,7 @@ from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
+from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
@@ -618,9 +619,9 @@ class Blob(dbo):
     def verify_checksum(self, hash=None, locks=None, urgent=True):
         # This method is focussed on sha512 hashes at the moment, but I also
         # want it to be able to do other hash types later -- for example OVA
-        # support needs sha1, and xxhash is a lot faster. So for now we always
-        # make sure there is a sha512, but if we're not in a hurry we'll
-        # calculate a few others just once as well.
+        # support needs sha1 or sha256, and xxhash is a lot faster. So for now
+        # we always make sure there is a sha512, but if we're not in a hurry
+        # we'll calculate a few others just once as well.
         if hash:
             sha512_hash = hash
         if not hash:
@@ -630,7 +631,7 @@ class Blob(dbo):
         extra_hashes = {}
         needs_rehashing = False
         c = self.checksums
-        for alg in ['sha1', 'xxh128']:
+        for alg in BLOB_HASH_ALGORITHMS:
             if alg not in c:
                 if not urgent:
                     extra_hashes[alg] = self._get_hash(

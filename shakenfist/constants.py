@@ -73,3 +73,6 @@ EVENT_TYPES = [EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE, EVENT_TYPE_STATUS,
 
 # Fake object type for API request tracing
 API_REQUESTS = 'api-requests'
+
+# Blob hashing algorithms
+BLOB_HASH_ALGORITHMS = ['sha1', 'sha256', 'sha512', 'xxh128']
