@@ -45,7 +45,7 @@ from shakenfist.util import process as util_process
 LOG, _ = logs.setup(__name__)
 
 
-def handle(jobname, workitem):
+def handle(queue_name, jobname, workitem):
     libvirt = util_libvirt.get_libvirt()
 
     log = LOG.with_fields({'workitem': jobname})
@@ -237,7 +237,7 @@ def handle(jobname, workitem):
             inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
     finally:
-        etcd.resolve(config.NODE_NAME, jobname)
+        etcd.resolve(queue_name, jobname)
 
 
 def image_fetch(url, namespace, inst):

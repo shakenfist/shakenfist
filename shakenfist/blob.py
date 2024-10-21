@@ -538,8 +538,11 @@ class Blob(dbo):
                         nodes.remove(n)
 
                 for n in nodes[:targets]:
-                    etcd.enqueue(n, {
-                        'tasks': [FetchBlobTask(self.uuid)]
+                    etcd.enqueue(f'{n}-background', {
+                        'tasks': [
+                            FetchBlobTask(self.uuid),
+                            HashBlobTask(self.uuid)
+                            ]
                     })
                     self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
@@ -635,9 +638,10 @@ class Blob(dbo):
                 else:
                     needs_rehashing = True
 
-        # If we're in a hurry but extra hashes are missing, enqueue those
+        # If we're in a hurry but extra hashes are missing, enqueue those as
+        # background tasks
         if needs_rehashing:
-            etcd.enqueue(config.NODE_NAME, {
+            etcd.enqueue(f'{config.NODE_NAME}-background', {
                     'tasks': [HashBlobTask(self.uuid)]
                 })
 
