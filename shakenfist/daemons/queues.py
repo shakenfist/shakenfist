@@ -131,7 +131,7 @@ def handle(jobname, workitem):
                 n.delete_on_hypervisor()
 
             elif isinstance(task, FetchBlobTask):
-                l = log.with_fields({'blob': task.blob_uuid()})
+                bl = log.with_fields({'blob': task.blob_uuid()})
                 metrics = etcd.get('metrics', config.NODE_NAME, None)
                 if metrics:
                     metrics = metrics.get('metrics', {})
@@ -140,36 +140,35 @@ def handle(jobname, workitem):
 
                 b = blob.Blob.from_db(task.blob_uuid())
                 if not b:
-                    l.info('Cannot replicate blob, not found')
+                    bl.info('Cannot replicate blob, not found')
 
                 elif (int(metrics.get('disk_free_blobs', 0)) - int(b.size) <
                       config.MINIMUM_FREE_DISK):
-                    l.info('Cannot replicate blob, insufficient space')
+                    bl.info('Cannot replicate blob, insufficient space')
 
                 else:
                     try:
-                        l.info('Replicating blob')
+                        bl.info('Replicating blob')
                         size = b.ensure_local([], wait_for_other_transfers=False)
-                        l.with_fields({
+                        bl.with_fields({
                             'transferred': size,
                             'expected': b.size
                         }).info('Replicating blob complete')
                     except exceptions.BlobMissing:
-                        l.info('Cannot replicate blob, no online sources')
+                        bl.info('Cannot replicate blob, no online sources')
 
             elif isinstance(task, HashBlobTask):
-                l = log.with_fields({'blob': task.blob_uuid()})
+                bl = log.with_fields({'blob': task.blob_uuid()})
                 b = blob.Blob.from_db(task.blob_uuid())
 
                 if not b:
-                    l.info('Cannot hash blob, not found')
+                    bl.info('Cannot hash blob, not found')
 
                 elif config.NODE_NAME not in b.locations:
-                    l.info('Cannot hash blob, not on this node')
+                    bl.info('Cannot hash blob, not on this node')
 
                 else:
                     b.verify_checksum(urgent=False)
-
 
             elif isinstance(task, ArchiveTranscodeTask):
                 if os.path.exists(task.cache_path()):
