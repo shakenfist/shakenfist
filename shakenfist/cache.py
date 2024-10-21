@@ -79,3 +79,12 @@ def update_blob_hash_cache(alg, hash, blob_uuid):
         if blob_uuid not in c['blobs']:
             c['blobs'].append(blob_uuid)
             etcd.put('blob_by_hash', alg, hash, c)
+
+
+def search_blob_hash_cache(alg, hash):
+    c = etcd.get('blob_by_hash', alg, hash)
+    if not c:
+        return []
+    if 'blobs' not in c:
+        return []
+    return c['blobs']

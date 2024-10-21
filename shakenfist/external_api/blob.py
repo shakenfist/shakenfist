@@ -21,8 +21,10 @@ from webargs.flaskparser import use_kwargs
 
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
+from shakenfist import cache
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
@@ -236,7 +238,11 @@ class BlobChecksumsEndpoint(sf_api.Resource):
         if not hash:
             return sf_api.error(400, 'you must specify a hash')
 
-        for b in Blobs(filters=[], prefilter='active'):
+        blobs = cache.search_blob_hash_cache('sha512', hash)
+        for b in blobs:
+            if not b.state.value == dbo.STATE_CREATED:
+                continue
+
             if b.checksums.get('sha512') == hash:
                 out = b.external_view()
                 out['instances'] = instance_usage_for_blob_uuid(b.uuid)
