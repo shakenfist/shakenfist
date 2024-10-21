@@ -725,13 +725,12 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
             })
     logs.with_fields({'bytes_fetched': fetched}).info('Fetch complete')
 
-    # Make the associated blob. Note that we deliberately don't calculate the
-    # artifact checksum here, as this makes large snapshots even slower for users.
-    # The checksum will "catch up" when the scheduled verification occurs.
+    # Import the newly fetched blob
     os.rename(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, fetched, resp.headers.get('Last-Modified'),
                  time.time())
     b.state = Blob.STATE_CREATED
+    b.verify_checksum(hash=sha512_hash.hexdigest())
     b.observe()
     b.request_replication()
     return b
