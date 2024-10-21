@@ -229,12 +229,21 @@ class BlobsEndpoint(sf_api.Resource):
 class BlobChecksumsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Search for a blob by sha512 hash.',
-        [('hash', 'query', 'string', 'The sha512 hash to search for.', True)],
-        [(200, 'Information about a single blob.', blob_get_example),
-         (404, 'Blob not found.', None)]))
+        [
+            ('algorithm', 'query', 'string',
+             'The hash algorithm, one of sha1, sha512, or xxh128.', True),
+            ('hash', 'query', 'string', 'The hash to search for.', True)
+        ],
+        [
+            (200, 'Information about a single blob.', blob_get_example),
+            (400, 'Invalid hash algorithm or hash.', None),
+            (404, 'Blob not found.', None)
+        ]))
     @api_base.verify_token
     @api_base.log_token_use
-    def get(self, hash=None):
+    def get(self, algorithm=None, hash=None):
+        if algorithm not in ['sha1', 'sha512', 'xxh128']:
+            return sf_api.error(400, 'unknown hash algorithm')
         if not hash:
             return sf_api.error(400, 'you must specify a hash')
 
