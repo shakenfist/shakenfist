@@ -299,6 +299,9 @@ class Monitor(daemon.Daemon):
         for entpath in p.glob('**/*'):
             entpath = str(entpath)
             try:
+                if entpath.endswith('/_version'):
+                    continue
+
                 if not os.path.isfile(entpath):
                     continue
 
