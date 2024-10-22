@@ -130,7 +130,7 @@ class Root(sf_api.Resource):
              'instance-put-blob, instance-execute, instance-get, instance-screenshot, '
              'get-instance-namespace, hot-plug-interface</li>'
              '<li>networks: list-addresses, route-addresses, get-network-namespace, '
-             'provide-dns'
+             'provide-dns, extra-dns-entries'
              '<li>networkinterfaces: interface-metadata</li>'
              '<li>nodes: node-get, node-metadata, node-process-metrics</li>'
              '</ul></p></body></html>'),
@@ -263,6 +263,10 @@ api.add_resource(api_network.NetworkRouteAddressEndpoint,
                  '/networks/<network_ref>/route')
 api.add_resource(api_network.NetworkUnrouteAddressEndpoint,
                  '/networks/<network_ref>/route/<address>')
+api.add_resource(api_network.NetworkDNSAddressEndpoint,
+                 '/networks/<network_ref>/dns')
+api.add_resource(api_network.NetworkUnDNSAddressEndpoint,
+                 '/networks/<network_ref>/dns/<address>')
 
 api.add_resource(api_node.NodesEndpoint, '/nodes')
 api.add_resource(api_node.NodeEndpoint, '/nodes/<node>')
