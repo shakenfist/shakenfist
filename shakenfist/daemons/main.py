@@ -43,7 +43,10 @@ def upgrade_blob_datastore():
         with open(version_path) as f:
             version = json.loads(f.read())['version']
     else:
+        LOG.with_fields({'path': version_path}).info(
+            'Blob data store version file missing while resharding')
         version = 1
+
     start_version = version
     start_time = time.time()
 
