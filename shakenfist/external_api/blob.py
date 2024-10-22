@@ -21,8 +21,11 @@ from webargs.flaskparser import use_kwargs
 
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
+from shakenfist import cache
 from shakenfist.config import config
+from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
@@ -227,16 +230,29 @@ class BlobsEndpoint(sf_api.Resource):
 class BlobChecksumsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Search for a blob by sha512 hash.',
-        [('hash', 'query', 'string', 'The sha512 hash to search for.', True)],
-        [(200, 'Information about a single blob.', blob_get_example),
-         (404, 'Blob not found.', None)]))
+        [
+            ('algorithm', 'query', 'string',
+             'The hash algorithm, one of sha1, sha512, or xxh128.', True),
+            ('hash', 'query', 'string', 'The hash to search for.', True)
+        ],
+        [
+            (200, 'Information about a single blob.', blob_get_example),
+            (400, 'Invalid hash algorithm or hash.', None),
+            (404, 'Blob not found.', None)
+        ]))
     @api_base.verify_token
     @api_base.log_token_use
-    def get(self, hash=None):
+    def get(self, algorithm=None, hash=None):
+        if algorithm not in BLOB_HASH_ALGORITHMS:
+            return sf_api.error(400, 'unknown hash algorithm')
         if not hash:
             return sf_api.error(400, 'you must specify a hash')
 
-        for b in Blobs(filters=[], prefilter='active'):
+        blobs = cache.search_blob_hash_cache('sha512', hash)
+        for b in blobs:
+            if not b.state.value == dbo.STATE_CREATED:
+                continue
+
             if b.checksums.get('sha512') == hash:
                 out = b.external_view()
                 out['instances'] = instance_usage_for_blob_uuid(b.uuid)

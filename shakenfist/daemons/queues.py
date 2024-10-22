@@ -26,6 +26,7 @@ from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.tasks import DeleteNetworkWhenClean
 from shakenfist.tasks import DestroyNetworkTask
 from shakenfist.tasks import FetchBlobTask
+from shakenfist.tasks import HashBlobTask
 from shakenfist.tasks import FetchImageTask
 from shakenfist.tasks import FloatNetworkInterfaceTask
 from shakenfist.tasks import HotPlugInstanceInterfaceTask
@@ -44,7 +45,7 @@ from shakenfist.util import process as util_process
 LOG, _ = logs.setup(__name__)
 
 
-def handle(jobname, workitem):
+def handle(queue_name, jobname, workitem):
     libvirt = util_libvirt.get_libvirt()
 
     log = LOG.with_fields({'workitem': jobname})
@@ -130,6 +131,7 @@ def handle(jobname, workitem):
                 n.delete_on_hypervisor()
 
             elif isinstance(task, FetchBlobTask):
+                bl = log.with_fields({'blob': task.blob_uuid()})
                 metrics = etcd.get('metrics', config.NODE_NAME, None)
                 if metrics:
                     metrics = metrics.get('metrics', {})
@@ -138,28 +140,35 @@ def handle(jobname, workitem):
 
                 b = blob.Blob.from_db(task.blob_uuid())
                 if not b:
-                    log.with_fields({
-                        'blob': task.blob_uuid()
-                    }).info('Cannot replicate blob, not found')
+                    bl.info('Cannot replicate blob, not found')
 
                 elif (int(metrics.get('disk_free_blobs', 0)) - int(b.size) <
                       config.MINIMUM_FREE_DISK):
-                    log.with_fields({
-                        'blob': task.blob_uuid()
-                    }).info('Cannot replicate blob, insufficient space')
+                    bl.info('Cannot replicate blob, insufficient space')
 
                 else:
                     try:
-                        log.with_fields({'blob': b}).info('Replicating blob')
+                        bl.info('Replicating blob')
                         size = b.ensure_local([], wait_for_other_transfers=False)
-                        log.with_fields({
-                            'blob': b,
+                        bl.with_fields({
                             'transferred': size,
                             'expected': b.size
                         }).info('Replicating blob complete')
                     except exceptions.BlobMissing:
-                        log.with_fields({'blob': b}).info(
-                            'Cannot replicate blob, no online sources')
+                        bl.info('Cannot replicate blob, no online sources')
+
+            elif isinstance(task, HashBlobTask):
+                bl = log.with_fields({'blob': task.blob_uuid()})
+                b = blob.Blob.from_db(task.blob_uuid())
+
+                if not b:
+                    bl.info('Cannot hash blob, not found')
+
+                elif config.NODE_NAME not in b.locations:
+                    bl.info('Cannot hash blob, not on this node')
+
+                else:
+                    b.verify_checksum(urgent=False)
 
             elif isinstance(task, ArchiveTranscodeTask):
                 if os.path.exists(task.cache_path()):
@@ -228,7 +237,7 @@ def handle(jobname, workitem):
             inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
     finally:
-        etcd.resolve(config.NODE_NAME, jobname)
+        etcd.resolve(queue_name, jobname)
 
 
 def image_fetch(url, namespace, inst):

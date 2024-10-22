@@ -302,7 +302,7 @@ class ImageFetchHelper:
             # We will cache this transcode, but we do it later as part of a
             # task so the instance isn't waiting for it.
             etcd.enqueue(
-                config.NODE_NAME,
+                f'{config.NODE_NAME}-background',
                 {
                     'tasks': [
                         ArchiveTranscodeTask(
