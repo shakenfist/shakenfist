@@ -69,16 +69,18 @@ def clobber_object_state_cache(object_type, state, object_uuids):
 
 
 # Blob hash caches live in etcd under /sf/blob_by_hash/...algorithm.../...hash...
-def update_blob_hash_cache(alg, hash, blob_uuid):
-    with etcd.get_lock('blob_by_hash', alg, hash, op='Blob hash cache update'):
-        c = etcd.get('blob_by_hash', alg, hash)
-        if not c:
-            c = {}
-        if 'blobs' not in c:
-            c['blobs'] = []
-        if blob_uuid not in c['blobs']:
-            c['blobs'].append(blob_uuid)
-            etcd.put('blob_by_hash', alg, hash, c)
+def update_blob_hash_cache(blob_uuid, hashes):
+    for alg in hashes:
+        with etcd.get_lock('blob_by_hash', alg, hashes[alg],
+                           op='Blob hash cache update'):
+            c = etcd.get('blob_by_hash', alg, hashes[alg])
+            if not c:
+                c = {}
+            if 'blobs' not in c:
+                c['blobs'] = []
+            if blob_uuid not in c['blobs']:
+                c['blobs'].append(blob_uuid)
+                etcd.put('blob_by_hash', alg, hashes[alg], c)
 
 
 def search_blob_hash_cache(alg, hash):
