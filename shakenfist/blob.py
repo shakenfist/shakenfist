@@ -651,7 +651,6 @@ class Blob(dbo):
             c = self.checksums
             if 'sha512' not in c:
                 c['sha512'] = sha512_hash
-                cache.update_blob_hash_cache('sha512', sha512_hash, self.uuid)
             else:
                 if c['sha512'] != sha512_hash:
                     self.add_event(EVENT_TYPE_AUDIT,
@@ -672,10 +671,15 @@ class Blob(dbo):
             for alg in extra_hashes:
                 if alg not in c:
                     c[alg] = extra_hashes[alg]
-                    cache.update_blob_hash_cache(
-                        alg, extra_hashes[alg], self.uuid)
 
             self._db_set_attribute('checksums', c)
+
+        # Avoid holding the checksum lock while updating the blob hash cache
+        hashes = {}
+        for alg in BLOB_HASH_ALGORITHMS:
+            if alg in c:
+                hashes[alg] = c[alg]
+        cache.update_blob_hash_cache(self.uuid, hashes)
 
         return True
 
