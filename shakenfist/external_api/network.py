@@ -660,8 +660,6 @@ class NetworkDNSAddressEndpoint(sf_api.Resource):
 
         network_from_db.update_dns_entry(name, value)
 
-
-class NetworkUnDNSAddressEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Remove a custom DNS entry for this network.',
         [
