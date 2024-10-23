@@ -266,8 +266,6 @@ api.add_resource(api_network.NetworkUnrouteAddressEndpoint,
                  '/networks/<network_ref>/route/<address>')
 api.add_resource(api_network.NetworkDNSAddressEndpoint,
                  '/networks/<network_ref>/dns')
-api.add_resource(api_network.NetworkUnDNSAddressEndpoint,
-                 '/networks/<network_ref>/dns/<address>')
 
 api.add_resource(api_node.NodesEndpoint, '/nodes')
 api.add_resource(api_node.NodeEndpoint, '/nodes/<node>')
