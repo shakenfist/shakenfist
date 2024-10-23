@@ -26,9 +26,9 @@ from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.tasks import DeleteNetworkWhenClean
 from shakenfist.tasks import DestroyNetworkTask
 from shakenfist.tasks import FetchBlobTask
-from shakenfist.tasks import HashBlobTask
 from shakenfist.tasks import FetchImageTask
 from shakenfist.tasks import FloatNetworkInterfaceTask
+from shakenfist.tasks import HashBlobTask
 from shakenfist.tasks import HotPlugInstanceInterfaceTask
 from shakenfist.tasks import HypervisorDestroyNetworkTask
 from shakenfist.tasks import InstanceTask

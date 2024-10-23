@@ -19,13 +19,13 @@ from shakenfist_utilities import logs
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 
+from shakenfist import cache
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
-from shakenfist import cache
 from shakenfist.config import config
 from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
