@@ -249,7 +249,10 @@ class BlobChecksumsEndpoint(sf_api.Resource):
             return sf_api.error(400, 'you must specify a hash')
 
         blobs = cache.search_blob_hash_cache('sha512', hash)
-        for b in blobs:
+        for blob_uuid in blobs:
+            b = Blob.from_db(blob_uuid)
+            if not b:
+                continue
             if not b.state.value == dbo.STATE_CREATED:
                 continue
 

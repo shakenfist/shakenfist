@@ -626,7 +626,7 @@ class Instance(dbo):
         block_devices['finalized'] = False
 
         # Increment blob references
-        self.blob_references = blob_refs
+        self.blob_references = dict(blob_refs)
         for blob_uuid in blob_refs:
             b = blob.Blob.from_db(blob_uuid)
             b.ref_count_inc(self, blob_refs[blob_uuid])
@@ -924,6 +924,9 @@ class Instance(dbo):
                             backing_chain = []
                             backing_uuid = disk['blob_uuid']
                             while backing_uuid:
+                                self.log.with_fields(disk).with_fields({
+                                    'backing_uuid': backing_uuid
+                                }).info('traversing backing blob')
                                 backing_path = os.path.join(
                                     config.STORAGE_PATH, 'image_cache', backing_uuid + '.qcow2')
                                 backing_chain.append(backing_path)
