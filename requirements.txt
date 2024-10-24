@@ -43,8 +43,8 @@ urllib3==2.2.3                     # mit
 
 # These must move as a set
 pydantic==2.9.2                    # mit
-pydantic-settings==2.5.2           # mit
-pydantic-core==2.23.4              # (indirect dependency)
+pydantic-settings==2.6.0           # mit
+pydantic-core==2.24.2              # (indirect dependency)
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt
