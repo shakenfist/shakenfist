@@ -8,6 +8,7 @@ from shakenfist_utilities import logs
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 
 
 LOG, _ = logs.setup(__name__)
@@ -72,14 +73,32 @@ class ManagedExecutable(dbo):
                 continue
 
             config_path = os.path.join(config_dir, outpath)
-            regenerated = self.__config_templates[outpath].render(subst)
+            original = ''
+            if os.path.exists(config_path):
+                with open(config_path) as f:
+                    original = f.read()
 
+            regenerated = self.__config_templates[outpath].render(subst)
             with open(config_path, 'w') as f:
                 f.write(regenerated)
+
+            if original == regenerated:
+                self.add_event(EVENT_TYPE_AUDIT, 'generated unchanged configuration',
+                               extra={'path': outpath})
+
+            else:
+                self.add_event(EVENT_TYPE_AUDIT, 'generated modified configuration',
+                               extra={
+                                   'path': outpath,
+                                   'original': original,
+                                   'regenerated': regenerated
+                               })
 
     def _remove_config(self):
         path = self.config_directory
         if os.path.exists(path):
+            self.add_event(EVENT_TYPE_AUDIT, 'removed configuration',
+                           extra={'path': path})
             shutil.rmtree(path)
 
     def _send_signal(self, sig):
@@ -88,6 +107,11 @@ class ManagedExecutable(dbo):
             if not psutil.pid_exists(pid):
                 return False
             os.kill(pid, sig)
+            self.add_event(EVENT_TYPE_AUDIT, 'sent signal',
+                           extra={
+                               'pid': pid,
+                               'signal': sig
+                           })
             if sig == signal.SIGKILL:
                 try:
                     os.waitpid(pid, 0)
@@ -120,3 +144,4 @@ class ManagedExecutable(dbo):
     def terminate(self):
         self._send_signal(signal.SIGKILL)
         self._remove_config()
+        self.add_event(EVENT_TYPE_AUDIT, 'terminated')
