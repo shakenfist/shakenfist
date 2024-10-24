@@ -715,3 +715,49 @@ class TestNetworking(base.BaseNamespacedTestCase):
         if data.find('www.google.com') == -1:
             self.fail(
                 f'Did not find "www.google.com" in getent output:\n\n{data}')
+
+    def test_provided_extra_dns(self):
+        extra_dns_net = self.test_client.allocate_network(
+            '192.168.242.0/24', True, True, '%s-extra-dns' % self.namespace,
+            provide_dns=True)
+        inst1 = self.test_client.create_instance(
+            'test-provided-dns', 1, 1024,
+            [
+                {
+                    'network_uuid': extra_dns_net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://upload/system/debian-11',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        # Create two extra DNS entries, delete one
+        self.test_client.update_network_dns_entry(
+            extra_dns_net['uuid'], 'banana', '11.22.33.44')
+        self.test_client.update_network_dns_entry(
+            extra_dns_net['uuid'], 'mango', '55.66.77.88')
+        self.test_client.delete_network_dns_entry(
+            extra_dns_net['uuid'], 'banana')
+
+        # Wait for the instance agent to report in
+        self._await_instance_ready(inst1['uuid'])
+
+        # Do a DNS lookup for banana
+        ec, data = self.test_client.await_agent_command(
+            inst1['uuid'], 'getent ahostsv4 banana || true')
+        self.assertEqual(0, ec)
+        if data.find('11.22.33.44') != -1:
+            self.fail(
+                f'Found "banana" in getent output:\n\n{data}')
+
+        # Do a DNS lookup for mango
+        ec, data = self.test_client.await_agent_command(
+            inst1['uuid'], 'getent ahostsv4 banana || true')
+        self.assertEqual(0, ec)
+        if data.find('55.66.77.88') == -1:
+            self.fail(
+                f'Did not find "mango" in getent output:\n\n{data}')
