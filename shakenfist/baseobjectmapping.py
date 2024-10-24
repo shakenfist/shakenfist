@@ -1,6 +1,7 @@
 from shakenfist import agentoperation
 from shakenfist import artifact
 from shakenfist import blob
+from shakenfist.managed_executables import dnsmasq
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import namespace
@@ -12,6 +13,7 @@ OBJECT_NAMES_TO_CLASSES = {
     'agentoperation': agentoperation.AgentOperation,
     'artifact': artifact.Artifact,
     'blob': blob.Blob,
+    'dhcp': dnsmasq.DnsMasq,
     'instance': instance.Instance,
     'ipam': ipam.IPAM,
     'namespace': namespace.Namespace,
@@ -20,6 +22,7 @@ OBJECT_NAMES_TO_CLASSES = {
     'node': node.Node
 }
 
+# dhcp does not have an iterator
 OBJECT_NAMES_TO_ITERATORS = {
     'agentoperation': agentoperation.AgentOperations,
     'artifact': artifact.Artifacts,
