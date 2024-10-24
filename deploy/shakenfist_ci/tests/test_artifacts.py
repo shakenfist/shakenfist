@@ -75,7 +75,7 @@ class TestImages(base.BaseNamespacedTestCase):
         i = self.test_client.get_instance(inst['uuid'])
         self.assertEqual('error', i['state'])
 
-    def test_resize_image_to_small(self):
+    def test_resize_image_too_small(self):
         inst = self.test_client.create_instance(
             'resizetoosmall', 2, 2048,
             [],

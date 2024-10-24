@@ -29,6 +29,7 @@ from shakenfist import network as sfnet
 from shakenfist import scheduler
 from shakenfist.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
+from shakenfist.artifact import ARTIFACT_URL
 from shakenfist.artifact import BLOB_URL
 from shakenfist.artifact import LABEL_URL
 from shakenfist.artifact import SNAPSHOT_URL
@@ -574,13 +575,19 @@ class InstancesEndpoint(sf_api.Resource):
                     return sf_api.error(404, 'Could not resolve snapshot to a blob')
                 d['blob_uuid'] = blob_uuid
 
-            elif disk_base.startswith(UPLOAD_URL) or disk_base.startswith(LABEL_URL):
+            elif (disk_base.startswith(UPLOAD_URL) or
+                  disk_base.startswith(LABEL_URL) or
+                  disk_base.startswith(ARTIFACT_URL)):
                 if disk_base.startswith(UPLOAD_URL):
                     a = Artifact.from_url(Artifact.TYPE_IMAGE, disk_base,
                                           namespace=namespace)
-                else:
+                elif disk_base.startswith(LABEL_URL):
                     a = Artifact.from_url(Artifact.TYPE_LABEL, disk_base,
                                           namespace=namespace)
+                else:
+                    a_uuid = disk_base[len(ARTIFACT_URL):]
+                    a = Artifact.from_db(a_uuid, suppress_failure_audit=True)
+
                 err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
                 if err:
                     return err

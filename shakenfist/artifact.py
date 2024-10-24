@@ -19,6 +19,7 @@ from shakenfist.namespace import namespace_is_trusted
 LOG, _ = logs.setup(__name__)
 
 
+ARTIFACT_URL = 'sf://artifact/'
 BLOB_URL = 'sf://blob/'
 INSTANCE_URL = 'sf://instance/'
 LABEL_URL = 'sf://label/'
