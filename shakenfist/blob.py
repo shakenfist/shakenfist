@@ -205,8 +205,13 @@ class Blob(dbo):
         self.record_usage()
         with self.get_lock(op='Update transcoded versions'):
             transcoded = self.transcoded
+            if style in transcoded:
+                # This is a duplicate transcode
+                return False
+
             transcoded[style] = blob_uuid
             self._db_set_attribute('transcoded', transcoded)
+            return True
 
     def remove_transcodes(self):
         with self.get_lock(op='Remove transcoded versions'):
