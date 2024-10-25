@@ -654,7 +654,7 @@ class NetworkDNSAddressEndpoint(sf_api.Resource):
             return sf_api.error(406, 'network does not provide DNS')
 
         valid_hostname = validators.hostname(
-            name, skip_ipv4_addr=True, skip_ipv6_add=True, may_have_port=False)
+            name, skip_ipv4_addr=True, skip_ipv6_addr=True, may_have_port=False)
         if not valid_hostname:
             return sf_api.error(406, 'invalid DNS name')
 
@@ -681,7 +681,7 @@ class NetworkDNSAddressEndpoint(sf_api.Resource):
             return sf_api.error(406, 'network does not provide DNS')
 
         valid_hostname = validators.hostname(
-            name, skip_ipv4_addr=True, skip_ipv6_add=True, may_have_port=False)
+            name, skip_ipv4_addr=True, skip_ipv6_addr=True, may_have_port=False)
         if not valid_hostname:
             return sf_api.error(406, 'invalid DNS name')
 

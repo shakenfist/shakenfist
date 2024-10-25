@@ -5,6 +5,7 @@ import time
 from shakenfist import instance
 from shakenfist import networkinterface
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.managed_executables import managedexecutable
 from shakenfist.util import process as util_process
@@ -150,9 +151,10 @@ class DnsMasq(managedexecutable.ManagedExecutable):
                 # 1672899136 02:00:00:55:04:a2 172.10.0.8 client *
                 # ^--expiry  ^--mac            ^--ip      ^-- hostname
                 elems = line.split(' ')
+                expiry = int(elems[0])
 
                 # The lease is expired, so we don't care
-                if time.time() > int(elems[0]):
+                if time.time() > expiry:
                     lout.write(line)
                     continue
 
@@ -164,6 +166,14 @@ class DnsMasq(managedexecutable.ManagedExecutable):
                 # Otherwise, this lease is invalid and we'll need to do a
                 # hard restart
                 needs_restart = True
+                self.add_event(EVENT_TYPE_AUDIT, 'detected invalid DHCP lease',
+                               extra={
+                                   'expiry': expiry,
+                                   'remaining_life': time.time() - expiry,
+                                   'macaddr': elems[1],
+                                   'ipv4': elems[2],
+                                   'hostname': elems[3]
+                               })
 
         return needs_restart
 
@@ -176,6 +186,11 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         util_process.execute(
             None, 'dhcp_release %(interface)s %(ipv4)s %(macaddr)s' % subst,
             namespace=self.network.uuid)
+        self.add_event(EVENT_TYPE_AUDIT, 'released a DHCP lease',
+                       extra={
+                           'macaddr': macaddr,
+                           'ipv4': ipv4
+                       })
 
     def restart(self):
         if not os.path.exists('/var/run/netns/%s' % self.network.uuid):
@@ -203,3 +218,4 @@ class DnsMasq(managedexecutable.ManagedExecutable):
             util_process.execute(
                 None, 'dnsmasq --conf-file=%s/config' % self.config_directory,
                 namespace=self.network.uuid)
+            self.add_event(EVENT_TYPE_AUDIT, 'started')

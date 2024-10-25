@@ -35,7 +35,7 @@ class NoopLock(Lock):
 
 VERSION_CACHE = None
 VERSION_CACHE_AGE = 0
-OBJECT_NAMES = ['agentoperation', 'artifact', 'blob', 'instance', 'ipam',
+OBJECT_NAMES = ['agentoperation', 'artifact', 'blob', 'dhcp', 'instance', 'ipam',
                 'namespace', 'network', 'networkinterface', 'node', 'upload']
 
 
@@ -218,6 +218,13 @@ class DatabaseBackedObject:
                     extra={'caller': util_callstack.get_caller(offset=-3)},
                     log_as_error=True)
             return None
+
+        if 'uuid' not in static_values:
+            LOG.with_fields(static_values).with_fields(
+                {
+                    'object_type': cls.object_type,
+                    'object_uuid': object_uuid
+                }).error('Object with no uuid!')
 
         return cls(static_values)
 
