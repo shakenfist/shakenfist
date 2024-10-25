@@ -88,12 +88,18 @@ class Blob(dbo):
             # I am currently unsure why you'd end up here, but am seeing it in
             # CI. Let's gather some more information so we can chase it down.
             LOG.with_fields(static_values).error(
-                'KeyError while upgrading metadata: %s' % e)
+                'KeyError while upgrading metadata (v4 to v5): %s' % e)
 
     @classmethod
     def _upgrade_step_5_to_6(cls, static_values):
-        etcd.put('attribute/blob', static_values['uuid'], 'retention',
-                 {'expires_at': 0})
+        try:
+            etcd.put('attribute/blob', static_values['uuid'], 'retention',
+                     {'expires_at': 0})
+        except KeyError as e:
+            # I am currently unsure why you'd end up here, but am seeing it in
+            # CI. Let's gather some more information so we can chase it down.
+            LOG.with_fields(static_values).error(
+                'KeyError while upgrading retention (v5 to v6): %s' % e)
 
     @classmethod
     def normalize_timestamp(cls, timestamp):
