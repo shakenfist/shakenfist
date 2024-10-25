@@ -219,6 +219,13 @@ class DatabaseBackedObject:
                     log_as_error=True)
             return None
 
+        if 'uuid' not in static_values:
+            LOG.with_fields(static_values).with_fields(
+                {
+                    'object_type': cls.object_type,
+                    'object_uuid': object_uuid
+                }).error('Object with no uuid!')
+
         return cls(static_values)
 
     @classmethod

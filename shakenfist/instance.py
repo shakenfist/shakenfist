@@ -939,6 +939,9 @@ class Instance(dbo):
                             indent = '      '
                             disk['backing'] = ''
                             backing_chain.reverse()
+                            self.log.with_fields(disk).with_fields({
+                                    'backing_chain': backing_chain
+                                }).info('resolved backing chain')
 
                             for backing_path in backing_chain:
                                 disk['backing'] = (
