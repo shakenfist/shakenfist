@@ -214,7 +214,7 @@ class ImageFetchHelper:
             b = self._blob_get(lock, url)
         else:
             self.log.info('Fetching image from the internet')
-            b = self._http_get_inner(lock, url, instance_object=self.instance)
+            b = self._http_get_inner(lock, url)
 
         return b
 
@@ -329,7 +329,7 @@ class ImageFetchHelper:
         b.ensure_local([lock], instance_object=self.instance)
         return b
 
-    def _http_get_inner(self, lock, url, instance_object=None):
+    def _http_get_inner(self, lock, url):
         """Fetch image if not downloaded and return image path."""
 
         with util_general.RecordedOperation('fetch image', self.instance):
@@ -342,7 +342,8 @@ class ImageFetchHelper:
 
             try:
                 b = blob.http_fetch(
-                    url, resp, blob_uuid, [lock], self.log, instance_object=instance_object)
+                    url, resp, blob_uuid, [lock], self.log,
+                    instance_object=self.instance)
             except exceptions.BadCheckSum as e:
                 self.instance.add_event(
                     EVENT_TYPE_AUDIT, 'fetched image had bad checksum')
