@@ -43,7 +43,7 @@
 
     - include_tasks: ci-include-common-localhost.yml
 
-- hosts: primary
+- hosts: sfall
   gather_facts: yes
   become: true
   vars:

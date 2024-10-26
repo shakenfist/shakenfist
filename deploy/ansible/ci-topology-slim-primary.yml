@@ -58,6 +58,7 @@
         ram: 12288
         disks:
           - "100@{{base_image}}"
+          - "30@sf://label/ci-images/dependencies"
         networkspecs:
           - network_uuid={{identifier}},address=10.0.0.20
           - network_uuid={{meshnetwork['meta']['uuid']}},address=none
@@ -86,6 +87,7 @@
         ram: 12288
         disks:
           - "100@{{base_image}}"
+          - "30@sf://label/ci-images/dependencies"
         networkspecs:
           - network_uuid={{identifier}},address=10.0.0.21
           - network_uuid={{meshnetwork['meta']['uuid']}},address=none
@@ -114,6 +116,7 @@
         ram: 12288
         disks:
           - "100@{{base_image}}"
+          - "30@sf://label/ci-images/dependencies"
         networkspecs:
           - network_uuid={{identifier}},address=10.0.0.22
           - network_uuid={{meshnetwork['meta']['uuid']}},address=none
@@ -142,6 +145,7 @@
         ram: 12288
         disks:
           - "100@{{base_image}}"
+          - "30@sf://label/ci-images/dependencies"
         networkspecs:
           - network_uuid={{identifier}},address=10.0.0.23
           - network_uuid={{meshnetwork['meta']['uuid']}},address=none
@@ -170,6 +174,7 @@
         ram: 12288
         disks:
           - "100@{{base_image}}"
+          - "30@sf://label/ci-images/dependencies"
         networkspecs:
           - network_uuid={{identifier}},address=10.0.0.24
           - network_uuid={{meshnetwork['meta']['uuid']}},address=none
@@ -203,7 +208,7 @@
 
     - include_tasks: ci-include-common-localhost.yml
 
-- hosts: primary
+- hosts: sfall
   gather_facts: yes
   become: true
   vars:
