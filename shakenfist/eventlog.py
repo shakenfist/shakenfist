@@ -22,12 +22,25 @@ from shakenfist.config import config
 LOG, _ = logs.setup(__name__)
 
 
-def add_event(event_type, object_type, object_uuid, message, duration=None,
-              extra=None, suppress_event_logging=False, log_as_error=False):
+def add_event(
+        event_type, object_type, object_uuid, message, duration=None,
+        extra=None, suppress_event_logging=False, log_as_error=False):
+    if not object_type or not object_uuid:
+        return
+
+    add_event_multi(
+        event_type, [(object_type, object_uuid)], message, duration=duration,
+        extra=extra, suppress_event_logging=suppress_event_logging,
+        log_as_error=log_as_error)
+
+
+def add_event_multi(
+        event_type, objects, message, duration=None, extra=None,
+        suppress_event_logging=False, log_as_error=False):
     # Queue an event in etcd to get shuffled over to the long term data store
     timestamp = time.time()
 
-    if not object_type or not object_uuid:
+    if not objects:
         return
 
     # If we alter extra, we don't want that to leak back to the caller.
@@ -46,49 +59,84 @@ def add_event(event_type, object_type, object_uuid, message, duration=None,
         extra['request-id'] = request_id
 
     log = LOG.with_fields({
-            object_type: object_uuid,
             'event_type': event_type,
             'fqdn': config.NODE_NAME,
             'duration': duration,
             'message': message,
             'extra': extra
         })
+    for object_type, object_uuid in objects:
+        log = log.with_fields({object_type: object_uuid})
+
     if not suppress_event_logging:
         if log_as_error:
             log.error('Added event')
         else:
             log.info('Added event')
 
-    # Attempt to send the event with gRPC directly to the eventlog node.
+    # Attempt to send with the newer EventMultiRequest
     try:
         with grpc.insecure_channel('{}:{}'.format(config.EVENTLOG_NODE_IP,
-                                                  config.EVENTLOG_API_PORT)) as channel:
+                                                config.EVENTLOG_API_PORT)) as channel:
+            objects = []
+            for object_type, object_uuid in objects:
+                objects.append(event_pb2.EventObject(
+                    object_type=object_type, object_uuid=object_uuid))
+
             stub = event_pb2_grpc.EventServiceStub(channel)
-            request = event_pb2.EventRequest(
-                object_type=object_type, object_uuid=object_uuid,
-                event_type=event_type, timestamp=timestamp,
-                fqdn=config.NODE_NAME, duration=duration,
-                message=message, extra=json.dumps(extra))
-            response = stub.RecordEvent(request)
+            request = event_pb2.EventMultiRequest(
+                objects=objects, event_type=event_type, timestamp=timestamp,
+                fqdn=config.NODE_NAME, duration=duration, message=message,
+                extra=json.dumps(extra))
+            response = stub.RecordMultiEvent(request)
             if response.ack:
                 return
 
     except grpc._channel._InactiveRpcError as e:
+        if e.code().name == 'UNIMPLEMENTED':
+            log.debug('Server does not support multi event with gRPC, '
+                      'trying single events')
+        else:
+            log.info('Unknown server error while sending multi event with gRPC, '
+                     'trying single events: %s' % e)
+
+    # Attempt to send with the older EventRequest
+    failed = objects
+    try:
+        with grpc.insecure_channel('{}:{}'.format(config.EVENTLOG_NODE_IP,
+                                                  config.EVENTLOG_API_PORT)) as channel:
+            stub = event_pb2_grpc.EventServiceStub(channel)
+            for object_type, object_uuid in objects:
+                request = event_pb2.EventRequest(
+                    object_type=object_type, object_uuid=object_uuid,
+                    event_type=event_type, timestamp=timestamp,
+                    fqdn=config.NODE_NAME, duration=duration,
+                    message=message, extra=json.dumps(extra))
+                response = stub.RecordEvent(request)
+
+                if not response.ack:
+                    del failed[(object_type, object_uuid)]
+
+    except grpc._channel._InactiveRpcError as e:
         log.info('Failed to send event with gRPC, adding to dead letter queue: %s' % e)
+
+    if not failed:
+        return
 
     # We use the old eventlog mechanism as a queueing system to get the logs
     # to the eventlog node.
-    etcd.put('event/%s' % object_type, object_uuid, timestamp,
-             {
-                 'timestamp': timestamp,
-                 'event_type': event_type,
-                 'object_type': object_type,
-                 'object_uuid': object_uuid,
-                 'fqdn': config.NODE_NAME,
-                 'duration': duration,
-                 'message': message,
-                 'extra': extra
-             })
+    for object_type, object_uuid in failed:
+        etcd.put('event/%s' % object_type, object_uuid, timestamp,
+                {
+                    'timestamp': timestamp,
+                    'event_type': event_type,
+                    'object_type': object_type,
+                    'object_uuid': object_uuid,
+                    'fqdn': config.NODE_NAME,
+                    'duration': duration,
+                    'message': message,
+                    'extra': extra
+                })
 
 
 def upgrade_data_store():

@@ -5,7 +5,7 @@ import grpc
 from shakenfist import event_pb2 as event__pb2
 
 
-class EventServiceStub:
+class EventServiceStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -19,12 +19,23 @@ class EventServiceStub:
                 request_serializer=event__pb2.EventRequest.SerializeToString,
                 response_deserializer=event__pb2.EventReply.FromString,
                 )
+        self.RecordMultiEvent = channel.unary_unary(
+                '/shakenfist.protos.EventService/RecordMultiEvent',
+                request_serializer=event__pb2.EventMultiRequest.SerializeToString,
+                response_deserializer=event__pb2.EventReply.FromString,
+                )
 
 
-class EventServiceServicer:
+class EventServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def RecordEvent(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RecordMultiEvent(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -38,6 +49,11 @@ def add_EventServiceServicer_to_server(servicer, server):
                     request_deserializer=event__pb2.EventRequest.FromString,
                     response_serializer=event__pb2.EventReply.SerializeToString,
             ),
+            'RecordMultiEvent': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordMultiEvent,
+                    request_deserializer=event__pb2.EventMultiRequest.FromString,
+                    response_serializer=event__pb2.EventReply.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'shakenfist.protos.EventService', rpc_method_handlers)
@@ -45,7 +61,7 @@ def add_EventServiceServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class EventService:
+class EventService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
@@ -61,6 +77,23 @@ class EventService:
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/shakenfist.protos.EventService/RecordEvent',
             event__pb2.EventRequest.SerializeToString,
+            event__pb2.EventReply.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def RecordMultiEvent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/shakenfist.protos.EventService/RecordMultiEvent',
+            event__pb2.EventMultiRequest.SerializeToString,
             event__pb2.EventReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

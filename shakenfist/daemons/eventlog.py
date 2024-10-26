@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import pathlib
@@ -31,64 +32,112 @@ class EventService(event_pb2_grpc.EventServiceServicer):
         super().__init__()
         self.monitor = monitor
 
+    def _record_with_dlq(
+            self, event_type, object_type, object_uuid, message, duration,
+            extra, timestamp, fqdn):
+        with eventlog.EventLog(object_type, object_uuid) as eventdb:
+            if not eventdb.write_event(
+                    event_type, timestamp, fqdn,
+                    duration, message, extra):
+                # Writing the event failed, queue it to etcd instead
+                LOG.info('Failed to write event via gRPC path, adding to dead '
+                         'letter queue')
+                etcd.put('event/%s' % object_type, object_uuid,
+                         timestamp,
+                         {
+                             'timestamp': timestamp,
+                             'event_type': event_type,
+                             'object_type': object_type,
+                             'object_uuid': object_uuid,
+                             'fqdn': fqdn,
+                             'message': message,
+                             'extra': extra
+                         })
+
+    def _add_other_objects(not_this_type, objects, extra):
+        tweaked_extra = copy.deepcopy(extra)
+        for object_type, object_uuid in objects:
+            if object_type != not_this_type:
+                tweaked_extra[object_type] = object_uuid
+        return tweaked_extra
+
+    # An older, less preferred implementation but still here as a fallback
+    # during upgrade
     def RecordEvent(self, request, context):
         try:
-            with eventlog.EventLog(request.object_type, request.object_uuid) as eventdb:
-                extra = json.loads(request.extra)
+            extra = json.loads(request.extra)
 
-                # Handle the replacement of the timestamp field. Weirdly, HasField()
-                # raises an exception if the field is not present in the message,
-                # instead of a boolean.
-                timestamp = request.obsolete_timestamp
-                try:
-                    timestamp = request.timestamp
-                except ValueError:
-                    ...
+            # Handle the replacement of the timestamp field. Weirdly, HasField()
+            # raises an exception if the field is not present in the message,
+            # instead of a boolean.
+            timestamp = request.obsolete_timestamp
+            try:
+                timestamp = request.timestamp
+            except ValueError:
+                ...
 
-                if not timestamp or timestamp == 0:
-                    LOG.with_fields({
-                        'event_type': request.event_type,
-                        'timestamp': timestamp,
-                        'protobuf_timestamp': request.timestamp,
-                        'protobuf_obsolete_timestamp': request.obsolete_timestamp,
-                        'node': request.fqdn,
-                        'message': request.message,
-                        'extra': request.extra
-                    }).error('Event has invalid timestamp')
+            if not timestamp or timestamp == 0:
+                LOG.with_fields({
+                    'event_type': request.event_type,
+                    'timestamp': timestamp,
+                    'protobuf_timestamp': request.timestamp,
+                    'protobuf_obsolete_timestamp': request.obsolete_timestamp,
+                    'node': request.fqdn,
+                    'message': request.message,
+                    'extra': request.extra
+                }).error('Event has invalid timestamp')
 
-                if not eventdb.write_event(
-                        request.event_type, timestamp, request.fqdn,
-                        request.duration, request.message, extra):
-                    # Write the event failed, queue it to etcd instead
-                    LOG.info('Failed to write event via gRPC path, adding to dead '
-                             'letter queue')
-                    etcd.put('event/%s' % request.object_type, request.object_uuid,
-                             timestamp,
-                             {
-                                 'timestamp': timestamp,
-                                 'event_type': request.event_type,
-                                 'object_type': request.object_type,
-                                 'object_uuid': request.object_uuid,
-                                 'fqdn': request.fqdn,
-                                 'message': request.message,
-                                 'extra': request.extra
-                             })
-                self.monitor.counters[request.event_type].inc()
+            self._record_with_dlq(
+                request.event_type, request.object_type, request.object_uuid,
+                request.message, request.duration, extra, timestamp,
+                request.fqdn)
+            self.monitor.counters[request.event_type].inc()
 
             # Piggy back request tracing onto object events
             if 'request-id' in extra:
                 # Add object information from the original event to extra
                 extra['object_type'] = request.object_type
                 extra['object_uuid'] = request.object_uuid
+                self._record_with_dlq(
+                    request.event_type, API_REQUESTS, extra['request-id'],
+                    request.message, request.duration, extra, timestamp,
+                    request.fqdn)
 
-                with eventlog.EventLog(API_REQUESTS, extra['request-id']) as eventdb:
-                    eventdb.write_event(
-                        request.event_type, timestamp, request.fqdn,
-                        request.duration, request.message, extra)
         except Exception as e:
             util_general.ignore_exception(
                 'failed to write event for %s %s'
                 % (request.object_type, request.object_uuid), e)
+            return event_pb2.EventReply(ack=False)
+
+        return event_pb2.EventReply(ack=True)
+
+    def RecordMultiEvent(self, request, context):
+        try:
+            extra = json.loads(request.extra)
+            timestamp = request.timestamp
+
+            for eo in request.objects:
+                tweaked_extra = self._add_other_objects(
+                    eo.object_type, request.objects, extra)
+                self._record_with_dlq(
+                    request.event_type, eo.object_type, eo.object_uuid,
+                    request.message, request.duration, tweaked_extra, timestamp,
+                    request.fqdn)
+            self.monitor.counters[request.event_type].inc()
+
+            # Piggy back request tracing onto object events
+            if 'request-id' in extra:
+                # Add object information from the original event to extra
+                tweaked_extra = self._add_other_objects(
+                    API_REQUESTS, request.objects, extra)
+                self._record_with_dlq(
+                    request.event_type, API_REQUESTS, extra['request-id'],
+                    request.message, request.duration, tweaked_extra, timestamp,
+                    request.fqdn)
+
+        except Exception as e:
+            util_general.ignore_exception(
+                'failed to write event for %s' % request.objects, e)
             return event_pb2.EventReply(ack=False)
 
         return event_pb2.EventReply(ack=True)

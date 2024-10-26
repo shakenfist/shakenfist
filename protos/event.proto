@@ -4,8 +4,10 @@ package shakenfist.protos;
 
 service EventService {
   rpc RecordEvent (EventRequest) returns (EventReply) {}
+  rpc RecordMultiEvent (EventMultiRequest) returns (EventReply) {}
 }
 
+// An event against a single object, should be removed one day
 message EventRequest {
     string object_type = 1;
     string object_uuid = 2;
@@ -18,6 +20,23 @@ message EventRequest {
     double timestamp = 9;
 }
 
+// An event against multiple objects
+message EventObject {
+  string object_type = 1;
+  string object_uuid = 2;
+}
+
+message EventMultiRequest {
+  repeated EventObject objects = 1;
+  string event_type = 2;
+  string fqdn = 3;
+  float duration = 4;
+  string message = 5;
+  string extra = 6;
+  double timestamp = 7;
+}
+
+// An ack from the eventlog daemon
 message EventReply {
   bool ack = 1;
 }
