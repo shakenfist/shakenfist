@@ -185,16 +185,23 @@ def handle(queue_name, jobname, workitem):
                         transcode_blob.state = blob.Blob.STATE_CREATED
                         transcode_blob.observe()
                         transcode_blob.verify_checksum(locks=[])
-                        transcode_blob.request_replication()
-                        log.with_fields({
-                            'blob': b,
-                            'transcode_blob_uuid': transcode_blob_uuid,
-                            'description': task.transcode_description()}).info(
-                            'Recorded transcode')
 
-                        b.add_transcode(task.transcode_description(),
-                                        transcode_blob_uuid)
-                        transcode_blob.ref_count_inc(b)
+                        if b.add_transcode(task.transcode_description(),
+                                           transcode_blob_uuid):
+                            transcode_blob.request_replication()
+                            log.with_fields({
+                                'blob': b,
+                                'transcode_blob_uuid': transcode_blob_uuid,
+                                'description': task.transcode_description()}).info(
+                                'Recorded transcode')
+                            transcode_blob.ref_count_inc(b)
+                        else:
+                            # We get a false back if someone else beat us and
+                            # has already recorded the same transcoding. In
+                            # that case just delete our attempt.
+                            transcode_blob.add_event(
+                                EVENT_TYPE_STATUS, 'Lost the transcode race!')
+                            transcode_blob.state = blob.Blob.STATE_DELETED
 
             elif isinstance(task, PreflightAgentOperationTask):
                 preflight_agent_operation(task.agentop_uuid())
