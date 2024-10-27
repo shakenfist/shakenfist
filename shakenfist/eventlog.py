@@ -76,8 +76,8 @@ def add_event_multi(
 
     # Attempt to send with the newer EventMultiRequest
     try:
-        with grpc.insecure_channel('{}:{}'.format(config.EVENTLOG_NODE_IP,
-                                                config.EVENTLOG_API_PORT)) as channel:
+        with grpc.insecure_channel(
+                f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}') as channel:
             objects = []
             for object_type, object_uuid in objects:
                 objects.append(event_pb2.EventObject(
@@ -103,8 +103,8 @@ def add_event_multi(
     # Attempt to send with the older EventRequest
     failed = objects
     try:
-        with grpc.insecure_channel('{}:{}'.format(config.EVENTLOG_NODE_IP,
-                                                  config.EVENTLOG_API_PORT)) as channel:
+        with grpc.insecure_channel(
+                f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}') as channel:
             stub = event_pb2_grpc.EventServiceStub(channel)
             for object_type, object_uuid in objects:
                 request = event_pb2.EventRequest(
@@ -126,17 +126,18 @@ def add_event_multi(
     # We use the old eventlog mechanism as a queueing system to get the logs
     # to the eventlog node.
     for object_type, object_uuid in failed:
-        etcd.put('event/%s' % object_type, object_uuid, timestamp,
-                {
-                    'timestamp': timestamp,
-                    'event_type': event_type,
-                    'object_type': object_type,
-                    'object_uuid': object_uuid,
-                    'fqdn': config.NODE_NAME,
-                    'duration': duration,
-                    'message': message,
-                    'extra': extra
-                })
+        etcd.put(
+            'event/%s' % object_type, object_uuid, timestamp,
+            {
+                'timestamp': timestamp,
+                'event_type': event_type,
+                'object_type': object_type,
+                'object_uuid': object_uuid,
+                'fqdn': config.NODE_NAME,
+                'duration': duration,
+                'message': message,
+                'extra': extra
+            })
 
 
 def upgrade_data_store():
@@ -155,8 +156,10 @@ def upgrade_data_store():
         # sqlite database.
         version = 2
         count = 0
-        for objtype in ['agentoperation', 'artifact', 'blob', 'instance', 'ipam',
-                        'namespace', 'network', 'networkinterface', 'node', 'upload']:
+        for objtype in [
+                'agentoperation', 'api-requests', 'artifact', 'blob', 'dhcp',
+                'instance', 'ipam', 'namespace', 'network', 'networkinterface',
+                'node', 'upload']:
             objroot = os.path.join(config.STORAGE_PATH, 'events', objtype)
             if os.path.exists(objroot):
                 for ent in os.listdir(objroot):
