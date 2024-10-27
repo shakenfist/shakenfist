@@ -54,7 +54,7 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                              'extra': extra
                          })
 
-    def _add_other_objects(not_this_type, objects, extra):
+    def _add_other_objects(self, not_this_type, objects, extra):
         tweaked_extra = copy.deepcopy(extra)
         for object_type, object_uuid in objects:
             if object_type != not_this_type:
