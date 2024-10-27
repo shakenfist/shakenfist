@@ -24,6 +24,7 @@ from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import GiB
 from shakenfist.constants import LOCK_REFRESH_SECONDS
 from shakenfist.eventlog import add_event_multi
@@ -773,7 +774,7 @@ def http_fetch(url, resp, blob_uuid, locks, objects):
                 last_refresh = time.time()
 
     add_event_multi(
-        EVENT_TYPE_STATUS, objects, 'fetching required HTTP resource complete',
+        EVENT_TYPE_USAGE, objects, 'fetching required HTTP resource complete',
         extra={
             'url': url,
             'bytes_fetched': fetched
