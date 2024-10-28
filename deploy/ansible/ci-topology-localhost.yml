@@ -132,6 +132,7 @@
           export GETSF_AGENT_PACKAGE="/root/{{hostvars['localhost']['agent_wheel_file']}}"
 
           export GETSF_SKIP_COMMON_IMAGES=1
+          export GETSF_CLIENT_ON_ALL_NODES=true
 
           read -r -d '' GETSF_EXTRA_CONFIG <<'EOF'
           [
