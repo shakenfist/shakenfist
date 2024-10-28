@@ -405,6 +405,8 @@
           export GETSF_NODE_MESH_ADDRESS_sf_5="{{hostvars['sf5']['mesh_ip']}}"
 
           export GETSF_SKIP_COMMON_IMAGES=1
+          export GETSF_CLIENT_ON_ALL_NODES=true
+          export GETSF_CLIENT_ON_ALL_NODES=1
 
           read -r -d '' GETSF_EXTRA_CONFIG <<'EOF'
           [
