@@ -334,7 +334,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle-${{ matrix.os.job_name }}.zip
+          name: bundle-functional-cluster-${{ matrix.os.job_name }}
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
@@ -504,7 +504,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle-ansible-modules.zip
+          name: bundle-functional-ansible-modules
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
@@ -678,7 +678,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle-node-lifecycle.zip
+          name: bundle-functional-node-lifecycle
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
@@ -817,7 +817,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle-upgrade-0-6-15.zip
+          name: bundle-functional-upgrade-0-6-15
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
