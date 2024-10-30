@@ -1637,6 +1637,8 @@
 <ul>
 <li>REST API request traces are now logged via the event logging mechanism with
   the object type "api-requests" and the UUID being the request id.</li>
+<li>Effort is now taken to report an event against all objects it affects, not
+  just an arbitrary single object. This should ease debugging.</li>
 </ul>
 <h3 id="containers-and-kubernetes">Containers and Kubernetes</h3>
 <ul>
