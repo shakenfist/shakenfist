@@ -69,7 +69,8 @@ done
 
 # Forbidden once stable, which we currently define as after the first 1,000
 # lines of the syslog file.
-FORBIDDEN_ONCE_STABLE=("Failed to send event with gRPC")
+FORBIDDEN_ONCE_STABLE=("Failed to send event with gRPC"
+                       "Unknown server error while sending multi event with gRPC")
 IFS=""
 for forbid in ${FORBIDDEN_ONCE_STABLE[*]}
 do

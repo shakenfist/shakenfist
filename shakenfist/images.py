@@ -1,3 +1,4 @@
+import copy
 import os
 import pathlib
 import re
@@ -9,11 +10,13 @@ from shakenfist_utilities import logs
 
 from shakenfist import blob
 from shakenfist import etcd
+from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist.artifact import Artifact
 from shakenfist.artifact import BLOB_URL
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import LOCK_REFRESH_SECONDS
 from shakenfist.constants import QCOW2_CLUSTER_SIZE
 from shakenfist.constants import TRANSCODE_DESCRIPTION
@@ -106,7 +109,10 @@ class ImageFetchHelper:
     def __init__(self, inst, artifact):
         self.instance = inst
         self.artifact = artifact
-        self.log = LOG.with_fields({'artifact': self.artifact.uuid})
+
+        self.objects = [('artifact', self.artifact.uuid)]
+        if self.instance:
+            self.objects.append(('instance', self.instance.uuid))
 
     def get_image(self):
         fetched_blobs = []
@@ -122,9 +128,12 @@ class ImageFetchHelper:
 
             # If the image depends on another image, we must fetch that too.
             while depends_on := fetched_blobs[-1].depends_on:
-                self.log.with_fields({
-                    'parent_blob_uuid': fetched_blobs[-1].uuid,
-                    'child_blob_uuid': depends_on}).info('Fetching dependency')
+                add_event_multi(
+                    EVENT_TYPE_STATUS, self.objects, 'fetching dependency',
+                    extra={
+                        'parent_blob_uuid': fetched_blobs[-1].uuid,
+                        'child_blob_uuid': depends_on
+                        })
                 fetched_blobs.append(
                     self._blob_get(lock, 'sf://blob/%s' % depends_on))
 
@@ -151,7 +160,9 @@ class ImageFetchHelper:
             dirty = False
 
             if most_recent.get('index', 0) == 0:
-                self.log.info('Cluster does not have a copy of image')
+                add_event_multi(
+                    EVENT_TYPE_STATUS, self.objects,
+                    'cluster does not have a copy of image')
                 dirty = True
             else:
                 most_recent_blob = blob.Blob.from_db(most_recent['blob_uuid'])
@@ -210,11 +221,15 @@ class ImageFetchHelper:
         # Ensure that we have the blob in the local store. This blob is in the
         # "original format" if downloaded from an HTTP source.
         if url.startswith(BLOB_URL):
-            self.log.info('Fetching image from within the cluster')
+            add_event_multi(
+                EVENT_TYPE_STATUS, self.objects,
+                'fetching image from within the cluster')
             b = self._blob_get(lock, url)
         else:
-            self.log.info('Fetching image from the internet')
-            b = self._http_get_inner(lock, url, instance_object=self.instance)
+            add_event_multi(
+                EVENT_TYPE_STATUS, self.objects,
+                'fetching image from the internet')
+            b = self._http_get_inner(lock, url)
 
         return b
 
@@ -294,9 +309,12 @@ class ImageFetchHelper:
                 except FileExistsError:
                     ...
             else:
+                objects_with_blob = copy.copy(self.objects)
+                objects_with_blob.append(('blob', b.uuid))
                 with util_general.RecordedOperation('transcode image', self.instance):
-                    self.log.with_fields({'blob': b}).info(
-                        f'Transcoding {blob_path} -> {cache_path}')
+                    add_event_multi(
+                        EVENT_TYPE_STATUS, objects_with_blob,
+                        f'transcoding {blob_path} -> {cache_path}')
                     util_image.create_qcow2([lock], blob_path, cache_path)
 
             # We will cache this transcode, but we do it later as part of a
@@ -309,10 +327,10 @@ class ImageFetchHelper:
                             b.uuid, cache_path, TRANSCODE_DESCRIPTION)]
                 })
 
-        shutil.chown(cache_path, config.LIBVIRT_USER,
-                     config.LIBVIRT_GROUP)
-        self.log.with_fields(util_general.stat_log_fields(cache_path)).info(
-            'Cache file %s created' % cache_path)
+        shutil.chown(cache_path, config.LIBVIRT_USER, config.LIBVIRT_GROUP)
+        add_event_multi(
+            EVENT_TYPE_STATUS, self.objects, f'cache file {cache_path} created',
+            extra=util_general.stat_log_fields(cache_path))
 
         if self.artifact.state.value == Artifact.STATE_INITIAL:
             self.artifact.state = Artifact.STATE_CREATED
@@ -329,25 +347,26 @@ class ImageFetchHelper:
         b.ensure_local([lock], instance_object=self.instance)
         return b
 
-    def _http_get_inner(self, lock, url, instance_object=None):
+    def _http_get_inner(self, lock, url):
         """Fetch image if not downloaded and return image path."""
 
         with util_general.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
-            self.log.with_fields({
-                'artifact': self.artifact,
-                'blob': blob_uuid,
-                'url': url}).info('Commencing HTTP fetch to blob')
+
+            objects_including_blob = copy.copy(self.objects)
+            objects_including_blob.append(('blob', blob_uuid))
+            add_event_multi(
+                EVENT_TYPE_STATUS, objects_including_blob,
+                'commencing HTTP fetch to blob', extra={'url': url})
 
             try:
                 b = blob.http_fetch(
-                    url, resp, blob_uuid, [lock], self.log, instance_object=instance_object)
+                    url, resp, blob_uuid, [lock], objects_including_blob)
             except exceptions.BadCheckSum as e:
-                self.instance.add_event(
-                    EVENT_TYPE_AUDIT, 'fetched image had bad checksum')
-                self.artifact.add_event(
-                    EVENT_TYPE_AUDIT, 'fetched image had bad checksum')
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, objects_including_blob,
+                    'fetched image had bad checksum', extra={'url': url})
                 raise e
 
             return b

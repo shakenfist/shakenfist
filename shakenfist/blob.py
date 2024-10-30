@@ -24,8 +24,10 @@ from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import GiB
 from shakenfist.constants import LOCK_REFRESH_SECONDS
+from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
 from shakenfist.exceptions import BlobDeleted
 from shakenfist.exceptions import BlobDependencyMissing
@@ -733,7 +735,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     return b
 
 
-def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
+def http_fetch(url, resp, blob_uuid, locks, objects):
     fetched = 0
     if resp.headers.get('Content-Length'):
         total_size = int(resp.headers.get('Content-Length'))
@@ -757,31 +759,26 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
             if total_size:
                 percentage = fetched / total_size * 100.0
                 if (percentage - previous_percentage) > 10.0:
-                    if instance_object:
-                        instance_object.add_event(
-                            EVENT_TYPE_STATUS, 'fetching required HTTP resource',
-                            extra={
-                                'url': url,
-                                'blob_uuid': blob_uuid,
-                                'percentage': percentage
-                            })
-
-                    logs.with_fields({'bytes_fetched': fetched}).debug(
-                        'Fetch %.02f percent complete' % percentage)
+                    add_event_multi(
+                        EVENT_TYPE_STATUS, objects,
+                        'fetching required HTTP resource',
+                        extra={
+                            'url': url,
+                            'percentage': percentage,
+                            'bytes_fetched': fetched
+                        })
                     previous_percentage = percentage
 
             if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
                 etcd.refresh_locks(locks)
                 last_refresh = time.time()
 
-    if instance_object:
-        instance_object.add_event(
-            EVENT_TYPE_STATUS, 'fetching required HTTP resource complete',
-            extra={
-                'url': url,
-                'blob_uuid': blob_uuid
-            })
-    logs.with_fields({'bytes_fetched': fetched}).info('Fetch complete')
+    add_event_multi(
+        EVENT_TYPE_USAGE, objects, 'fetching required HTTP resource complete',
+        extra={
+            'url': url,
+            'bytes_fetched': fetched
+        })
 
     # Import the newly fetched blob
     os.rename(dest_path + '.partial', dest_path)
