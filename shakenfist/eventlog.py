@@ -236,13 +236,14 @@ class EventLog:
             self.write_elc_cache[(year, month)].close()
 
     def write_event(self, event_type, timestamp, fqdn, duration, message,
-                    extra=None):
+                    extra=None, correlation_id=None):
         with self.lock:
             return self._write_event_inner(
-                event_type, timestamp, fqdn, duration, message, extra=extra)
+                event_type, timestamp, fqdn, duration, message, extra=extra,
+                correlation_id=correlation_id)
 
     def _write_event_inner(self, event_type, timestamp, fqdn, duration, message,
-                           extra=None):
+                           extra=None, correlation_id=None):
         year, month = _timestamp_to_year_month(timestamp)
         if (year, month) in self.write_elc_cache:
             elc = self.write_elc_cache[(year, month)]
@@ -252,7 +253,7 @@ class EventLog:
 
         try:
             elc.write_event(event_type, timestamp, fqdn, duration, message,
-                            extra=extra)
+                            extra=extra, correlation_id=correlation_id)
             return True
         except (sqlite3.DatabaseError, exceptions.CorruptEventChunk) as e:
             if str(e) == 'database is locked':
@@ -380,14 +381,15 @@ class EventLog:
 
 
 # This is the version for an individual sqlite file
-VERSION = 7
+VERSION = 8
 CREATE_EVENT_TABLE = [
     (
         'CREATE TABLE IF NOT EXISTS events('
         'type text, timestamp real, fqdn text, duration float, message text, '
-        'extra text);'
+        'extra text, correlation_id text);'
     ),
-    'CREATE INDEX IF NOT EXISTS timestamp_idx ON events (timestamp);'
+    'CREATE INDEX IF NOT EXISTS timestamp_idx ON events (timestamp);',
+    'CREATE INDEX IF NOT EXISTS correlation_id_idx ON events (correlation_id);',
 ]
 CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int primary key)"""
 
@@ -559,6 +561,19 @@ class EventLogChunk:
                 'VALUES (%f, "Upgraded database to version 7");'
                 % time.time())
 
+        if ver == 7:
+            # We add a correlation id to events with an associated index.
+            ver = 8
+            self.log.info('Upgrading database from v7 to v8')
+            self.con.execute('ALTER TABLE events ADD COLUMN correlation_id text;')
+            self.con.execute('CREATE INDEX IF NOT EXISTS correlation_id_idx ON '
+                             'events (correlation_id);')
+
+            self.con.execute(
+                'INSERT INTO events(type, timestamp, message) '
+                'VALUES ("audit", %f, "Upgraded database to version 8")'
+                % time.time())
+
         if start_ver != ver:
             self.con.execute('UPDATE version SET version = ?', (ver,))
             self.con.commit()
@@ -572,15 +587,18 @@ class EventLogChunk:
         if self.bootstrapped:
             self.con.close()
 
-    def write_event(self, event_type, timestamp, fqdn, duration, message, extra=None):
+    def write_event(self, event_type, timestamp, fqdn, duration, message,
+                    extra=None, correlation_id=None):
         if not self.bootstrapped:
             self._bootstrap()
 
         self.con.execute(
-            'INSERT INTO events(type, timestamp, fqdn, duration, message, extra) '
-            'VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO events(type, timestamp, fqdn, duration, message, '
+            'extra, correlation_id) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?)',
             (event_type, timestamp, fqdn, duration, message,
-             json.dumps(extra, cls=etcd.JSONEncoderCustomTypes)))
+             json.dumps(extra, cls=etcd.JSONEncoderCustomTypes),
+             correlation_id))
         self.con.commit()
 
     def read_events(self, limit=100, event_type=None):

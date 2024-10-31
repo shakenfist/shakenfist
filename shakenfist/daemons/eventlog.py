@@ -10,6 +10,7 @@ import grpc
 from prometheus_client import Counter
 from prometheus_client import start_http_server
 from shakenfist_utilities import logs
+from shakenfist_utilities.random import random_id
 
 from shakenfist import etcd
 from shakenfist import event_pb2
@@ -34,11 +35,11 @@ class EventService(event_pb2_grpc.EventServiceServicer):
 
     def _record_with_dlq(
             self, event_type, object_type, object_uuid, message, duration,
-            extra, timestamp, fqdn):
+            extra, timestamp, fqdn, correlation_id=None):
         with eventlog.EventLog(object_type, object_uuid) as eventdb:
             if not eventdb.write_event(
-                    event_type, timestamp, fqdn,
-                    duration, message, extra):
+                    event_type, timestamp, fqdn, duration, message, extra=extra,
+                    correlation_id=correlation_id):
                 # Writing the event failed, queue it to etcd instead
                 LOG.info('Failed to write event via gRPC path, adding to dead '
                          'letter queue')
@@ -51,7 +52,8 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                              'object_uuid': object_uuid,
                              'fqdn': fqdn,
                              'message': message,
-                             'extra': extra
+                             'extra': extra,
+                             'correlation_id': correlation_id
                          })
 
     def _add_other_objects(self, not_this_type, objects, extra):
@@ -62,7 +64,7 @@ class EventService(event_pb2_grpc.EventServiceServicer):
         return tweaked_extra
 
     # An older, less preferred implementation but still here as a fallback
-    # during upgrade
+    # during upgrade.
     def RecordEvent(self, request, context):
         try:
             extra = json.loads(request.extra)
@@ -76,6 +78,12 @@ class EventService(event_pb2_grpc.EventServiceServicer):
             except ValueError:
                 ...
 
+            # Generate a correlation id, but only if this event also has a
+            # request-id.
+            correlation_id = None
+            if 'request-id' in extra:
+                correlation_id = random_id()
+
             if not timestamp or timestamp == 0:
                 LOG.with_fields({
                     'event_type': request.event_type,
@@ -84,13 +92,14 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                     'protobuf_obsolete_timestamp': request.obsolete_timestamp,
                     'node': request.fqdn,
                     'message': request.message,
-                    'extra': request.extra
+                    'extra': request.extra,
+                    'correlation_id': correlation_id
                 }).error('Event has invalid timestamp')
 
             self._record_with_dlq(
                 request.event_type, request.object_type, request.object_uuid,
                 request.message, request.duration, extra, timestamp,
-                request.fqdn)
+                request.fqdn, correlation_id=correlation_id)
             self.monitor.counters[request.event_type].inc()
 
             # Piggy back request tracing onto object events
@@ -101,7 +110,7 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                 self._record_with_dlq(
                     request.event_type, API_REQUESTS, extra['request-id'],
                     request.message, request.duration, extra, timestamp,
-                    request.fqdn)
+                    request.fqdn, correlation_id=correlation_id)
 
         except Exception as e:
             util_general.ignore_exception(
@@ -116,13 +125,19 @@ class EventService(event_pb2_grpc.EventServiceServicer):
             extra = json.loads(request.extra)
             timestamp = request.timestamp
 
+            # Generate a correlation id, but only if this event also has a
+            # request-id or is for more than one object.
+            correlation_id = None
+            if 'request-id' in extra or len(request.objects) > 1:
+                correlation_id = random_id()
+
             for eo in request.objects:
                 tweaked_extra = self._add_other_objects(
                     eo.object_type, request.objects, extra)
                 self._record_with_dlq(
                     request.event_type, eo.object_type, eo.object_uuid,
                     request.message, request.duration, tweaked_extra, timestamp,
-                    request.fqdn)
+                    request.fqdn, correlation_id=correlation_id)
             self.monitor.counters[request.event_type].inc()
 
             # Piggy back request tracing onto object events
@@ -133,7 +148,7 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                 self._record_with_dlq(
                     request.event_type, API_REQUESTS, extra['request-id'],
                     request.message, request.duration, tweaked_extra, timestamp,
-                    request.fqdn)
+                    request.fqdn, correlation_id=correlation_id)
 
         except Exception as e:
             util_general.ignore_exception(
@@ -206,10 +221,10 @@ class Monitor(daemon.WorkerPoolDaemon):
                             for k, v in results[(objtype, objuuid)]:
                                 event_type = v.get('event_type', EVENT_TYPE_HISTORIC)
                                 eventdb.write_event(
-                                    event_type,
-                                    v['timestamp'], v['fqdn'],
-                                    v.get('duration'),
-                                    v['message'], extra=v.get('extra'))
+                                    event_type, v['timestamp'], v['fqdn'],
+                                    v.get('duration'), v['message'],
+                                    extra=v.get('extra'),
+                                    correlation_id=v.get('correlation_id'))
                                 self.counters[event_type].inc()
                                 etcd.get_etcd_client().delete(k)
                     except Exception as e:
