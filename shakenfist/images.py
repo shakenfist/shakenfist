@@ -10,7 +10,6 @@ from shakenfist_utilities import logs
 
 from shakenfist import blob
 from shakenfist import etcd
-from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist.artifact import Artifact
 from shakenfist.artifact import BLOB_URL
@@ -20,6 +19,7 @@ from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import LOCK_REFRESH_SECONDS
 from shakenfist.constants import QCOW2_CLUSTER_SIZE
 from shakenfist.constants import TRANSCODE_DESCRIPTION
+from shakenfist.eventlog import add_event_multi
 from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
