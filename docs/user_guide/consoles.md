@@ -87,7 +87,7 @@ SPICE consoles, see https://www.spice-space.org/multiple-clients.html.
 And example video specification would be:
 
 ```
---video model=qxl,memory=65536,vdi=spiceconcurrent
+--videospec model=qxl,memory=65536,vdi=spiceconcurrent
 ```
 
 ## Screen captures
