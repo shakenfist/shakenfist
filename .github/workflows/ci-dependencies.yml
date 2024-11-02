@@ -3,7 +3,7 @@ name: Rebuild CI dependencies
 on:
   workflow_dispatch:
   schedule:
-    - cron: '00 16 * * *'        # utc
+    - cron: '13 30 * * *'        # utc
 
 jobs:
   ci-dependencies:
