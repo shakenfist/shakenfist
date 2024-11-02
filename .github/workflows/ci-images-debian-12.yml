@@ -3,7 +3,7 @@ name: Rebuild debian-12
 on:
   workflow_dispatch:
   schedule:
-    - cron: '00 16 * * *'        # utc
+    - cron: '11 00 * * *'        # utc
 
 jobs:
   debian-12:
