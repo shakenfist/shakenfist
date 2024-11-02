@@ -147,12 +147,30 @@ class BaseTestCase(testtools.TestCase):
             'instance_uuid': instance_uuid
         })
 
-        self.system_client.await_agent_command(
-            instance_uuid, 'cloud-init status --wait --long')
-        self._emit_tracing_event({
-            'msg': 'Instance ready (cloud-init status)',
-            'instance_uuid': instance_uuid
-        })
+        retries = 0
+        while retries < 3:
+            try:
+                self.system_client.await_agent_command(
+                    instance_uuid, 'cloud-init status --wait --long')
+                self._emit_tracing_event({
+                    'msg': 'Instance ready (cloud-init status)',
+                    'instance_uuid': instance_uuid
+                })
+                return
+
+            except apiclient.AgentCommandError as e:
+                self._emit_tracing_event({
+                    'msg': 'Instance ready (cloud-init status) attempt failed',
+                    'instance_uuid': instance_uuid,
+                    'attempt': retries,
+                    'error': e
+                })
+
+                time.sleep(30)
+                retries += 1
+
+        raise TimeoutException(
+            'repeated attempts to detect cloud-init completion failed')
 
     def _await_instance_not_ready(self, instance_uuid):
         self._await_agent_state(instance_uuid, ready=False)
