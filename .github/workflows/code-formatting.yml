@@ -3,7 +3,7 @@ name: Run automated code formatters
 on:
   workflow_dispatch:
   schedule:
-    - cron: '00 00 * * *'        # utc
+    - cron: '13 00 * * *'        # utc
   pull_request:
     branches:
       - develop
