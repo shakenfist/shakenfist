@@ -3,7 +3,6 @@
   connection: ssh
   vars:
     identifier: unknown
-    source_path: "/srv/github/src/shakenfist/"
     base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
     base_image_user: "ubuntu"
 
@@ -208,7 +207,6 @@
   gather_facts: yes
   become: true
   vars:
-    source_path: "/srv/github/src/shakenfist/"
 
   tasks:
     - name: Make /srv/ci
@@ -226,6 +224,53 @@
 
     - name: Log the contents of /srv/ci
       shell: ls -lrth /srv/ci
+
+    - name: Make /srv/shakenfist/volumes
+      file:
+        path: /srv/shakenfist/volumes
+        state: directory
+        mode: u+rw,g+rw,o-rwx
+
+    - name: Install NFS server
+      apt:
+        name: nfs-kernel-server
+        state: present
+
+    - name: Export the volumes directory
+      lineinfile:
+        path: /etc/exports
+        state: present
+        line: "{{ item }}"
+      with_items:
+        - '/srv/shakenfist/volumes  *(rw,no_root_squash,no_subtree_check,insecure)'
+
+    - name: Restart nfs-kernel-server.service
+      ansible.builtin.systemd:
+        daemon_reload: yes
+        state: started
+        name: nfs-kernel-server.service
+
+    - name: Re-export the share
+      command: exportfs -rav
+
+- hosts: hypervisors
+  gather_facts: yes
+  become: true
+  vars:
+
+  tasks:
+    - name: Install NFS client
+      apt:
+        name: nfs-common
+        state: present
+
+    - name: Mount /srv/ci
+      mount:
+        path: /srv/shakenfist/volumes
+        src: 10.0.0.10:/srv/shakenfist/volumes
+        opts: rw,sync,hard
+        fstype: nfs
+        state: mounted
 
 - hosts: sfall
   gather_facts: yes

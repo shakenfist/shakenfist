@@ -66,6 +66,12 @@
     - name: Log the contents of /srv/ci
       shell: ls -lrth /srv/ci
 
+    - name: Make /srv/shakenfist/volumes
+      file:
+        path: /srv/shakenfist/volumes
+        state: directory
+        mode: u+rw,g+rw,o-rwx
+
     - name: Disable logrotate
       service:
         name: logrotate
