@@ -29,11 +29,7 @@ from shakenfist import network as sfnet
 from shakenfist import scheduler
 from shakenfist.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
-from shakenfist.artifact import ARTIFACT_URL
 from shakenfist.artifact import BLOB_URL
-from shakenfist.artifact import LABEL_URL
-from shakenfist.artifact import SNAPSHOT_URL
-from shakenfist.artifact import UPLOAD_URL
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.config import config
@@ -222,30 +218,6 @@ class InstanceEndpoint(sf_api.Resource):
 
         # Return UUID in case API call was made using object name
         return instance_from_db.external_view()
-
-
-def _artifact_safety_checks(a, instance_uuid=None):
-    log = LOG
-    if a:
-        log = log.with_fields({'artifact': a})
-    if instance_uuid:
-        log = log.with_fields({'instance': instance_uuid})
-
-    if not a:
-        log.info('Artifact not found')
-        return sf_api.error(404, 'artifact not found')
-    if a.state.value != Artifact.STATE_CREATED:
-        log.info('Artifact not in ready state')
-        return sf_api.error(
-            404, 'artifact not ready (state=%s)' % a.state.value)
-
-    if namespace_is_trusted(a.namespace, get_jwt_identity()[0]):
-        return
-    if a.shared:
-        return
-
-    log.info('Artifact not owned or trusted by requestor and not shared')
-    return sf_api.error(404, 'artifact not found')
 
 
 def _netdesc_safety_checks(netdesc, namespace):
@@ -544,68 +516,37 @@ class InstancesEndpoint(sf_api.Resource):
                 return sf_api.error(400, 'invalid disk bus %s' % disk_bus,
                                     suppress_traceback=True)
 
-            # Convert internal shorthand forms into specific blobs
             disk_base = d.get('base')
             if util_general.noneish(disk_base):
                 d['disk_base'] = None
 
-            elif disk_base.startswith('label:'):
-                label = disk_base[len('label:'):]
-                a = Artifact.from_url(
-                    Artifact.TYPE_LABEL,
-                    f'{LABEL_URL}{get_jwt_identity()[0]}/{label}',
-                    name=label, namespace=namespace)
-                err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
-                if err:
-                    return err
+            # Convert internal shorthand forms into specific artifacts. No
+            # artifact being found and permissions checks are handled by
+            # lookup_artifact_reference, so we don't need to check here as well.
+            a = api_util.lookup_artifact_reference(
+                disk_base, namespace, instance_uuid)
+            if not a:
+                # It might be a direct blob reference?
+                if disk_base.startswith(BLOB_URL):
+                    d['blob_uuid'] = disk_base[len(BLOB_URL):]
 
-                blob_uuid = a.resolve_to_blob()
-                if not blob_uuid:
-                    return sf_api.error(404, 'Could not resolve label %s to a blob' % label)
-                d['blob_uuid'] = blob_uuid
-
-            elif disk_base.startswith(SNAPSHOT_URL):
-                a = Artifact.from_db(disk_base[len(SNAPSHOT_URL):])
-                err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
-                if err:
-                    return err
-
-                blob_uuid = a.resolve_to_blob()
-                if not blob_uuid:
-                    return sf_api.error(404, 'Could not resolve snapshot to a blob')
-                d['blob_uuid'] = blob_uuid
-
-            elif (disk_base.startswith(UPLOAD_URL) or
-                  disk_base.startswith(LABEL_URL) or
-                  disk_base.startswith(ARTIFACT_URL)):
-                if disk_base.startswith(UPLOAD_URL):
-                    a = Artifact.from_url(Artifact.TYPE_IMAGE, disk_base,
-                                          namespace=namespace)
-                elif disk_base.startswith(LABEL_URL):
-                    a = Artifact.from_url(Artifact.TYPE_LABEL, disk_base,
-                                          namespace=namespace)
                 else:
-                    a_uuid = disk_base[len(ARTIFACT_URL):]
-                    a = Artifact.from_db(a_uuid, suppress_failure_audit=True)
-
-                err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
-                if err:
-                    return err
-
-                blob_uuid = a.resolve_to_blob()
-                if not blob_uuid:
-                    return sf_api.error(404, 'Could not resolve artifact to a blob')
-                d['blob_uuid'] = blob_uuid
-
-            elif disk_base.startswith(BLOB_URL):
-                d['blob_uuid'] = disk_base[len(BLOB_URL):]
+                    # We ensure that the image exists in the database in an initial
+                    # state here so that it will show up in image list requests.
+                    # The image is fetched by the queued job later. This disk_base
+                    # is not re-written here, and is converted into a blob at
+                    # instance start by _configure_block_devices().
+                    a = Artifact.from_url(
+                        Artifact.TYPE_IMAGE, disk_base, namespace=namespace,
+                        create_if_new=True)
 
             else:
-                # We ensure that the image exists in the database in an initial state
-                # here so that it will show up in image list requests. The image is
-                # fetched by the queued job later.
-                Artifact.from_url(Artifact.TYPE_IMAGE, disk_base,
-                                  namespace=namespace, create_if_new=True)
+                # Convert that artifact into a specific blob
+                blob_uuid = a.resolve_to_blob()
+                if not blob_uuid:
+                    return sf_api.error(
+                        404, f'Could not resolve artifact {a["uuid"]} to a blob')
+                d['blob_uuid'] = blob_uuid
 
             transformed_disk.append(d)
 
@@ -614,34 +555,16 @@ class InstancesEndpoint(sf_api.Resource):
         # Perform a similar translation for NVRAM templates, turning them into
         # blob UUIDs.
         if nvram_template:
-            original_template = nvram_template
-            if nvram_template.startswith('label:'):
-                label = nvram_template[len('label:'):]
-                url = f'{LABEL_URL}{get_jwt_identity()[0]}/{label}'
-                a = Artifact.from_url(Artifact.TYPE_LABEL, url, name=label,
-                                      namespace=namespace)
-                err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
-                if err:
-                    return err
-
+            a = api_util.lookup_artifact_reference(
+                nvram_template, namespace, instance_uuid)
+            if not a:
+                return sf_api.error(
+                    f'Could not resolve NVRAM template {nvram_template} to a blob')
+            else:
                 blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
-                    return sf_api.error(404, 'Could not resolve label %s to a blob' % label)
-                LOG.with_fields({'instance': instance_uuid}).with_fields({
-                    'original_template': original_template,
-                    'label': label,
-                    'source_url': url,
-                    'artifact': a.uuid,
-                    'blob': blob_uuid
-                }).info('NVRAM template label resolved')
-                nvram_template = blob_uuid
-
-            elif nvram_template.startswith(BLOB_URL):
-                nvram_template = nvram_template[len(BLOB_URL):]
-                LOG.with_fields({'instance': instance_uuid}).with_fields({
-                    'original_template': original_template,
-                    'blob': nvram_template
-                }).info('NVRAM template URL converted')
+                    return sf_api.error(
+                        404, f'Could not resolve artifact {a["uuid"]} to a blob')
                 nvram_template = blob_uuid
 
         # We no longer support IDE.
@@ -760,8 +683,7 @@ class InstancesEndpoint(sf_api.Resource):
                     namespace=namespace, instance_uuid=inst.uuid))
             elif not util_general.noneish(disk_base):
                 tasks.append(FetchImageTask(
-                    disk['base'],
-                    namespace=namespace, instance_uuid=inst.uuid))
+                    disk['base'], namespace=namespace, instance_uuid=inst.uuid))
         tasks.append(StartInstanceTask(inst.uuid, network))
         tasks.extend(float_tasks)
 

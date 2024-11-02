@@ -128,7 +128,8 @@ class Root(sf_api.Resource):
              '<li>admin: cluster-cacert, cluster-resources</li>'
              '<li>agent-operations: agentoperations-crud, instance-agentoperations, '
              'instance-agentoperations-all</li>'
-             '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
+             '<li>artifacts: artifact-metadata, artifact-upload-types, '
+             'artifact-url-refs</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
              'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events</li>'
              '<li>events: events-by-type</li>'
@@ -154,6 +155,7 @@ api.add_resource(api_admin.AdminLocksEndpoint, '/admin/locks')
 api.add_resource(api_admin.AdminClusterCaCertificateEndpoint, '/admin/cacert')
 
 api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_ref>')
+api.add_resource(api_artifact.ArtifactsUrlRefEndpoint, '/artifacts/byurl')
 api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')
 api.add_resource(api_artifact.ArtifactUploadEndpoint,
                  '/artifacts/upload/<artifact_name>')

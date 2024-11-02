@@ -34,6 +34,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
+from shakenfist.external_api import util as api_util
 from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
 from shakenfist.namespace import namespace_is_trusted
@@ -265,11 +266,11 @@ class ArtifactsEndpoint(sf_api.Resource):
                     b = Blob.from_db(idx['blob_uuid'])
                     if b and node in b.locations:
                         ev = a.external_view()
-                        ev['instances']: instance_usage_for_blob_uuid(b.uuid)
+                        ev['instances'] = instance_usage_for_blob_uuid(b.uuid)
                         retval.append(ev)
             else:
                 ev = a.external_view()
-                ev['instances']: instance_usage_for_blob_uuid(b.uuid)
+                ev['instances'] = instance_usage_for_blob_uuid(b.uuid)
                 retval.append(ev)
         return retval
 
@@ -356,6 +357,34 @@ class ArtifactsEndpoint(sf_api.Resource):
             deleted.append(a.uuid)
 
         return deleted
+
+
+class ArtifactsUrlRefEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'artifacts', ('Lookup an artifact using a URL like reference, as '
+                      'used by instance disk base references. Lookup of '
+                      'a URL which does not exist will not cause that URL '
+                      'to be fetched.'),
+        [
+            ('reference', 'body', 'string', ('An artifact reference.'), False),
+        ],
+        [
+            (200, 'An artifact.', artifacts_get_example),
+            (400, 'No reference specified.', None),
+            (404, 'No artifact found', None)
+        ]))
+    @api_base.verify_token
+    @api_base.log_token_use
+    def post(self, reference=None):
+        if not reference:
+            return sf_api.error(400, 'No reference specified')
+
+        a = api_util.lookup_artifact_reference(
+            reference, get_jwt_identity()[0], None)
+        if not a:
+            return sf_api.error(404, 'Could not resolve reference')
+
+        return a.external_view()
 
 
 class ArtifactUploadEndpoint(sf_api.Resource):

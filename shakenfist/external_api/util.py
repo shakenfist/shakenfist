@@ -2,10 +2,16 @@ from flask_jwt_extended import get_jwt_identity
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.artifact import Artifact
+from shakenfist.artifact import ARTIFACT_URL
+from shakenfist.artifact import LABEL_URL
+from shakenfist.artifact import SNAPSHOT_URL
+from shakenfist.artifact import UPLOAD_URL
 from shakenfist import ipam
 from shakenfist import network
 from shakenfist.daemons import daemon
 from shakenfist.instance import Instance
+from shakenfist.namespace import namespace_is_trusted
 from shakenfist.networkinterface import NetworkInterface
 
 
@@ -52,3 +58,56 @@ def safe_get_network_interface(interface_uuid):
         return None, None, sf_api.error(404, 'interface not found')
 
     return ni, n, None
+
+
+# Convert internal shorthand forms into specific artifacts (but not their blob)
+def lookup_artifact_reference(disk_base, namespace, instance_uuid):
+    a = None
+
+    if not disk_base:
+        return None
+
+    if disk_base.startswith('label:'):
+        label = disk_base[len('label:'):]
+        a = Artifact.from_url(
+            Artifact.TYPE_LABEL,
+            f'{LABEL_URL}{get_jwt_identity()[0]}/{label}',
+            name=label, namespace=namespace)
+
+    elif disk_base.startswith(SNAPSHOT_URL):
+        a = Artifact.from_db(disk_base[len(SNAPSHOT_URL):])
+
+    elif (disk_base.startswith(UPLOAD_URL) or
+          disk_base.startswith(LABEL_URL) or
+          disk_base.startswith(ARTIFACT_URL)):
+        if disk_base.startswith(UPLOAD_URL):
+            a = Artifact.from_url(Artifact.TYPE_IMAGE, disk_base,
+                                  namespace=namespace)
+        elif disk_base.startswith(LABEL_URL):
+            a = Artifact.from_url(Artifact.TYPE_LABEL, disk_base,
+                                  namespace=namespace)
+        else:
+            a_uuid = disk_base[len(ARTIFACT_URL):]
+            a = Artifact.from_db(a_uuid, suppress_failure_audit=True)
+
+    if not a:
+        return None
+
+    log = LOG.with_fields({'artifact': a})
+    if instance_uuid:
+        log = log.with_fields({'instance': instance_uuid})
+
+    # Is the artifact ready?
+    if a.state.value != Artifact.STATE_CREATED:
+        log.info('Artifact not in ready state')
+        return a, sf_api.error(
+            404, 'artifact not ready (state=%s)' % a.state.value)
+
+    # Can we see the artifact?
+    if namespace_is_trusted(a.namespace, get_jwt_identity()[0]):
+        return a
+    if a.shared:
+        return a
+
+    # As far as we're concerned the artifact doesn't exist
+    return None
