@@ -249,15 +249,14 @@ class Monitor(daemon.Daemon):
                                     process_metrics.update(_emit_process_metrics(subchild))
                     except (psutil.NoSuchProcess, FileNotFoundError):
                         ...
-
                 # Record etcd process metrics
                 if config.NODE_IS_ETCD_MASTER:
                     for p in psutil.process_iter():
-                        if p.name().endswith('/etcd'):
-                            try:
+                        try:
+                            if p.name().endswith('/etcd'):
                                 process_metrics.update(_emit_process_metrics(p))
-                            except (psutil.NoSuchProcess, FileNotFoundError):
-                                ...
+                        except (psutil.NoSuchProcess, FileNotFoundError):
+                            ...
 
                 n.process_metrics = process_metrics
 
