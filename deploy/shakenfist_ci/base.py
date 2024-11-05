@@ -456,12 +456,23 @@ class BaseNamespacedTestCase(BaseTestCase):
             try:
                 non_blocking_client.delete_instance(inst['uuid'])
             except apiclient.ResourceNotFoundException:
-                pass
+                ...
 
         start_time = time.time()
+        last_retry = start_time
         while time.time() - start_time < 5 * 60:
-            if not list(non_blocking_client.get_instances()):
+            remaining = list(self.test_client.get_instances())
+            if not remaining:
                 break
+
+            if time.time() - last_retry > 60:
+                last_retry = time.time()
+                for inst in remaining:
+                    try:
+                        non_blocking_client.delete_instance(inst['uuid'])
+                    except apiclient.ResourceNotFoundException:
+                        ...
+
             time.sleep(5)
 
         remaining_instances = list(non_blocking_client.get_instances())
@@ -475,7 +486,7 @@ class BaseNamespacedTestCase(BaseTestCase):
                     non_blocking_client.delete_network(net['uuid'])
                 except (apiclient.ResourceStateConflictException,
                         apiclient.ResourceNotFoundException):
-                    pass
+                    ...
 
             time.sleep(5)
 
