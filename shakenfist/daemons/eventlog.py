@@ -55,9 +55,6 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                              'extra': extra,
                              'correlation_id': correlation_id
                          })
-            else:
-                LOG.with_fields({object_type, object_uuid}).debug(
-                    'Wrote event to chunk')
 
     def _add_other_objects(self, not_this_type, objects, extra):
         tweaked_extra = copy.deepcopy(extra)
@@ -121,8 +118,6 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                 % (request.object_type, request.object_uuid), e)
             return event_pb2.EventReply(ack=False)
 
-        LOG.with_fields({request.object_type, request.object_uuid}).debug(
-            'Wrote single event')
         return event_pb2.EventReply(ack=True)
 
     def RecordMultiEvent(self, request, context):
@@ -160,9 +155,6 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                 'failed to write event for %s' % request.objects, e)
             return event_pb2.EventReply(ack=False)
 
-        LOG.with_fields(
-            self._add_other_objects('all', request.objects, {})).debug(
-            'Wrote multi event')
         return event_pb2.EventReply(ack=True)
 
 
