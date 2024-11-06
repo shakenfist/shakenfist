@@ -3,6 +3,7 @@ import os
 import pathlib
 import re
 import shutil
+import time
 import uuid
 
 import requests
@@ -353,6 +354,8 @@ class ImageFetchHelper:
         with util_general.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
+            b = blob.Blob.new(
+                blob_uuid, resp.headers.get('Last-Modified'), time.time())
 
             objects_including_blob = copy.copy(self.objects)
             objects_including_blob.append(('blob', blob_uuid))
