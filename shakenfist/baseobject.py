@@ -223,7 +223,8 @@ class DatabaseBackedObject:
             LOG.with_fields(static_values).with_fields(
                 {
                     'object_type': cls.object_type,
-                    'object_uuid': object_uuid
+                    'object_uuid': object_uuid,
+                    'number_of_static_values': len(static_values)
                 }).error('Object with no uuid!')
 
         return cls(static_values)

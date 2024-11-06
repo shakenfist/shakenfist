@@ -259,6 +259,10 @@ class BadCheckSum(BlobException):
     ...
 
 
+class BlobSizeCannotChange(BlobException):
+    ...
+
+
 # Events
 class EventException(Exception):
     ...

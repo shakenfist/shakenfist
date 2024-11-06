@@ -577,6 +577,21 @@ fi
 question_end
 echo
 
+question_start
+echo "Should the Shaken Fist client be installed on all nodes?"
+echo "The default is to install the client only on the primary"
+echo "node, but sometimes its convenient to have it everywhere."
+echo
+if [ -z ${GETSF_CLIENT_ON_ALL_NODES} ]; then
+    echo -n "(true or false) >> "
+    read GETSF_CLIENT_ON_ALL_NODES
+    record_answer GETSF_CLIENT_ON_ALL_NODES "${GETSF_CLIENT_ON_ALL_NODES}"
+else
+    echo "(true or false) >> ${GETSF_CLIENT_ON_ALL_NODES}"
+fi
+question_end
+echo
+
 # Build local wheels if required
 if [ ! -z ${GETSF_SERVER_REPO} ]; then
     echo
@@ -903,6 +918,10 @@ fi
 
 if [ ! -z ${GETSF_SSH_KEY_FILENAME} ]; then
     echo "export SSH_KEY_FILENAME=\"${GETSF_SSH_KEY_FILENAME}\"" >> /root/sf-deploy
+fi
+
+if [ ! -z ${GETSF_CLIENT_ON_ALL_NODES} ]; then
+    echo "export CLIENT_ON_ALL_NODES=\"${GETSF_CLIENT_ON_ALL_NODES}\"" >> /root/sf-deploy
 fi
 
 echo "export KSM_ENABLED=1" >> /root/sf-deploy

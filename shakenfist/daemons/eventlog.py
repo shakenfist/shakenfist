@@ -41,7 +41,7 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                     event_type, timestamp, fqdn, duration, message, extra=extra,
                     correlation_id=correlation_id):
                 # Writing the event failed, queue it to etcd instead
-                LOG.info('Failed to write event via gRPC path, adding to dead '
+                LOG.info('Failed to write event to chunk, adding to dead '
                          'letter queue')
                 etcd.put('event/%s' % object_type, object_uuid,
                          timestamp,
@@ -58,9 +58,9 @@ class EventService(event_pb2_grpc.EventServiceServicer):
 
     def _add_other_objects(self, not_this_type, objects, extra):
         tweaked_extra = copy.deepcopy(extra)
-        for object_type, object_uuid in objects:
-            if object_type != not_this_type:
-                tweaked_extra[object_type] = object_uuid
+        for eo in objects:
+            if eo.object_type != not_this_type:
+                tweaked_extra[eo.object_type] = eo.object_uuid
         return tweaked_extra
 
     # An older, less preferred implementation but still here as a fallback
