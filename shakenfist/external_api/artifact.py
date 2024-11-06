@@ -467,9 +467,9 @@ class ArtifactUploadEndpoint(sf_api.Resource):
                 shutil.move(upload_path, blob_path)
                 st = os.stat(blob_path)
                 b = Blob.new(
-                    blob_uuid, st.st_size,
-                    time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime()),
+                    blob_uuid, time.strftime('%a, %d %b %Y %H:%M:%S GMT',time.gmtime()),
                     time.time())
+                b.size = st.st_size
                 b.state = Blob.STATE_CREATED
                 b.observe()
                 b.verify_checksum()

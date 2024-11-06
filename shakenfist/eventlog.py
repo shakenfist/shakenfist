@@ -78,16 +78,17 @@ def add_event_multi(
     try:
         with grpc.insecure_channel(
                 f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}') as channel:
-            objects = []
-            for object_type, object_uuid in objects:
-                objects.append(event_pb2.EventObject(
-                    object_type=object_type, object_uuid=object_uuid))
-
             stub = event_pb2_grpc.EventServiceStub(channel)
             request = event_pb2.EventMultiRequest(
-                objects=objects, event_type=event_type, timestamp=timestamp,
-                fqdn=config.NODE_NAME, duration=duration, message=message,
-                extra=json.dumps(extra))
+                event_type=event_type, timestamp=timestamp, fqdn=config.NODE_NAME,
+                duration=duration, message=message, extra=json.dumps(extra))
+
+            objs = []
+            for object_type, object_uuid in objects:
+                objs.append(event_pb2.EventObject(
+                    object_type=object_type, object_uuid=object_uuid))
+            request.objects.extend(objs)
+
             response = stub.RecordMultiEvent(request)
             if response.ack:
                 return
