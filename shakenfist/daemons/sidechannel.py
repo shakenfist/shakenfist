@@ -221,6 +221,7 @@ class Monitor(daemon.Daemon):
         get_successful = False
 
         blob_uuid = str(uuid.uuid4())
+        b = blob.Blob.new(blob_uuid, time.time(), time.time())
         blob_path = blob.Blob.filepath(blob_uuid)
         stat_result = {}
         total_length = 0
@@ -295,8 +296,7 @@ class Monitor(daemon.Daemon):
                 self.log.error('Agent get-file blob is zero not %d bytes.'
                                % total_length)
 
-            b = blob.Blob.new(blob_uuid, total_length,
-                              time.time(), time.time())
+            b.size = total_length
             b.ref_count_inc(agentop)
             b.observe()
             b.request_replication()
