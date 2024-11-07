@@ -181,7 +181,8 @@ def handle(queue_name, jobname, workitem):
                         st = os.stat(transcode_blob_path)
 
                         transcode_blob = blob.Blob.new(
-                            transcode_blob_uuid, st.st_size, time.time(), time.time())
+                            transcode_blob_uuid, time.time(), time.time())
+                        transcode_blob.size = st.st_size
                         transcode_blob.state = blob.Blob.STATE_CREATED
                         transcode_blob.observe()
                         transcode_blob.verify_checksum(locks=[])

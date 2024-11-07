@@ -147,12 +147,30 @@ class BaseTestCase(testtools.TestCase):
             'instance_uuid': instance_uuid
         })
 
-        self.system_client.await_agent_command(
-            instance_uuid, 'cloud-init status --wait --long')
-        self._emit_tracing_event({
-            'msg': 'Instance ready (cloud-init status)',
-            'instance_uuid': instance_uuid
-        })
+        retries = 0
+        while retries < 3:
+            try:
+                self.system_client.await_agent_command(
+                    instance_uuid, 'cloud-init status --wait --long')
+                self._emit_tracing_event({
+                    'msg': 'Instance ready (cloud-init status)',
+                    'instance_uuid': instance_uuid
+                })
+                return
+
+            except apiclient.AgentCommandError as e:
+                self._emit_tracing_event({
+                    'msg': 'Instance ready (cloud-init status) attempt failed',
+                    'instance_uuid': instance_uuid,
+                    'attempt': retries,
+                    'error': e
+                })
+
+                time.sleep(30)
+                retries += 1
+
+        raise TimeoutException(
+            'repeated attempts to detect cloud-init completion failed')
 
     def _await_instance_not_ready(self, instance_uuid):
         self._await_agent_state(instance_uuid, ready=False)
@@ -438,12 +456,23 @@ class BaseNamespacedTestCase(BaseTestCase):
             try:
                 non_blocking_client.delete_instance(inst['uuid'])
             except apiclient.ResourceNotFoundException:
-                pass
+                ...
 
         start_time = time.time()
+        last_retry = start_time
         while time.time() - start_time < 5 * 60:
-            if not list(non_blocking_client.get_instances()):
+            remaining = list(self.test_client.get_instances())
+            if not remaining:
                 break
+
+            if time.time() - last_retry > 60:
+                last_retry = time.time()
+                for inst in remaining:
+                    try:
+                        non_blocking_client.delete_instance(inst['uuid'])
+                    except apiclient.ResourceNotFoundException:
+                        ...
+
             time.sleep(5)
 
         remaining_instances = list(non_blocking_client.get_instances())
@@ -457,7 +486,7 @@ class BaseNamespacedTestCase(BaseTestCase):
                     non_blocking_client.delete_network(net['uuid'])
                 except (apiclient.ResourceStateConflictException,
                         apiclient.ResourceNotFoundException):
-                    pass
+                    ...
 
             time.sleep(5)
 
