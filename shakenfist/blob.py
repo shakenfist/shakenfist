@@ -33,8 +33,8 @@ from shakenfist.exceptions import BlobDeleted
 from shakenfist.exceptions import BlobDependencyMissing
 from shakenfist.exceptions import BlobFetchFailed
 from shakenfist.exceptions import BlobMissing
-from shakenfist.exceptions import BlobsMustHaveContent
 from shakenfist.exceptions import BlobSizeCannotChange
+from shakenfist.exceptions import BlobsMustHaveContent
 from shakenfist.exceptions import BlobTransferSetupFailed
 from shakenfist.node import Node
 from shakenfist.node import Nodes
