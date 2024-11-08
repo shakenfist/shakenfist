@@ -219,6 +219,10 @@ class Monitor(daemon.Daemon):
                     # Ignore new processes
                     return {}
 
+                if p.name().startswith('sf-queues'):
+                    # Ignore queue workers
+                    return {}
+
                 smn = _safe_metric_name(p.name())
                 out = {}
                 times = p.cpu_times()
