@@ -3,6 +3,7 @@ import os
 import pathlib
 import re
 import shutil
+import time
 import uuid
 
 import requests
@@ -313,8 +314,7 @@ class ImageFetchHelper:
                 objects_with_blob.append(('blob', b.uuid))
                 with util_general.RecordedOperation('transcode image', self.instance):
                     add_event_multi(
-                        EVENT_TYPE_STATUS, objects_with_blob,
-                        f'transcoding {blob_path} -> {cache_path}')
+                        EVENT_TYPE_STATUS, objects_with_blob, 'transcoding blob')
                     util_image.create_qcow2([lock], blob_path, cache_path)
 
             # We will cache this transcode, but we do it later as part of a
@@ -353,6 +353,8 @@ class ImageFetchHelper:
         with util_general.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
+            b = blob.Blob.new(
+                blob_uuid, resp.headers.get('Last-Modified'), time.time())
 
             objects_including_blob = copy.copy(self.objects)
             objects_including_blob.append(('blob', blob_uuid))

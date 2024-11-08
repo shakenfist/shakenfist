@@ -61,6 +61,7 @@
     server_package: "shakenfist"
     client_package: "shakenfist-client"
     pip_extra: ""
+    client_on_all_nodes: false
 
   tasks:
     - name: Setup /etc/hosts
@@ -149,12 +150,17 @@
           - xxhash
         state: latest
 
-    - name: Create python venv and install Shaken Fist packages
+    - name: Create python venv and install Shaken Fist server and agent packages
       shell: |
         mkdir -p /srv/shakenfist/venv
         python3 -mvenv --system-site-packages /srv/shakenfist/venv
         /srv/shakenfist/venv/bin/pip install -U pip
-        /srv/shakenfist/venv/bin/pip install {{pip_extra}} {{agent_package}} {{server_package}} {{client_package}}
+        /srv/shakenfist/venv/bin/pip install {{pip_extra}} {{agent_package}} {{server_package}}
+
+    - name: Optionally install the Shaken Fist client package
+      shell: |
+        /srv/shakenfist/venv/bin/pip install {{pip_extra}} {{client_package}}
+      when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
 
 # Setup the TLS CA on the primary
 - hosts: localhost
@@ -778,21 +784,18 @@
         state: directory
         mode: "0755"
 
-- hosts: primary_node
+- hosts: sfall
   any_errors_fatal: true
   become: yes
   become_method: sudo
   tags: bootstrap
   gather_facts: no
   connection: ssh
+  vars:
+    admin_password: "undefined"
+    client_on_all_nodes: false
 
   tasks:
-    - name: Create config directory
-      file:
-        path: /etc/sf
-        state: directory
-        mode: "0755"
-
     - name: Set system key from extra-vars
       set_fact:
         system_key: "{{admin_password}}"
@@ -807,6 +810,13 @@
         - fail:
             msg: "Ensure that you have installed ansible-modules-hashivault ie. pip install ansible-modules-hashivault"
 
+    - name: Create config directory
+      file:
+        path: /etc/sf
+        state: directory
+        mode: "0755"
+      when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
+
     - name: Write sfrc file
       template:
         src: files/sfrc
@@ -814,6 +824,7 @@
         owner: root
         group: sudo
         mode: u=r,g=r,o=
+      when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
 
     - name: Install sfrc for root user
       lineinfile:
@@ -821,6 +832,7 @@
         create: yes
         regexp: ". /etc/sf/sfrc"
         line: ". /etc/sf/sfrc"
+      when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
 
     - name: Write a global auth file
       template:
@@ -829,6 +841,7 @@
         owner: root
         group: sudo
         mode: u=r,g=r,o=
+      when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
 
 - hosts: primary_node
   any_errors_fatal: true

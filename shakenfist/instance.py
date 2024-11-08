@@ -1494,8 +1494,8 @@ class Instance(dbo):
                 shutil.copyfile(disk['path'], dest_path)
 
                 st = os.stat(dest_path)
-                b = blob.Blob.new(blob_uuid, st.st_size,
-                                  time.time(), time.time())
+                b = blob.Blob.new(blob_uuid, time.time(), time.time())
+                b.size = st.st_size
                 b.observe()
                 b.verify_checksum()
 
@@ -1538,7 +1538,8 @@ class Instance(dbo):
             dest_path = blob.Blob.filepath(blob_uuid)
             shutil.copyfile(console_path, dest_path)
 
-            b = blob.Blob.new(blob_uuid, st.st_size, time.time(), time.time())
+            b = blob.Blob.new(blob_uuid, time.time(), time.time())
+            b.size = st.st_size
             b.set_lifetime(config.ARCHIVE_INSTANCE_CONSOLE_DURATION * 3600 * 24)
             b.observe()
             b.verify_checksum()
@@ -1624,7 +1625,8 @@ class Instance(dbo):
         # we don't use util_general.link().
         st = os.stat(dest_path + '.partial')
         os.link(dest_path + '.partial', dest_path)
-        b = blob.Blob.new(blob_uuid, st.st_size, time.time(), time.time())
+        b = blob.Blob.new(blob_uuid, time.time(), time.time())
+        b.size = st.st_size
         b.state = blob.Blob.STATE_CREATED
         b.observe()
         b.request_replication()
