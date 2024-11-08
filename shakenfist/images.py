@@ -314,8 +314,7 @@ class ImageFetchHelper:
                 objects_with_blob.append(('blob', b.uuid))
                 with util_general.RecordedOperation('transcode image', self.instance):
                     add_event_multi(
-                        EVENT_TYPE_STATUS, objects_with_blob,
-                        f'transcoding {blob_path} -> {cache_path}')
+                        EVENT_TYPE_STATUS, objects_with_blob, 'transcoding blob')
                     util_image.create_qcow2([lock], blob_path, cache_path)
 
             # We will cache this transcode, but we do it later as part of a
