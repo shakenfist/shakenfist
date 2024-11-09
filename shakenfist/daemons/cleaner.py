@@ -7,13 +7,11 @@ import shutil
 import signal
 import time
 
-import grpc
+
 from oslo_concurrency import processutils
 from shakenfist_utilities import logs
 
 from shakenfist import etcd
-from shakenfist import etcd_pb2
-from shakenfist import etcd_pb2_grpc
 from shakenfist import instance
 from shakenfist import node
 from shakenfist import upload
@@ -431,18 +429,7 @@ class Monitor(daemon.Daemon):
             # )]
             n = node.Node.from_db(config.NODE_NAME)
             kv = etcd.get_etcd_client().get('/sf/compact', metadata=True)[0][1]
-
-            with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
-                stub = etcd_pb2_grpc.KVStub(channel)
-                request = etcd_pb2.CompactionRequest(
-                    revision=int(kv['mod_revision']), physical=True
-                )
-                stub.Compact(request)
-
-                stub = etcd_pb2_grpc.MaintenanceStub(channel)
-                request = etcd_pb2.DefragmentRequest()
-                stub.Defragment(request)
-
+            etcd.compact(int(kv['mod_revision']))
             n.add_event(EVENT_TYPE_STATUS, 'compacted etcd',
                         extra={'mod_revision': int(kv['mod_revision'])})
 

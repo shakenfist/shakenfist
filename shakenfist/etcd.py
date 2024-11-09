@@ -4,6 +4,7 @@ import threading
 import time
 from collections import defaultdict
 
+import grpc
 import psutil
 import requests
 from etcd3gw.client import Etcd3Client
@@ -15,6 +16,8 @@ from shakenfist_utilities import logs
 from shakenfist_utilities import random as util_random
 
 from shakenfist import baseobject
+from shakenfist import etcd_pb2
+from shakenfist import etcd_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
 from shakenfist.tasks import FetchBlobTask
@@ -584,3 +587,16 @@ def restart_queues():
     if config.NODE_IS_NETWORK_NODE:
         _restart_queue('networknode')
     _restart_queue(config.NODE_NAME)
+
+
+def compact(revision):
+    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+        stub = etcd_pb2_grpc.KVStub(channel)
+        request = etcd_pb2.CompactionRequest(
+            revision=revision, physical=True
+        )
+        stub.Compact(request)
+
+        stub = etcd_pb2_grpc.MaintenanceStub(channel)
+        request = etcd_pb2.DefragmentRequest()
+        stub.Defragment(request)
