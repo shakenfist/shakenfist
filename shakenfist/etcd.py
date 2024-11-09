@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import threading
@@ -592,11 +593,47 @@ def restart_queues():
 def compact(revision):
     with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
         stub = etcd_pb2_grpc.KVStub(channel)
-        request = etcd_pb2.CompactionRequest(
+        stub.Compact(etcd_pb2.CompactionRequest(
             revision=revision, physical=True
+            )
         )
-        stub.Compact(request)
 
         stub = etcd_pb2_grpc.MaintenanceStub(channel)
         request = etcd_pb2.DefragmentRequest()
         stub.Defragment(request)
+
+
+def transactional_delete(path, original_data):
+    path_encoded = path.encode()
+    original_data_encoded = json.dumps(
+        original_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes
+        ).encode()
+
+    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+        stub = etcd_pb2_grpc.KVStub(channel)
+
+        response = stub.Txn(
+            etcd_pb2.TxnRequest(
+                compare=[
+                    etcd_pb2.Compare(
+                        key=path_encoded,
+                        result=etcd_pb2.Compare.EQUAL,
+                        target=etcd_pb2.Compare.VALUE,
+                        value=original_data_encoded
+                    )
+                ],
+                success=[
+                    etcd_pb2.RequestOp(
+                        request_delete_range=etcd_pb2.DeleteRangeRequest(
+                            key=path_encoded
+                        )
+                    )
+                ],
+                failure=[]
+            )
+        )
+
+        LOG.with_fields({
+            'success': response.succeeded
+            }).info(f'etcd transactional_delete {path}')
+        return response.succeeded

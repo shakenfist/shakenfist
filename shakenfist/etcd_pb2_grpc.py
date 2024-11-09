@@ -34,6 +34,11 @@ class KVStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.Txn = channel.unary_unary(
+                '/etcdserverpb.KV/Txn',
+                request_serializer=etcd__pb2.TxnRequest.SerializeToString,
+                response_deserializer=etcd__pb2.TxnResponse.FromString,
+                _registered_method=True)
         self.Compact = channel.unary_unary(
                 '/etcdserverpb.KV/Compact',
                 request_serializer=etcd__pb2.CompactionRequest.SerializeToString,
@@ -43,6 +48,16 @@ class KVStub(object):
 
 class KVServicer(object):
     """Missing associated documentation comment in .proto file."""
+
+    def Txn(self, request, context):
+        """Txn processes multiple requests in a single transaction.
+        A txn request increments the revision of the key-value store
+        and generates events with the same revision for every completed request.
+        It is not allowed to modify the same key several times within one txn.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def Compact(self, request, context):
         """Compact compacts the event history in the etcd key-value store. The key-value
@@ -56,6 +71,11 @@ class KVServicer(object):
 
 def add_KVServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'Txn': grpc.unary_unary_rpc_method_handler(
+                    servicer.Txn,
+                    request_deserializer=etcd__pb2.TxnRequest.FromString,
+                    response_serializer=etcd__pb2.TxnResponse.SerializeToString,
+            ),
             'Compact': grpc.unary_unary_rpc_method_handler(
                     servicer.Compact,
                     request_deserializer=etcd__pb2.CompactionRequest.FromString,
@@ -71,6 +91,33 @@ def add_KVServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class KV(object):
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def Txn(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/etcdserverpb.KV/Txn',
+            etcd__pb2.TxnRequest.SerializeToString,
+            etcd__pb2.TxnResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
 
     @staticmethod
     def Compact(request,
