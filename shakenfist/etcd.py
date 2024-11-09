@@ -372,6 +372,16 @@ def create(objecttype, subtype, name, data):
 
 
 @retry_etcd_forever
+def replace_raw(path, original_data, new_data):
+    original_data_encoded = json.dumps(
+        original_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes)
+    new_data_encoded = json.dumps(
+        new_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes)
+
+    LOG.info('etcd replace %s' % path)
+    return get_etcd_client().replace(path, original_data_encoded, new_data_encoded)
+
+@retry_etcd_forever
 def get_raw(path):
     value = get_etcd_client().get(path)
     if value is None or len(value) == 0:
@@ -411,13 +421,13 @@ def get_all_dict(objecttype, subtype=None, sort_order=None, limit=0):
 
 @retry_etcd_forever
 def delete_raw(path):
-    get_etcd_client().delete(path)
     LOG.info('etcd delete %s' % path)
+    return get_etcd_client().delete(path)
 
 
 def delete(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
-    delete_raw(path)
+    return delete_raw(path)
 
 
 @retry_etcd_forever
