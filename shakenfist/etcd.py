@@ -598,6 +598,7 @@ def restart_queues():
     if config.NODE_IS_NETWORK_NODE:
         _restart_queue('networknode')
     _restart_queue(config.NODE_NAME)
+    _restart_queue(f'{config.NODE_NAME}-background')
 
 
 def compact(revision):
