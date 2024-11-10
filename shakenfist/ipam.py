@@ -220,20 +220,31 @@ class IPAM(dbo):
         return str(self.ipblock[idx])
 
     def is_in_range(self, address):
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
+
         return ipaddress.ip_address(address) in self.ipblock
 
     def is_free(self, address):
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
+
         return address not in self.in_use
 
     def reserve(self, address, user, reservation_type, comment):
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
+
         if self.version == 3:
             success = self.cached_ipmanager_object.reserve(address, user)
             if success:
                 self.cached_ipmanager_object.persist()
-            self.log.with_fields(reservation).info('Reserved address via ipmanager')
+            self.log.with_fields({'address': address}).info('Reserved address via ipmanager')
             return success
 
-        self.release_haloed(config.IP_DELETION_HALO_DURATION)
         reservation = {
             'address': address,
             'user': user,
@@ -242,12 +253,18 @@ class IPAM(dbo):
             'comment': comment
         }
 
-        if not etcd.create(self.reservations_path + address, reservation):
+        self.release_haloed(config.IP_DELETION_HALO_DURATION)
+
+        if not etcd.create_raw(self.reservations_path + address, reservation):
             return False
         self.add_event(EVENT_TYPE_AUDIT, 'reserved address', extra=reservation)
         return True
 
     def release(self, address):
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
+
         if self.version == 3:
             success = self.cached_ipmanager_object.release(address)
             if success:
@@ -353,12 +370,20 @@ class IPAM(dbo):
         raise exceptions.CongestedNetwork('No free addresses on network')
 
     def get_reservation(self, address):
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
+
         if self.version == 3:
             return self.cached_ipmanager_object.in_use.get(address)
 
         return etcd.get_raw(self.reservations_path + address)
 
     def get_allocation_age(self, address):
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
+
         if self.version == 3:
             return self.cached_ipmanager_object.in_use.get(address, {}).get('when')
 

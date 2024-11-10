@@ -270,3 +270,12 @@ class InvalidEventType(EventException):
 
 class CorruptEventChunk(EventException):
     ...
+
+
+# IPAM
+class IPAMException(Exception):
+    ...
+
+
+class InvalidIPAMAddress(IPAMException):
+    ...

@@ -1,4 +1,3 @@
-import base64
 import json
 import os
 import threading
@@ -363,12 +362,17 @@ def put(objecttype, subtype, name, data):
 
 
 @retry_etcd_forever
-def create(objecttype, subtype, name, data):
-    path = _construct_key(objecttype, subtype, name)
+def create_raw(path, data):
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderCustomTypes)
     LOG.info('etcd create %s' % path)
     return get_etcd_client().create(path, encoded, lease=None)
+
+
+@retry_etcd_forever
+def create(objecttype, subtype, name, data):
+    path = _construct_key(objecttype, subtype, name)
+    return create_raw(path, data)
 
 
 @retry_etcd_forever
@@ -380,6 +384,7 @@ def replace_raw(path, original_data, new_data):
 
     LOG.info('etcd replace %s' % path)
     return get_etcd_client().replace(path, original_data_encoded, new_data_encoded)
+
 
 @retry_etcd_forever
 def get_raw(path):
