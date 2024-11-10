@@ -2,7 +2,6 @@ import uuid
 from unittest import mock
 
 import testtools
-
 from shakenfist import exceptions
 from shakenfist import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
