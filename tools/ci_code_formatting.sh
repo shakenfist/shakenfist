@@ -6,38 +6,52 @@ pyupgrade --help > /dev/null
 reorder-python-imports --help > /dev/null
 
 datestamp=$(date "+%Y%m%d")
+git checkout develop
+git pull
 git checkout -b formatting-automations
+git rebase develop
 
 # We only want to change five files at a time
 changed=0
-for file in $( find . -type f -name "*.py" | egrep -v "(_pb2.py|pb2_grpc.py|.github)"); do
-    # pyupgrade
-    out=$( ${RUNNER_TEMP}/venv/bin/pyupgrade --py${1}-plus \
-        --exit-zero-even-if-changed ${file} 2>&1 || true )
-    rewrites=$( echo ${out} | grep -c "Rewriting" || true )
-    if [ ${rewrites} -gt 0 ]; then
-        echo "${file} was modified"
-    fi
-    changed=$(( ${changed} + $rewrites ))
 
-    if [ ${changed} -gt 4 ]; then
-        break
-    fi
+# Regenerate gPRC code and see if its changed
+cd shakenfist
+../protos/_make_stubs.sh
+delta=$( git diff | grep -c "diff" || true )
+echo "${delta} gRPC generated files were modified"
+changed=$(( ${changed} + ${delta} ))
 
-    # reorder imports
-    out=$( ${RUNNER_TEMP}/venv/bin/reorder-python-imports --py${1}-plus \
-        --application-directories=.:shakenfist \
-        --exit-zero-even-if-changed ${file} 2>&1 || true )
-    rewrites=$( echo ${out} | grep -c "Reordering" || true )
-    if [ ${rewrites} -gt 0 ]; then
-        echo "${file} was modified"
-    fi
-    changed=$(( ${changed} + $rewrites ))
+if [ ${changed} -lt 5 ]; then
+    # Run our code formatting tools
+    for file in $( find . -type f -name "*.py" | egrep -v "(_pb2.py|pb2_grpc.py|.github)"); do
+        # pyupgrade
+        out=$( pyupgrade --py${1}-plus \
+            --exit-zero-even-if-changed ${file} 2>&1 || true )
+        rewrites=$( echo ${out} | grep -c "Rewriting" || true )
+        if [ ${rewrites} -gt 0 ]; then
+            echo "${file} was modified"
+        fi
+        changed=$(( ${changed} + ${rewrites} ))
 
-    if [ ${changed} -gt 4 ]; then
-        break
-    fi
-done
+        if [ ${changed} -gt 4 ]; then
+            break
+        fi
+
+        # reorder imports
+        out=$( reorder-python-imports --py${1}-plus \
+            --application-directories=.:shakenfist \
+            --exit-zero-even-if-changed ${file} 2>&1 || true )
+        rewrites=$( echo ${out} | grep -c "Reordering" || true )
+        if [ ${rewrites} -gt 0 ]; then
+            echo "${file} was modified"
+        fi
+        changed=$(( ${changed} + ${rewrites} ))
+
+        if [ ${changed} -gt 4 ]; then
+            break
+        fi
+    done
+fi
 
 # Did we find something new?
 if [ $(git diff | wc -l) -gt 0 ]; then

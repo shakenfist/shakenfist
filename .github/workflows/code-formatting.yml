@@ -52,6 +52,8 @@ jobs:
             install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
 
           python3 -m venv  --system-site-packages ${RUNNER_TEMP}/venv
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          ${RUNNER_TEMP}/venv/bin/pip install -r requirements.txt
           ${RUNNER_TEMP}/venv/bin/pip install pyupgrade reorder-python-imports
 
       - name: Scan for obsolete syntax
@@ -59,4 +61,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN }}
         run: |
           cd ${GITHUB_WORKSPACE}/shakenfist
+          . ${RUNNER_TEMP}/venv/bin/activate
           ${GITHUB_WORKSPACE}/shakenfist/tools/ci_code_formatting.sh 39
