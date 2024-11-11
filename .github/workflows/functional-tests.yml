@@ -610,16 +610,7 @@ jobs:
           setup="${setup} sf-client artifact upload"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@${UPLOAD_TARGET} \
-              "${setup} ubuntu-2004 /srv/ci/ubuntu:20.04 --shared --no-checksum"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@${UPLOAD_TARGET} \
               "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@${UPLOAD_TARGET} \
-              "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@${UPLOAD_TARGET} \
-              "${setup} cirros /srv/ci/cirros --shared"
 
       - name: Run node lifecycle tests
         timeout-minutes: 120
