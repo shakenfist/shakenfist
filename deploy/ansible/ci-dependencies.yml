@@ -86,7 +86,7 @@
         fstype: ext4
         state: mounted
 
-    - name: Cache most images used during CI to reduce network traffic
+    - name: Cache all minimal images we currently build to reduce network traffic
       get_url:
         url: "{{item.url}}"
         dest: "/srv/ci/{{item.name}}"
@@ -119,6 +119,22 @@
         - {
             url: "https://images.shakenfist.com/debian:12/latest.qcow2",
             name: "debian:12",
+          }
+        - {
+            url: "https://images.shakenfist.com/centos:9-stream/latest.qcow2",
+            name: "centos:9-stream",
+          }
+        - {
+            url: "https://images.shakenfist.com/fedora:40/latest.qcow2",
+            name: "fedora:40",
+          }
+        - {
+            url: "https://images.shakenfist.com/rocky:8/latest.qcow2",
+            name: "rocky:8",
+          }
+        - {
+            url: "https://images.shakenfist.com/rocky:9/latest.qcow2",
+            name: "rocky:9",
           }
         - {
             url: "{{ actions_url }}",
