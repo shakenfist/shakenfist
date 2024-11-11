@@ -541,11 +541,6 @@ class Network(dbo):
                 util_process.execute(
                     None, 'ip link delete %(vx_interface)s' % subst)
 
-            if self.floating_gateway:
-                fn = floating_network()
-                fn.ipam.release(self.floating_gateway)
-                self.update_floating_gateway(None)
-
     # This method should only ever be called when you already know you're on
     # the network node. Specifically it is called by a queue task that the
     # network node listens for.
