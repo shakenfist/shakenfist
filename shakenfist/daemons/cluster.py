@@ -142,6 +142,8 @@ class Monitor(daemon.Daemon):
         with fn.ipam.get_lock('reservations', op='Delete stray reservations'):
             for addr in fn.ipam.in_use:
                 reservation = fn.ipam.get_reservation(addr)
+                if not reservation:
+                    continue
                 if reservation['type'] not in [ipam.RESERVATION_TYPE_GATEWAY,
                                                ipam.RESERVATION_TYPE_FLOATING,
                                                ipam.RESERVATION_TYPE_ROUTED]:
