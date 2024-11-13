@@ -1,13 +1,12 @@
 import json
 from unittest import mock
 
-from shakenfist_utilities import logs
-
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import tasks
 from shakenfist.config import BaseSettings
 from shakenfist.tests import base
+from shakenfist_utilities import logs
 
 LOG, _ = logs.setup(__name__)
 
