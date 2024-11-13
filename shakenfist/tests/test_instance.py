@@ -9,7 +9,6 @@ from unittest import mock
 
 import pycdlib
 import testtools
-
 from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist import instance
