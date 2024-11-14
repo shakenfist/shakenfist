@@ -2,8 +2,6 @@
 from functools import partial
 from uuid import uuid4
 
-from shakenfist_utilities import logs
-
 from shakenfist import baseobject
 from shakenfist import blob
 from shakenfist import etcd
@@ -14,6 +12,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.namespace import namespace_is_trusted
+from shakenfist_utilities import logs
 
 
 LOG, _ = logs.setup(__name__)
