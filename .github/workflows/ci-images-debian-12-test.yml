@@ -8,7 +8,7 @@ on:
 
 jobs:
   debian-12-test:
-    runs-on: self-hosted
+    runs-on: [self-hosted, vm]
     timeout-minutes: 120
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}

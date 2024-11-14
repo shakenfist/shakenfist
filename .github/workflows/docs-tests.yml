@@ -15,7 +15,7 @@ on:
 
 jobs:
   build-docs:
-    runs-on: self-hosted
+    runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-lint
       cancel-in-progress: true
