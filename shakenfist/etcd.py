@@ -4,6 +4,7 @@ import threading
 import time
 from collections import defaultdict
 
+import grpc
 import psutil
 import requests
 from etcd3gw.client import Etcd3Client
@@ -15,6 +16,8 @@ from shakenfist_utilities import logs
 from shakenfist_utilities import random as util_random
 
 from shakenfist import baseobject
+from shakenfist import etcd_pb2
+from shakenfist import etcd_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
 from shakenfist.tasks import FetchBlobTask
@@ -359,12 +362,28 @@ def put(objecttype, subtype, name, data):
 
 
 @retry_etcd_forever
-def create(objecttype, subtype, name, data):
-    path = _construct_key(objecttype, subtype, name)
+def create_raw(path, data):
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderCustomTypes)
     LOG.info('etcd create %s' % path)
     return get_etcd_client().create(path, encoded, lease=None)
+
+
+@retry_etcd_forever
+def create(objecttype, subtype, name, data):
+    path = _construct_key(objecttype, subtype, name)
+    return create_raw(path, data)
+
+
+@retry_etcd_forever
+def replace_raw(path, original_data, new_data):
+    original_data_encoded = json.dumps(
+        original_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes)
+    new_data_encoded = json.dumps(
+        new_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes)
+
+    LOG.info('etcd replace %s' % path)
+    return get_etcd_client().replace(path, original_data_encoded, new_data_encoded)
 
 
 @retry_etcd_forever
@@ -407,13 +426,13 @@ def get_all_dict(objecttype, subtype=None, sort_order=None, limit=0):
 
 @retry_etcd_forever
 def delete_raw(path):
-    get_etcd_client().delete(path)
     LOG.info('etcd delete %s' % path)
+    return get_etcd_client().delete(path)
 
 
 def delete(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
-    delete_raw(path)
+    return delete_raw(path)
 
 
 @retry_etcd_forever
@@ -584,3 +603,53 @@ def restart_queues():
     if config.NODE_IS_NETWORK_NODE:
         _restart_queue('networknode')
     _restart_queue(config.NODE_NAME)
+    _restart_queue(f'{config.NODE_NAME}-background')
+
+
+def compact(revision):
+    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+        stub = etcd_pb2_grpc.KVStub(channel)
+        stub.Compact(etcd_pb2.CompactionRequest(
+            revision=revision, physical=True
+            )
+        )
+
+        stub = etcd_pb2_grpc.MaintenanceStub(channel)
+        request = etcd_pb2.DefragmentRequest()
+        stub.Defragment(request)
+
+
+def transactional_delete(path, original_data):
+    path_encoded = path.encode()
+    original_data_encoded = json.dumps(
+        original_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes
+        ).encode()
+
+    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+        stub = etcd_pb2_grpc.KVStub(channel)
+
+        response = stub.Txn(
+            etcd_pb2.TxnRequest(
+                compare=[
+                    etcd_pb2.Compare(
+                        key=path_encoded,
+                        result=etcd_pb2.Compare.EQUAL,
+                        target=etcd_pb2.Compare.VALUE,
+                        value=original_data_encoded
+                    )
+                ],
+                success=[
+                    etcd_pb2.RequestOp(
+                        request_delete_range=etcd_pb2.DeleteRangeRequest(
+                            key=path_encoded
+                        )
+                    )
+                ],
+                failure=[]
+            )
+        )
+
+        LOG.with_fields({
+            'success': response.succeeded
+            }).info(f'etcd transactional_delete {path}')
+        return response.succeeded

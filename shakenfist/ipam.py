@@ -39,7 +39,7 @@ RESERVATION_TYPE_UNKNOWN = 'unknown'
 class IPAM(dbo):
     object_type = 'ipam'
     initial_version = 3
-    current_version = 5
+    current_version = 6
 
     state_targets = {
         None: (dbo.STATE_CREATED),
@@ -97,6 +97,10 @@ class IPAM(dbo):
                 ipm.delete()
         except exceptions.IPManagerMissing:
             pass
+
+    @classmethod
+    def _upgrade_step_5_to_6(cls, static_values):
+        etcd.delete('attribute/ipam', static_values['uuid'], 'deletion-halo')
 
     def _ensure_ipblock_object(self):
         if not self.cached_ipblock_object:
@@ -216,13 +220,31 @@ class IPAM(dbo):
         return str(self.ipblock[idx])
 
     def is_in_range(self, address):
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
+
         return ipaddress.ip_address(address) in self.ipblock
 
     def is_free(self, address):
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
+
         return address not in self.in_use
 
     def reserve(self, address, user, reservation_type, comment):
-        self.release_haloed(config.IP_DELETION_HALO_DURATION)
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
+
+        if self.version == 3:
+            success = self.cached_ipmanager_object.reserve(address, user)
+            if success:
+                self.cached_ipmanager_object.persist()
+            self.log.with_fields({'address': address}).info('Reserved address via ipmanager')
+            return success
+
         reservation = {
             'address': address,
             'user': user,
@@ -231,23 +253,30 @@ class IPAM(dbo):
             'comment': comment
         }
 
-        with self.get_lock('reservations', op='Reserve address'):
-            if self.version == 3:
-                success = self.cached_ipmanager_object.reserve(address, user)
-                if success:
-                    self.cached_ipmanager_object.persist()
-                self.log.with_fields(reservation).info('Reserved address via ipmanager')
-                return success
+        self.release_haloed(config.IP_DELETION_HALO_DURATION)
 
-            if not self.is_free(address):
-                return False
-
-            etcd.put_raw(self.reservations_path + address, reservation)
-            self.add_event(EVENT_TYPE_AUDIT, 'reserved address', extra=reservation)
-            return True
+        if not etcd.create_raw(self.reservations_path + address, reservation):
+            return False
+        self.add_event(EVENT_TYPE_AUDIT, 'reserved address', extra=reservation)
+        return True
 
     def release(self, address):
-        reservation = {
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
+
+        if self.version == 3:
+            success = self.cached_ipmanager_object.release(address)
+            if success:
+                self.cached_ipmanager_object.persist()
+            self.log.with_fields({'address': address}).info('Released address via ipmanager')
+            return success
+
+        original_reservation = self.get_reservation(address)
+        if not original_reservation:
+            return False
+
+        halo_reservation = {
             'address': address,
             'user': None,
             'when': time.time(),
@@ -255,43 +284,41 @@ class IPAM(dbo):
             'comment': ''
         }
 
-        with self.get_lock('reservations', op='Release address'):
-            if self.version == 3:
-                success = self.cached_ipmanager_object.release(address)
-                if success:
-                    self.cached_ipmanager_object.persist()
-                self.log.with_fields({'address': address}).info('Released address via ipmanager')
-                return success
+        reservation_path = self.reservations_path + address
+        if not etcd.replace_raw(
+                reservation_path, original_reservation, halo_reservation):
+            return False
 
-            if self.is_free(address):
-                return False
-
-            etcd.put_raw(self.reservations_path + address, reservation)
-            self._add_item_in_attribute_list(
-                'deletion-halo', [address, reservation['when']])
-            self.add_event(
-                EVENT_TYPE_AUDIT, 'released address to deletion-halo', extra=reservation)
-            return True
+        self.add_event(
+            EVENT_TYPE_AUDIT, 'released address to deletion-halo',
+            extra=original_reservation)
+        return True
 
     def release_haloed(self, duration):
+        if self.version == 3:
+            return
+
+        # Handle the possible allocation race here where something's halo is
+        # removed and its immediately allocated, but at the same time we
+        # remove its halo by using a transactional_delete.
         freed = 0
-        with self.get_lock('reservations', op='Release haloed addresses'):
-            haloed = self._db_get_attribute('deletion-halo', {'deletion-halo': []})
-            for address, when in haloed['deletion-halo']:
-                if time.time() - when > duration:
-                    etcd.delete_raw(self.reservations_path + address)
-                    self._remove_item_in_attribute_list(
-                        'deletion-halo', [address, when])
-                    self.add_event(
-                        EVENT_TYPE_AUDIT, 'released address to free pool',
-                        extra={'address': address})
+        for key, data in etcd.get_prefix(
+                self.reservations_path,
+                sort_order='ascend',
+                sort_target='key'):
+            if (data['type'] == RESERVATION_TYPE_DELETION_HALO and
+                    time.time() - data['when'] > duration):
+                if etcd.transactional_delete(key, data):
                     freed += 1
         return freed
 
     def get_haloed_addresses(self):
-        haloed = self._db_get_attribute('deletion-halo', {'deletion-halo': []})
-        for address, _ in haloed['deletion-halo']:
-            yield address
+        for _, data in etcd.get_prefix(
+                self.reservations_path,
+                sort_order='ascend',
+                sort_target='key'):
+            if data['type'] == RESERVATION_TYPE_DELETION_HALO:
+                yield data['address']
 
     def get_random_address(self):
         bits = random.getrandbits(
@@ -343,8 +370,9 @@ class IPAM(dbo):
         raise exceptions.CongestedNetwork('No free addresses on network')
 
     def get_reservation(self, address):
-        if address not in self.in_use:
-            return None
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
 
         if self.version == 3:
             return self.cached_ipmanager_object.in_use.get(address)
@@ -352,6 +380,10 @@ class IPAM(dbo):
         return etcd.get_raw(self.reservations_path + address)
 
     def get_allocation_age(self, address):
+        if not address:
+            raise exceptions.InvalidIPAMAddress(
+                f'{address} is not a valid address')
+
         if self.version == 3:
             return self.cached_ipmanager_object.in_use.get(address, {}).get('when')
 

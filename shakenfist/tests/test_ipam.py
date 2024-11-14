@@ -68,8 +68,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
         ipm.release('192.168.1.10')
         self.assertIn('192.168.1.10', ipm.in_use)
 
-        # Check that halo goes away, but this requires we reserve another IP as
-        # release is a side effect of reservation
+        # Check that halo goes away
         time.sleep(1)
         ipm.release_haloed(0)
         self.assertNotIn('192.168.1.10', ipm.in_use)
@@ -79,14 +78,17 @@ class IPAMTestCase(base.ShakenFistTestCase):
         ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
 
         self.assertEqual(True, ipm.is_free('192.168.1.24'))
-        ipm.reserve('192.168.1.24', ('test', '123'), ipam.RESERVATION_TYPE_FLOATING, '')
+        ipm.reserve('192.168.1.24', ('test', '123'),
+                    ipam.RESERVATION_TYPE_FLOATING, '')
         self.assertEqual(False, ipm.is_free('192.168.1.24'))
         self.assertEqual(
-            False, ipm.reserve('192.168.1.24', ('test', '123'), ipam.RESERVATION_TYPE_FLOATING, ''))
+            False, ipm.reserve('192.168.1.24', ('test', '123'),
+                               ipam.RESERVATION_TYPE_FLOATING, ''))
 
         self.assertEqual(True, ipm.is_free('192.168.1.42'))
         self.assertEqual(
-            True, ipm.reserve('192.168.1.42', ('test', '123'), ipam.RESERVATION_TYPE_FLOATING, ''))
+            True, ipm.reserve('192.168.1.42', ('test', '123'),
+                              ipam.RESERVATION_TYPE_FLOATING, ''))
         self.assertEqual(False, ipm.is_free('192.168.1.42'))
 
     def test_get_free_random_ip(self):
