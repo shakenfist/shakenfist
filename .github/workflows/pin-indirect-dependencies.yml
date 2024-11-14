@@ -12,7 +12,7 @@ on:
 
 jobs:
   indirect-dependencies:
-    runs-on: self-hosted
+    runs-on: [self-hosted, vm]
     timeout-minutes: 60
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}

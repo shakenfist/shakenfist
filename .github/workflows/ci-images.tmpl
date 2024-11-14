@@ -14,7 +14,7 @@ on:
 
 jobs:
   {{name}}:
-    runs-on: self-hosted
+    runs-on: [self-hosted, vm]
     timeout-minutes: 120
     concurrency:
       group: {% raw %}${{ github.workflow }}-${{ github.ref }}{% endraw %}
