@@ -12,9 +12,6 @@ from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
 from etcd3gw.utils import _encode
 from etcd3gw.utils import _increment_last_byte
-from shakenfist_utilities import logs
-from shakenfist_utilities import random as util_random
-
 from shakenfist import baseobject
 from shakenfist import etcd_pb2
 from shakenfist import etcd_pb2_grpc
@@ -23,6 +20,8 @@ from shakenfist.config import config
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.tasks import QueueTask
 from shakenfist.util import callstack as util_callstack
+from shakenfist_utilities import logs
+from shakenfist_utilities import random as util_random
 
 
 LOG, _ = logs.setup(__name__)

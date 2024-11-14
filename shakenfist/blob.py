@@ -12,9 +12,6 @@ import uuid
 
 import magic
 import psutil
-from shakenfist_utilities import logs
-from shakenfist_utilities import random as sf_random
-
 from shakenfist import cache
 from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -44,6 +41,8 @@ from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import process as util_process
+from shakenfist_utilities import logs
+from shakenfist_utilities import random as sf_random
 
 
 LOG, _ = logs.setup(__name__)
