@@ -6,8 +6,6 @@ import shutil
 import uuid
 
 import requests
-from shakenfist_utilities import logs
-
 from shakenfist import blob
 from shakenfist import etcd
 from shakenfist import exceptions
@@ -24,6 +22,7 @@ from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import process as util_process
+from shakenfist_utilities import logs
 
 
 LOG, _ = logs.setup(__name__)

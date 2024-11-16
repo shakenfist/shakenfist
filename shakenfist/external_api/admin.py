@@ -9,11 +9,10 @@ import os
 
 import flask
 from flasgger import swag_from
-from shakenfist_utilities import api as sf_api
-
 from shakenfist import etcd
 from shakenfist import scheduler
 from shakenfist.external_api import base as api_base
+from shakenfist_utilities import api as sf_api
 
 
 admin_locks_get_example = """{
