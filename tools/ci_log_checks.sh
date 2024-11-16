@@ -9,7 +9,7 @@ etcd_conns=`grep -c "Building new etcd connection" /var/log/syslog || true`
 echo "This CI run created $etcd_conns etcd connections."
 if [ $etcd_conns -gt 5000 ]; then
 echo "FAILURE: Too many etcd clients!"
-failures=1
+failures=$(( $failures + 1))
 fi
 
 echo
@@ -17,7 +17,7 @@ sigterms=`grep -c "Sent SIGTERM to " /var/log/syslog || true`
 echo "This CI run sent $sigterms SIGTERM signals while shutting down."
 if [ $sigterms -gt 50 ]; then
 echo "FAILURE: Too many SIGTERMs sent!"
-failures=1
+failures=$(( $failures + 1))
 fi
 
 # NOTE(mikal): online upgrades are forbidden in these fresh install
@@ -67,7 +67,7 @@ do
     if [ ${count} -gt 0 ]
     then
         echo "FAILURE: Forbidden string found in logs ${count} times."
-        failures=1
+        failures=$(( $failures + 1))
     fi
 done
 
@@ -83,13 +83,13 @@ do
     if [ ${count} -gt 0 ]
     then
         echo "FAILURE: Forbidden once stable string found ${count} times."
-        failures=1
+        failures=$(( $failures + 1))
     fi
 done
 
 echo
 if [ $failures -gt 0 ]; then
-    echo "...failures detected."
+    echo "...${failures} failures detected."
     exit 1
 fi
 
@@ -105,11 +105,11 @@ do
     if [ ${count} -gt 0 ]
     then
         echo "WARNING: Forbidden string found in logs ${count} times."
-        failures=1
+        failures=$(( $failures + 1))
     fi
 done
 
 echo
 if [ $failures -gt 0 ]; then
-    echo "...warnings detected."
+    echo "...${failures} warnings detected."
 fi
