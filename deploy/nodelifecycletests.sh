@@ -57,7 +57,7 @@ sf-client artifact list
 # Sleep for a little to let instances start
 echo
 log "Pausing to let instances boot"
-sleep 180
+sleep 300
 
 # Ensure we made instances and they started ok
 echo
