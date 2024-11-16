@@ -6,7 +6,7 @@ import os
 import time
 
 import click
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 
 LOG = logs.setup_console(__name__)

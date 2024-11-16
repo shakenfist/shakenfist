@@ -9,7 +9,7 @@ import uuid
 import cpuinfo
 import distro
 from pbr.version import VersionInfo
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import eventlog
 from shakenfist.constants import EVENT_TYPE_STATUS

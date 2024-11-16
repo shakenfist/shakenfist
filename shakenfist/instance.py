@@ -17,7 +17,7 @@ from uuid import uuid4
 
 import jinja2
 import pycdlib
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
 from shakenfist import baseobject

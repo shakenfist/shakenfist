@@ -6,7 +6,7 @@ from math import inf
 
 from etcd3gw.lock import Lock
 from oslo_concurrency import lockutils
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import cache
 from shakenfist import constants

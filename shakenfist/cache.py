@@ -1,7 +1,8 @@
 import time
 
+from shakenfist_utilities import logs  # noreorder
+
 from shakenfist import etcd
-from shakenfist_utilities import logs
 
 
 LOG, _ = logs.setup(__name__)

@@ -3,7 +3,7 @@ import re
 import shutil
 
 import versions
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import constants
 from shakenfist import exceptions

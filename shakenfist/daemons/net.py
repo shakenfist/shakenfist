@@ -6,7 +6,7 @@ from collections import defaultdict
 
 import setproctitle
 from oslo_concurrency import processutils
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist import exceptions

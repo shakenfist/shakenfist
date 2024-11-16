@@ -19,8 +19,8 @@ import flask_restful
 from flask_jwt_extended import JWTManager
 from flask_request_id import RequestID
 from pbr.version import VersionInfo
-from shakenfist_utilities import api as sf_api
-from shakenfist_utilities import logs
+from shakenfist_utilities import api as sf_api  # noreorder
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import constants
 from shakenfist import eventlog

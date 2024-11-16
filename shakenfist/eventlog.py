@@ -9,7 +9,7 @@ import time
 import flask
 import grpc
 from oslo_concurrency import lockutils
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import constants
 from shakenfist import etcd

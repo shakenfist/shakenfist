@@ -6,7 +6,7 @@ import time
 import psutil
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 from versions import parse_version
 
 from shakenfist import etcd

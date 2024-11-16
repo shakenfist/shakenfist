@@ -8,7 +8,7 @@ from functools import partial
 from uuid import uuid4
 
 from oslo_concurrency import processutils
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
 from shakenfist import etcd
