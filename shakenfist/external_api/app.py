@@ -89,10 +89,15 @@ def log_request_info():
 
 @app.after_request
 def log_response_info(response):
-    body = response.get_data()
-    if len(body) > 1024:
+    if response.is_streamed:
+        body = '...body not logged as it is streamed...'
+    elif response.direct_passthrough:
+        body = '...body not logged as response is streaming...'
+    elif response.content_length > 1024:
         body = '...body not logged as greater than 1kb...'
     else:
+        body = response.get_data()
+
         try:
             body = json.loads(body)
         except ValueError:

@@ -174,7 +174,8 @@ class Monitor(daemon.Daemon):
         for a in artifact.Artifacts([]):
             # If the artifact's namespace is deleted then we should remove the
             # artifact
-            ns = namespace.Namespace.from_db(a.namespace)
+            ns = namespace.Namespace.from_db(
+                a.namespace, suppress_failure_audit=True)
             if not ns:
                 a.delete()
                 continue

@@ -37,19 +37,27 @@ echo
 for hypervisor in ${hypervisors}; do
     for i in $(seq 2); do
         sf-client network create ${hypervisor}-${i} 10.0.0.0/24 > /dev/null
-	log "Created network ${hypervisor}-${i}"
+	    log "Created network ${hypervisor}-${i}"
 
         sf-client instance create ${hypervisor}-${i} 1 1024 \
             -d 20@sf://upload/system/debian-11 -f ${hypervisor}-${i} \
             -p ${hypervisor} > /dev/null
-	log "Created instance ${hypervisor}-${i}"
+	    log "Created instance ${hypervisor}-${i}"
     done
 done
+
+# Sleep a tiny bit
+echo
+sleep 30
+
+# List artifacts
+log "Listing artifacts"
+sf-client artifact list
 
 # Sleep for a little to let instances start
 echo
 log "Pausing to let instances boot"
-sleep 60
+sleep 300
 
 # Ensure we made instances and they started ok
 echo
@@ -62,7 +70,12 @@ if [ $(sf-client instance list | grep -c created) -lt 1 ]; then
     exit 1
 fi
 
+# List blobs
+echo
+sf-client blob list
+
 # Ensure all instances are now created
+echo
 failed=$(sf-client --json instance list | jq --raw-output '.instances | .[] | select(.state != "created") | "\(.uuid), \(.name), \(.state)"')
 if [ "$failed" != "" ]; then
     log "Some instances failed to start"

@@ -31,6 +31,7 @@ from shakenfist.exceptions import BlobDependencyMissing
 from shakenfist.exceptions import BlobFetchFailed
 from shakenfist.exceptions import BlobMissing
 from shakenfist.exceptions import BlobsMustHaveContent
+from shakenfist.exceptions import BlobSizeCannotChange
 from shakenfist.exceptions import BlobTransferSetupFailed
 from shakenfist.node import Node
 from shakenfist.node import Nodes
@@ -48,10 +49,14 @@ from shakenfist_utilities import random as sf_random
 LOG, _ = logs.setup(__name__)
 
 
+# NOTE(mikal): blobs are immutable objects, that is their content cannot change
+# once set. However, we don't always know the size or content of the blob when
+# we reserve its UUID, so we do allow the size of the blob to be set after
+# creation.
 class Blob(dbo):
     object_type = 'blob'
     initial_version = 2
-    current_version = 6
+    current_version = 7
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -67,7 +72,6 @@ class Blob(dbo):
 
         super().__init__(static_values.get('uuid'), static_values.get('version'))
 
-        self.__size = static_values['size']
         self.__modified = static_values['modified']
         self.__fetched_at = static_values['fetched_at']
         self.__depends_on = static_values.get('depends_on')
@@ -103,6 +107,17 @@ class Blob(dbo):
                 'KeyError while upgrading retention (v5 to v6): %s' % e)
 
     @classmethod
+    def _upgrade_step_6_to_7(cls, static_values):
+        try:
+            etcd.put('attribute/blob', static_values['uuid'], 'size',
+                     {'size': static_values['size']})
+        except KeyError as e:
+            # I am currently unsure why you'd end up here, but am seeing it in
+            # CI. Let's gather some more information so we can chase it down.
+            LOG.with_fields(static_values).error(
+                'KeyError while upgrading retention (v6 to v7): %s' % e)
+
+    @classmethod
     def normalize_timestamp(cls, timestamp):
         # The timestamp is either a number (int or float, assumed to be epoch
         # seconds)...
@@ -119,15 +134,11 @@ class Blob(dbo):
         return time.mktime(t)
 
     @classmethod
-    def new(cls, blob_uuid, size, modified, fetched_at, depends_on=None):
-        if not size:
-            raise BlobsMustHaveContent('A blob cannot be of zero size')
-
+    def new(cls, blob_uuid, modified, fetched_at, depends_on=None):
         Blob._db_create(
             blob_uuid,
             {
                 'uuid': blob_uuid,
-                'size': size,
                 'modified': cls.normalize_timestamp(modified),
                 'fetched_at': fetched_at,
                 'depends_on': depends_on,
@@ -161,10 +172,6 @@ class Blob(dbo):
 
     # Static values
     @property
-    def size(self):
-        return self.__size
-
-    @property
     def modified(self):
         return self.__modified
 
@@ -177,6 +184,21 @@ class Blob(dbo):
         return self.__depends_on
 
     # Values routed to attributes
+    @property
+    def size(self):
+        size = self._db_get_attribute('size', {'size': 0})
+        return size['size']
+
+    @size.setter
+    def size(self, new_size):
+        if new_size < 1:
+            raise BlobsMustHaveContent()
+
+        size = self._db_get_attribute('size', None)
+        if size:
+            raise BlobSizeCannotChange()
+        self._db_set_attribute('size', {'size': new_size})
+
     @property
     def locations(self):
         locs = self._db_get_attribute('locations', {'locations': []})
@@ -724,7 +746,8 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     # to avoid deletion races. Note that this _must_ be a hard link, which is why
     # we don't use util_general.link().
     os.link(dest_path + '.partial', dest_path)
-    b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(), depends_on=depends_on)
+    b = Blob.new(blob_uuid, time.time(), time.time(), depends_on=depends_on)
+    b.size = st.st_size
     b.state = Blob.STATE_CREATED
     if dep_blob:
         dep_blob.ref_count_inc(b)
@@ -735,6 +758,8 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
 
 
 def http_fetch(url, resp, blob_uuid, locks, objects):
+    b = Blob.from_db(blob_uuid)
+
     fetched = 0
     if resp.headers.get('Content-Length'):
         total_size = int(resp.headers.get('Content-Length'))
@@ -781,8 +806,7 @@ def http_fetch(url, resp, blob_uuid, locks, objects):
 
     # Import the newly fetched blob
     os.rename(dest_path + '.partial', dest_path)
-    b = Blob.new(blob_uuid, fetched, resp.headers.get('Last-Modified'),
-                 time.time())
+    b.size = fetched
     b.state = Blob.STATE_CREATED
     b.verify_checksum(hash=sha512_hash.hexdigest())
     b.observe()
@@ -795,7 +819,8 @@ def from_memory(content):
     with open(Blob.filepath(blob_uuid), 'wb') as f:
         f.write(content)
 
-    b = Blob.new(blob_uuid, len(content), time.time(), time.time())
+    b = Blob.new(blob_uuid, time.time(), time.time())
+    b.size = len(content)
     b.state = Blob.STATE_CREATED
     b.observe()
     b.request_replication()

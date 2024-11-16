@@ -3,7 +3,7 @@ name: Rebuild ubuntu-2404
 on:
   workflow_dispatch:
   schedule:
-    - cron: '00 16 * * *'        # utc
+    - cron: '13 16 * * *'        # utc
 
 jobs:
   ubuntu-2404:

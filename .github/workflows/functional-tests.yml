@@ -149,6 +149,24 @@ jobs:
               base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
               deploy/ansible/ci-topology-${{ matrix.os.topology }}.yml
 
+          if [ "${{ matrix.os.topology }}" == "localhost" ]; then
+            echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
+          else
+            nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
+            random_index=$(( RANDOM % 5 ))
+            echo "UPLOAD_TARGET=${nodes[$random_index]}" >> $GITHUB_ENV
+          fi
+
+      - name: Log environmental configuration
+        run: |
+          echo "## ci-environment.sh"
+          cat ${GITHUB_WORKSPACE}/ci-environment.sh
+          echo
+          echo "## Environment variables"
+          echo "SF_HEAD_SHA = ${SF_HEAD_SHA}"
+          echo "SHAKENFIST_NAMESPACE = ${SHAKENFIST_NAMESPACE}"
+          echo "UPLOAD_TARGET = ${UPLOAD_TARGET}"
+
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
@@ -208,18 +226,23 @@ jobs:
       - name: Import cached images
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
+          setup="${setup} . /etc/sf/sfrc;"
+          setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
+          setup="${setup} sf-client artifact upload"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04 --shared'
+              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
+              "${setup} ubuntu-2004 /srv/ci/ubuntu:20.04 --shared --no-checksum"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11 --shared'
+              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
+              "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              '. /etc/sf/sfrc; sf-client artifact upload debian-12 /srv/ci/debian:12 --shared'
+              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
+              "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros --shared'
+              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
+              "${setup} cirros /srv/ci/cirros --shared"
 
       - name: Create a base level of activity in the cluster
         run: |
@@ -311,7 +334,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle-${{ matrix.os.job_name }}.zip
+          name: bundle-functional-cluster-${{ matrix.os.job_name }}
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
@@ -347,6 +370,20 @@ jobs:
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
               deploy/ansible/ci-topology-slim-primary.yml
+
+          nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
+          random_index=$(( RANDOM % 5 ))
+          echo "UPLOAD_TARGET=${nodes[$random_index]}" >> $GITHUB_ENV
+
+      - name: Log environmental configuration
+        run: |
+          echo "## ci-environment.sh"
+          cat ${GITHUB_WORKSPACE}/ci-environment.sh
+          echo
+          echo "## Environment variables"
+          echo "SF_HEAD_SHA = ${SF_HEAD_SHA}"
+          echo "SHAKENFIST_NAMESPACE = ${SHAKENFIST_NAMESPACE}"
+          echo "UPLOAD_TARGET = ${UPLOAD_TARGET}"
 
       - name: Copy CI tools to primary
         run: |
@@ -395,15 +432,23 @@ jobs:
       - name: Import cached images
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
+          setup="${setup} . /etc/sf/sfrc;"
+          setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
+          setup="${setup} sf-client artifact upload"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04 --shared'
+              debian@${UPLOAD_TARGET} \
+              "${setup} ubuntu-2004 /srv/ci/ubuntu:20.04 --shared --no-checksum"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11 --shared'
+              debian@${UPLOAD_TARGET} \
+              "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros --shared'
+              debian@${UPLOAD_TARGET} \
+              "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@${UPLOAD_TARGET} \
+              "${setup} cirros /srv/ci/cirros --shared"
 
       - name: Run ansible module tests
         timeout-minutes: 120
@@ -429,6 +474,14 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs'
+
+      - name: Check for reasonable data rates
+        timeout-minutes: 5
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
         if: always()
@@ -459,7 +512,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle-ansible-modules.zip
+          name: bundle-functional-ansible-modules
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
@@ -497,6 +550,20 @@ jobs:
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
               deploy/ansible/ci-topology-slim-primary.yml
 
+          nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
+          random_index=$(( RANDOM % 5 ))
+          echo "UPLOAD_TARGET=${nodes[$random_index]}" >> $GITHUB_ENV
+
+      - name: Log environmental configuration
+        run: |
+          echo "## ci-environment.sh"
+          cat ${GITHUB_WORKSPACE}/ci-environment.sh
+          echo
+          echo "## Environment variables"
+          echo "SF_HEAD_SHA = ${SF_HEAD_SHA}"
+          echo "SHAKENFIST_NAMESPACE = ${SHAKENFIST_NAMESPACE}"
+          echo "UPLOAD_TARGET = ${UPLOAD_TARGET}"
+
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
@@ -544,15 +611,14 @@ jobs:
       - name: Import cached images
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
+          setup="${setup} . /etc/sf/sfrc;"
+          setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
+          setup="${setup} sf-client artifact upload"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04 --shared'
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11 --shared'
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros --shared'
+              debian@${UPLOAD_TARGET} \
+              "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
 
       - name: Run node lifecycle tests
         timeout-minutes: 120
@@ -581,6 +647,14 @@ jobs:
               sf-client instance reboot --hard ${node}
           done
           sleep 90
+
+      - name: Check for reasonable data rates
+        timeout-minutes: 5
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
         if: always()
@@ -611,7 +685,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle-node-lifecycle.zip
+          name: bundle-functional-node-lifecycle
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
@@ -648,6 +722,18 @@ jobs:
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
               deploy/ansible/ci-topology-localhost-upgrade.yml
+
+          echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
+
+      - name: Log environmental configuration
+        run: |
+          echo "## ci-environment.sh"
+          cat ${GITHUB_WORKSPACE}/ci-environment.sh
+          echo
+          echo "## Environment variables"
+          echo "SF_HEAD_SHA = ${SF_HEAD_SHA}"
+          echo "SHAKENFIST_NAMESPACE = ${SHAKENFIST_NAMESPACE}"
+          echo "UPLOAD_TARGET = ${UPLOAD_TARGET}"
 
       - name: Copy CI tools to primary
         run: |
@@ -710,6 +796,14 @@ jobs:
           cd ${GITHUB_WORKSPACE}/shakenfist
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop upgrade-0-6-15"
 
+      - name: Check for reasonable data rates
+        timeout-minutes: 5
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
+
       - name: Fetch and tweak inventory
         if: always()
         run: |
@@ -738,7 +832,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle-upgrade-0-6-15.zip
+          name: bundle-functional-upgrade-0-6-15
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
