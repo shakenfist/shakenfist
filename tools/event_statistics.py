@@ -1,5 +1,6 @@
 # Emit statistics about how many events we create for CI runs.
 from collections import defaultdict
+import math
 import os
 import sys
 
@@ -41,12 +42,13 @@ if __name__ == '__main__':
                         if event['message'] == 'instance creation complete':
                             instance_started = event['timestamp']
 
-                if objtype == 'instance':
+                if (objtype == 'instance' and instance_object_created > 0 and
+                        instance_started > 0):
                     # We round the duration to the nearest 30 seconds to bucketize
                     # results
                     duration = instance_started - instance_object_created
-                    rounded = int(duration / 30) * 30
-                    instance_start_times[rounded].append(objuuid)
+                    rounded = math.ceil(duration / 30) * 30
+                    instance_start_times[rounded].append((objuuid, duration))
 
         print('Object type %s has %d events' % (objtype, event_count))
         if event_count > 200000:
@@ -66,13 +68,13 @@ if __name__ == '__main__':
     print('Instance start times')
     for start_time in sorted(instance_start_times.keys()):
         count = len(instance_start_times[start_time])
-        print(f'{start_time:08}: {count}')
-        if start_time > 300:
-            # failures += count
+        print(f'    {start_time:08}: {count}')
+        if start_time > 900:
+            failures += count
 
-            print('    ... which is slower than our threshold of 300 seconds')
-            for inst in instance_start_times[start_time]:
-                print(f'    ... {inst}')
+            print('        ... which is slower than our threshold of 900 seconds')
+            for inst, duration in instance_start_times[start_time]:
+                print(f'        ... {inst} ({duration:.02} seconds)')
     print()
 
     sys.exit(failures)

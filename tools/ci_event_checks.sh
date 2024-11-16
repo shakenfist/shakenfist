@@ -8,7 +8,7 @@ revisions=$(etcdctl get / --write-out=json | jq .header.revision)
 echo "Number of etcd revisions in this test run: ${revisions}"
 if [ ${revisions} -gt 175000 ]; then
     echo "FAILURE: Too many etcd writes!"
-    failures=1
+    failures=$(( $failures + 1))
 fi
 echo
 
@@ -24,26 +24,27 @@ fi
 echo
 
 # Lock acquisition is expensive, prefer etcd transactions.
-acquired_locks=$(grep -c /var/log/syslog "Acquired lock")
+acquired_locks=$(grep -c "Acquired lock" /var/log/syslog)
 echo "Number of locks acquired: ${acquired_locks}"
 echo
 echo "Top 20 locks by acquisition:"
 
-IFS="\n"
+IFS=$'\n'
 for lock in $(grep "Acquired lock" /var/log/syslog | \
         sed -e 's/.*key=//' -e 's/;.*//' | \
-        sort | uniq -c | sort -n | tail -20); do
+        sort | uniq -c | sort -n | tail -20 \
+        | sed 's/^ *//' | tr -s " "); do
     echo "${lock}"
-    count=$(echo ${lock} | sed -e 's/^ +//' -e 's| /sflocks.*||')
+    count=$(echo ${lock} | sed -e 's| /sflocks.*||')
     if [ ${count} -gt 1500 ]; then
         echo "   ... more than threshold of 1,500"
-        failures=1
+        failures=$(( $failures + 1))
     fi
 done
 echo
 
 # And the finale.
 if [ $failures -gt 0 ]; then
-    echo "...failures detected."
+    echo "...${failures} failures detected."
     exit 1
 fi
