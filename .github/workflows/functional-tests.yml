@@ -475,6 +475,14 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs'
 
+      - name: Check for reasonable data rates
+        timeout-minutes: 5
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
+
       - name: Fetch and tweak inventory
         if: always()
         run: |
@@ -640,6 +648,14 @@ jobs:
           done
           sleep 90
 
+      - name: Check for reasonable data rates
+        timeout-minutes: 5
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
+
       - name: Fetch and tweak inventory
         if: always()
         run: |
@@ -779,6 +795,14 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/shakenfist
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop upgrade-0-6-15"
+
+      - name: Check for reasonable data rates
+        timeout-minutes: 5
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
         if: always()
