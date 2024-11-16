@@ -9,8 +9,8 @@ from concurrent import futures
 import grpc
 from prometheus_client import Counter
 from prometheus_client import start_http_server
-from shakenfist_utilities import logs
-from shakenfist_utilities.random import random_id
+from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities.random import random_id  # noreorder
 
 from shakenfist import etcd
 from shakenfist import event_pb2

@@ -8,7 +8,7 @@ from collections import defaultdict
 from functools import partial
 
 import setproctitle
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
 from shakenfist import cache

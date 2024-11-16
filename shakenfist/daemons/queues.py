@@ -4,7 +4,7 @@ import uuid
 
 import requests
 import setproctitle
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import blob
 from shakenfist import etcd

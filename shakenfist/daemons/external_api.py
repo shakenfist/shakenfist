@@ -1,7 +1,7 @@
 import os
 import signal
 
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon

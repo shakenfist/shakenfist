@@ -2,7 +2,7 @@ import time
 from collections import defaultdict
 
 import versions
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo

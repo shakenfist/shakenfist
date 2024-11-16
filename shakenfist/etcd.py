@@ -7,6 +7,9 @@ from collections import defaultdict
 import grpc
 import psutil
 import requests
+from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities import random as util_random  # noreorder
+
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
@@ -20,8 +23,6 @@ from shakenfist.config import config
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.tasks import QueueTask
 from shakenfist.util import callstack as util_callstack
-from shakenfist_utilities import logs
-from shakenfist_utilities import random as util_random
 
 
 LOG, _ = logs.setup(__name__)

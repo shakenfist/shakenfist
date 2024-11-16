@@ -1,7 +1,7 @@
 import ipaddress
 import time
 
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import db
 

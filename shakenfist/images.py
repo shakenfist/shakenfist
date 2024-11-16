@@ -7,7 +7,7 @@ import time
 import uuid
 
 import requests
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import blob
 from shakenfist import etcd

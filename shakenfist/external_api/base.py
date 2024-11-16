@@ -5,8 +5,8 @@ import requests
 from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import verify_jwt_in_request
 from flask_jwt_extended.exceptions import NoAuthorizationError
-from shakenfist_utilities import api as sf_api
-from shakenfist_utilities import logs
+from shakenfist_utilities import api as sf_api  # noreorder
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import exceptions
 from shakenfist import network

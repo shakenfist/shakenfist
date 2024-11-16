@@ -2,6 +2,8 @@ import ipaddress
 import random
 import time
 
+from shakenfist_utilities import logs  # noreorder
+
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
@@ -12,7 +14,6 @@ from shakenfist.baseobject import get_minimum_object_version as gmov
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.util import callstack as util_callstack
-from shakenfist_utilities import logs
 
 
 # Please note: IPAMs are a "foundational" baseobject type, which means they

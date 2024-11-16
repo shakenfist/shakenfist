@@ -11,7 +11,7 @@ from functools import partial
 
 import psutil
 import setproctitle
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import cache
 from shakenfist import config as sf_config

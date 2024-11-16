@@ -7,7 +7,7 @@
 #        - and include examples: yes
 #   - Has complete CI coverage:
 from flasgger import swag_from
-from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import api as sf_api  # noreorder
 
 from shakenfist import etcd
 from shakenfist import eventlog

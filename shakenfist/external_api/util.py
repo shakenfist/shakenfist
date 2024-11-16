@@ -1,6 +1,6 @@
 from flask_jwt_extended import get_jwt_identity
-from shakenfist_utilities import api as sf_api
-from shakenfist_utilities import logs
+from shakenfist_utilities import api as sf_api  # noreorder
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import ipam
 from shakenfist import network

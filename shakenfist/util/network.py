@@ -5,7 +5,7 @@ import re
 import time
 
 from oslo_concurrency import processutils
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import exceptions
 from shakenfist.config import config
