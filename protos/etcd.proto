@@ -167,6 +167,11 @@ message DeleteRangeResponse {
 }
 
 service KV {
+    // Put puts the given key into the key-value store.
+    // A put request increments the revision of the key-value store
+    // and generates one event in the event history.
+    rpc Put(PutRequest) returns (PutResponse) {}
+
     // Txn processes multiple requests in a single transaction.
     // A txn request increments the revision of the key-value store
     // and generates events with the same revision for every completed request.

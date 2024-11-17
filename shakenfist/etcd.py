@@ -358,43 +358,14 @@ class JSONEncoderCustomTypes(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-@retry_etcd_forever
-def put_raw(path, data):
-    encoded = json.dumps(data, indent=4, sort_keys=True,
-                         cls=JSONEncoderCustomTypes)
-    get_etcd_client().put(path, encoded, lease=None)
-    LOG.info('etcd put %s' % path)
-
-
-@retry_etcd_forever
 def put(objecttype, subtype, name, data):
     path = _construct_key(objecttype, subtype, name)
     put_raw(path, data)
 
 
-@retry_etcd_forever
-def create_raw(path, data):
-    encoded = json.dumps(data, indent=4, sort_keys=True,
-                         cls=JSONEncoderCustomTypes)
-    LOG.info('etcd create %s' % path)
-    return get_etcd_client().create(path, encoded, lease=None)
-
-
-@retry_etcd_forever
 def create(objecttype, subtype, name, data):
     path = _construct_key(objecttype, subtype, name)
     return create_raw(path, data)
-
-
-@retry_etcd_forever
-def replace_raw(path, original_data, new_data):
-    original_data_encoded = json.dumps(
-        original_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes)
-    new_data_encoded = json.dumps(
-        new_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes)
-
-    LOG.info('etcd replace %s' % path)
-    return get_etcd_client().replace(path, original_data_encoded, new_data_encoded)
 
 
 @retry_etcd_forever
@@ -617,6 +588,12 @@ def restart_queues():
     _restart_queue(f'{config.NODE_NAME}-background')
 
 
+# Direct etcd calls via gRPC
+def _encode_data(data):
+    return json.dumps(
+        data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes).encode()
+
+
 def compact(revision):
     with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
         stub = etcd_pb2_grpc.KVStub(channel)
@@ -630,11 +607,93 @@ def compact(revision):
         stub.Defragment(request)
 
 
-def transactional_delete(path, original_data):
+def put_raw(path, new_data):
     path_encoded = path.encode()
-    original_data_encoded = json.dumps(
-        original_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes
-        ).encode()
+    new_data_encoded = _encode_data(new_data)
+
+    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+        stub = etcd_pb2_grpc.KVStub(channel)
+
+        # NOTE(mikal): yes, this doesn't return a meaningful result. etcd3gw
+        # simply hardcoded a "return True" here, the etcd server returns a
+        # result indicating the previous value of the key. That is, a failure
+        # will raise an exception.
+        stub.Put(
+            etcd_pb2.PutRequest(
+                key=path_encoded,
+                value=new_data_encoded
+            )
+        )
+
+
+def create_raw(path, new_data):
+    path_encoded = path.encode()
+    new_data_encoded = _encode_data(new_data)
+
+    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+        stub = etcd_pb2_grpc.KVStub(channel)
+
+        response = stub.Txn(
+            etcd_pb2.TxnRequest(
+                compare=[
+                    etcd_pb2.Compare(
+                        key=path_encoded,
+                        result=etcd_pb2.Compare.EQUAL,
+                        target=etcd_pb2.Compare.CREATE,
+                        create_revision=0
+                    )
+                ],
+                success=[
+                    etcd_pb2.RequestOp(
+                        request_put=etcd_pb2.PutRequest(
+                            key=path_encoded,
+                            value=new_data_encoded
+                        )
+                    )
+                ],
+                failure=[]
+            )
+        )
+
+        return response.succeeded
+
+
+def replace_raw(path, original_data, new_data):
+    path_encoded = path.encode()
+    original_data_encoded = _encode_data(original_data)
+    new_data_encoded = _encode_data(new_data)
+
+    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+        stub = etcd_pb2_grpc.KVStub(channel)
+
+        response = stub.Txn(
+            etcd_pb2.TxnRequest(
+                compare=[
+                    etcd_pb2.Compare(
+                        key=path_encoded,
+                        result=etcd_pb2.Compare.EQUAL,
+                        target=etcd_pb2.Compare.VALUE,
+                        value=original_data_encoded
+                    )
+                ],
+                success=[
+                    etcd_pb2.RequestOp(
+                        request_put=etcd_pb2.PutRequest(
+                            key=path_encoded,
+                            value=new_data_encoded
+                        )
+                    )
+                ],
+                failure=[]
+            )
+        )
+
+        return response.succeeded
+
+
+def transactional_delete_raw(path, original_data):
+    path_encoded = path.encode()
+    original_data_encoded = _encode_data(original_data)
 
     with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
         stub = etcd_pb2_grpc.KVStub(channel)
@@ -660,7 +719,4 @@ def transactional_delete(path, original_data):
             )
         )
 
-        LOG.with_fields({
-            'success': response.succeeded
-            }).info(f'etcd transactional_delete {path}')
         return response.succeeded

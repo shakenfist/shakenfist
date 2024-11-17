@@ -300,7 +300,7 @@ class IPAM(dbo):
 
         # Handle the possible allocation race here where something's halo is
         # removed and its immediately allocated, but at the same time we
-        # remove its halo by using a transactional_delete.
+        # remove its halo by using a transactional_delete_raw.
         freed = 0
         for key, data in etcd.get_prefix(
                 self.reservations_path,
@@ -308,7 +308,7 @@ class IPAM(dbo):
                 sort_target='key'):
             if (data['type'] == RESERVATION_TYPE_DELETION_HALO and
                     time.time() - data['when'] > duration):
-                if etcd.transactional_delete(key, data):
+                if etcd.transactional_delete_raw(key, data):
                     freed += 1
         return freed
 
