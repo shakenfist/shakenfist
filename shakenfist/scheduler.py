@@ -5,8 +5,6 @@ import time
 import uuid
 from collections import defaultdict
 
-from shakenfist_utilities import logs
-
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
@@ -17,6 +15,7 @@ from shakenfist.constants import GiB
 from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.util import general as util_general
+from shakenfist_utilities import logs
 
 
 LOG, _ = logs.setup(__name__)
