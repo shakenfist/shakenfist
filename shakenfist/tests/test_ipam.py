@@ -61,16 +61,18 @@ class IPAMTestCase(base.ShakenFistTestCase):
         ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
 
         self.assertNotIn('192.168.1.10', ipm.in_use)
-        ipm.reserve('192.168.1.10', ('test', '123'), ipam.RESERVATION_TYPE_FLOATING, '')
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', ('test', '123'),
+                        ipam.RESERVATION_TYPE_FLOATING, ''))
         self.assertIn('192.168.1.10', ipm.in_use)
 
         # Check for halo
-        ipm.release('192.168.1.10')
+        self.assertTrue(ipm.release('192.168.1.10'))
         self.assertIn('192.168.1.10', ipm.in_use)
 
         # Check that halo goes away
         time.sleep(1)
-        ipm.release_haloed(0)
+        self.assertTrue(ipm.release_haloed(0) > 0)
         self.assertNotIn('192.168.1.10', ipm.in_use)
 
     def test_is_free_and_reserve(self):
