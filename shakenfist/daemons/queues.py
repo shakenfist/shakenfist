@@ -336,6 +336,11 @@ def instance_start(inst, netdescs):
             EVENT_TYPE_STATUS, 'you cannot start an instance which has been deleted.')
         return
 
+    # Configure block devices, not including config drive creation which is
+    # done in power_on().
+    with util_general.RecordedOperation('configure block devices', inst):
+        inst._configure_block_devices()
+
     with inst.get_lock(ttl=900, op='Instance start', global_scope=False):
         try:
             # Ensure networks are connected to this node

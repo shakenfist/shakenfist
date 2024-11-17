@@ -688,10 +688,6 @@ class Instance(dbo):
         # Ensure we have state on disk
         os.makedirs(self.instance_path, exist_ok=True)
 
-        # Configure block devices, not including config drive creation which is
-        # done in power_on().
-        self._configure_block_devices(lock)
-
         self.power_on()
         if self.is_powered_on():
             self.state = self.STATE_CREATED
@@ -822,13 +818,11 @@ class Instance(dbo):
         self._free_console_port(ports.get('vdi_tls_port'))
         self._db_delete_attribute('ports')
 
-    def _configure_block_devices(self, lock):
+    def _configure_block_devices(self):
         with self.get_lock_attr(
                 'block_devices', 'Initialize block devices', ttl=600) as bd_lock:
             # Locks to refresh
             locks = [bd_lock]
-            if lock:
-                locks.append(lock)
 
             # Create block devices if required
             block_devices = self.block_devices
