@@ -7,9 +7,6 @@
 #        - and include examples: yes
 #   - Has complete CI coverage:
 from flasgger import swag_from
-from shakenfist_utilities import api as sf_api
-from shakenfist_utilities import logs
-
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -18,6 +15,8 @@ from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
 from shakenfist.tasks import DefloatNetworkInterfaceTask
 from shakenfist.tasks import FloatNetworkInterfaceTask
+from shakenfist_utilities import api as sf_api
+from shakenfist_utilities import logs
 
 
 LOG, HANDLER = logs.setup(__name__)
