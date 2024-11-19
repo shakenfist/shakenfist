@@ -260,8 +260,12 @@ jobs:
       - name: Make the traces directory
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "sudo mkdir -p /srv/ci/traces; sudo chown -R ${{ matrix.os.base_image_user }}:${{ matrix.os.base_image_user }} /srv/ci/traces"
+          script="sudo mkdir -p /srv/ci/traces;"
+          script="${script} export USER=\"${{ matrix.os.base_image_user }}\";"
+          script="${script} sudo chown -R \${USER}:\${USER} /srv/ci/traces"
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} "${script}"
 
       - name: Run functional tests
         timeout-minutes: 120
@@ -315,11 +319,14 @@ jobs:
         run: |
           set -x
 
-          # Fetch unit test tracing
+          # Fetch unit test tracing. Sometimes this isn't present if we failed
+          # super early in the CI job.
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           mkdir -p /srv/github/bundle/
-          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -rp \
-              ${{ matrix.os.base_image_user }}@${primary}:/srv/ci/traces /srv/github/bundle/
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null -rp \
+              ${{ matrix.os.base_image_user }}@${primary}:/srv/ci/traces \
+              /srv/github/bundle/ || true
 
           # We need the ssh key in the place ansible expects it to be, which isn't
           # true on the CI worker node.
