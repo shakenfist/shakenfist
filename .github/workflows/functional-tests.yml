@@ -55,7 +55,6 @@ jobs:
           venv/bin/pip3 install -r shakenfist/requirements.txt
 
   build38:
-    needs: lint
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-build38
@@ -73,7 +72,6 @@ jobs:
 
   functional_matrix:
     name: "${{ matrix.os.description }}"
-    needs: requirements-check
     strategy:
       fail-fast: false
       matrix:
