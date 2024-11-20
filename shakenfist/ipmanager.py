@@ -1,9 +1,8 @@
 import ipaddress
 import time
 
-from shakenfist_utilities import logs
-
 from shakenfist import db
+from shakenfist_utilities import logs
 
 
 LOG, _ = logs.setup(__name__)

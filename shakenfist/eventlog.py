@@ -9,14 +9,13 @@ import time
 import flask
 import grpc
 from oslo_concurrency import lockutils
-from shakenfist_utilities import logs
-
 from shakenfist import constants
 from shakenfist import etcd
 from shakenfist import event_pb2
 from shakenfist import event_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
+from shakenfist_utilities import logs
 
 
 LOG, _ = logs.setup(__name__)
