@@ -73,7 +73,7 @@ jobs:
 
   functional_matrix:
     name: "${{ matrix.os.description }}"
-    needs: requirements-check
+    needs: lint
     strategy:
       fail-fast: false
       matrix:
