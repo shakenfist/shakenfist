@@ -2,7 +2,11 @@ name: Functional tests
 
 # NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
 # which is available as GITHUB_WORKSPACE. You can find other environment
-# variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
+# variables at:
+# https://docs.github.com/en/actions/learn-github-actions/environment-variables
+#
+# The can_enqueue / can_merge scheme is as described at:
+# https://boinkor.net/2023/11/neat-github-actions-patterns-for-github-merge-queues/
 
 on:
   workflow_dispatch:
@@ -74,6 +78,7 @@ jobs:
 
   functional_matrix_pr:
     needs: [build38, requirements_check]
+    if: always() && github.event_name != 'merge_group'
     name: "${{ matrix.os.description }}"
     strategy:
       fail-fast: false
