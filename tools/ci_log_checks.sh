@@ -50,6 +50,10 @@ if [ $(echo "${1}" | grep -c "v0.7" || true) -lt 1 ]; then
     FORBIDDEN+=("Repeated failures to add address to device")
 fi
 
+# I would like to forbid these, but haven't been able to nail down the root
+# cause yet:
+# FORBIDDEN+=("*** Check failure stack trace: ***")
+
 if [ $(echo "${2}" | grep -c "upgrade" || true) -lt 1 ]; then
     echo "INFO: Including forbidden strings for non-upgrade jobs."
     FORBIDDEN+=("online upgrade")

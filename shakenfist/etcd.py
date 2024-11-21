@@ -1,17 +1,20 @@
+from collections import defaultdict
 import json
 import os
 import threading
 import time
-from collections import defaultdict
 
-import grpc
-import psutil
-import requests
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
 from etcd3gw.utils import _encode
 from etcd3gw.utils import _increment_last_byte
+import grpc
+import psutil
+import requests
+from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities import random as util_random  # noreorder
+
 from shakenfist import baseobject
 from shakenfist import etcd_pb2
 from shakenfist import etcd_pb2_grpc
@@ -20,8 +23,6 @@ from shakenfist.config import config
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.tasks import QueueTask
 from shakenfist.util import callstack as util_callstack
-from shakenfist_utilities import logs
-from shakenfist_utilities import random as util_random
 
 
 LOG, _ = logs.setup(__name__)
@@ -140,8 +141,8 @@ class ActualLock(Lock):
         self.operation = op
         self.lockid = util_random.random_id()
 
-        node = config.NODE_NAME
-        pid = os.getpid()
+        self.node = config.NODE_NAME
+        self.pid = os.getpid()
         caller = util_callstack.get_caller(offset=3)
 
         # We also override the location of the lock so that we're in our own spot
@@ -151,8 +152,8 @@ class ActualLock(Lock):
             {
                 'lock': self.path,
                 'key': self.key,
-                'node': node,
-                'pid': pid,
+                'node': self.node,
+                'pid': self.pid,
                 'line': caller,
                 'operation': self.operation,
                 'id': self.lockid
@@ -161,8 +162,8 @@ class ActualLock(Lock):
         # We override the UUID of the lock with something more helpful to debugging
         self._uuid = json.dumps(
             {
-                'node': node,
-                'pid': pid,
+                'node': self.node,
+                'pid': self.pid,
                 'line': caller,
                 'operation': self.operation,
                 'id': self.lockid
@@ -281,11 +282,22 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
 
 
 def refresh_lock(lock, log_ctx=LOG):
-    if not lock.is_acquired():
-        log_ctx.with_fields({'lock': lock.name}).info(
-            'Attempt to refresh an expired lock')
+    log = log_ctx.with_fields({
+        'lock': lock.name,
+        'path': lock.path,
+        'pid': lock.pid
+    })
+
+    try:
+        psutil.Process(lock.pid)
+        if not lock.is_acquired():
+            log.error('Attempt to refresh an expired lock')
+            raise exceptions.LockException(
+                f'The lock on {lock.path} has expired.')
+    except (psutil.NoSuchProcess, FileNotFoundError):
+        log.error('Attempt to refresh lock whose process has disappeared')
         raise exceptions.LockException(
-            'The lock on %s has expired.' % lock.path)
+            f'The process (pid {lock.pid}) holding lock {lock.path} has disappeared.')
 
     lock.refresh()
 
