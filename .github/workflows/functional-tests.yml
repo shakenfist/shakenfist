@@ -77,9 +77,9 @@ jobs:
           /usr/bin/tox -epy3
 
   functional_matrix_pr:
-    needs: [build38, requirements_check]
     if: always() && github.event_name != 'merge_group'
     name: "${{ matrix.os.description }}"
+    needs: [build38, requirements_check]
     strategy:
       fail-fast: false
       matrix:
