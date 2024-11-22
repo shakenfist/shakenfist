@@ -161,6 +161,8 @@ class MockEtcd():
     def replace_many_raw(self, mutations):
         updates = {}
         deletes = []
+        failures = []
+
         for mutation in mutations:
             path = mutation['path']
             ode = etcd._encode_data(mutation['original_data'])
@@ -170,7 +172,13 @@ class MockEtcd():
                 if path in self.db:
                     self._trace(f'MockEtcd.replace_many_raw() {path} failure: '
                                 'path exists')
-                    return False
+                    failures.append(
+                        {
+                            'path': path,
+                            'desired': None,
+                            'actual': self.db[path].decode()
+                        }
+                    )
                 elif mutation['new_data']:
                     updates[path] = nde
                 else:
@@ -179,22 +187,37 @@ class MockEtcd():
                 if path not in self.db:
                     self._trace(f'MockEtcd.replace_many_raw() {path} failure: '
                                 'path does not exist')
-                    return False
+                    failures.append(
+                        {
+                            'path': path,
+                            'desired': mutation['original_data'],
+                            'actual': None
+                        }
+                    )
                 if self.db[path] != ode:
                     self._trace(f'MockEtcd.replace_many_raw() {path} failure: '
                                 f'{self.db[path]} != {ode}')
-                    return False
+                    failures.append(
+                        {
+                            'path': path,
+                            'desired': mutation['original_data'],
+                            'actual': self.db[path]
+                        }
+                    )
 
                 if not mutation['new_data']:
                     deletes.append(path)
                 else:
                     updates[path] = nde
 
+        if failures:
+            return False, failures
+
         self.db.update(updates)
         for path in deletes:
             del self.db[path]
         self._trace('MockEtcd.replace_many_raw() success')
-        return True
+        return True, []
 
     #
     # DB operations - Utilizing SF DB functionality

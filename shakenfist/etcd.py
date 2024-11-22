@@ -639,7 +639,7 @@ def create_raw(path, new_data):
         'path': path,
         'original_data': None,
         'new_data': new_data
-    }])
+    }])[0]
 
 
 def replace_raw(path, original_data, new_data):
@@ -647,7 +647,7 @@ def replace_raw(path, original_data, new_data):
         'path': path,
         'original_data': original_data,
         'new_data': new_data
-    }])
+    }])[0]
 
 
 def transactional_delete_raw(path, original_data):
@@ -655,7 +655,7 @@ def transactional_delete_raw(path, original_data):
         'path': path,
         'original_data': original_data,
         'new_data': None
-    }])
+    }])[0]
 
 
 def replace_many_raw(mutations):
@@ -728,7 +728,7 @@ def replace_many_raw(mutations):
         )
 
         if response.succeeded:
-            return True
+            return True, []
 
         # Determine which keys had non-matching values
         failures = []
@@ -743,8 +743,16 @@ def replace_many_raw(mutations):
                                 'actual': kvs.value.decode()
                             }
                         )
+                        del values_by_path[kvs.key]
 
-        if failures:
-            LOG.with_fields({'failed': failures}).info('Transaction failure')
+        for key in values_by_path:
+            failures.append(
+                {
+                    'path': key.decode(),
+                    'desired': values_by_path[key],
+                    'actual': None
+                }
+            )
 
-        return False
+        LOG.with_fields({'failed': failures}).info('Transaction failure')
+        return False, failures

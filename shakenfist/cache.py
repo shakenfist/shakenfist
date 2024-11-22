@@ -41,13 +41,17 @@ def _update_object_state_cache_attempt(object_type, object_uuid, old_state, new_
     mutations = []
 
     # We have a special case list of objects in all states
-    original = read_object_state_cache(object_type, '_all_')
-    updated = copy.copy(original)
+    original = etcd.get('cache', object_type, '_all_')
+    if not original:
+        updated = {}
+    else:
+        updated = copy.copy(original)
     changed = False
-    if new_state == 'hard-deleted' and object_uuid in original:
+
+    if new_state == 'hard-deleted' and object_uuid in updated:
         del updated[object_uuid]
         changed = True
-    elif object_uuid not in original:
+    elif object_uuid not in updated:
         updated[object_uuid] = time.time()
         changed = True
     if changed:
@@ -59,21 +63,26 @@ def _update_object_state_cache_attempt(object_type, object_uuid, old_state, new_
 
     # And then the actual per-state cache
     if old_state:
-        original = read_object_state_cache(object_type, old_state)
-        updated = copy.copy(original)
-        changed = False
-        if object_uuid in original:
+        original = etcd.get('cache', object_type, old_state)
+        if not original:
+            updated = {}
+        else:
+            updated = copy.copy(original)
+
+        if object_uuid in updated:
             del updated[object_uuid]
-            changed = True
-        if changed:
             mutations.append({
                 'path': etcd._construct_key('cache', object_type, old_state),
                 'original_data': original,
                 'new_data': updated
             })
 
-    original = read_object_state_cache(object_type, new_state)
-    updated = copy.copy(original)
+    original = etcd.get('cache', object_type, new_state)
+    if not original:
+        updated = {}
+    else:
+        updated = copy.copy(original)
+
     updated[object_uuid] = time.time()
     mutations.append({
         'path': etcd._construct_key('cache', object_type, new_state),
@@ -86,15 +95,24 @@ def _update_object_state_cache_attempt(object_type, object_uuid, old_state, new_
 
 def update_object_state_cache(object_type, object_uuid, old_state, new_state):
     attempts = 0
+    failures = []
     while attempts < 3:
-        if _update_object_state_cache_attempt(
-                object_type, object_uuid, old_state, new_state):
+        success, failures = _update_object_state_cache_attempt(
+            object_type, object_uuid, old_state, new_state)
+        if success:
             return
         attempts += 1
 
+    failure_strings = []
+    for f in failures:
+        failure_strings.append(
+            f'    {f["path"]}:\n'
+            f'        actual: {f["actual"]}\n'
+            f'        desired: {f["desired"]}')
+    failure_dump = '\n'.join(failure_strings)
     raise exceptions.ObjectStateLocklessUpdateFailed(
         f'Lockless object state cache update for {object_type} {object_uuid} '
-        f'from {old_state} to {new_state} failed.')
+        f'from {old_state} to {new_state} failed. Failures:\n{failure_dump}')
 
 
 def clobber_object_state_cache(object_type, state, object_uuids):
