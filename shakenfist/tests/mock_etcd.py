@@ -3,6 +3,7 @@
 #
 # Mock the Etcd store with a Python dict.
 #
+import json
 import os
 import time
 from collections import defaultdict
@@ -60,11 +61,11 @@ class MockEtcd():
         self.etcd_create_raw.start()
         self.test_obj.addCleanup(self.etcd_create_raw.stop)
 
-        self.etcd_get = mock.patch(
-            'shakenfist.etcd.WrappedEtcdClient.get',
-            side_effect=self.get)
-        self.etcd_get.start()
-        self.test_obj.addCleanup(self.etcd_get.stop)
+        self.etcd_get_raw = mock.patch(
+            'shakenfist.etcd.get_raw',
+            side_effect=self.get_raw)
+        self.etcd_get_raw.start()
+        self.test_obj.addCleanup(self.etcd_get_raw.stop)
 
         self.etcd_get_prefix = mock.patch(
             'shakenfist.etcd.WrappedEtcdClient.get_prefix',
@@ -116,19 +117,6 @@ class MockEtcd():
     # DB operations - Low level
     #
 
-    def get(self, path, metadata=False, sort_order=None, sort_target=None):
-        d = self.db.get(path)
-        if d:
-            d = d.decode()
-        self._trace(f'MockEtcd.get() retrieving data for key {path}: {d}')
-        if not d:
-            return None
-
-        if metadata:
-            return [[d]]
-        else:
-            return [d]
-
     def get_prefix(self, path, sort_order=None, sort_target=None, limit=0):
         ret = []
         for k in sorted(self.db):
@@ -157,6 +145,13 @@ class MockEtcd():
 
         self._trace(f'MockEtcd.create() {path} failure')
         return False
+
+    def get_raw(self, path):
+        d = self.db.get(path)
+        if d:
+            d = json.loads(d.decode())
+        self._trace(f'MockEtcd.get() retrieving data for key {path}: {d}')
+        return d
 
     def put_raw(self, path, data, lease=None):
         encoded = etcd._encode_data(data)

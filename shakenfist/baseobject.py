@@ -274,11 +274,7 @@ class DatabaseBackedObject:
     def _db_get(cls, object_uuid):
         o = etcd.get(cls.object_type, None, object_uuid)
         if not o:
-            # Retry with a new client just to be sure
-            etcd.reset_client()
-            o = etcd.get(cls.object_type, None, object_uuid)
-            if not o:
-                return None
+            return None
 
         if o.get('version', 0) != cls.current_version:
             if not cls.upgrade_supported:

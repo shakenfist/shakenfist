@@ -368,15 +368,6 @@ def create(objecttype, subtype, name, data):
     return create_raw(path, data)
 
 
-@retry_etcd_forever
-def get_raw(path):
-    value = get_etcd_client().get(path)
-    if value is None or len(value) == 0:
-        return None
-    return json.loads(value[0])
-
-
-@retry_etcd_forever
 def get(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
     return get_raw(path)
@@ -605,6 +596,23 @@ def compact(revision):
         stub = etcd_pb2_grpc.MaintenanceStub(channel)
         request = etcd_pb2.DefragmentRequest()
         stub.Defragment(request)
+
+
+def get_raw(path):
+    path_encoded = path.encode()
+
+    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+        stub = etcd_pb2_grpc.KVStub(channel)
+
+        resp = stub.Range(
+            etcd_pb2.RangeRequest(
+                key=path_encoded
+            )
+        )
+        if len(resp.kvs) > 0:
+            kvs = resp.kvs[0]
+            return json.loads(kvs.value.decode())
+        return None
 
 
 def put_raw(path, new_data):

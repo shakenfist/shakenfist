@@ -1,4 +1,3 @@
-import json
 from unittest import mock
 
 from shakenfist import instance
@@ -115,8 +114,8 @@ class CleanerTestCase(base.ShakenFistTestCase):
                           ('crashed', 'crashed'),
                           ('paused', 'paused'),
                           ('suspended', 'paused')]:
-            read_state = json.loads(self.mock_etcd.get(
-                f'/sf/attribute/instance/{id}/power_state')[0])
+            read_state = self.mock_etcd.get_raw(
+                f'/sf/attribute/instance/{id}/power_state')
             self.assertEqual(
                 state, read_state['power_state'],
                 f'State for instance "{id}" does not match "{state}"')

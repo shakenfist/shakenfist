@@ -20,6 +20,7 @@ class ShakenFistTestCase(testtools.TestCase):
         logging.getLogger().setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
-        self.mock_add_event = mock.patch('shakenfist.eventlog.add_event')
-        self.mock_add_event.start()
-        self.addCleanup(self.mock_add_event.stop)
+        self.mock_add_event_multi = mock.patch(
+            'shakenfist.eventlog.add_event_multi')
+        self.mock_add_event_multi.start()
+        self.addCleanup(self.mock_add_event_multi.stop)
