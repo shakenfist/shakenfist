@@ -112,7 +112,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
 
         # Create an instance
         inst1 = self.test_client.create_instance(
-            'test-boot-no-network', 1, 1024, None,
+            'test-artifact-show', 1, 1024, None,
             [
                 {
                     'size': 8,
