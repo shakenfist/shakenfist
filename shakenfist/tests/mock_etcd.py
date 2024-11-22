@@ -90,17 +90,11 @@ class MockEtcd():
         self.etcd_delete_prefix.start()
         self.test_obj.addCleanup(self.etcd_delete_prefix.stop)
 
-        self.etcd_replace_raw = mock.patch(
-            'shakenfist.etcd.replace_raw',
-            side_effect=self.replace_raw)
-        self.etcd_replace_raw.start()
-        self.test_obj.addCleanup(self.etcd_replace_raw.stop)
-
-        self.etcd_transactional_delete_raw = mock.patch(
-            'shakenfist.etcd.transactional_delete_raw',
-            side_effect=self.transactional_delete_raw)
-        self.etcd_transactional_delete_raw.start()
-        self.test_obj.addCleanup(self.etcd_transactional_delete_raw.stop)
+        self.etcd_replace_many_raw = mock.patch(
+            'shakenfist.etcd.replace_many_raw',
+            side_effect=self.replace_many_raw)
+        self.etcd_replace_many_raw.start()
+        self.test_obj.addCleanup(self.etcd_replace_many_raw.stop)
 
         self.etcd_get_lock = mock.patch('shakenfist.etcd.get_lock')
         self.etcd_get_lock.start()
@@ -169,27 +163,43 @@ class MockEtcd():
         self.db[path] = encoded
         self._trace(f'MockEtcd.put() {path}: {encoded}')
 
-    def replace_raw(self, path, original_data, new_data):
-        original_data_encoded = etcd._encode_data(original_data)
-        if self.db[path] == original_data_encoded:
-            self.db[path] = etcd._encode_data(new_data)
-            self._trace('MockEtcd.replace() %s success' % path)
-            return True
+    def replace_many_raw(self, mutations):
+        updates = {}
+        deletes = []
+        for mutation in mutations:
+            path = mutation['path']
+            ode = etcd._encode_data(mutation['original_data'])
+            nde = etcd._encode_data(mutation['new_data'])
 
-        self._trace(f'MockEtcd.replace() {path} failure: '
-                    f'{self.db[path]} != {original_data_encoded}')
-        return False
+            if not mutation['original_data']:
+                if path in self.db:
+                    self._trace(f'MockEtcd.replace_many_raw() {path} failure: '
+                                'path exists')
+                    return False
+                elif mutation['new_data']:
+                    updates[path] = nde
+                else:
+                    del updates[path]
+            else:
+                if path not in self.db:
+                    self._trace(f'MockEtcd.replace_many_raw() {path} failure: '
+                                'path does not exist')
+                    return False
+                if self.db[path] != ode:
+                    self._trace(f'MockEtcd.replace_many_raw() {path} failure: '
+                                f'{self.db[path]} != {ode}')
+                    return False
 
-    def transactional_delete_raw(self, path, original_data):
-        original_data_encoded = etcd._encode_data(original_data)
-        if self.db[path] == original_data_encoded:
+                if not mutation['new_data']:
+                    deletes.append(path)
+                else:
+                    updates[path] = nde
+
+        self.db.update(updates)
+        for path in deletes:
             del self.db[path]
-            self._trace(
-                'MockEtcd.transactional_delete_raw() %s success' % path)
-            return True
-
-        self._trace('MockEtcd.transactional_delete_raw() %s failure' % path)
-        return False
+        self._trace('MockEtcd.replace_many_raw() success')
+        return True
 
     #
     # DB operations - Utilizing SF DB functionality

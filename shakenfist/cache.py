@@ -1,8 +1,10 @@
+import copy
 import time
 
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
+from shakenfist import exceptions
 
 
 LOG, _ = logs.setup(__name__)
@@ -35,32 +37,64 @@ def read_object_state_cache_many(object_type, states):
     return out
 
 
+def _update_object_state_cache_attempt(object_type, object_uuid, old_state, new_state):
+    mutations = []
+
+    # We have a special case list of objects in all states
+    original = read_object_state_cache(object_type, '_all_')
+    updated = copy.copy(original)
+    changed = False
+    if new_state == 'hard-deleted' and object_uuid in original:
+        del updated[object_uuid]
+        changed = True
+    elif object_uuid not in original:
+        updated[object_uuid] = time.time()
+        changed = True
+    if changed:
+        mutations.append({
+            'path': etcd._construct_key('cache', object_type, '_all_'),
+            'original_data': original,
+            'new_data': updated
+        })
+
+    # And then the actual per-state cache
+    if old_state:
+        original = read_object_state_cache(object_type, old_state)
+        updated = copy.copy(original)
+        changed = False
+        if object_uuid in original:
+            del updated[object_uuid]
+            changed = True
+        if changed:
+            mutations.append({
+                'path': etcd._construct_key('cache', object_type, old_state),
+                'original_data': original,
+                'new_data': updated
+            })
+
+    original = read_object_state_cache(object_type, new_state)
+    updated = copy.copy(original)
+    updated[object_uuid] = time.time()
+    mutations.append({
+        'path': etcd._construct_key('cache', object_type, new_state),
+        'original_data': original,
+        'new_data': updated
+    })
+
+    return etcd.replace_many_raw(mutations)
+
+
 def update_object_state_cache(object_type, object_uuid, old_state, new_state):
-    with etcd.get_lock('cache', None, object_type, op='Object state cache update'):
-        # We have a special case list of objects in all states
-        c = read_object_state_cache(object_type, '_all_')
-        changed = False
-        if new_state == 'hard-deleted' and object_uuid in c:
-            del c[object_uuid]
-            changed = True
-        elif object_uuid not in c:
-            c[object_uuid] = time.time()
-            changed = True
-        if changed:
-            etcd.put('cache', object_type, '_all_', c)
+    attempts = 0
+    while attempts < 3:
+        if _update_object_state_cache_attempt(
+                object_type, object_uuid, old_state, new_state):
+            return
+        attempts += 1
 
-        # And then the actual per-state cache
-        c = read_object_state_cache(object_type, old_state)
-        changed = False
-        if object_uuid in c:
-            del c[object_uuid]
-            changed = True
-        if changed:
-            etcd.put('cache', object_type, old_state, c)
-
-        c = read_object_state_cache(object_type, new_state)
-        c[object_uuid] = time.time()
-        etcd.put('cache', object_type, new_state, c)
+    raise exceptions.ObjectStateLocklessUpdateFailed(
+        f'Lockless object state cache update for {object_type} {object_uuid} '
+        f'from {old_state} to {new_state} failed.')
 
 
 def clobber_object_state_cache(object_type, state, object_uuids):

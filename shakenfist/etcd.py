@@ -627,96 +627,116 @@ def put_raw(path, new_data):
 
 
 def create_raw(path, new_data):
-    path_encoded = path.encode()
-    new_data_encoded = _encode_data(new_data)
-
-    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
-        stub = etcd_pb2_grpc.KVStub(channel)
-
-        response = stub.Txn(
-            etcd_pb2.TxnRequest(
-                compare=[
-                    etcd_pb2.Compare(
-                        key=path_encoded,
-                        result=etcd_pb2.Compare.EQUAL,
-                        target=etcd_pb2.Compare.CREATE,
-                        create_revision=0
-                    )
-                ],
-                success=[
-                    etcd_pb2.RequestOp(
-                        request_put=etcd_pb2.PutRequest(
-                            key=path_encoded,
-                            value=new_data_encoded
-                        )
-                    )
-                ],
-                failure=[]
-            )
-        )
-
-        return response.succeeded
+    return replace_many_raw([{
+        'path': path,
+        'original_data': None,
+        'new_data': new_data
+    }])
 
 
 def replace_raw(path, original_data, new_data):
-    path_encoded = path.encode()
-    original_data_encoded = _encode_data(original_data)
-    new_data_encoded = _encode_data(new_data)
-
-    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
-        stub = etcd_pb2_grpc.KVStub(channel)
-
-        response = stub.Txn(
-            etcd_pb2.TxnRequest(
-                compare=[
-                    etcd_pb2.Compare(
-                        key=path_encoded,
-                        result=etcd_pb2.Compare.EQUAL,
-                        target=etcd_pb2.Compare.VALUE,
-                        value=original_data_encoded
-                    )
-                ],
-                success=[
-                    etcd_pb2.RequestOp(
-                        request_put=etcd_pb2.PutRequest(
-                            key=path_encoded,
-                            value=new_data_encoded
-                        )
-                    )
-                ],
-                failure=[]
-            )
-        )
-
-        return response.succeeded
+    return replace_many_raw([{
+        'path': path,
+        'original_data': original_data,
+        'new_data': new_data
+    }])
 
 
 def transactional_delete_raw(path, original_data):
-    path_encoded = path.encode()
-    original_data_encoded = _encode_data(original_data)
+    return replace_many_raw([{
+        'path': path,
+        'original_data': original_data,
+        'new_data': None
+    }])
 
-    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
-        stub = etcd_pb2_grpc.KVStub(channel)
 
-        response = stub.Txn(
-            etcd_pb2.TxnRequest(
-                compare=[
-                    etcd_pb2.Compare(
+def replace_many_raw(mutations):
+    values_by_path = {}
+    comparisons = []
+    replacements = []
+    failures = []
+
+    for mutation in mutations:
+        path_encoded = mutation['path'].encode()
+        new_data_encoded = _encode_data(mutation['new_data'])
+
+        if mutation['original_data'] is None:
+            comparisons.append(
+                etcd_pb2.Compare(
+                    key=path_encoded,
+                    result=etcd_pb2.Compare.EQUAL,
+                    target=etcd_pb2.Compare.CREATE,
+                    create_revision=0
+                )
+            )
+            values_by_path[path_encoded] = None
+        else:
+            original_data_encoded = _encode_data(mutation['original_data'])
+            comparisons.append(
+                etcd_pb2.Compare(
+                    key=path_encoded,
+                    result=etcd_pb2.Compare.EQUAL,
+                    target=etcd_pb2.Compare.VALUE,
+                    value=original_data_encoded
+                )
+            )
+            values_by_path[path_encoded] = original_data_encoded.decode()
+
+        if mutation['new_data'] is None:
+            replacements.append(
+                etcd_pb2.RequestOp(
+                    request_delete_range=etcd_pb2.DeleteRangeRequest(
+                        key=path_encoded
+                    )
+                )
+            )
+        else:
+            replacements.append(
+                etcd_pb2.RequestOp(
+                    request_put=etcd_pb2.PutRequest(
                         key=path_encoded,
-                        result=etcd_pb2.Compare.EQUAL,
-                        target=etcd_pb2.Compare.VALUE,
-                        value=original_data_encoded
+                        value=new_data_encoded
                     )
-                ],
-                success=[
-                    etcd_pb2.RequestOp(
-                        request_delete_range=etcd_pb2.DeleteRangeRequest(
-                            key=path_encoded
-                        )
-                    )
-                ],
-                failure=[]
+                )
+            )
+
+        # On failure, we grab all of the keys and their current values
+        failures.append(
+            etcd_pb2.RequestOp(
+                request_range=etcd_pb2.RangeRequest(
+                    key=path_encoded
+                )
             )
         )
 
-        return response.succeeded
+    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+        stub = etcd_pb2_grpc.KVStub(channel)
+        response = stub.Txn(
+            etcd_pb2.TxnRequest(
+                compare=comparisons,
+                success=replacements,
+                failure=failures
+            )
+        )
+
+        if response.succeeded:
+            return True
+
+        # Determine which keys had non-matching values
+        failures = []
+        for resp in response.responses:
+            if resp.HasField('response_range'):
+                for kvs in resp.response_range.kvs:
+                    if values_by_path[kvs.key] != kvs.value:
+                        failures.append(
+                            {
+                                'path': kvs.key.decode(),
+                                'desired': values_by_path[kvs.key],
+                                'actual': kvs.value.decode()
+                            }
+                        )
+
+        if failures:
+            LOG.with_fields({'failed': failures}).info('Transaction failure')
+
+        return False

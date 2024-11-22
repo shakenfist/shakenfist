@@ -283,3 +283,12 @@ class IPAMException(Exception):
 
 class InvalidIPAMAddress(IPAMException):
     ...
+
+
+# Lockless update failures
+class LocklessUpdateFailed(Exception):
+    ...
+
+
+class ObjectStateLocklessUpdateFailed(LocklessUpdateFailed):
+    ...
