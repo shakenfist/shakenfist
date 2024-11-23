@@ -311,21 +311,21 @@ class ImageFetchHelper:
                     ...
             else:
                 objects_with_blob = copy.copy(self.objects)
-                objects_with_blob.append(('blob', b.uuid))
+                objects_with_blob.append(b)
                 with util_general.RecordedOperation('transcode image', self.instance):
                     add_event_multi(
                         EVENT_TYPE_STATUS, objects_with_blob, 'transcoding blob')
                     util_image.create_qcow2([lock], blob_path, cache_path)
 
-            # We will cache this transcode, but we do it later as part of a
-            # task so the instance isn't waiting for it.
-            etcd.enqueue(
-                f'{config.NODE_NAME}-background',
-                {
-                    'tasks': [
-                        ArchiveTranscodeTask(
-                            b.uuid, cache_path, TRANSCODE_DESCRIPTION)]
-                })
+                # We will cache this transcode, but we do it later as part of a
+                # task so the instance isn't waiting for it.
+                etcd.enqueue(
+                    f'{config.NODE_NAME}-background',
+                    {
+                        'tasks': [
+                            ArchiveTranscodeTask(
+                                b.uuid, cache_path, TRANSCODE_DESCRIPTION)]
+                    })
 
         shutil.chown(cache_path, config.LIBVIRT_USER, config.LIBVIRT_GROUP)
         add_event_multi(
