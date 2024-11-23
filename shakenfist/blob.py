@@ -758,9 +758,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     return b
 
 
-def http_fetch(url, resp, blob_uuid, locks, objects):
-    b = Blob.from_db(blob_uuid)
-
+def http_fetch(url, resp, b, locks, objects):
     fetched = 0
     if resp.headers.get('Content-Length'):
         total_size = int(resp.headers.get('Content-Length'))
@@ -769,7 +767,7 @@ def http_fetch(url, resp, blob_uuid, locks, objects):
 
     previous_percentage = 0.0
     last_refresh = 0
-    dest_path = Blob.filepath(blob_uuid)
+    dest_path = Blob.filepath(b.uuid)
 
     md5_hash = hashlib.md5()
     sha512_hash = hashlib.sha512()

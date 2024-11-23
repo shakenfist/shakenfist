@@ -111,9 +111,9 @@ class ImageFetchHelper:
         self.instance = inst
         self.artifact = artifact
 
-        self.objects = [('artifact', self.artifact.uuid)]
+        self.objects = [self.artifact]
         if self.instance:
-            self.objects.append(('instance', self.instance.uuid))
+            self.objects.append(self.instance)
 
     def get_image(self):
         fetched_blobs = []
@@ -357,14 +357,13 @@ class ImageFetchHelper:
                 blob_uuid, resp.headers.get('Last-Modified'), time.time())
 
             objects_including_blob = copy.copy(self.objects)
-            objects_including_blob.append(('blob', blob_uuid))
+            objects_including_blob.append(b)
             add_event_multi(
                 EVENT_TYPE_STATUS, objects_including_blob,
                 'commencing HTTP fetch to blob', extra={'url': url})
 
             try:
-                b = blob.http_fetch(
-                    url, resp, blob_uuid, [lock], objects_including_blob)
+                blob.http_fetch(url, resp, b, [lock], objects_including_blob)
             except exceptions.BadCheckSum as e:
                 add_event_multi(
                     EVENT_TYPE_AUDIT, objects_including_blob,

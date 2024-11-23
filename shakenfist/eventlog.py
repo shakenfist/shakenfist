@@ -43,6 +43,18 @@ def add_event_multi(
     if not objects:
         return
 
+    # Flatten objects down to a single data type, whilst also not recording
+    # events for in memory only artifacts.
+    simpler_objects = []
+    for obj in objects:
+        if isinstance(obj, tuple):
+            simpler_objects.append(obj)
+            continue
+
+        if obj.in_memory_only:
+            continue
+        simpler_objects.append((obj.object_type, obj.uuid))
+
     # If we alter extra, we don't want that to leak back to the caller.
     if not extra:
         extra = {}
@@ -65,7 +77,7 @@ def add_event_multi(
             'message': message,
             'extra': extra
         })
-    for object_type, object_uuid in objects:
+    for object_type, object_uuid in simpler_objects:
         log = log.with_fields({object_type: object_uuid})
 
     if not suppress_event_logging:
@@ -83,7 +95,7 @@ def add_event_multi(
                 event_type=event_type, timestamp=timestamp, fqdn=config.NODE_NAME,
                 duration=duration, message=message, extra=json.dumps(extra))
 
-            for object_type, object_uuid in objects:
+            for object_type, object_uuid in simpler_objects:
                 eo = request.objects.add()
                 eo.object_type = object_type
                 eo.object_uuid = object_uuid
@@ -101,12 +113,12 @@ def add_event_multi(
                      'trying single events: %s' % e)
 
     # Attempt to send with the older EventRequest
-    failed = objects
+    failed = simpler_objects
     try:
         with grpc.insecure_channel(
                 f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}') as channel:
             stub = event_pb2_grpc.EventServiceStub(channel)
-            for object_type, object_uuid in objects:
+            for object_type, object_uuid in simpler_objects:
                 request = event_pb2.EventRequest(
                     object_type=object_type, object_uuid=object_uuid,
                     event_type=event_type, timestamp=timestamp,
