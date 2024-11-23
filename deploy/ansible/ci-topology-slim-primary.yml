@@ -214,6 +214,13 @@
   vars:
 
   tasks:
+    - name: Disable unattended upgrades
+      when: ansible_distribution == "Ubuntu"
+      service:
+        name: unattended-upgrades
+        state: stopped
+        enabled: false
+
     - name: Make /srv/ci
       file:
         path: /srv/ci
