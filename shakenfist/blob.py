@@ -279,20 +279,19 @@ class Blob(dbo):
         if self.state.value == self.STATE_INITIAL:
             self.state = self.STATE_CREATED
 
-        with self.get_lock_attr('info', 'Set blob info'):
-            if not self.info:
-                blob_path = Blob.filepath(self.uuid)
+        if not self.info:
+            blob_path = Blob.filepath(self.uuid)
 
-                # We put a bunch of information from "qemu-img info" into the
-                # blob because its helpful. However, there are some values we
-                # don't want to persist.
-                info = util_image.identify(blob_path)
-                for key in ['corrupt', 'image', 'lazy refcounts', 'refcount bits']:
-                    if key in info:
-                        del info[key]
+            # We put a bunch of information from "qemu-img info" into the
+            # blob because its helpful. However, there are some values we
+            # don't want to persist.
+            info = util_image.identify(blob_path)
+            for key in ['corrupt', 'image', 'lazy refcounts', 'refcount bits']:
+                if key in info:
+                    del info[key]
 
-                info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
-                self._db_set_attribute('info', info)
+            info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
+            self._db_set_attribute('info', info)
 
     def ref_count_inc(self, baseobject, count=1):
         with self.get_lock_attr('ref_count', 'Increase reference count'):

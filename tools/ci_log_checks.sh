@@ -48,6 +48,7 @@ if [ $(echo "${1}" | grep -c "v0.7" || true) -lt 1 ]; then
     FORBIDDEN+=("Ignoring malformed cache entry")
     FORBIDDEN+=("WORKER TIMEOUT")
     FORBIDDEN+=("Repeated failures to add address to device")
+    FORBIDDEN+=("Lock held by missing process on this node")
 fi
 
 # I would like to forbid these, but haven't been able to nail down the root
