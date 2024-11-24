@@ -132,8 +132,12 @@ class Monitor(daemon.Daemon):
 
             n = network.Network.from_db(ipm.network_uuid, suppress_failure_audit=True)
             if not n and ipm.state.value != dbo.STATE_DELETED:
+                ipm.add_event(
+                    EVENT_TYPE_AUDIT,
+                    ('the cluster wide cleanup daemon is deleting this '
+                     'IPAM as leaked because the associated network is '
+                     'missing'))
                 ipm.state = dbo.STATE_DELETED
-                ipm.log.warning('Cleaning up leaked IPAM')
         self.lock.refresh()
 
         # Cleanup floating IP reservations which refer to deleted objects

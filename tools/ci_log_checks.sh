@@ -37,7 +37,7 @@ FORBIDDEN=("Traceback (most recent call last):"
             "ConnectionFailedError"
             "invalid JWT in Authorization header"
             "Libvirt Error: XML error"
-            "Cleaning up leaked IPAM"
+            "cluster wide cleanup daemon is deleting this IPAM as leaked"
             "Cleaning up leaked vxlan"
             "invalid salt"
             "unable to execute QEMU command")
