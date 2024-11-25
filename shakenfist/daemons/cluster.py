@@ -13,6 +13,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import artifact
 from shakenfist import cache
 from shakenfist import etcd
+from shakenfist import eventlog
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import namespace
@@ -142,26 +143,31 @@ class Monitor(daemon.Daemon):
 
         # Cleanup floating IP reservations which refer to deleted objects
         fn = network.floating_network()
-        releaseable = []
-        with fn.ipam.get_lock('reservations', op='Delete stray reservations'):
-            for addr in fn.ipam.in_use:
-                reservation = fn.ipam.get_reservation(addr)
-                if not reservation:
-                    continue
-                if reservation['type'] not in [ipam.RESERVATION_TYPE_GATEWAY,
-                                               ipam.RESERVATION_TYPE_FLOATING,
-                                               ipam.RESERVATION_TYPE_ROUTED]:
-                    continue
+        for addr in fn.ipam.in_use:
+            reservation = fn.ipam.get_reservation(addr)
+            if not reservation:
+                continue
+            if reservation['type'] not in [ipam.RESERVATION_TYPE_GATEWAY,
+                                           ipam.RESERVATION_TYPE_FLOATING,
+                                           ipam.RESERVATION_TYPE_ROUTED]:
+                continue
 
-                object_type, object_uuid = reservation['user']
-                obj = OBJECT_NAMES_TO_CLASSES[object_type].from_db(object_uuid)
-                if not obj or obj.state.value == dbo.STATE_DELETED:
-                    releaseable.append(addr)
+            leaked = False
+            object_type, object_uuid = reservation['user']
+            obj = OBJECT_NAMES_TO_CLASSES[object_type].from_db(object_uuid)
+            if not obj:
+                leaked = True
+            else:
+                s = obj.state
+                if (s.value == dbo.STATE_DELETED and
+                        time.time() - s.update_time > 300):
+                    leaked = True
 
-        for addr in releaseable:
-            fn.ipam.release(addr)
-            fn.ipam.log.with_fields({object_type: object_uuid}).warning(
-                'Cleaned up an address which refers to a deleted object')
+            if leaked:
+                fn.ipam.release(addr)
+                eventlog.add_event_multi(
+                    EVENT_TYPE_AUDIT, [fn.ipam, (object_type, object_uuid)],
+                    'cleaned up an address which refers to a deleted object')
 
         # Cleanup old uploads which were never completed
         for upload in Uploads([]):
