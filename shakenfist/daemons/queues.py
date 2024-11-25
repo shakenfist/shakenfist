@@ -21,6 +21,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
+from shakenfist import eventlog
 from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.tasks import DeleteNetworkWhenClean
@@ -39,7 +40,6 @@ from shakenfist.tasks import SnapshotTask
 from shakenfist.tasks import StartInstanceTask
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
-from shakenfist.util import process as util_process
 
 
 LOG, _ = logs.setup(__name__)
@@ -171,38 +171,51 @@ def handle(queue_name, jobname, workitem):
                     b.verify_checksum(urgent=False)
 
             elif isinstance(task, ArchiveTranscodeTask):
-                if os.path.exists(task.cache_path()):
+                if not os.path.exists(task.cache_path()):
+                    continue
+
+                try:
                     b = blob.Blob.from_db(task.blob_uuid())
-                    if b:
-                        transcode_blob_uuid = str(uuid.uuid4())
-                        transcode_blob_path = blob.Blob.filepath(transcode_blob_uuid)
-                        util_process.execute(
-                            [], f'cp {task.cache_path()} {transcode_blob_path}')
-                        st = os.stat(transcode_blob_path)
+                    if not b:
+                        continue
+                    if b.state.value != dbo.STATE_CREATED:
+                        continue
 
-                        transcode_blob = blob.Blob.new(
-                            transcode_blob_uuid, time.time(), time.time())
-                        transcode_blob.size = st.st_size
-                        transcode_blob.state = blob.Blob.STATE_CREATED
-                        transcode_blob.observe()
-                        transcode_blob.verify_checksum(locks=[])
+                    transcode_blob_uuid = str(uuid.uuid4())
+                    transcode_blob_path = blob.Blob.filepath(
+                        transcode_blob_uuid)
+                    util_general.link_or_copy(
+                        task.cache_path(), transcode_blob_path)
+                    st = os.stat(transcode_blob_path)
 
-                        if b.add_transcode(task.transcode_description(),
-                                           transcode_blob_uuid):
-                            transcode_blob.request_replication()
-                            log.with_fields({
-                                'blob': b,
-                                'transcode_blob_uuid': transcode_blob_uuid,
-                                'description': task.transcode_description()}).info(
-                                'Recorded transcode')
-                            transcode_blob.ref_count_inc(b)
-                        else:
-                            # We get a false back if someone else beat us and
-                            # has already recorded the same transcoding. In
-                            # that case just delete our attempt.
-                            transcode_blob.add_event(
-                                EVENT_TYPE_STATUS, 'Lost the transcode race!')
-                            transcode_blob.state = blob.Blob.STATE_DELETED
+                    transcode_blob = blob.Blob.new(
+                        transcode_blob_uuid, time.time(), time.time())
+                    transcode_blob.size = st.st_size
+                    transcode_blob.state = blob.Blob.STATE_CREATED
+                    transcode_blob.observe()
+                    transcode_blob.verify_checksum(locks=[])
+
+                    if b.add_transcode(task.transcode_description(),
+                                       transcode_blob_uuid):
+                        transcode_blob.request_replication()
+                        eventlog.add_event_multi(
+                            EVENT_TYPE_AUDIT, [b, transcode_blob],
+                            'recorded transcode',
+                            extra=task.transcode_description())
+                        transcode_blob.ref_count_inc(b)
+                    else:
+                        # We get a false back if someone else beat us and
+                        # has already recorded the same transcoding. In
+                        # that case just delete our attempt.
+                        eventlog.add_event_multi(
+                            EVENT_TYPE_STATUS, [b, transcode_blob],
+                            'lost the transcode race!')
+                        transcode_blob.state = blob.Blob.STATE_DELETED
+
+                except exceptions.BlobDeleted:
+                    eventlog.add_event_multi(
+                        EVENT_TYPE_STATUS, [b, transcode_blob],
+                        'transcode blob deleted, perhaps parent blob was reaped?')
 
             elif isinstance(task, PreflightAgentOperationTask):
                 preflight_agent_operation(task.agentop_uuid())
