@@ -134,7 +134,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             # Ensure we are on every network we have a host for
             for network_uuid in host_networks:
                 try:
-                    n = network.Network.from_db(network_uuid)
+                    n = network.Network.from_db(
+                        network_uuid, suppress_failure_audit=True)
                     if not n:
                         continue
 
