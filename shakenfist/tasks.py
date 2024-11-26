@@ -1,3 +1,5 @@
+import flask
+
 from shakenfist.exceptions import NetworkNotListTaskException
 from shakenfist.exceptions import NoInstanceTaskException
 from shakenfist.exceptions import NoNetworkInterfaceTaskException
@@ -8,11 +10,23 @@ from shakenfist.exceptions import NoURLImageFetchTaskException
 class QueueTask:
     """QueueTask defines a validated task placed on the job queue."""
     _name = None
-    _version = 1  # Enable future upgrades to existing tasks
+    _version = 1        # Enable future upgrades to existing tasks
+    _request_id = None  # If this is associated with an API request
+
+    def __init__(self):
+        # If this task is related to an API request, we should keep that
+        # association.
+        try:
+            self._request_id = flask.request.environ.get('FLASK_REQUEST_ID')
+        except RuntimeError:
+            self._request_id = None
 
     @classmethod
     def name(self):
         return self._name
+
+    def request_id(self):
+        return self._request_id
 
     @classmethod
     def pretty_task_name(self):

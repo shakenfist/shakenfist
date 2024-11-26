@@ -2,6 +2,7 @@ import os
 import time
 import uuid
 
+import flask
 import requests
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
@@ -58,6 +59,18 @@ def handle(queue_name, jobname, workitem):
     try:
         for task in workitem.get('tasks', []):
             log = log.with_fields({'task': task})
+
+            # Tasks should log with the request id of the API request that
+            # caused them, if there was in fact one.
+            request_id = task.request_id()
+            try:
+                if request_id:
+                    flask.request.environ['REQUEST_ID'] = request_id
+                else:
+                    if 'REQUEST_ID' in flask.request.environ:
+                        del flask.request.environ['REQUEST_ID']
+            except RuntimeError:
+                ...
 
             if not QueueTask.__subclasscheck__(type(task)):
                 raise exceptions.UnknownTaskException(

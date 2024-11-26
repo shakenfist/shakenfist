@@ -4,6 +4,7 @@ import signal
 import time
 from collections import defaultdict
 
+import flask
 import setproctitle
 from oslo_concurrency import processutils
 from shakenfist_utilities import logs  # noreorder
@@ -359,6 +360,18 @@ class Monitor(daemon.WorkerPoolDaemon):
                 jobname, workitem = jobname_workitem
                 setproctitle.setproctitle(
                     '{}-{}'.format(daemon.process_name('net'), jobname))
+
+                # Tasks should log with the request id of the API request that
+                # caused them, if there was in fact one.
+                request_id = workitem.request_id()
+                try:
+                    if request_id:
+                        flask.request.environ['REQUEST_ID'] = request_id
+                    else:
+                        if 'REQUEST_ID' in flask.request.environ:
+                            del flask.request.environ['REQUEST_ID']
+                except RuntimeError:
+                    ...
 
                 try:
                     log_ctx = LOG.with_fields({'workitem': workitem})
