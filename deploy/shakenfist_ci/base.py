@@ -33,12 +33,6 @@ class WrongEventException(Exception):
     pass
 
 
-# NOTE(mikal): this is a hack to "turn up the knob" on how slow image
-# downloads can be while my ISP is congested because of COVID. We should
-# turn this back down as things improve.
-NETWORK_PATIENCE_FACTOR = 3
-
-
 def load_userdata(name):
     test_dir = os.path.dirname(os.path.abspath(__file__))
     with open(f'{test_dir}/tests/files/{name}_userdata') as f:
@@ -192,7 +186,7 @@ class BaseTestCase(testtools.TestCase):
             desired = 'not ready'
 
         start_time = time.time()
-        while time.time() - start_time < timeout * 60 * NETWORK_PATIENCE_FACTOR:
+        while time.time() - start_time < timeout * 180:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] == 'error':
                 raise StartException(
@@ -213,7 +207,7 @@ class BaseTestCase(testtools.TestCase):
         # morning it can take over 2 minutes to download a Ubuntu image.
         start_time = time.time()
         final = False
-        while time.time() - start_time < 5 * 60 * NETWORK_PATIENCE_FACTOR:
+        while time.time() - start_time < 900:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] in ['created', 'error']:
                 final = True
@@ -259,7 +253,7 @@ class BaseTestCase(testtools.TestCase):
     def _await_image_event(
             self, image_uuid, operation, message=None, after=None):
         start_time = time.time()
-        while time.time() - start_time < 5 * 60 * NETWORK_PATIENCE_FACTOR:
+        while time.time() - start_time < 900:
             for event in self.system_client.get_artifact_events(image_uuid):
                 if after and event['timestamp'] <= after:
                     continue

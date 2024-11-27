@@ -52,7 +52,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         start_time = time.time()
         a = json.loads(self._exec_client(
             '--json artifact show %s' % cirros_uuid))
-        while time.time() - start_time < 5 * 60 * base.NETWORK_PATIENCE_FACTOR:
+        while time.time() - start_time < 5 * 60:
             if a.get('blob_uuid'):
                 break
             time.sleep(5)
@@ -95,7 +95,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
 
         # Ensure we have the right number of versions
         start_time = time.time()
-        while time.time() - start_time < 5 * 60 * base.NETWORK_PATIENCE_FACTOR:
+        while time.time() - start_time < 5 * 60:
             versions = json.loads(self._exec_client(
                 'artifact versions %s' % artifact_uuid))
             # Number of versions will be limited to the max_versions setting
