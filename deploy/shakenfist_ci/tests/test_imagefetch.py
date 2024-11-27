@@ -58,7 +58,11 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
         self.assertEqual('created', img['state'])
 
     def test_disappearing_source_instance(self):
-        n = self.system_client.get_nodes()[-1]['name']
+        for n in self.system_client.get_nodes():
+            if n['is_hypervisor']:
+                break
+        n = n['name']
+
         p = subprocess.run(
             ['sudo sf-client artifact download debian-11 '
              '/var/www/html/debian-11-disappearing-instance'],
