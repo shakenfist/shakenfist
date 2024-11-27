@@ -172,10 +172,13 @@ class BaseTestCase(testtools.TestCase):
     def _await_instance_deleted(self, instance_uuid):
         start_time = time.time()
         while time.time() - start_time < 300:
-            if instance_uuid not in self.system_client.get_instances():
+            i = self.system_client.get_instance(instance_uuid)
+            if not i:
+                return
+            if i['state'].startswith('delete'):
                 return
             time.sleep(5)
-        self.fail('Failed to delete instance: %s' % instance_uuid)
+        self.fail(f'Failed to delete instance after 5 minutes {instance_uuid}')
 
     def _await_agent_state(self, instance_uuid, ready=True, timeout=7):
         # Wait up to 5 minutes for the instance to be created and enter
