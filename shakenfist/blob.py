@@ -497,7 +497,7 @@ class Blob(dbo):
                             EVENT_TYPE_STATUS, affected_objects,
                             f'fetching required blob {direction_info}',
                             extra={
-                                'percentage': percentage
+                                'percentage': int(percentage)
                             }
                         )
                         next_percentage += 10
@@ -802,7 +802,7 @@ def http_fetch(url, resp, b, locks, objects):
                         'fetching required HTTP resource',
                         extra={
                             'url': url,
-                            'percentage': percentage,
+                            'percentage': int(percentage),
                             'bytes_fetched': fetched
                         })
                     previous_percentage = percentage
