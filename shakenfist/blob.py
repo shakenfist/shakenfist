@@ -353,8 +353,9 @@ class Blob(dbo):
     def ensure_local(self, locks, instance_object=None,
                      wait_for_other_transfers=True):
         if self.state.value != self.STATE_CREATED:
-            self.log.warning(
-                'Blob not in created state, replication cancelled')
+            self.add_event(
+                EVENT_TYPE_STATUS,
+                'blob not in created state, replication to this node cancelled')
             return
 
         # Replicate any blob this blob depends on
@@ -374,23 +375,32 @@ class Blob(dbo):
         while os.path.exists(partial_path):
             st = os.stat(partial_path)
             if time.time() - st.st_mtime > 300:
-                self.log.with_fields({
-                    'partial file age': time.time() - st.st_mtime}).info(
-                    'No activity on previous partial download in more than '
-                    'five minutes. Removing and re-attempting.')
+                self.add_event(
+                    EVENT_TYPE_AUDIT,
+                    ('no activity on previous partial download in more than '
+                     'five minutes. Removing and re-attempting.'),
+                    extra={
+                        'partial file age': time.time() - st.st_mtime
+                    }
+                )
                 os.unlink(partial_path)
             else:
                 if not wait_for_other_transfers:
                     raise BlobAlreadyBeingTransferred()
 
-                self.log.with_fields({
-                    'partial file age': time.time() - st.st_mtime}).debug(
-                    'Waiting for existing download to complete')
+                self.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'waiting for existing download to complete',
+                    extra={
+                        'partial file age': time.time() - st.st_mtime
+                    }
+                )
                 time.sleep(10)
 
         # If the blob exists after waiting for another partial transfer,
         # we're done
         if os.path.exists(blob_path):
+            self.add_event(EVENT_TYPE_AUDIT, 'blob now exists on this node')
             self.observe()
             return
 
@@ -412,7 +422,7 @@ class Blob(dbo):
         with open(partial_path, 'wb') as f:
             total_bytes_received = 0
             last_refresh = 0
-            previous_percentage = 0
+            next_percentage = 10
 
             locations = self.locations
             for n in Nodes([], prefilter='inactive'):
@@ -435,8 +445,16 @@ class Blob(dbo):
                 'token': token
             }
 
+            direction_info = f'({locations[0]} -> {config.NODE_NAME})'
+            affected_objects = [self, ('node', config.NODE_NAME),
+                                ('node', locations[0])]
+            if instance_object:
+                affected_objects.append(instance_object)
+
             etcd.put('transfer', locations[0], name, data)
-            self.log.with_fields(data).info('Created transfer request')
+            add_event_multi(
+                EVENT_TYPE_AUDIT, affected_objects,
+                f'created transfer request {direction_info}', extra=data)
 
             waiting_time = time.time()
             while time.time() - waiting_time < 30:
@@ -446,14 +464,21 @@ class Blob(dbo):
                 time.sleep(1)
 
             if data['server_state'] != dbo.STATE_CREATED:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
+                    f'transfer setup failed {direction_info}', extra=data)
                 raise BlobTransferSetupFailed(
-                    'transfer %s failed to setup, state is %s'
-                    % (name, data['server_state']))
+                    f'transfer {name} failed to setup, state is {data["server_state"]}')
+
+            add_event_multi(
+                EVENT_TYPE_AUDIT, affected_objects,
+                f'transfer setup succeeded  {direction_info}', extra=data)
 
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect((locations[0], data['port']))
             client.send(token.encode('utf-8'))
 
+            last_event = time.time()
             sha512_hash = hashlib.sha512()
             with open(partial_path, 'wb') as f:
                 while d := client.recv(8000):
@@ -466,60 +491,51 @@ class Blob(dbo):
                         last_refresh = time.time()
 
                     percentage = total_bytes_received / int(self.size) * 100.0
-                    if (percentage - previous_percentage) > 10.0:
-                        if instance_object:
-                            instance_object.add_event(
-                                EVENT_TYPE_STATUS, 'fetching required blob',
-                                extra={
-                                    'blob_uuid': self.uuid,
-                                    'percentage': percentage
-                                })
-                        self.log.with_fields({
-                            'bytes_fetched': total_bytes_received,
-                            'size': int(self.size)
-                        }).debug('Fetch %.02f percent complete' % percentage)
-                        previous_percentage = percentage
+                    if ((next_percentage - percentage) < 0 or
+                            time.time() - last_event > 30):
+                        add_event_multi(
+                            EVENT_TYPE_STATUS, affected_objects,
+                            f'fetching required blob {direction_info}',
+                            extra={
+                                'percentage': percentage
+                            }
+                        )
+                        next_percentage += 10
 
             if total_bytes_received != int(self.size):
+                add_event_multi(
+                    EVENT_TYPE_STATUS, affected_objects,
+                    f'did not fetch entire blob, cleaning up {direction_info}',
+                    extra={
+                        'received': total_bytes_received,
+                        'expected': self.size
+                    }
+                )
                 if os.path.exists(partial_path):
                     os.unlink(partial_path)
                 raise BlobFetchFailed(
                     'The amount of fetched data does not match the stored size. We '
-                    'fetched %d bytes, but expected %d.'
-                    % (total_bytes_received, self.size))
+                    f'fetched {total_bytes_received} bytes, but expected {self.size}.')
 
             if not self.verify_size(partial=True):
-                if instance_object:
-                    instance_object.add_event(
-                        EVENT_TYPE_AUDIT, 'fetching required blob failed',
-                        extra={
-                            'blob_uuid': self.uuid,
-                            'error': 'incorrect size'
-                            })
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
+                    f'fetching required blob failed, incorrect size {direction_info}')
                 raise BlobFetchFailed(
-                    'Fetching required blob %s failed. We fetched %d bytes, but expected %d.'
-                    % (self.uuid, total_bytes_received, self.size))
+                    f'Fetching required blob {self.uuid} failed. We fetched '
+                    f'{total_bytes_received} bytes, but expected {self.size}.')
 
             if not self.verify_checksum(sha512_hash.hexdigest()):
-                if instance_object:
-                    instance_object.add_event(
-                        EVENT_TYPE_AUDIT, 'fetching required blob failed',
-                        extra={
-                            'blob_uuid': self.uuid,
-                            'error': 'incorrect checksum'
-                            })
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
+                    f'fetching required blob failed, incorrect checksum {direction_info}')
                 raise BlobFetchFailed(
-                    'Fetching required blob %s failed. Incorrect checksum.' % self.uuid)
+                    f'Fetching required blob {self.uuid} failed. Incorrect checksum.')
 
             os.rename(partial_path, blob_path)
-            if instance_object:
-                instance_object.add_event(
-                    EVENT_TYPE_STATUS, 'fetching required blob complete',
-                    extra={'blob_uuid': self.uuid})
-            self.log.with_fields({
-                'bytes_fetched': total_bytes_received,
-                'size': int(self.size)
-            }).info('Fetch complete')
+            add_event_multi(
+                EVENT_TYPE_AUDIT, affected_objects,
+                f'fetching required blob complete {direction_info}')
             self.observe()
             return total_bytes_received
 

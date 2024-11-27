@@ -293,7 +293,6 @@ class BaseTestCase(testtools.TestCase):
 
     def _await_objects_ready(self, callback, items):
         waiting_for = list(enumerate(items))
-        start_time = time.time()
         results = [None] * len(items)
 
         time_since_last_progress = time.time()
