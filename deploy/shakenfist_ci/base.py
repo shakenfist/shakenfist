@@ -296,6 +296,7 @@ class BaseTestCase(testtools.TestCase):
         start_time = time.time()
         results = [None] * len(items)
 
+        time_since_last_progress = time.time()
         while waiting_for:
             for idx, item in copy.copy(waiting_for):
                 try:
@@ -303,6 +304,7 @@ class BaseTestCase(testtools.TestCase):
                     if n.get('state') in ['created', 'deleted', 'error']:
                         waiting_for.remove((idx, item))
                         results[idx] = n
+                        time_since_last_progress = time.time()
 
                 except apiclient.ResourceNotFoundException:
                     # Its likely this exception can be removed once PR #1314 (or
@@ -314,13 +316,15 @@ class BaseTestCase(testtools.TestCase):
             if waiting_for:
                 time.sleep(5)
 
-            if waiting_for and time.time() - start_time > 300:
+            if waiting_for and time.time() - time_since_last_progress > 300:
                 remaining = []
                 for _, item in waiting_for:
                     remaining.append(item)
 
                 raise TimeoutException(
-                    'Items %s never became ready (waited 5 mins)' % ', '.join(remaining))
+                    'Items %s never became ready, and no progress has been '
+                    'made in at least five minutes.'
+                    % ', '.join(remaining))
 
         return results
 
