@@ -482,6 +482,9 @@ class Blob(dbo):
             sha512_hash = hashlib.sha512()
             with open(partial_path, 'wb') as f:
                 while d := client.recv(8000):
+                    if len(d) == 0:
+                        break
+
                     f.write(d)
                     sha512_hash.update(d)
                     total_bytes_received += len(d)
