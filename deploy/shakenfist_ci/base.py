@@ -134,8 +134,8 @@ class BaseTestCase(testtools.TestCase):
         return self._await_instance_event(
             instance_uuid, 'detected poweroff', after=after)
 
-    def _await_instance_ready(self, instance_uuid, timeout=7):
-        self._await_agent_state(instance_uuid, ready=True, timeout=timeout)
+    def _await_instance_ready(self, instance_uuid):
+        self._await_agent_state(instance_uuid, ready=True)
         self._emit_tracing_event({
             'msg': 'Instance ready (agent ready state)',
             'instance_uuid': instance_uuid
@@ -180,52 +180,66 @@ class BaseTestCase(testtools.TestCase):
             time.sleep(5)
         self.fail(f'Failed to delete instance after 5 minutes {instance_uuid}')
 
-    def _await_agent_state(self, instance_uuid, ready=True, timeout=7):
-        # Wait up to 5 minutes for the instance to be created and enter
-        # the desired agent running state
+    def _await_agent_state(self, instance_uuid, ready=True):
+        # Wait the instance to be created and enter the desired agent running state
         if ready:
             desired = 'ready'
         else:
             desired = 'not ready'
 
-        start_time = time.time()
-        while time.time() - start_time < timeout * 180:
+        last_event = None
+        time_since_last_progress = time.time()
+        while time.time() - time_since_last_progress < 180:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] == 'error':
                 raise StartException(
-                    'Instance %s failed to start (marked as error state)'
-                    % instance_uuid)
+                    f'Instance {instance_uuid} failed to start (marked as '
+                    'error state)')
 
             if i['agent_state'] and i['agent_state'].startswith(desired):
                 return
+
+            events = self.system_client.get_instance_events(
+                instance_uuid, limit=1)
+            if events:
+                last_event = events[0]
+                time_since_last_progress = last_event['timestamp']
+
             time.sleep(5)
 
         raise TimeoutException(
-            'Instance %s failed to start and enter the agent %s state '
-            'in %d minutes. Agent state is %s.'
-            % (instance_uuid, desired, timeout, i['agent_state']))
+            f'Instance {instance_uuid} failed to start and enter the agent '
+            f'{desired} state and has seen no progress in 3 minutes. Agent '
+            f'state is {i["agent_state"]} and the last recorded event was '
+            f'{last_event}.')
 
     def _await_instance_create(self, instance_uuid):
-        # Wait up to 5 minutes for the instance to be created. On a slow
-        # morning it can take over 2 minutes to download a Ubuntu image.
-        start_time = time.time()
-        final = False
-        while time.time() - start_time < 900:
+        # Wait for the instance to be created
+        last_event = None
+        time_since_last_progress = time.time()
+        while time.time() - time_since_last_progress < 180:
             i = self.system_client.get_instance(instance_uuid)
-            if i['state'] in ['created', 'error']:
-                final = True
-                break
+            if i['state'] == 'error':
+                raise StartException(
+                    f'Instance {instance_uuid} failed to start (marked as '
+                    'error state)')
+
+            if i['state'] == 'created':
+                return
+
+            events = self.system_client.get_instance_events(
+                instance_uuid, limit=1)
+            if events:
+                last_event = events[0]
+                time_since_last_progress = last_event['timestamp']
+
             time.sleep(5)
 
-        if i['state'] == 'error':
-            raise StartException(
-                'Instance %s failed to start (marked as error state, %s)'
-                % (instance_uuid, i))
-
-        if not final:
-            raise TimeoutException(
-                'Instance %s was not created in a reasonable time (%s)'
-                % (instance_uuid, i))
+        raise TimeoutException(
+            f'Instance {instance_uuid} failed to start and enter the created '
+            f'state and has seen no progress in 3 minutes. Instance '
+            f'state is {i["state"]} and the last recorded event was '
+            f'{last_event}.')
 
     def _await_instance_event(
             self, instance_uuid, operation, message=None, after=None):
