@@ -104,6 +104,11 @@ while [ ${finished} -lt 1 ]; do
     fi
 done
 
+# List blobs again
+echo
+log "=== Listing blobs ==="
+sf-client blob list
+
 # Ensure we made instances and they started ok
 echo
 log "=== Boot checks ==="
