@@ -223,6 +223,19 @@
         state: stopped
         enabled: false
 
+    # https://wiki.debian.org/UnattendedUpgrades#Modifying_download_and_upgrade_schedules_.28on_systemd.29
+    - name: Disable daily apt downloads
+      service:
+        name: apt-daily
+        state: stopped
+        enabled: false
+
+    - name: Disable daily apt upgrades
+      service:
+        name: apt-daily-upgrade
+        state: stopped
+        enabled: false
+
     - name: Make /srv/ci
       file:
         path: /srv/ci
