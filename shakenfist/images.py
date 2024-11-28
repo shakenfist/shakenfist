@@ -310,7 +310,7 @@ class ImageFetchHelper:
                 except FileExistsError:
                     ...
             else:
-                objects_with_blob = copy.copy(self.objects)
+                objects_with_blob = copy.deepcopy(self.objects)
                 objects_with_blob.append(b)
                 with util_general.RecordedOperation('transcode image', self.instance):
                     add_event_multi(
@@ -356,7 +356,7 @@ class ImageFetchHelper:
             b = blob.Blob.new(
                 blob_uuid, resp.headers.get('Last-Modified'), time.time())
 
-            objects_including_blob = copy.copy(self.objects)
+            objects_including_blob = copy.deepcopy(self.objects)
             objects_including_blob.append(b)
             add_event_multi(
                 EVENT_TYPE_STATUS, objects_including_blob,

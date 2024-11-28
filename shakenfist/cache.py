@@ -45,7 +45,7 @@ def _update_object_state_cache_attempt(object_type, object_uuid, old_state, new_
     if not original:
         updated = {}
     else:
-        updated = copy.copy(original)
+        updated = copy.deepcopy(original)
     changed = False
 
     if new_state == 'hard-deleted' and object_uuid in updated:
@@ -67,7 +67,7 @@ def _update_object_state_cache_attempt(object_type, object_uuid, old_state, new_
         if not original:
             updated = {}
         else:
-            updated = copy.copy(original)
+            updated = copy.deepcopy(original)
 
         if object_uuid in updated:
             del updated[object_uuid]
@@ -81,7 +81,7 @@ def _update_object_state_cache_attempt(object_type, object_uuid, old_state, new_
     if not original:
         updated = {}
     else:
-        updated = copy.copy(original)
+        updated = copy.deepcopy(original)
 
     updated[object_uuid] = time.time()
     mutations.append({

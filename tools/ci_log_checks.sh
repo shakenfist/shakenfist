@@ -24,23 +24,23 @@ fi
 # tests.
 echo
 FORBIDDEN=("Traceback (most recent call last):"
-            "ERROR sf"
-            "ERROR gunicorn"
-            " died"
-            "Extra vxlan present"
-            "Fork support is only compatible with the epoll1 and poll polling strategies"
-            "not using configured address"
-            "Dumping thread traces"
-            "because it is leased to"
-            "not committing online upgrade"
-            "Received a GOAWAY with error code ENHANCE_YOUR_CALM"
-            "ConnectionFailedError"
-            "invalid JWT in Authorization header"
-            "Libvirt Error: XML error"
-            "cluster wide cleanup daemon is deleting this IPAM as leaked"
-            "Cleaning up leaked vxlan"
-            "invalid salt"
-            "unable to execute QEMU command")
+           "ERROR sf"
+           "ERROR gunicorn"
+           " died"
+           "Extra vxlan present"
+           "Fork support is only compatible with the epoll1 and poll polling strategies"
+           "not using configured address"
+           "Dumping thread traces"
+           "because it is leased to"
+           "not committing online upgrade"
+           "Received a GOAWAY with error code ENHANCE_YOUR_CALM"
+           "ConnectionFailedError"
+           "invalid JWT in Authorization header"
+           "Libvirt Error: XML error"
+           "cluster wide cleanup daemon is deleting this IPAM as leaked"
+           "Cleaning up leaked vxlan"
+           "invalid salt"
+           "unable to execute QEMU command")
 
 if [ $(echo "${1}" | grep -c "v0.7" || true) -lt 1 ]; then
     echo "INFO: Including forbidden strings for v0.8 onwards."
@@ -96,7 +96,8 @@ fi
 
 # Just a warning for now, likely to get promoted to a failure later...
 failures=0
-WARNING=("Waiting to acquire lock")
+WARNING=("Waiting to acquire lock"
+         "Transaction failure")
 
 IFS=""
 for forbid in ${WARNING[*]}
@@ -105,7 +106,7 @@ do
     count=$(grep -c -i "$forbid" /var/log/syslog || true)
     if [ ${count} -gt 0 ]
     then
-        echo "WARNING: Forbidden string found in logs ${count} times."
+        echo "WARNING: Undesirable string found in logs ${count} times."
         failures=$(( $failures + 1))
     fi
 done

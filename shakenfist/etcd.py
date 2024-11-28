@@ -667,13 +667,16 @@ def transactional_delete_raw(path, original_data):
 
 
 def replace_many_raw(mutations):
-    values_by_path = {}
+    original_values_by_path = {}
+    new_values_by_path = {}
+
     comparisons = []
     replacements = []
     failures = []
 
     for mutation in mutations:
         path_encoded = mutation['path'].encode()
+        original_data_encoded = _encode_data(mutation['original_data'])
         new_data_encoded = _encode_data(mutation['new_data'])
 
         if mutation['original_data'] is None:
@@ -685,9 +688,8 @@ def replace_many_raw(mutations):
                     create_revision=0
                 )
             )
-            values_by_path[path_encoded] = None
+            original_values_by_path[path_encoded] = None
         else:
-            original_data_encoded = _encode_data(mutation['original_data'])
             comparisons.append(
                 etcd_pb2.Compare(
                     key=path_encoded,
@@ -696,7 +698,7 @@ def replace_many_raw(mutations):
                     value=original_data_encoded
                 )
             )
-            values_by_path[path_encoded] = original_data_encoded.decode()
+            original_values_by_path[path_encoded] = original_data_encoded
 
         if mutation['new_data'] is None:
             replacements.append(
@@ -706,6 +708,7 @@ def replace_many_raw(mutations):
                     )
                 )
             )
+            new_values_by_path[path_encoded] = None
         else:
             replacements.append(
                 etcd_pb2.RequestOp(
@@ -715,6 +718,7 @@ def replace_many_raw(mutations):
                     )
                 )
             )
+            new_values_by_path[path_encoded] = new_data_encoded
 
         # On failure, we grab all of the keys and their current values
         failures.append(
@@ -743,22 +747,24 @@ def replace_many_raw(mutations):
         for resp in response.responses:
             if resp.HasField('response_range'):
                 for kvs in resp.response_range.kvs:
-                    if values_by_path[kvs.key] != kvs.value:
+                    if original_values_by_path[kvs.key] != kvs.value:
                         failures.append(
                             {
                                 'path': kvs.key.decode(),
-                                'desired': values_by_path[kvs.key],
-                                'actual': kvs.value.decode()
+                                'desired': original_values_by_path[kvs.key],
+                                'actual': kvs.value.decode(),
+                                'replacement': new_values_by_path[kvs.key]
                             }
                         )
-                        del values_by_path[kvs.key]
+                        del original_values_by_path[kvs.key]
 
-        for key in values_by_path:
+        for key in original_values_by_path:
             failures.append(
                 {
                     'path': key.decode(),
-                    'desired': values_by_path[key],
-                    'actual': None
+                    'desired': original_values_by_path[key],
+                    'actual': None,
+                    'replacement': new_values_by_path[kvs.key]
                 }
             )
 

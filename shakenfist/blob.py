@@ -237,7 +237,7 @@ class Blob(dbo):
         if not original:
             updated = {'locations': {}}
         else:
-            updated = copy.copy(original)
+            updated = copy.deepcopy(original)
         changed = False
 
         if config.NODE_NAME not in updated['locations']:
@@ -251,7 +251,7 @@ class Blob(dbo):
             return etcd.replace(f'attribute/{self.object_type}', self.uuid,
                                 'incomplete_locations', original, updated)
 
-        return True, []
+        return True
 
     def update_incomplete_location(self, percentage):
         percentage = round(percentage, 1)
@@ -260,6 +260,7 @@ class Blob(dbo):
             if self._update_incomplete_location_inner(percentage):
                 return
             attempts += 1
+            time.sleep(0.01)
 
         raise LocklessUpdateFailed(
             f'Lockless update of incomplete locations for blob {self.uuid} '
@@ -269,15 +270,15 @@ class Blob(dbo):
         original = etcd.get(f'attribute/{self.object_type}', self.uuid,
                             'incomplete_locations')
         if not original:
-            return
+            return True
 
         if config.NODE_NAME in original['locations']:
-            updated = copy.copy(original)
+            updated = copy.deepcopy(original)
             del updated['locations'][config.NODE_NAME]
             return etcd.replace(f'attribute/{self.object_type}', self.uuid,
                                 'incomplete_locations', original, updated)
 
-        return True, []
+        return True
 
     def remove_incomplete_location(self):
         attempts = 0
@@ -285,6 +286,7 @@ class Blob(dbo):
             if self._remove_incomplete_location_inner():
                 return
             attempts += 1
+            time.sleep(0.01)
 
         raise LocklessUpdateFailed(
             f'Lockless removal of incomplete locations for blob {self.uuid} '
