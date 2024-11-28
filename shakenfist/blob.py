@@ -254,6 +254,7 @@ class Blob(dbo):
         return True, []
 
     def update_incomplete_location(self, percentage):
+        percentage = round(percentage, 1)
         attempts = 0
         while attempts < 3:
             if self._update_incomplete_location_inner(percentage):
@@ -430,9 +431,13 @@ class Blob(dbo):
 
     def ensure_local(self, locks, instance_object=None,
                      wait_for_other_transfers=True):
+        affected_objects = [self]
+        if instance_object:
+            affected_objects.append(instance_object)
+
         if self.state.value != self.STATE_CREATED:
-            self.add_event(
-                EVENT_TYPE_STATUS,
+            add_event_multi(
+                EVENT_TYPE_STATUS, affected_objects,
                 'blob not in created state, replication to this node cancelled')
             return
 
@@ -449,25 +454,26 @@ class Blob(dbo):
             self.observe()
             return
 
+        add_event_multi(
+            EVENT_TYPE_STATUS, affected_objects, 'replicating blob to this node')
         partial_path = blob_path + '.partial'
         while os.path.exists(partial_path):
             st = os.stat(partial_path)
             if time.time() - st.st_mtime > 300:
-                self.add_event(
-                    EVENT_TYPE_AUDIT,
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
                     ('no activity on previous partial download in more than '
                      'five minutes. Removing and re-attempting.'),
                     extra={
                         'partial file age': time.time() - st.st_mtime
-                    }
-                )
+                    })
                 os.unlink(partial_path)
             else:
                 if not wait_for_other_transfers:
                     raise BlobAlreadyBeingTransferred()
 
-                self.add_event(
-                    EVENT_TYPE_AUDIT,
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
                     'waiting for existing download to complete',
                     extra={
                         'partial file age': time.time() - st.st_mtime
@@ -478,7 +484,8 @@ class Blob(dbo):
         # If the blob exists after waiting for another partial transfer,
         # we're done
         if os.path.exists(blob_path):
-            self.add_event(EVENT_TYPE_AUDIT, 'blob now exists on this node')
+            add_event_multi(
+                EVENT_TYPE_AUDIT, affected_objects, 'blob now exists on this node')
             self.observe()
             return
 
@@ -487,7 +494,7 @@ class Blob(dbo):
         while True:
             try:
                 return self._attempt_transfer(
-                    locks, instance_object, partial_path, blob_path)
+                    locks, affected_objects, partial_path, blob_path)
             except (ConnectionRefusedError, BlobTransferSetupFailed,
                     BlobFetchFailed) as e:
                 attempts += 1
@@ -495,8 +502,10 @@ class Blob(dbo):
                     raise BlobFetchFailed(
                         'Repeated attempts to fetch blob failed: %s' % e)
 
-    def _attempt_transfer(self, locks, instance_object, partial_path,
+    def _attempt_transfer(self, locks, affected_objects, partial_path,
                           blob_path):
+        add_event_multi(
+            EVENT_TYPE_AUDIT, affected_objects, 'attempting transfer')
         with open(partial_path, 'wb') as f:
             locations = self.locations
             for n in Nodes([], prefilter='inactive'):
@@ -507,6 +516,9 @@ class Blob(dbo):
                         'Node is inactive, ignoring blob location')
                     locations.remove(n.uuid)
             if len(locations) == 0:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
+                    'there are no online sources for this blob')
                 raise BlobMissing('There are no online sources for this blob')
 
             random.shuffle(locations)
@@ -520,10 +532,9 @@ class Blob(dbo):
             }
 
             direction_info = f'({locations[0]} -> {config.NODE_NAME})'
-            affected_objects = [self, ('node', config.NODE_NAME),
-                                ('node', locations[0])]
-            if instance_object:
-                affected_objects.append(instance_object)
+            affected_objects = copy.deepcopy(affected_objects)
+            affected_objects.append(('node', config.NODE_NAME))
+            affected_objects.append(('node', locations[0]))
 
             etcd.put('transfer', locations[0], name, data)
             add_event_multi(
@@ -584,6 +595,7 @@ class Blob(dbo):
                         self.update_incomplete_location(percentage)
                         if (next_percentage - percentage) < 0:
                             next_percentage += 10
+                        last_event = time.time()
 
             self.remove_incomplete_location()
 
@@ -898,6 +910,7 @@ def http_fetch(url, resp, b, locks, affected_objects):
                 b.update_incomplete_location(percentage)
                 if (next_percentage - percentage) < 0:
                     next_percentage += 10
+                last_event = time.time()
 
             if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
                 etcd.refresh_locks(locks)
