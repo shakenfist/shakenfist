@@ -2,6 +2,7 @@
 # Please note: blobs are a "foundational" baseobject type, which means they
 # should not rely on any other baseobjects for their implementation. This is
 # done to help minimize circular import problems.
+import copy
 import hashlib
 import numbers
 import os
@@ -36,6 +37,7 @@ from shakenfist.exceptions import BlobMissing
 from shakenfist.exceptions import BlobsMustHaveContent
 from shakenfist.exceptions import BlobSizeCannotChange
 from shakenfist.exceptions import BlobTransferSetupFailed
+from shakenfist.exceptions import LocklessUpdateFailed
 from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
@@ -57,7 +59,7 @@ LOG, _ = logs.setup(__name__)
 class Blob(dbo):
     object_type = 'blob'
     initial_version = 2
-    current_version = 7
+    current_version = 8
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -119,6 +121,11 @@ class Blob(dbo):
                 'KeyError while upgrading retention (v6 to v7): %s' % e)
 
     @classmethod
+    def _upgrade_step_7_to_8(cls, static_values):
+        # We added the concept of "incomplete locations".
+        ...
+
+    @classmethod
     def normalize_timestamp(cls, timestamp):
         # The timestamp is either a number (int or float, assumed to be epoch
         # seconds)...
@@ -162,12 +169,16 @@ class Blob(dbo):
             'fetched_at': self.fetched_at,
             'depends_on': self.depends_on,
             'transcodes': self.transcoded,
-            'locations': self.locations,
             'reference_count': self.ref_count,
             'sha512': self.checksums.get('sha512'),
             'last_used': self.last_used
         })
 
+        # Locations and their incomplete counterparts
+        out['locations'] = self.locations
+        out['locations'].extend(self.incomplete_locations)
+
+        # Include information about the blob
         out.update(self.info)
         return out
 
@@ -210,6 +221,73 @@ class Blob(dbo):
 
     def remove_location(self, location):
         self._remove_item_in_attribute_list('locations', location)
+
+    @property
+    def incomplete_locations(self):
+        out = []
+        locs = self._db_get_attribute(
+            'incomplete_locations', {'locations': {}})
+        for loc in locs['locations']:
+            out.append(f'{loc} ({locs["locations"][loc]:.2f}%)')
+        return out
+
+    def _update_incomplete_location_inner(self, percentage):
+        original = etcd.get(f'attribute/{self.object_type}', self.uuid,
+                            'incomplete_locations')
+        if not original:
+            updated = {'locations': {}}
+        else:
+            updated = copy.copy(original)
+        changed = False
+
+        if config.NODE_NAME not in updated['locations']:
+            changed = True
+            updated['locations'][config.NODE_NAME] = percentage
+        elif updated['locations'][config.NODE_NAME] != percentage:
+            changed = True
+            updated['locations'][config.NODE_NAME] = percentage
+
+        if changed:
+            return etcd.replace(f'attribute/{self.object_type}', self.uuid,
+                                'incomplete_locations', original, updated)
+
+        return True, []
+
+    def update_incomplete_location(self, percentage):
+        attempts = 0
+        while attempts < 3:
+            if self._update_incomplete_location_inner(percentage):
+                return
+            attempts += 1
+
+        raise LocklessUpdateFailed(
+            f'Lockless update of incomplete locations for blob {self.uuid} '
+            'failed.')
+
+    def _remove_incomplete_location_inner(self):
+        original = etcd.get(f'attribute/{self.object_type}', self.uuid,
+                            'incomplete_locations')
+        if not original:
+            return
+
+        if config.NODE_NAME in original['locations']:
+            updated = copy.copy(original)
+            del updated['locations'][config.NODE_NAME]
+            return etcd.replace(f'attribute/{self.object_type}', self.uuid,
+                                'incomplete_locations', original, updated)
+
+        return True, []
+
+    def remove_incomplete_location(self):
+        attempts = 0
+        while attempts < 3:
+            if self._remove_incomplete_location_inner():
+                return
+            attempts += 1
+
+        raise LocklessUpdateFailed(
+            f'Lockless removal of incomplete locations for blob {self.uuid} '
+            'failed.')
 
     @property
     def info(self):
@@ -420,10 +498,6 @@ class Blob(dbo):
     def _attempt_transfer(self, locks, instance_object, partial_path,
                           blob_path):
         with open(partial_path, 'wb') as f:
-            total_bytes_received = 0
-            last_refresh = 0
-            next_percentage = 10
-
             locations = self.locations
             for n in Nodes([], prefilter='inactive'):
                 if n.uuid in locations:
@@ -478,6 +552,10 @@ class Blob(dbo):
             client.connect((locations[0], data['port']))
             client.send(token.encode('utf-8'))
 
+            total_bytes_received = 0
+            last_refresh = 0
+            next_percentage = 10
+
             last_event = time.time()
             sha512_hash = hashlib.sha512()
             with open(partial_path, 'wb') as f:
@@ -503,8 +581,11 @@ class Blob(dbo):
                                 'percentage': int(percentage)
                             }
                         )
+                        self.update_incomplete_location(percentage)
                         if (next_percentage - percentage) < 0:
                             next_percentage += 10
+
+            self.remove_incomplete_location()
 
             if total_bytes_received != int(self.size):
                 add_event_multi(
@@ -814,7 +895,7 @@ def http_fetch(url, resp, b, locks, affected_objects):
                         'percentage': int(percentage),
                         'bytes_fetched': fetched
                     })
-
+                b.update_incomplete_location(percentage)
                 if (next_percentage - percentage) < 0:
                     next_percentage += 10
 
@@ -822,6 +903,7 @@ def http_fetch(url, resp, b, locks, affected_objects):
                 etcd.refresh_locks(locks)
                 last_refresh = time.time()
 
+    b.remove_incomplete_location()
     add_event_multi(
         EVENT_TYPE_USAGE, affected_objects,
         'fetching required HTTP resource complete',

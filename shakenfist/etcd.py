@@ -397,6 +397,14 @@ def get_all_dict(objecttype, subtype=None, sort_order=None, limit=0):
     return key_val
 
 
+def replace(objecttype, subtype, name, original_data, new_data):
+    return replace_many_raw([{
+        'path': _construct_key(objecttype, subtype, name),
+        'original_data': original_data,
+        'new_data': new_data
+    }])[0]
+
+
 @retry_etcd_forever
 def delete_raw(path):
     LOG.info('etcd delete %s' % path)

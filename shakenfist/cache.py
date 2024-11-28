@@ -110,7 +110,7 @@ def update_object_state_cache(object_type, object_uuid, old_state, new_state):
             f'        actual: {f["actual"]}\n'
             f'        desired: {f["desired"]}')
     failure_dump = '\n'.join(failure_strings)
-    raise exceptions.ObjectStateLocklessUpdateFailed(
+    raise exceptions.LocklessUpdateFailed(
         f'Lockless object state cache update for {object_type} {object_uuid} '
         f'from {old_state} to {new_state} failed. Failures:\n{failure_dump}')
 

@@ -295,7 +295,7 @@ class DatabaseBackedObject:
         if self.__in_memory_only:
             retval = json.loads(self.__in_memory_values.get(attribute, 'null'))
         else:
-            retval = etcd.get('attribute/%s' % self.object_type,
+            retval = etcd.get(f'attribute/{self.object_type}',
                               self.__uuid, attribute)
         if not retval:
             if default is None:

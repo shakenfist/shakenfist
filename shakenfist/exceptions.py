@@ -290,5 +290,5 @@ class LocklessUpdateFailed(Exception):
     ...
 
 
-class ObjectStateLocklessUpdateFailed(LocklessUpdateFailed):
+class LocklessUpdateFailed(LocklessUpdateFailed):
     ...
