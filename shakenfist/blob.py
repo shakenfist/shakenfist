@@ -503,7 +503,8 @@ class Blob(dbo):
                                 'percentage': int(percentage)
                             }
                         )
-                        next_percentage += 10
+                        if (next_percentage - percentage) < 0:
+                            next_percentage += 10
 
             if total_bytes_received != int(self.size):
                 add_event_multi(
@@ -776,20 +777,23 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     return b
 
 
-def http_fetch(url, resp, b, locks, objects):
+def http_fetch(url, resp, b, locks, affected_objects):
     fetched = 0
+
     if resp.headers.get('Content-Length'):
         total_size = int(resp.headers.get('Content-Length'))
     else:
         total_size = None
 
-    previous_percentage = 0.0
     last_refresh = 0
     dest_path = Blob.filepath(b.uuid)
 
     md5_hash = hashlib.md5()
     sha512_hash = hashlib.sha512()
 
+    percentage = 0
+    next_percentage = 10
+    last_event = time.time()
     with open(dest_path + '.partial', 'wb') as f:
         for chunk in resp.iter_content(chunk_size=8192):
             fetched += len(chunk)
@@ -799,23 +803,28 @@ def http_fetch(url, resp, b, locks, objects):
 
             if total_size:
                 percentage = fetched / total_size * 100.0
-                if (percentage - previous_percentage) > 10.0:
-                    add_event_multi(
-                        EVENT_TYPE_STATUS, objects,
-                        'fetching required HTTP resource',
-                        extra={
-                            'url': url,
-                            'percentage': int(percentage),
-                            'bytes_fetched': fetched
-                        })
-                    previous_percentage = percentage
+
+            if ((next_percentage - percentage) < 0 or
+                    time.time() - last_event > 30):
+                add_event_multi(
+                    EVENT_TYPE_STATUS, affected_objects,
+                    'fetching required HTTP resource',
+                    extra={
+                        'url': url,
+                        'percentage': int(percentage),
+                        'bytes_fetched': fetched
+                    })
+
+                if (next_percentage - percentage) < 0:
+                    next_percentage += 10
 
             if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
                 etcd.refresh_locks(locks)
                 last_refresh = time.time()
 
     add_event_multi(
-        EVENT_TYPE_USAGE, objects, 'fetching required HTTP resource complete',
+        EVENT_TYPE_USAGE, affected_objects,
+        'fetching required HTTP resource complete',
         extra={
             'url': url,
             'bytes_fetched': fetched
