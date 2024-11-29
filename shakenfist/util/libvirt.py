@@ -62,6 +62,26 @@ class LibvirtConnection():
         # RUNNING, SHUTDOWN
         return 'on'
 
+    def extract_power_state_pretty(self, domain):
+        # We skip the reason code because they don't look super useful. They're
+        # in a series of enums with names like VirtDomainCrashedReason as
+        # documented at https://libvirt.org/html/libvirt-libvirt-domain.html
+        # if we ever change our mind about that.
+        state, _ = domain.state()
+
+        # https://libvirt.org/html/libvirt-libvirt-domain.html#virDomainState
+        libvirt_states_to_strings = {
+            self.libvirt.VIR_DOMAIN_NOSTATE: 'no state',
+            self.libvirt.VIR_DOMAIN_RUNNING: 'running',
+            self.libvirt.VIR_DOMAIN_BLOCKED: 'blocked',
+            self.libvirt.VIR_DOMAIN_PAUSED: 'paused',
+            self.libvirt.VIR_DOMAIN_SHUTDOWN: 'shutdown',
+            self.libvirt.VIR_DOMAIN_SHUTOFF: 'shutoff',
+            self.libvirt.VIR_DOMAIN_CRASHED: 'crashed',
+            self.libvirt.VIR_DOMAIN_PMSUSPENDED: 'power management suspended'
+        }
+        return libvirt_states_to_strings[state]
+
     def define_xml(self, xml):
         return self.conn.defineXML(xml)
 

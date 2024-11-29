@@ -340,25 +340,41 @@ class Monitor(daemon.Daemon):
                             inst = instance.Instance.from_db(instance_uuid)
                             if not inst:
                                 continue
-                            bd = inst.block_devices
-                            if not bd:
-                                continue
 
+                            # Base libvirt statistics
                             statistics = util_libvirt.extract_statistics(domain)
 
-                            # Add in actual size on disk
-                            for disk in bd.get('devices', [{}]):
-                                disk_path = disk.get('path')
-                                disk_device = disk.get('device')
-                                if disk_path and disk_device and os.path.exists(disk_path):
-                                    # Because nvme disks don't exist as full libvirt
-                                    # disks, they are missing from the statistics
-                                    # results.
-                                    if disk_device not in statistics['disk usage']:
-                                        statistics['disk usage'][disk_device] = {}
+                            # Power information
+                            statistics['libvirt_raw_power_state'] = \
+                                lc.extract_power_state_pretty(domain)
+                            statistics['power_state'] = \
+                                lc.extract_power_state(domain)
 
-                                    statistics['disk usage'][disk_device][
-                                        'actual bytes on disk'] = os.stat(disk_path).st_size
+                            # Add in actual size on disk
+                            bd = inst.block_devices
+                            if bd:
+                                for disk in bd.get('devices', [{}]):
+                                    disk_path = disk.get('path')
+                                    disk_device = disk.get('device')
+                                    if disk_path and disk_device and os.path.exists(disk_path):
+                                        # Because nvme disks don't exist as full libvirt
+                                        # disks, they are missing from the statistics
+                                        # results.
+                                        if disk_device not in statistics['disk usage']:
+                                            statistics['disk usage'][disk_device] = {
+                                            }
+
+                                        statistics['disk usage'][disk_device][
+                                            'actual bytes on disk'] = os.stat(disk_path).st_size
+
+                            # Console log size
+                            console_path = os.path.join(
+                                inst.instance_path, 'console.log')
+                            if os.path.exists(console_path):
+                                st = os.stat(console_path)
+                                statistics['console_log_size'] = st.st_size
+                            else:
+                                statistics['console_log_size'] = 0
 
                             # Add in OOM details
                             try:

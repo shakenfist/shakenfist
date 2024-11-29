@@ -1231,7 +1231,7 @@ class Instance(dbo):
             if not inst:
                 return 'off'
 
-            return lc.extract_power_state(inst)
+            return lc.extract_power_state(inst) == 'on'
 
     def power_on(self):
         # Generate a config drive. It is deliberate that this is in power_on now,
