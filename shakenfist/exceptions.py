@@ -292,3 +292,8 @@ class LocklessUpdateFailed(Exception):
 
 class LocklessUpdateFailed(LocklessUpdateFailed):
     ...
+
+
+# gRPC call failures
+class gRPCException(Exception):
+    ...

@@ -32,9 +32,13 @@ symbolicmode==2.0.1                # CC0 1.0 Universal (CC0 1.0) Public Domain D
 version-comparison==0.2            # mit
 pycdlib==1.14.0                    # lgpl
 versions==2.1.2                    # mit
-grpcio-tools==1.67.1               # apache2
 protobuf==5.28.3                   # bsd
 validators==0.34.0                 # mit
+
+grpcio==1.67.1                     # apache2
+grpcio-status==1.67.1              # apache2
+grpcio-tools==1.67.1               # apache2
+googleapis-common-protos==1.66.0   # apache2
 
 requests==2.32.3                   # apache2
 requests-toolbelt==1.0.0           # apache2
@@ -63,7 +67,6 @@ exceptiongroup==1.2.2
 executor==23.2
 funcs==0.11.0
 futurist==3.0.0
-grpcio==1.67.1
 humanfriendly==10.0
 importlib-metadata==8.5.0
 iters==0.18.0

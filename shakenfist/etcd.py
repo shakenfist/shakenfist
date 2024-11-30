@@ -9,7 +9,9 @@ from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
 from etcd3gw.utils import _encode
 from etcd3gw.utils import _increment_last_byte
+from google.rpc import error_details_pb2
 import grpc
+from grpc_status import rpc_status
 import psutil
 import requests
 from shakenfist_utilities import logs  # noreorder
@@ -593,17 +595,38 @@ def _encode_data(data):
         data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes).encode()
 
 
+def _log_and_raise_error(rpc_error):
+    LOG.error(f'gRPC call failure: {rpc_error}')
+    status = rpc_status.from_call(rpc_error)
+    for detail in status.details:
+        if detail.Is(error_details_pb2.QuotaFailure.DESCRIPTOR):
+            info = error_details_pb2.QuotaFailure()
+            detail.Unpack(info)
+            LOG.error(f'Quota failure: {info}')
+        else:
+            raise exceptions.gRPCException(f'Unexpected failure: {detail}')
+
+    raise exceptions.gRPCException(rpc_error)
+
+
 def compact(revision):
     with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
         stub = etcd_pb2_grpc.KVStub(channel)
-        stub.Compact(etcd_pb2.CompactionRequest(
-            revision=revision, physical=True
+        try:
+            stub.Compact(etcd_pb2.CompactionRequest(
+                revision=revision, physical=True
             )
-        )
+            )
+        except grpc.RpcError as rpc_error:
+            _log_and_raise_error(rpc_error)
 
-        stub = etcd_pb2_grpc.MaintenanceStub(channel)
-        request = etcd_pb2.DefragmentRequest()
-        stub.Defragment(request)
+        try:
+            stub = etcd_pb2_grpc.MaintenanceStub(channel)
+            request = etcd_pb2.DefragmentRequest()
+            stub.Defragment(request)
+        except grpc.RpcError as rpc_error:
+            _log_and_raise_error(rpc_error)
+            return False
 
 
 def get_raw(path):
@@ -612,11 +635,15 @@ def get_raw(path):
     with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
         stub = etcd_pb2_grpc.KVStub(channel)
 
-        resp = stub.Range(
-            etcd_pb2.RangeRequest(
-                key=path_encoded
+        try:
+            resp = stub.Range(
+                etcd_pb2.RangeRequest(
+                    key=path_encoded
+                )
             )
-        )
+        except grpc.RpcError as rpc_error:
+            _log_and_raise_error(rpc_error)
+
         if len(resp.kvs) > 0:
             kvs = resp.kvs[0]
             return json.loads(kvs.value.decode())
@@ -634,12 +661,15 @@ def put_raw(path, new_data):
         # simply hardcoded a "return True" here, the etcd server returns a
         # result indicating the previous value of the key. That is, a failure
         # will raise an exception.
-        stub.Put(
-            etcd_pb2.PutRequest(
-                key=path_encoded,
-                value=new_data_encoded
+        try:
+            stub.Put(
+                etcd_pb2.PutRequest(
+                    key=path_encoded,
+                    value=new_data_encoded
+                )
             )
-        )
+        except grpc.RpcError as rpc_error:
+            _log_and_raise_error(rpc_error)
 
 
 def create_raw(path, new_data):
@@ -731,13 +761,16 @@ def replace_many_raw(mutations):
 
     with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
         stub = etcd_pb2_grpc.KVStub(channel)
-        response = stub.Txn(
-            etcd_pb2.TxnRequest(
-                compare=comparisons,
-                success=replacements,
-                failure=failures
+        try:
+            response = stub.Txn(
+                etcd_pb2.TxnRequest(
+                    compare=comparisons,
+                    success=replacements,
+                    failure=failures
+                )
             )
-        )
+        except grpc.RpcError as rpc_error:
+            _log_and_raise_error(rpc_error)
 
         if response.succeeded:
             return True, []
