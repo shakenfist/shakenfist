@@ -1,0 +1,93 @@
+name: Rebuild CI images (test)
+
+# NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
+# which is available as GITHUB_WORKSPACE. You can find other environment
+# variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
+
+on:
+  pull_request:
+    paths:
+      - deploy/ansible/ci-image.yml
+      - .github/workflows/ci-images-*
+
+jobs:
+  image_build_matrix:
+    name: "${{ matrix.os.name }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [
+            {
+                'name': 'debian-11-test',
+                'baseimage': 'debian:11',
+                'baseuser': 'debian',
+                'outputlabel': 'ci-images/debian-11-test',
+                'scheduled': False
+            },
+            {
+                'name': 'debian-12-test',
+                'baseimage': 'debian:12',
+                'baseuser': 'debian',
+                'outputlabel': 'ci-images/debian-12-test',
+                'scheduled': False
+            },
+            {
+                'name': 'ubuntu-2004-test',
+                'baseimage': 'ubuntu:20.04',
+                'baseuser': 'ubuntu',
+                'outputlabel': 'ci-images/ubuntu-2004-test',
+                'scheduled': False
+            },
+            {
+                'name': 'ubuntu-2204-test',
+                'baseimage': 'ubuntu:22.04',
+                'baseuser': 'ubuntu',
+                'outputlabel': 'ci-images/ubuntu-2204-test',
+                'scheduled': False
+            },
+            {
+                'name': 'rocky-9-test',
+                'baseimage': 'rocky:9',
+                'baseuser': 'cloud-user',
+                'outputlabel': 'ci-images/rocky-9-test',
+                'scheduled': False
+            },
+        ]
+    runs-on: [self-hosted, vm]
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os.name }}
+      cancel-in-progress: true
+
+    steps:
+        - name: Set environment variables
+          run: |
+            echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
+
+        - name: Checkout shakenfist
+          uses: actions/checkout@v4
+          with:
+            path: shakenfist
+            fetch-depth: 0
+
+        - name: Build image
+          run: |
+            cd ${GITHUB_WORKSPACE}/shakenfist
+            ansible-playbook -i /home/debian/ansible-hosts \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+                base_image=${{ matrix.os.baseimage }} base_image_user=${{ matrix.os.baseuser }} label=${{ matrix.os.outputlabel }}" \
+              deploy/ansible/ci-image.yml
+
+        - uses: JasonEtco/create-an-issue@v2
+          if: failure()
+          id: create-issue
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            SF_CI_NAME: ${{ matrix.os.name }}
+            SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          with:
+            filename: shakenfist/.github/workflows/ci-images-failure.md
+            update_existing: true
+            search_existing: open
+
+        - if: failure()
+          run: 'echo Created ${{ steps.create-issue.outputs.url }}'
