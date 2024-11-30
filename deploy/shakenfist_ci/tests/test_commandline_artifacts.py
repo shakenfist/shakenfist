@@ -120,7 +120,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
-        self._await_instances_ready([inst1['uuid']])
+        self._await_instance_ready(inst1['uuid'])
 
         # Take a snapshot
         snap1 = json.loads(self._exec_client(
@@ -156,8 +156,8 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                     'base': 'sf://snapshot/%s' % snap_uuid,
                     'type': 'disk'
                 }
-            ], None, None)
-        self._await_instances_ready([inst2['uuid']])
+            ], None, None, force_placement=inst1['node'])
+        self._await_instance_ready(inst2['uuid'])
 
         # Test instance is listed against blob in snapshot listing
         show_info = json.loads(self._exec_client(

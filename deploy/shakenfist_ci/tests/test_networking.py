@@ -203,7 +203,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
-        self._await_instances_ready([inst['uuid']])
+        self._await_instance_ready(inst['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst['uuid'])
         self.assertEqual(1, len(nics))

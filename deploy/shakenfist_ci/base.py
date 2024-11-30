@@ -331,15 +331,6 @@ class BaseTestCase(testtools.TestCase):
         return self._await_objects_ready(
             self.system_client.get_network, network_uuids)
 
-    def _await_instances_ready(self, instance_uuids):
-        res = self._await_objects_ready(
-            self.system_client.get_instance, instance_uuids)
-
-        for instance_uuid in instance_uuids:
-            self.assertInstanceOk(instance_uuid)
-
-        return res
-
     def _await_artifacts_ready(self, artifact_uuids):
         return self._await_objects_ready(
             self.system_client.get_artifact, artifact_uuids)
@@ -407,7 +398,7 @@ class BaseTestCase(testtools.TestCase):
     def assertInstanceConsoleAfterBoot(self, instance_uuid, contains):
         self.assertIsNotNone(instance_uuid)
         LOG.info('Waiting for %s to be ready' % instance_uuid)
-        self._await_instances_ready([instance_uuid])
+        self._await_instance_ready(instance_uuid)
 
         # Wait for the console log to have any data (i.e. boot commenced)
         start_time = time.time()
