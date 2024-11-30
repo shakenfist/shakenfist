@@ -27,6 +27,7 @@ from shakenfist.config import config
 from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
+from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
@@ -225,6 +226,39 @@ class BlobsEndpoint(sf_api.Resource):
                 retval.append(b.external_view())
 
         return retval
+
+
+artifact_events_example = """[
+    ...
+    {
+            "duration": null,
+            "extra": {},
+            "fqdn": "sf-3",
+            "message": "artifact fetch complete",
+            "timestamp": 1684718452.2673004,
+            "type": "audit"
+        },
+    ...
+]"""
+
+
+class BlobEventsEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'blobs', 'Get blob event information.',
+        [
+            ('blob_uuid', 'query', 'uuid', 'The UUID of the blob.', True),
+            ('event_type', 'body', 'string', 'The type of event to return.', False),
+            ('limit', 'body', 'integer',
+             'The number of events to return, defaults to 100.', False)
+        ],
+        [(200, 'Event information about a single artifact.', artifact_events_example),
+         (404, 'Artifact not found.', None)]))
+    @api_base.verify_token
+    @api_base.log_token_use
+    @api_base.redirect_to_eventlog_node
+    def get(self, blob_uuid=None, event_type=None, limit=100):
+        with eventlog.EventLog('blob', blob_uuid) as eventdb:
+            return list(eventdb.read_events(limit=limit, event_type=event_type))
 
 
 class BlobChecksumsEndpoint(sf_api.Resource):

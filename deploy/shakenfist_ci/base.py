@@ -291,19 +291,25 @@ class BaseTestCase(testtools.TestCase):
             'After time %s, image %s had no event type "%s" (waited 5 mins)'
             % (after, image_uuid, operation))
 
-    def _await_objects_ready(self, callback, items):
+    def _await_objects_ready(self, get_callback, event_callback, items):
         waiting_for = list(enumerate(items))
         results = [None] * len(items)
 
+        last_event = None
         time_since_last_progress = time.time()
         while waiting_for:
             for idx, item in copy.copy(waiting_for):
                 try:
-                    n = callback(item)
+                    n = get_callback(item)
                     if n.get('state') in ['created', 'deleted', 'error']:
                         waiting_for.remove((idx, item))
                         results[idx] = n
                         time_since_last_progress = time.time()
+                    else:
+                        events = event_callback(item, limit=1)
+                        if events:
+                            last_event = events[0]
+                            time_since_last_progress = last_event['timestamp']
 
                 except apiclient.ResourceNotFoundException:
                     # Its likely this exception can be removed once PR #1314 (or
@@ -319,25 +325,32 @@ class BaseTestCase(testtools.TestCase):
                 remaining = []
                 for _, item in waiting_for:
                     remaining.append(item)
+                remaining_string = ', '.join(remaining)
 
                 raise TimeoutException(
-                    'Items %s never became ready, and no progress has been '
-                    'made in at least five minutes.'
-                    % ', '.join(remaining))
+                    f'Items {remaining_string} never became ready, and no '
+                    f'progress has been made in at least five minutes. The last  '
+                    f'recorded event was {last_event}.')
 
         return results
 
     def _await_networks_ready(self, network_uuids):
         return self._await_objects_ready(
-            self.system_client.get_network, network_uuids)
+            self.system_client.get_network,
+            self.system_client.get_network_events,
+            network_uuids)
 
     def _await_artifacts_ready(self, artifact_uuids):
         return self._await_objects_ready(
-            self.system_client.get_artifact, artifact_uuids)
+            self.system_client.get_artifact,
+            self.system_client.get_artifact_events,
+            artifact_uuids)
 
     def _await_blobs_ready(self, blob_uuids):
         return self._await_objects_ready(
-            self.system_client.get_blob, blob_uuids)
+            self.system_client.get_blob,
+            self.system_client.get_blob_events,
+            blob_uuids)
 
     def _await_command(self, instance_ref, command):
         aop = self.system_client.instance_execute(instance_ref, command)
