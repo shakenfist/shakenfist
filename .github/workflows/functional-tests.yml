@@ -107,21 +107,10 @@ jobs:
           echo "topology: ${{ matrix.os.topology }}"
           echo "concurrency: ${{ matrix.os.concurrency }}"
 
-      - name: Set environment variables
-        run: |
-          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
-          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
-
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment
         with:
-          path: shakenfist
-          fetch-depth: 0
-
-      - name: Determine if there is any dependency between the repositories
-        run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+          primary_repository: shakenfist/shakenfist
 
       - name: Build infrastructure
         run: |
@@ -368,21 +357,10 @@ jobs:
           echo "topology: ${{ matrix.os.topology }}"
           echo "concurrency: ${{ matrix.os.concurrency }}"
 
-      - name: Set environment variables
-        run: |
-          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
-          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
-
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment
         with:
-          path: shakenfist
-          fetch-depth: 0
-
-      - name: Determine if there is any dependency between the repositories
-        run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+          primary_repository: shakenfist/shakenfist
 
       - name: Build infrastructure
         run: |

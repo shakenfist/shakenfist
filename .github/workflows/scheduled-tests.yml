@@ -63,12 +63,6 @@ jobs:
           echo "topology: ${{ matrix.os.topology }}"
           echo "concurrency: ${{ matrix.os.concurrency }}"
 
-      - name: Set environment variables
-        run: |
-          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
-          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
-
       - name: Install the github command line
         run: |
           sudo apt update
@@ -81,23 +75,10 @@ jobs:
           sudo apt update
           sudo apt install -y gh
 
-      - name: Checkout shakenfist target branch
-        uses: actions/checkout@v4
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment
         with:
-          path: shakenfist
-          fetch-depth: 0
-          ref: ${{ matrix.os.branch }}
-
-      - name: Checkout shakenfist develop branch for tooling
-        uses: actions/checkout@v4
-        with:
-          path: shakenfist-develop
-          fetch-depth: 0
-          ref: develop
-
-      - name: Determine if there is any dependency between the repositories
-        run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist-develop/tools/clone_with_depends.py ${{ matrix.os.branch }}
+          primary_repository: shakenfist/shakenfist
 
       - name: Build infrastructure
         run: |
