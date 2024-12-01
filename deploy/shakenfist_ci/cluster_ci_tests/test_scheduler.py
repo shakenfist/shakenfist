@@ -28,7 +28,7 @@ class TestAffinity(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/ubuntu-2004',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None, metadata={
@@ -48,7 +48,7 @@ class TestAffinity(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/ubuntu-2004',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None, metadata={
@@ -67,7 +67,7 @@ class TestAffinity(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/ubuntu-2004',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None, metadata={

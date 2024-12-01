@@ -82,7 +82,7 @@ class TestImages(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 1,
-                    'base': 'sf://upload/system/ubuntu-2004',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None)

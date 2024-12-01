@@ -68,7 +68,7 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None)
@@ -105,7 +105,7 @@ class TestInterfaceMetadata(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None)

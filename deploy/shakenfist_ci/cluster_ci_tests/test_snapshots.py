@@ -25,7 +25,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None)
@@ -223,7 +223,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 },
                 {
@@ -232,7 +232,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 },
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'cdrom'
                 }
             ], None, None)
@@ -301,7 +301,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None)
@@ -350,7 +350,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None)
@@ -398,7 +398,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 },
                 {
@@ -407,7 +407,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 },
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None)
@@ -463,7 +463,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 20,
-                    'base': 'sf://upload/system/ubuntu-2004',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, base.load_userdata('cluster_ci_tests', 'writedata'))

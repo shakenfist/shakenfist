@@ -29,7 +29,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/ubuntu-2004',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None, force_placement='sf-nosuchnode')
@@ -47,7 +47,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
                 [
                     {
                         'size': 8,
-                        'base': 'sf://upload/system/ubuntu-2004',
+                        'base': base.CLUSTER_CI_IMAGE,
                         'type': 'disk'
                     }
                 ], None, None, force_placement=socket.getfqdn())
@@ -80,7 +80,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
                 [
                     {
                         'size': 8,
-                        'base': 'sf://upload/system/debian-11',
+                        'base': base.CLUSTER_CI_IMAGE,
                         'type': 'disk'
                     }
                 ], None, None, force_placement='sf-2')

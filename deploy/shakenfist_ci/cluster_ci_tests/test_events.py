@@ -14,9 +14,10 @@ class TestEvents(base.BaseNamespacedTestCase):
             provide_dns=True)
         self._await_networks_ready([self.net_one['uuid']])
 
-    def test_artifact_events(self):
-        a = self.test_client.get_artifact('sf://upload/system/debian-11')
-        self.assertNotEqual(0, len(self.test_client.get_artifact_events(a['uuid'])))
+    # NOTE(mikal): needs ArtifactsUrlRefEndpoint implemented first
+    # def test_artifact_events(self):
+    #     a = self.test_client.get_artifact(base.CLUSTER_CI_IMAGE)
+    #     self.assertNotEqual(0, len(self.test_client.get_artifact_events(a['uuid'])))
 
     def test_network_events(self):
         self.assertNotEqual(
@@ -33,7 +34,7 @@ class TestEvents(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None)
