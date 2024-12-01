@@ -404,97 +404,94 @@ class Monitor(daemon.WorkerPoolDaemon):
             # Ensure we haven't leaked any floating IPs (because we used to). We
             # have to hold a lock here to avoid races where an IP is freed while
             # we're iterating through the loop. Note that this means we can't call
-            # anything which also wants to lock the ipmanager.
-            with etcd.get_lock('ipmanager', None, 'floating', ttl=120,
-                               op='Cleanup leaks'):
-                floating_network = network.floating_network()
-                LOG.debug('Floating network registrations: %s'
-                          % floating_network.ipam.in_use)
+            floating_network = network.floating_network()
+            LOG.debug('Floating network registrations: %s'
+                      % floating_network.ipam.in_use)
 
-                # Collect floating gateways and floating IPs, while ensuring that
-                # they are correctly reserved on the floating network as well.
-                floating_gateways = []
-                for n in network.Networks([], prefilter='active'):
-                    fg = n.floating_gateway
-                    if fg:
-                        floating_gateways.append(fg)
-                        if floating_network.ipam.is_free(fg):
-                            floating_network.ipam.reserve(
-                                fg, n.unique_label(), ipam.RESERVATION_TYPE_GATEWAY,
-                                'Rescued from incorrect registration')
-                            LOG.with_fields({
-                                'network': n.uuid,
-                                'address': fg
-                            }).error('Floating gateway not reserved correctly')
-                LOG.info('Found floating gateways: %s' % floating_gateways)
+            # Collect floating gateways and floating IPs, while ensuring that
+            # they are correctly reserved on the floating network as well.
+            floating_gateways = []
+            for n in network.Networks([], prefilter='active'):
+                fg = n.floating_gateway
+                if fg:
+                    floating_gateways.append(fg)
+                    if floating_network.ipam.is_free(fg):
+                        floating_network.ipam.reserve(
+                            fg, n.unique_label(), ipam.RESERVATION_TYPE_GATEWAY,
+                            'Rescued from incorrect registration')
+                        LOG.with_fields({
+                            'network': n.uuid,
+                            'address': fg
+                        }).error('Floating gateway not reserved correctly')
+            LOG.info('Found floating gateways: %s' % floating_gateways)
 
-                floating_addresses = []
-                for ni in networkinterface.NetworkInterfaces([], prefilter='active'):
-                    fa = ni.floating.get('floating_address')
-                    if fa:
-                        floating_addresses.append(fa)
-                        if floating_network.ipam.is_free(fa):
-                            floating_network.ipam.reserve(
-                                fg, n.unique_label(), ipam.RESERVATION_TYPE_FLOATING,
-                                'Rescued from incorrect registration')
-                            LOG.with_fields({
-                                'networkinterface': ni.uuid,
-                                'address': fa
-                            }).error('Floating address not reserved correctly')
-                LOG.info('Found floating addresses: %s' % floating_addresses)
+            floating_addresses = []
+            for ni in networkinterface.NetworkInterfaces([], prefilter='active'):
+                fa = ni.floating.get('floating_address')
+                if fa:
+                    floating_addresses.append(fa)
+                    if floating_network.ipam.is_free(fa):
+                        floating_network.ipam.reserve(
+                            fg, n.unique_label(), ipam.RESERVATION_TYPE_FLOATING,
+                            'Rescued from incorrect registration')
+                        LOG.with_fields({
+                            'networkinterface': ni.uuid,
+                            'address': fa
+                        }).error('Floating address not reserved correctly')
+            LOG.info('Found floating addresses: %s' % floating_addresses)
 
-                floating_routed = []
-                for addr in floating_network.ipam.in_use:
-                    reservation = floating_network.ipam.get_reservation(addr)
-                    if not reservation:
-                        continue
-                    if reservation.get('type') != ipam.RESERVATION_TYPE_ROUTED:
-                        continue
-                    user_type, user_uuid = reservation['user']
-                    if user_type != 'network':
-                        LOG.with_fields(reservation).error(
-                            'Objects of type %s should not be routing floating IPs!'
-                            % user_type)
-                        continue
+            floating_routed = []
+            for addr in floating_network.ipam.in_use:
+                reservation = floating_network.ipam.get_reservation(addr)
+                if not reservation:
+                    continue
+                if reservation.get('type') != ipam.RESERVATION_TYPE_ROUTED:
+                    continue
+                user_type, user_uuid = reservation['user']
+                if user_type != 'network':
+                    LOG.with_fields(reservation).error(
+                        'Objects of type %s should not be routing floating IPs!'
+                        % user_type)
+                    continue
 
-                    n = network.Network.from_db(user_uuid)
-                    if not n:
-                        LOG.with_fields(reservation).error(
-                            'Routed IP reserved by missing network')
-                        continue
+                n = network.Network.from_db(user_uuid)
+                if not n:
+                    LOG.with_fields(reservation).error(
+                        'Routed IP reserved by missing network')
+                    continue
 
-                    floating_routed.append(addr)
-                LOG.info('Found routed addresses: %s' % floating_routed)
+                floating_routed.append(addr)
+            LOG.info('Found routed addresses: %s' % floating_routed)
 
-                floating_reserved = [
-                    floating_network.ipam.get_address_at_index(0),
-                    floating_network.ipam.get_address_at_index(1),
-                    floating_network.ipam.broadcast_address,
-                    floating_network.ipam.network_address
-                ]
-                LOG.info('Found floating reservations: %s' % floating_reserved)
+            floating_reserved = [
+                floating_network.ipam.get_address_at_index(0),
+                floating_network.ipam.get_address_at_index(1),
+                floating_network.ipam.broadcast_address,
+                floating_network.ipam.network_address
+            ]
+            LOG.info('Found floating reservations: %s' % floating_reserved)
 
-                floating_halo = list(floating_network.ipam.get_haloed_addresses())
-                LOG.info('Found floating deletion halos: %s' % floating_halo)
+            floating_halo = list(floating_network.ipam.get_haloed_addresses())
+            LOG.info('Found floating deletion halos: %s' % floating_halo)
 
-                # Now the reverse check. Test if there are any reserved IPs which
-                # are not actually in use. Free any we find.
-                leaks = []
-                for ip in floating_network.ipam.in_use:
-                    if ip not in itertools.chain(floating_gateways,
-                                                 floating_addresses,
-                                                 floating_routed,
-                                                 floating_reserved,
-                                                 floating_halo):
-                        # This IP needs to have been allocated more than 300 seconds
-                        # ago to ensure that the network setup isn't still queued.
-                        if time.time() - floating_network.ipam.get_allocation_age(ip) > 300:
-                            LOG.error('Floating IP %s has leaked.' % ip)
-                            leaks.append(ip)
+            # Now the reverse check. Test if there are any reserved IPs which
+            # are not actually in use. Free any we find.
+            leaks = []
+            for ip in floating_network.ipam.in_use:
+                if ip not in itertools.chain(floating_gateways,
+                                             floating_addresses,
+                                             floating_routed,
+                                             floating_reserved,
+                                             floating_halo):
+                    # This IP needs to have been allocated more than 300 seconds
+                    # ago to ensure that the network setup isn't still queued.
+                    if time.time() - floating_network.ipam.get_allocation_age(ip) > 300:
+                        LOG.error('Floating IP %s has leaked.' % ip)
+                        leaks.append(ip)
 
-                for ip in leaks:
-                    LOG.error('Leaked floating IP %s has been released.' % ip)
-                    floating_network.ipam.release(ip)
+            for ip in leaks:
+                LOG.error('Leaked floating IP %s has been released.' % ip)
+                floating_network.ipam.release(ip)
 
     def _validate_mtus(self):
         last_loop = 0
