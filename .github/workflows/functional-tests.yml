@@ -60,7 +60,7 @@ jobs:
           venv/bin/pip3 install -r shakenfist/requirements.txt
 
   build38:
-    needs: requirements_check
+    needs: [lint, requirements_check]
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-build38
@@ -79,7 +79,7 @@ jobs:
   functional_matrix_pr:
     if: always() && github.event_name != 'merge_group'
     name: "${{ matrix.os.description }}"
-    needs: [build38, requirements_check]
+    needs: [lint, requirements_check]
     strategy:
       fail-fast: false
       matrix:
@@ -324,7 +324,7 @@ jobs:
   functional_matrix_merge:
     if: github.event_name == 'merge_group'
     name: "${{ matrix.os.description }}"
-    needs: [build38, requirements_check]
+    needs: [lint, requirements_check, build38]
     strategy:
       fail-fast: false
       matrix:
@@ -588,7 +588,7 @@ jobs:
 
   ansible_modules:
     if: github.event_name == 'merge_group'
-    needs: requirements_check
+    needs: [lint, requirements_check, build38]
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-ansiblemodules
@@ -767,7 +767,7 @@ jobs:
 
   node_lifecycle:
     if: github.event_name == 'merge_group'
-    needs: requirements_check
+    needs: [lint, requirements_check, build38]
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-nodelifecycle
@@ -940,7 +940,7 @@ jobs:
 
   upgrade_0_6_15:
     if: github.event_name == 'merge_group'
-    needs: requirements_check
+    needs: [lint, requirements_check, build38]
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-upgrade-0-6-15
