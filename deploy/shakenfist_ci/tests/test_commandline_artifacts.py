@@ -52,7 +52,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         start_time = time.time()
         a = json.loads(self._exec_client(
             '--json artifact show %s' % cirros_uuid))
-        while time.time() - start_time < 5 * 60 * base.NETWORK_PATIENCE_FACTOR:
+        while time.time() - start_time < 5 * 60:
             if a.get('blob_uuid'):
                 break
             time.sleep(5)
@@ -95,7 +95,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
 
         # Ensure we have the right number of versions
         start_time = time.time()
-        while time.time() - start_time < 5 * 60 * base.NETWORK_PATIENCE_FACTOR:
+        while time.time() - start_time < 5 * 60:
             versions = json.loads(self._exec_client(
                 'artifact versions %s' % artifact_uuid))
             # Number of versions will be limited to the max_versions setting
@@ -112,7 +112,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
 
         # Create an instance
         inst1 = self.test_client.create_instance(
-            'test-boot-no-network', 1, 1024, None,
+            'test-artifact-show', 1, 1024, None,
             [
                 {
                     'size': 8,
@@ -120,7 +120,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
-        self._await_instances_ready([inst1['uuid']])
+        self._await_instance_ready(inst1['uuid'])
 
         # Take a snapshot
         snap1 = json.loads(self._exec_client(
@@ -156,8 +156,8 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                     'base': 'sf://snapshot/%s' % snap_uuid,
                     'type': 'disk'
                 }
-            ], None, None)
-        self._await_instances_ready([inst2['uuid']])
+            ], None, None, force_placement=inst1['node'])
+        self._await_instance_ready(inst2['uuid'])
 
         # Test instance is listed against blob in snapshot listing
         show_info = json.loads(self._exec_client(

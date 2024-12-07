@@ -7,7 +7,7 @@ import time
 import uuid
 
 import requests
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import blob
 from shakenfist import etcd
@@ -111,9 +111,9 @@ class ImageFetchHelper:
         self.instance = inst
         self.artifact = artifact
 
-        self.objects = [('artifact', self.artifact.uuid)]
+        self.objects = [self.artifact]
         if self.instance:
-            self.objects.append(('instance', self.instance.uuid))
+            self.objects.append(self.instance)
 
     def get_image(self):
         fetched_blobs = []
@@ -310,22 +310,22 @@ class ImageFetchHelper:
                 except FileExistsError:
                     ...
             else:
-                objects_with_blob = copy.copy(self.objects)
-                objects_with_blob.append(('blob', b.uuid))
+                objects_with_blob = copy.deepcopy(self.objects)
+                objects_with_blob.append(b)
                 with util_general.RecordedOperation('transcode image', self.instance):
                     add_event_multi(
                         EVENT_TYPE_STATUS, objects_with_blob, 'transcoding blob')
                     util_image.create_qcow2([lock], blob_path, cache_path)
 
-            # We will cache this transcode, but we do it later as part of a
-            # task so the instance isn't waiting for it.
-            etcd.enqueue(
-                f'{config.NODE_NAME}-background',
-                {
-                    'tasks': [
-                        ArchiveTranscodeTask(
-                            b.uuid, cache_path, TRANSCODE_DESCRIPTION)]
-                })
+                # We will cache this transcode, but we do it later as part of a
+                # task so the instance isn't waiting for it.
+                etcd.enqueue(
+                    f'{config.NODE_NAME}-background',
+                    {
+                        'tasks': [
+                            ArchiveTranscodeTask(
+                                b.uuid, cache_path, TRANSCODE_DESCRIPTION)]
+                    })
 
         shutil.chown(cache_path, config.LIBVIRT_USER, config.LIBVIRT_GROUP)
         add_event_multi(
@@ -356,15 +356,14 @@ class ImageFetchHelper:
             b = blob.Blob.new(
                 blob_uuid, resp.headers.get('Last-Modified'), time.time())
 
-            objects_including_blob = copy.copy(self.objects)
-            objects_including_blob.append(('blob', blob_uuid))
+            objects_including_blob = copy.deepcopy(self.objects)
+            objects_including_blob.append(b)
             add_event_multi(
                 EVENT_TYPE_STATUS, objects_including_blob,
                 'commencing HTTP fetch to blob', extra={'url': url})
 
             try:
-                b = blob.http_fetch(
-                    url, resp, blob_uuid, [lock], objects_including_blob)
+                blob.http_fetch(url, resp, b, [lock], objects_including_blob)
             except exceptions.BadCheckSum as e:
                 add_event_multi(
                     EVENT_TYPE_AUDIT, objects_including_blob,

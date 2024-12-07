@@ -4,7 +4,7 @@ import signal
 from threading import Event
 
 import setproctitle
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist.config import config

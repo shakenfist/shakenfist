@@ -5,6 +5,7 @@ from unittest import mock
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.config import SFConfig
+from shakenfist import etcd
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.tests import base
@@ -494,7 +495,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
 
     def test_get_namespace_metadata(self):
         self.mock_etcd.db['/sf/attribute/namespace/system/metadata'] = \
-            json.dumps({'a': 'a', 'b': 'b'}, indent=4, sort_keys=True)
+            etcd._encode_data({'a': 'a', 'b': 'b'})
         resp = self.client.get(
             '/auth/namespaces/system/metadata', headers={'Authorization': self.auth_token})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
@@ -512,7 +513,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
-            json.dumps({'foo': 'bar'}, indent=4, sort_keys=True),
+            etcd._encode_data({'foo': 'bar'}),
             self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
 
     @mock.patch('shakenfist.etcd.get_lock')
@@ -526,20 +527,19 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
-            json.dumps({'foo': 'bar'}, indent=4, sort_keys=True),
+            etcd._encode_data({'foo': 'bar'}),
             self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
 
     @mock.patch('shakenfist.etcd.get_lock')
     def test_delete_namespace_metadata(self, mock_get_lock):
         self.mock_etcd.db['/sf/attribute/namespace/system/metadata'] = \
-            json.dumps({'foo': 'bar', 'real': 'smart'}, indent=4,
-                       sort_keys=True)
+            etcd._encode_data({'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete('/auth/namespaces/system/metadata/foo',
                                   headers={'Authorization': self.auth_token})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
-            json.dumps({'real': 'smart'}, indent=4, sort_keys=True),
+            etcd._encode_data({'real': 'smart'}),
             self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
 
     @mock.patch('shakenfist.etcd.get_lock')

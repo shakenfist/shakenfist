@@ -17,7 +17,7 @@ from uuid import uuid4
 
 import jinja2
 import pycdlib
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
 from shakenfist import baseobject
@@ -1231,7 +1231,7 @@ class Instance(dbo):
             if not inst:
                 return 'off'
 
-            return lc.extract_power_state(inst)
+            return lc.extract_power_state(inst) == 'on'
 
     def power_on(self):
         # Generate a config drive. It is deliberate that this is in power_on now,

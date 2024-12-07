@@ -6,7 +6,7 @@ from math import inf
 
 from etcd3gw.lock import Lock
 from oslo_concurrency import lockutils
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import cache
 from shakenfist import constants
@@ -274,11 +274,7 @@ class DatabaseBackedObject:
     def _db_get(cls, object_uuid):
         o = etcd.get(cls.object_type, None, object_uuid)
         if not o:
-            # Retry with a new client just to be sure
-            etcd.reset_client()
-            o = etcd.get(cls.object_type, None, object_uuid)
-            if not o:
-                return None
+            return None
 
         if o.get('version', 0) != cls.current_version:
             if not cls.upgrade_supported:
@@ -299,7 +295,7 @@ class DatabaseBackedObject:
         if self.__in_memory_only:
             retval = json.loads(self.__in_memory_values.get(attribute, 'null'))
         else:
-            retval = etcd.get('attribute/%s' % self.object_type,
+            retval = etcd.get(f'attribute/{self.object_type}',
                               self.__uuid, attribute)
         if not retval:
             if default is None:

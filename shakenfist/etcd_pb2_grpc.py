@@ -34,6 +34,16 @@ class KVStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.Range = channel.unary_unary(
+                '/etcdserverpb.KV/Range',
+                request_serializer=etcd__pb2.RangeRequest.SerializeToString,
+                response_deserializer=etcd__pb2.RangeResponse.FromString,
+                _registered_method=True)
+        self.Put = channel.unary_unary(
+                '/etcdserverpb.KV/Put',
+                request_serializer=etcd__pb2.PutRequest.SerializeToString,
+                response_deserializer=etcd__pb2.PutResponse.FromString,
+                _registered_method=True)
         self.Txn = channel.unary_unary(
                 '/etcdserverpb.KV/Txn',
                 request_serializer=etcd__pb2.TxnRequest.SerializeToString,
@@ -48,6 +58,22 @@ class KVStub(object):
 
 class KVServicer(object):
     """Missing associated documentation comment in .proto file."""
+
+    def Range(self, request, context):
+        """Range gets the keys in the range from the key-value store.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Put(self, request, context):
+        """Put puts the given key into the key-value store.
+        A put request increments the revision of the key-value store
+        and generates one event in the event history.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def Txn(self, request, context):
         """Txn processes multiple requests in a single transaction.
@@ -71,6 +97,16 @@ class KVServicer(object):
 
 def add_KVServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'Range': grpc.unary_unary_rpc_method_handler(
+                    servicer.Range,
+                    request_deserializer=etcd__pb2.RangeRequest.FromString,
+                    response_serializer=etcd__pb2.RangeResponse.SerializeToString,
+            ),
+            'Put': grpc.unary_unary_rpc_method_handler(
+                    servicer.Put,
+                    request_deserializer=etcd__pb2.PutRequest.FromString,
+                    response_serializer=etcd__pb2.PutResponse.SerializeToString,
+            ),
             'Txn': grpc.unary_unary_rpc_method_handler(
                     servicer.Txn,
                     request_deserializer=etcd__pb2.TxnRequest.FromString,
@@ -91,6 +127,60 @@ def add_KVServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class KV(object):
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def Range(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/etcdserverpb.KV/Range',
+            etcd__pb2.RangeRequest.SerializeToString,
+            etcd__pb2.RangeResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Put(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/etcdserverpb.KV/Put',
+            etcd__pb2.PutRequest.SerializeToString,
+            etcd__pb2.PutResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
 
     @staticmethod
     def Txn(request,

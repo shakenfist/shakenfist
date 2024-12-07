@@ -1,7 +1,7 @@
 # Copyright 2020 Michael Still
 import uuid
 
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist.exceptions import IPManagerMissing

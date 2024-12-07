@@ -4,10 +4,11 @@ import signal
 
 import jinja2
 import psutil
+from shakenfist_utilities import logs  # noreorder
+
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist_utilities import logs
 
 
 LOG, _ = logs.setup(__name__)

@@ -6,7 +6,7 @@ from shakenfist import exceptions
 from shakenfist import tasks
 from shakenfist.config import BaseSettings
 from shakenfist.tests import base
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 LOG, _ = logs.setup(__name__)
 
@@ -146,92 +146,74 @@ class ActualLockTestCase(base.ShakenFistTestCase):
 
 
 class TaskEncodingETCDtestCase(base.ShakenFistTestCase):
-    @mock.patch('etcd3gw.Etcd3Client.put')
-    def test_put_PreflightInstanceTask(self, mock_put):
-        etcd.put('objecttype', 'subtype', 'name',
-                 tasks.PreflightInstanceTask('fake_uuid'))
-
-        path = '/sf/objecttype/subtype/name'
-        encoded = '''{
+    def test_encode_PreflightInstanceTask(self):
+        actual = etcd._encode_data(tasks.PreflightInstanceTask('fake_uuid'))
+        expected = b"""{
     "instance_uuid": "fake_uuid",
     "network": [],
     "task": "instance_preflight",
     "version": 1
-}'''
-        mock_put.assert_called_with(path, encoded, lease=None)
+}"""
+        self.assertEqual(expected, actual)
 
-    @mock.patch('etcd3gw.Etcd3Client.put')
-    def test_put_StartInstanceTask(self, mock_put):
-        etcd.put('objecttype', 'subtype', 'name',
-                 tasks.StartInstanceTask('fake_uuid', ['net_uuid']))
-
-        path = '/sf/objecttype/subtype/name'
-        encoded = '''{
+    def test_encode_StartInstanceTask(self):
+        actual = etcd._encode_data(
+            tasks.StartInstanceTask('fake_uuid', ['net_uuid']))
+        expected = b"""{
     "instance_uuid": "fake_uuid",
     "network": [
         "net_uuid"
     ],
     "task": "instance_start",
     "version": 1
-}'''
-        mock_put.assert_called_with(path, encoded, lease=None)
+}"""
+        self.assertEqual(expected, actual)
 
-    @mock.patch('etcd3gw.Etcd3Client.put')
-    def test_put_DeleteInstanceTask(self, mock_put):
-        etcd.put('objecttype', 'subtype', 'name',
-                 tasks.DeleteInstanceTask('fake_uuid'))
-
-        path = '/sf/objecttype/subtype/name'
-        encoded = '''{
+    def test_encode_DeleteInstanceTask(self):
+        actual = etcd._encode_data(tasks.DeleteInstanceTask('fake_uuid'))
+        expected = b"""{
     "instance_uuid": "fake_uuid",
     "network": [],
     "task": "instance_delete",
     "version": 1
-}'''
-        mock_put.assert_called_with(path, encoded, lease=None)
+}"""
+        self.assertEqual(expected, actual)
 
-    @mock.patch('etcd3gw.Etcd3Client.put')
-    def test_put_DeployNetworkTask(self, mock_put):
-        etcd.put('objecttype', 'subtype', 'name',
-                 tasks.DeployNetworkTask('fake_uuid'))
+    def test_encode_DeployNetworkTask(self):
+        actual = etcd._encode_data(tasks.DeployNetworkTask('fake_uuid'))
 
-        path = '/sf/objecttype/subtype/name'
-        encoded = '''{
+        expected = b"""{
     "network_uuid": "fake_uuid",
     "task": "network_deploy",
     "version": 1
-}'''
-        mock_put.assert_called_with(path, encoded, lease=None)
+}"""
+        self.assertEqual(expected, actual)
 
-    @mock.patch('etcd3gw.Etcd3Client.put')
-    def test_put_FetchImageTask(self, mock_put):
-        etcd.put('objecttype', 'subtype', 'name',
-                 tasks.FetchImageTask('http://server/image', namespace='foo'))
-
-        path = '/sf/objecttype/subtype/name'
-        encoded = '''{
+    def test_encode_FetchImageTask(self):
+        actual = etcd._encode_data(
+            tasks.FetchImageTask('http://server/image', namespace='foo'))
+        expected = b"""{
     "instance_uuid": null,
     "namespace": "foo",
     "task": "image_fetch",
     "url": "http://server/image",
     "version": 1
-}'''
-        mock_put.assert_called_with(path, encoded, lease=None)
+}"""
+        self.assertEqual(expected, actual)
 
-        etcd.put('objecttype', 'subtype', 'name',
-                 tasks.FetchImageTask('http://server/image',
-                                      namespace='foo',
-                                      instance_uuid='fake_uuid'))
-
-        path = '/sf/objecttype/subtype/name'
-        encoded = '''{
+        actual = etcd._encode_data(
+            tasks.FetchImageTask(
+                'http://server/image',
+                namespace='foo',
+                instance_uuid='fake_uuid'))
+        expected = b"""{
     "instance_uuid": "fake_uuid",
     "namespace": "foo",
     "task": "image_fetch",
     "url": "http://server/image",
     "version": 1
-}'''
-        mock_put.assert_called_with(path, encoded, lease=None)
+}"""
+        self.assertEqual(expected, actual)
 
 
 #

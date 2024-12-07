@@ -7,7 +7,7 @@ import os
 import tarfile
 
 import click
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 
 LOG = logs.setup_console(__name__)

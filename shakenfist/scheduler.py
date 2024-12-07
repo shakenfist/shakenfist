@@ -5,7 +5,7 @@ import time
 import uuid
 from collections import defaultdict
 
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist import exceptions

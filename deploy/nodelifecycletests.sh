@@ -51,13 +51,63 @@ echo
 sleep 30
 
 # List artifacts
-log "Listing artifacts"
+echo
+log "=== Listing artifacts ==="
 sf-client artifact list
+
+# List blobs
+echo
+log "=== Listing blobs ==="
+sf-client blob list
+
 
 # Sleep for a little to let instances start
 echo
-log "Pausing to let instances boot"
-sleep 300
+log "=== Watch instances boot ==="
+started=$(date +%s)
+finished=0
+while [ ${finished} -lt 1 ]; do
+    log "Status check..."
+    potential=0
+    for status in $(sf-client --json instance list | jq --raw-output '.instances | .[] | select(.state != "created") | "\(.uuid)!\(.name)!\(.state)"'); do
+        uuid=$(echo ${status} | cut -f 1 -d "!")
+        name=$(echo ${status} | cut -f 2 -d "!")
+        state=$(echo ${status} | cut -f 3 -d "!")
+        log "Instance ${name} (${uuid}) is in state ${state}"
+
+        if [ "${state}" == "error" ]; then
+            log "... error state, aborting"
+            finished=1
+        else
+            potential=$(( $potential + 1 ))
+        fi
+    done
+
+    if [ ${potential} -lt 1 ]; then
+        log "No more instances!"
+        finished=1
+    fi
+
+    # This timeout is way too long, and often doesn't need to be this
+    # generous, but then again sometimes it does. Its yet another thing I
+    # should clamp down one day when CI is a bit more under control.
+    now=$(date +%s)
+    elapsed=$(( ${now} - ${started} ))
+    log "Time elapsed: ${elapsed} seconds"
+    if [ ${elapsed} -gt 1200 ]; then
+        log "Timed out!"
+        finished=1
+    fi
+
+    if [ ${finished} -lt 1 ]; then
+        sleep 30
+    fi
+done
+
+# List blobs again
+echo
+log "=== Listing blobs ==="
+sf-client blob list
 
 # Ensure we made instances and they started ok
 echo
@@ -69,10 +119,6 @@ if [ $(sf-client instance list | grep -c created) -lt 1 ]; then
     log "No instances in created state"
     exit 1
 fi
-
-# List blobs
-echo
-sf-client blob list
 
 # Ensure all instances are now created
 echo

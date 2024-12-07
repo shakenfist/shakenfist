@@ -4,8 +4,8 @@ import string
 import time
 
 import bcrypt
-from shakenfist_utilities import logs
-from shakenfist_utilities import random as sfrandom
+from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities import random as sfrandom  # noreorder
 
 from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo

@@ -9,8 +9,8 @@ from concurrent import futures
 import grpc
 from prometheus_client import Counter
 from prometheus_client import start_http_server
-from shakenfist_utilities import logs
-from shakenfist_utilities.random import random_id
+from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities.random import random_id  # noreorder
 
 from shakenfist import etcd
 from shakenfist import event_pb2
@@ -131,7 +131,9 @@ class EventService(event_pb2_grpc.EventServiceServicer):
             if 'request-id' in extra or len(request.objects) > 1:
                 correlation_id = random_id()
 
+            logged_types = []
             for eo in request.objects:
+                logged_types.append(eo.object_type)
                 tweaked_extra = self._add_other_objects(
                     eo.object_type, request.objects, extra)
                 self._record_with_dlq(
@@ -141,7 +143,7 @@ class EventService(event_pb2_grpc.EventServiceServicer):
             self.monitor.counters[request.event_type].inc()
 
             # Piggy back request tracing onto object events
-            if 'request-id' in extra:
+            if 'request-id' in extra and API_REQUESTS not in logged_types:
                 # Add object information from the original event to extra
                 tweaked_extra = self._add_other_objects(
                     API_REQUESTS, request.objects, extra)

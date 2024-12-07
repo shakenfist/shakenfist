@@ -7,7 +7,7 @@ import uuid
 
 import setproctitle
 from shakenfist_agent import protocol
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 from versions_comparison import Comparison
 
 from shakenfist import blob

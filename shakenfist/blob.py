@@ -2,6 +2,7 @@
 # Please note: blobs are a "foundational" baseobject type, which means they
 # should not rely on any other baseobjects for their implementation. This is
 # done to help minimize circular import problems.
+import copy
 import hashlib
 import numbers
 import os
@@ -12,6 +13,9 @@ import uuid
 
 import magic
 import psutil
+from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities import random as sf_random  # noreorder
+
 from shakenfist import cache
 from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -33,6 +37,7 @@ from shakenfist.exceptions import BlobMissing
 from shakenfist.exceptions import BlobsMustHaveContent
 from shakenfist.exceptions import BlobSizeCannotChange
 from shakenfist.exceptions import BlobTransferSetupFailed
+from shakenfist.exceptions import LocklessUpdateFailed
 from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
@@ -42,8 +47,6 @@ from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import process as util_process
-from shakenfist_utilities import logs
-from shakenfist_utilities import random as sf_random
 
 
 LOG, _ = logs.setup(__name__)
@@ -56,7 +59,7 @@ LOG, _ = logs.setup(__name__)
 class Blob(dbo):
     object_type = 'blob'
     initial_version = 2
-    current_version = 7
+    current_version = 8
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -118,6 +121,11 @@ class Blob(dbo):
                 'KeyError while upgrading retention (v6 to v7): %s' % e)
 
     @classmethod
+    def _upgrade_step_7_to_8(cls, static_values):
+        # We added the concept of "incomplete locations".
+        ...
+
+    @classmethod
     def normalize_timestamp(cls, timestamp):
         # The timestamp is either a number (int or float, assumed to be epoch
         # seconds)...
@@ -161,12 +169,16 @@ class Blob(dbo):
             'fetched_at': self.fetched_at,
             'depends_on': self.depends_on,
             'transcodes': self.transcoded,
-            'locations': self.locations,
             'reference_count': self.ref_count,
             'sha512': self.checksums.get('sha512'),
             'last_used': self.last_used
         })
 
+        # Locations and their incomplete counterparts
+        out['locations'] = self.locations
+        out['locations'].extend(self.incomplete_locations)
+
+        # Include information about the blob
         out.update(self.info)
         return out
 
@@ -209,6 +221,76 @@ class Blob(dbo):
 
     def remove_location(self, location):
         self._remove_item_in_attribute_list('locations', location)
+
+    @property
+    def incomplete_locations(self):
+        out = []
+        locs = self._db_get_attribute(
+            'incomplete_locations', {'locations': {}})
+        for loc in locs['locations']:
+            out.append(f'{loc} ({locs["locations"][loc]:.2f}%)')
+        return out
+
+    def _update_incomplete_location_inner(self, percentage):
+        original = etcd.get(f'attribute/{self.object_type}', self.uuid,
+                            'incomplete_locations')
+        if not original:
+            updated = {'locations': {}}
+        else:
+            updated = copy.deepcopy(original)
+        changed = False
+
+        if config.NODE_NAME not in updated['locations']:
+            changed = True
+            updated['locations'][config.NODE_NAME] = percentage
+        elif updated['locations'][config.NODE_NAME] != percentage:
+            changed = True
+            updated['locations'][config.NODE_NAME] = percentage
+
+        if changed:
+            return etcd.replace(f'attribute/{self.object_type}', self.uuid,
+                                'incomplete_locations', original, updated)
+
+        return True
+
+    def update_incomplete_location(self, percentage):
+        percentage = round(percentage, 1)
+        attempts = 0
+        while attempts < 3:
+            if self._update_incomplete_location_inner(percentage):
+                return
+            attempts += 1
+            time.sleep(0.01)
+
+        raise LocklessUpdateFailed(
+            f'Lockless update of incomplete locations for blob {self.uuid} '
+            'failed.')
+
+    def _remove_incomplete_location_inner(self):
+        original = etcd.get(f'attribute/{self.object_type}', self.uuid,
+                            'incomplete_locations')
+        if not original:
+            return True
+
+        if config.NODE_NAME in original['locations']:
+            updated = copy.deepcopy(original)
+            del updated['locations'][config.NODE_NAME]
+            return etcd.replace(f'attribute/{self.object_type}', self.uuid,
+                                'incomplete_locations', original, updated)
+
+        return True
+
+    def remove_incomplete_location(self):
+        attempts = 0
+        while attempts < 3:
+            if self._remove_incomplete_location_inner():
+                return
+            attempts += 1
+            time.sleep(0.01)
+
+        raise LocklessUpdateFailed(
+            f'Lockless removal of incomplete locations for blob {self.uuid} '
+            'failed.')
 
     @property
     def info(self):
@@ -278,20 +360,19 @@ class Blob(dbo):
         if self.state.value == self.STATE_INITIAL:
             self.state = self.STATE_CREATED
 
-        with self.get_lock_attr('info', 'Set blob info'):
-            if not self.info:
-                blob_path = Blob.filepath(self.uuid)
+        if not self.info:
+            blob_path = Blob.filepath(self.uuid)
 
-                # We put a bunch of information from "qemu-img info" into the
-                # blob because its helpful. However, there are some values we
-                # don't want to persist.
-                info = util_image.identify(blob_path)
-                for key in ['corrupt', 'image', 'lazy refcounts', 'refcount bits']:
-                    if key in info:
-                        del info[key]
+            # We put a bunch of information from "qemu-img info" into the
+            # blob because its helpful. However, there are some values we
+            # don't want to persist.
+            info = util_image.identify(blob_path)
+            for key in ['corrupt', 'image', 'lazy refcounts', 'refcount bits']:
+                if key in info:
+                    del info[key]
 
-                info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
-                self._db_set_attribute('info', info)
+            info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
+            self._db_set_attribute('info', info)
 
     def ref_count_inc(self, baseobject, count=1):
         with self.get_lock_attr('ref_count', 'Increase reference count'):
@@ -352,9 +433,14 @@ class Blob(dbo):
 
     def ensure_local(self, locks, instance_object=None,
                      wait_for_other_transfers=True):
+        affected_objects = [self]
+        if instance_object:
+            affected_objects.append(instance_object)
+
         if self.state.value != self.STATE_CREATED:
-            self.log.warning(
-                'Blob not in created state, replication cancelled')
+            add_event_multi(
+                EVENT_TYPE_STATUS, affected_objects,
+                'blob not in created state, replication to this node cancelled')
             return
 
         # Replicate any blob this blob depends on
@@ -370,27 +456,38 @@ class Blob(dbo):
             self.observe()
             return
 
+        add_event_multi(
+            EVENT_TYPE_STATUS, affected_objects, 'replicating blob to this node')
         partial_path = blob_path + '.partial'
         while os.path.exists(partial_path):
             st = os.stat(partial_path)
             if time.time() - st.st_mtime > 300:
-                self.log.with_fields({
-                    'partial file age': time.time() - st.st_mtime}).info(
-                    'No activity on previous partial download in more than '
-                    'five minutes. Removing and re-attempting.')
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
+                    ('no activity on previous partial download in more than '
+                     'five minutes. Removing and re-attempting.'),
+                    extra={
+                        'partial file age': time.time() - st.st_mtime
+                    })
                 os.unlink(partial_path)
             else:
                 if not wait_for_other_transfers:
                     raise BlobAlreadyBeingTransferred()
 
-                self.log.with_fields({
-                    'partial file age': time.time() - st.st_mtime}).debug(
-                    'Waiting for existing download to complete')
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
+                    'waiting for existing download to complete',
+                    extra={
+                        'partial file age': time.time() - st.st_mtime
+                    }
+                )
                 time.sleep(10)
 
         # If the blob exists after waiting for another partial transfer,
         # we're done
         if os.path.exists(blob_path):
+            add_event_multi(
+                EVENT_TYPE_AUDIT, affected_objects, 'blob now exists on this node')
             self.observe()
             return
 
@@ -399,7 +496,7 @@ class Blob(dbo):
         while True:
             try:
                 return self._attempt_transfer(
-                    locks, instance_object, partial_path, blob_path)
+                    locks, affected_objects, partial_path, blob_path)
             except (ConnectionRefusedError, BlobTransferSetupFailed,
                     BlobFetchFailed) as e:
                 attempts += 1
@@ -407,13 +504,11 @@ class Blob(dbo):
                     raise BlobFetchFailed(
                         'Repeated attempts to fetch blob failed: %s' % e)
 
-    def _attempt_transfer(self, locks, instance_object, partial_path,
+    def _attempt_transfer(self, locks, affected_objects, partial_path,
                           blob_path):
+        add_event_multi(
+            EVENT_TYPE_AUDIT, affected_objects, 'attempting transfer')
         with open(partial_path, 'wb') as f:
-            total_bytes_received = 0
-            last_refresh = 0
-            previous_percentage = 0
-
             locations = self.locations
             for n in Nodes([], prefilter='inactive'):
                 if n.uuid in locations:
@@ -423,6 +518,9 @@ class Blob(dbo):
                         'Node is inactive, ignoring blob location')
                     locations.remove(n.uuid)
             if len(locations) == 0:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
+                    'there are no online sources for this blob')
                 raise BlobMissing('There are no online sources for this blob')
 
             random.shuffle(locations)
@@ -435,8 +533,15 @@ class Blob(dbo):
                 'token': token
             }
 
+            direction_info = f'({locations[0]} -> {config.NODE_NAME})'
+            affected_objects = copy.deepcopy(affected_objects)
+            affected_objects.append(('node', config.NODE_NAME))
+            affected_objects.append(('node', locations[0]))
+
             etcd.put('transfer', locations[0], name, data)
-            self.log.with_fields(data).info('Created transfer request')
+            add_event_multi(
+                EVENT_TYPE_AUDIT, affected_objects,
+                f'created transfer request {direction_info}', extra=data)
 
             waiting_time = time.time()
             while time.time() - waiting_time < 30:
@@ -446,17 +551,31 @@ class Blob(dbo):
                 time.sleep(1)
 
             if data['server_state'] != dbo.STATE_CREATED:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
+                    f'transfer setup failed {direction_info}', extra=data)
                 raise BlobTransferSetupFailed(
-                    'transfer %s failed to setup, state is %s'
-                    % (name, data['server_state']))
+                    f'transfer {name} failed to setup, state is {data["server_state"]}')
+
+            add_event_multi(
+                EVENT_TYPE_AUDIT, affected_objects,
+                f'transfer setup succeeded  {direction_info}', extra=data)
 
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect((locations[0], data['port']))
             client.send(token.encode('utf-8'))
 
+            total_bytes_received = 0
+            last_refresh = 0
+            next_percentage = 10
+
+            last_event = time.time()
             sha512_hash = hashlib.sha512()
             with open(partial_path, 'wb') as f:
                 while d := client.recv(8000):
+                    if len(d) == 0:
+                        break
+
                     f.write(d)
                     sha512_hash.update(d)
                     total_bytes_received += len(d)
@@ -466,60 +585,56 @@ class Blob(dbo):
                         last_refresh = time.time()
 
                     percentage = total_bytes_received / int(self.size) * 100.0
-                    if (percentage - previous_percentage) > 10.0:
-                        if instance_object:
-                            instance_object.add_event(
-                                EVENT_TYPE_STATUS, 'fetching required blob',
-                                extra={
-                                    'blob_uuid': self.uuid,
-                                    'percentage': percentage
-                                })
-                        self.log.with_fields({
-                            'bytes_fetched': total_bytes_received,
-                            'size': int(self.size)
-                        }).debug('Fetch %.02f percent complete' % percentage)
-                        previous_percentage = percentage
+                    if ((next_percentage - percentage) < 0 or
+                            time.time() - last_event > 30):
+                        add_event_multi(
+                            EVENT_TYPE_STATUS, affected_objects,
+                            f'fetching required blob {direction_info}',
+                            extra={
+                                'percentage': int(percentage)
+                            }
+                        )
+                        self.update_incomplete_location(percentage)
+                        if (next_percentage - percentage) < 0:
+                            next_percentage += 10
+                        last_event = time.time()
+
+            self.remove_incomplete_location()
 
             if total_bytes_received != int(self.size):
+                add_event_multi(
+                    EVENT_TYPE_STATUS, affected_objects,
+                    f'did not fetch entire blob, cleaning up {direction_info}',
+                    extra={
+                        'received': total_bytes_received,
+                        'expected': self.size
+                    }
+                )
                 if os.path.exists(partial_path):
                     os.unlink(partial_path)
                 raise BlobFetchFailed(
                     'The amount of fetched data does not match the stored size. We '
-                    'fetched %d bytes, but expected %d.'
-                    % (total_bytes_received, self.size))
+                    f'fetched {total_bytes_received} bytes, but expected {self.size}.')
 
             if not self.verify_size(partial=True):
-                if instance_object:
-                    instance_object.add_event(
-                        EVENT_TYPE_AUDIT, 'fetching required blob failed',
-                        extra={
-                            'blob_uuid': self.uuid,
-                            'error': 'incorrect size'
-                            })
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
+                    f'fetching required blob failed, incorrect size {direction_info}')
                 raise BlobFetchFailed(
-                    'Fetching required blob %s failed. We fetched %d bytes, but expected %d.'
-                    % (self.uuid, total_bytes_received, self.size))
+                    f'Fetching required blob {self.uuid} failed. We fetched '
+                    f'{total_bytes_received} bytes, but expected {self.size}.')
 
             if not self.verify_checksum(sha512_hash.hexdigest()):
-                if instance_object:
-                    instance_object.add_event(
-                        EVENT_TYPE_AUDIT, 'fetching required blob failed',
-                        extra={
-                            'blob_uuid': self.uuid,
-                            'error': 'incorrect checksum'
-                            })
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, affected_objects,
+                    f'fetching required blob failed, incorrect checksum {direction_info}')
                 raise BlobFetchFailed(
-                    'Fetching required blob %s failed. Incorrect checksum.' % self.uuid)
+                    f'Fetching required blob {self.uuid} failed. Incorrect checksum.')
 
             os.rename(partial_path, blob_path)
-            if instance_object:
-                instance_object.add_event(
-                    EVENT_TYPE_STATUS, 'fetching required blob complete',
-                    extra={'blob_uuid': self.uuid})
-            self.log.with_fields({
-                'bytes_fetched': total_bytes_received,
-                'size': int(self.size)
-            }).info('Fetch complete')
+            add_event_multi(
+                EVENT_TYPE_AUDIT, affected_objects,
+                f'fetching required blob complete {direction_info}')
             self.observe()
             return total_bytes_received
 
@@ -757,22 +872,23 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     return b
 
 
-def http_fetch(url, resp, blob_uuid, locks, objects):
-    b = Blob.from_db(blob_uuid)
-
+def http_fetch(url, resp, b, locks, affected_objects):
     fetched = 0
+
     if resp.headers.get('Content-Length'):
         total_size = int(resp.headers.get('Content-Length'))
     else:
         total_size = None
 
-    previous_percentage = 0.0
     last_refresh = 0
-    dest_path = Blob.filepath(blob_uuid)
+    dest_path = Blob.filepath(b.uuid)
 
     md5_hash = hashlib.md5()
     sha512_hash = hashlib.sha512()
 
+    percentage = 0
+    next_percentage = 10
+    last_event = time.time()
     with open(dest_path + '.partial', 'wb') as f:
         for chunk in resp.iter_content(chunk_size=8192):
             fetched += len(chunk)
@@ -782,23 +898,30 @@ def http_fetch(url, resp, blob_uuid, locks, objects):
 
             if total_size:
                 percentage = fetched / total_size * 100.0
-                if (percentage - previous_percentage) > 10.0:
-                    add_event_multi(
-                        EVENT_TYPE_STATUS, objects,
-                        'fetching required HTTP resource',
-                        extra={
-                            'url': url,
-                            'percentage': percentage,
-                            'bytes_fetched': fetched
-                        })
-                    previous_percentage = percentage
+
+            if ((next_percentage - percentage) < 0 or
+                    time.time() - last_event > 30):
+                add_event_multi(
+                    EVENT_TYPE_STATUS, affected_objects,
+                    'fetching required HTTP resource',
+                    extra={
+                        'url': url,
+                        'percentage': int(percentage),
+                        'bytes_fetched': fetched
+                    })
+                b.update_incomplete_location(percentage)
+                if (next_percentage - percentage) < 0:
+                    next_percentage += 10
+                last_event = time.time()
 
             if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
                 etcd.refresh_locks(locks)
                 last_refresh = time.time()
 
+    b.remove_incomplete_location()
     add_event_multi(
-        EVENT_TYPE_USAGE, objects, 'fetching required HTTP resource complete',
+        EVENT_TYPE_USAGE, affected_objects,
+        'fetching required HTTP resource complete',
         extra={
             'url': url,
             'bytes_fetched': fetched

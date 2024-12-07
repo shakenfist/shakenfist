@@ -58,6 +58,11 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
         self.assertEqual('created', img['state'])
 
     def test_disappearing_source_instance(self):
+        for n in self.system_client.get_nodes():
+            if n['is_hypervisor']:
+                break
+        n = n['name']
+
         p = subprocess.run(
             ['sudo sf-client artifact download debian-11 '
              '/var/www/html/debian-11-disappearing-instance'],
@@ -75,7 +80,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
                     'base': url,
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, force_placement=n)
         self._await_instance_ready(inst['uuid'])
 
         # Remove the source image
@@ -95,5 +100,5 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
                     'base': url,
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, force_placement=n)
         self._await_instance_ready(inst['uuid'])

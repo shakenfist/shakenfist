@@ -9,10 +9,11 @@ import uuid
 import cpuinfo
 import distro
 from pbr.version import VersionInfo
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import eventlog
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.util import process as util_process
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
@@ -112,7 +113,7 @@ def stat_log_fields(path):
 
 
 def file_permutation_exists(basename, extensions):
-    """ Find if any of the possible extensions exists. """
+    """Find if any of the possible extensions exists. """
     for extn in extensions:
         filename = f'{basename}.{extn}'
         if os.path.exists(filename):
@@ -121,7 +122,7 @@ def file_permutation_exists(basename, extensions):
 
 
 def link(source, destination):
-    """ Hardlink a file, unless we have to symlink. """
+    """Hard link a file, unless we have to symlink. """
     try:
         os.link(source, destination)
     except OSError:
@@ -134,6 +135,16 @@ def link(source, destination):
             # just shrug and keep going.
             if os.path.realpath(destination) != source:
                 raise e
+
+    pathlib.Path(destination).touch(exist_ok=True)
+
+
+def link_or_copy(source, destination):
+    """Hard link a file, unless we have to copy it. """
+    try:
+        os.link(source, destination)
+    except OSError:
+        util_process.execute([], f'cp {source} {destination}')
 
     pathlib.Path(destination).touch(exist_ok=True)
 

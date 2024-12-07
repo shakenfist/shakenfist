@@ -283,3 +283,17 @@ class IPAMException(Exception):
 
 class InvalidIPAMAddress(IPAMException):
     ...
+
+
+# Lockless update failures
+class LocklessUpdateFailed(Exception):
+    ...
+
+
+class LocklessUpdateFailed(LocklessUpdateFailed):
+    ...
+
+
+# gRPC call failures
+class gRPCException(Exception):
+    ...

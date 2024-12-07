@@ -1,17 +1,22 @@
+from collections import defaultdict
 import json
 import os
 import threading
 import time
-from collections import defaultdict
 
-import grpc
-import psutil
-import requests
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
 from etcd3gw.utils import _encode
 from etcd3gw.utils import _increment_last_byte
+from google.rpc import error_details_pb2
+import grpc
+from grpc_status import rpc_status
+import psutil
+import requests
+from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities import random as util_random  # noreorder
+
 from shakenfist import baseobject
 from shakenfist import etcd_pb2
 from shakenfist import etcd_pb2_grpc
@@ -20,8 +25,6 @@ from shakenfist.config import config
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.tasks import QueueTask
 from shakenfist.util import callstack as util_callstack
-from shakenfist_utilities import logs
-from shakenfist_utilities import random as util_random
 
 
 LOG, _ = logs.setup(__name__)
@@ -140,8 +143,8 @@ class ActualLock(Lock):
         self.operation = op
         self.lockid = util_random.random_id()
 
-        node = config.NODE_NAME
-        pid = os.getpid()
+        self.node = config.NODE_NAME
+        self.pid = os.getpid()
         caller = util_callstack.get_caller(offset=3)
 
         # We also override the location of the lock so that we're in our own spot
@@ -151,8 +154,8 @@ class ActualLock(Lock):
             {
                 'lock': self.path,
                 'key': self.key,
-                'node': node,
-                'pid': pid,
+                'node': self.node,
+                'pid': self.pid,
                 'line': caller,
                 'operation': self.operation,
                 'id': self.lockid
@@ -161,8 +164,8 @@ class ActualLock(Lock):
         # We override the UUID of the lock with something more helpful to debugging
         self._uuid = json.dumps(
             {
-                'node': node,
-                'pid': pid,
+                'node': self.node,
+                'pid': self.pid,
                 'line': caller,
                 'operation': self.operation,
                 'id': self.lockid
@@ -281,11 +284,22 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
 
 
 def refresh_lock(lock, log_ctx=LOG):
-    if not lock.is_acquired():
-        log_ctx.with_fields({'lock': lock.name}).info(
-            'Attempt to refresh an expired lock')
+    log = log_ctx.with_fields({
+        'lock': lock.name,
+        'path': lock.path,
+        'pid': lock.pid
+    })
+
+    try:
+        psutil.Process(lock.pid)
+        if not lock.is_acquired():
+            log.error('Attempt to refresh an expired lock')
+            raise exceptions.LockException(
+                f'The lock on {lock.path} has expired.')
+    except (psutil.NoSuchProcess, FileNotFoundError):
+        log.error('Attempt to refresh lock whose process has disappeared')
         raise exceptions.LockException(
-            'The lock on %s has expired.' % lock.path)
+            f'The process (pid {lock.pid}) holding lock {lock.path} has disappeared.')
 
     lock.refresh()
 
@@ -346,54 +360,16 @@ class JSONEncoderCustomTypes(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-@retry_etcd_forever
-def put_raw(path, data):
-    encoded = json.dumps(data, indent=4, sort_keys=True,
-                         cls=JSONEncoderCustomTypes)
-    get_etcd_client().put(path, encoded, lease=None)
-    LOG.info('etcd put %s' % path)
-
-
-@retry_etcd_forever
 def put(objecttype, subtype, name, data):
     path = _construct_key(objecttype, subtype, name)
     put_raw(path, data)
 
 
-@retry_etcd_forever
-def create_raw(path, data):
-    encoded = json.dumps(data, indent=4, sort_keys=True,
-                         cls=JSONEncoderCustomTypes)
-    LOG.info('etcd create %s' % path)
-    return get_etcd_client().create(path, encoded, lease=None)
-
-
-@retry_etcd_forever
 def create(objecttype, subtype, name, data):
     path = _construct_key(objecttype, subtype, name)
     return create_raw(path, data)
 
 
-@retry_etcd_forever
-def replace_raw(path, original_data, new_data):
-    original_data_encoded = json.dumps(
-        original_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes)
-    new_data_encoded = json.dumps(
-        new_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes)
-
-    LOG.info('etcd replace %s' % path)
-    return get_etcd_client().replace(path, original_data_encoded, new_data_encoded)
-
-
-@retry_etcd_forever
-def get_raw(path):
-    value = get_etcd_client().get(path)
-    if value is None or len(value) == 0:
-        return None
-    return json.loads(value[0])
-
-
-@retry_etcd_forever
 def get(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
     return get_raw(path)
@@ -421,6 +397,14 @@ def get_all_dict(objecttype, subtype=None, sort_order=None, limit=0):
         key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
 
     return key_val
+
+
+def replace(objecttype, subtype, name, original_data, new_data):
+    return replace_many_raw([{
+        'path': _construct_key(objecttype, subtype, name),
+        'original_data': original_data,
+        'new_data': new_data
+    }])[0]
 
 
 @retry_etcd_forever
@@ -605,50 +589,217 @@ def restart_queues():
     _restart_queue(f'{config.NODE_NAME}-background')
 
 
+# Direct etcd calls via gRPC
+def _encode_data(data):
+    return json.dumps(
+        data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes).encode()
+
+
+def _log_and_raise_error(rpc_error):
+    LOG.error(f'gRPC call failure: {rpc_error}')
+    status = rpc_status.from_call(rpc_error)
+    for detail in status.details:
+        if detail.Is(error_details_pb2.QuotaFailure.DESCRIPTOR):
+            info = error_details_pb2.QuotaFailure()
+            detail.Unpack(info)
+            LOG.error(f'Quota failure: {info}')
+        else:
+            raise exceptions.gRPCException(f'Unexpected failure: {detail}')
+
+    raise exceptions.gRPCException(rpc_error)
+
+
 def compact(revision):
     with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
         stub = etcd_pb2_grpc.KVStub(channel)
-        stub.Compact(etcd_pb2.CompactionRequest(
-            revision=revision, physical=True
+        try:
+            stub.Compact(etcd_pb2.CompactionRequest(
+                revision=revision, physical=True
             )
-        )
+            )
+        except grpc.RpcError as rpc_error:
+            _log_and_raise_error(rpc_error)
 
-        stub = etcd_pb2_grpc.MaintenanceStub(channel)
-        request = etcd_pb2.DefragmentRequest()
-        stub.Defragment(request)
+        try:
+            stub = etcd_pb2_grpc.MaintenanceStub(channel)
+            request = etcd_pb2.DefragmentRequest()
+            stub.Defragment(request)
+        except grpc.RpcError as rpc_error:
+            _log_and_raise_error(rpc_error)
+            return False
 
 
-def transactional_delete(path, original_data):
+def get_raw(path):
     path_encoded = path.encode()
-    original_data_encoded = json.dumps(
-        original_data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes
-        ).encode()
 
     with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
         stub = etcd_pb2_grpc.KVStub(channel)
 
-        response = stub.Txn(
-            etcd_pb2.TxnRequest(
-                compare=[
-                    etcd_pb2.Compare(
+        try:
+            resp = stub.Range(
+                etcd_pb2.RangeRequest(
+                    key=path_encoded
+                )
+            )
+        except grpc.RpcError as rpc_error:
+            _log_and_raise_error(rpc_error)
+
+        if len(resp.kvs) > 0:
+            kvs = resp.kvs[0]
+            return json.loads(kvs.value.decode())
+        return None
+
+
+def put_raw(path, new_data):
+    path_encoded = path.encode()
+    new_data_encoded = _encode_data(new_data)
+
+    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+        stub = etcd_pb2_grpc.KVStub(channel)
+
+        # NOTE(mikal): yes, this doesn't return a meaningful result. etcd3gw
+        # simply hardcoded a "return True" here, the etcd server returns a
+        # result indicating the previous value of the key. That is, a failure
+        # will raise an exception.
+        try:
+            stub.Put(
+                etcd_pb2.PutRequest(
+                    key=path_encoded,
+                    value=new_data_encoded
+                )
+            )
+        except grpc.RpcError as rpc_error:
+            _log_and_raise_error(rpc_error)
+
+
+def create_raw(path, new_data):
+    return replace_many_raw([{
+        'path': path,
+        'original_data': None,
+        'new_data': new_data
+    }])[0]
+
+
+def replace_raw(path, original_data, new_data):
+    return replace_many_raw([{
+        'path': path,
+        'original_data': original_data,
+        'new_data': new_data
+    }])[0]
+
+
+def transactional_delete_raw(path, original_data):
+    return replace_many_raw([{
+        'path': path,
+        'original_data': original_data,
+        'new_data': None
+    }])[0]
+
+
+def replace_many_raw(mutations):
+    original_values_by_path = {}
+    new_values_by_path = {}
+
+    comparisons = []
+    replacements = []
+    failures = []
+
+    for mutation in mutations:
+        path_encoded = mutation['path'].encode()
+        original_data_encoded = _encode_data(mutation['original_data'])
+        new_data_encoded = _encode_data(mutation['new_data'])
+
+        if mutation['original_data'] is None:
+            comparisons.append(
+                etcd_pb2.Compare(
+                    key=path_encoded,
+                    result=etcd_pb2.Compare.EQUAL,
+                    target=etcd_pb2.Compare.CREATE,
+                    create_revision=0
+                )
+            )
+            original_values_by_path[path_encoded] = None
+        else:
+            comparisons.append(
+                etcd_pb2.Compare(
+                    key=path_encoded,
+                    result=etcd_pb2.Compare.EQUAL,
+                    target=etcd_pb2.Compare.VALUE,
+                    value=original_data_encoded
+                )
+            )
+            original_values_by_path[path_encoded] = original_data_encoded
+
+        if mutation['new_data'] is None:
+            replacements.append(
+                etcd_pb2.RequestOp(
+                    request_delete_range=etcd_pb2.DeleteRangeRequest(
+                        key=path_encoded
+                    )
+                )
+            )
+            new_values_by_path[path_encoded] = None
+        else:
+            replacements.append(
+                etcd_pb2.RequestOp(
+                    request_put=etcd_pb2.PutRequest(
                         key=path_encoded,
-                        result=etcd_pb2.Compare.EQUAL,
-                        target=etcd_pb2.Compare.VALUE,
-                        value=original_data_encoded
+                        value=new_data_encoded
                     )
-                ],
-                success=[
-                    etcd_pb2.RequestOp(
-                        request_delete_range=etcd_pb2.DeleteRangeRequest(
-                            key=path_encoded
-                        )
-                    )
-                ],
-                failure=[]
+                )
+            )
+            new_values_by_path[path_encoded] = new_data_encoded
+
+        # On failure, we grab all of the keys and their current values
+        failures.append(
+            etcd_pb2.RequestOp(
+                request_range=etcd_pb2.RangeRequest(
+                    key=path_encoded
+                )
             )
         )
 
-        LOG.with_fields({
-            'success': response.succeeded
-            }).info(f'etcd transactional_delete {path}')
-        return response.succeeded
+    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
+        stub = etcd_pb2_grpc.KVStub(channel)
+        try:
+            response = stub.Txn(
+                etcd_pb2.TxnRequest(
+                    compare=comparisons,
+                    success=replacements,
+                    failure=failures
+                )
+            )
+        except grpc.RpcError as rpc_error:
+            _log_and_raise_error(rpc_error)
+
+        if response.succeeded:
+            return True, []
+
+        # Determine which keys had non-matching values
+        failures = []
+        for resp in response.responses:
+            if resp.HasField('response_range'):
+                for kvs in resp.response_range.kvs:
+                    if original_values_by_path[kvs.key] != kvs.value:
+                        failures.append(
+                            {
+                                'path': kvs.key.decode(),
+                                'desired': original_values_by_path[kvs.key],
+                                'actual': kvs.value.decode(),
+                                'replacement': new_values_by_path[kvs.key]
+                            }
+                        )
+                        del original_values_by_path[kvs.key]
+
+        for key in original_values_by_path:
+            failures.append(
+                {
+                    'path': key.decode(),
+                    'desired': original_values_by_path[key],
+                    'actual': None,
+                    'replacement': new_values_by_path[kvs.key]
+                }
+            )
+
+        LOG.with_fields({'failed': failures}).info('Transaction failure')
+        return False, failures

@@ -2,6 +2,8 @@ import ipaddress
 import random
 import time
 
+from shakenfist_utilities import logs  # noreorder
+
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
@@ -12,7 +14,6 @@ from shakenfist.baseobject import get_minimum_object_version as gmov
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.util import callstack as util_callstack
-from shakenfist_utilities import logs
 
 
 # Please note: IPAMs are a "foundational" baseobject type, which means they
@@ -299,7 +300,7 @@ class IPAM(dbo):
 
         # Handle the possible allocation race here where something's halo is
         # removed and its immediately allocated, but at the same time we
-        # remove its halo by using a transactional_delete.
+        # remove its halo by using a transactional_delete_raw.
         freed = 0
         for key, data in etcd.get_prefix(
                 self.reservations_path,
@@ -307,7 +308,7 @@ class IPAM(dbo):
                 sort_target='key'):
             if (data['type'] == RESERVATION_TYPE_DELETION_HALO and
                     time.time() - data['when'] > duration):
-                if etcd.transactional_delete(key, data):
+                if etcd.transactional_delete_raw(key, data):
                     freed += 1
         return freed
 

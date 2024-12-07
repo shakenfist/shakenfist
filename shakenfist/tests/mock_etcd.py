@@ -55,17 +55,17 @@ class MockEtcd():
         self.test_obj.addCleanup(self.etcd_status.stop)
 
         # Mock WrappedEtcdClient()
-        self.etcd_create = mock.patch(
-            'shakenfist.etcd.WrappedEtcdClient.create',
-            side_effect=self.create)
-        self.etcd_create.start()
-        self.test_obj.addCleanup(self.etcd_create.stop)
+        self.etcd_create_raw = mock.patch(
+            'shakenfist.etcd.create_raw',
+            side_effect=self.create_raw)
+        self.etcd_create_raw.start()
+        self.test_obj.addCleanup(self.etcd_create_raw.stop)
 
-        self.etcd_get = mock.patch(
-            'shakenfist.etcd.WrappedEtcdClient.get',
-            side_effect=self.get)
-        self.etcd_get.start()
-        self.test_obj.addCleanup(self.etcd_get.stop)
+        self.etcd_get_raw = mock.patch(
+            'shakenfist.etcd.get_raw',
+            side_effect=self.get_raw)
+        self.etcd_get_raw.start()
+        self.test_obj.addCleanup(self.etcd_get_raw.stop)
 
         self.etcd_get_prefix = mock.patch(
             'shakenfist.etcd.WrappedEtcdClient.get_prefix',
@@ -73,11 +73,11 @@ class MockEtcd():
         self.etcd_get_prefix.start()
         self.test_obj.addCleanup(self.etcd_get_prefix.stop)
 
-        self.etcd_put = mock.patch(
-            'shakenfist.etcd.WrappedEtcdClient.put',
-            side_effect=self.put)
-        self.etcd_put.start()
-        self.test_obj.addCleanup(self.etcd_put.stop)
+        self.etcd_put_raw = mock.patch(
+            'shakenfist.etcd.put_raw',
+            side_effect=self.put_raw)
+        self.etcd_put_raw.start()
+        self.test_obj.addCleanup(self.etcd_put_raw.stop)
 
         self.etcd_delete = mock.patch(
             'shakenfist.etcd.WrappedEtcdClient.delete',
@@ -91,20 +91,12 @@ class MockEtcd():
         self.etcd_delete_prefix.start()
         self.test_obj.addCleanup(self.etcd_delete_prefix.stop)
 
-        self.etcd_replace = mock.patch(
-            'shakenfist.etcd.WrappedEtcdClient.replace',
-            side_effect=self.replace)
-        self.etcd_replace.start()
-        self.test_obj.addCleanup(self.etcd_replace.stop)
+        self.etcd_replace_many_raw = mock.patch(
+            'shakenfist.etcd.replace_many_raw',
+            side_effect=self.replace_many_raw)
+        self.etcd_replace_many_raw.start()
+        self.test_obj.addCleanup(self.etcd_replace_many_raw.stop)
 
-        # Newer gRPC calls
-        self.etcd_transactional_delete = mock.patch(
-            'shakenfist.etcd.transactional_delete',
-            side_effect=self.transactional_delete)
-        self.etcd_transactional_delete.start()
-        self.test_obj.addCleanup(self.etcd_transactional_delete.stop)
-
-        # Mock etcd
         self.etcd_get_lock = mock.patch('shakenfist.etcd.get_lock')
         self.etcd_get_lock.start()
         self.test_obj.addCleanup(self.etcd_get_lock.stop)
@@ -125,37 +117,13 @@ class MockEtcd():
     # DB operations - Low level
     #
 
-    def create(self, path, encoded, lease=None):
-        if path not in self.db:
-            self.db[path] = encoded
-            self._trace(f'MockEtcd.create() {path} successful')
-            return True
-
-        self._trace(f'MockEtcd.create() {path} failure')
-        return False
-
-    def get(self, path, metadata=False, sort_order=None, sort_target=None):
-        d = self.db.get(path)
-        self._trace(f'MockEtcd.get() retrieving data for key {path}: {d}')
-        if not d:
-            return None
-
-        if metadata:
-            return [[d]]
-        else:
-            return [d]
-
     def get_prefix(self, path, sort_order=None, sort_target=None, limit=0):
         ret = []
         for k in sorted(self.db):
             if k.startswith(path):
-                ret.append((self.db[k], {'key': k.encode('utf-8')}))
+                ret.append((self.db[k].decode(), {'key': k.encode('utf-8')}))
                 self._trace('MockEtcd.delete_prefix() %s' % k)
         return ret
-
-    def put(self, path, encoded, lease=None):
-        self.db[path] = encoded
-        self._trace(f'MockEtcd.put() {path}: {encoded}')
 
     def delete(self, path):
         if path in self.db:
@@ -168,28 +136,88 @@ class MockEtcd():
                 del self.db[k]
                 self._trace('MockEtcd.delete_prefix() %s' % k)
 
-    def replace(self, path, original_data, new_data):
-        if self.db[path] == original_data:
-            self.db[path] = new_data
-            self._trace('MockEtcd.replace() %s success' % path)
-            return True
-
-        self._trace('MockEtcd.replace() %s failure' % path)
-        return False
-
     # Newer gRPC methods
-    def transactional_delete(self, path, original_data):
-        original_data_encoded = json.dumps(
-            original_data, indent=4, sort_keys=True,
-            cls=etcd.JSONEncoderCustomTypes
-            )
-        if self.db[path] == original_data_encoded:
-            del self.db[path]
-            self._trace('MockEtcd.transactional_delete() %s success' % path)
+    def create_raw(self, path, data, lease=None):
+        if path not in self.db:
+            self.db[path] = etcd._encode_data(data)
+            self._trace(f'MockEtcd.create() {path} successful')
             return True
 
-        self._trace('MockEtcd.transactional_delete() %s failure' % path)
+        self._trace(f'MockEtcd.create() {path} failure')
         return False
+
+    def get_raw(self, path):
+        d = self.db.get(path)
+        if d:
+            d = json.loads(d.decode())
+        self._trace(f'MockEtcd.get() retrieving data for key {path}: {d}')
+        return d
+
+    def put_raw(self, path, data, lease=None):
+        encoded = etcd._encode_data(data)
+        self.db[path] = encoded
+        self._trace(f'MockEtcd.put() {path}: {encoded}')
+
+    def replace_many_raw(self, mutations):
+        updates = {}
+        deletes = []
+        failures = []
+
+        for mutation in mutations:
+            path = mutation['path']
+            ode = etcd._encode_data(mutation['original_data'])
+            nde = etcd._encode_data(mutation['new_data'])
+
+            if not mutation['original_data']:
+                if path in self.db:
+                    self._trace(f'MockEtcd.replace_many_raw() {path} failure: '
+                                'path exists')
+                    failures.append(
+                        {
+                            'path': path,
+                            'desired': None,
+                            'actual': self.db[path].decode()
+                        }
+                    )
+                elif mutation['new_data']:
+                    updates[path] = nde
+                else:
+                    del updates[path]
+            else:
+                if path not in self.db:
+                    self._trace(f'MockEtcd.replace_many_raw() {path} failure: '
+                                'path does not exist')
+                    failures.append(
+                        {
+                            'path': path,
+                            'desired': mutation['original_data'],
+                            'actual': None
+                        }
+                    )
+                if self.db[path] != ode:
+                    self._trace(f'MockEtcd.replace_many_raw() {path} failure: '
+                                f'{self.db[path]} != {ode}')
+                    failures.append(
+                        {
+                            'path': path,
+                            'desired': mutation['original_data'],
+                            'actual': self.db[path]
+                        }
+                    )
+
+                if not mutation['new_data']:
+                    deletes.append(path)
+                else:
+                    updates[path] = nde
+
+        if failures:
+            return False, failures
+
+        self.db.update(updates)
+        for path in deletes:
+            del self.db[path]
+        self._trace('MockEtcd.replace_many_raw() success')
+        return True, []
 
     #
     # DB operations - Utilizing SF DB functionality
@@ -215,7 +243,7 @@ class MockEtcd():
                 'timestamp': time.time(),
                 'metrics': metrics,
             }
-            self.db[key] = json.dumps(data, indent=4, sort_keys=True)
+            self.db[key] = etcd._encode_data(data)
 
     #
     # Database backed objects

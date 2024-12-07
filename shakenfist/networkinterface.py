@@ -2,7 +2,7 @@
 from functools import partial
 from uuid import uuid4
 
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist import exceptions

@@ -33,12 +33,6 @@ class WrongEventException(Exception):
     pass
 
 
-# NOTE(mikal): this is a hack to "turn up the knob" on how slow image
-# downloads can be while my ISP is congested because of COVID. We should
-# turn this back down as things improve.
-NETWORK_PATIENCE_FACTOR = 3
-
-
 def load_userdata(name):
     test_dir = os.path.dirname(os.path.abspath(__file__))
     with open(f'{test_dir}/tests/files/{name}_userdata') as f:
@@ -140,8 +134,8 @@ class BaseTestCase(testtools.TestCase):
         return self._await_instance_event(
             instance_uuid, 'detected poweroff', after=after)
 
-    def _await_instance_ready(self, instance_uuid, timeout=7):
-        self._await_agent_state(instance_uuid, ready=True, timeout=timeout)
+    def _await_instance_ready(self, instance_uuid):
+        self._await_agent_state(instance_uuid, ready=True)
         self._emit_tracing_event({
             'msg': 'Instance ready (agent ready state)',
             'instance_uuid': instance_uuid
@@ -178,57 +172,74 @@ class BaseTestCase(testtools.TestCase):
     def _await_instance_deleted(self, instance_uuid):
         start_time = time.time()
         while time.time() - start_time < 300:
-            if instance_uuid not in self.system_client.get_instances():
+            i = self.system_client.get_instance(instance_uuid)
+            if not i:
+                return
+            if i['state'].startswith('delete'):
                 return
             time.sleep(5)
-        self.fail('Failed to delete instance: %s' % instance_uuid)
+        self.fail(f'Failed to delete instance after 5 minutes {instance_uuid}')
 
-    def _await_agent_state(self, instance_uuid, ready=True, timeout=7):
-        # Wait up to 5 minutes for the instance to be created and enter
-        # the desired agent running state
+    def _await_agent_state(self, instance_uuid, ready=True):
+        # Wait the instance to be created and enter the desired agent running state
         if ready:
             desired = 'ready'
         else:
             desired = 'not ready'
 
-        start_time = time.time()
-        while time.time() - start_time < timeout * 60 * NETWORK_PATIENCE_FACTOR:
+        last_event = None
+        time_since_last_progress = time.time()
+        while time.time() - time_since_last_progress < 180:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] == 'error':
                 raise StartException(
-                    'Instance %s failed to start (marked as error state)'
-                    % instance_uuid)
+                    f'Instance {instance_uuid} failed to start (marked as '
+                    'error state)')
 
             if i['agent_state'] and i['agent_state'].startswith(desired):
                 return
+
+            events = self.system_client.get_instance_events(
+                instance_uuid, limit=1)
+            if events:
+                last_event = events[0]
+                time_since_last_progress = last_event['timestamp']
+
             time.sleep(5)
 
         raise TimeoutException(
-            'Instance %s failed to start and enter the agent %s state '
-            'in %d minutes. Agent state is %s.'
-            % (instance_uuid, desired, timeout, i['agent_state']))
+            f'Instance {instance_uuid} failed to start and enter the agent '
+            f'{desired} state and has seen no progress in 3 minutes. Agent '
+            f'state is {i["agent_state"]} and the last recorded event was '
+            f'{last_event}.')
 
     def _await_instance_create(self, instance_uuid):
-        # Wait up to 5 minutes for the instance to be created. On a slow
-        # morning it can take over 2 minutes to download a Ubuntu image.
-        start_time = time.time()
-        final = False
-        while time.time() - start_time < 5 * 60 * NETWORK_PATIENCE_FACTOR:
+        # Wait for the instance to be created
+        last_event = None
+        time_since_last_progress = time.time()
+        while time.time() - time_since_last_progress < 180:
             i = self.system_client.get_instance(instance_uuid)
-            if i['state'] in ['created', 'error']:
-                final = True
-                break
+            if i['state'] == 'error':
+                raise StartException(
+                    f'Instance {instance_uuid} failed to start (marked as '
+                    'error state)')
+
+            if i['state'] == 'created':
+                return
+
+            events = self.system_client.get_instance_events(
+                instance_uuid, limit=1)
+            if events:
+                last_event = events[0]
+                time_since_last_progress = last_event['timestamp']
+
             time.sleep(5)
 
-        if i['state'] == 'error':
-            raise StartException(
-                'Instance %s failed to start (marked as error state, %s)'
-                % (instance_uuid, i))
-
-        if not final:
-            raise TimeoutException(
-                'Instance %s was not created in a reasonable time (%s)'
-                % (instance_uuid, i))
+        raise TimeoutException(
+            f'Instance {instance_uuid} failed to start and enter the created '
+            f'state and has seen no progress in 3 minutes. Instance '
+            f'state is {i["state"]} and the last recorded event was '
+            f'{last_event}.')
 
     def _await_instance_event(
             self, instance_uuid, operation, message=None, after=None):
@@ -259,7 +270,7 @@ class BaseTestCase(testtools.TestCase):
     def _await_image_event(
             self, image_uuid, operation, message=None, after=None):
         start_time = time.time()
-        while time.time() - start_time < 5 * 60 * NETWORK_PATIENCE_FACTOR:
+        while time.time() - start_time < 900:
             for event in self.system_client.get_artifact_events(image_uuid):
                 if after and event['timestamp'] <= after:
                     continue
@@ -280,18 +291,25 @@ class BaseTestCase(testtools.TestCase):
             'After time %s, image %s had no event type "%s" (waited 5 mins)'
             % (after, image_uuid, operation))
 
-    def _await_objects_ready(self, callback, items):
+    def _await_objects_ready(self, get_callback, event_callback, items):
         waiting_for = list(enumerate(items))
-        start_time = time.time()
         results = [None] * len(items)
 
+        last_event = None
+        time_since_last_progress = time.time()
         while waiting_for:
             for idx, item in copy.copy(waiting_for):
                 try:
-                    n = callback(item)
+                    n = get_callback(item)
                     if n.get('state') in ['created', 'deleted', 'error']:
                         waiting_for.remove((idx, item))
                         results[idx] = n
+                        time_since_last_progress = time.time()
+                    else:
+                        events = event_callback(item, limit=1)
+                        if events:
+                            last_event = events[0]
+                            time_since_last_progress = last_event['timestamp']
 
                 except apiclient.ResourceNotFoundException:
                     # Its likely this exception can be removed once PR #1314 (or
@@ -303,36 +321,36 @@ class BaseTestCase(testtools.TestCase):
             if waiting_for:
                 time.sleep(5)
 
-            if waiting_for and time.time() - start_time > 300:
+            if waiting_for and time.time() - time_since_last_progress > 300:
                 remaining = []
                 for _, item in waiting_for:
                     remaining.append(item)
+                remaining_string = ', '.join(remaining)
 
                 raise TimeoutException(
-                    'Items %s never became ready (waited 5 mins)' % ', '.join(remaining))
+                    f'Items {remaining_string} never became ready, and no '
+                    f'progress has been made in at least five minutes. The last  '
+                    f'recorded event was {last_event}.')
 
         return results
 
     def _await_networks_ready(self, network_uuids):
         return self._await_objects_ready(
-            self.system_client.get_network, network_uuids)
-
-    def _await_instances_ready(self, instance_uuids):
-        res = self._await_objects_ready(
-            self.system_client.get_instance, instance_uuids)
-
-        for instance_uuid in instance_uuids:
-            self.assertInstanceOk(instance_uuid)
-
-        return res
+            self.system_client.get_network,
+            self.system_client.get_network_events,
+            network_uuids)
 
     def _await_artifacts_ready(self, artifact_uuids):
         return self._await_objects_ready(
-            self.system_client.get_artifact, artifact_uuids)
+            self.system_client.get_artifact,
+            self.system_client.get_artifact_events,
+            artifact_uuids)
 
     def _await_blobs_ready(self, blob_uuids):
         return self._await_objects_ready(
-            self.system_client.get_blob, blob_uuids)
+            self.system_client.get_blob,
+            self.system_client.get_blob_events,
+            blob_uuids)
 
     def _await_command(self, instance_ref, command):
         aop = self.system_client.instance_execute(instance_ref, command)
@@ -393,7 +411,7 @@ class BaseTestCase(testtools.TestCase):
     def assertInstanceConsoleAfterBoot(self, instance_uuid, contains):
         self.assertIsNotNone(instance_uuid)
         LOG.info('Waiting for %s to be ready' % instance_uuid)
-        self._await_instances_ready([instance_uuid])
+        self._await_instance_ready(instance_uuid)
 
         # Wait for the console log to have any data (i.e. boot commenced)
         start_time = time.time()
