@@ -96,9 +96,17 @@ def add_event_multi(
                 duration=duration, message=message, extra=json.dumps(extra))
 
             for object_type, object_uuid in simpler_objects:
-                eo = request.objects.add()
-                eo.object_type = object_type
-                eo.object_uuid = object_uuid
+                if not object_uuid:
+                    continue
+
+                try:
+                    eo = request.objects.add()
+                    eo.object_type = object_type
+                    eo.object_uuid = object_uuid
+                except TypeError as e:
+                    log.warning(
+                        f'Failed to add event for {object_type} with uuid '
+                        f'{object_uuid}: {e}')
 
             response = stub.RecordMultiEvent(request)
             if response.ack:
