@@ -4,6 +4,7 @@ import json
 import os
 import pathlib
 import sqlite3
+import threading
 import time
 
 import flask
@@ -20,6 +21,20 @@ from shakenfist.config import config
 
 
 LOG, _ = logs.setup(__name__)
+
+
+# This module stores some state in thread local storage.
+local = threading.local()
+local.sf_eventlog_client = None
+
+
+def get_eventlog_client():
+    c = getattr(local, 'sf_eventlog_client', None)
+    if not c:
+        local.sf_eventlog_client = grpc.insecure_channel(
+            f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}')
+        c = local.sf_eventlog_client
+    return c
 
 
 def add_event(
@@ -88,29 +103,28 @@ def add_event_multi(
 
     # Attempt to send with the newer EventMultiRequest
     try:
-        with grpc.insecure_channel(
-                f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}') as channel:
-            stub = event_pb2_grpc.EventServiceStub(channel)
-            request = event_pb2.EventMultiRequest(
-                event_type=event_type, timestamp=timestamp, fqdn=config.NODE_NAME,
-                duration=duration, message=message, extra=json.dumps(extra))
+        channel = get_eventlog_client()
+        stub = event_pb2_grpc.EventServiceStub(channel)
+        request = event_pb2.EventMultiRequest(
+            event_type=event_type, timestamp=timestamp, fqdn=config.NODE_NAME,
+            duration=duration, message=message, extra=json.dumps(extra))
 
-            for object_type, object_uuid in simpler_objects:
-                if not object_uuid:
-                    continue
+        for object_type, object_uuid in simpler_objects:
+            if not object_uuid:
+                continue
 
-                try:
-                    eo = request.objects.add()
-                    eo.object_type = object_type
-                    eo.object_uuid = object_uuid
-                except TypeError as e:
-                    log.warning(
-                        f'Failed to add event for {object_type} with uuid '
-                        f'{object_uuid}: {e}')
+            try:
+                eo = request.objects.add()
+                eo.object_type = object_type
+                eo.object_uuid = object_uuid
+            except TypeError as e:
+                log.warning(
+                    f'Failed to add event for {object_type} with uuid '
+                    f'{object_uuid}: {e}')
 
-            response = stub.RecordMultiEvent(request)
-            if response.ack:
-                return
+        response = stub.RecordMultiEvent(request)
+        if response.ack:
+            return
 
     except grpc._channel._InactiveRpcError as e:
         if e.code().name == 'UNIMPLEMENTED':
@@ -123,19 +137,17 @@ def add_event_multi(
     # Attempt to send with the older EventRequest
     failed = simpler_objects
     try:
-        with grpc.insecure_channel(
-                f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}') as channel:
-            stub = event_pb2_grpc.EventServiceStub(channel)
-            for object_type, object_uuid in simpler_objects:
-                request = event_pb2.EventRequest(
-                    object_type=object_type, object_uuid=object_uuid,
-                    event_type=event_type, timestamp=timestamp,
-                    fqdn=config.NODE_NAME, duration=duration,
-                    message=message, extra=json.dumps(extra))
-                response = stub.RecordEvent(request)
+        channel = channel = get_eventlog_client()
+        for object_type, object_uuid in simpler_objects:
+            request = event_pb2.EventRequest(
+                object_type=object_type, object_uuid=object_uuid,
+                event_type=event_type, timestamp=timestamp,
+                fqdn=config.NODE_NAME, duration=duration,
+                message=message, extra=json.dumps(extra))
+            response = stub.RecordEvent(request)
 
-                if not response.ack:
-                    del failed[(object_type, object_uuid)]
+            if not response.ack:
+                del failed[(object_type, object_uuid)]
 
     except grpc._channel._InactiveRpcError as e:
         log.info('Failed to send event with gRPC, adding to dead letter queue: %s' % e)
