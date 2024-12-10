@@ -101,6 +101,8 @@ def update_object_state_cache(object_type, object_uuid, old_state, new_state):
             object_type, object_uuid, old_state, new_state)
         if success:
             return
+
+        time.sleep(0.2)
         attempts += 1
 
     failure_strings = []
