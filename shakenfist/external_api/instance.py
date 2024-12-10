@@ -520,33 +520,34 @@ class InstancesEndpoint(sf_api.Resource):
             if util_general.noneish(disk_base):
                 d['disk_base'] = None
 
-            # Convert internal shorthand forms into specific artifacts. No
-            # artifact being found and permissions checks are handled by
-            # lookup_artifact_reference, so we don't need to check here as well.
-            a = api_util.lookup_artifact_reference(
-                disk_base, namespace, instance_uuid)
-            if not a:
-                # It might be a direct blob reference?
-                if disk_base.startswith(BLOB_URL):
-                    d['blob_uuid'] = disk_base[len(BLOB_URL):]
+            if disk_base:
+                # Convert internal shorthand forms into specific artifacts. No
+                # artifact being found and permissions checks are handled by
+                # lookup_artifact_reference, so we don't need to check here as well.
+                a = api_util.lookup_artifact_reference(
+                    disk_base, namespace, instance_uuid)
+                if not a:
+                    # It might be a direct blob reference?
+                    if disk_base.startswith(BLOB_URL):
+                        d['blob_uuid'] = disk_base[len(BLOB_URL):]
+
+                    else:
+                        # We ensure that the image exists in the database in an initial
+                        # state here so that it will show up in image list requests.
+                        # The image is fetched by the queued job later. This disk_base
+                        # is not re-written here, and is converted into a blob at
+                        # instance start by _configure_block_devices().
+                        a = Artifact.from_url(
+                            Artifact.TYPE_IMAGE, disk_base, namespace=namespace,
+                            create_if_new=True)
 
                 else:
-                    # We ensure that the image exists in the database in an initial
-                    # state here so that it will show up in image list requests.
-                    # The image is fetched by the queued job later. This disk_base
-                    # is not re-written here, and is converted into a blob at
-                    # instance start by _configure_block_devices().
-                    a = Artifact.from_url(
-                        Artifact.TYPE_IMAGE, disk_base, namespace=namespace,
-                        create_if_new=True)
-
-            else:
-                # Convert that artifact into a specific blob
-                blob_uuid = a.resolve_to_blob()
-                if not blob_uuid:
-                    return sf_api.error(
-                        404, f'Could not resolve artifact {a["uuid"]} to a blob')
-                d['blob_uuid'] = blob_uuid
+                    # Convert that artifact into a specific blob
+                    blob_uuid = a.resolve_to_blob()
+                    if not blob_uuid:
+                        return sf_api.error(
+                            404, f'Could not resolve artifact {a["uuid"]} to a blob')
+                    d['blob_uuid'] = blob_uuid
 
             transformed_disk.append(d)
 
