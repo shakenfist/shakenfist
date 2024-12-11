@@ -98,8 +98,8 @@ jobs:
             job_name: 'guests',
             base_image: 'sf://label/ci-images/debian-11',
             base_image_user: 'debian',
-            topology: 'localhost',
-            concurrency: 3,
+            topology: 'slim-primary',
+            concurrency: 5,
             stestr_config: 'guest-ci.conf'
           },
         ]
@@ -399,8 +399,8 @@ jobs:
             job_name: 'guests',
             base_image: 'sf://label/ci-images/debian-11',
             base_image_user: 'debian',
-            topology: 'localhost',
-            concurrency: 3,
+            topology: 'slim-primary',
+            concurrency: 5,
             stestr_config: 'guest-ci.conf'
           }
         ]
