@@ -20,7 +20,9 @@ on:
       - mkdocs.yml
 
 jobs:
-  lint:
+  # These sanity checks used to be three separate jobs, but are now combined
+  # to save a little time and reduce CI runner churn.
+  sanity_checks:
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-lint
@@ -36,41 +38,10 @@ jobs:
         run: |
           /usr/bin/tox -eflake8
 
-  # NOTE(mikal): we need this one early because renovate creates a lot of PRs
-  # where the proposed combination of dependencies doesn't actually install and
-  # I don't want to waste a lot of CI resources on them.
-  requirements_check:
-    needs: lint
-    runs-on: [self-hosted, vm]
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-requirements
-      cancel-in-progress: true
-
-    steps:
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
-        with:
-          path: shakenfist
-          fetch-depth: 0
-
       - name: Attempt to install requirements
         run: |
-          cd ${GITHUB_WORKSPACE}
-          python3 -mvenv venv
-          venv/bin/pip3 install -r shakenfist/requirements.txt
-
-  build38:
-    needs: [lint, requirements_check]
-    runs-on: [self-hosted, vm]
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-build38
-      cancel-in-progress: true
-
-    steps:
-      - name: Checkout code with two commits
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
+          python3 -mvenv /tmp/venv
+          /tmp/venv/bin/pip3 install -r requirements.txt
 
       - name: Run python3 unit tests
         run: |
@@ -79,28 +50,18 @@ jobs:
   functional_matrix_pr:
     if: always() && github.event_name != 'merge_group'
     name: "${{ matrix.os.description }}"
-    needs: [lint, requirements_check]
     strategy:
       fail-fast: false
       matrix:
         os: [
           {
-            description: 'debian 11 single machine',
-            job_name: 'debian-11-localhost',
+            description: 'smoke',
+            job_name: 'smoke',
             base_image: 'sf://label/ci-images/debian-11',
             base_image_user: 'debian',
             topology: 'localhost',
             concurrency: 3,
-            stestr_config: 'cluster-ci.conf'
-          },
-          {
-            description: 'guests',
-            job_name: 'guests',
-            base_image: 'sf://label/ci-images/debian-11',
-            base_image_user: 'debian',
-            topology: 'slim-primary',
-            concurrency: 5,
-            stestr_config: 'guest-ci.conf'
+            stestr_config: 'smoke-ci.conf'
           },
         ]
     runs-on: [self-hosted, vm]
@@ -212,23 +173,9 @@ jobs:
           setup="${setup} . /etc/sf/sfrc;"
           setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
           setup="${setup} sf-client artifact upload"
-
-          # The cluster CI image, used by all CI types
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-                "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
-
-          if [ "${{ matrix.os.stestr_config }}" != "cluster-ci.conf" ]; then
-            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-                "${setup} ubuntu-2004 /srv/ci/ubuntu:20.04 --shared --no-checksum"
-            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-                "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
-            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-                "${setup} cirros /srv/ci/cirros --shared"
-          fi
+              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
+              "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
 
       - name: Create a base level of activity in the cluster
         run: |
@@ -267,7 +214,6 @@ jobs:
               ${{ matrix.os.base_image_user }}@${primary} "${script}"
 
       - name: List slowest tests
-        if: failure()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
@@ -362,7 +308,6 @@ jobs:
   functional_matrix_merge:
     if: github.event_name == 'merge_group'
     name: "${{ matrix.os.description }}"
-    needs: [build38, requirements_check]
     strategy:
       fail-fast: false
       matrix:
@@ -550,7 +495,6 @@ jobs:
               ${{ matrix.os.base_image_user }}@${primary} "${script}"
 
       - name: List slowest tests
-        if: failure()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
@@ -641,7 +585,6 @@ jobs:
 
   ansible_modules:
     if: github.event_name == 'merge_group'
-    needs: [lint, requirements_check, build38]
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-ansiblemodules
@@ -813,7 +756,6 @@ jobs:
 
   node_lifecycle:
     if: github.event_name == 'merge_group'
-    needs: [lint, requirements_check, build38]
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-nodelifecycle
@@ -987,7 +929,6 @@ jobs:
 
   upgrade_0_6_15:
     if: github.event_name == 'merge_group'
-    needs: [lint, requirements_check, build38]
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-upgrade-0-6-15
@@ -1140,9 +1081,6 @@ jobs:
 
   can_enqueue:
     needs:
-      - lint
-      - build38
-      - requirements_check
       - functional_matrix_pr
     if: always() && github.event_name != 'merge_group'
     permissions:
@@ -1159,9 +1097,6 @@ jobs:
 
   can_merge:
     needs:
-      - lint
-      - build38
-      - requirements_check
       - functional_matrix_merge
       - ansible_modules
       - node_lifecycle
