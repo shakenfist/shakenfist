@@ -82,11 +82,11 @@ jobs:
 
       - name: Build infrastructure
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist-develop
+          cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
-              deploy/ansible/ci-topology-${{ matrix.os.topology }}.yml
+              ansible/ci-topology-${{ matrix.os.topology }}.yml
 
           if [ "${{ matrix.os.topology }}" == "localhost" ]; then
             echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
@@ -109,7 +109,7 @@ jobs:
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist-develop
+          cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
               ${{ matrix.os.base_image_user }}@${primary}:.
@@ -123,7 +123,7 @@ jobs:
       - name: Log github actions buffering status
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist-develop
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
@@ -242,7 +242,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist-develop
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh ${{ matrix.os.branch }}"
 
       # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
@@ -268,7 +268,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist-develop
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh ${{ matrix.os.branch }}"
 
       - name: Fetch and tweak inventory
@@ -295,7 +295,7 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist-develop/deploy/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

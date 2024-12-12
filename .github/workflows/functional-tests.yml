@@ -85,11 +85,11 @@ jobs:
 
       - name: Build infrastructure
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
-              deploy/ansible/ci-topology-${{ matrix.os.topology }}.yml
+              ansible/ci-topology-${{ matrix.os.topology }}.yml
 
           if [ "${{ matrix.os.topology }}" == "localhost" ]; then
             echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
@@ -112,7 +112,7 @@ jobs:
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
               ${{ matrix.os.base_image_user }}@${primary}:.
@@ -126,7 +126,7 @@ jobs:
       - name: Log github actions buffering status
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
@@ -241,7 +241,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.os.job_name }}"
 
       # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
@@ -259,7 +259,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
@@ -295,7 +295,7 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -370,11 +370,11 @@ jobs:
 
       - name: Build infrastructure
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
-              deploy/ansible/ci-topology-${{ matrix.os.topology }}.yml
+              ansible/ci-topology-${{ matrix.os.topology }}.yml
 
           if [ "${{ matrix.os.topology }}" == "localhost" ]; then
             echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
@@ -397,7 +397,7 @@ jobs:
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
               ${{ matrix.os.base_image_user }}@${primary}:.
@@ -411,7 +411,7 @@ jobs:
       - name: Log github actions buffering status
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
@@ -522,7 +522,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.os.job_name }}"
 
       - name: Check SF process CPU usage
@@ -537,7 +537,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
@@ -573,7 +573,7 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -591,29 +591,18 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Set environment variables
-        run: |
-          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
-          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
-
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment@main
         with:
-          path: shakenfist
-          fetch-depth: 0
-
-      - name: Determine if there is any dependency between the repositories
-        run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+          primary_repository: shakenfist/shakenfist
 
       - name: Build infrastructure
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
-              deploy/ansible/ci-topology-slim-primary.yml
+              ansible/ci-topology-slim-primary.yml
 
           nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
           random_index=$(( RANDOM % 5 ))
@@ -632,7 +621,7 @@ jobs:
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
               debian@$primary:.
@@ -702,7 +691,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ansible-modules"
 
       - name: Check process CPU usage
@@ -717,7 +706,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
@@ -744,7 +733,7 @@ jobs:
 
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -762,29 +751,18 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Set environment variables
-        run: |
-          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
-          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
-
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment@main
         with:
-          path: shakenfist
-          fetch-depth: 0
-
-      - name: Determine if there is any dependency between the repositories
-        run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+          primary_repository: shakenfist/shakenfist
 
       - name: Build infrastructure
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
-              deploy/ansible/ci-topology-slim-primary.yml
+              ansible/ci-topology-slim-primary.yml
 
           nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
           random_index=$(( RANDOM % 5 ))
@@ -803,7 +781,7 @@ jobs:
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
               debian@$primary:.
@@ -872,7 +850,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop node-lifecycle"
 
       - name: Restart Shaken Fist nodes so we can collect logs
@@ -890,7 +868,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
@@ -917,7 +895,7 @@ jobs:
 
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -935,29 +913,18 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Set environment variables
-        run: |
-          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
-          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
-
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment@main
         with:
-          path: shakenfist
-          fetch-depth: 0
-
-      - name: Determine if there is any dependency between the repositories
-        run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+          primary_repository: shakenfist/shakenfist
 
       - name: Build infrastructure
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
-              deploy/ansible/ci-topology-localhost-upgrade.yml
+              ansible/ci-topology-localhost-upgrade.yml
 
           echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
 
@@ -974,7 +941,7 @@ jobs:
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
               debian@$primary:.
@@ -1029,7 +996,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop upgrade-0-6-15"
 
       - name: Check for reasonable data rates
@@ -1037,7 +1004,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
@@ -1063,7 +1030,7 @@ jobs:
 
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()

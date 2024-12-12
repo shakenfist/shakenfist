@@ -62,19 +62,20 @@ jobs:
           run: |
             echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
 
-        - name: Checkout shakenfist
+        - name: Checkout the actions repository
           uses: actions/checkout@v4
           with:
-            path: shakenfist
+            repository: shakenfist/actions
+            path: actions
             fetch-depth: 0
 
         - name: Build image
           run: |
-            cd ${GITHUB_WORKSPACE}/shakenfist
+            cd ${GITHUB_WORKSPACE}/actions
             ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
                 base_image=${{ matrix.os.baseimage }} base_image_user=${{ matrix.os.baseuser }} label=${{ matrix.os.outputlabel }}" \
-              deploy/ansible/ci-image.yml
+              ansible/ci-image.yml
 
         - uses: JasonEtco/create-an-issue@v2
           if: failure()
