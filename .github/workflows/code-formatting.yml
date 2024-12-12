@@ -9,7 +9,6 @@ on:
       - develop
     paths:
       - '.github/workflows/code-formatting.yml'
-      - 'tools/ci_code_formatting.sh'
 
 jobs:
   code-formatters:
@@ -32,6 +31,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: shakenfist
+          fetch-depth: 0
+
+      - name: Checkout the actions repository
+        uses: actions/checkout@v4
+        with:
+          repository: shakenfist/actions
+          path: actions
           fetch-depth: 0
 
       - name: Install the github command line
@@ -62,4 +68,4 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/shakenfist
           . ${RUNNER_TEMP}/venv/bin/activate
-          ${GITHUB_WORKSPACE}/shakenfist/tools/ci_code_formatting.sh 39
+          ${GITHUB_WORKSPACE}/actions/tools/ci_code_formatting.sh 39

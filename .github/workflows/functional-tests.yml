@@ -20,7 +20,9 @@ on:
       - mkdocs.yml
 
 jobs:
-  lint:
+  # These sanity checks used to be three separate jobs, but are now combined
+  # to save a little time and reduce CI runner churn.
+  sanity_checks:
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-lint
@@ -36,41 +38,10 @@ jobs:
         run: |
           /usr/bin/tox -eflake8
 
-  # NOTE(mikal): we need this one early because renovate creates a lot of PRs
-  # where the proposed combination of dependencies doesn't actually install and
-  # I don't want to waste a lot of CI resources on them.
-  requirements_check:
-    needs: lint
-    runs-on: [self-hosted, vm]
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-requirements
-      cancel-in-progress: true
-
-    steps:
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
-        with:
-          path: shakenfist
-          fetch-depth: 0
-
       - name: Attempt to install requirements
         run: |
-          cd ${GITHUB_WORKSPACE}
-          python3 -mvenv venv
-          venv/bin/pip3 install -r shakenfist/requirements.txt
-
-  build38:
-    needs: [lint, requirements_check]
-    runs-on: [self-hosted, vm]
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-build38
-      cancel-in-progress: true
-
-    steps:
-      - name: Checkout code with two commits
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
+          python3 -mvenv /tmp/venv
+          /tmp/venv/bin/pip3 install -r requirements.txt
 
       - name: Run python3 unit tests
         run: |
@@ -79,19 +50,19 @@ jobs:
   functional_matrix_pr:
     if: always() && github.event_name != 'merge_group'
     name: "${{ matrix.os.description }}"
-    needs: [lint, requirements_check]
     strategy:
       fail-fast: false
       matrix:
         os: [
           {
-            description: 'debian 11 single machine',
-            job_name: 'debian-11-localhost',
+            description: 'smoke',
+            job_name: 'smoke',
             base_image: 'sf://label/ci-images/debian-11',
             base_image_user: 'debian',
             topology: 'localhost',
-            concurrency: 3
-          }
+            concurrency: 3,
+            stestr_config: 'smoke-ci.conf'
+          },
         ]
     runs-on: [self-hosted, vm]
     concurrency:
@@ -107,29 +78,18 @@ jobs:
           echo "topology: ${{ matrix.os.topology }}"
           echo "concurrency: ${{ matrix.os.concurrency }}"
 
-      - name: Set environment variables
-        run: |
-          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
-          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
-
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment@main
         with:
-          path: shakenfist
-          fetch-depth: 0
-
-      - name: Determine if there is any dependency between the repositories
-        run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+          primary_repository: shakenfist/shakenfist
 
       - name: Build infrastructure
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
-              deploy/ansible/ci-topology-${{ matrix.os.topology }}.yml
+              ansible/ci-topology-${{ matrix.os.topology }}.yml
 
           if [ "${{ matrix.os.topology }}" == "localhost" ]; then
             echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
@@ -152,7 +112,7 @@ jobs:
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
               ${{ matrix.os.base_image_user }}@${primary}:.
@@ -166,7 +126,7 @@ jobs:
       - name: Log github actions buffering status
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
@@ -215,16 +175,294 @@ jobs:
           setup="${setup} sf-client artifact upload"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-              "${setup} ubuntu-2004 /srv/ci/ubuntu:20.04 --shared --no-checksum"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
               "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
+
+      - name: Create a base level of activity in the cluster
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-              "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
+              ${{ matrix.os.base_image_user }}@${primary} \
+              'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
+          echo ""
+          echo ""
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-              "${setup} cirros /srv/ci/cirros --shared"
+              ${{ matrix.os.base_image_user }}@${primary} \
+              '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24 > /dev/null; echo -n "."; done'
+          echo ""
+
+      - name: Make the traces directory
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} "sudo mkdir -p /srv/ci/traces; sudo chown -R ${{ matrix.os.base_image_user }}:${{ matrix.os.base_image_user }} /srv/ci/traces"
+
+      - name: Run functional tests
+        timeout-minutes: 180
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${source_path}/shakenfist \
+              ${{ matrix.os.base_image_user }}@${primary}:shakenfist
+
+          script="cd shakenfist/deploy/;"
+          script="${script} . /etc/sf/sfrc;"
+          script="${script} sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt;"
+          script="${script} set -e;"
+          script="${script} stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} "${script}"
+
+      - name: List slowest tests
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} \
+              "cd shakenfist/deploy; stestr slowest || true"
+
+      - name: List failing tests
+        if: failure()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          echo "Gathering list of failed tests..."
+          touch ${GITHUB_WORKSPACE}/failed
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} \
+              "cd shakenfist/deploy; stestr failing || true" > ${GITHUB_WORKSPACE}/failed
+          echo
+
+          echo "Failed tests:"
+          cat ${GITHUB_WORKSPACE}/failed
+          echo
+
+      - name: Check logs
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.os.job_name }}"
+
+      # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
+      # cost. That's not really something we can control, so just ignore the CPU
+      # usage of that process instead.
+      - name: Check SF process CPU usage
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs -t 0.99 --ignore sf_cleaner'
+
+      - name: Check for reasonable data rates
+        timeout-minutes: 5
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
+
+      - name: Fetch and tweak inventory
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary}:/etc/sf/inventory.yaml /srv/github/
+          sed -i 's|/root/.ssh|/home/debian/.ssh|g' /srv/github/inventory.yaml
+
+          echo "====="
+          cat /srv/github/inventory.yaml
+
+      - name: Gather logs
+        if: always()
+        run: |
+          set -x
+
+          # Fetch unit test tracing. Sometimes this isn't present if we failed
+          # super early in the CI job.
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          mkdir -p /srv/github/bundle/
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null -rp \
+              ${{ matrix.os.base_image_user }}@${primary}:/srv/ci/traces \
+              /srv/github/bundle/ || true
+
+          # We need the ssh key in the place ansible expects it to be, which isn't
+          # true on the CI worker node.
+          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
+          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
+
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
+              ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bundle-functional-cluster-${{ matrix.os.job_name }}
+          retention-days: 90
+          if-no-files-found: error
+          path: /srv/github/artifacts/bundle.zip
+
+  functional_matrix_merge:
+    if: github.event_name == 'merge_group'
+    name: "${{ matrix.os.description }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [
+          {
+            description: 'debian 11 single machine',
+            job_name: 'debian-11-localhost',
+            base_image: 'sf://label/ci-images/debian-11',
+            base_image_user: 'debian',
+            topology: 'localhost',
+            concurrency: 3,
+            stestr_config: 'cluster-ci.conf'
+          },
+          {
+            description: 'debian 12 cluster',
+            job_name: 'debian-12-slim-primary',
+            base_image: 'sf://label/ci-images/debian-12',
+            base_image_user: 'debian',
+            topology: 'slim-primary',
+            concurrency: 5,
+            stestr_config: 'guest-ci.conf'
+          },
+          {
+            description: 'ubuntu 24.04 cluster',
+            job_name: 'ubuntu-2404-slim-primary',
+            base_image: 'sf://label/ci-images/ubuntu-2404',
+            base_image_user: 'ubuntu',
+            topology: 'slim-primary',
+            concurrency: 5,
+            stestr_config: 'guest-ci.conf'
+          },
+          {
+            description: 'guests',
+            job_name: 'guests',
+            base_image: 'sf://label/ci-images/debian-11',
+            base_image_user: 'debian',
+            topology: 'slim-primary',
+            concurrency: 5,
+            stestr_config: 'guest-ci.conf'
+          }
+        ]
+    runs-on: [self-hosted, vm]
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os.job_name }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Log matrix details
+        run: |
+          echo "job_name: ${{ matrix.os.job_name }}"
+          echo "base_image: ${{ matrix.os.base_image }}"
+          echo "base_image_user: ${{ matrix.os.base_image_user }}"
+          echo "topology: ${{ matrix.os.topology }}"
+          echo "concurrency: ${{ matrix.os.concurrency }}"
+
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment@main
+        with:
+          primary_repository: shakenfist/shakenfist
+
+      - name: Build infrastructure
+        run: |
+          cd ${GITHUB_WORKSPACE}/actions
+          ansible-playbook -i /home/debian/ansible-hosts \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+              base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
+              ansible/ci-topology-${{ matrix.os.topology }}.yml
+
+          if [ "${{ matrix.os.topology }}" == "localhost" ]; then
+            echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
+          else
+            nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
+            random_index=$(( RANDOM % 5 ))
+            echo "UPLOAD_TARGET=${nodes[$random_index]}" >> $GITHUB_ENV
+          fi
+
+      - name: Log environmental configuration
+        run: |
+          echo "## ci-environment.sh"
+          cat ${GITHUB_WORKSPACE}/ci-environment.sh
+          echo
+          echo "## Environment variables"
+          echo "SF_HEAD_SHA = ${SF_HEAD_SHA}"
+          echo "SHAKENFIST_NAMESPACE = ${SHAKENFIST_NAMESPACE}"
+          echo "UPLOAD_TARGET = ${UPLOAD_TARGET}"
+
+      - name: Copy CI tools to primary
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null -rp tools \
+              ${{ matrix.os.base_image_user }}@${primary}:.
+
+          echo ""
+          echo "Copied tools:"
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} "ls tools"
+
+      - name: Log github actions buffering status
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} python3 tools/buffer.py
+
+      - name: Run getsf installer on primary
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} /tmp/getsf-wrapper
+          echo ""
+          echo ""
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} \
+              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
+
+      - name: Wait for API to start answering
+        run: |
+          set +e
+
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
+
+          count=0
+          while [ $count -lt 60 ]
+          do
+            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client instance list'
+            if [ $? == 0 ]; then
+              exit 0
+            fi
+
+            count=$(( $count + 1 ))
+            sleep 5
+          done
+
+          exit 1
+
+      - name: Import cached images
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
+          setup="${setup} . /etc/sf/sfrc;"
+          setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
+          setup="${setup} sf-client artifact upload"
+
+          # The cluster CI image, used by all CI types
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
+                "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
 
       - name: Create a base level of activity in the cluster
         run: |
@@ -248,284 +486,43 @@ jobs:
       - name: Run functional tests
         timeout-minutes: 120
         run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              $source_path/shakenfist \
-              ${{ matrix.os.base_image_user }}@${primary}:shakenfist
+          script="cd shakenfist/deploy/;"
+          script="${script} . /etc/sf/sfrc;"
+          script="${script} sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt;"
+          script="${script} set -e;"
+          script="${script} stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency=${{ matrix.os.concurrency}}; stestr slowest"
-
-      - name: Check logs
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.os.job_name }}"
-
-      - name: Check SF process CPU usage
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs -t 0.99'
-
-      - name: Check for reasonable data rates
-        timeout-minutes: 5
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
-          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
-
-      - name: Fetch and tweak inventory
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary}:/etc/sf/inventory.yaml /srv/github/
-          sed -i 's|/root/.ssh|/home/debian/.ssh|g' /srv/github/inventory.yaml
-
-          echo "====="
-          cat /srv/github/inventory.yaml
-
-      - name: Gather logs
-        if: always()
-        run: |
-          set -x
-
-          # Fetch unit test tracing. Sometimes this isn't present if we failed
-          # super early in the CI job.
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          mkdir -p /srv/github/bundle/
-          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null -rp \
-              ${{ matrix.os.base_image_user }}@${primary}:/srv/ci/traces \
-              /srv/github/bundle/ || true
-
-          # We need the ssh key in the place ansible expects it to be, which isn't
-          # true on the CI worker node.
-          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
-          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
-
-          ansible-playbook -i /srv/github/inventory.yaml \
-              --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
-              ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: bundle-functional-cluster-${{ matrix.os.job_name }}
-          retention-days: 90
-          if-no-files-found: error
-          path: /srv/github/artifacts/bundle.zip
-
-  functional_matrix_merge:
-    if: github.event_name == 'merge_group'
-    name: "${{ matrix.os.description }}"
-    needs: [lint, requirements_check, build38]
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [
-          {
-            description: 'debian 11 single machine',
-            job_name: 'debian-11-localhost',
-            base_image: 'sf://label/ci-images/debian-11',
-            base_image_user: 'debian',
-            topology: 'localhost',
-            concurrency: 3
-          },
-          {
-            description: 'debian 12 cluster',
-            job_name: 'debian-12-slim-primary',
-            base_image: 'sf://label/ci-images/debian-12',
-            base_image_user: 'debian',
-            topology: 'slim-primary',
-            concurrency: 5
-          },
-          {
-            description: 'ubuntu 24.04 cluster',
-            job_name: 'ubuntu-2404-slim-primary',
-            base_image: 'sf://label/ci-images/ubuntu-2404',
-            base_image_user: 'ubuntu',
-            topology: 'slim-primary',
-            concurrency: 5
-          },
-        ]
-    runs-on: [self-hosted, vm]
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os.job_name }}
-      cancel-in-progress: true
-
-    steps:
-      - name: Log matrix details
-        run: |
-          echo "job_name: ${{ matrix.os.job_name }}"
-          echo "base_image: ${{ matrix.os.base_image }}"
-          echo "base_image_user: ${{ matrix.os.base_image_user }}"
-          echo "topology: ${{ matrix.os.topology }}"
-          echo "concurrency: ${{ matrix.os.concurrency }}"
-
-      - name: Set environment variables
-        run: |
-          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
-          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
-
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
-        with:
-          path: shakenfist
-          fetch-depth: 0
-
-      - name: Determine if there is any dependency between the repositories
-        run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
-
-      - name: Build infrastructure
-        run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
-          ansible-playbook -i /home/debian/ansible-hosts \
-              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
-              base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
-              deploy/ansible/ci-topology-${{ matrix.os.topology }}.yml
-
-          if [ "${{ matrix.os.topology }}" == "localhost" ]; then
-            echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
-          else
-            nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
-            random_index=$(( RANDOM % 5 ))
-            echo "UPLOAD_TARGET=${nodes[$random_index]}" >> $GITHUB_ENV
-          fi
-
-      - name: Log environmental configuration
-        run: |
-          echo "## ci-environment.sh"
-          cat ${GITHUB_WORKSPACE}/ci-environment.sh
-          echo
-          echo "## Environment variables"
-          echo "SF_HEAD_SHA = ${SF_HEAD_SHA}"
-          echo "SHAKENFIST_NAMESPACE = ${SHAKENFIST_NAMESPACE}"
-          echo "UPLOAD_TARGET = ${UPLOAD_TARGET}"
-
-      - name: Copy CI tools to primary
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
-          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null -rp tools \
-              ${{ matrix.os.base_image_user }}@${primary}:.
-
-          echo ""
-          echo "Copied tools:"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "ls tools"
-
-      - name: Log github actions buffering status
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
-          tools/run_remote ${primary} python3 tools/buffer.py
-
-      - name: Run getsf installer on primary
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} /tmp/getsf-wrapper
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
-
-      - name: Wait for API to start answering
-        run: |
-          set +e
-
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
-
-          count=0
-          while [ $count -lt 60 ]
-          do
-            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client instance list'
-            if [ $? == 0 ]; then
-              exit 0
-            fi
-
-            count=$(( $count + 1 ))
-            sleep 5
-          done
-
-          exit 1
-
-      - name: Import cached images
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-
-          setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
-          setup="${setup} . /etc/sf/sfrc;"
-          setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
-          setup="${setup} sf-client artifact upload"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-              "${setup} ubuntu-2004 /srv/ci/ubuntu:20.04 --shared --no-checksum"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-              "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-              "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-              "${setup} cirros /srv/ci/cirros --shared"
-
-      - name: Create a base level of activity in the cluster
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24 > /dev/null; echo -n "."; done'
-          echo ""
-
-      - name: Make the traces directory
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          script="sudo mkdir -p /srv/ci/traces;"
-          script="${script} export USER=\"${{ matrix.os.base_image_user }}\";"
-          script="${script} sudo chown -R \${USER}:\${USER} /srv/ci/traces"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} "${script}"
 
-      - name: Run functional tests
-        timeout-minutes: 180
+      - name: List slowest tests
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              $source_path/shakenfist \
-              ${{ matrix.os.base_image_user }}@${primary}:shakenfist
+
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "cd shakenfist/deploy; . /etc/sf/sfrc; sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt; set -e; stestr run --concurrency=${{ matrix.os.concurrency}}; stestr slowest"
+              ${{ matrix.os.base_image_user }}@${primary} \
+              "cd shakenfist/deploy; stestr slowest || true"
+
+      - name: List failing tests
+        if: failure()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          echo "Gathering list of failed tests..."
+          touch ${GITHUB_WORKSPACE}/failed
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} \
+              "cd shakenfist/deploy; stestr failing || true" > ${GITHUB_WORKSPACE}/failed
+          echo
+
+          echo "Failed tests:"
+          cat ${GITHUB_WORKSPACE}/failed
+          echo
 
       - name: Check logs
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.os.job_name }}"
 
       - name: Check SF process CPU usage
@@ -540,7 +537,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
@@ -576,7 +573,7 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -588,36 +585,24 @@ jobs:
 
   ansible_modules:
     if: github.event_name == 'merge_group'
-    needs: [lint, requirements_check, build38]
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-ansiblemodules
       cancel-in-progress: true
 
     steps:
-      - name: Set environment variables
-        run: |
-          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
-          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
-
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment@main
         with:
-          path: shakenfist
-          fetch-depth: 0
-
-      - name: Determine if there is any dependency between the repositories
-        run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+          primary_repository: shakenfist/shakenfist
 
       - name: Build infrastructure
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
-              deploy/ansible/ci-topology-slim-primary.yml
+              ansible/ci-topology-slim-primary.yml
 
           nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
           random_index=$(( RANDOM % 5 ))
@@ -636,7 +621,7 @@ jobs:
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
               debian@$primary:.
@@ -685,18 +670,11 @@ jobs:
           setup="${setup} . /etc/sf/sfrc;"
           setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
           setup="${setup} sf-client artifact upload"
+
+          # The cluster CI image, used by all CI types
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@${UPLOAD_TARGET} \
-              "${setup} ubuntu-2004 /srv/ci/ubuntu:20.04 --shared --no-checksum"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@${UPLOAD_TARGET} \
-              "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@${UPLOAD_TARGET} \
-              "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@${UPLOAD_TARGET} \
-              "${setup} cirros /srv/ci/cirros --shared"
+                debian@${UPLOAD_TARGET} \
+                "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
 
       - name: Run ansible module tests
         timeout-minutes: 60
@@ -713,7 +691,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ansible-modules"
 
       - name: Check process CPU usage
@@ -728,7 +706,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
@@ -755,7 +733,7 @@ jobs:
 
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -767,36 +745,24 @@ jobs:
 
   node_lifecycle:
     if: github.event_name == 'merge_group'
-    needs: [lint, requirements_check, build38]
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-nodelifecycle
       cancel-in-progress: true
 
     steps:
-      - name: Set environment variables
-        run: |
-          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
-          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
-
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment@main
         with:
-          path: shakenfist
-          fetch-depth: 0
-
-      - name: Determine if there is any dependency between the repositories
-        run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+          primary_repository: shakenfist/shakenfist
 
       - name: Build infrastructure
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
-              deploy/ansible/ci-topology-slim-primary.yml
+              ansible/ci-topology-slim-primary.yml
 
           nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
           random_index=$(( RANDOM % 5 ))
@@ -815,7 +781,7 @@ jobs:
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
               debian@$primary:.
@@ -864,6 +830,7 @@ jobs:
           setup="${setup} . /etc/sf/sfrc;"
           setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
           setup="${setup} sf-client artifact upload"
+
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@${UPLOAD_TARGET} \
               "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
@@ -883,7 +850,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop node-lifecycle"
 
       - name: Restart Shaken Fist nodes so we can collect logs
@@ -901,7 +868,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
@@ -928,7 +895,7 @@ jobs:
 
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -940,36 +907,24 @@ jobs:
 
   upgrade_0_6_15:
     if: github.event_name == 'merge_group'
-    needs: [lint, requirements_check, build38]
     runs-on: [self-hosted, vm]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-upgrade-0-6-15
       cancel-in-progress: true
 
     steps:
-      - name: Set environment variables
-        run: |
-          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
-          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
-
-      - name: Checkout shakenfist
-        uses: actions/checkout@v4
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment@main
         with:
-          path: shakenfist
-          fetch-depth: 0
-
-      - name: Determine if there is any dependency between the repositories
-        run: |
-          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+          primary_repository: shakenfist/shakenfist
 
       - name: Build infrastructure
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
-              deploy/ansible/ci-topology-localhost-upgrade.yml
+              ansible/ci-topology-localhost-upgrade.yml
 
           echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
 
@@ -986,7 +941,7 @@ jobs:
       - name: Copy CI tools to primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
               debian@$primary:.
@@ -1041,7 +996,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop upgrade-0-6-15"
 
       - name: Check for reasonable data rates
@@ -1049,7 +1004,7 @@ jobs:
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
+          cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
 
       - name: Fetch and tweak inventory
@@ -1075,7 +1030,7 @@ jobs:
 
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/deploy/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -1093,9 +1048,6 @@ jobs:
 
   can_enqueue:
     needs:
-      - lint
-      - build38
-      - requirements_check
       - functional_matrix_pr
     if: always() && github.event_name != 'merge_group'
     permissions:
@@ -1112,9 +1064,6 @@ jobs:
 
   can_merge:
     needs:
-      - lint
-      - build38
-      - requirements_check
       - functional_matrix_merge
       - ansible_modules
       - node_lifecycle

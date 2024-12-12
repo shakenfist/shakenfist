@@ -21,6 +21,9 @@ LOG = logging.getLogger()
 TRACE_PATH = '/srv/ci/traces'
 
 
+CLUSTER_CI_IMAGE = 'sf://upload/system/debian-11'
+
+
 class TimeoutException(Exception):
     pass
 
@@ -33,9 +36,9 @@ class WrongEventException(Exception):
     pass
 
 
-def load_userdata(name):
+def load_userdata(suite, name):
     test_dir = os.path.dirname(os.path.abspath(__file__))
-    with open(f'{test_dir}/tests/files/{name}_userdata') as f:
+    with open(f'{test_dir}/{suite}/files/{name}_userdata') as f:
         return base64.b64encode(f.read().encode('utf-8')).decode('utf-8')
 
 

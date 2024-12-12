@@ -1,0 +1,6 @@
+prettytable                 # bsd
+oslo.concurrency            # apache2
+setuptools>=65.3.0          # mit
+
+testtools                   # mit
+stestr==4.1.0               # apache2
