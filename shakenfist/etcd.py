@@ -108,7 +108,15 @@ def reset_client():
     local.sf_etcd_client = None
 
 
-def get_etcd__native_client():
+def get_etcd_native_client():
+    # If your eventlog server isn't setup, we get cranky. Note that this
+    # happens during unit test discovery for py3 unit tests.
+    if not config.ETCD_HOST:
+        caller = util_callstack.generate_traceback()
+        LOG.error('Cannot communicate with etcd, no configured server! Caller was:\n'
+                  f'{caller}')
+        return
+
     c = getattr(local, 'sf_etcd_native_client', None)
     if not c:
         local.sf_etcd_native_client = grpc.insecure_channel(
@@ -677,7 +685,7 @@ def _retry_etcd_native_client(func):
 
 @_retry_etcd_native_client
 def compact(revision):
-    channel = get_etcd__native_client()
+    channel = get_etcd_native_client()
     stub = etcd_pb2_grpc.KVStub(channel)
     try:
         stub.Compact(etcd_pb2.CompactionRequest(
@@ -699,7 +707,7 @@ def compact(revision):
 @_retry_etcd_native_client
 def get_raw(path):
     path_encoded = path.encode()
-    channel = get_etcd__native_client()
+    channel = get_etcd_native_client()
     stub = etcd_pb2_grpc.KVStub(channel)
 
     try:
@@ -721,7 +729,7 @@ def get_raw(path):
 def put_raw(path, new_data):
     path_encoded = path.encode()
     new_data_encoded = _encode_data(new_data)
-    channel = get_etcd__native_client()
+    channel = get_etcd_native_client()
     stub = etcd_pb2_grpc.KVStub(channel)
 
     # NOTE(mikal): yes, this doesn't return a meaningful result. etcd3gw
@@ -827,7 +835,7 @@ def replace_many_raw(mutations):
             )
         )
 
-    channel = channel = get_etcd__native_client()
+    channel = channel = get_etcd_native_client()
     stub = etcd_pb2_grpc.KVStub(channel)
     try:
         response = stub.Txn(
