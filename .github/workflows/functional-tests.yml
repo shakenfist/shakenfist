@@ -161,6 +161,7 @@ jobs:
           tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -483,6 +484,7 @@ jobs:
           tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -767,6 +769,7 @@ jobs:
               debian@$primary:.
 
       - name: Run getsf installer on primary
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -954,6 +957,7 @@ jobs:
               debian@$primary:.
 
       - name: Run getsf installer on primary
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -1141,6 +1145,7 @@ jobs:
               debian@$primary:.
 
       - name: Run getsf to only install etcd, and then restore a backup
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -1152,6 +1157,7 @@ jobs:
               debian@$primary 'sudo chmod ugo+r /etc/sf/*; . /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-backup restore /srv/ci/backup-0.6.15-20230319'
 
       - name: Run getsf installer on primary
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
