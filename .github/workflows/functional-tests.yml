@@ -35,15 +35,18 @@ jobs:
           fetch-depth: 2
 
       - name: Lint with flake8
+        timeout-minutes: 5
         run: |
           /usr/bin/tox -eflake8
 
       - name: Attempt to install requirements
+        timeout-minutes: 5
         run: |
           python3 -mvenv /tmp/venv
           /tmp/venv/bin/pip3 install -r requirements.txt
 
       - name: Run python3 unit tests
+        timeout-minutes: 10
         run: |
           /usr/bin/tox -epy3
 
@@ -197,7 +200,7 @@ jobs:
               ${{ matrix.os.base_image_user }}@${primary} "sudo mkdir -p /srv/ci/traces; sudo chown -R ${{ matrix.os.base_image_user }}:${{ matrix.os.base_image_user }} /srv/ci/traces"
 
       - name: Run functional tests
-        timeout-minutes: 180
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
