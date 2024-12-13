@@ -14,3 +14,9 @@ def get_caller(offset=-2):
     return '{}:{}:{}()'.format(filename,
                                traceback.extract_stack()[offset].lineno,
                                traceback.extract_stack()[offset].name)
+
+
+def generate_traceback(offset=-2):
+    stack = traceback.extract_stack()
+    formatted = traceback.format_list(stack[:-offset])
+    return '\n%s'.join(formatted)
