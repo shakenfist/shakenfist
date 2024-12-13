@@ -94,17 +94,41 @@ class WrappedEtcdClient(Etcd3Client):
 # This module stores some state in thread local storage.
 local = threading.local()
 local.sf_etcd_client = None
+local.sf_etcd_native_client = None
 
 
 def get_etcd_client():
     c = getattr(local, 'sf_etcd_client', None)
     if not c:
+        LOG.info('Creating new etcd client via gateway')
         c = local.sf_etcd_client = WrappedEtcdClient()
     return c
 
 
 def reset_client():
     local.sf_etcd_client = None
+
+
+def get_etcd_native_client():
+    # If your eventlog server isn't setup, we get cranky. Note that this
+    # happens during unit test discovery for py3 unit tests.
+    if not config.ETCD_HOST:
+        caller = util_callstack.generate_traceback()
+        LOG.error('Cannot communicate with etcd, no configured server! Caller was:\n'
+                  f'{caller}')
+        return
+
+    c = getattr(local, 'sf_etcd_native_client', None)
+    if not c:
+        LOG.info('Creating new etcd client via native protocol')
+        local.sf_etcd_native_client = grpc.insecure_channel(
+            '%s:2379' % config.ETCD_HOST)
+        c = local.sf_etcd_native_client
+    return c
+
+
+def reset_native_client():
+    local.sf_etcd_native_client = None
 
 
 def retry_etcd_forever(func):
@@ -119,14 +143,19 @@ def retry_etcd_forever(func):
     bring attention to the deeper problem.
     """
     def wrapper(*args, **kwargs):
-        count = 0
+        attempt = 0
         while True:
             try:
                 return func(*args, **kwargs)
             except InternalServerError as e:
+                LOG.with_fields(kwargs).with_fields({
+                    'args': args,
+                    'function': func,
+                    'attempt': attempt
+                }).info('Failed etcd request via gateway')
                 LOG.error('Etcd3gw Internal Server Error: %s' % e)
-            time.sleep(count/10.0)
-            count += 1
+            time.sleep(attempt / 10.0)
+            attempt += 1
     return wrapper
 
 
@@ -611,8 +640,11 @@ def _log_and_raise_error(rpc_error):
                     raise exceptions.gRPCException(f'Quota failure: {info}')
                 detail.append(d)
     else:
-        code = rpc_error.code()
-        detail = rpc_error.detail()
+        try:
+            code = rpc_error.code()
+            detail = rpc_error.detail()
+        except AttributeError:
+            ...
 
     if not detail:
         detail = 'no detail available'
@@ -632,67 +664,94 @@ def _log_and_raise_error(rpc_error):
     raise exceptions.gRPCException(rpc_error)
 
 
+def _retry_etcd_native_client(func):
+    def wrapper(*args, **kwargs):
+        attempt = 0
+        last_exception = None
+
+        while attempt < 3:
+            try:
+                return func(*args, **kwargs)
+            except exceptions.gRPCException as e:
+                last_exception = e
+
+            LOG.with_fields(kwargs).with_fields({
+                'args': args,
+                'function': func,
+                'attempt': attempt
+            }).info('Failed etcd request via native protocol')
+            reset_native_client()
+            time.sleep(attempt / 10.0)
+            attempt += 1
+
+        if last_exception:
+            raise last_exception
+
+    return wrapper
+
+
+@_retry_etcd_native_client
 def compact(revision):
-    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
-        stub = etcd_pb2_grpc.KVStub(channel)
-        try:
-            stub.Compact(etcd_pb2.CompactionRequest(
-                revision=revision, physical=True
-            )
-            )
-        except grpc.RpcError as rpc_error:
-            _log_and_raise_error(rpc_error)
+    channel = get_etcd_native_client()
+    stub = etcd_pb2_grpc.KVStub(channel)
+    try:
+        stub.Compact(etcd_pb2.CompactionRequest(
+            revision=revision, physical=True
+        )
+        )
+    except grpc.RpcError as rpc_error:
+        _log_and_raise_error(rpc_error)
 
-        try:
-            stub = etcd_pb2_grpc.MaintenanceStub(channel)
-            request = etcd_pb2.DefragmentRequest()
-            stub.Defragment(request)
-        except grpc.RpcError as rpc_error:
-            _log_and_raise_error(rpc_error)
-            return False
+    try:
+        stub = etcd_pb2_grpc.MaintenanceStub(channel)
+        request = etcd_pb2.DefragmentRequest()
+        stub.Defragment(request)
+    except grpc.RpcError as rpc_error:
+        _log_and_raise_error(rpc_error)
+        return False
 
 
+@_retry_etcd_native_client
 def get_raw(path):
     path_encoded = path.encode()
+    channel = get_etcd_native_client()
+    stub = etcd_pb2_grpc.KVStub(channel)
 
-    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
-        stub = etcd_pb2_grpc.KVStub(channel)
-
-        try:
-            resp = stub.Range(
-                etcd_pb2.RangeRequest(
-                    key=path_encoded
-                )
+    try:
+        resp = stub.Range(
+            etcd_pb2.RangeRequest(
+                key=path_encoded
             )
-        except grpc.RpcError as rpc_error:
-            _log_and_raise_error(rpc_error)
+        )
+    except grpc.RpcError as rpc_error:
+        _log_and_raise_error(rpc_error)
 
-        if len(resp.kvs) > 0:
-            kvs = resp.kvs[0]
-            return json.loads(kvs.value.decode())
-        return None
+    if len(resp.kvs) > 0:
+        kvs = resp.kvs[0]
+        return json.loads(kvs.value.decode())
+    return None
 
 
+@_retry_etcd_native_client
 def put_raw(path, new_data):
     path_encoded = path.encode()
     new_data_encoded = _encode_data(new_data)
+    channel = get_etcd_native_client()
+    stub = etcd_pb2_grpc.KVStub(channel)
 
-    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
-        stub = etcd_pb2_grpc.KVStub(channel)
-
-        # NOTE(mikal): yes, this doesn't return a meaningful result. etcd3gw
-        # simply hardcoded a "return True" here, the etcd server returns a
-        # result indicating the previous value of the key. That is, a failure
-        # will raise an exception.
-        try:
-            stub.Put(
-                etcd_pb2.PutRequest(
-                    key=path_encoded,
-                    value=new_data_encoded
-                )
+    # NOTE(mikal): yes, this doesn't return a meaningful result. etcd3gw
+    # simply hardcoded a "return True" here, the etcd server returns a
+    # result indicating the previous value of the key. That is, a failure
+    # will raise an exception.
+    try:
+        stub.Put(
+            etcd_pb2.PutRequest(
+                key=path_encoded,
+                value=new_data_encoded
             )
-        except grpc.RpcError as rpc_error:
-            _log_and_raise_error(rpc_error)
+        )
+    except grpc.RpcError as rpc_error:
+        _log_and_raise_error(rpc_error)
 
 
 def create_raw(path, new_data):
@@ -719,6 +778,7 @@ def transactional_delete_raw(path, original_data):
     }])[0]
 
 
+@_retry_etcd_native_client
 def replace_many_raw(mutations):
     original_values_by_path = {}
     new_values_by_path = {}
@@ -782,47 +842,47 @@ def replace_many_raw(mutations):
             )
         )
 
-    with grpc.insecure_channel('%s:2379' % config.ETCD_HOST) as channel:
-        stub = etcd_pb2_grpc.KVStub(channel)
-        try:
-            response = stub.Txn(
-                etcd_pb2.TxnRequest(
-                    compare=comparisons,
-                    success=replacements,
-                    failure=failures
-                )
+    channel = channel = get_etcd_native_client()
+    stub = etcd_pb2_grpc.KVStub(channel)
+    try:
+        response = stub.Txn(
+            etcd_pb2.TxnRequest(
+                compare=comparisons,
+                success=replacements,
+                failure=failures
             )
-        except grpc.RpcError as rpc_error:
-            _log_and_raise_error(rpc_error)
+        )
+    except grpc.RpcError as rpc_error:
+        _log_and_raise_error(rpc_error)
 
-        if response.succeeded:
-            return True, []
+    if response.succeeded:
+        return True, []
 
-        # Determine which keys had non-matching values
-        failures = []
-        for resp in response.responses:
-            if resp.HasField('response_range'):
-                for kvs in resp.response_range.kvs:
-                    if original_values_by_path[kvs.key] != kvs.value:
-                        failures.append(
-                            {
-                                'path': kvs.key.decode(),
-                                'desired': original_values_by_path[kvs.key],
-                                'actual': kvs.value.decode(),
-                                'replacement': new_values_by_path[kvs.key]
-                            }
-                        )
-                        del original_values_by_path[kvs.key]
+    # Determine which keys had non-matching values
+    failures = []
+    for resp in response.responses:
+        if resp.HasField('response_range'):
+            for kvs in resp.response_range.kvs:
+                if original_values_by_path[kvs.key] != kvs.value:
+                    failures.append(
+                        {
+                            'path': kvs.key.decode(),
+                            'desired': original_values_by_path[kvs.key],
+                            'actual': kvs.value.decode(),
+                            'replacement': new_values_by_path[kvs.key]
+                        }
+                    )
+                    del original_values_by_path[kvs.key]
 
-        for key in original_values_by_path:
-            failures.append(
-                {
-                    'path': key.decode(),
-                    'desired': original_values_by_path[key],
-                    'actual': None,
-                    'replacement': new_values_by_path[kvs.key]
-                }
-            )
+    for key in original_values_by_path:
+        failures.append(
+            {
+                'path': key.decode(),
+                'desired': original_values_by_path[key],
+                'actual': None,
+                'replacement': new_values_by_path[kvs.key]
+            }
+        )
 
-        LOG.with_fields({'failed': failures}).info('Transaction failure')
-        return False, failures
+    LOG.with_fields({'failed': failures}).info('Transaction failure')
+    return False, failures
