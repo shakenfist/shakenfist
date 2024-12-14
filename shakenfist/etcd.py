@@ -100,6 +100,7 @@ local.sf_etcd_native_client = None
 def get_etcd_client():
     c = getattr(local, 'sf_etcd_client', None)
     if not c:
+        LOG.info('Creating new etcd client via gateway')
         c = local.sf_etcd_client = WrappedEtcdClient()
     return c
 
@@ -119,6 +120,7 @@ def get_etcd_native_client():
 
     c = getattr(local, 'sf_etcd_native_client', None)
     if not c:
+        LOG.info('Creating new etcd client via native protocol')
         local.sf_etcd_native_client = grpc.insecure_channel(
             '%s:2379' % config.ETCD_HOST)
         c = local.sf_etcd_native_client
@@ -141,14 +143,19 @@ def retry_etcd_forever(func):
     bring attention to the deeper problem.
     """
     def wrapper(*args, **kwargs):
-        count = 0
+        attempt = 0
         while True:
             try:
                 return func(*args, **kwargs)
             except InternalServerError as e:
+                LOG.with_fields(kwargs).with_fields({
+                    'args': args,
+                    'function': func,
+                    'attempt': attempt
+                }).info('Failed etcd request via gateway')
                 LOG.error('Etcd3gw Internal Server Error: %s' % e)
-            time.sleep(count / 10.0)
-            count += 1
+            time.sleep(attempt / 10.0)
+            attempt += 1
     return wrapper
 
 
@@ -659,6 +666,8 @@ def _log_and_raise_error(rpc_error):
 
 def _retry_etcd_native_client(func):
     def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+
         attempt = 0
         last_exception = None
 
@@ -672,7 +681,7 @@ def _retry_etcd_native_client(func):
                 'args': args,
                 'function': func,
                 'attempt': attempt
-            }).debug('Failed etcd request')
+            }).info('Failed etcd request via native protocol')
             reset_native_client()
             time.sleep(attempt / 10.0)
             attempt += 1
