@@ -119,15 +119,32 @@ def get_etcd_native_client():
         return
 
     c = getattr(local, 'sf_etcd_native_client', None)
+    if c:
+        # Ensure the channel is ready
+        try:
+            grpc.channel_ready_future(c).result(timeout=0.5)
+        except grpc.FutureTimeoutError:
+            c.close()
+            c = None
+
     if not c:
         LOG.info('Creating new etcd client via native protocol')
         local.sf_etcd_native_client = grpc.insecure_channel(
-            '%s:2379' % config.ETCD_HOST)
+            '%s:2379' % config.ETCD_HOST,
+            options=[
+                ('keepalive_timeout_ms', 200),
+                ('grpc.http2.max_pings_without_data', 0),
+                ('grpc.keepalive_permit_without_calls', 1),
+            ]
+        )
         c = local.sf_etcd_native_client
     return c
 
 
 def reset_native_client():
+    c = getattr(local, 'sf_etcd_native_client', None)
+    if c:
+        c.close()
     local.sf_etcd_native_client = None
 
 
@@ -655,6 +672,9 @@ def _log_and_raise_error(rpc_error):
 
     if code == grpc.StatusCode.ABORTED:
         raise exceptions.gRPCException(f'Aborted: {detail}')
+
+    if code == grpc.StatusCode.INTERNAL:
+        raise exceptions.gRPCException(f'Internal error: {detail}')
 
     if code == 32:
         # "sendmsg: Broken pipe (32)"
