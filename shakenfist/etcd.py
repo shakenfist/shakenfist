@@ -666,8 +666,6 @@ def _log_and_raise_error(rpc_error):
 
 def _retry_etcd_native_client(func):
     def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-
         attempt = 0
         last_exception = None
 
