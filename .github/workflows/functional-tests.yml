@@ -180,19 +180,6 @@ jobs:
               ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
               "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
 
-      - name: Create a base level of activity in the cluster
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24 > /dev/null; echo -n "."; done'
-          echo ""
-
       - name: Make the traces directory
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
