@@ -486,6 +486,12 @@ jobs:
       - name: Run functional tests
         timeout-minutes: 120
         run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${source_path}/shakenfist \
+              ${{ matrix.os.base_image_user }}@${primary}:shakenfist
+
           script="cd shakenfist/deploy/;"
           script="${script} . /etc/sf/sfrc;"
           script="${script} sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt;"

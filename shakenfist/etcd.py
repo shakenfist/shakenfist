@@ -596,16 +596,39 @@ def _encode_data(data):
 
 
 def _log_and_raise_error(rpc_error):
-    LOG.error(f'gRPC call failure: {rpc_error}')
-    status = rpc_status.from_call(rpc_error)
-    for detail in status.details:
-        if detail.Is(error_details_pb2.QuotaFailure.DESCRIPTOR):
-            info = error_details_pb2.QuotaFailure()
-            detail.Unpack(info)
-            LOG.error(f'Quota failure: {info}')
-        else:
-            raise exceptions.gRPCException(f'Unexpected failure: {detail}')
+    code = None
+    detail = None
 
+    status = rpc_status.from_call(rpc_error)
+    if status:
+        code = status.code
+        if status.details:
+            detail = []
+            for d in status.details:
+                if d.Is(error_details_pb2.QuotaFailure.DESCRIPTOR):
+                    info = error_details_pb2.QuotaFailure()
+                    d.Unpack(info)
+                    raise exceptions.gRPCException(f'Quota failure: {info}')
+                detail.append(d)
+    else:
+        code = rpc_error.code()
+        detail = rpc_error.detail()
+
+    if not detail:
+        detail = 'no detail available'
+
+    if code == grpc.StatusCode.UNAVAILABLE:
+        # Unavailable such as "sendmsg: Socket operation on non-socket"
+        raise exceptions.gRPCException(f'Server unavailable: {detail}')
+
+    if code == grpc.StatusCode.ABORTED:
+        raise exceptions.gRPCException(f'Aborted: {detail}')
+
+    if code == 32:
+        # "sendmsg: Broken pipe (32)"
+        raise exceptions.gRPCEXception(f'Broken pipe: {detail}')
+
+    LOG.debug(f'Unhandled gRPC call failure: {rpc_error}')
     raise exceptions.gRPCException(rpc_error)
 
 
