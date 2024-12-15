@@ -96,7 +96,7 @@ class WorkerPoolDaemon(Daemon):
         jobname_workitem = etcd.dequeue(queue_name)
         if jobname_workitem:
             args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
-            self.start_workitem(processing_callback, args, 'worker')
+            self.start_workitem(processing_callback, args, jobname_workitem[0])
             return True
 
         # Low priority jobs
@@ -107,7 +107,7 @@ class WorkerPoolDaemon(Daemon):
         if jobname_workitem:
             args = [f'{queue_name}-background', jobname_workitem[0],
                     jobname_workitem[1]]
-            self.start_workitem(processing_callback, args, 'worker')
+            self.start_workitem(processing_callback, args, jobname_workitem[0])
             return True
 
         return False
