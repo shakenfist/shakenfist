@@ -1,16 +1,9 @@
 import faulthandler
 import logging
 import signal
-<<<<<<< HEAD
-from threading import Event
-import time
-
-import psutil
-=======
 import threading
 
 import pyprctl
->>>>>>> 9ad7e383 (Convert to using threads to resolve grpc segfault issues.)
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 
