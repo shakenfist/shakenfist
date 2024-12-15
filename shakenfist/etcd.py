@@ -697,11 +697,12 @@ def _retry_etcd_native_client(func):
             except exceptions.gRPCException as e:
                 last_exception = e
 
-            LOG.with_fields(kwargs).with_fields({
-                'args': args,
-                'function': func,
-                'attempt': attempt
-            }).info('Failed etcd request via native protocol')
+            if attempt > 0:
+                LOG.with_fields(kwargs).with_fields({
+                    'args': args,
+                    'function': func,
+                    'attempt': attempt
+                }).info('Failed etcd request via native protocol')
             reset_native_client()
             time.sleep(attempt / 10.0)
             attempt += 1
