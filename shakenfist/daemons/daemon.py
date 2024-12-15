@@ -2,7 +2,9 @@ import faulthandler
 import logging
 import signal
 from threading import Event
+import time
 
+import psutil
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 
@@ -72,12 +74,28 @@ class WorkerPoolDaemon(Daemon):
         self.workers = {}
         self.present_cpus = util_libvirt.get_cpu_count()
 
+        self.age_warnings = {}
+
     def reap_workers(self):
         for workname in list(self.workers.keys()):
             p = self.workers[workname]
             if not p.is_alive():
                 p.join(1)
                 del self.workers[workname]
+                if workname in self.age_warnings:
+                    del self.age_warnings[workname]
+            else:
+                try:
+                    pu = psutil.Process(p.pid)
+                    age = time.time() - pu.create_time()
+                    if age > 30:
+                        if time.time() - self.age_warnings.get(workname, 0) > 30:
+                            self.log.info(
+                                f'Workitem {workname} has taken {age:.0f} seconds')
+                            self.age_warnings[workname] = time.time()
+
+                except psutil.NoSuchProcess:
+                    ...
 
     def start_workitem(self, processing_callback, args, name):
         p = util_process.fork(processing_callback, args,
