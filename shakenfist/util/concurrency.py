@@ -1,4 +1,4 @@
-import multiprocessing
+import threading
 import time
 
 import psutil
@@ -14,10 +14,29 @@ from shakenfist import etcd
 LOG, _ = logs.setup(__name__)
 
 
-def _lock_refresher(locks):
-    while True:
-        etcd.refresh_locks(locks)
-        time.sleep(10)
+class Job:
+    def __init__(self):
+        self.exit = threading.Event()
+
+    def run(self):
+        LOG.debug('Starting job execution')
+        self.execute()
+        LOG.debug('Finished job execution')
+
+
+class LockRefresherJob(Job):
+    def __init__(self, locks):
+        super().__init__()
+        self.locks = locks
+
+    def execute(self):
+        etcd.reset_client()
+        last_refresh = 0
+        while not self.exit.is_set():
+            if time.time() - last_refresh > 9:
+                etcd.refresh_locks(self.locks)
+                last_refresh = time.time()
+            time.sleep(0.2)
 
 
 # Mid-range best effort, equivalent to not specifying a value
@@ -31,7 +50,7 @@ def _log_results(stdout, stderr, execution_time):
         'stdout': stdout,
         'stderr': stderr,
         'execution_time': f'{execution_time:.2f}'
-        }
+    }
 
     try:
         LOG.with_fields(fields).debug('Command output')
@@ -69,7 +88,10 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
         return stdout, stderr
 
     else:
-        p = fork(_lock_refresher, [locks], 'lock-refresher')
+        refresher = LockRefresherJob(locks)
+        refresher_thread = threading.Thread(
+            target=refresher.run, daemon=True, name='lock-refresher')
+        refresher_thread.start()
 
         try:
             start_time = time.time()
@@ -80,23 +102,8 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
                 _log_results(stdout, stderr, time.time() - start_time)
             return stdout, stderr
         finally:
-            p.kill()
-            p.join()
-
-
-def _process_start_shim(*args):
-    etcd.reset_client()
-    args[0](*args[1:])
-
-
-def fork(process_callback, args, process_name):
-    # We need to reset the etcd thread local cache before we start running a
-    # subprocess.
-
-    shim_args = [process_callback]
-    shim_args.extend(args)
-
-    p = multiprocessing.Process(
-        target=_process_start_shim, args=shim_args, name=process_name)
-    p.start()
-    return p
+            refresher.exit.set()
+            refresher_thread.join(1.0)
+            if refresher_thread.is_alive():
+                LOG.error('Failed to terminate lock refresher thread with '
+                          f'ident {refresher_thread.ident}')

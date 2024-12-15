@@ -24,7 +24,7 @@ from shakenfist.node import Node
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import network as util_network
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -246,11 +246,13 @@ class Monitor(daemon.Daemon):
                 for child in shim.children():
                     try:
                         with child.oneshot():
-                            process_metrics.update(_emit_process_metrics(child))
+                            process_metrics.update(
+                                _emit_process_metrics(child))
 
                             for subchild in child.children():
                                 with subchild.oneshot():
-                                    process_metrics.update(_emit_process_metrics(subchild))
+                                    process_metrics.update(
+                                        _emit_process_metrics(subchild))
                     except (psutil.NoSuchProcess, FileNotFoundError):
                         ...
                 # Record etcd process metrics
@@ -258,14 +260,15 @@ class Monitor(daemon.Daemon):
                     for p in psutil.process_iter():
                         try:
                             if p.name().endswith('/etcd'):
-                                process_metrics.update(_emit_process_metrics(p))
+                                process_metrics.update(
+                                    _emit_process_metrics(p))
                         except (psutil.NoSuchProcess, FileNotFoundError):
                             ...
 
                 n.process_metrics = process_metrics
 
                 # What package versions do we have?
-                vers_out, _ = util_process.execute(
+                vers_out, _ = util_concurrency.execute(
                     None,
                     ('dpkg-query --show --showformat=\'${Package}==${Version}\\n\' '
                      '--no-pager'),
@@ -307,7 +310,11 @@ class Monitor(daemon.Daemon):
                 etcd.delete_raw(k)
 
         # Some versions are static and only looked up at startup
+        Node.observe_this_node()
         n = Node.from_db(config.NODE_NAME)
+        if not n:
+            raise exceptions.NodeShouldExist()
+
         n.python_version = platform.python_version_tuple()
         n.python_implementation = platform.python_implementation()
 
@@ -342,7 +349,8 @@ class Monitor(daemon.Daemon):
                                 continue
 
                             # Base libvirt statistics
-                            statistics = util_libvirt.extract_statistics(domain)
+                            statistics = util_libvirt.extract_statistics(
+                                domain)
 
                             # Power information
                             statistics['libvirt_raw_power_state'] = \
@@ -420,7 +428,8 @@ class Monitor(daemon.Daemon):
             for child in init.children():
                 try:
                     with child.oneshot():
-                        m = LIBVIRT_KVM_CMDLINE_RE.match(' '.join(child.cmdline()))
+                        m = LIBVIRT_KVM_CMDLINE_RE.match(
+                            ' '.join(child.cmdline()))
                         if m:
                             instance_uuid = m.group(1)
                             i = instance.Instance.from_db(instance_uuid)
@@ -466,3 +475,8 @@ class Monitor(daemon.Daemon):
                 util_general.ignore_exception('resource statistics', e)
 
         LOG.info('Terminated')
+
+
+def main():
+    m = Monitor('resources')
+    m.run()

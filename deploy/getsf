@@ -806,7 +806,7 @@ if [ -e /etc/os-release ]; then
     fi
 fi
 
-if [ ${has_ansible} == 0]; then
+if [ ${has_ansible} == 0 ]; then
     echo
     status "Install ansible"
     DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \

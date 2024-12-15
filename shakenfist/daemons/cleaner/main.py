@@ -24,7 +24,7 @@ from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -49,8 +49,9 @@ class Monitor(daemon.Daemon):
         log_ctx = LOG.with_fields({'instance': instance_uuid})
         try:
             log_ctx.warning('Destroying instance using virsh')
-            util_process.execute(None, 'virsh destroy "sf:%s"' % instance_uuid)
-            util_process.execute(
+            util_concurrency.execute(
+                None, 'virsh destroy "sf:%s"' % instance_uuid)
+            util_concurrency.execute(
                 None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
             self._delete_instance_files(instance_uuid)
             log_ctx.warning('Destroying instance using virsh succeeded')
@@ -62,14 +63,15 @@ class Monitor(daemon.Daemon):
         except processutils.ProcessExecutionError:
             log_ctx.warning('Destroying instance using virsh failed')
             if inst:
-                inst.add_event(EVENT_TYPE_AUDIT, 'enforced delete via virsh failed')
+                inst.add_event(EVENT_TYPE_AUDIT,
+                               'enforced delete via virsh failed')
             return False
 
     def _delete_with_kill(self, instance_uuid, inst):
         log_ctx = LOG.with_fields({'instance': instance_uuid})
         try:
             log_ctx.warning('Destroying instance using SIGKILL')
-            stdout, _ = util_process.execute(None, 'aa-status --json')
+            stdout, _ = util_concurrency.execute(None, 'aa-status --json')
             status = json.loads(stdout)
             profile = 'libvirt-%s' % instance_uuid
             for proc in status['processes']['/usr/bin/qemu-system-x86_64']:
@@ -77,7 +79,7 @@ class Monitor(daemon.Daemon):
                     os.kill(int(proc['pid']), signal.SIGKILL)
 
             try:
-                util_process.execute(
+                util_concurrency.execute(
                     None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
             except processutils.ProcessExecutionError:
                 pass
@@ -145,7 +147,7 @@ class Monitor(daemon.Daemon):
                     inst.update_power_state(state)
                     if state == 'crashed':
                         if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
-                            util_process.execute(
+                            util_concurrency.execute(
                                 None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
                             inst.state.value = dbo.STATE_DELETED
                         else:
@@ -174,14 +176,15 @@ class Monitor(daemon.Daemon):
                         if not inst:
                             # Instance is SF but not in database. Kill because
                             # unknown.
-                            log_ctx.warning('Removing unknown inactive instance')
+                            log_ctx.warning(
+                                'Removing unknown inactive instance')
                             self._delete_instance_files(instance_uuid)
                             try:
                                 # TODO(mikal): work out if we can pass
                                 # VIR_DOMAIN_UNDEFINE_NVRAM with virDomainUndefineFlags()
                                 domain.undefine()
                             except lc.libvirt.libvirtError:
-                                util_process.execute(
+                                util_concurrency.execute(
                                     None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
                             continue
 
@@ -199,10 +202,11 @@ class Monitor(daemon.Daemon):
                                 # VIR_DOMAIN_UNDEFINE_NVRAM with virDomainUndefineFlags()
                                 domain.undefine()
                             except lc.libvirt.libvirtError:
-                                util_process.execute(
+                                util_concurrency.execute(
                                     None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
 
-                            inst.add_event(EVENT_TYPE_AUDIT, 'deleted stray instance')
+                            inst.add_event(EVENT_TYPE_AUDIT,
+                                           'deleted stray instance')
                             if db_state.value != dbo.STATE_DELETED:
                                 inst.state.value = dbo.STATE_DELETED
                             continue
@@ -215,7 +219,8 @@ class Monitor(daemon.Daemon):
                         if not os.path.exists(inst.instance_path):
                             # If we're inactive and our files aren't on disk,
                             # we have a problem.
-                            inst.add_event(EVENT_TYPE_AUDIT, 'instance files missing')
+                            inst.add_event(EVENT_TYPE_AUDIT,
+                                           'instance files missing')
                             if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
                                 inst.state.value = dbo.STATE_DELETED
                             else:
@@ -223,7 +228,8 @@ class Monitor(daemon.Daemon):
 
                         elif not db_power or db_power['power_state'] != 'off':
                             inst.update_power_state('off')
-                            inst.add_event(EVENT_TYPE_AUDIT, 'detected poweroff')
+                            inst.add_event(EVENT_TYPE_AUDIT,
+                                           'detected poweroff')
 
             except lc.libvirt.libvirtError as e:
                 LOG.debug('Failed to lookup all domains: %s' % e)
@@ -291,6 +297,10 @@ class Monitor(daemon.Daemon):
         for b in Blobs([], prefilter='active'):
             active_blob_uuids.append(b.uuid)
         n = node.Node.from_db(config.NODE_NAME)
+        if not n:
+            # We have started up enough yet to exist in etcd
+            return
+
         all_node_blobs = n.blobs
 
         p = pathlib.Path(blob_path)
@@ -486,3 +496,8 @@ class Monitor(daemon.Daemon):
             self.exit.wait(60)
 
         LOG.info('Terminated')
+
+
+def main():
+    m = Monitor('cleaner')
+    m.run()

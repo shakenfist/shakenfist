@@ -51,3 +51,8 @@ class Monitor(daemon.Daemon):
             self.exit.wait(300)
 
         LOG.info('Terminated')
+
+
+def main():
+    m = Monitor('checksums')
+    m.run()

@@ -690,7 +690,7 @@ class DnsMasqTestCase(testtools.TestCase):
     @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._send_signal',
                 return_value=False)
     @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._make_config')
-    @mock.patch('shakenfist.util.process.execute')
+    @mock.patch('shakenfist.util.concurrency.execute')
     def test_restart(self, mock_execute, mock_config, mock_signal,
                      mock_makedirs, mock_exists):
         self.mock_etcd = MockEtcd(self, node_count=4)
@@ -724,7 +724,7 @@ class DnsMasqTestCase(testtools.TestCase):
                         '1a:91:64:d2:15:39': '127.0.0.5'
                     })
                 )
-    @mock.patch('shakenfist.util.process.execute')
+    @mock.patch('shakenfist.util.concurrency.execute')
     def test_remove_leases(self, mock_execute, mock_hosts, mock_config,
                            mock_signal, mock_exists):
         self.mock_etcd = MockEtcd(self, node_count=4)
@@ -776,7 +776,7 @@ class DnsMasqTestCase(testtools.TestCase):
                         '1a:91:64:d2:15:39': '127.0.0.5'
                     })
                 )
-    @mock.patch('shakenfist.util.process.execute')
+    @mock.patch('shakenfist.util.concurrency.execute')
     def test_remove_no_leases(self, mock_execute, mock_hosts, mock_config,
                               mock_signal, mock_exists):
         self.mock_etcd = MockEtcd(self, node_count=4)

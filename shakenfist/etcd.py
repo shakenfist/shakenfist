@@ -202,6 +202,7 @@ class ActualLock(Lock):
                 'key': self.key,
                 'node': self.node,
                 'pid': self.pid,
+                'thread': threading.get_ident(),
                 'line': caller,
                 'operation': self.operation,
                 'id': self.lockid
@@ -212,6 +213,7 @@ class ActualLock(Lock):
             {
                 'node': self.node,
                 'pid': self.pid,
+                'thread': threading.get_ident(),
                 'line': caller,
                 'operation': self.operation,
                 'id': self.lockid

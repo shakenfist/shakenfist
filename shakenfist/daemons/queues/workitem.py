@@ -4,7 +4,7 @@ import uuid
 
 import flask
 import requests
-import setproctitle
+import pyprctl
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import blob
@@ -21,7 +21,6 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist.daemons import daemon
 from shakenfist import eventlog
 from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.tasks import DeleteInstanceTask
@@ -39,6 +38,7 @@ from shakenfist.tasks import PreflightInstanceTask
 from shakenfist.tasks import QueueTask
 from shakenfist.tasks import SnapshotTask
 from shakenfist.tasks import StartInstanceTask
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 
@@ -46,232 +46,253 @@ from shakenfist.util import libvirt as util_libvirt
 LOG, _ = logs.setup(__name__)
 
 
-def handle(queue_name, jobname, workitem):
-    libvirt = util_libvirt.get_libvirt()
+class Job(util_concurrency.Job):
+    def __init__(self, queue_name, jobname, workitem):
+        super().__init__()
 
-    log = LOG.with_fields({'workitem': jobname})
-    log.info('Processing workitem')
+        self.queue_name = queue_name
+        self.jobname = jobname
+        self.workitem = workitem
 
-    setproctitle.setproctitle('{}-{}'.format(daemon.process_name('queues'), jobname))
+        self.log = LOG.with_fields({
+            'queue': self.queue_name,
+            'job': jobname
+        })
 
-    inst = None
-    task = None
-    try:
-        for task in workitem.get('tasks', []):
-            log = log.with_fields({'task': task})
+    def execute(self):
+        libvirt = util_libvirt.get_libvirt()
+        self.log.info('Processing job')
 
-            # Tasks should log with the request id of the API request that
-            # caused them, if there was in fact one.
-            request_id = task.request_id()
-            try:
-                if request_id:
-                    flask.request.environ['REQUEST_ID'] = request_id
-                else:
-                    if 'REQUEST_ID' in flask.request.environ:
-                        del flask.request.environ['REQUEST_ID']
-            except RuntimeError:
-                ...
+        pyprctl.set_name(self.jobname)
+        LOG.debug(f'This worker thread is executing job {self.jobname}')
 
-            if not QueueTask.__subclasscheck__(type(task)):
-                raise exceptions.UnknownTaskException(
-                    'Task was not decoded: %s' % task)
+        inst = None
+        task = None
+        try:
+            for task in self.workitem.get('tasks', []):
+                self.log = self.log.with_fields({'task': task})
 
-            if InstanceTask.__subclasscheck__(type(task)):
-                inst = instance.Instance.from_db(task.instance_uuid())
-                if not inst:
-                    raise exceptions.InstanceNotInDBException(
-                        task.instance_uuid())
+                # Tasks should log with the request id of the API request that
+                # caused them, if there was in fact one.
+                request_id = task.request_id()
+                try:
+                    if request_id:
+                        flask.request.environ['REQUEST_ID'] = request_id
+                    else:
+                        if 'REQUEST_ID' in flask.request.environ:
+                            del flask.request.environ['REQUEST_ID']
+                except RuntimeError:
+                    ...
 
-            for t in [FetchImageTask, SnapshotTask, HotPlugInstanceInterfaceTask]:
-                if isinstance(task, t):
+                if not QueueTask.__subclasscheck__(type(task)):
+                    raise exceptions.UnknownTaskException(
+                        'Task was not decoded: %s' % task)
+
+                if InstanceTask.__subclasscheck__(type(task)):
                     inst = instance.Instance.from_db(task.instance_uuid())
-                    break
+                    if not inst:
+                        raise exceptions.InstanceNotInDBException(
+                            task.instance_uuid())
 
-            if inst:
-                log = log.with_fields({'instance': inst})
+                for t in [FetchImageTask, SnapshotTask, HotPlugInstanceInterfaceTask]:
+                    if isinstance(task, t):
+                        inst = instance.Instance.from_db(task.instance_uuid())
+                        break
 
-            log.with_fields({'task_name': task.name()}).info('Starting task')
+                if inst:
+                    self.log = self.log.with_fields({'instance': inst})
 
-            if isinstance(task, FetchImageTask):
-                n = task.namespace()
-                if not n:
-                    n = 'system'
-                image_fetch(task.url(), n, inst)
+                self.log = self.log.with_fields({
+                    'task_name': task.name()
+                })
+                self.log.info('Starting task')
 
-            elif isinstance(task, PreflightInstanceTask):
-                s = inst.state.value
-                if s == dbo.STATE_DELETED or s.endswith('-error'):
-                    log.warning(
-                        'You cannot preflight an instance in state %s, skipping task' % s)
-                    continue
+                if isinstance(task, FetchImageTask):
+                    n = task.namespace()
+                    if not n:
+                        n = 'system'
+                    image_fetch(task.url(), n, inst)
 
-                redirect_to = instance_preflight(inst, task.network())
-                if redirect_to:
-                    log.info(f'Redirecting instance start to {redirect_to}')
-                    etcd.enqueue(redirect_to, workitem)
-                    return
+                elif isinstance(task, PreflightInstanceTask):
+                    s = inst.state.value
+                    if s == dbo.STATE_DELETED or s.endswith('-error'):
+                        self.log.warning(
+                            'You cannot preflight an instance in state %s, '
+                            'skipping task' % s)
+                        continue
 
-            elif isinstance(task, StartInstanceTask):
-                instance_start(inst, task.network())
+                    redirect_to = instance_preflight(inst, task.network())
+                    if redirect_to:
+                        self.log.info(
+                            f'Redirecting instance start to {redirect_to}')
+                        etcd.enqueue(redirect_to, self.workitem)
+                        return
 
-            elif isinstance(task, HotPlugInstanceInterfaceTask):
-                inst.hot_plug_interface(
-                    task.network_uuid(), task.interface_uuid())
+                elif isinstance(task, StartInstanceTask):
+                    instance_start(inst, task.network())
 
-            elif isinstance(task, DeleteInstanceTask):
-                try:
-                    instance_delete(inst)
-                except Exception as e:
-                    util_general.ignore_exception(
-                        'instance %s delete task' % inst, e)
+                elif isinstance(task, HotPlugInstanceInterfaceTask):
+                    inst.hot_plug_interface(
+                        task.network_uuid(), task.interface_uuid())
 
-            elif isinstance(task, FloatNetworkInterfaceTask):
-                # Just punt it to the network node now that the interface is ready
-                etcd.enqueue('networknode', task)
-
-            elif isinstance(task, SnapshotTask):
-                snapshot(inst, task.disk(), task.artifact_uuid(), task.blob_uuid(),
-                         task.thin())
-
-            elif isinstance(task, DeleteNetworkWhenClean):
-                # This is a historical concept, it turns out the network node
-                # now just defers the delete task until there are no interfaces,
-                # so we don't need this at all.
-                etcd.enqueue('networknode', DestroyNetworkTask(task.network_uuid()))
-
-            elif isinstance(task, HypervisorDestroyNetworkTask):
-                n = network.Network.from_db(task.network_uuid())
-                n.delete_on_hypervisor()
-
-            elif isinstance(task, FetchBlobTask):
-                bl = log.with_fields({'blob': task.blob_uuid()})
-                metrics = etcd.get('metrics', config.NODE_NAME, None)
-                if metrics:
-                    metrics = metrics.get('metrics', {})
-                else:
-                    metrics = {}
-
-                b = blob.Blob.from_db(task.blob_uuid())
-                if not b:
-                    bl.info('Cannot replicate blob, not found')
-
-                elif (int(metrics.get('disk_free_blobs', 0)) - int(b.size) <
-                      config.MINIMUM_FREE_DISK):
-                    bl.info('Cannot replicate blob, insufficient space')
-
-                else:
+                elif isinstance(task, DeleteInstanceTask):
                     try:
-                        bl.info('Replicating blob')
-                        size = b.ensure_local([], wait_for_other_transfers=False)
-                        bl.with_fields({
-                            'transferred': size,
-                            'expected': b.size
-                        }).info('Replicating blob complete')
-                    except exceptions.BlobMissing:
-                        bl.info('Cannot replicate blob, no online sources')
+                        instance_delete(inst)
+                    except Exception as e:
+                        util_general.ignore_exception(
+                            'instance %s delete task' % inst, e)
 
-            elif isinstance(task, HashBlobTask):
-                bl = log.with_fields({'blob': task.blob_uuid()})
-                b = blob.Blob.from_db(task.blob_uuid())
+                elif isinstance(task, FloatNetworkInterfaceTask):
+                    # Just punt it to the network node now that the interface is ready
+                    etcd.enqueue('networknode', task)
 
-                if not b:
-                    bl.info('Cannot hash blob, not found')
+                elif isinstance(task, SnapshotTask):
+                    snapshot(inst, task.disk(), task.artifact_uuid(), task.blob_uuid(),
+                             task.thin())
 
-                elif config.NODE_NAME not in b.locations:
-                    bl.info('Cannot hash blob, not on this node')
+                elif isinstance(task, DeleteNetworkWhenClean):
+                    # This is a historical concept, it turns out the network node
+                    # now just defers the delete task until there are no interfaces,
+                    # so we don't need this at all.
+                    etcd.enqueue('networknode', DestroyNetworkTask(
+                        task.network_uuid()))
 
-                else:
-                    b.verify_checksum(urgent=False)
+                elif isinstance(task, HypervisorDestroyNetworkTask):
+                    n = network.Network.from_db(task.network_uuid())
+                    n.delete_on_hypervisor()
 
-            elif isinstance(task, ArchiveTranscodeTask):
-                if not os.path.exists(task.cache_path()):
-                    continue
+                elif isinstance(task, FetchBlobTask):
+                    bl = self.log.with_fields({'blob': task.blob_uuid()})
+                    metrics = etcd.get('metrics', config.NODE_NAME, None)
+                    if metrics:
+                        metrics = metrics.get('metrics', {})
+                    else:
+                        metrics = {}
 
-                try:
                     b = blob.Blob.from_db(task.blob_uuid())
                     if not b:
-                        continue
-                    if b.state.value != dbo.STATE_CREATED:
-                        continue
+                        bl.info('Cannot replicate blob, not found')
 
-                    transcode_blob_uuid = str(uuid.uuid4())
-                    transcode_blob_path = blob.Blob.filepath(
-                        transcode_blob_uuid)
-                    util_general.link_or_copy(
-                        task.cache_path(), transcode_blob_path)
-                    st = os.stat(transcode_blob_path)
+                    elif (int(metrics.get('disk_free_blobs', 0)) - int(b.size) <
+                          config.MINIMUM_FREE_DISK):
+                        bl.info('Cannot replicate blob, insufficient space')
 
-                    transcode_blob = blob.Blob.new(
-                        transcode_blob_uuid, time.time(), time.time())
-                    transcode_blob.size = st.st_size
-                    transcode_blob.state = blob.Blob.STATE_CREATED
-                    transcode_blob.observe()
-                    transcode_blob.verify_checksum(locks=[])
-
-                    if b.add_transcode(task.transcode_description(),
-                                       transcode_blob_uuid):
-                        transcode_blob.request_replication()
-                        eventlog.add_event_multi(
-                            EVENT_TYPE_AUDIT, [b, transcode_blob],
-                            'recorded transcode',
-                            extra=task.transcode_description())
-                        transcode_blob.ref_count_inc(b)
                     else:
-                        # We get a false back if someone else beat us and
-                        # has already recorded the same transcoding. In
-                        # that case just delete our attempt.
+                        try:
+                            bl.info('Replicating blob')
+                            size = b.ensure_local(
+                                [], wait_for_other_transfers=False)
+                            bl.with_fields({
+                                'transferred': size,
+                                'expected': b.size
+                            }).info('Replicating blob complete')
+                        except exceptions.BlobMissing:
+                            bl.info('Cannot replicate blob, no online sources')
+
+                elif isinstance(task, HashBlobTask):
+                    bl = self.log.with_fields({'blob': task.blob_uuid()})
+                    b = blob.Blob.from_db(task.blob_uuid())
+
+                    if not b:
+                        bl.info('Cannot hash blob, not found')
+
+                    elif config.NODE_NAME not in b.locations:
+                        bl.info('Cannot hash blob, not on this node')
+
+                    else:
+                        b.verify_checksum(urgent=False)
+
+                elif isinstance(task, ArchiveTranscodeTask):
+                    if not os.path.exists(task.cache_path()):
+                        continue
+
+                    try:
+                        b = blob.Blob.from_db(task.blob_uuid())
+                        if not b:
+                            continue
+                        if b.state.value != dbo.STATE_CREATED:
+                            continue
+
+                        transcode_blob_uuid = str(uuid.uuid4())
+                        transcode_blob_path = blob.Blob.filepath(
+                            transcode_blob_uuid)
+                        util_general.link_or_copy(
+                            task.cache_path(), transcode_blob_path)
+                        st = os.stat(transcode_blob_path)
+
+                        transcode_blob = blob.Blob.new(
+                            transcode_blob_uuid, time.time(), time.time())
+                        transcode_blob.size = st.st_size
+                        transcode_blob.state = blob.Blob.STATE_CREATED
+                        transcode_blob.observe()
+                        transcode_blob.verify_checksum(locks=[])
+
+                        if b.add_transcode(task.transcode_description(),
+                                           transcode_blob_uuid):
+                            transcode_blob.request_replication()
+                            eventlog.add_event_multi(
+                                EVENT_TYPE_AUDIT, [b, transcode_blob],
+                                'recorded transcode',
+                                extra=task.transcode_description())
+                            transcode_blob.ref_count_inc(b)
+                        else:
+                            # We get a false back if someone else beat us and
+                            # has already recorded the same transcoding. In
+                            # that case just delete our attempt.
+                            eventlog.add_event_multi(
+                                EVENT_TYPE_STATUS, [b, transcode_blob],
+                                'lost the transcode race!')
+                            transcode_blob.state = blob.Blob.STATE_DELETED
+
+                    except exceptions.BlobDeleted:
                         eventlog.add_event_multi(
                             EVENT_TYPE_STATUS, [b, transcode_blob],
-                            'lost the transcode race!')
-                        transcode_blob.state = blob.Blob.STATE_DELETED
+                            'transcode blob deleted, perhaps parent blob was reaped?')
 
-                except exceptions.BlobDeleted:
-                    eventlog.add_event_multi(
-                        EVENT_TYPE_STATUS, [b, transcode_blob],
-                        'transcode blob deleted, perhaps parent blob was reaped?')
+                elif isinstance(task, PreflightAgentOperationTask):
+                    preflight_agent_operation(task.agentop_uuid())
 
-            elif isinstance(task, PreflightAgentOperationTask):
-                preflight_agent_operation(task.agentop_uuid())
+                else:
+                    self.log.error('Unhandled task was dropped')
 
-            else:
-                log.error('Unhandled task was dropped')
+                self.log.info('Task complete')
 
-            log.info('Task complete')
+        except exceptions.BlobAlreadyBeingTransferred:
+            # Re-enqueue this job to run in a minute
+            self.log.info('Deferring job as blob is already being transferred')
+            etcd.enqueue(config.NODE_NAME, self.workitem, delay=60)
 
-    except exceptions.BlobAlreadyBeingTransferred:
-        # Re-enqueue this job to run in a minute
-        log.info('Deferring job as blob is already being transferred')
-        etcd.enqueue(config.NODE_NAME, workitem, delay=60)
+        except exceptions.ImageFetchTaskFailedException as e:
+            # Usually caused by external issue and not an application error
+            self.log.info('Fetch Image Error: %s', e)
+            if inst:
+                inst.enqueue_delete_due_error('Image fetch failed: %s' % e)
 
-    except exceptions.ImageFetchTaskFailedException as e:
-        # Usually caused by external issue and not an application error
-        log.info('Fetch Image Error: %s', e)
-        if inst:
-            inst.enqueue_delete_due_error('Image fetch failed: %s' % e)
+        except exceptions.ImagesCannotShrinkException as e:
+            self.log.info('Fetch Resize Error: %s', e)
+            if inst:
+                inst.enqueue_delete_due_error('Image resize failed: %s' % e)
 
-    except exceptions.ImagesCannotShrinkException as e:
-        log.info('Fetch Resize Error: %s', e)
-        if inst:
-            inst.enqueue_delete_due_error('Image resize failed: %s' % e)
+        except libvirt.libvirtError as e:
+            self.log.info('Libvirt Error: %s', e)
+            if inst:
+                inst.enqueue_delete_due_error('Instance task failed: %s' % e)
 
-    except libvirt.libvirtError as e:
-        log.info('Libvirt Error: %s', e)
-        if inst:
-            inst.enqueue_delete_due_error('Instance task failed: %s' % e)
+        except exceptions.InstanceException as e:
+            self.log.info('Instance Error: %s', e)
+            if inst:
+                inst.enqueue_delete_due_error('Instance task failed: %s' % e)
 
-    except exceptions.InstanceException as e:
-        log.info('Instance Error: %s', e)
-        if inst:
-            inst.enqueue_delete_due_error('Instance task failed: %s' % e)
+        except Exception as e:
+            # Logging ignored exception - this should be investigated
+            util_general.ignore_exception('queue worker', e)
+            if inst:
+                inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
-    except Exception as e:
-        # Logging ignored exception - this should be investigated
-        util_general.ignore_exception('queue worker', e)
-        if inst:
-            inst.enqueue_delete_due_error('Failed queue task: %s' % e)
-
-    finally:
-        etcd.resolve(queue_name, jobname)
+        finally:
+            etcd.resolve(self.queue_name, self.jobname)
+            LOG.debug(
+                f'This worker thread is finished executing job {self.jobname}')
 
 
 def image_fetch(url, namespace, inst):
@@ -526,37 +547,3 @@ def preflight_agent_operation(agentop_uuid):
             b.ensure_local([])
 
     agentop.state = AgentOperation.STATE_QUEUED
-
-
-class Monitor(daemon.WorkerPoolDaemon):
-    def run(self):
-        LOG.info('Starting')
-        last_length = 0
-
-        while not self.exit.is_set():
-            try:
-                self.reap_workers()
-
-                if not self.exit.is_set():
-                    if time.time() - last_length > 10:
-                        processing, queued, deferred = etcd.get_queue_length(
-                            config.NODE_NAME)
-                        LOG.with_fields({
-                            'processing': processing,
-                            'queued': queued,
-                            'deferred': deferred
-                        }).debug('Queue length')
-                        last_length = time.time()
-
-                    if not self.dequeue_work_item(config.NODE_NAME, handle):
-                        self.exit.wait(0.2)
-                elif len(self.workers) > 0:
-                    LOG.info('Waiting for %d workers to finish' % len(self.workers))
-                    self.exit.wait(0.2)
-                else:
-                    return
-
-            except Exception as e:
-                util_general.ignore_exception('queue worker', e)
-
-        LOG.info('Terminated')

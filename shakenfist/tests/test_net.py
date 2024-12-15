@@ -157,7 +157,7 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     #
     # is_created()
     #
-    @mock.patch('shakenfist.util.process.execute',
+    @mock.patch('shakenfist.util.concurrency.execute',
                 return_value=(
                     """[ {},{
         "ifindex": 1,
@@ -182,7 +182,7 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_created())
 
-    @mock.patch('shakenfist.util.process.execute',
+    @mock.patch('shakenfist.util.concurrency.execute',
                 return_value=("""[ {},{
         "ifindex": 1,
         "ifname": "br-vxlan-5",
@@ -206,7 +206,7 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_created())
 
-    @mock.patch('shakenfist.util.process.execute',
+    @mock.patch('shakenfist.util.concurrency.execute',
                 return_value=('', "Device 'br-vxlan-45' does not exist."))
     def test_is_created_no_bridge(self, mock_execute):
         self.mock_etcd = MockEtcd(self, node_count=4)

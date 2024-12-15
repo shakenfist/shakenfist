@@ -8,7 +8,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.managed_executables import managedexecutable
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 
 
 class DnsMasq(managedexecutable.ManagedExecutable):
@@ -183,7 +183,7 @@ class DnsMasq(managedexecutable.ManagedExecutable):
             'ipv4': ipv4,
             'macaddr': macaddr
         })
-        util_process.execute(
+        util_concurrency.execute(
             None, 'dhcp_release %(interface)s %(ipv4)s %(macaddr)s' % subst,
             namespace=self.network.uuid)
         self.add_event(EVENT_TYPE_AUDIT, 'released a DHCP lease',
@@ -215,7 +215,7 @@ class DnsMasq(managedexecutable.ManagedExecutable):
             needs_start = True
 
         if needs_start:
-            util_process.execute(
+            util_concurrency.execute(
                 None, 'dnsmasq --conf-file=%s/config' % self.config_directory,
                 namespace=self.network.uuid)
             self.add_event(EVENT_TYPE_AUDIT, 'started')

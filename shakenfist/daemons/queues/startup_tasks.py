@@ -1,20 +1,14 @@
-# Copyright 2019 Michael Still
-import faulthandler
 import json
 import os
 import pathlib
-import signal
-import subprocess
 import time
 from collections import defaultdict
 from functools import partial
 
-import psutil
-import setproctitle
+import pyprctl
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import cache
-from shakenfist import config as sf_config
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import network
@@ -25,12 +19,9 @@ from shakenfist.blob import Blobs
 from shakenfist.blob import placement_filter
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist.daemons import shim
 from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
 from shakenfist.util import general as util_general
-from shakenfist.util import network as util_network
-from shakenfist.util import process as util_process
 
 
 LOG, HANDLER = logs.setup('main')
@@ -177,35 +168,7 @@ def restore_instances():
     n.instances = instance_uuids
 
 
-DAEMON_PROCS = {}
-
-
-def propagate_signal(signum, _frame):
-    # We have a bunch of subprocesses here, so we can't just use the default
-    # faulthandler mechanism.
-    faulthandler.dump_traceback
-    for proc in DAEMON_PROCS:
-        try:
-            os.kill(DAEMON_PROCS[proc].pid, signum)
-        except ProcessLookupError:
-            pass
-
-
-signal.signal(signal.SIGUSR1, propagate_signal)
-
-
-def main():
-    global DAEMON_PROCS
-
-    def _start_daemon(d):
-        DAEMON_PROCS[d] = subprocess.Popen(
-            ['/srv/shakenfist/venv/bin/sf-daemon-shim', d])
-        LOG.with_fields({'pid': DAEMON_PROCS[d].pid}).info('Started %s' % d)
-
-    # This is awkward, but let's verify our configuration before we get any
-    # further.
-    sf_config.verify_config()
-
+def startup_tasks():
     # We need to report object versions very early before the resources daemon
     # has started. This code is duplicated from the resources daemon code. Sorry.
     stats = {}
@@ -220,16 +183,8 @@ def main():
             'metrics': stats
         })
 
-    # Start the eventlog daemon very very early because basically everything
-    # else talks to it.
-    if not config.NODE_IS_EVENTLOG_NODE:
-        del shim.DAEMON_IMPLEMENTATIONS['eventlog']
-    else:
-        _start_daemon('eventlog')
-
-    LOG.info('Starting...')
-    setproctitle.setproctitle(
-        daemon.process_name('main') + '-v%s' % util_general.get_version())
+    LOG.info('Starting')
+    pyprctl.set_name('main-v%s' % util_general.get_version())
 
     # Ensure we have a consistent cache of object states if the cache is entirely
     # absent.
@@ -246,7 +201,8 @@ def main():
                 for obj in OBJECT_NAMES_TO_ITERATORS[obj_type]([]):
                     by_state[obj.state.value][obj.uuid] = time.time()
                 for state in by_state:
-                    cache.clobber_object_state_cache(obj_type, state, by_state[state])
+                    cache.clobber_object_state_cache(
+                        obj_type, state, by_state[state])
         cache_version['version'] = 2
         etcd.put_raw('/sf/cache/_version', cache_version)
 
@@ -268,139 +224,4 @@ def main():
     # Ensure the blob data store is the most recent version
     upgrade_blob_datastore()
 
-    # If I am the network node, I need some setup
-    if config.NODE_IS_NETWORK_NODE:
-        # Bootstrap the floating network in the Networks table
-        network.floating_network()
-        subst = {
-            'egress_bridge': util_network.get_safe_interface_name(
-                'egr-br-%s' % config.NODE_EGRESS_NIC),
-            'egress_nic': config.NODE_EGRESS_NIC
-        }
-
-        if not util_network.check_for_interface(subst['egress_bridge']):
-            # NOTE(mikal): Adding the physical interface to the physical bridge
-            # is considered outside the scope of the orchestration software as
-            # it will cause the node to lose network connectivity. So instead
-            # all we do is create a bridge if it doesn't exist and the wire
-            # everything up to it. We can do egress NAT in that state, even if
-            # floating IPs don't work.
-            #
-            # No locking as read only
-            fn = network.floating_network()
-            subst['master_float'] = fn.ipam.get_address_at_index(1)
-            subst['netmask'] = fn.netmask
-
-            # We need to copy the MTU of the interface we are bridging to
-            # or weird networking things happen.
-            mtu = util_network.get_interface_mtu(config.NODE_EGRESS_NIC)
-
-            util_network.create_interface(
-                subst['egress_bridge'], 'bridge', '', mtu=mtu)
-
-            util_process.execute(None, 'ip link set %(egress_bridge)s up' % subst)
-            util_network.add_address_to_interface(
-                None, subst['master_float'], subst['netmask'], subst['egress_bridge'])
-
-            util_process.execute(None,
-                                 'iptables -w 10 -A FORWARD -o %(egress_nic)s '
-                                 '-i %(egress_bridge)s -j ACCEPT' % subst)
-            util_process.execute(None,
-                                 'iptables -w 10 -A FORWARD -i %(egress_nic)s '
-                                 '-o %(egress_bridge)s -j ACCEPT' % subst)
-            util_process.execute(None,
-                                 'iptables -w 10 -t nat -A POSTROUTING '
-                                 '-o %(egress_nic)s -j MASQUERADE' % subst)
-
-    def _audit_daemons():
-        running_daemons = []
-        for proc in DAEMON_PROCS:
-            running_daemons.append(proc)
-
-        for d in shim.DAEMON_IMPLEMENTATIONS:
-            if d not in running_daemons:
-                _start_daemon(d)
-
-    _audit_daemons()
     restore_instances()
-
-    running = True
-    shutdown_commenced = None
-    warned_locks = {}
-
-    while True:
-        time.sleep(5)
-
-        try:
-            dead = []
-            for proc in DAEMON_PROCS:
-                if DAEMON_PROCS[proc].poll():
-                    LOG.warning('%s process has exited' % proc)
-                    dead.append(proc)
-
-                elif not psutil.pid_exists(DAEMON_PROCS[proc].pid):
-                    LOG.warning('%s process is missing' % proc)
-                    dead.append(proc)
-
-            for d in dead:
-                LOG.with_fields({
-                    'pid': DAEMON_PROCS[d].pid,
-                    'exit': DAEMON_PROCS[d].returncode
-                }).warning('%s is dead' % proc)
-                del DAEMON_PROCS[d]
-
-        except ChildProcessError:
-            # We get this if there are no child processes
-            pass
-
-        n = Node.from_db(config.NODE_NAME)
-        if n.state.value not in [Node.STATE_STOPPING, Node.STATE_STOPPED]:
-            _audit_daemons()
-            Node.observe_this_node()
-
-            # Check if we hold any locks for processes which don't exist any
-            # more. That is, a process has ended but left a stray lock.
-            locks = etcd.get_existing_locks()
-            for lock in locks:
-                lock_details = locks[lock]
-                if lock_details.get('node') != config.NODE_NAME:
-                    continue
-
-                pid = lock_details.get('pid')
-                if psutil.pid_exists(pid):
-                    continue
-                if pid not in warned_locks:
-                    LOG.with_fields(lock_details).warning(
-                        'Lock held by missing process on this node')
-                    warned_locks[pid] = time.time()
-                elif time.time() - warned_locks[pid] > 30:
-                    LOG.with_fields(lock_details).error(
-                        'Lock held by missing process on this node for more '
-                        'than 30 seconds')
-
-        elif len(DAEMON_PROCS) == 0:
-            n.state = Node.STATE_STOPPED
-            return
-
-        else:
-            if running:
-                shutdown_commenced = time.time()
-                for proc in DAEMON_PROCS:
-                    try:
-                        os.kill(DAEMON_PROCS[proc].pid, signal.SIGTERM)
-                        LOG.info('Sent SIGTERM to %s (pid %s)'
-                                 % (proc, DAEMON_PROCS[proc].pid))
-                    except OSError as e:
-                        LOG.warn('Failed to send SIGTERM to %s: %s'
-                                 % (proc, e))
-
-            if time.time() - shutdown_commenced > 10:
-                LOG.warning('We have taken more than ten seconds to shut down')
-                for proc in DAEMON_PROCS:
-                    LOG.warning('%s daemon still running (pid %d)'
-                                % (proc, DAEMON_PROCS[proc].pid))
-                LOG.warning('Dumping thread traces')
-                propagate_signal(signal.SIGUSR1, None)
-                shutdown_commenced = time.time()
-
-            running = False

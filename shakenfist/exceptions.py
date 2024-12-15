@@ -284,6 +284,16 @@ class IPAMException(Exception):
 class InvalidIPAMAddress(IPAMException):
     ...
 
+# Nodes
+
+
+class NodeException(Exception):
+    ...
+
+
+class NodeShouldExist(NodeException):
+    ...
+
 
 # Lockless update failures
 class LocklessUpdateFailed(Exception):

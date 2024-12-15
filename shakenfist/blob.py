@@ -46,7 +46,7 @@ from shakenfist.tasks import HashBlobTask
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -759,10 +759,10 @@ class Blob(dbo):
         return True
 
     def _get_hash(self, hashtype='sha512', locks=None):
-        hash_out, _ = util_process.execute(
+        hash_out, _ = util_concurrency.execute(
             locks,
             f'{hashtype}sum {Blob.filepath(self.uuid)}',
-            iopriority=util_process.PRIORITY_LOW)
+            iopriority=util_concurrency.PRIORITY_LOW)
         return hash_out.split(' ')[0]
 
     def verify_checksum(self, hash=None, locks=None, urgent=True):

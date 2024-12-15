@@ -193,7 +193,8 @@ class Monitor(daemon.WorkerPoolDaemon):
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         event_pb2_grpc.add_EventServiceServicer_to_server(
             EventService(self), server)
-        server.add_insecure_port(f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}')
+        server.add_insecure_port(
+            f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}')
         server.start()
 
         while not self.exit.is_set():
@@ -221,7 +222,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                     try:
                         with eventlog.EventLog(objtype, objuuid) as eventdb:
                             for k, v in results[(objtype, objuuid)]:
-                                event_type = v.get('event_type', EVENT_TYPE_HISTORIC)
+                                event_type = v.get(
+                                    'event_type', EVENT_TYPE_HISTORIC)
                                 eventdb.write_event(
                                     event_type, v['timestamp'], v['fqdn'],
                                     v.get('duration'), v['message'],
@@ -241,7 +243,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                     if not prune_targets:
                         # Only sweep all databases once a day
                         if time.time() - prune_sweep_started > 24 * 3600:
-                            event_path = os.path.join(config.STORAGE_PATH, 'events')
+                            event_path = os.path.join(
+                                config.STORAGE_PATH, 'events')
                             p = pathlib.Path(event_path)
                             for entpath in p.glob('**/*.lock'):
                                 entpath = str(entpath)[len(event_path) + 1:-5]
@@ -288,3 +291,8 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         server.stop(1).wait()
         LOG.info('Terminated')
+
+
+def main():
+    m = Monitor('eventlog')
+    m.run()

@@ -43,8 +43,10 @@ class ActualLockTestCase(base.ShakenFistTestCase):
     @mock.patch('etcd3gw.lock.Lock.acquire', return_value=True)
     @mock.patch('shakenfist.etcd.ActualLock.get_lease')
     @mock.patch('os.getpid', return_value=42)
-    def test_context_manager(self, mock_pid, mock_lease, mock_acquire, mock_release,
-                             mock_get_caller, mock_get_holder, mock_fake_id):
+    @mock.patch('threading.get_ident', return_value=1234567890)
+    def test_context_manager(
+            self, mock_thread_ident, mock_pid, mock_lease, mock_acquire,
+            mock_release, mock_get_caller, mock_get_holder, mock_fake_id):
         al = etcd.ActualLock('instance', None, 'auuid', op='Test case')
 
         self.assertEqual('/sflocks/sf/instance/auuid', al.key)
@@ -64,6 +66,7 @@ class ActualLockTestCase(base.ShakenFistTestCase):
             json.dumps({
                 'node': 'thisnode',
                 'pid': 42,
+                'thread': 1234567890,
                 'line': 'banana.py:43',
                 'operation': 'Test case'
             }, indent=4, sort_keys=True), al._uuid)
@@ -93,9 +96,11 @@ class ActualLockTestCase(base.ShakenFistTestCase):
                 side_effect=[False, False, False, False, False, True])
     @mock.patch('shakenfist.etcd.ActualLock.get_lease')
     @mock.patch('os.getpid', return_value=42)
+    @mock.patch('threading.get_ident', return_value=1234567890)
     def test_context_manager_slow(
-            self, mock_pid, mock_lease, mock_acquire, mock_release, mock_sleep,
-            mock_time, mock_add_event, mock_get_holder, mock_fake_id):
+            self, mock_thread_ident, mock_pid, mock_lease, mock_acquire,
+            mock_release, mock_sleep, mock_time, mock_add_event,
+            mock_get_holder, mock_fake_id):
         al = etcd.ActualLock('instance', None, 'auuid', op='Test case', timeout=12)
         al.log_ctx = mock.MagicMock()
 
@@ -114,6 +119,7 @@ class ActualLockTestCase(base.ShakenFistTestCase):
                 return_value={
                     'node': 'foo',
                     'pid': 43,
+                    'thread': 1234567890,
                     'line': 'banana.py:43',
                     'operation': 'bar',
                     'id': 'fakeid'
@@ -129,9 +135,11 @@ class ActualLockTestCase(base.ShakenFistTestCase):
                 side_effect=[False, False, False, False, False, True])
     @mock.patch('shakenfist.etcd.ActualLock.get_lease')
     @mock.patch('os.getpid', return_value=42)
+    @mock.patch('threading.get_ident', return_value=1234567890)
     def test_context_manager_timeout(
-            self, mock_pid, mock_lease, mock_acquire, mock_release, mock_sleep,
-            mock_time, mock_add_event, mock_get_holder, mock_fake_id):
+            self, mock_thread_ident, mock_pid, mock_lease, mock_acquire,
+            mock_release, mock_sleep, mock_time, mock_add_event,
+            mock_get_holder, mock_fake_id):
         al = etcd.ActualLock('instance', None, 'auuid', op='Test case',
                              timeout=4)
         al.log_ctx = mock.MagicMock()

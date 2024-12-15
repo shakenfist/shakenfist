@@ -1,22 +1,30 @@
 import faulthandler
 import logging
 import signal
+<<<<<<< HEAD
 from threading import Event
 import time
 
 import psutil
+=======
+import threading
+
+import pyprctl
+>>>>>>> 9ad7e383 (Convert to using threads to resolve grpc segfault issues.)
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist.config import config
 from shakenfist.util import libvirt as util_libvirt
-from shakenfist.util import process as util_process
+
+
+LOG, _ = logs.setup(__name__)
 
 
 DAEMON_NAMES = {
     'api': 'sf-api',
-    'checksum': 'sf-checksum',
+    'checksums': 'sf-checksums',
     'cleaner': 'sf-cleaner',
     'cluster': 'sf-cluster',
     'eventlog': 'sf-eventlog',
@@ -53,11 +61,13 @@ def set_log_level(log, name):
 
 class Daemon:
     def __init__(self, name):
-        setproctitle.setproctitle(process_name(name))
+        procname = process_name(name)
+        setproctitle.setproctitle(procname)
+        pyprctl.set_name(procname)
         self.log, _ = logs.setup(name)
         set_log_level(self.log, name)
 
-        self.exit = Event()
+        self.exit = threading.Event()
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
         faulthandler.register(signal.SIGUSR1)
@@ -77,33 +87,28 @@ class WorkerPoolDaemon(Daemon):
         self.age_warnings = {}
 
     def reap_workers(self):
-        for workname in list(self.workers.keys()):
-            p = self.workers[workname]
-            if not p.is_alive():
-                p.join(1)
-                del self.workers[workname]
-                if workname in self.age_warnings:
-                    del self.age_warnings[workname]
+        remaining_workers = {}
+        for thread_name in self.workers:
+            if self.workers[thread_name]['thread'].is_alive():
+                remaining_workers[thread_name] = self.workers[thread_name]
             else:
-                try:
-                    pu = psutil.Process(p.pid)
-                    age = time.time() - pu.create_time()
-                    if age > 30:
-                        if time.time() - self.age_warnings.get(workname, 0) > 30:
-                            self.log.info(
-                                f'Workitem {workname} has taken {age:.0f} seconds')
-                            self.age_warnings[workname] = time.time()
+                thread_ident = self.workers[thread_name]['thread'].ident
+                LOG.info(f'Reaping thread {thread_name} with ident '
+                         f'{thread_ident}')
+                self.workers[thread_name]['thread'].join(0.2)
+        self.workers = remaining_workers
 
-                except psutil.NoSuchProcess:
-                    ...
+    def start_job(self, processing_class, args, name):
+        worker_object = processing_class(*args)
+        worker_thread = threading.Thread(
+            target=worker_object.run, daemon=True, name=name)
+        self.workers[name] = {
+            'object': worker_object,
+            'thread': worker_thread
+        }
+        worker_thread.start()
 
-    def start_workitem(self, processing_callback, args, name):
-        p = util_process.fork(processing_callback, args,
-                              '{}-{}'.format(process_name('queues'), name))
-        self.workers[name] = p
-        return p.pid
-
-    def dequeue_work_item(self, queue_name, processing_callback):
+    def dequeue_job(self, queue_name, processing_class):
         max_workers = self.present_cpus / 2
         num_workers = len(self.workers)
 
@@ -114,7 +119,7 @@ class WorkerPoolDaemon(Daemon):
         jobname_workitem = etcd.dequeue(queue_name)
         if jobname_workitem:
             args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
-            self.start_workitem(processing_callback, args, jobname_workitem[0])
+            self.start_job(processing_class, args, jobname_workitem[0])
             return True
 
         # Low priority jobs
@@ -125,7 +130,7 @@ class WorkerPoolDaemon(Daemon):
         if jobname_workitem:
             args = [f'{queue_name}-background', jobname_workitem[0],
                     jobname_workitem[1]]
-            self.start_workitem(processing_callback, args, jobname_workitem[0])
+            self.start_job(processing_class, args, jobname_workitem[0])
             return True
 
         return False

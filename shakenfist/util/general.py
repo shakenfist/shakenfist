@@ -13,7 +13,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import eventlog
 from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
@@ -144,7 +144,7 @@ def link_or_copy(source, destination):
     try:
         os.link(source, destination)
     except OSError:
-        util_process.execute([], f'cp {source} {destination}')
+        util_concurrency.execute([], f'cp {source} {destination}')
 
     pathlib.Path(destination).touch(exist_ok=True)
 
