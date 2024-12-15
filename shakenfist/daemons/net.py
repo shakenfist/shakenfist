@@ -351,7 +351,18 @@ class Monitor(daemon.WorkerPoolDaemon):
             return
 
     def _process_network_node_workitems(self):
+        last_length = 0
         while not self.exit.is_set():
+            if time.time() - last_length > 10:
+                processing, queued, deferred = etcd.get_queue_length(
+                    'networknode')
+                LOG.with_fields({
+                    'processing': processing,
+                    'queued': queued,
+                    'deferred': deferred
+                }).debug('Queue length')
+                last_length = time.time()
+
             jobname_workitem = etcd.dequeue('networknode')
             if not jobname_workitem:
                 time.sleep(0.2)
@@ -388,6 +399,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
                 finally:
                     etcd.resolve('networknode', jobname)
+                    last_length = 0
 
                 setproctitle.setproctitle('%s-idle' % daemon.process_name('net'))
 
