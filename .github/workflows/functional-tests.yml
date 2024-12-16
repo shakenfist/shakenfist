@@ -1066,6 +1066,18 @@ jobs:
         if: failure()
         name: Cancel entire workflow on failure
 
+  merge_pr_comment:
+    if: always() && github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: mshick/add-pr-comment@v2.8.2
+        with:
+          message-id: "merge-attempt-${{ github.run_id }}"
+          message: |
+            A merge queue job for this PR is running at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
   can_see_status:
     runs-on: ubuntu-latest
     steps:
@@ -1080,13 +1092,13 @@ jobs:
       actions: read
     runs-on: ubuntu-latest
     steps:
-    - env:
-        NEEDS_JSON: "${{toJSON(needs)}}"
-      name: Transform outcomes
-      run: |
-        echo "ALL_SUCCESS=$(echo "$NEEDS_JSON" | jq '. | to_entries | map([.value.result == "success", .value.result == "skipped"] | any) | all')" >>$GITHUB_ENV
-    - name: Check outcomes
-      run: "[ $ALL_SUCCESS == true ]"
+      - env:
+          NEEDS_JSON: "${{toJSON(needs)}}"
+        name: Transform outcomes
+        run: |
+          echo "ALL_SUCCESS=$(echo "$NEEDS_JSON" | jq '. | to_entries | map([.value.result == "success", .value.result == "skipped"] | any) | all')" >>$GITHUB_ENV
+      - name: Check outcomes
+        run: "[ $ALL_SUCCESS == true ]"
 
   can_merge:
     needs:
@@ -1099,10 +1111,22 @@ jobs:
       actions: read
     runs-on: ubuntu-latest
     steps:
-    - env:
-        NEEDS_JSON: "${{toJSON(needs)}}"
-      name: Transform outcomes
-      run: |
-        echo "ALL_SUCCESS=$(echo "$NEEDS_JSON" | jq '. | to_entries | map([.value.result == "success", .value.result == "skipped"] | any) | all')" >>$GITHUB_ENV
-    - name: Check outcomes
-      run: "[ $ALL_SUCCESS == true ]"
+      - env:
+          NEEDS_JSON: "${{toJSON(needs)}}"
+        name: Transform outcomes
+        run: |
+          echo "ALL_SUCCESS=$(echo "$NEEDS_JSON" | jq '. | to_entries | map([.value.result == "success", .value.result == "skipped"] | any) | all')" >>$GITHUB_ENV
+      - name: Check outcomes
+        run: "[ $ALL_SUCCESS == true ]"
+      - uses: mshick/add-pr-comment@v2.8.2
+        if: failure()
+        with:
+          message-id: "merge-attempt-${{ github.run_id }}"
+          message: |
+            The merge queue job for this PR at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} failed.
+      - uses: mshick/add-pr-comment@v2.8.2
+        if: success()
+        with:
+          message-id: "merge-attempt-${{ github.run_id }}"
+          message: |
+            The merge queue job for this PR at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} succeeded.
