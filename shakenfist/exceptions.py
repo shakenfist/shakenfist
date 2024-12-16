@@ -297,3 +297,12 @@ class LocklessUpdateFailed(LocklessUpdateFailed):
 # gRPC call failures
 class gRPCException(Exception):
     ...
+
+
+# Authentication exceptions
+class AuthException(Exception):
+    ...
+
+
+class CannotParseJWTIdentity(AuthException):
+    ...

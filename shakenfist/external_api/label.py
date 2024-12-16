@@ -9,7 +9,6 @@
 from functools import partial
 
 from flasgger import swag_from
-from flask_jwt_extended import get_jwt_identity
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
@@ -25,6 +24,7 @@ from shakenfist.daemons import daemon
 from shakenfist.exceptions import LabelHierarchyTooDeep
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
+from shakenfist.util.access_tokens import parse_jwt_identity
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -38,7 +38,7 @@ def _label_url(label_name):
             raise LabelHierarchyTooDeep()
         namespace, label = elems
     else:
-        namespace = get_jwt_identity()[0]
+        namespace = parse_jwt_identity()[0]
         label = label_name
     return (namespace, f'{LABEL_URL}{namespace}/{label}')
 

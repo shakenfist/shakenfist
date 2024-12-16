@@ -7,7 +7,6 @@
 #        - and include examples:
 #   - Has complete CI coverage:
 from flasgger import swag_from
-from flask_jwt_extended import get_jwt_identity
 from shakenfist_utilities import api as sf_api
 from shakenfist_utilities import logs  # noreorder
 
@@ -15,6 +14,7 @@ from shakenfist.agentoperation import AgentOperation
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
+from shakenfist.util.access_tokens import parse_jwt_identity
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -42,7 +42,7 @@ def requires_operation_ownership(func):
             log.info('Operation not found, kwarg missing')
             return sf_api.error(404, 'agent operation not found')
 
-        if get_jwt_identity()[0] not in [kwargs['operation_from_db'].namespace, 'system']:
+        if parse_jwt_identity()[0] not in [kwargs['operation_from_db'].namespace, 'system']:
             log.info('Agent operation not found, ownership test in decorator')
             return sf_api.error(404, 'agent operation not found')
 

@@ -15,7 +15,6 @@ import flask
 import symbolicmode
 import validators
 from flasgger import swag_from
-from flask_jwt_extended import get_jwt_identity
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
@@ -52,6 +51,7 @@ from shakenfist.tasks import HotPlugInstanceInterfaceTask
 from shakenfist.tasks import PreflightAgentOperationTask
 from shakenfist.tasks import PreflightInstanceTask
 from shakenfist.tasks import StartInstanceTask
+from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util import general as util_general
 
 
@@ -239,7 +239,7 @@ def _artifact_safety_checks(a, instance_uuid=None):
         return sf_api.error(
             404, 'artifact not ready (state=%s)' % a.state.value)
 
-    if namespace_is_trusted(a.namespace, get_jwt_identity()[0]):
+    if namespace_is_trusted(a.namespace, parse_jwt_identity()[0]):
         return
     if a.shared:
         return
@@ -261,7 +261,7 @@ def _netdesc_safety_checks(netdesc, namespace):
     # if not found)
     try:
         n = sfnet.Network.from_db_by_ref(netdesc['network_uuid'],
-                                         get_jwt_identity()[0])
+                                         parse_jwt_identity()[0])
     except exceptions.MultipleObjects as e:
         return sf_api.error(400, str(e), suppress_traceback=True)
 
@@ -391,7 +391,8 @@ class InstancesEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def get(self, all=False):
         prefilter = None
-        filters = [partial(baseobject.namespace_filter, get_jwt_identity()[0])]
+        filters = [partial(baseobject.namespace_filter,
+                           parse_jwt_identity()[0])]
         if not all:
             prefilter = 'active'
 
@@ -490,10 +491,10 @@ class InstancesEndpoint(sf_api.Resource):
         machine_type = 'pc'
 
         if not namespace:
-            namespace = get_jwt_identity()[0]
+            namespace = parse_jwt_identity()[0]
 
         # If accessing a foreign namespace, we need to be an admin
-        if not namespace_is_trusted(namespace, get_jwt_identity()[0]):
+        if not namespace_is_trusted(namespace, parse_jwt_identity()[0]):
             return sf_api.error(404, 'namespace not found')
 
         # Check that the instance name is safe for use as a DNS host name
@@ -553,7 +554,7 @@ class InstancesEndpoint(sf_api.Resource):
                 label = disk_base[len('label:'):]
                 a = Artifact.from_url(
                     Artifact.TYPE_LABEL,
-                    f'{LABEL_URL}{get_jwt_identity()[0]}/{label}',
+                    f'{LABEL_URL}{parse_jwt_identity()[0]}/{label}',
                     name=label, namespace=namespace)
                 err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
                 if err:
@@ -617,7 +618,7 @@ class InstancesEndpoint(sf_api.Resource):
             original_template = nvram_template
             if nvram_template.startswith('label:'):
                 label = nvram_template[len('label:'):]
-                url = f'{LABEL_URL}{get_jwt_identity()[0]}/{label}'
+                url = f'{LABEL_URL}{parse_jwt_identity()[0]}/{label}'
                 a = Artifact.from_url(Artifact.TYPE_LABEL, url, name=label,
                                       namespace=namespace)
                 err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
@@ -786,7 +787,7 @@ class InstancesEndpoint(sf_api.Resource):
         if confirm is not True:
             return sf_api.error(400, 'parameter confirm is not set true')
 
-        if get_jwt_identity()[0] == 'system':
+        if parse_jwt_identity()[0] == 'system':
             if not isinstance(namespace, str):
                 # A client using a system key must specify the namespace. This
                 # ensures that deleting all instances in the cluster (by
@@ -794,9 +795,9 @@ class InstancesEndpoint(sf_api.Resource):
                 return sf_api.error(400, 'system user must specify parameter namespace')
 
         else:
-            if namespace and namespace != get_jwt_identity()[0]:
+            if namespace and namespace != parse_jwt_identity()[0]:
                 return sf_api.error(401, 'you cannot delete other namespaces')
-            namespace = get_jwt_identity()[0]
+            namespace = parse_jwt_identity()[0]
 
         waiting_for = []
         tasks_by_node = defaultdict(list)
