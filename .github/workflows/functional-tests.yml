@@ -305,6 +305,12 @@ jobs:
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
 
+      # We do this instead of "fast-fail: true" because we want to cancel jobs
+      # outside of the matrix as well.
+      - uses: andymckay/cancel-action@0.5
+        if: failure()
+        name: Cancel entire workflow on failure
+
   functional_matrix_merge:
     if: github.event_name == 'merge_group'
     name: "${{ matrix.os.description }}"
@@ -589,6 +595,12 @@ jobs:
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
 
+      # We do this instead of "fast-fail: true" because we want to cancel jobs
+      # outside of the matrix as well.
+      - uses: andymckay/cancel-action@0.5
+        if: failure()
+        name: Cancel entire workflow on failure
+
   ansible_modules:
     if: github.event_name == 'merge_group'
     runs-on: [self-hosted, vm]
@@ -748,6 +760,12 @@ jobs:
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
+
+      # We do this instead of "fast-fail: true" because we want to cancel jobs
+      # outside of the matrix as well.
+      - uses: andymckay/cancel-action@0.5
+        if: failure()
+        name: Cancel entire workflow on failure
 
   node_lifecycle:
     if: github.event_name == 'merge_group'
@@ -911,6 +929,12 @@ jobs:
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
 
+      # We do this instead of "fast-fail: true" because we want to cancel jobs
+      # outside of the matrix as well.
+      - uses: andymckay/cancel-action@0.5
+        if: failure()
+        name: Cancel entire workflow on failure
+
   upgrade_0_6_15:
     if: github.event_name == 'merge_group'
     runs-on: [self-hosted, vm]
@@ -1045,6 +1069,12 @@ jobs:
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
+
+      # We do this instead of "fast-fail: true" because we want to cancel jobs
+      # outside of the matrix as well.
+      - uses: andymckay/cancel-action@0.5
+        if: failure()
+        name: Cancel entire workflow on failure
 
   can_see_status:
     runs-on: ubuntu-latest
