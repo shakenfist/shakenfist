@@ -398,7 +398,7 @@ jobs:
             base_image_user: 'debian',
             topology: 'slim-primary',
             concurrency: 5,
-            stestr_config: 'guest-ci.conf'
+            stestr_config: 'cluster-ci.conf'
           },
           {
             description: 'ubuntu 24.04 cluster',
@@ -407,7 +407,7 @@ jobs:
             base_image_user: 'ubuntu',
             topology: 'slim-primary',
             concurrency: 5,
-            stestr_config: 'guest-ci.conf'
+            stestr_config: 'cluster-ci.conf'
           },
           {
             description: 'guests',
