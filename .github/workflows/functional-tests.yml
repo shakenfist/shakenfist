@@ -75,9 +75,9 @@ jobs:
 
       # We do this instead of "fast-fail: true" because we want to cancel jobs
       # outside of the matrix as well.
-      - uses: andymckay/cancel-action@0.5
-        if: failure()
-        name: Cancel entire workflow on failure
+      # - uses: andymckay/cancel-action@0.5
+      #   if: failure()
+      #   name: Cancel entire workflow on failure
 
   functional_matrix_pr:
     if: always() && github.event_name != 'merge_group'
@@ -370,9 +370,9 @@ jobs:
 
       # We do this instead of "fast-fail: true" because we want to cancel jobs
       # outside of the matrix as well.
-      - uses: andymckay/cancel-action@0.5
-        if: failure()
-        name: Cancel entire workflow on failure
+      # - uses: andymckay/cancel-action@0.5
+      #   if: failure()
+      #   name: Cancel entire workflow on failure
 
   functional_matrix_merge:
     if: github.event_name == 'merge_group'
@@ -704,9 +704,9 @@ jobs:
 
       # We do this instead of "fast-fail: true" because we want to cancel jobs
       # outside of the matrix as well.
-      - uses: andymckay/cancel-action@0.5
-        if: failure()
-        name: Cancel entire workflow on failure
+      # - uses: andymckay/cancel-action@0.5
+      #   if: failure()
+      #   name: Cancel entire workflow on failure
 
   ansible_modules:
     if: github.event_name == 'merge_group'
@@ -891,9 +891,9 @@ jobs:
 
       # We do this instead of "fast-fail: true" because we want to cancel jobs
       # outside of the matrix as well.
-      - uses: andymckay/cancel-action@0.5
-        if: failure()
-        name: Cancel entire workflow on failure
+      # - uses: andymckay/cancel-action@0.5
+      #   if: failure()
+      #   name: Cancel entire workflow on failure
 
   node_lifecycle:
     if: github.event_name == 'merge_group'
@@ -1080,9 +1080,9 @@ jobs:
 
       # We do this instead of "fast-fail: true" because we want to cancel jobs
       # outside of the matrix as well.
-      - uses: andymckay/cancel-action@0.5
-        if: failure()
-        name: Cancel entire workflow on failure
+      # - uses: andymckay/cancel-action@0.5
+      #   if: failure()
+      #   name: Cancel entire workflow on failure
 
   upgrade_0_6_15:
     if: github.event_name == 'merge_group'
@@ -1242,9 +1242,9 @@ jobs:
 
       # We do this instead of "fast-fail: true" because we want to cancel jobs
       # outside of the matrix as well.
-      - uses: andymckay/cancel-action@0.5
-        if: failure()
-        name: Cancel entire workflow on failure
+      # - uses: andymckay/cancel-action@0.5
+      #   if: failure()
+      #   name: Cancel entire workflow on failure
 
   enqueue_pr_comment:
     if: always() && github.event_name == 'pull_request'
