@@ -253,7 +253,7 @@ jobs:
           echo
 
           failed=$(cat ${GITHUB_WORKSPACE}/failed | egrep "^FAIL: " | \
-              sed "s/^FAIL: shakenfist_ci\./• /")
+              sed -z 's/^FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
 
           echo "Failed tests:"
           cat ${GITHUB_WORKSPACE}/failed
@@ -590,7 +590,7 @@ jobs:
           echo
 
           failed=$(cat ${GITHUB_WORKSPACE}/failed | egrep "^FAIL: " | \
-              sed "s/^FAIL: shakenfist_ci\./• /")
+              sed -z 's/^FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
 
           echo "Failed tests:"
           cat ${GITHUB_WORKSPACE}/failed
