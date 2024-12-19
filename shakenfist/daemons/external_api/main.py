@@ -5,7 +5,6 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -16,7 +15,6 @@ class Monitor(daemon.Daemon):
     def run(self):
         LOG.info('Starting')
 
-        present_cpus = util_libvirt.get_cpu_count()
         os.makedirs('/var/run/sf', exist_ok=True)
         util_concurrency.execute(
             None,
