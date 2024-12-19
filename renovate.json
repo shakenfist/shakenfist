@@ -16,7 +16,7 @@
         "patch",
         "digest"
       ],
-      "automerge": true
+      "automerge": false
     },
     {
       "description": "Group pydantic updates together",
