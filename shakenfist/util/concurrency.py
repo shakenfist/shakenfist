@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 
@@ -6,6 +7,7 @@ from oslo_concurrency import processutils
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
+from shakenfist.util import callstack as util_callstack
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
@@ -63,6 +65,10 @@ def _log_results(stdout, stderr, execution_time):
         LOG.with_fields(fields).debug('Command output (truncated)')
 
 
+def _is_gunicorn():
+    return 'gunicorn' in os.environ.get('SERVER_SOFTWARE', '')
+
+
 def execute(locks, command, check_exit_code=[0], env_variables=None,
             namespace=None, iopriority=None, cwd=None,
             suppress_command_logging=False):
@@ -88,6 +94,11 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
         return stdout, stderr
 
     else:
+        if _is_gunicorn():
+            caller = util_callstack.generate_traceback()
+            LOG.warning(
+                f'Lock refreshers should not be used under gunicorn: {caller}')
+
         refresher = LockRefresherJob(locks)
         refresher_thread = threading.Thread(
             target=refresher.run, daemon=True, name='lock-refresher')

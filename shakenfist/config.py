@@ -64,8 +64,7 @@ class SFConfig(BaseSettings):
     )
     API_COMMAND_LINE: str = Field(
         (
-            '/srv/shakenfist/venv/bin/gunicorn --workers %(workers)d '
-            '--threads %(threads)s --worker-class=gevent '
+            '/srv/shakenfist/venv/bin/gunicorn --workers 5 '
             '--bind 0.0.0.0:%(port)d --log-syslog --log-syslog-prefix sf '
             '--timeout %(timeout)s --name "%(name)s" '
             '--pid /var/run/sf/gunicorn.pid '
