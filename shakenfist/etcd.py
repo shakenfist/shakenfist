@@ -611,8 +611,11 @@ def _log_and_raise_error(rpc_error):
                     raise exceptions.gRPCException(f'Quota failure: {info}')
                 detail.append(d)
     else:
-        code = rpc_error.code()
-        detail = rpc_error.detail()
+        try:
+            code = rpc_error.code()
+            detail = rpc_error.detail()
+        except AttributeError:
+            ...
 
     if not detail:
         detail = 'no detail available'
