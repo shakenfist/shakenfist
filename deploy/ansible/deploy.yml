@@ -1244,7 +1244,7 @@
       debug:
         msg: "{{etcd_config.stdout}}"
 
-- hosts: hypervisors, network_node, etcd_master, storage
+- hosts: hypervisors, network_node, etcd_master, storage, eventlog_node
   any_errors_fatal: true
   serial: 1
   become: yes
@@ -1267,6 +1267,7 @@
         daemon_reload: no
       vars:
         item: sf-eventlog
+      when: inventory_hostname in groups.get('eventlog_node', [])
 
     # The ordering of units here is to match the order they must start in, not
     # alphabetical order.
