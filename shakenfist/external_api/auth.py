@@ -11,7 +11,6 @@ import base64
 import bcrypt
 import flask
 from flasgger import swag_from
-from flask_jwt_extended import get_jwt_identity
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
@@ -26,6 +25,7 @@ from shakenfist.namespace import Namespace
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.namespace import Namespaces
 from shakenfist.util import access_tokens
+from shakenfist.util.access_tokens import parse_jwt_identity
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -55,7 +55,7 @@ def arg_is_namespace(func):
 def requires_namespace_ownership(func):
     def wrapper(*args, **kwargs):
         ns = kwargs.get('namespace')
-        if not namespace_is_trusted(ns, get_jwt_identity()[0]):
+        if not namespace_is_trusted(ns, parse_jwt_identity()[0]):
             LOG.info('Namespace not found, ownership test in decorator')
             return sf_api.error(404, 'namespace not found')
 
@@ -162,7 +162,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
         # Log this special case of a token being used
         auth_header = flask.request.headers.get('Authorization', 'Bearer none')
         token = auth_header.split(' ')[1]
-        invoking_namespace, keyname = get_jwt_identity()
+        invoking_namespace, keyname = parse_jwt_identity()
         parent_ns = Namespace.from_db(invoking_namespace)
         if parent_ns:
             parent_ns.add_event(
@@ -207,7 +207,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
     def get(self):
         retval = []
         for ns in Namespaces(filters=[], prefilter='active'):
-            if namespace_is_trusted(ns.uuid, get_jwt_identity()[0]):
+            if namespace_is_trusted(ns.uuid, parse_jwt_identity()[0]):
                 retval.append(ns.external_view())
         return retval
 
@@ -483,7 +483,7 @@ class AuthNamespaceTrustsEndpoint(sf_api.Resource):
         if not external_namespace:
             return sf_api.error(400, 'no external namespace specified')
 
-        if not namespace_is_trusted(namespace, get_jwt_identity()[0]):
+        if not namespace_is_trusted(namespace, parse_jwt_identity()[0]):
             LOG.with_fields({'namespace': namespace}).info(
                 'Namespace not found, trust test failed')
             return sf_api.error(404, 'namespace not found')
@@ -514,7 +514,7 @@ class AuthNamespaceTrustEndpoint(sf_api.Resource):
         if not external_namespace:
             return sf_api.error(400, 'no external namespace specified')
 
-        if not namespace_is_trusted(namespace, get_jwt_identity()[0]):
+        if not namespace_is_trusted(namespace, parse_jwt_identity()[0]):
             LOG.with_fields({'namespace': namespace}).info(
                 'Namespace not found, trust test failed')
             return sf_api.error(404, 'namespace not found')

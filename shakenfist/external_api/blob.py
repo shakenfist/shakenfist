@@ -13,7 +13,6 @@ import random
 import flask
 import requests
 from flasgger import swag_from
-from flask_jwt_extended import get_jwt_identity
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 from webargs import fields
@@ -31,6 +30,7 @@ from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
+from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util import general as util_general
 
 
@@ -56,7 +56,7 @@ def _read_file(filename, offset, limit=0):
 def _read_remote(target, blob_uuid, offset=0, limit=0):
     api_token = get_api_token(
         'http://%s:%d' % (target, config.API_PORT),
-        namespace=get_jwt_identity()[0])
+        namespace=parse_jwt_identity()[0])
 
     url = 'http://%s:%d/blobs/%s/data?offset=%d&limit=%d' % (
         target, config.API_PORT, blob_uuid, offset, limit)

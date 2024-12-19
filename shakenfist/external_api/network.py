@@ -11,7 +11,6 @@ from functools import partial
 
 import validators
 from flasgger import swag_from
-from flask_jwt_extended import get_jwt_identity
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
@@ -31,6 +30,7 @@ from shakenfist.tasks import DeleteNetworkWhenClean
 from shakenfist.tasks import DestroyNetworkTask
 from shakenfist.tasks import RouteAddressTask
 from shakenfist.tasks import UnrouteAddressTask
+from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util import process as util_process
 
 
@@ -170,7 +170,8 @@ class NetworksEndpoint(sf_api.Resource):
     @api_base.verify_token
     @api_base.log_token_use
     def get(self, all=False):
-        filters = [partial(baseobject.namespace_filter, get_jwt_identity()[0])]
+        filters = [partial(baseobject.namespace_filter,
+                           parse_jwt_identity()[0])]
         prefilter = None
         if not all:
             prefilter = 'active'
@@ -222,10 +223,10 @@ class NetworksEndpoint(sf_api.Resource):
                 400, 'cannot parse netblock: %s' % e, suppress_traceback=True)
 
         if not namespace:
-            namespace = get_jwt_identity()[0]
+            namespace = parse_jwt_identity()[0]
 
         # If accessing a foreign name namespace, we need to be an admin
-        if get_jwt_identity()[0] not in [namespace, 'system']:
+        if parse_jwt_identity()[0] not in [namespace, 'system']:
             return sf_api.error(
                 401, 'only admins can create resources in a different namespace')
 
@@ -258,7 +259,7 @@ class NetworksEndpoint(sf_api.Resource):
         if confirm is not True:
             return sf_api.error(400, 'parameter confirm is not set true')
 
-        if get_jwt_identity()[0] == 'system':
+        if parse_jwt_identity()[0] == 'system':
             if not isinstance(namespace, str):
                 # A client using a system key must specify the namespace. This
                 # ensures that deleting all networks in the cluster (by
@@ -266,9 +267,9 @@ class NetworksEndpoint(sf_api.Resource):
                 return sf_api.error(400, 'system user must specify parameter namespace')
 
         else:
-            if namespace and namespace != get_jwt_identity()[0]:
+            if namespace and namespace != parse_jwt_identity()[0]:
                 return sf_api.error(401, 'you cannot delete other namespaces')
-            namespace = get_jwt_identity()[0]
+            namespace = parse_jwt_identity()[0]
 
         networks_del = []
         networks_unable = []

@@ -531,12 +531,23 @@ def preflight_agent_operation(agentop_uuid):
 class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
+        last_length = 0
 
         while not self.exit.is_set():
             try:
                 self.reap_workers()
 
                 if not self.exit.is_set():
+                    if time.time() - last_length > 10:
+                        processing, queued, deferred = etcd.get_queue_length(
+                            config.NODE_NAME)
+                        LOG.with_fields({
+                            'processing': processing,
+                            'queued': queued,
+                            'deferred': deferred
+                        }).debug('Queue length')
+                        last_length = time.time()
+
                     if not self.dequeue_work_item(config.NODE_NAME, handle):
                         self.exit.wait(0.2)
                 elif len(self.workers) > 0:
