@@ -161,15 +161,20 @@ def create_interface(interface, interface_type, extra, mtu=None):
         mtu = config.MAX_HYPERVISOR_MTU - 50
 
     interface = get_safe_interface_name(interface)
-    concurrency.execute(
-        None,
-        'ip link add %(interface)s mtu %(mtu)s '
-        'type %(interface_type)s %(extra)s' % {
-            'interface': interface,
-            'interface_type': interface_type,
-            'mtu': mtu,
-            'extra': extra
-        })
+    try:
+        concurrency.execute(
+            None,
+            'ip link add %(interface)s mtu %(mtu)s '
+            'type %(interface_type)s %(extra)s' % {
+                'interface': interface,
+                'interface_type': interface_type,
+                'mtu': mtu,
+                'extra': extra
+            })
+
+    except processutils.ProcessExecutionError as e:
+        if e.stderr != 'RTNETLINK answers: File exists\n':
+            raise e
 
 
 def nat_rules_for_ipblock(ipblock):
