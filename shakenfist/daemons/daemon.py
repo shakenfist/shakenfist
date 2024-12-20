@@ -1,12 +1,18 @@
 import faulthandler
 import logging
+from math import inf
 import signal
 import threading
+import time
 
 import pyprctl
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.baseobject import get_maximum_object_version
+from shakenfist.baseobject import get_minimum_object_version
+from shakenfist.baseobject import OBJECT_NAMES
+from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist import etcd
 from shakenfist.config import config
 from shakenfist.util import libvirt as util_libvirt
@@ -64,6 +70,54 @@ class Daemon:
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
         faulthandler.register(signal.SIGUSR1)
+
+        self.last_stability = None
+        self.last_stability_log = 0
+
+    def _log_stability(self, log, msg):
+        if (self.last_stability == msg and
+                time.time() - self.last_stability_log < 10):
+            return
+
+        self.last_stability = msg
+        log.debug(msg)
+        self.last_stability_log = time.time()
+
+    def cluster_stable(self):
+        # Does the cluster have a stable set of object versions across nodes?
+        # We should generally avoid cleanup operations if there is still an
+        # upgrade in flight.
+        for objname in OBJECT_NAMES:
+            current_version = OBJECT_NAMES_TO_CLASSES[objname].current_version
+            minimum = get_minimum_object_version(objname)
+            maximum = get_maximum_object_version(objname)
+            log = LOG.with_fields({
+                'object': objname,
+                'minimum_version': minimum,
+                'maximum_version': maximum,
+                'current_version': current_version
+            })
+
+            if maximum == -1:
+                self._log_stability(
+                    log, 'Cluster not yet stable (no maximum recorded)')
+                return False
+            if maximum != current_version:
+                self._log_stability(
+                    log, 'Cluster not yet stable (maximum is not the current version)')
+                return False
+
+            if minimum == inf:
+                self._log_stability(
+                    log, 'Cluster not yet stable (no minimum recorded)')
+                return False
+            if minimum != current_version:
+                self._log_stability(
+                    log, 'Cluster not yet stable (minimum is not the current version)')
+                return False
+
+        self._log_stability(log, 'Cluster is stable')
+        return True
 
     def exit_gracefully(self, sig, _frame):
         if sig == signal.SIGTERM:

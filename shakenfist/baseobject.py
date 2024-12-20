@@ -33,22 +33,27 @@ class NoopLock(Lock):
         pass
 
 
-VERSION_CACHE = None
+VERSION_CACHE_MINIMUM = None
+VERSION_CACHE_MAXIMUM = None
 VERSION_CACHE_AGE = 0
 OBJECT_NAMES = ['agentoperation', 'artifact', 'blob', 'dhcp', 'instance', 'ipam',
                 'namespace', 'network', 'networkinterface', 'node', 'upload']
 
 
-def get_minimum_object_version(objname):
-    global VERSION_CACHE
+def _maintain_version_cache():
+    global VERSION_CACHE_MINIMUM
+    global VERSION_CACHE_MAXIMUM
     global VERSION_CACHE_AGE
 
-    if not VERSION_CACHE:
-        VERSION_CACHE = {}
+    if not VERSION_CACHE_MINIMUM or not VERSION_CACHE_MAXIMUM:
+        VERSION_CACHE_MINIMUM = {}
+        VERSION_CACHE_MAXIMUM = {}
     elif time.time() - VERSION_CACHE_AGE > 300:
-        VERSION_CACHE = {}
-    elif objname in VERSION_CACHE:
-        return VERSION_CACHE[objname]
+        VERSION_CACHE_MINIMUM = {}
+        VERSION_CACHE_MAXIMUM = {}
+    else:
+        # Cache up to date
+        return
 
     metrics = {}
 
@@ -86,6 +91,7 @@ def get_minimum_object_version(objname):
         nodes_by_version = defaultdict(list, [])
         node_metric_age = {}
         minimum = inf
+        maximum = -1
 
         for node_name in metrics:
             node_metric_age[f'metrics age {node_name}'] = \
@@ -93,21 +99,30 @@ def get_minimum_object_version(objname):
             ver = metrics[node_name].get('object_version_%s' % possible_objname)
             if ver:
                 minimum = min(minimum, ver)
+                maximum = max(maximum, ver)
                 nodes_by_version[f'version {ver}'].append(node_name)
             else:
                 nodes_by_version['no version reported'].append(node_name)
 
         LOG.with_fields(nodes_by_version).with_fields(node_metric_age).with_fields({
-            'object_type': possible_objname}).debug('Object versions reported')
-        VERSION_CACHE[possible_objname] = minimum
+            'object_type': possible_objname,
+            'minimum': minimum,
+            'maximum': maximum
+        }).debug('Object versions reported')
+        VERSION_CACHE_MINIMUM[possible_objname] = minimum
+        VERSION_CACHE_MAXIMUM[possible_objname] = maximum
 
-    if VERSION_CACHE[objname] == inf:
-        LOG.with_fields({
-            'object_type': possible_objname
-        }).debug('No object versions reported, so discarding version cache')
-    else:
-        VERSION_CACHE_AGE = time.time()
-    return VERSION_CACHE[objname]
+    VERSION_CACHE_AGE = time.time()
+
+
+def get_minimum_object_version(objname):
+    _maintain_version_cache()
+    return VERSION_CACHE_MINIMUM.get(objname, inf)
+
+
+def get_maximum_object_version(objname):
+    _maintain_version_cache()
+    return VERSION_CACHE_MAXIMUM.get(objname, -1)
 
 
 class DatabaseBackedObject:

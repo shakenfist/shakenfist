@@ -462,6 +462,7 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
+        last_defer_message = 0
 
         self.refresh_object_state_caches()
 
@@ -470,6 +471,12 @@ class Monitor(daemon.Daemon):
             pyprctl.set_name('idle')
             LOG.debug('This cluster thread is now idle and awaiting election')
             self._await_election()
+
+            if not self.cluster_stable():
+                if time.time() - last_defer_message > 10:
+                    LOG.info('Cluster not yet stable, deferring maintenance')
+                    last_defer_message = time.time()
+                continue
 
             # Infrequently ensure we have no blobs with a reference count of zero
             orphan_blobs = []

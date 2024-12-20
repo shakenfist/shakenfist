@@ -448,6 +448,7 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
+        last_defer_message = 0
 
         # Delay first compaction until system startup load has reduced
         last_compaction = time.time() - random.randint(1, 20*60)
@@ -457,6 +458,12 @@ class Monitor(daemon.Daemon):
 
         n = node.Node.from_db(config.NODE_NAME)
         while not self.exit.is_set():
+            if not self.cluster_stable():
+                if time.time() - last_defer_message > 10:
+                    LOG.info('Cluster not yet stable, deferring maintenance')
+                    last_defer_message = time.time()
+                continue
+
             # Update power state of all instances on this hypervisor
             with util_general.RecordedOperation('update power states', n,
                                                 threshold=1):

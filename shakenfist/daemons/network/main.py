@@ -24,6 +24,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         LOG.info('Starting')
         running = True
         shutdown_commenced = None
+        last_defer_message = 0
 
         self.workers = {}
         job_classes = {
@@ -44,6 +45,14 @@ class Monitor(daemon.WorkerPoolDaemon):
                         if (job_name == 'net-worker' and
                                 not config.NODE_IS_NETWORK_NODE):
                             continue
+
+                        if not self.cluster_stable():
+                            if time.time() - last_defer_message > 10:
+                                LOG.info(
+                                    'Cluster not yet stable, deferring maintenance')
+                                last_defer_message = time.time()
+                            continue
+
                         if job_name not in self.workers:
                             needs_start = True
                         elif not self.workers[job_name]['thread'].is_alive():

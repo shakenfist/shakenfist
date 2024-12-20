@@ -3,11 +3,12 @@ from shakenfist import artifact
 from shakenfist import blob
 from shakenfist import instance
 from shakenfist import ipam
+from shakenfist.managed_executables import dnsmasq
 from shakenfist import namespace
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist import node
-from shakenfist.managed_executables import dnsmasq
+from shakenfist import upload
 
 OBJECT_NAMES_TO_CLASSES = {
     'agentoperation': agentoperation.AgentOperation,
@@ -19,7 +20,8 @@ OBJECT_NAMES_TO_CLASSES = {
     'namespace': namespace.Namespace,
     'network': network.Network,
     'networkinterface': networkinterface.NetworkInterface,
-    'node': node.Node
+    'node': node.Node,
+    'upload': upload.Upload
 }
 
 # dhcp does not have an iterator

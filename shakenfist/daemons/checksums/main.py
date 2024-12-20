@@ -22,9 +22,16 @@ LOG, _ = logs.setup(__name__)
 class Monitor(daemon.Daemon):
     def run(self):
         LOG.info('Starting')
+        last_defer_message = 0
 
         blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
         while not self.exit.is_set():
+            if not self.cluster_stable():
+                if time.time() - last_defer_message > 10:
+                    LOG.info('Cluster not yet stable, deferring maintenance')
+                    last_defer_message = time.time()
+                continue
+
             for b in blob.Blobs([partial(blob.placement_filter, config.NODE_NAME)]):
                 blob_path = blob.Blob.filepath(b.uuid)
                 if os.path.exists(blob_path):
