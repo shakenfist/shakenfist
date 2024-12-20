@@ -427,7 +427,15 @@ class Network(dbo):
 
             subst = self.subst_dict()
             if not os.path.exists('/var/run/netns/%s' % self.uuid):
-                util_concurrency.execute(None, 'ip netns add %s' % self.uuid)
+                try:
+                    util_concurrency.execute(
+                        None, 'ip netns add %s' % self.uuid)
+                except processutils.ProcessExecutionError as e:
+                    r = re.compile(
+                        r'Cannot create namespace file ".*": File exists\n')
+                    m = r.match(e.stderr)
+                    if not m:
+                        raise e
 
             if not util_network.check_for_interface(subst['vx_veth_outer']):
                 util_network.create_interface(
