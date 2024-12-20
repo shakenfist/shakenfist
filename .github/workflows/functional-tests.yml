@@ -253,7 +253,7 @@ jobs:
           echo
 
           failed=$(cat ${GITHUB_WORKSPACE}/failed | egrep "^FAIL: " | \
-              sed -z 's/^FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
+              sed -z 's/FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
 
           echo "Failed tests:"
           cat ${GITHUB_WORKSPACE}/failed
