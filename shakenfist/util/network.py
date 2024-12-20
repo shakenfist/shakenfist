@@ -156,11 +156,7 @@ def get_safe_interface_name(interface):
     return interface
 
 
-def create_interface(interface, interface_type, extra, mtu=None):
-    if not mtu:
-        mtu = config.MAX_HYPERVISOR_MTU - 50
-
-    interface = get_safe_interface_name(interface)
+def _create_interface_inner(interface, interface_type, extra, mtu):
     try:
         concurrency.execute(
             None,
@@ -171,10 +167,29 @@ def create_interface(interface, interface_type, extra, mtu=None):
                 'mtu': mtu,
                 'extra': extra
             })
+        return True
 
     except processutils.ProcessExecutionError as e:
         if e.stderr != 'RTNETLINK answers: File exists\n':
             raise e
+
+        # If the interface exists we don't return true here because it likely
+        # means we're racing another thread.
+
+    return False
+
+
+def create_interface(interface, interface_type, extra, mtu=None):
+    if not mtu:
+        mtu = config.MAX_HYPERVISOR_MTU - 50
+
+    interface = get_safe_interface_name(interface)
+    attempts = 0
+    while attempts < 3:
+        if _create_interface_inner(interface, interface_type, extra, mtu):
+            return
+        time.sleep(0.2)
+        attempts += 1
 
 
 def nat_rules_for_ipblock(ipblock):
