@@ -192,6 +192,10 @@ class NatOnlyNetworksShouldNotHaveDnsMasq(NetworkException):
     ...
 
 
+class CannotAssignFloatingGateway(NetworkException):
+    ...
+
+
 # NetworkInterface
 class NetworkInterfaceException(Exception):
     ...

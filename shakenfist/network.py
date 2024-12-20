@@ -1,4 +1,5 @@
 # Copyright 2020 Michael Still
+import copy
 import ipaddress
 import os
 import random
@@ -20,6 +21,7 @@ from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
+from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import IPManagerMissing
@@ -271,15 +273,44 @@ class Network(dbo):
             self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
         self._remove_item_in_attribute_list('networkinterfaces', ni.uuid)
 
-    def update_floating_gateway(self, gateway):
-        with self.get_lock_attr('routing', 'Update floating gateway'):
-            routing = self.routing
-            if routing.get('floating_gateway') and gateway:
-                self.log.with_fields({
-                    'old_gateway': routing['floating_gateway'],
-                    'new_gateway': gateway}).error('Clobbering previous floating gateway')
-            routing['floating_gateway'] = gateway
-            self._db_set_attribute('routing', routing)
+    def _update_floating_gateway(self, gateway):
+        original_routing = self.routing
+        original_gateway = original_routing.get('floating_gateway')
+        if original_gateway == gateway:
+            return True
+        if original_gateway:
+            return False
+
+        if not original_routing:
+            original_routing = None
+            updated_routing = {
+                'floating_gateway': gateway
+            }
+        else:
+            updated_routing = copy.copy(original_routing)
+            updated_routing['floating_gateway'] = gateway
+
+        return etcd.replace('attribute/network', self.uuid, 'routing',
+                            original_routing, updated_routing)
+
+    def assign_floating_gateway(self):
+        fn = floating_network()
+        floating_gateway = fn.ipam.reserve_random_free_address(
+            self.unique_label(), ipam.RESERVATION_TYPE_GATEWAY, '')
+        if self._update_floating_gateway(floating_gateway):
+            return
+        fn.ipam.release(floating_gateway)
+
+        if not self.floating_gateway:
+            raise CannotAssignFloatingGateway()
+
+    def unassign_floating_gateway(self):
+        floating_gateway = self.floating_gateway
+        if not floating_gateway:
+            return
+        fn = floating_network()
+        fn.ipam.release(floating_gateway)
+        self._update_floating_gateway(None)
 
     @property
     def _vx_veth_inner(self):
@@ -490,15 +521,15 @@ class Network(dbo):
                 # we don't need to construct two identical ipmanagers one after
                 # the other.
                 try:
-                    fn = floating_network()
                     if not self.floating_gateway:
-                        self.update_floating_gateway(
-                            fn.ipam.reserve_random_free_address(
-                                self.unique_label(), ipam.RESERVATION_TYPE_GATEWAY, ''))
+                        self.assign_floating_gateway()
 
-                    subst['floating_router'] = fn.ipam.get_address_at_index(1)
-                    subst['floating_gateway'] = self.floating_gateway
-                    subst['floating_netmask'] = fn.netmask
+                    fn = floating_network()
+                    subst.update({
+                        'floating_router': fn.ipam.get_address_at_index(1),
+                        'floating_gateway': self.floating_gateway,
+                        'floating_netmask': fn.netmask
+                    })
                 except CongestedNetwork:
                     self.error = 'Unable to allocate floating gateway IP'
                     self.state = self.STATE_ERROR
@@ -658,9 +689,7 @@ class Network(dbo):
     def remove_nat(self):
         if config.NODE_IS_NETWORK_NODE:
             if self.floating_gateway:
-                fn = floating_network()
-                fn.ipam.release(self.floating_gateway)
-                self.update_floating_gateway(None)
+                self.unassign_floating_gateway()
 
         else:
             etcd.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
