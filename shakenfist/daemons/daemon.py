@@ -116,7 +116,12 @@ class Daemon:
                     log, 'Cluster not yet stable (minimum is not the current version)')
                 return False
 
-        self._log_stability(log, 'Cluster is stable')
+        # We don't use the helper here because we don't want to emit this every
+        # ten seconds.
+        msg = 'Cluster is stable'
+        if self.last_stability != msg:
+            log.debug(msg)
+            self.last_stability = msg
         return True
 
     def exit_gracefully(self, sig, _frame):
@@ -130,8 +135,6 @@ class WorkerPoolDaemon(Daemon):
         super().__init__(name)
         self.workers = {}
         self.present_cpus = util_libvirt.get_cpu_count()
-
-        self.age_warnings = {}
 
     def reap_workers(self):
         remaining_workers = {}
