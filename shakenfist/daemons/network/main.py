@@ -11,6 +11,7 @@ from shakenfist.daemons.network import stray_nics
 from shakenfist.daemons.network import workitem
 from shakenfist.config import config
 from shakenfist.daemons import daemon
+from shakenfist import etcd
 from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
 from shakenfist.util import concurrency as util_concurrency
@@ -25,6 +26,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         running = True
         shutdown_commenced = None
         last_defer_message = 0
+        last_length = 0
 
         self.workers = {}
         job_classes = {
@@ -40,6 +42,16 @@ class Monitor(daemon.WorkerPoolDaemon):
                 self.reap_workers()
 
                 if not self.exit.is_set():
+                    if time.time() - last_length > 10:
+                        processing, queued, deferred = etcd.get_queue_length(
+                            config.NODE_NAME)
+                        LOG.with_fields({
+                            'processing': processing,
+                            'queued': queued,
+                            'deferred': deferred
+                        }).debug('Queue length')
+                        last_length = time.time()
+
                     for job_name in job_classes:
                         needs_start = False
                         if (job_name == 'net-worker' and
