@@ -146,12 +146,22 @@ sudo ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=1 \
 log "Will gracefully stop another node, ${other_victim}"
 sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
     "sudo systemctl stop sf.target"
+echo
+
+# Wait for SF to actually stop
+log "Waiting for SF stop on ${other_victim}"
+sleep 10
+sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
+    "sudo systemctl list-units sf.target"
+echo
 
 # Ensure SF really stopped on ${other_victim}
 running=$(sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
     "sudo ps -ef | grep sf | egrep -v '(ata_sff|kvm|agent|grep)'" | wc -l)
 if [ $running -gt 0 ]; then
-    log "SF failed to stop on ${other_victim}"
+    log "SF failed to stop on ${other_victim}, the following processes are "
+    log "still running:"
+    log "{running}"
     exit 1
 fi
 

@@ -2,6 +2,7 @@
 Description=Shaken Fist {{ item }}
 After=multi-user.target
 PartOf=sf.target
+ReloadPropagatedFrom=sf.target
 
 [Service]
 Type=simple
