@@ -150,6 +150,20 @@ def get_default_routes(namespace):
     return routes
 
 
+def add_default_route(namespace, router):
+    try:
+        concurrency.execute(
+            None, f'route add default gw {router}', namespace=namespace)
+    except processutils.ProcessExecutionError as e:
+        if e.stderr != 'SIOCADDRT: File exists\n':
+            raise e
+
+
+def delete_default_route(namespace, router):
+    concurrency.execute(
+        None, f'route del default gw {router}', namespace=namespace)
+
+
 def get_safe_interface_name(interface):
     if len(interface) > 15:
         interface = interface[:15]

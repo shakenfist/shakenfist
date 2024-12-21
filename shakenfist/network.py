@@ -546,18 +546,21 @@ class Network(dbo):
                         self.uuid, subst['floating_gateway'], subst['floating_netmask'],
                         subst['egress_veth_inner'])
 
-                default_routes = util_network.get_default_routes(
-                    subst['netns'])
-                if default_routes != [subst['floating_router']]:
-                    if default_routes:
-                        for default_route in default_routes:
-                            util_concurrency.execute(
-                                None, 'route del default gw %s' % default_route,
-                                namespace=self.uuid)
+                needs_default_route = True
+                default_routes = util_network.get_default_routes(self.uuid)
+                if default_routes == [subst['floating_router']]:
+                    needs_default_route = False
+                elif default_routes:
+                    for default_route in default_routes:
+                        if default_route == subst['floating_router']:
+                            needs_default_route = False
+                        else:
+                            util_network.delete_default_route(
+                                self.uuid, default_route)
 
-                    util_concurrency.execute(
-                        None, 'route add default gw %(floating_router)s' % subst,
-                        namespace=self.uuid)
+                if needs_default_route:
+                    util_network.add_default_route(
+                        self.uuid, subst['floating_router'])
 
                 self.enable_nat()
 
