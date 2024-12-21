@@ -137,17 +137,19 @@ other_victim=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cl
 
 echo
 log "Will hard stop the cluster maintainer, ${maintainer}"
-log "Will gracefully stop another node, ${other_victim}"
 
 # Terminate the node uncleanly for ${maintainer}, with extra flags so we don't hang
 sudo ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=1 \
     -o ServerAliveCountMax=1 debian@${maintainer} "sudo halt --force --force"
 
 # Stop SF on ${other_victim}
-sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} "sudo systemctl stop sf"
+log "Will gracefully stop another node, ${other_victim}"
+sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
+    "sudo systemctl stop sf.target"
 
 # Ensure SF really stopped on ${other_victim}
-running=$(sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} "sudo ps -ef | grep sf | egrep -v '(ata_sff|kvm|agent|grep)'" | wc -l)
+running=$(sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
+    "sudo ps -ef | grep sf | egrep -v '(ata_sff|kvm|agent|grep)'" | wc -l)
 if [ $running -gt 0 ]; then
     log "SF failed to stop on ${other_victim}"
     exit 1
