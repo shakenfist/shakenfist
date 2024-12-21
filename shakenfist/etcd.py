@@ -903,7 +903,7 @@ def replace_many_raw(mutations):
                 'path': key.decode(),
                 'desired': original_values_by_path[key],
                 'actual': None,
-                'replacement': new_values_by_path[kvs.key]
+                'replacement': new_values_by_path[key]
             }
         )
 
