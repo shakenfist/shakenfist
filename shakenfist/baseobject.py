@@ -234,7 +234,9 @@ class DatabaseBackedObject:
                     log_as_error=True)
             return None
 
-        if 'uuid' not in static_values:
+        # Ignore old versions of objects for this check
+        if (static_values.get('version') == cls.current_version and
+                'uuid' not in static_values):
             LOG.with_fields(static_values).with_fields(
                 {
                     'object_type': cls.object_type,
