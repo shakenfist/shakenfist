@@ -172,6 +172,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
     def run(self):
         LOG.info('Starting')
+        self.record_start()
         prune_targets = []
         prune_sweep_started = 0
 
@@ -284,13 +285,16 @@ class Monitor(daemon.WorkerPoolDaemon):
                             did_work = True
 
                 if not did_work:
-                    self.exit.wait(10)
+                    self.idle(10)
 
             except Exception as e:
                 util_general.ignore_exception('eventlog daemon', e)
 
+            self.check_daemon_state()
+
         server.stop(1).wait()
         LOG.info('Terminated')
+        self.record_exit()
 
 
 def main():

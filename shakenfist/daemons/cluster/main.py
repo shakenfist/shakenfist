@@ -54,7 +54,9 @@ class Monitor(daemon.Daemon):
             if result:
                 self.is_elected = True
                 return
-            self.exit.wait(10)
+
+            self.exit.wait(5)
+            self.check_daemon_state()
 
     def _cluster_wide_cleanup(self, last_loop_run):
         LOG.info('Running cluster maintenance')
@@ -462,6 +464,7 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
+        self.record_start()
         last_defer_message = 0
 
         self.refresh_object_state_caches()
@@ -501,12 +504,13 @@ class Monitor(daemon.Daemon):
                 last_loop_run = time.time()
                 self.lock.refresh()
 
-                self.exit.wait(60)
+                self.idle(60)
 
         # Stop being the cluster maintenance node if we were
         if self.lock.is_acquired():
             self.lock.release()
         LOG.info('Terminated')
+        self.record_exit()
 
 
 def main():

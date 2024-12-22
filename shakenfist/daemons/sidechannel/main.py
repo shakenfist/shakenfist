@@ -628,10 +628,15 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
+        self.record_start()
+
         running = True
         instance_sidechannel_cache = {}
 
-        while True:
+        # Note this while look is different from many of the other daemons
+        # because we need to wait for work to terminate before exiting.
+        done = False
+        while not done:
             try:
                 self.reap_single_instance_monitors()
 
@@ -696,14 +701,17 @@ class Monitor(daemon.Daemon):
                         running = False
 
                 else:
-                    break
+                    done = True
 
                 self.exit.wait(1)
 
             except Exception as e:
                 util_general.ignore_exception('sidechannel monitor', e)
 
+            self.check_daemon_state()
+
         LOG.info('Terminated')
+        self.record_exit()
 
 
 def main():

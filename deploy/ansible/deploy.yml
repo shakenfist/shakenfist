@@ -1257,36 +1257,71 @@
       service:
         daemon_reload: yes
 
+    - name: Ensure the node exists in etcd
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl initialise-node
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_NODE_NAME: "{{node_name}}"
+        SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+
+    - name: Register the eventlog daemon if this is an eventlog node
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl initialise-daemon eventlog
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_NODE_NAME: "{{node_name}}"
+        SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+      when: inventory_hostname in groups.get('eventlog_node', [])
+
     # This must happen first to avoid gRPC event errors in the logs on single
     # machine installs.
-    - name: Restart sf-eventlog if this node is the eventlog node
+    - name: Restart the eventlog daemon if this node is the eventlog node
       service:
-        name: "{{ item }}"
+        name: "sf-{{ item }}"
         enabled: yes
         state: restarted
         daemon_reload: no
       vars:
-        item: sf-eventlog
+        item: eventlog
       when: inventory_hostname in groups.get('eventlog_node', [])
+
+    - name: Register the other SF daemons, one node at a time
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl initialise-daemon {{ item }}
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_NODE_NAME: "{{node_name}}"
+        SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+      with_items:
+        - net
+        - resources
+        - sidechannel
+        - queues
+        - api
+        - checksums
+        - cleaner
+        - cluster
+        - transfers
 
     # The ordering of units here is to match the order they must start in, not
     # alphabetical order.
-    - name: Restart the SF daemons, one node at a time
+    - name: Restart the other SF daemons, one node at a time
       service:
-        name: "{{ item }}"
+        name: "sf-{{ item }}"
         enabled: yes
         state: restarted
         daemon_reload: no
       with_items:
-        - sf-net
-        - sf-resources
-        - sf-sidechannel
-        - sf-queues
-        - sf-api
-        - sf-checksums
-        - sf-cleaner
-        - sf-cluster
-        - sf-transfers
+        - net
+        - resources
+        - sidechannel
+        - queues
+        - api
+        - checksums
+        - cleaner
+        - cluster
+        - transfers
 
     - name: Make sure sf.target unit is active
       vars:

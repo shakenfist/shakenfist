@@ -23,6 +23,8 @@ LOG, _ = logs.setup(__name__)
 class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
+        self.record_start()
+
         running = True
         shutdown_commenced = None
         last_defer_message = 0
@@ -37,7 +39,10 @@ class Monitor(daemon.WorkerPoolDaemon):
             'stray-nics': stray_nics.Job
         }
 
-        while True:
+        # Note this while look is different from many of the other daemons
+        # because we need to wait for work to terminate before exiting.
+        done = False
+        while not done:
             try:
                 self.reap_workers()
 
@@ -96,14 +101,15 @@ class Monitor(daemon.WorkerPoolDaemon):
                         faulthandler.dump_traceback()
 
                 else:
-                    break
-
-                self.exit.wait(1)
+                    done = True
 
             except Exception as e:
                 util_general.ignore_exception('network worker', e)
 
+            self.idle(5)
+
         LOG.info('Terminated')
+        self.record_exit()
 
 
 def main():

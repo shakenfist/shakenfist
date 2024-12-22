@@ -20,11 +20,16 @@ LOG, _ = logs.setup(__name__)
 class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
+        self.record_start()
+
         warned_locks = {}
         last_checkin = 0
         last_length = 0
 
-        while not self.exit.is_set():
+        # Note this while look is different from many of the other daemons
+        # because we need to wait for work to terminate before exiting.
+        done = False
+        while not done:
             try:
                 self.reap_workers()
 
@@ -73,12 +78,15 @@ class Monitor(daemon.WorkerPoolDaemon):
                              len(self.workers))
                     self.exit.wait(0.2)
                 else:
-                    return
+                    done = True
 
             except Exception as e:
                 util_general.ignore_exception('queue worker', e)
 
+            self.check_daemon_state()
+
         LOG.info('Terminated')
+        self.record_exit()
 
 
 def main():

@@ -15,6 +15,7 @@ from shakenfist.baseobject import OBJECT_NAMES
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist import etcd
 from shakenfist.config import config
+from shakenfist.node import Node
 from shakenfist.util import libvirt as util_libvirt
 
 
@@ -60,6 +61,8 @@ def set_log_level(log, name):
 
 class Daemon:
     def __init__(self, name):
+        self.daemon_name = name
+
         procname = process_name(name)
         setproctitle.setproctitle(procname)
         pyprctl.set_name(procname)
@@ -127,7 +130,31 @@ class Daemon:
     def exit_gracefully(self, sig, _frame):
         if sig == signal.SIGTERM:
             self.log.info('Caught SIGTERM, terminating')
+            n = Node.from_db(config.NODE_NAME)
+            n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPING)
             self.exit.set()
+
+    def check_daemon_state(self):
+        n = Node.from_db(config.NODE_NAME)
+        daemon_state = n.get_daemon_state(self.daemon_name).value
+        if daemon_state in [Node.DAEMON_STATE_STOPPED,
+                            Node.DAEMON_STATE_STOPPING]:
+            self.exit.set()
+
+    def record_start(self):
+        n = Node.from_db(config.NODE_NAME)
+        n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_RUNNING)
+
+    def record_exit(self):
+        n = Node.from_db(config.NODE_NAME)
+        n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPED)
+
+    def idle(self, seconds):
+        for _ in range(int(seconds / 5)):
+            self.exit.wait(5)
+            self.check_daemon_state()
+            if self.exit.is_set():
+                break
 
 
 class WorkerPoolDaemon(Daemon):

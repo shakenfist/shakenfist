@@ -3,7 +3,6 @@ import importlib
 import json
 import logging
 import os
-import time
 
 import click
 from shakenfist_utilities import logs  # noreorder
@@ -107,27 +106,40 @@ def verify_config():
 
 
 @click.command()
-def stop():
-    click.echo('Gracefully stopping Shaken Fist on this node...')
+def initialise_node():
+    click.echo('Initializing node...')
+    n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
+    click.echo(f'Node is now in state {n.state.value}.')
+
+
+@click.command()
+@click.argument('daemon')
+def initialise_daemon(daemon):
+    click.echo(f'Initializing {daemon} on node...')
+    n = Node.from_db(config.NODE_NAME)
+    n.register_daemon(daemon)
+    click.echo(f'Node is now in state {n.state.value}.')
+    click.echo(f'Daemon is now in state {n.get_daemon_state(daemon).value}.')
+
+
+@click.command()
+@click.argument('daemon')
+def stop(daemon):
+    click.echo(
+        f'Gracefully stopping Shaken Fist {daemon} daemon on this node...')
     n = Node.from_db(config.NODE_NAME)
 
     # If we were missing, we're not any more
     if n.state.value == Node.STATE_MISSING:
-        n.state = Node.STATE_CREATED
+        n.state = Node.STATE_DEGRADED
 
-    # But we are now stopping
-    n.state = Node.STATE_STOPPING
-    click.echo('Placed node in stopping state')
-
-    while n.state.value != Node.STATE_STOPPED:
-        click.echo('Waiting for Shaken Fist to stop...')
-        time.sleep(5)
-
-    click.echo('Node is now stopped')
+    n.set_daemon_state(daemon, Node.DAEMON_STATE_STOPPING)
 
 
 cli.add_command(bootstrap_system_key)
 cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
 cli.add_command(verify_config)
+cli.add_command(initialise_node)
+cli.add_command(initialise_daemon)
 cli.add_command(stop)

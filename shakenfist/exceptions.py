@@ -299,6 +299,14 @@ class NodeShouldExist(NodeException):
     ...
 
 
+class NoSuchDaemon(NodeException):
+    ...
+
+
+class NoSuchDaemonState(NodeException):
+    ...
+
+
 # Lockless update failures
 class LocklessUpdateFailed(Exception):
     ...

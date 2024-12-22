@@ -60,7 +60,6 @@ echo
 log "=== Listing blobs ==="
 sf-client blob list
 
-
 # Sleep for a little to let instances start
 echo
 log "=== Watch instances boot ==="
@@ -152,7 +151,7 @@ echo
 log "Waiting for SF stop on ${other_victim}"
 sleep 10
 sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
-    "sudo systemctl list-units sf.target"
+    "sudo systemctl list-units -all sf.target"
 echo
 
 # Ensure SF really stopped on ${other_victim}

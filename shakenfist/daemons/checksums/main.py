@@ -22,9 +22,11 @@ LOG, _ = logs.setup(__name__)
 class Monitor(daemon.Daemon):
     def run(self):
         LOG.info('Starting')
-        last_defer_message = 0
+        self.record_start()
 
+        last_defer_message = 0
         blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
+
         while not self.exit.is_set():
             if not self.cluster_stable():
                 if time.time() - last_defer_message > 10:
@@ -52,12 +54,14 @@ class Monitor(daemon.Daemon):
                             b.verify_checksum(urgent=False)
 
                         self.exit.wait(5)
+                        self.check_daemon_state()
                         if self.exit.is_set():
                             break
 
-            self.exit.wait(300)
+            self.idle(300)
 
         LOG.info('Terminated')
+        self.record_exit()
 
 
 def main():

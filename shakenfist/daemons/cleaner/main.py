@@ -448,6 +448,7 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
+        self.record_start()
         last_defer_message = 0
 
         # Delay first compaction until system startup load has reduced
@@ -500,9 +501,10 @@ class Monitor(daemon.Daemon):
                     self._clear_old_libvirt_logs()
                     last_libvirt_log_clean = time.time()
 
-            self.exit.wait(60)
+            self.idle(60)
 
         LOG.info('Terminated')
+        self.record_exit()
 
 
 def main():
