@@ -128,7 +128,8 @@ def get_etcd_native_client():
             c = None
 
     if not c:
-        LOG.info('Creating new etcd client via native protocol')
+        if config.LOG_ETCD_CONNECTIONS:
+            LOG.info('Creating new etcd client via native protocol')
         local.sf_etcd_native_client = grpc.insecure_channel(
             '%s:2379' % config.ETCD_HOST,
             options=[
