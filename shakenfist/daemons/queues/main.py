@@ -18,10 +18,7 @@ LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.WorkerPoolDaemon):
-    def run(self):
-        LOG.info('Starting')
-        self.record_start()
-
+    def _run_inner(self):
         warned_locks = {}
         last_checkin = 0
         last_length = 0
@@ -84,9 +81,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                 util_general.ignore_exception('queue worker', e)
 
             self.check_daemon_state()
-
-        LOG.info('Terminated')
-        self.record_exit()
 
 
 def main():

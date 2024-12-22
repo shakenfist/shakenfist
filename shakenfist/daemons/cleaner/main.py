@@ -446,9 +446,7 @@ class Monitor(daemon.Daemon):
         except Exception as e:
             util_general.ignore_exception('etcd compaction', e)
 
-    def run(self):
-        LOG.info('Starting')
-        self.record_start()
+    def _run_inner(self):
         last_defer_message = 0
 
         # Delay first compaction until system startup load has reduced
@@ -502,9 +500,6 @@ class Monitor(daemon.Daemon):
                     last_libvirt_log_clean = time.time()
 
             self.idle(60)
-
-        LOG.info('Terminated')
-        self.record_exit()
 
 
 def main():

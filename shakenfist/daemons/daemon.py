@@ -77,6 +77,24 @@ class Daemon:
         self.last_stability = None
         self.last_stability_log = 0
 
+    def run(self):
+        try:
+            LOG.info('Starting')
+            self.record_start()
+
+            self._run_inner()
+        except ValueError as e:
+            # This value error is caused by grpc getting confused by channels
+            # shutting down in other threads as we terminate our processes
+            # at graceful shutdown. Given we recreate the channel if we need it,
+            # its safe to ignore.
+            if str(e) != 'Cannot monitor channel state: Channel closed!':
+                LOG.warning('Unhandled top level value error: {e}')
+                raise e
+        finally:
+            LOG.info('Terminated')
+            self.record_exit()
+
     def _log_stability(self, log, msg):
         if (self.last_stability == msg and
                 time.time() - self.last_stability_log < 10):

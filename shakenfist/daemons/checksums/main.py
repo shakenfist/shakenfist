@@ -20,10 +20,7 @@ LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.Daemon):
-    def run(self):
-        LOG.info('Starting')
-        self.record_start()
-
+    def _run_inner(self):
         last_defer_message = 0
         blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
 
@@ -59,9 +56,6 @@ class Monitor(daemon.Daemon):
                             break
 
             self.idle(300)
-
-        LOG.info('Terminated')
-        self.record_exit()
 
 
 def main():

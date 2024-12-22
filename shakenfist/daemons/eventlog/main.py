@@ -170,9 +170,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         }
         start_http_server(config.EVENTLOG_METRICS_PORT)
 
-    def run(self):
-        LOG.info('Starting')
-        self.record_start()
+    def _run_inner(self):
         prune_targets = []
         prune_sweep_started = 0
 
@@ -293,8 +291,6 @@ class Monitor(daemon.WorkerPoolDaemon):
             self.check_daemon_state()
 
         server.stop(1).wait()
-        LOG.info('Terminated')
-        self.record_exit()
 
 
 def main():

@@ -462,9 +462,7 @@ class Monitor(daemon.Daemon):
                     cache.clobber_object_state_cache(
                         object_type, state, by_state[state])
 
-    def run(self):
-        LOG.info('Starting')
-        self.record_start()
+    def _run_inner(self):
         last_defer_message = 0
 
         self.refresh_object_state_caches()
@@ -509,8 +507,6 @@ class Monitor(daemon.Daemon):
         # Stop being the cluster maintenance node if we were
         if self.lock.is_acquired():
             self.lock.release()
-        LOG.info('Terminated')
-        self.record_exit()
 
 
 def main():

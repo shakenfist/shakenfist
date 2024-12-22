@@ -155,12 +155,14 @@ sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
 echo
 
 # Ensure SF really stopped on ${other_victim}
-running=$(sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
+running_count=$(sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
     "sudo ps -ef | grep sf | egrep -v '(ata_sff|kvm|agent|grep)'" | wc -l)
-if [ $running -gt 0 ]; then
-    log "SF failed to stop on ${other_victim}, the following processes are "
-    log "still running:"
-    log "${running}"
+if [ ${running_count} -gt 0 ]; then
+    log "SF failed to stop on ${other_victim}, there are ${running_count} processes"
+    log "still running."
+    log ""
+    sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
+        "sudo ps -ef | grep sf | egrep -v '(ata_sff|kvm|agent|grep)'"
     exit 1
 fi
 

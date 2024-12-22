@@ -81,10 +81,7 @@ class TransferJob(util_concurrency.Job):
 
 
 class Monitor(daemon.WorkerPoolDaemon):
-    def run(self):
-        LOG.info('Starting')
-        self.record_start()
-
+    def _run_inner(self):
         # Note this while look is different from many of the other daemons
         # because we need to wait for work to terminate before exiting.
         done = False

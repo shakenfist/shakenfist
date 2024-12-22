@@ -626,10 +626,7 @@ class Monitor(daemon.Daemon):
                 EVENT_TYPE_AUDIT, 'instance', instance_uuid,
                 'sidechannel monitor finished')
 
-    def run(self):
-        LOG.info('Starting')
-        self.record_start()
-
+    def _run_inner(self):
         running = True
         instance_sidechannel_cache = {}
 
@@ -709,9 +706,6 @@ class Monitor(daemon.Daemon):
                 util_general.ignore_exception('sidechannel monitor', e)
 
             self.check_daemon_state()
-
-        LOG.info('Terminated')
-        self.record_exit()
 
 
 def main():

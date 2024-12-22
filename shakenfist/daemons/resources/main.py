@@ -297,10 +297,7 @@ class Monitor(daemon.Daemon):
                 self.last_logged_resources = time.time()
             return retval
 
-    def run(self):
-        LOG.info('Starting')
-        self.record_start()
-
+    def _run_inner(self):
         gauges = {
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
         }
@@ -477,9 +474,6 @@ class Monitor(daemon.Daemon):
                 util_general.ignore_exception('resource statistics', e)
 
             self.check_daemon_state()
-
-        LOG.info('Terminated')
-        self.record_exit()
 
 
 def main():

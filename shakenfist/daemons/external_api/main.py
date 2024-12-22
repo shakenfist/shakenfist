@@ -13,9 +13,7 @@ LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.Daemon):
-    def run(self):
-        LOG.info('Starting')
-        self.record_start()
+    def _run_inner(self):
 
         os.makedirs('/var/run/sf', exist_ok=True)
         util_concurrency.execute(
@@ -27,9 +25,6 @@ class Monitor(daemon.Daemon):
             },
             env_variables=os.environ,
             check_exit_code=[0, 1, -15])
-
-        LOG.info('Terminated')
-        self.record_exit()
 
     def exit_gracefully(self, sig, _frame):
         if sig == signal.SIGTERM:

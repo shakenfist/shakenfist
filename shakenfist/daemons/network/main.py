@@ -21,10 +21,7 @@ LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.WorkerPoolDaemon):
-    def run(self):
-        LOG.info('Starting')
-        self.record_start()
-
+    def _run_inner(self):
         running = True
         shutdown_commenced = None
         last_defer_message = 0
@@ -107,9 +104,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                 util_general.ignore_exception('network worker', e)
 
             self.idle(5)
-
-        LOG.info('Terminated')
-        self.record_exit()
 
 
 def main():
