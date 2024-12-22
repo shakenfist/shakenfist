@@ -160,7 +160,7 @@ running=$(sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
 if [ $running -gt 0 ]; then
     log "SF failed to stop on ${other_victim}, the following processes are "
     log "still running:"
-    log "{running}"
+    log "${running}"
     exit 1
 fi
 
