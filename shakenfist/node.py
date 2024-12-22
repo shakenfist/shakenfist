@@ -51,7 +51,7 @@ class Node(dbo):
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING,
                             STATE_DEGRADED),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING,
-                            STATE_STOPPING),
+                            STATE_STOPPING, STATE_DEGRADED),
         STATE_STOPPING: (STATE_STOPPED, dbo.STATE_DELETED, dbo.STATE_ERROR,
                          dbo.STATE_CREATED),
         STATE_STOPPED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
