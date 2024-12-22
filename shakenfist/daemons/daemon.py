@@ -130,8 +130,13 @@ class Daemon:
     def exit_gracefully(self, sig, _frame):
         if sig == signal.SIGTERM:
             self.log.info('Caught SIGTERM, terminating')
-            n = Node.from_db(config.NODE_NAME)
-            n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPING)
+            try:
+                n = Node.from_db(config.NODE_NAME)
+                n.set_daemon_state(
+                    self.daemon_name, Node.DAEMON_STATE_STOPPING)
+            except ValueError:
+                # This might fail if grpc has already started shutting down
+                ...
             self.exit.set()
 
     def check_daemon_state(self):
