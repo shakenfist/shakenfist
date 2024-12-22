@@ -29,6 +29,8 @@ class Node(dbo):
     STATE_STOPPED = 'stopped'
     STATE_DEGRADED = 'degraded'
 
+    # Note that this list of active states is duplicated in baseobject as well to
+    # avoid a circular import, and if changed must be updated there as well.
     ACTIVE_STATES = {dbo.STATE_INITIAL, dbo.STATE_CREATED, STATE_DEGRADED}
     INACTIVE_STATES = {dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING}
 

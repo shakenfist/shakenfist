@@ -40,7 +40,7 @@ OBJECT_NAMES = ['agentoperation', 'artifact', 'blob', 'dhcp', 'instance', 'ipam'
                 'namespace', 'network', 'networkinterface', 'node', 'upload']
 
 
-def _maintain_version_cache():
+def _maintain_version_cache(max_cache_age):
     global VERSION_CACHE_MINIMUM
     global VERSION_CACHE_MAXIMUM
     global VERSION_CACHE_AGE
@@ -48,7 +48,7 @@ def _maintain_version_cache():
     if not VERSION_CACHE_MINIMUM or not VERSION_CACHE_MAXIMUM:
         VERSION_CACHE_MINIMUM = {}
         VERSION_CACHE_MAXIMUM = {}
-    elif time.time() - VERSION_CACHE_AGE > 300:
+    elif time.time() - VERSION_CACHE_AGE > max_cache_age:
         VERSION_CACHE_MINIMUM = {}
         VERSION_CACHE_MAXIMUM = {}
     else:
@@ -59,33 +59,32 @@ def _maintain_version_cache():
 
     # Ignore metrics for deleted nodes, but include nodes in an error state
     # as they may return.
-    for k, d in etcd.get_all('metrics', None):
-        node_name = d['fqdn']
-        d['metrics']['metrics_age'] = time.time() - d.get('timestamp', 0)
-
-        # Discard very old metrics
-        if d['metrics']['metrics_age'] > 24 * 7 * 3600:
-            LOG.with_fields({
-                'node_name': node_name,
-                'from_key': k,
-                'metrics_age': d['metrics']['metrics_age']
-            }).debug('Ignoring very old metrics entry')
+    for node_uuid in cache.read_object_state_cache_many(
+            'node', [DatabaseBackedObject.STATE_INITIAL,
+                     DatabaseBackedObject.STATE_CREATED,
+                     'degraded']):
+        n = etcd.get('node', None, node_uuid)
+        if not n:
             continue
 
-        state = etcd.get('attribute/node', node_name, 'state')
-        if state and state['value'] != DatabaseBackedObject.STATE_DELETED:
-            metrics[node_name] = d['metrics']
-            LOG.with_fields({
-                'node_name': node_name,
-                'from_key': k,
-                'metrics_age': d['metrics']['metrics_age']
-            }).debug('Considering metrics entry')
-        else:
-            LOG.with_fields({
-                'node_name': node_name,
-                'from_key': k,
-                'metrics_age': d['metrics']['metrics_age']
-            }).debug('Ignoring metrics entry for deleted node')
+        node_name = n['fqdn']
+        d = etcd.get('metrics', n['fqdn'], None)
+        if not d:
+            continue
+
+        d['metrics']['metrics_age'] = time.time() - d.get('timestamp', 0)
+        log = LOG.with_fields({
+            'node_name': node_name,
+            'metrics_age': d['metrics']['metrics_age']
+        })
+
+        # Discard very old metrics
+        if d['metrics']['metrics_age'] > 300:
+            log.warning('Ignoring very old metrics entry for active node')
+            continue
+
+        metrics[node_name] = d['metrics']
+        log.debug('Considering metrics entry')
 
     for possible_objname in OBJECT_NAMES:
         nodes_by_version = defaultdict(list, [])
@@ -115,13 +114,13 @@ def _maintain_version_cache():
     VERSION_CACHE_AGE = time.time()
 
 
-def get_minimum_object_version(objname):
-    _maintain_version_cache()
+def get_minimum_object_version(objname, max_cache_age=300):
+    _maintain_version_cache(max_cache_age)
     return VERSION_CACHE_MINIMUM.get(objname, inf)
 
 
-def get_maximum_object_version(objname):
-    _maintain_version_cache()
+def get_maximum_object_version(objname, max_cache_age=300):
+    _maintain_version_cache(max_cache_age)
     return VERSION_CACHE_MAXIMUM.get(objname, -1)
 
 

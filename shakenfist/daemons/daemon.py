@@ -92,8 +92,8 @@ class Daemon:
         # upgrade in flight.
         for objname in OBJECT_NAMES:
             current_version = OBJECT_NAMES_TO_CLASSES[objname].current_version
-            minimum = get_minimum_object_version(objname)
-            maximum = get_maximum_object_version(objname)
+            minimum = get_minimum_object_version(objname, max_cache_age=5)
+            maximum = get_maximum_object_version(objname, max_cache_age=5)
             log = LOG.with_fields({
                 'object': objname,
                 'minimum_version': minimum,
