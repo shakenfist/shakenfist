@@ -1127,30 +1127,30 @@
     - name: Write systemd units on remote host
       template:
         src: files/sf.service
-        dest: /etc/systemd/system/{{ item }}.service
+        dest: /etc/systemd/system/sf-{{ item }}.service
         owner: root
         group: root
         mode: u=r,g=r,o=r
       with_items:
-        - sf-api
-        - sf-checksums
-        - sf-cleaner
-        - sf-cluster
-        - sf-net
-        - sf-queues
-        - sf-resources
-        - sf-sidechannel
-        - sf-transfers
+        - api
+        - checksums
+        - cleaner
+        - cluster
+        - net
+        - queues
+        - resources
+        - sidechannel
+        - transfers
 
     - name: Write systemd unit for eventlog daemon
       template:
         src: files/sf.service
-        dest: /etc/systemd/system/{{ item }}.service
+        dest: /etc/systemd/system/sf-{{ item }}.service
         owner: root
         group: root
         mode: u=r,g=r,o=r
       vars:
-        item: sf-eventlog
+        item: eventlog
       when: inventory_hostname in groups.get('eventlog_node', [])
 
     # https://stackoverflow.com/questions/64701241/how-do-i-write-ansible-task-for-systemctl-set-default-graphical-target-without
