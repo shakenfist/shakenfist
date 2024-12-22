@@ -187,7 +187,7 @@ class Job(util_concurrency.Job):
         if isinstance(workitem, DefloatNetworkInterfaceTask):
             floating = ni.floating.get('floating_address')
             if not floating:
-                self.log.warning(
+                log_ctx.warning(
                     'Not defloating an interface with no floating address')
             else:
                 n.remove_floating_ip(floating, ni.ipv4)
@@ -206,7 +206,7 @@ class Job(util_concurrency.Job):
         if isinstance(workitem, FloatNetworkInterfaceTask):
             floating = ni.floating.get('floating_address')
             if not floating:
-                self.log.warning(
+                log_ctx.warning(
                     'Not floating an interface with no floating address')
             else:
                 n.add_floating_ip(floating, ni.ipv4)
