@@ -221,10 +221,10 @@ def redirect_instance_request(func):
             return
 
         if placement.get('node') != config.NODE_NAME:
-            url = 'http://%s:%d%s' % (placement['node'], config.API_PORT,
-                                      flask.request.environ['PATH_INFO'])
+            path = flask.request.environ['PATH_INFO']
+            url = f'http://{placement["node"]}:13000{path}'
             api_token = get_api_token(
-                'http://%s:%d' % (placement['node'], config.API_PORT),
+                f'http://{placement["node"]}:13000',
                 namespace=parse_jwt_identity()[0])
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
@@ -235,11 +235,13 @@ def redirect_instance_request(func):
                     'X-Request-ID': flask.request.headers.get('X-Request-ID')
                 })
 
-            LOG.info('Proxied %s %s returns: %d, %s' % (
-                     flask.request.environ['REQUEST_METHOD'], url,
-                     r.status_code, r.text))
-            resp = flask.Response(r.text,
-                                  mimetype='application/json')
+            LOG.with_fields({
+                'method': flask.request.environ['REQUEST_METHOD'],
+                'url': url,
+                'status_code': r.status_code,
+                'text': r.text
+            }).info('Returning proxied request')
+            resp = flask.Response(r.text, mimetype='application/json')
             resp.status_code = r.status_code
             return resp
 
@@ -306,14 +308,12 @@ def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
         if not config.NODE_IS_NETWORK_NODE:
+            path = flask.request.environ['PATH_INFO']
             admin_token = get_api_token(
-                'http://%s:%d' % (config.NETWORK_NODE_IP, config.API_PORT),
-                namespace='system')
+                f'http://{config.NETWORK_NODE_IP}:13000', namespace='system')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
-                'http://%s:%d%s'
-                % (config.NETWORK_NODE_IP, config.API_PORT,
-                   flask.request.environ['PATH_INFO']),
+                f'http://{config.NETWORK_NODE_IP}:13000{path}',
                 data=flask.request.data,
                 headers={
                     'Authorization': admin_token,
@@ -321,8 +321,12 @@ def redirect_to_network_node(func):
                     'X-Request-ID': flask.request.headers.get('X-Request-ID')
                 })
 
-            LOG.info('Returning proxied request: %d, %s'
-                     % (r.status_code, r.text))
+            LOG.with_fields({
+                'method': flask.request.environ['REQUEST_METHOD'],
+                'url': path,
+                'status_code': r.status_code,
+                'text': r.text
+            }).info('Returning proxied request')
             resp = flask.Response(r.text, mimetype='application/json')
             resp.status_code = r.status_code
             return resp
@@ -406,11 +410,10 @@ def redirect_upload_request(func):
             return
 
         if u.node != config.NODE_NAME:
-            url = 'http://%s:%d%s' % (u.node, config.API_PORT,
-                                      flask.request.environ['PATH_INFO'])
+            path = flask.request.environ['PATH_INFO']
+            url = f'http://{u.node}:13000{path}'
             api_token = get_api_token(
-                'http://%s:%d' % (u.node, config.API_PORT),
-                namespace=parse_jwt_identity()[0])
+                f'http://{u.node}:13000', namespace=parse_jwt_identity()[0])
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=flask.request.get_data(cache=False, as_text=False,
@@ -421,9 +424,12 @@ def redirect_upload_request(func):
                     'X-Request-ID': flask.request.headers.get('X-Request-ID')
                 })
 
-            LOG.info('Proxied %s %s returns: %d, %s' % (
-                     flask.request.environ['REQUEST_METHOD'], url,
-                     r.status_code, r.text))
+            LOG.with_fields({
+                'method': flask.request.environ['REQUEST_METHOD'],
+                'url': url,
+                'status_code': r.status_code,
+                'text': r.text
+            }).info('Returning proxied request')
             resp = flask.Response(r.text,  mimetype='application/json')
             resp.status_code = r.status_code
             return resp
@@ -436,14 +442,12 @@ def redirect_to_eventlog_node(func):
     # Redirect method to the event node
     def wrapper(*args, **kwargs):
         if not config.NODE_IS_EVENTLOG_NODE:
+            path = flask.request.environ['PATH_INFO']
             admin_token = get_api_token(
-                'http://%s:%d' % (config.EVENTLOG_NODE_IP, config.API_PORT),
-                namespace='system')
+                f'http://{config.EVENTLOG_NODE_IP}:13000', namespace='system')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
-                'http://%s:%d%s'
-                % (config.EVENTLOG_NODE_IP, config.API_PORT,
-                   flask.request.environ['PATH_INFO']),
+                f'http://{config.EVENTLOG_NODE_IP}:13000{path}',
                 data=flask.request.data,
                 headers={
                     'Authorization': admin_token,
@@ -451,8 +455,12 @@ def redirect_to_eventlog_node(func):
                     'X-Request-ID': flask.request.headers.get('X-Request-ID')
                 })
 
-            LOG.info('Returning proxied request: %d, %s'
-                     % (r.status_code, r.text))
+            LOG.with_fields({
+                'method': flask.request.environ['REQUEST_METHOD'],
+                'url': path,
+                'status_code': r.status_code,
+                'text': r.text
+            }).info('Returning proxied request')
             resp = flask.Response(r.text, mimetype='application/json')
             resp.status_code = r.status_code
             return resp

@@ -22,7 +22,6 @@ from shakenfist import cache
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
-from shakenfist.config import config
 from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
@@ -55,11 +54,9 @@ def _read_file(filename, offset, limit=0):
 
 def _read_remote(target, blob_uuid, offset=0, limit=0):
     api_token = get_api_token(
-        'http://%s:%d' % (target, config.API_PORT),
-        namespace=parse_jwt_identity()[0])
-
-    url = 'http://%s:%d/blobs/%s/data?offset=%d&limit=%d' % (
-        target, config.API_PORT, blob_uuid, offset, limit)
+        f'http://{target}:13000', namespace=parse_jwt_identity()[0])
+    url = (f'http://{target}:13000/blobs/{blob_uuid}/'
+           f'data?offset={offset}&limit={limit}')
 
     LOG.with_fields({
         'blob': blob_uuid,
@@ -67,12 +64,12 @@ def _read_remote(target, blob_uuid, offset=0, limit=0):
         'host': target
     }).info('Requesting blob from remote host')
     r = requests.request(
-            'GET', url, stream=True,
-            headers={
-                'Authorization': api_token,
-                'User-Agent': util_general.get_user_agent(),
-                'X-Request-ID': flask.request.headers.get('X-Request-ID')
-            })
+        'GET', url, stream=True,
+        headers={
+            'Authorization': api_token,
+            'User-Agent': util_general.get_user_agent(),
+            'X-Request-ID': flask.request.headers.get('X-Request-ID')
+        })
     yield from r.iter_content(chunk_size=CHUNK_SIZE)
 
 

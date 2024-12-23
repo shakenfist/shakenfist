@@ -288,9 +288,8 @@ class IPAMException(Exception):
 class InvalidIPAMAddress(IPAMException):
     ...
 
+
 # Nodes
-
-
 class NodeException(Exception):
     ...
 
@@ -327,4 +326,17 @@ class AuthException(Exception):
 
 
 class CannotParseJWTIdentity(AuthException):
+    ...
+
+
+# Utility exceptions
+class MissingPrivExecSocket(Exception):
+    ...
+
+
+class TruncatedPrivExecResponse(Exception):
+    ...
+
+
+class UnknownReplyException(Exception):
     ...

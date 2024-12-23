@@ -403,11 +403,10 @@ class ArtifactUploadEndpoint(sf_api.Resource):
                 return sf_api.error(404, 'upload not found')
 
             if u.node != config.NODE_NAME:
-                url = 'http://%s:%d%s' % (u.node, config.API_PORT,
-                                          flask.request.environ['PATH_INFO'])
+                path = flask.request.environ['PATH_INFO']
+                url = f'http://{u.node}:13000{path}'
                 api_token = get_api_token(
-                    'http://%s:%d' % (u.node, config.API_PORT),
-                    namespace=parse_jwt_identity()[0])
+                    f'http://{u.node}:13000', namespace=parse_jwt_identity()[0])
                 r = requests.request(
                     flask.request.environ['REQUEST_METHOD'], url,
                     data=json.dumps(sf_api.flask_get_post_body()),

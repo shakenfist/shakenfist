@@ -1,5 +1,6 @@
 import time
 
+import os
 import psutil
 import pyprctl
 import setproctitle
@@ -18,10 +19,32 @@ LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.WorkerPoolDaemon):
+    def _check_other_daemon(self, daemon_name, override_daemon_name=None):
+        daemon_running = False
+        if os.path.exists(f'/run/sf-{daemon_name}.pid'):
+            try:
+                with open(f'/run/sf-{daemon_name}.pid') as f:
+                    pid = int(f.read())
+                psutil.Process(pid)
+                daemon_running = True
+
+            except (ValueError, psutil.NoSuchProcess):
+                ...
+
+        if override_daemon_name:
+            daemon_name = override_daemon_name
+
+        n = Node.from_db(config.NODE_NAME)
+        if daemon_running:
+            n.set_daemon_state(daemon_name, Node.DAEMON_STATE_RUNNING)
+        else:
+            n.set_daemon_state(daemon_name, Node.DAEMON_STATE_STOPPED)
+
     def _run_inner(self):
         warned_locks = {}
         last_checkin = 0
         last_length = 0
+        last_third_party_health_check = 0
 
         # Note this while look is different from many of the other daemons
         # because we need to wait for work to terminate before exiting.
@@ -33,6 +56,14 @@ class Monitor(daemon.WorkerPoolDaemon):
                 if time.time() - last_checkin > 5:
                     Node.observe_this_node()
                     last_checkin = time.time()
+
+                if time.time() - last_third_party_health_check > 30:
+                    # We also check in on the privexec and api daemon heres because
+                    # they cannot do this for themselves...
+                    self._check_other_daemon('privexec')
+                    self._check_other_daemon(
+                        'gunicorn', override_daemon_name='api')
+                    last_third_party_health_check = time.time()
 
                 # Check if we hold any locks for processes which don't exist any
                 # more. That is, a process has ended but left a stray lock.

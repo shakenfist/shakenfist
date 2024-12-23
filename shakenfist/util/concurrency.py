@@ -1,12 +1,19 @@
+import flask
 import os
+import socket
 import threading
 import time
 
-import psutil
+from google.protobuf.message import DecodeError
 from oslo_concurrency import processutils
-from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities import logs        # noreorder
+from shakenfist_utilities import random      # noreorder
 
 from shakenfist import etcd
+from shakenfist.exceptions import MissingPrivExecSocket
+from shakenfist.exceptions import TruncatedPrivExecResponse
+from shakenfist.exceptions import UnknownReplyException
+from shakenfist import privexec_pb2
 from shakenfist.util import callstack as util_callstack
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
@@ -14,6 +21,7 @@ from shakenfist.util import callstack as util_callstack
 
 
 LOG, _ = logs.setup(__name__)
+SOCKET_PATH = '/srv/shakenfist/.privexec'
 
 
 class Job:
@@ -26,95 +34,126 @@ class Job:
         LOG.debug('Finished job execution')
 
 
-class LockRefresherJob(Job):
-    def __init__(self, locks):
-        super().__init__()
-        self.locks = locks
-
-    def execute(self):
-        etcd.reset_client()
-        last_refresh = 0
-        while not self.exit.is_set():
-            if time.time() - last_refresh > 9:
-                etcd.refresh_locks(self.locks)
-                last_refresh = time.time()
-            time.sleep(0.2)
-
-
-# Mid-range best effort, equivalent to not specifying a value
-PRIORITY_NORMAL = (2, 4)
-PRIORITY_LOW = (2, 7)
-PRIORITY_HIGH = (2, 0)
-
-
-def _log_results(stdout, stderr, execution_time):
-    fields = {
-        'stdout': stdout,
-        'stderr': stderr,
-        'execution_time': f'{execution_time:.2f}'
-    }
-
-    try:
-        LOG.with_fields(fields).debug('Command output')
-    except OSError:
-        # This happens when the log message is too long...
-        if len(stdout) > 512:
-            fields['stdout'] = stdout[:512] + '...'
-        if len(stderr) > 512:
-            fields['stderr'] = stderr[:512] + '...'
-        LOG.with_fields(fields).debug('Command output (truncated)')
-
-
 def _is_gunicorn():
     return 'gunicorn' in os.environ.get('SERVER_SOFTWARE', '')
+
+
+def _log_results(**kwargs):
+    try:
+        LOG.with_fields(kwargs).debug('Command output')
+    except OSError:
+        # This happens when the log message is too long...
+        if len(kwargs['stdout']) > 512:
+            kwargs['stdout'] = kwargs['stdout'][:512] + '...'
+        if len(kwargs['stderr']) > 512:
+            kwargs['stderr'] = kwargs['stderr'][:512] + '...'
+        LOG.with_fields(kwargs).debug('Command output (truncated)')
+
+
+PRIORITY_NORMAL = privexec_pb2.ExecuteRequest.NORMAL
+PRIORITY_LOW = privexec_pb2.ExecuteRequest.LOW
+PRIORITY_HIGH = privexec_pb2.ExecuteRequest.HIGH
 
 
 def execute(locks, command, check_exit_code=[0], env_variables=None,
             namespace=None, iopriority=None, cwd=None,
             suppress_command_logging=False):
-    if namespace:
-        command = f'ip netns exec {namespace} {command}'
+    try:
+        request_id = flask.request.environ.get('FLASK_REQUEST_ID')
+    except RuntimeError:
+        request_id = None
 
-    if iopriority:
-        current_iopriority = psutil.Process().ionice()
-        if current_iopriority != iopriority:
-            command = 'ionice -c %d -n %d %s' % (iopriority[0], iopriority[1],
-                                                 command)
+    execution_id = random.random_id()
+    request = privexec_pb2.Request(
+        execute_request=privexec_pb2.ExecuteRequest(
+            command=command,
+            network_namespace=namespace,
+            io_priority=iopriority,
+            working_directory=cwd,
+            request_id=request_id,
+            execution_id=execution_id
+        )
+    )
+
+    if env_variables:
+        for env_var in env_variables:
+            ev = request.execute_request.environment_variables.add()
+            ev.name = env_var
+            ev.value = env_variables[env_var]
+    else:
+        env_variables = {}
+
+    if 'PATH' not in env_variables:
+        ev = request.execute_request.environment_variables.add()
+        ev.name = 'PATH'
+        ev.value = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 
     if not suppress_command_logging:
-        LOG.info('Executing %s with locks %s', command, locks)
+        LOG.with_fields({
+            'command': command,
+            'namespace': namespace,
+            'iopriority': iopriority,
+            'environment_variables': env_variables,
+            'working_directory': cwd,
+            'request_id': request_id,
+            'execution_id': execution_id
+        }).info('Executing command')
 
-    if not locks:
-        start_time = time.time()
-        stdout, stderr = processutils.execute(
-            command, check_exit_code=check_exit_code,
-            env_variables=env_variables, shell=True, cwd=cwd)
-        if not suppress_command_logging:
-            _log_results(stdout, stderr, time.time() - start_time)
-        return stdout, stderr
+    if _is_gunicorn() and locks:
+        caller = util_callstack.generate_traceback()
+        LOG.warning(
+            f'Lock refreshers should not be used under gunicorn: {caller}')
 
-    else:
-        if _is_gunicorn():
-            caller = util_callstack.generate_traceback()
-            LOG.warning(
-                f'Lock refreshers should not be used under gunicorn: {caller}')
+    if not os.path.exists(SOCKET_PATH):
+        raise MissingPrivExecSocket()
 
-        refresher = LockRefresherJob(locks)
-        refresher_thread = threading.Thread(
-            target=refresher.run, daemon=True, name='lock-refresher')
-        refresher_thread.start()
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    client.connect(SOCKET_PATH)
 
-        try:
-            start_time = time.time()
-            stdout, stderr = processutils.execute(
-                command, check_exit_code=check_exit_code,
-                env_variables=env_variables, shell=True)
-            if not suppress_command_logging:
-                _log_results(stdout, stderr, time.time() - start_time)
-            return stdout, stderr
-        finally:
-            refresher.exit.set()
-            refresher_thread.join(1.0)
-            if refresher_thread.is_alive():
-                LOG.error('Failed to terminate lock refresher thread with '
-                          f'ident {refresher_thread.ident}')
+    try:
+        client.sendall(request.SerializeToString())
+
+        buffered = bytearray()
+        last_refresh = 0
+        while True:
+            input = client.recv(102400)
+            if not input:
+                raise TruncatedPrivExecResponse()
+            buffered += input
+
+            try:
+                reply = privexec_pb2.Reply()
+                consumed = reply.ParseFromString(buffered)
+                if consumed == 0:
+                    continue
+
+                if reply.HasField('execute_reply'):
+                    response = reply.execute_reply
+                    _log_results(
+                        request_id=response.request_id,
+                        execution_id=response.execution_id,
+                        stdout=response.stdout,
+                        stderr=response.stderr,
+                        exit_code=response.exit_code,
+                        duration=response.execution_seconds)
+                    if response.exit_code in check_exit_code:
+                        return response.stdout, response.stderr
+                    else:
+                        raise processutils.ProcessExecutionError(
+                            exit_code=response.exit_code,
+                            stdout=response.stdout,
+                            stderr=response.stderr,
+                            cmd=command
+                        )
+                else:
+                    raise UnknownReplyException()
+
+            except DecodeError as e:
+                ...
+
+            if locks and time.time() - last_refresh > 9:
+                etcd.refresh_locks(locks)
+                last_refresh = time.time()
+
+    finally:
+        client.close()

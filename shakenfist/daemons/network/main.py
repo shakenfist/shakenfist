@@ -110,6 +110,7 @@ def main():
     # If I am the network node, I need some setup
     if config.NODE_IS_NETWORK_NODE:
         LOG.info('Network node pre-start is running')
+        daemon.health_check_privexec()
 
         # Bootstrap the floating network in the Networks table
         network.floating_network()

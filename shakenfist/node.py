@@ -35,10 +35,10 @@ class Node(dbo):
     INACTIVE_STATES = {dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING}
 
     # Remember that this list must align with what sf-ctl is called with in
-    # deploy.yml
+    # deploy.yml.
     VALID_DAEMONS = ['eventlog', 'net', 'resources', 'sidechannel',
                      'queues', 'api', 'checksums', 'cleaner', 'cluster',
-                     'transfers']
+                     'transfers', 'privexec']
 
     DAEMON_STATE_RUNNING = 'daemon-running'
     DAEMON_STATE_STOPPING = 'daemon-stopping'
@@ -54,14 +54,16 @@ class Node(dbo):
                             STATE_STOPPING, STATE_DEGRADED),
         STATE_STOPPING: (STATE_STOPPED, dbo.STATE_DELETED, dbo.STATE_ERROR,
                          dbo.STATE_CREATED),
-        STATE_STOPPED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        STATE_STOPPED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR,
+                        STATE_DEGRADED),
 
         # Some (but not all) components are not running correctly on the node
         STATE_DEGRADED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
 
         # A node can return from the dead...
-        dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED),
-        STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED, STATE_DEGRADED),
+        STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR,
+                        STATE_DEGRADED),
 
         # But not from being deleted.
         dbo.STATE_DELETED: None,
@@ -179,8 +181,9 @@ class Node(dbo):
             if daemon_state == self.DAEMON_STATE_STOPPED:
                 node_degraded = True
 
-        if (node_state not in [self.STATE_STOPPING, self.STATE_STOPPED] and
-                node_degraded):
+        degraded_or_stopping = [self.STATE_DEGRADED, self.STATE_STOPPING,
+                                self.STATE_STOPPED]
+        if node_state not in degraded_or_stopping and node_degraded:
             self.add_event(
                 EVENT_TYPE_AUDIT,
                 'node is not stopping or stopped, but a daemon is not running '

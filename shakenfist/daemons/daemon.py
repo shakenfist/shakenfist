@@ -5,6 +5,7 @@ import signal
 import threading
 import time
 
+from oslo_concurrency import processutils
 import pyprctl
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
@@ -16,6 +17,7 @@ from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist import etcd
 from shakenfist.config import config
 from shakenfist.node import Node
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import libvirt as util_libvirt
 
 
@@ -57,6 +59,23 @@ def set_log_level(log, name):
         numeric_level = logging.INFO
 
     log.setLevel(numeric_level)
+
+
+def health_check_privexec():
+    try:
+        stdout, stderr = util_concurrency.execute(None, 'whoami')
+    except processutils.ProcessExecutionError as e:
+        LOG.with_fields({
+            'stdout': e.stdout,
+            'stderr': e.stderr,
+            'exit_code': e.exit_code
+        }).error('privsep daemon is unhealthy (execution error)!')
+        return False
+    except ConnectionResetError:
+        LOG.error('privsep daemon is unhealthy (connection reset)!')
+        return False
+
+    return True
 
 
 class Daemon:

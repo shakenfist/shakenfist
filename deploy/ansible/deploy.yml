@@ -1132,7 +1132,7 @@
         group: root
         mode: u=r,g=r,o=r
       with_items:
-        - api
+        - privexec
         - checksums
         - cleaner
         - cluster
@@ -1141,6 +1141,14 @@
         - resources
         - sidechannel
         - transfers
+
+    - name: Write systemd unit for API daemon
+      template:
+        src: files/sf-api.service
+        dest: /etc/systemd/system/sf-api.service
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
 
     - name: Write systemd unit for eventlog daemon
       template:
@@ -1294,6 +1302,7 @@
         SHAKENFIST_NODE_NAME: "{{node_name}}"
         SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
       with_items:
+        - privexec
         - net
         - resources
         - sidechannel
@@ -1313,6 +1322,7 @@
         state: restarted
         daemon_reload: no
       with_items:
+        - privexec
         - net
         - resources
         - sidechannel

@@ -3,6 +3,7 @@ import platform
 import re
 import time
 
+from oslo_concurrency import processutils
 import psutil
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
@@ -268,27 +269,31 @@ class Monitor(daemon.Daemon):
                 n.process_metrics = process_metrics
 
                 # What package versions do we have?
-                vers_out, _ = util_concurrency.execute(
-                    None,
-                    ('dpkg-query --show --showformat=\'${Package}==${Version}\\n\' '
-                     '--no-pager'),
-                    suppress_command_logging=True)
-                versions = {}
-                for line in vers_out.split():
-                    package, version = line.split('==')
-                    versions[package] = version
-                n.dependency_versions = versions
+                try:
+                    vers_out, _ = util_concurrency.execute(
+                        None,
+                        ('dpkg-query --show --showformat=\'${Package}==${Version}\\n\' '
+                         '--no-pager'),
+                        suppress_command_logging=True)
+                    versions = {}
+                    for line in vers_out.split():
+                        package, version = line.split('==')
+                        versions[package] = version
+                    n.dependency_versions = versions
 
-                # Some versions are especially important and we make them easier
-                # to lookup
-                for package, attr in [('qemu-utils', 'qemu_version'),
-                                      ('libvirt-daemon', 'libvirt_version')]:
-                    ver = versions.get(package, 'none')
-                    if ':' in ver:
-                        ver = ver.split(':')[1]
-                    ver = re.split('[-+]', ver)[0]
-                    ver = parse_version(ver)
-                    n.__setattr__(attr, ver.release.parts)
+                    # Some versions are especially important and we make them easier
+                    # to lookup
+                    for package, attr in [('qemu-utils', 'qemu_version'),
+                                          ('libvirt-daemon', 'libvirt_version')]:
+                        ver = versions.get(package, 'none')
+                        if ':' in ver:
+                            ver = ver.split(':')[1]
+                        ver = re.split('[-+]', ver)[0]
+                        ver = parse_version(ver)
+                        n.__setattr__(attr, ver.release.parts)
+
+                except processutils.ProcessExecutionError:
+                    LOG.warning('Failed to lookup package versions')
 
                 # Log resources
                 n.add_event(
@@ -298,6 +303,7 @@ class Monitor(daemon.Daemon):
             return retval
 
     def _run_inner(self):
+        daemon.health_check_privexec()
         gauges = {
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
         }
