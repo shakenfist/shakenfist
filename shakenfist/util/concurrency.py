@@ -148,7 +148,7 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
                 else:
                     raise UnknownReplyException()
 
-            except DecodeError as e:
+            except DecodeError:
                 ...
 
             if locks and time.time() - last_refresh > 9:

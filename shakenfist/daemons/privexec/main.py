@@ -140,7 +140,7 @@ class PrivExecJob:
                     LOG.error('Unknown execute request type')
                 break
 
-            except DecodeError as e:
+            except DecodeError:
                 ...
 
         self.conn.close()
