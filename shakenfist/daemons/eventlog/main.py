@@ -168,16 +168,17 @@ class Monitor(daemon.WorkerPoolDaemon):
             'pruned_sweep': Counter('pruned_sweep',
                                     'Number of databases checked for pruning')
         }
-        start_http_server(config.EVENTLOG_METRICS_PORT)
-
-    def _run_inner(self):
-        prune_targets = []
-        prune_sweep_started = 0
 
         for event_type in EVENT_TYPES:
             self.counters[event_type] = Counter(
                 '%s_events' % event_type,
                 'Number of %s events seen' % event_type)
+
+        start_http_server(config.EVENTLOG_METRICS_PORT)
+
+    def _run_inner(self):
+        prune_targets = []
+        prune_sweep_started = 0
 
         eventlog.upgrade_data_store()
 
