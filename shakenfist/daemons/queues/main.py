@@ -18,33 +18,42 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 
 
+def _check_other_daemon(n, daemon_name, override_daemon_name=None):
+    daemon_running = False
+    if os.path.exists(f'/run/sf-{daemon_name}.pid'):
+        try:
+            with open(f'/run/sf-{daemon_name}.pid') as f:
+                pid = int(f.read())
+            psutil.Process(pid)
+            daemon_running = True
+
+        except (ValueError, psutil.NoSuchProcess):
+            ...
+
+    if override_daemon_name:
+        daemon_name = override_daemon_name
+
+    if daemon_running:
+        n.set_daemon_state(daemon_name, Node.DAEMON_STATE_RUNNING)
+    else:
+        n.set_daemon_state(daemon_name, Node.DAEMON_STATE_STOPPED)
+
+
+def _health_checks():
+    n = Node.from_db(config.NODE_NAME)
+    n.set_daemon_state('queues', Node.DAEMON_STATE_RUNNING)
+    _check_other_daemon(n, 'privexec')
+    _check_other_daemon(n, 'gunicorn', override_daemon_name='api')
+
+
 class Monitor(daemon.WorkerPoolDaemon):
-    def _check_other_daemon(self, daemon_name, override_daemon_name=None):
-        daemon_running = False
-        if os.path.exists(f'/run/sf-{daemon_name}.pid'):
-            try:
-                with open(f'/run/sf-{daemon_name}.pid') as f:
-                    pid = int(f.read())
-                psutil.Process(pid)
-                daemon_running = True
-
-            except (ValueError, psutil.NoSuchProcess):
-                ...
-
-        if override_daemon_name:
-            daemon_name = override_daemon_name
-
-        n = Node.from_db(config.NODE_NAME)
-        if daemon_running:
-            n.set_daemon_state(daemon_name, Node.DAEMON_STATE_RUNNING)
-        else:
-            n.set_daemon_state(daemon_name, Node.DAEMON_STATE_STOPPED)
-
     def _run_inner(self):
         warned_locks = {}
         last_checkin = 0
         last_length = 0
         last_third_party_health_check = 0
+
+        n = Node.from_db(config.NODE_NAME)
 
         # Note this while look is different from many of the other daemons
         # because we need to wait for work to terminate before exiting.
@@ -60,9 +69,9 @@ class Monitor(daemon.WorkerPoolDaemon):
                 if time.time() - last_third_party_health_check > 30:
                     # We also check in on the privexec and api daemon heres because
                     # they cannot do this for themselves...
-                    self._check_other_daemon('privexec')
-                    self._check_other_daemon(
-                        'gunicorn', override_daemon_name='api')
+                    _check_other_daemon(n, 'privexec')
+                    _check_other_daemon(
+                        n, 'gunicorn', override_daemon_name='api')
                     last_third_party_health_check = time.time()
 
                 # Check if we hold any locks for processes which don't exist any
@@ -120,7 +129,12 @@ def main():
     name = f'{daemon.process_name("queues")} startup'
     setproctitle.setproctitle(name)
     pyprctl.set_name(name)
+    _health_checks()
+
+    start_time = time.time()
     startup_tasks.startup_tasks()
+    duration = time.time() - start_time
+    LOG.info(f'Startup tasks took {duration:.2f} seconds')
 
     m = Monitor('queues')
     m.run()

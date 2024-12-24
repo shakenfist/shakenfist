@@ -14,6 +14,7 @@ from shakenfist.baseobject import get_maximum_object_version
 from shakenfist.baseobject import get_minimum_object_version
 from shakenfist.baseobject import OBJECT_NAMES
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist.config import config
 from shakenfist.node import Node
@@ -186,10 +187,12 @@ class Daemon:
     def record_start(self):
         n = Node.from_db(config.NODE_NAME)
         n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_RUNNING)
+        n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon starting')
 
     def record_exit(self):
         n = Node.from_db(config.NODE_NAME)
         n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPED)
+        n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon stopped')
 
     def idle(self, seconds):
         for _ in range(int(seconds / 5)):

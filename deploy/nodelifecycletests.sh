@@ -16,6 +16,48 @@ echo
 sf-client node list
 echo
 
+# Sleep for a little to let nodes start
+echo
+log "=== Watch nodes boot ==="
+started=$(date +%s)
+finished=0
+while [ ${finished} -lt 1 ]; do
+    log "Status check..."
+    potential=0
+    for status in $(sf-client --json node list | jq --raw-output '.[] | select(.state != "created") | "\(.name)!\(.state)"'); do
+        name=$(echo ${status} | cut -f 1 -d "!")
+        state=$(echo ${status} | cut -f 2 -d "!")
+        log "Node ${name} is in state ${state}"
+
+        if [ "${state}" == "error" ]; then
+            log "... error state, aborting"
+            finished=1
+        else
+            potential=$(( $potential + 1 ))
+        fi
+    done
+
+    if [ ${potential} -lt 1 ]; then
+        log "No more nodes!"
+        finished=1
+    fi
+
+    # This timeout is way too long, and often doesn't need to be this
+    # generous, but then again sometimes it does. Its yet another thing I
+    # should clamp down one day when CI is a bit more under control.
+    now=$(date +%s)
+    elapsed=$(( ${now} - ${started} ))
+    log "Time elapsed: ${elapsed} seconds"
+    if [ ${elapsed} -gt 1200 ]; then
+        log "Timed out!"
+        finished=1
+    fi
+
+    if [ ${finished} -lt 1 ]; then
+        sleep 30
+    fi
+done
+
 # Determine hypervisor nodes
 hypervisors=$(sf-client --json node list | jq --raw-output ".[] | select(.is_hypervisor) | .name")
 
@@ -134,12 +176,12 @@ log "=== Terminate cluster maintenance node, stop another node ==="
 maintainer=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer) | .name')
 other_victim=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer != true) | .name' | head -1)
 
-echo
 log "Will hard stop the cluster maintainer, ${maintainer}"
 
 # Terminate the node uncleanly for ${maintainer}, with extra flags so we don't hang
 sudo ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=1 \
     -o ServerAliveCountMax=1 debian@${maintainer} "sudo halt --force --force"
+echo
 
 # Stop SF on ${other_victim}
 log "Will gracefully stop another node, ${other_victim}"
@@ -148,18 +190,51 @@ sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
 echo
 
 # Wait for SF to actually stop
-log "Waiting for SF stop on ${other_victim}"
-sleep 10
-sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
-    "sudo systemctl list-units -all sf.target"
+echo "Copy a helper script to ${other_victim}"
+cat - > /tmp/other-target-script << EOF
+echo "Target:"
+systemctl list-units -all sf.target
 echo
+echo "Services:"
+systemctl list-units -all | grep sf | grep service || true
+EOF
+chmod ugo+rx /tmp/other-target-script
+sudo scp -o StrictHostKeyChecking=no /tmp/other-target-script \
+    debian@${other_victim}:/tmp/other-target-script
+echo
+
+log "=== Wait for ${other_victim} to stop ==="
+started=$(date +%s)
+finished=0
+while [ ${finished} -lt 1 ]; do
+    log "Status check..."
+    sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
+        sudo /tmp/other-target-script | tee /tmp/other-target-script.out
+    active=$( egrep -c "(active|deactivating)" /tmp/other-target-script.out || true)
+
+    if [ ${active} -lt 1 ]; then
+        log "No more running services!"
+        finished=1
+    fi
+
+    now=$(date +%s)
+    elapsed=$(( ${now} - ${started} ))
+    log "Time elapsed: ${elapsed} seconds"
+    if [ ${elapsed} -gt 300 ]; then
+        log "Timed out!"
+        finished=1
+    fi
+
+    if [ ${finished} -lt 1 ]; then
+        sleep 30
+    fi
+done
 
 # Ensure SF really stopped on ${other_victim}
 running_count=$(sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
     "sudo ps -ef | grep sf | egrep -v '(ata_sff|kvm|agent|grep)'" | wc -l)
 if [ ${running_count} -gt 0 ]; then
-    log "SF failed to stop on ${other_victim}, there are ${running_count} processes"
-    log "still running."
+    log "SF failed to stop on ${other_victim}, there are ${running_count} processes still running."
     log ""
     sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
         "sudo ps -ef | grep sf | egrep -v '(ata_sff|kvm|agent|grep)'"

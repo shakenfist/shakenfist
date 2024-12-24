@@ -9,6 +9,7 @@ import pyprctl
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import cache
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import network
@@ -183,8 +184,13 @@ def startup_tasks():
             'metrics': stats
         })
 
-    LOG.info('Starting')
-    pyprctl.set_name('main-v%s' % util_general.get_version())
+    version = util_general.get_version()
+    pyprctl.set_name('main-v%s' % version)
+
+    # If you ran this, it means we're not shutting down any more
+    n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
+    n.state = Node.STATE_CREATED
+    n.add_event(EVENT_TYPE_AUDIT, f'node is running v{version}')
 
     # Ensure we have a consistent cache of object states if the cache is entirely
     # absent.
@@ -205,10 +211,6 @@ def startup_tasks():
                         obj_type, state, by_state[state])
         cache_version['version'] = 2
         etcd.put_raw('/sf/cache/_version', cache_version)
-
-    # If you ran this, it means we're not shutting down any more
-    n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
-    n.state = Node.STATE_CREATED
 
     # Log configuration on startup
     for key, value in config.dict().items():

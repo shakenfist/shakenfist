@@ -189,13 +189,6 @@ class Monitor(daemon.WorkerPoolDaemon):
             with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
                 pass
 
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        event_pb2_grpc.add_EventServiceServicer_to_server(
-            EventService(self), server)
-        server.add_insecure_port(
-            f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}')
-        server.start()
-
         while not self.exit.is_set():
             try:
                 did_work = False
@@ -290,9 +283,17 @@ class Monitor(daemon.WorkerPoolDaemon):
 
             self.check_daemon_state()
 
-        server.stop(1).wait()
-
 
 def main():
     m = Monitor('eventlog')
+
+    # Start the grpc server very early
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    event_pb2_grpc.add_EventServiceServicer_to_server(
+        EventService(m), server)
+    server.add_insecure_port(
+        f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}')
+
+    server.start()
     m.run()
+    server.stop(1).wait()

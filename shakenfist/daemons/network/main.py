@@ -12,6 +12,7 @@ from shakenfist.daemons.network import workitem
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
+from shakenfist.node import Node
 from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
 from shakenfist.util import concurrency as util_concurrency
@@ -107,7 +108,11 @@ class Monitor(daemon.WorkerPoolDaemon):
 
 
 def main():
+    n = Node.from_db(config.NODE_NAME)
+    n.set_daemon_state('net', Node.DAEMON_STATE_RUNNING)
+
     # If I am the network node, I need some setup
+    start_time = time.time()
     if config.NODE_IS_NETWORK_NODE:
         LOG.info('Network node pre-start is running')
         daemon.health_check_privexec()
@@ -157,6 +162,9 @@ def main():
                 None,
                 'iptables -w 10 -t nat -A POSTROUTING '
                 '-o %(egress_nic)s -j MASQUERADE' % subst)
+
+    duration = time.time() - start_time
+    LOG.info(f'Startup tasks took {duration:.2f} seconds')
 
     m = Monitor('net')
     m.run()

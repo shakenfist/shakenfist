@@ -115,6 +115,7 @@ class Node(dbo):
         })
         n = Node.from_db(name)
         n.state = cls.STATE_INITIAL
+        n.add_event(EVENT_TYPE_AUDIT, 'node created')
         return n
 
     @classmethod
@@ -162,6 +163,7 @@ class Node(dbo):
             raise NoSuchDaemon(f'Cannot register daemon "{daemon}" on node '
                                f'{self.uuid}, as that daemon is unknown.')
         self.set_daemon_state(daemon, self.DAEMON_STATE_STOPPED)
+        self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon registered')
 
     def set_daemon_state(self, daemon, state):
         if daemon not in self.VALID_DAEMONS:
