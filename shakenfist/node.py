@@ -173,23 +173,23 @@ class Node(dbo):
 
         # Determine if the node should transition state based on this update
         node_state = self.state.value
-        node_degraded = False
+        degraded = []
         for daemon in self.VALID_DAEMONS:
             daemon_state = self.get_daemon_state(daemon).value
             if not daemon_state:
                 continue
             if daemon_state == self.DAEMON_STATE_STOPPED:
-                node_degraded = True
+                degraded.append(daemon)
 
         degraded_or_stopping = [self.STATE_DEGRADED, self.STATE_STOPPING,
                                 self.STATE_STOPPED]
-        if node_state not in degraded_or_stopping and node_degraded:
+        if node_state not in degraded_or_stopping and degraded:
             self.add_event(
                 EVENT_TYPE_AUDIT,
                 'node is not stopping or stopped, but a daemon is not running '
-                'so entering degraded state')
+                'so entering degraded state', extra={'degraded': degraded})
             self.state = self.STATE_DEGRADED
-        elif node_state == self.STATE_DEGRADED and not node_degraded:
+        elif node_state == self.STATE_DEGRADED and not degraded:
             self.add_event(EVENT_TYPE_AUDIT, 'node is no longer degraded')
             self.state = self.STATE_CREATED
 
