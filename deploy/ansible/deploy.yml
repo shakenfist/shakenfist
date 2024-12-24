@@ -1265,6 +1265,14 @@
       service:
         daemon_reload: yes
 
+- hosts: eventlog_node
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
     - name: Ensure the node exists in etcd
       shell: |
         /srv/shakenfist/venv/bin/sf-ctl initialise-node
@@ -1293,6 +1301,23 @@
       vars:
         item: eventlog
       when: inventory_hostname in groups.get('eventlog_node', [])
+
+- hosts: hypervisors, network_node, etcd_master, storage, eventlog_node
+  any_errors_fatal: true
+  serial: 1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Ensure the node exists in etcd
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl initialise-node
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_NODE_NAME: "{{node_name}}"
+        SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
 
     - name: Register the other SF daemons, one node at a time
       shell: |
