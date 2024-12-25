@@ -108,6 +108,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
 
 def main():
+    daemon.write_pid_file('net')
     n = Node.from_db(config.NODE_NAME)
     n.set_daemon_state('net', Node.DAEMON_STATE_RUNNING)
 

@@ -127,5 +127,6 @@ class Monitor(daemon.WorkerPoolDaemon):
 
 
 def main():
+    daemon.write_pid_file('transfers')
     m = Monitor('transfers')
     m.run()

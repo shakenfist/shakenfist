@@ -709,5 +709,6 @@ class Monitor(daemon.Daemon):
 
 
 def main():
+    daemon.write_pid_file('sidechannel')
     m = Monitor('sidechannel')
     m.run()

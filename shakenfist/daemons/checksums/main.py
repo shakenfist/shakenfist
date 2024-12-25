@@ -59,5 +59,6 @@ class Monitor(daemon.Daemon):
 
 
 def main():
+    daemon.write_pid_file('checksums')
     m = Monitor('checksums')
     m.run()

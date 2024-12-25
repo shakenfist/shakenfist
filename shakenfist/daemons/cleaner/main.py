@@ -504,5 +504,6 @@ class Monitor(daemon.Daemon):
 
 
 def main():
+    daemon.write_pid_file('cleaner')
     m = Monitor('cleaner')
     m.run()

@@ -286,6 +286,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
 
 def main():
+    daemon.write_pid_file('eventlog')
     m = Monitor('eventlog')
 
     # Start the grpc server very early

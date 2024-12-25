@@ -146,10 +146,17 @@ class PrivExecJob:
         self.conn.close()
 
 
+def write_pid_file():
+    with open('/run/sf-privexec.pid', 'w') as f:
+        f.write(f'{os.getpid()}')
+
+
 def main():
     global LOG
     global SOCKET_PATH
     global STOPPED
+
+    write_pid_file()
 
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)

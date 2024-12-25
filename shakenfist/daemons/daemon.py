@@ -1,6 +1,7 @@
 import faulthandler
 import logging
 from math import inf
+import os
 import signal
 import threading
 import time
@@ -60,6 +61,11 @@ def set_log_level(log, name):
         numeric_level = logging.INFO
 
     log.setLevel(numeric_level)
+
+
+def write_pid_file(daemon_name):
+    with open(f'/run/{DAEMON_NAMES[daemon_name]}.pid', 'w') as f:
+        f.write(f'{os.getpid()}')
 
 
 def health_check_privexec():

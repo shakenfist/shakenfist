@@ -483,5 +483,6 @@ class Monitor(daemon.Daemon):
 
 
 def main():
+    daemon.write_pid_file('resources')
     m = Monitor('resources')
     m.run()

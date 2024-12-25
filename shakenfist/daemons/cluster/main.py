@@ -510,5 +510,6 @@ class Monitor(daemon.Daemon):
 
 
 def main():
+    daemon.write_pid_file('cluster')
     m = Monitor('cluster')
     m.run()

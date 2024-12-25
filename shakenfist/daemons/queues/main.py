@@ -30,18 +30,20 @@ def _check_other_daemon(n, daemon_name, override_daemon_name=None):
     try:
         with open(f'/run/sf-{daemon_name}.pid') as f:
             pid = int(f.read())
+            psutil.Process(pid)
+            n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_RUNNING)
+            return
+    except FileNotFoundError:
+        n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
+                           message='pid file missing on read')
     except ValueError:
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='pid file not parsable')
-
-    try:
-        psutil.Process(pid)
-        n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_RUNNING)
     except psutil.NoSuchProcess:
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='process absent')
 
-    n.set_daemon_state(daemon_name, Node.DAEMON_STATE_STOPPED,
+    n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                        message='unknown issue')
 
 
@@ -130,6 +132,8 @@ class Monitor(daemon.WorkerPoolDaemon):
 
 
 def main():
+    daemon.write_pid_file('queues')
+
     # Because we do work before starting the queue thread, we need to name
     # ourselves here too.
     name = f'{daemon.process_name("queues")} startup'
