@@ -1275,7 +1275,9 @@ class Instance(dbo):
                     pass
                 elif (str(e).find('Failed to find an available port: '
                                   'Address already in use') != -1 or
-                      str(e).find('reds_init_socket: binding socket') != -1):
+                      str(e).find('reds_init_socket: binding socket') != -1 or
+                      str(e).find("Invalid value for attribute 'port' in "
+                                  "element 'graphics': 'None'") != -1):
                     self.add_event(
                         EVENT_TYPE_STATUS,
                         'instance ports clash during boot attempt',
