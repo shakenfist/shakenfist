@@ -79,10 +79,20 @@ class BaseTestCase(testtools.TestCase):
         # This method implements a simple tracing scheme to help work out what
         # the slow bits of a unit test are. This isn't really a complete thing,
         # its more of a proof of concept at this point.
+        event['ts'] = time.time()
+        event['ts_pretty'] = str(datetime.datetime.now())
+
+        if 'error' in event:
+            try:
+                json.dumps(event['error'])
+            except TypeError:
+                # Exception classes are not JSON serializable for example...
+                event['error_type'] = type(event['error']).__name__
+                event['error'] = str(event['error'])
+
         os.makedirs(TRACE_PATH, exist_ok=True)
-        with open(os.path.join(TRACE_PATH, f'{self._testMethodName}.json'), 'a') as f:
-            event['ts'] = time.time()
-            event['ts_pretty'] = str(datetime.datetime.now())
+        with open(os.path.join(TRACE_PATH, f'{self._testMethodName}.json'),
+                  'a') as f:
             f.write(json.dumps(event))
             f.write('\n')
 
