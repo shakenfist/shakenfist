@@ -13,7 +13,7 @@ EnvironmentFile=/etc/sf/config
 ExecStartPre=/bin/sh -c '/srv/shakenfist/venv/bin/sf-ctl verify-config'
 ExecStart=/bin/sh -c '/srv/shakenfist/venv/bin/sf-{{ item }}'
 ExecStop=/bin/sh -c '/srv/shakenfist/venv/bin/sf-ctl stop {{ item }}'
-PIDFile=/run/{{ item }}.pid
+PIDFile=/run/sf-{{ item }}.pid
 
 Restart=on-failure
 RestartSec=5

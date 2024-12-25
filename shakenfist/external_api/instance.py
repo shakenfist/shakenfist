@@ -523,7 +523,10 @@ class InstancesEndpoint(sf_api.Resource):
             if node_state != Node.STATE_CREATED:
                 n.add_event(
                     EVENT_TYPE_AUDIT, 'API query for node told node not ready',
-                    extra={'node_state': node_state})
+                    extra={
+                        'node_state': node_state,
+                        'degraded_daemons': n.get_degraded_daemons()
+                    })
                 return sf_api.error(404, f'Specified node {placed_on} not ready')
 
         # Make sure we've been given a valid configdrive option

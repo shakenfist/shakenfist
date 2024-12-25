@@ -165,23 +165,18 @@ class Node(dbo):
         self.set_daemon_state(daemon, self.DAEMON_STATE_STOPPED)
         self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon registered')
 
-    def set_daemon_state(self, daemon, state):
+    def set_daemon_state(self, daemon, state, message=None):
         if daemon not in self.VALID_DAEMONS:
             raise NoSuchDaemon(f'Cannot set daemon state for "{daemon}" on node '
                                f'{self.uuid}, as that daemon is unknown.')
         if state not in self.VALID_DAEMON_STATES:
             raise NoSuchDaemonState(f'The daemon state {state} does not exist')
-        self._state_update(state, state_attribute_name=f'daemon:{daemon}')
+        self._state_update(state, state_attribute_name=f'daemon:{daemon}',
+                           message=message)
 
         # Determine if the node should transition state based on this update
         node_state = self.state.value
-        degraded = []
-        for daemon in self.VALID_DAEMONS:
-            daemon_state = self.get_daemon_state(daemon).value
-            if not daemon_state:
-                continue
-            if daemon_state == self.DAEMON_STATE_STOPPED:
-                degraded.append(daemon)
+        degraded = self.get_degraded_daemons()
 
         degraded_or_stopping = [self.STATE_DEGRADED, self.STATE_STOPPING,
                                 self.STATE_STOPPED]
@@ -200,6 +195,16 @@ class Node(dbo):
             raise NoSuchDaemon(f'Cannot get daemon state for "{daemon}" on node '
                                f'{self.uuid}, as that daemon is unknown.')
         return self._state_read(state_attribute_name=f'daemon:{daemon}')
+
+    def get_degraded_daemons(self):
+        degraded = []
+        for daemon in self.VALID_DAEMONS:
+            daemon_state = self.get_daemon_state(daemon).value
+            if not daemon_state:
+                continue
+            if daemon_state == self.DAEMON_STATE_STOPPED:
+                degraded.append(daemon)
+        return degraded
 
     # Static values
     @property

@@ -19,24 +19,30 @@ LOG, _ = logs.setup(__name__)
 
 
 def _check_other_daemon(n, daemon_name, override_daemon_name=None):
-    daemon_running = False
-    if os.path.exists(f'/run/sf-{daemon_name}.pid'):
-        try:
-            with open(f'/run/sf-{daemon_name}.pid') as f:
-                pid = int(f.read())
-            psutil.Process(pid)
-            daemon_running = True
-
-        except (ValueError, psutil.NoSuchProcess):
-            ...
-
+    recorded_daemon_name = daemon_name
     if override_daemon_name:
-        daemon_name = override_daemon_name
+        recorded_daemon_name = override_daemon_name
 
-    if daemon_running:
-        n.set_daemon_state(daemon_name, Node.DAEMON_STATE_RUNNING)
-    else:
-        n.set_daemon_state(daemon_name, Node.DAEMON_STATE_STOPPED)
+    if not os.path.exists(f'/run/sf-{daemon_name}.pid'):
+        n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
+                           message='pid file missing')
+
+    try:
+        with open(f'/run/sf-{daemon_name}.pid') as f:
+            pid = int(f.read())
+    except ValueError:
+        n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
+                           message='pid file not parsable')
+
+    try:
+        psutil.Process(pid)
+        n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_RUNNING)
+    except psutil.NoSuchProcess:
+        n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
+                           message='process absent')
+
+    n.set_daemon_state(daemon_name, Node.DAEMON_STATE_STOPPED,
+                       message='unknown issue')
 
 
 def _health_checks():

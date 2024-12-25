@@ -424,7 +424,7 @@ class DatabaseBackedObject:
         return State(**db_data)
 
     def _state_update(self, new_value, skip_transition_validation=False,
-                      state_attribute_name='state'):
+                      state_attribute_name='state', message=None):
         with self.get_lock_attr(state_attribute_name, 'State update'):
             orig = self._state_read(state_attribute_name=state_attribute_name)
 
@@ -458,7 +458,7 @@ class DatabaseBackedObject:
                             'object=%s uuid=%s',
                             orig.value, new_value, self.object_type, self.uuid)
 
-            new_state = State(new_value, time.time())
+            new_state = State(new_value, time.time(), message=message)
             self._db_set_attribute(state_attribute_name, new_state)
 
             # Only standard states are cached right now
@@ -575,9 +575,10 @@ def namespace_filter(namespace, o):
 
 
 class State:
-    def __init__(self, value, update_time):
+    def __init__(self, value, update_time, message=None):
         self.__value = value
         self.__update_time = update_time
+        self.__message = message
 
     def __repr__(self):
         return 'State(' + str(self.obj_dict()) + ')'
@@ -596,8 +597,15 @@ class State:
     def update_time(self):
         return self.__update_time
 
+    @property
+    def message(self):
+        return self.__message
+
     def obj_dict(self):
-        return {
+        retval = {
             'value': self.__value,
-            'update_time': self.__update_time,
+            'update_time': self.__update_time
         }
+        if self.__message:
+            retval['message'] = self.__message
+        return retval
