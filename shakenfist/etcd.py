@@ -124,7 +124,9 @@ def get_etcd_native_client():
         try:
             grpc.channel_ready_future(c).result(timeout=0.5)
         except grpc.FutureTimeoutError:
-            c.close()
+            # We do not close the channel here because this cause grpc to sometimes
+            # throw a traceback from another thread trying to monitor a now closed
+            # channel.
             c = None
 
     if not c:
@@ -143,9 +145,9 @@ def get_etcd_native_client():
 
 
 def reset_native_client():
-    c = getattr(local, 'sf_etcd_native_client', None)
-    if c:
-        c.close()
+    # We do not close the channel here because this cause grpc to sometimes
+    # throw a traceback from another thread trying to monitor a now closed
+    # channel.
     local.sf_etcd_native_client = None
 
 

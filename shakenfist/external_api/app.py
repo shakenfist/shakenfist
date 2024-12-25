@@ -9,7 +9,8 @@
 # traceback.                                                                    #
 #################################################################################
 # To run a local test API, use this command line:
-#     SHAKENFIST_ETCD_HOST=localhost flask --app shakenfist.external_api.app:app --debug run
+#     SHAKENFIST_ETCD_HOST=localhost flask --app shakenfist.external_api.app:app \
+#     --debug run
 import base64
 import json
 
