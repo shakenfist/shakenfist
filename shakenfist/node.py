@@ -38,7 +38,7 @@ class Node(dbo):
     # deploy.yml.
     VALID_DAEMONS = ['eventlog', 'net', 'resources', 'sidechannel',
                      'queues', 'api', 'checksums', 'cleaner', 'cluster',
-                     'transfers', 'privexec', 'sentinel']
+                     'transfers', 'privexec', 'sentinel-first', 'sentinel-last']
 
     DAEMON_STATE_RUNNING = 'daemon-running'
     DAEMON_STATE_STOPPING = 'daemon-stopping'
@@ -188,11 +188,11 @@ class Node(dbo):
                            message=message)
 
         # Determine if the node should transition state based on this update
-        node_state = self.state.value
         degraded = self.get_degraded_daemons()
-
         degraded_or_stopping = [self.STATE_DEGRADED, self.STATE_STOPPING,
                                 self.STATE_STOPPED]
+        node_state = self.state.value
+
         if node_state not in degraded_or_stopping and degraded:
             self.add_event(
                 EVENT_TYPE_AUDIT,
@@ -215,7 +215,8 @@ class Node(dbo):
             daemon_state = self.get_daemon_state(daemon).value
             if not daemon_state:
                 degraded.append(daemon)
-            if daemon_state == self.DAEMON_STATE_STOPPED:
+            if daemon_state in [self.DAEMON_STATE_STOPPING,
+                                self.DAEMON_STATE_STOPPED]:
                 degraded.append(daemon)
         return degraded
 

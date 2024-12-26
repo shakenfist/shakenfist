@@ -1,8 +1,35 @@
 [Unit]
 Description=Shaken Fist {{ item }} daemon
+
+# There is some ordering magic happening with the SF systemd units. Firstly,
+# there is the sentinel-first.service unit. This unit is the first to start,
+# and its role is to sit around waiting to be asked to terminate. When it is
+# asked to terminate it marks the node as stopped.
+#
+# Next, all the real SF service units start. These do their things to run the
+# actual control plane of the cloud.
+#
+# Then the sentinel-last.service unit is started. This unit just sits around
+# waiting to be asked to terminate. When it is, it marks the node as being in
+# stopping stage.
+#
+# This is done this way because the order is reversed on stop of the sf.target
+# run-level. sentinel-last ends first and the node is now in the stopping state.
+# Then the various control plane services stop. Then sentinel-first ends, and
+# can mark the node as gracefully stopped.
+#
+# Yes I know this is complicated. I couldn't find another way to express it in
+# systemd with the current options.
+{% if item == "sentinel-first" %}
 After=multi-user.target
+TimeoutStopSec=90s
+{% elif item == "privexec" %}
+After=sf-sentinel-first.service
+{% else %}
+After=sf-privexec.service
+Before=sf-sentinel-last.service
+{% endif%}
 PartOf=sf.target
-ReloadPropagatedFrom=sf.target
 
 [Service]
 Type=simple

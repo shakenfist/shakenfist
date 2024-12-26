@@ -15,9 +15,10 @@ from shakenfist.baseobject import get_maximum_object_version
 from shakenfist.baseobject import get_minimum_object_version
 from shakenfist.baseobject import OBJECT_NAMES
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
+from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
-from shakenfist.config import config
+from shakenfist.exceptions import InvalidStateException
 from shakenfist.node import Node
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import libvirt as util_libvirt
@@ -197,7 +198,13 @@ class Daemon:
 
     def record_exit(self):
         n = Node.from_db(config.NODE_NAME)
-        n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPED)
+        try:
+            n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPED)
+        except InvalidStateException as e:
+            # Sometimes we race between the node going into stopping before the
+            # daemons all start to stop.
+            if not str(e).startswith('Invalid state change from stopping to degraded'):
+                raise e
         n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon stopped')
 
     def idle(self, seconds):
