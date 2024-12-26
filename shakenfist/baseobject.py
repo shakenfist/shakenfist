@@ -426,46 +426,45 @@ class DatabaseBackedObject:
 
     def _state_update(self, new_value, skip_transition_validation=False,
                       state_attribute_name='state', message=None):
-        with self.get_lock_attr(state_attribute_name, 'State update'):
-            orig = self._state_read(state_attribute_name=state_attribute_name)
+        orig = self._state_read(state_attribute_name=state_attribute_name)
 
-            if orig.value == new_value:
-                return
+        if orig.value == new_value:
+            return
 
-            # Only standard states have validation right now
-            if state_attribute_name == 'state':
-                if orig.value == self.STATE_DELETED:
-                    LOG.with_fields(
-                        {
-                            'uuid': self.uuid,
-                            'object_type': self.object_type,
-                            'original state': orig,
-                            'new state': new_value
-                        }).warn('Objects do not undelete')
+        # Only standard states have validation right now
+        if state_attribute_name == 'state':
+            if orig.value == self.STATE_DELETED:
+                LOG.with_fields(
+                    {
+                        'uuid': self.uuid,
+                        'object_type': self.object_type,
+                        'original state': orig,
+                        'new state': new_value
+                    }).warn('Objects do not undelete')
+                raise exceptions.InvalidStateException(
+                    'Invalid state change from %s to %s for '
+                    'object=%s uuid=%s',
+                    orig.value, new_value, self.object_type, self.uuid)
+
+            # Ensure state change is valid
+            if not skip_transition_validation:
+                if not self.state_targets:
+                    raise exceptions.NoStateTransitionsDefined(
+                        self.object_type)
+
+                if new_value not in self.state_targets.get(orig.value, []):
                     raise exceptions.InvalidStateException(
                         'Invalid state change from %s to %s for '
                         'object=%s uuid=%s',
                         orig.value, new_value, self.object_type, self.uuid)
 
-                # Ensure state change is valid
-                if not skip_transition_validation:
-                    if not self.state_targets:
-                        raise exceptions.NoStateTransitionsDefined(
-                            self.object_type)
+        new_state = State(new_value, time.time(), message=message)
+        self._db_set_attribute(state_attribute_name, new_state)
 
-                    if new_value not in self.state_targets.get(orig.value, []):
-                        raise exceptions.InvalidStateException(
-                            'Invalid state change from %s to %s for '
-                            'object=%s uuid=%s',
-                            orig.value, new_value, self.object_type, self.uuid)
-
-            new_state = State(new_value, time.time(), message=message)
-            self._db_set_attribute(state_attribute_name, new_state)
-
-            # Only standard states are cached right now
-            if not self.__in_memory_only and state_attribute_name == 'state':
-                cache.update_object_state_cache(
-                    self.object_type, self.uuid, orig.value, new_value)
+        # Only standard states are cached right now
+        if not self.__in_memory_only and state_attribute_name == 'state':
+            cache.update_object_state_cache(
+                self.object_type, self.uuid, orig.value, new_value)
 
     @state.setter
     def state(self, new_value):
