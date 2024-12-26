@@ -196,7 +196,7 @@ echo "Target:"
 systemctl list-units -all sf.target
 echo
 echo "Services:"
-systemctl list-units -all | grep sf | grep service || true
+systemctl list-units -all | grep sf | grep -v sf-agent | grep service || true
 EOF
 chmod ugo+rx /tmp/other-target-script
 sudo scp -o StrictHostKeyChecking=no /tmp/other-target-script \
