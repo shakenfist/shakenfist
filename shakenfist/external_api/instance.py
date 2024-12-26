@@ -903,8 +903,7 @@ class InstanceInterfacesEndpoint(sf_api.Resource):
     @api_base.requires_instance_ownership
     @api_base.log_token_use
     def post(self, instance_ref=None, network=None, instance_from_db=None):
-        s = instance_from_db.state.value
-        if s == dbo.STATE_DELETED or s.endswith('-error'):
+        if instance_from_db.state.value in instance.Instance.TERMINAL_STATES:
             return sf_api.error(406, 'instance in invalid state for hot plug')
 
         err = _netdesc_safety_checks(network, instance_from_db.namespace)

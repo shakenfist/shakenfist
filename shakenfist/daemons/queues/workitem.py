@@ -115,7 +115,7 @@ class Job(util_concurrency.Job):
 
                 elif isinstance(task, PreflightInstanceTask):
                     s = inst.state.value
-                    if s == dbo.STATE_DELETED or s.endswith('-error'):
+                    if s in instance.Instance.TERMINAL_STATES:
                         self.log.warning(
                             'You cannot preflight an instance in state %s, '
                             'skipping task' % s)
@@ -373,14 +373,9 @@ def instance_preflight(inst, netdescs):
 
 
 def instance_start(inst, netdescs):
-    s = inst.state.value
-    if s.endswith('-error'):
+    if inst.state.value in instance.Instance.TERMINAL_STATES:
         inst.add_event(
-            EVENT_TYPE_STATUS, 'you cannot start an instance in an error state.')
-        return
-    if s in (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED):
-        inst.add_event(
-            EVENT_TYPE_STATUS, 'you cannot start an instance which has been deleted.')
+            EVENT_TYPE_STATUS, 'you cannot start an instance in a terminal state')
         return
 
     with inst.get_lock(ttl=900, op='Instance start', global_scope=False):
@@ -447,7 +442,7 @@ def instance_delete(inst):
 
         # We don't need delete_wait for the error states as they're already
         # in a transition state.
-        if not inst.state.value.endswith('-error'):
+        if inst.state.value not in instance.Instance.ERROR_STATES:
             inst.state = dbo.STATE_DELETE_WAIT
 
         # Create list of networks used by instance. We cannot use the
