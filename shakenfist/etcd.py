@@ -259,7 +259,7 @@ class ActualLock(Lock):
                 'leased_keys': self.get_lease().keys()
             })
 
-            duration = time.time() - start_time
+            duration = round(time.time() - start_time, 2)
             if res:
                 current = self.get_holder()
                 current_id = current.get('id')
@@ -288,7 +288,7 @@ class ActualLock(Lock):
 
         current = self.get_holder(key_prefix='current')
         self.log_ctx.with_fields(current).with_fields({
-            'duration': time.time() - start_time
+            'duration': round(time.time() - start_time, 2)
             }).info('Failed to acquire lock')
 
         raise exceptions.LockException(

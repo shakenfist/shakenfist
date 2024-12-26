@@ -366,7 +366,7 @@ class Monitor(daemon.Daemon):
 
         # Node management
         for n in Nodes([]):
-            age = time.time() - n.last_seen
+            age = round(time.time() - n.last_seen, 2)
 
             LOG.with_fields(
                 {

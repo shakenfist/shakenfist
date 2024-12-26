@@ -169,7 +169,7 @@ class DnsMasq(managedexecutable.ManagedExecutable):
                 self.add_event(EVENT_TYPE_AUDIT, 'detected invalid DHCP lease',
                                extra={
                                    'expiry': expiry,
-                                   'remaining_life': time.time() - expiry,
+                                   'remaining_life': round(time.time() - expiry, 2),
                                    'macaddr': elems[1],
                                    'ipv4': elems[2],
                                    'hostname': elems[3]

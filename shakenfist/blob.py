@@ -467,7 +467,7 @@ class Blob(dbo):
                     ('no activity on previous partial download in more than '
                      'five minutes. Removing and re-attempting.'),
                     extra={
-                        'partial file age': time.time() - st.st_mtime
+                        'partial file age': round(time.time() - st.st_mtime, 2)
                     })
                 os.unlink(partial_path)
             else:
@@ -478,7 +478,7 @@ class Blob(dbo):
                     EVENT_TYPE_AUDIT, affected_objects,
                     'waiting for existing download to complete',
                     extra={
-                        'partial file age': time.time() - st.st_mtime
+                        'partial file age': round(time.time() - st.st_mtime, 2)
                     }
                 )
                 time.sleep(10)

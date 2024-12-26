@@ -72,7 +72,8 @@ def _maintain_version_cache(max_cache_age):
         if not d:
             continue
 
-        d['metrics']['metrics_age'] = time.time() - d.get('timestamp', 0)
+        d['metrics']['metrics_age'] = \
+            round(time.time() - d.get('timestamp', 0), 2)
         log = LOG.with_fields({
             'node_name': node_name,
             'metrics_age': d['metrics']['metrics_age']

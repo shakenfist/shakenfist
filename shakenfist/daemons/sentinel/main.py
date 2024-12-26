@@ -50,7 +50,7 @@ def main():
             if degraded in all_daemons:
                 all_daemons.remove(degraded)
 
-        duration = time.time() - start_time
+        duration = round(time.time() - start_time, 2)
         LOG.with_fields({
             'have_waited': duration,
             'remaining_daemons': all_daemons

@@ -46,7 +46,8 @@ class RecordedOperation():
             else:
                 LOG.with_fields({
                     'label': self.object,
-                    'duration': duration}).info('Finish %s', self.operation)
+                    'duration': round(duration, 2)
+                }).info('Finish %s', self.operation)
 
     def unique_label(self):
         if self.object:

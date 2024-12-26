@@ -228,7 +228,7 @@ class Monitor(daemon.Daemon):
                 out = {}
                 times = p.cpu_times()
                 usage = (times.user + times.system)
-                age = time.time() - p.create_time()
+                age = round(time.time() - p.create_time(), 2)
                 out['process_cpu_time_%s' % smn] = usage
                 out['process_age_%s' % smn] = age
 
