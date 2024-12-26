@@ -1272,16 +1272,16 @@ class Instance(dbo):
 
     def _power_on_inner(self):
         with util_libvirt.LibvirtConnection() as lc:
-            inst = lc.get_domain_from_sf_uuid(self.uuid)
-            if not inst:
-                inst = lc.define_xml(self._create_domain_xml())
-                if not inst:
+            domain = lc.get_domain_from_sf_uuid(self.uuid)
+            if not domain:
+                domain = lc.define_xml(self._create_domain_xml())
+                if not domain:
                     self.enqueue_delete_due_error(
                         'power on failed to create domain')
                     raise exceptions.NoDomainException()
 
             try:
-                inst.create()
+                domain.create()
             except lc.libvirt.libvirtError as e:
                 if str(e).startswith('Requested operation is not valid: '
                                      'domain is already running'):
@@ -1309,7 +1309,7 @@ class Instance(dbo):
                     if os.path.exists(nvram_path):
                         os.unlink(nvram_path)
 
-                    inst.undefine()
+                    domain.undefine()
 
                     self.ports = None
                     self.allocate_instance_ports()
@@ -1320,8 +1320,8 @@ class Instance(dbo):
                         extra={'message': str(e)})
                     return False
 
-            inst.setAutostart(1)
-            self.update_power_state(lc.extract_power_state(inst))
+            domain.setAutostart(1)
+            self.update_power_state(lc.extract_power_state(domain))
             self.add_event(EVENT_TYPE_AUDIT, 'poweron')
             return True
 
