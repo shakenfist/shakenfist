@@ -377,7 +377,8 @@ class Monitor(daemon.Daemon):
                 }).debug('Considering node status')
 
             # Find nodes which have returned from being missing
-            if n.state.value == Node.STATE_CREATED:
+            if n.state.value in [Node.STATE_INITIAL, Node.STATE_CREATING,
+                                 Node.STATE_CREATED, Node.STATE_DEGRADED]:
                 if age > config.NODE_CHECKIN_MAXIMUM:
                     n.state = Node.STATE_MISSING
                     n.add_event(EVENT_TYPE_AUDIT, 'node has gone missing',

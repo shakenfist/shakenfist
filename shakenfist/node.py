@@ -58,7 +58,8 @@ class Node(dbo):
                         STATE_DEGRADED),
 
         # Some (but not all) components are not running correctly on the node
-        STATE_DEGRADED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        STATE_DEGRADED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR,
+                         STATE_MISSING),
 
         # A node can return from the dead...
         dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED, STATE_DEGRADED),
