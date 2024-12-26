@@ -189,7 +189,6 @@ def startup_tasks():
 
     # If you ran this, it means we're not shutting down any more
     n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
-    n.state = Node.STATE_CREATED
     n.add_event(EVENT_TYPE_AUDIT, f'node is running v{version}')
 
     # Ensure we have a consistent cache of object states if the cache is entirely
@@ -220,7 +219,6 @@ def startup_tasks():
 
     # Check in early and often, also reset processing queue items.
     etcd.clear_stale_locks()
-    Node.observe_this_node()
     etcd.restart_queues()
 
     # Ensure the blob data store is the most recent version

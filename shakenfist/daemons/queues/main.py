@@ -57,7 +57,6 @@ def _health_checks():
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
         warned_locks = {}
-        last_checkin = 0
         last_length = 0
         last_third_party_health_check = 0
 
@@ -69,10 +68,6 @@ class Monitor(daemon.WorkerPoolDaemon):
         while not done:
             try:
                 self.reap_workers()
-
-                if time.time() - last_checkin > 5:
-                    Node.observe_this_node()
-                    last_checkin = time.time()
 
                 if time.time() - last_third_party_health_check > 30:
                     # We also check in on the privexec and api daemon heres because

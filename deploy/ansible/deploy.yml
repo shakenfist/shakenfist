@@ -1132,6 +1132,7 @@
         group: root
         mode: u=r,g=r,o=r
       with_items:
+        - sentinel
         - privexec
         - checksums
         - cleaner
@@ -1283,7 +1284,7 @@
 
     - name: Register the eventlog daemon if this is an eventlog node
       shell: |
-        /srv/shakenfist/venv/bin/sf-ctl initialise-daemon eventlog
+        /srv/shakenfist/venv/bin/sf-ctl register-daemon eventlog
       environment:
         SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
         SHAKENFIST_NODE_NAME: "{{node_name}}"
@@ -1321,12 +1322,13 @@
 
     - name: Register the other SF daemons, one node at a time
       shell: |
-        /srv/shakenfist/venv/bin/sf-ctl initialise-daemon {{ item }}
+        /srv/shakenfist/venv/bin/sf-ctl register-daemon {{ item }}
       environment:
         SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
         SHAKENFIST_NODE_NAME: "{{node_name}}"
         SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
       with_items:
+        - sentinel
         - privexec
         - net
         - resources
@@ -1347,6 +1349,7 @@
         state: restarted
         daemon_reload: no
       with_items:
+        - sentinel
         - privexec
         - net
         - resources

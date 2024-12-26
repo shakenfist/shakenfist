@@ -210,7 +210,7 @@ while [ ${finished} -lt 1 ]; do
     log "Status check..."
     sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
         sudo /tmp/other-target-script | tee /tmp/other-target-script.out
-    active=$( egrep -c "(active|deactivating)" /tmp/other-target-script.out || true)
+    active=$( egrep -c "( active|deactivating)" /tmp/other-target-script.out || true )
 
     if [ ${active} -lt 1 ]; then
         log "No more running services!"

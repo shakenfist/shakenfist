@@ -315,7 +315,6 @@ class Monitor(daemon.Daemon):
                 etcd.delete_raw(k)
 
         # Some versions are static and only looked up at startup
-        Node.observe_this_node()
         n = Node.from_db(config.NODE_NAME)
         if not n:
             raise exceptions.NodeShouldExist()

@@ -114,12 +114,21 @@ def initialise_node():
 
 @click.command()
 @click.argument('daemon')
-def initialise_daemon(daemon):
-    click.echo(f'Initializing {daemon} on node...')
+def register_daemon(daemon):
+    click.echo(f'Registering {daemon} on node...')
     n = Node.from_db(config.NODE_NAME)
     n.register_daemon(daemon)
     click.echo(f'Node is now in state {n.state.value}.')
     click.echo(f'Daemon is now in state {n.get_daemon_state(daemon).value}.')
+
+
+@click.command()
+@click.argument('daemon')
+def deregister_daemon(daemon):
+    click.echo(f'Deregistering {daemon} on node...')
+    n = Node.from_db(config.NODE_NAME)
+    n.deregister_daemon(daemon)
+    click.echo(f'Node is now in state {n.state.value}.')
 
 
 @click.command()
@@ -141,5 +150,6 @@ cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
 cli.add_command(verify_config)
 cli.add_command(initialise_node)
-cli.add_command(initialise_daemon)
+cli.add_command(register_daemon)
+cli.add_command(deregister_daemon)
 cli.add_command(stop)

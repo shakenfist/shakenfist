@@ -376,7 +376,7 @@ class Monitor(daemon.Daemon):
                     'state': n.state.value
                 }).debug('Considering node status')
 
-            # Find nodes which have returned from being missing
+            # Find nodes which are now missing or have returned from being missing
             if n.state.value in [Node.STATE_INITIAL, Node.STATE_CREATING,
                                  Node.STATE_CREATED, Node.STATE_DEGRADED]:
                 if age > config.NODE_CHECKIN_MAXIMUM:

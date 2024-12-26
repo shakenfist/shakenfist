@@ -38,7 +38,7 @@ class Node(dbo):
     # deploy.yml.
     VALID_DAEMONS = ['eventlog', 'net', 'resources', 'sidechannel',
                      'queues', 'api', 'checksums', 'cleaner', 'cluster',
-                     'transfers', 'privexec']
+                     'transfers', 'privexec', 'sentinel']
 
     DAEMON_STATE_RUNNING = 'daemon-running'
     DAEMON_STATE_STOPPING = 'daemon-stopping'
@@ -159,12 +159,24 @@ class Node(dbo):
 
         return retval
 
+    def get_registered_daemons(self):
+        return self._db_get_attribute('daemons').get('daemons', [])
+
     def register_daemon(self, daemon):
         if daemon not in self.VALID_DAEMONS:
             raise NoSuchDaemon(f'Cannot register daemon "{daemon}" on node '
                                f'{self.uuid}, as that daemon is unknown.')
+        self._add_item_in_attribute_list('daemons', daemon)
         self.set_daemon_state(daemon, self.DAEMON_STATE_STOPPED)
         self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon registered')
+
+    def deregister_daemon(self, daemon):
+        if daemon not in self.VALID_DAEMONS:
+            raise NoSuchDaemon(f'Cannot deregister daemon "{daemon}" on node '
+                               f'{self.uuid}, as that daemon is unknown.')
+        self._remove_item_in_attribute_list('daemons', daemon)
+        self._db_delete_attribute(f'daemon:{daemon}')
+        self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon deregistered')
 
     def set_daemon_state(self, daemon, state, message=None):
         if daemon not in self.VALID_DAEMONS:
@@ -199,10 +211,10 @@ class Node(dbo):
 
     def get_degraded_daemons(self):
         degraded = []
-        for daemon in self.VALID_DAEMONS:
+        for daemon in self.get_registered_daemons():
             daemon_state = self.get_daemon_state(daemon).value
             if not daemon_state:
-                continue
+                degraded.append(daemon)
             if daemon_state == self.DAEMON_STATE_STOPPED:
                 degraded.append(daemon)
         return degraded
