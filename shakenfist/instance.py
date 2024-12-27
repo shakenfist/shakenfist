@@ -36,6 +36,7 @@ from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.exceptions import InstancePowerOnException
 from shakenfist.node import Node
 from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.tasks import SnapshotTask
@@ -425,6 +426,11 @@ class Instance(dbo):
     @property
     def instance_path(self):
         return os.path.join(config.STORAGE_PATH, 'instances', self.uuid)
+
+    # Calculated properties
+    @property
+    def domain_xml_path(self):
+        return os.path.join(self.instance_path, 'original_domain.xml')
 
     # Values routed to attributes, writes are via helper methods.
     @property
@@ -1233,7 +1239,7 @@ class Instance(dbo):
         # Libvirt re-writes the domain XML once loaded, so we store the XML
         # as generated as well so that we can debug. Note that this is _not_
         # the XML actually used by libvirt.
-        with open(os.path.join(self.instance_path, 'original_domain.xml'), 'w') as f:
+        with open(self.domain_xml_path, 'w') as f:
             f.write(x)
 
         return x
@@ -1274,7 +1280,8 @@ class Instance(dbo):
         with util_libvirt.LibvirtConnection() as lc:
             domain = lc.get_domain_from_sf_uuid(self.uuid)
             if not domain:
-                domain = lc.define_xml(self._create_domain_xml())
+                domain_xml = self._create_domain_xml()
+                domain = lc.define_xml(domain_xml)
                 if not domain:
                     self.enqueue_delete_due_error(
                         'power on failed to create domain')
@@ -1283,24 +1290,40 @@ class Instance(dbo):
             try:
                 domain.create()
             except lc.libvirt.libvirtError as e:
+                needs_port_reallocation = False
+                needs_retry = False
                 if str(e).startswith('Requested operation is not valid: '
                                      'domain is already running'):
-                    pass
+                    return True
                 elif (str(e).find('Failed to find an available port: '
-                                  'Address already in use') != -1 or
-                      str(e).find('reds_init_socket: binding socket') != -1 or
-                      str(e).find("Invalid value for attribute 'port' in "
-                                  "element 'graphics': 'None'") != -1):
+                                  'Address already in use') != -1):
+                    needs_retry = True
+                elif str(e).find('reds_init_socket: binding socket') != -1:
+                    needs_retry = True
+                elif (str(e).find('internal error: process exited while '
+                                  'connecting to monitor') != -1):
+                    needs_retry = True
+                else:
+                    self.add_event(
+                        EVENT_TYPE_AUDIT, 'instance start error',
+                        extra={'message': str(e)})
+                    return False
+
+                if needs_port_reallocation:
                     self.add_event(
                         EVENT_TYPE_STATUS,
                         'instance ports clash during boot attempt',
                         extra={'message': str(e)})
 
                     # Free those ports and pick some new ones
-                    ports = self.ports
-                    self._free_console_port(ports['console_port'])
-                    self._free_console_port(ports['vdi_port'])
-                    self._free_console_port(ports['vdi_tls_port'])
+                    self.deallocate_instance_ports()
+                    self.allocate_instance_ports()
+
+                if needs_retry:
+                    self.add_event(
+                        EVENT_TYPE_STATUS,
+                        'instance power on requires new attempt',
+                        extra={'message': str(e)})
 
                     # We need to delete the nvram file before we can undefine
                     # the domain. This will be recreated by libvirt on the next
@@ -1310,15 +1333,11 @@ class Instance(dbo):
                         os.unlink(nvram_path)
 
                     domain.undefine()
+                    return False
 
-                    self.ports = None
-                    self.allocate_instance_ports()
-                    return False
                 else:
-                    self.add_event(
-                        EVENT_TYPE_AUDIT, 'instance start error',
-                        extra={'message': str(e)})
-                    return False
+                    # How did you end up here?
+                    raise InstancePowerOnException()
 
             domain.setAutostart(1)
             self.update_power_state(lc.extract_power_state(domain))
