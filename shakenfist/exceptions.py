@@ -344,3 +344,12 @@ class TruncatedPrivExecResponse(Exception):
 
 class UnknownReplyException(Exception):
     ...
+
+
+class ProcessExecutionError(Exception):
+    def __init__(self, stdout=None, stderr=None, exit_code=None, cmd=None):
+        super().__init__(stdout, stderr, exit_code, cmd)
+        self.exit_code = exit_code
+        self.stderr = stderr
+        self.stdout = stdout
+        self.cmd = cmd

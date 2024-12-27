@@ -6,7 +6,6 @@ import signal
 import threading
 import time
 
-from oslo_concurrency import processutils
 import pyprctl
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
@@ -19,6 +18,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist.exceptions import InvalidStateException
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import libvirt as util_libvirt
@@ -72,7 +72,7 @@ def write_pid_file(daemon_name):
 def health_check_privexec():
     try:
         stdout, stderr = util_concurrency.execute(None, 'whoami')
-    except processutils.ProcessExecutionError as e:
+    except ProcessExecutionError as e:
         LOG.with_fields({
             'stdout': e.stdout,
             'stderr': e.stderr,

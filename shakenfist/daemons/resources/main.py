@@ -3,7 +3,6 @@ import platform
 import re
 import time
 
-from oslo_concurrency import processutils
 import psutil
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
@@ -21,6 +20,7 @@ from shakenfist.constants import EVENT_TYPE_RESOURCES
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.daemons import daemon
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
@@ -292,7 +292,7 @@ class Monitor(daemon.Daemon):
                         ver = parse_version(ver)
                         n.__setattr__(attr, ver.release.parts)
 
-                except processutils.ProcessExecutionError:
+                except ProcessExecutionError:
                     LOG.warning('Failed to lookup package versions')
 
                 # Log resources

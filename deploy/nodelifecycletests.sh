@@ -211,6 +211,12 @@ while [ ${finished} -lt 1 ]; do
     sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
         sudo /tmp/other-target-script | tee /tmp/other-target-script.out
     active=$( egrep -c "( active|deactivating)" /tmp/other-target-script.out || true )
+    failed=$( grep -c "failed" /tmp/other-target-script.out || true )
+
+    if [ ${failed} -gt 0 ]; then
+        log "A unit failed to gracefully stop!"
+        exit 1
+    fi
 
     if [ ${active} -lt 1 ]; then
         log "No more running services!"

@@ -5,12 +5,12 @@ import threading
 import time
 
 from google.protobuf.message import DecodeError
-from oslo_concurrency import processutils
 from shakenfist_utilities import logs        # noreorder
 from shakenfist_utilities import random      # noreorder
 
 from shakenfist import etcd
 from shakenfist.exceptions import MissingPrivExecSocket
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.exceptions import TruncatedPrivExecResponse
 from shakenfist.exceptions import UnknownReplyException
 from shakenfist import privexec_pb2
@@ -139,7 +139,7 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
                     if response.exit_code in check_exit_code:
                         return response.stdout, response.stderr
                     else:
-                        raise processutils.ProcessExecutionError(
+                        raise ProcessExecutionError(
                             exit_code=response.exit_code,
                             stdout=response.stdout,
                             stderr=response.stderr,

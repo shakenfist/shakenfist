@@ -8,7 +8,6 @@ import time
 from functools import partial
 from uuid import uuid4
 
-from oslo_concurrency import processutils
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
@@ -25,6 +24,7 @@ from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import IPManagerMissing
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
@@ -461,7 +461,7 @@ class Network(dbo):
                 try:
                     util_concurrency.execute(
                         None, 'ip netns add %s' % self.uuid)
-                except processutils.ProcessExecutionError as e:
+                except ProcessExecutionError as e:
                     r = re.compile(
                         r'Cannot create namespace file ".*": File exists\n')
                     m = r.match(e.stderr)
@@ -748,7 +748,7 @@ class Network(dbo):
                 if m:
                     yield m.group(1)
 
-        except processutils.ProcessExecutionError as e:
+        except ProcessExecutionError as e:
             if time.time() - self.state.update_time > 10:
                 self.log.warning('Mesh discovery failure: %s' % e)
 
@@ -827,7 +827,7 @@ class Network(dbo):
                 'bridge fdb append to 00:00:00:00:00:00 '
                 'dst %(node)s dev %(vx_interface)s' % subst)
             self.add_event(EVENT_TYPE_MUTATE, 'added new mesh element', extra={'ip': n})
-        except processutils.ProcessExecutionError as e:
+        except ProcessExecutionError as e:
             self.log.with_fields({
                 'node': n,
                 'error': e}).info('Failed to add mesh element')
@@ -843,7 +843,7 @@ class Network(dbo):
                 'dev %(vx_interface)s' % subst)
             self.add_event(EVENT_TYPE_MUTATE, 'removed excess mesh element',
                            extra={'ip': n})
-        except processutils.ProcessExecutionError as e:
+        except ProcessExecutionError as e:
             self.log.with_fields({
                 'node': n,
                 'error': e}).info('Failed to remove mesh element')

@@ -8,7 +8,6 @@ import signal
 import time
 
 
-from oslo_concurrency import processutils
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
@@ -22,6 +21,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import concurrency as util_concurrency
@@ -60,7 +60,7 @@ class Monitor(daemon.Daemon):
                     EVENT_TYPE_AUDIT,  'enforced delete via virsh method succeeded')
                 return True
 
-        except processutils.ProcessExecutionError:
+        except ProcessExecutionError:
             log_ctx.warning('Destroying instance using virsh failed')
             if inst:
                 inst.add_event(EVENT_TYPE_AUDIT,
@@ -81,7 +81,7 @@ class Monitor(daemon.Daemon):
             try:
                 util_concurrency.execute(
                     None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
-            except processutils.ProcessExecutionError:
+            except ProcessExecutionError:
                 pass
 
             self._delete_instance_files(instance_uuid)
@@ -89,7 +89,7 @@ class Monitor(daemon.Daemon):
             if inst:
                 inst.add_event(
                     EVENT_TYPE_AUDIT, 'enforced delete via SIGKILL succeeded')
-        except processutils.ProcessExecutionError:
+        except ProcessExecutionError:
             log_ctx.warning('Destroying instance using SIGKILL failed')
             if inst:
                 inst.add_event(

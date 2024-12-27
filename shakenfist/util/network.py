@@ -4,11 +4,12 @@ import random
 import re
 import time
 
-from oslo_concurrency import processutils
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import exceptions
 from shakenfist.config import config
+from shakenfist.exceptions import InvalidAddress
+from shakenfist.exceptions import NoInterfaceStatistics
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.util import concurrency
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
@@ -102,7 +103,7 @@ def get_interface_statistics(name, namespace=None):
         suppress_command_logging=True)
 
     if not stdout:
-        raise exceptions.NoInterfaceStatistics(
+        raise NoInterfaceStatistics(
             'No statistics for interface %s in namespace %s (%s)'
             % (name, namespace, stderr))
 
@@ -110,7 +111,7 @@ def get_interface_statistics(name, namespace=None):
         stats = _clean_ip_json(stdout)
         return stats[0].get('stats64')
     except IndexError:
-        raise exceptions.NoInterfaceStatistics(
+        raise NoInterfaceStatistics(
             'No statistics for interface %s in namespace %s (%s)'
             % (name, namespace, stderr))
 
@@ -154,7 +155,7 @@ def add_default_route(namespace, router):
     try:
         concurrency.execute(
             None, f'route add default gw {router}', namespace=namespace)
-    except processutils.ProcessExecutionError as e:
+    except ProcessExecutionError as e:
         if e.stderr != 'SIOCADDRT: File exists\n':
             raise e
 
@@ -183,7 +184,7 @@ def _create_interface_inner(interface, interface_type, extra, mtu):
             })
         return True
 
-    except processutils.ProcessExecutionError as e:
+    except ProcessExecutionError as e:
         if e.stderr != 'RTNETLINK answers: File exists\n':
             raise e
 
@@ -276,7 +277,7 @@ def add_address_to_interface(namespace, address, netmask, device):
 
     def _add_address(namespace, address, netmask, device):
         if not address:
-            raise exceptions.InvalidAddress(address)
+            raise InvalidAddress(address)
 
         try:
             concurrency.execute(
@@ -290,7 +291,7 @@ def add_address_to_interface(namespace, address, netmask, device):
             concurrency.execute(None, 'ip link set %s up' %
                                 device, namespace=namespace)
 
-        except processutils.ProcessExecutionError as e:
+        except ProcessExecutionError as e:
             if e.stderr.rstrip() != 'RTNETLINK answers: File exists':
                 raise e
 

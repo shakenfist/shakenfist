@@ -1,13 +1,14 @@
 from collections import defaultdict
 import time
 
-from oslo_concurrency import processutils
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist import etcd
-from shakenfist import exceptions
+from shakenfist.exceptions import LockException
+from shakenfist.exceptions import DeadNetwork
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import network
@@ -144,13 +145,13 @@ class Job(util_concurrency.Job):
 
                     n.ensure_mesh()
 
-                except exceptions.LockException as e:
+                except LockException as e:
                     LOG.warning(
                         'Failed to acquire lock while maintaining networks: %s' % e)
-                except exceptions.DeadNetwork as e:
+                except DeadNetwork as e:
                     LOG.with_fields({'exception': e}).info(
                         'maintain_network attempted on dead network')
-                except processutils.ProcessExecutionError as e:
+                except ProcessExecutionError as e:
                     LOG.error('Network maintenance failure: %s', e)
 
             # Determine if there are any extra vxids
