@@ -608,6 +608,7 @@ class Monitor(daemon.Daemon):
                 del self.monitors[instance_uuid]
 
     def _request_all_threads_exit(self):
+        LOG.info('Requesting all threads exit')
         all_monitors = self.monitors.keys()
         for instance_uuid in all_monitors:
             self._request_thread_exit(instance_uuid)
@@ -627,13 +628,9 @@ class Monitor(daemon.Daemon):
                 'sidechannel monitor finished')
 
     def _run_inner(self):
-        running = True
         instance_sidechannel_cache = {}
 
-        # Note this while look is different from many of the other daemons
-        # because we need to wait for work to terminate before exiting.
-        done = False
-        while not done:
+        while not self.exit.is_set():
             try:
                 self.reap_single_instance_monitors()
 
@@ -692,20 +689,21 @@ class Monitor(daemon.Daemon):
                     for instance_uuid in extra_instances:
                         self._request_thread_exit(instance_uuid)
 
-                elif len(self.monitors) > 0:
-                    if running:
-                        self._request_all_threads_exit()
-                        running = False
-
-                else:
-                    done = True
-
-                self.exit.wait(1)
+                    self.exit.wait(1)
 
             except Exception as e:
                 util_general.ignore_exception('sidechannel monitor', e)
 
-            self.check_daemon_state()
+        LOG.info('Stopping')
+
+        while self.monitors:
+            LOG.info('There are {len(self.monitors)} threads remaining')
+            self._request_all_threads_exit()
+            if self(self.monitors):
+                time.sleep(5)
+
+        LOG.info('There are {len(self.monitors)} threads remaining')
+        LOG.info('Stopped')
 
 
 def main():
