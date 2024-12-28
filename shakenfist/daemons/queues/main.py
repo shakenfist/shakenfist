@@ -62,10 +62,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         n = Node.from_db(config.NODE_NAME)
 
-        # Note this while look is different from many of the other daemons
-        # because we need to wait for work to terminate before exiting.
-        done = False
-        while not done:
+        while not self.exit.is_set():
             try:
                 self.reap_workers()
 
@@ -100,25 +97,18 @@ class Monitor(daemon.WorkerPoolDaemon):
                             'Lock held by missing process on this node for more '
                             'than 30 seconds')
 
-                if not self.exit.is_set():
-                    if time.time() - last_length > 10:
-                        processing, queued, deferred = etcd.get_queue_length(
-                            config.NODE_NAME)
-                        LOG.with_fields({
-                            'processing': processing,
-                            'queued': queued,
-                            'deferred': deferred
-                        }).debug('Queue length')
-                        last_length = time.time()
+                if time.time() - last_length > 10:
+                    processing, queued, deferred = etcd.get_queue_length(
+                        config.NODE_NAME)
+                    LOG.with_fields({
+                        'processing': processing,
+                        'queued': queued,
+                        'deferred': deferred
+                    }).debug('Queue length')
+                    last_length = time.time()
 
-                    if not self.dequeue_job(config.NODE_NAME, workitem.Job):
-                        self.exit.wait(0.2)
-                elif len(self.workers) > 0:
-                    LOG.info('Waiting for %d workers to finish' %
-                             len(self.workers))
+                if not self.dequeue_job(config.NODE_NAME, workitem.Job):
                     self.exit.wait(0.2)
-                else:
-                    done = True
 
             except Exception as e:
                 util_general.ignore_exception('queue worker', e)

@@ -21,13 +21,14 @@ class TransferJob(util_concurrency.Job):
         super().__init__()
         self.name = name
         self.data = data
+        self.exit = threading.Event()
 
     def execute(self):
         etcd.reset_client()
         log = LOG.with_fields(self.data).with_fields({'name': self.name})
         try:
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server.settimeout(60)
+            server.settimeout(30)
             server.bind((config.NODE_MESH_IP, 0))
 
             # Update etcd with where we are listening
@@ -71,9 +72,12 @@ class TransferJob(util_concurrency.Job):
                 while d := f.read(8000):
                     conn.send(d)
                     sent_bytes += len(d)
+
+                    if self.exit.is_set():
+                        break
                 conn.close()
 
-            log.info('Transfer complete, sent %d bytes' % sent_bytes)
+            log.info(f'Transfer complete or aborted, sent {sent_bytes} bytes')
 
         finally:
             etcd.delete('transfer', config.NODE_NAME, self.name)
@@ -82,48 +86,28 @@ class TransferJob(util_concurrency.Job):
 
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
-        # Note this while look is different from many of the other daemons
-        # because we need to wait for work to terminate before exiting.
-        done = False
-        while not done:
+        while not self.exit.is_set():
             try:
                 self.reap_workers()
 
-                if not self.exit.is_set():
-                    for name, data in etcd.get_all('transfer', config.NODE_NAME):
-                        name = name.split('/')[-1]
-                        if name not in self.workers:
-                            t_obj = TransferJob(name, data)
-                            t_thread = threading.Thread(
-                                target=t_obj.run, daemon=True, name=name)
-                            t_thread.start()
+                for name, data in etcd.get_all('transfer', config.NODE_NAME):
+                    name = name.split('/')[-1]
+                    if name not in self.workers:
+                        t_obj = TransferJob(name, data)
+                        t_thread = threading.Thread(
+                            target=t_obj.run, daemon=True, name=name)
+                        t_thread.start()
 
-                            self.workers[name] = {
-                                'object': t_obj,
-                                'thread': t_thread
-                            }
-                    self.exit.wait(0.2)
-
-                elif len(self.workers) > 0:
-                    LOG.info('Waiting for %d workers to finish'
-                             % len(self.workers))
-
-                    for worker in self.workers:
-                        worker['object'].exit.set()
-
-                    self.reap_workers()
-                    self.exit.wait(0.2)
-
-                else:
-                    done = True
+                        self.workers[name] = {
+                            'object': t_obj,
+                            'thread': t_thread
+                        }
 
             except Exception as e:
                 util_general.ignore_exception('transfer worker', e)
 
+            self.exit.wait(0.2)
             self.check_daemon_state()
-
-        LOG.info('Terminated')
-        self.record_exit()
 
 
 def main():

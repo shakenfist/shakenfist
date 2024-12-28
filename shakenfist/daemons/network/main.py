@@ -1,4 +1,3 @@
-import faulthandler
 import time
 
 from shakenfist_utilities import logs  # noreorder
@@ -23,12 +22,9 @@ LOG, _ = logs.setup(__name__)
 
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
-        running = True
-        shutdown_commenced = None
         last_defer_message = 0
         last_length = 0
 
-        self.workers = {}
         job_classes = {
             'fip-reaper': floating_ip_reaper.Job,
             'maintain': maintain.Job,
@@ -37,74 +33,47 @@ class Monitor(daemon.WorkerPoolDaemon):
             'stray-nics': stray_nics.Job
         }
 
-        # Note this while look is different from many of the other daemons
-        # because we need to wait for work to terminate before exiting.
-        done = False
-        while not done:
+        while not self.exit.is_set():
             try:
                 self.reap_workers()
 
-                if not self.exit.is_set():
-                    if time.time() - last_length > 10:
-                        processing, queued, deferred = etcd.get_queue_length(
-                            config.NODE_NAME)
-                        LOG.with_fields({
-                            'processing': processing,
-                            'queued': queued,
-                            'deferred': deferred
-                        }).debug('Queue length')
-                        last_length = time.time()
+                if time.time() - last_length > 10:
+                    processing, queued, deferred = etcd.get_queue_length(
+                        config.NODE_NAME)
+                    LOG.with_fields({
+                        'processing': processing,
+                        'queued': queued,
+                        'deferred': deferred
+                    }).debug('Queue length')
+                    last_length = time.time()
 
-                    for job_name in job_classes:
-                        needs_start = False
-                        if (job_name == 'net-worker' and
-                                not config.NODE_IS_NETWORK_NODE):
-                            continue
+                for job_name in job_classes:
+                    needs_start = False
+                    if (job_name == 'net-worker' and
+                            not config.NODE_IS_NETWORK_NODE):
+                        continue
 
-                        if not self.cluster_stable():
-                            if time.time() - last_defer_message > 10:
-                                LOG.info(
-                                    'Cluster not yet stable, deferring maintenance')
-                                last_defer_message = time.time()
-                            continue
+                    if not self.cluster_stable():
+                        if time.time() - last_defer_message > 10:
+                            LOG.info(
+                                'Cluster not yet stable, deferring maintenance')
+                            last_defer_message = time.time()
+                        continue
 
-                        if job_name not in self.workers:
-                            needs_start = True
-                        elif not self.workers[job_name]['thread'].is_alive():
-                            needs_start = True
-                            self.workers[job_name]['thread'].join(0.2)
+                    if job_name not in self.workers:
+                        needs_start = True
+                    elif not self.workers[job_name]['thread'].is_alive():
+                        needs_start = True
+                        self.workers[job_name]['thread'].join(0.2)
 
-                        if needs_start:
-                            self.start_job(job_classes[job_name], [], job_name)
-
-                elif len(self.workers) > 0:
-                    if running:
-                        shutdown_commenced = time.time()
-                        for thread_name in self.workers:
-                            thread_ident = self.workers[thread_name]['thread'].ident
-                            self.workers[thread_name]['object'].exit.set()
-                            LOG.info(f'Sent exit event to {thread_name} thread '
-                                     f'with ident {thread_ident}')
-
-                        running = False
-
-                    if time.time() - shutdown_commenced > 10:
-                        LOG.warning(
-                            'We have taken more than ten seconds to shut down')
-                        LOG.warning('Dumping thread traces')
-                        for thread_name in self.workers:
-                            thread_ident = self.workers[thread_name]['thread'].ident
-                            LOG.warning(f'{thread_name} thread still running '
-                                        f'with ident {thread_ident}')
-                        faulthandler.dump_traceback()
-
-                else:
-                    done = True
+                    if needs_start:
+                        self.start_job(job_classes[job_name], [], job_name)
 
             except Exception as e:
                 util_general.ignore_exception('network worker', e)
 
-            self.idle(5)
+            self.exit.wait(5)
+            self.check_daemon_state()
 
 
 def main():

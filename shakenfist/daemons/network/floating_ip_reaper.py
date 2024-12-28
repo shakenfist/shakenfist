@@ -24,9 +24,7 @@ class Job(util_concurrency.Job):
 
             last_loop = time.time()
 
-            # Ensure we haven't leaked any floating IPs (because we used to). We
-            # have to hold a lock here to avoid races where an IP is freed while
-            # we're iterating through the loop. Note that this means we can't call
+            # Ensure we haven't leaked any floating IPs (because we used to).
             floating_network = network.floating_network()
             LOG.debug('Floating network registrations: %s'
                       % floating_network.ipam.in_use)

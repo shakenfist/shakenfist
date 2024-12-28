@@ -221,6 +221,41 @@ class WorkerPoolDaemon(Daemon):
         self.workers = {}
         self.present_cpus = util_libvirt.get_cpu_count()
 
+    def run(self):
+        try:
+            LOG.info('Starting')
+            self.record_start()
+
+            self._run_inner()
+        except ValueError as e:
+            # This value error is caused by grpc getting confused by channels
+            # shutting down in other threads as we terminate our processes
+            # at graceful shutdown. Given we recreate the channel if we need it,
+            # its safe to ignore.
+            if str(e) != 'Cannot monitor channel state: Channel closed!':
+                LOG.warning('Unhandled top level value error: {e}')
+                raise e
+        finally:
+            LOG.info('Stopping')
+
+            while len(self.workers) > 0:
+                for thread_name in self.workers:
+                    thread_ident = self.workers[thread_name]['thread'].ident
+                    self.workers[thread_name]['object'].exit.set()
+                    LOG.info(f'Sent exit event to {thread_name} thread '
+                             f'with ident {thread_ident}')
+
+                if len(self.workers) > 0:
+                    time.sleep(5)
+
+                self.reap_workers()
+
+            LOG.info(f'There are {len(self.workers)} remaining workers')
+            LOG.info('Stopped')
+
+            LOG.info('Terminated')
+            self.record_exit()
+
     def reap_workers(self):
         remaining_workers = {}
         for thread_name in self.workers:
