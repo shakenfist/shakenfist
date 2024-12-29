@@ -139,10 +139,15 @@ class NetworkInterface(dbo):
         self._db_set_attribute('floating', {'floating_address': address})
 
     def delete(self):
-        if self.floating['floating_address']:
-            etcd.enqueue(
-                'networknode',
-                DefloatNetworkInterfaceTask(self.network_uuid, self.uuid))
+        floating_address = self.floating['floating_address']
+        if floating_address:
+            task = DefloatNetworkInterfaceTask(
+                self.network_uuid, self.uuid, floating_address)
+            etcd.enqueue('networknode', task)
+
+            fn = network.floating_network()
+            fn.ipam.release(floating_address)
+            self.floating = None
 
         n = network.Network.from_db(self.network_uuid)
         if n:

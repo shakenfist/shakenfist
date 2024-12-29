@@ -403,7 +403,8 @@ def instance_start(inst, netdescs):
                     inst.add_event(
                         EVENT_TYPE_STATUS,
                         'you cannot start an instance with an inactive network '
-                        'interface.', extra={
+                        'interface.',
+                        extra={
                             'networkinterface': ni.uuid,
                             'state': ni.state.value
                         })

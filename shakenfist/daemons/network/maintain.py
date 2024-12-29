@@ -122,15 +122,12 @@ class Job(util_concurrency.Job):
                                 if not ni:
                                     continue
 
-                                if ni.floating.get('floating_address'):
-                                    LOG.with_fields(
-                                        {
-                                            'instance': ni.instance_uuid,
-                                            'networkinterface': ni.uuid,
-                                            'floating': ni.floating.get('floating_address')
-                                        }).info('Refloating interface')
-                                    n.add_floating_ip(ni.floating.get(
-                                        'floating_address'), ni.ipv4)
+                                floating_addr = ni.floating.get(
+                                    'floating_address')
+                                if floating_addr:
+                                    n.add_floating_ip(
+                                        floating_addr, ni.ipv4,
+                                        [ni, ('instance', ni.instance_uuid)])
 
                             # It also implies we should create all the routed IPs
                             # for that network too.

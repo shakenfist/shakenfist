@@ -20,6 +20,7 @@ from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
+from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
@@ -850,12 +851,15 @@ class Network(dbo):
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
-    def add_floating_ip(self, floating_address, inner_address):
-        self.add_event(EVENT_TYPE_AUDIT, 'adding floating ip',
-                       extra={
-                           'floating': floating_address,
-                           'inner': inner_address
-                       })
+    def add_floating_ip(self, floating_address, inner_address, affected_objects):
+        affected_objects.append(self)
+        affected_objects.append(('network', 'floating'))
+        add_event_multi(
+            EVENT_TYPE_AUDIT, affected_objects, 'adding floating ip',
+            extra={
+                'floating': floating_address,
+                'inner': inner_address
+            })
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['floating_address_as_hex'] = '%08x' % int(
@@ -877,12 +881,15 @@ class Network(dbo):
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
-    def remove_floating_ip(self, floating_address, inner_address):
-        self.add_event(EVENT_TYPE_AUDIT, 'removing floating',
-                       extra={
-                           'floating': floating_address,
-                           'inner': inner_address
-                       })
+    def remove_floating_ip(self, floating_address, inner_address, affected_objects):
+        affected_objects.append(self)
+        affected_objects.append(('network', 'floating'))
+        add_event_multi(
+            EVENT_TYPE_AUDIT, affected_objects, 'remove floating ip',
+            extra={
+                'floating': floating_address,
+                'inner': inner_address
+            })
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['floating_address_as_hex'] = '%08x' % int(

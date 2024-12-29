@@ -185,15 +185,9 @@ class Job(util_concurrency.Job):
             return
 
         if isinstance(workitem, DefloatNetworkInterfaceTask):
-            floating = ni.floating.get('floating_address')
-            if not floating:
-                log_ctx.warning(
-                    'Not defloating an interface with no floating address')
-            else:
-                n.remove_floating_ip(floating, ni.ipv4)
-                fn = network.floating_network()
-                fn.ipam.release(ni.floating.get('floating_address'))
-                ni.floating = None
+            n.remove_floating_ip(
+                workitem.floating(), ni.ipv4,
+                [ni, ('instance', ni.instance_uuid)])
             return
 
         # Tasks that should not operate on a dead network
@@ -209,5 +203,6 @@ class Job(util_concurrency.Job):
                 log_ctx.warning(
                     'Not floating an interface with no floating address')
             else:
-                n.add_floating_ip(floating, ni.ipv4)
+                n.add_floating_ip(
+                    floating, ni.ipv4, [ni, ('instance', ni.instance_uuid)])
             return
