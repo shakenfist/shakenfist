@@ -86,6 +86,25 @@
         group: root
         mode: u=r,g=r,o=r
 
+    - name: Make /etc/systemd/system-preset/
+      file:
+        path: /etc/systemd/system-preset
+        state: directory
+        mode: "0755"
+
+    - name: Disable autostarting of dnsmasq on installation
+      copy:
+        content: |
+          disable dnsmasq.service
+        dest: /etc/systemd/system-preset/00-sf-disable-dnsmasq.preset
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Reload systemd
+      service:
+        daemon_reload: yes
+
     - name: Log network and primary node
       debug:
         msg:
@@ -115,7 +134,7 @@
 
     # We install libvirt, even on non-hypervisors, because we use it to track
     # the CPU topology and load of the node.
-    - name: Install non-hypervisor dependencies
+    - name: Install shared dependencies
       apt:
         name:
           - apparmor
@@ -123,12 +142,8 @@
           - bridge-utils
           - build-essential
           - cpu-checker
-          - dnsmasq
-          - dnsmasq-utils
-          - dnsutils
           - git
           - libmagic-dev
-          - libssl-dev
           - libssl-dev
           - libvirt-daemon-system
           - libvirt-dev
@@ -145,10 +160,20 @@
           - pwgen
           - qemu-utils
           - rsyslog
-          - tox
           - unzip
           - xxhash
         state: latest
+
+    - name: Enable desired services
+      service:
+        name: "{{ item }}.service"
+        enabled: yes
+        state: started
+      with_items:
+        - apparmor
+        - libvirtd
+        - prometheus-node-exporter
+        - rsyslog
 
     - name: Create python venv and install Shaken Fist server and agent packages
       shell: |
@@ -161,6 +186,30 @@
       shell: |
         /srv/shakenfist/venv/bin/pip install {{pip_extra}} {{client_package}}
       when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
+
+- hosts: network_node
+  gather_facts: yes
+  connection: ssh
+  become: yes
+
+  tasks:
+    - name: Install network node dependencies
+      apt:
+        name:
+          - dnsmasq
+          - dnsmasq-utils
+        state: latest
+
+    - name: Disable dnsmasq
+      service:
+        name: dnsmasq
+        enabled: no
+        state: stopped
+
+    - name: Remove dnsmasq unit
+      file:
+        path: /usr/lib/systemd/system/dnsmasq.service
+        state: absent
 
 # Setup the TLS CA on the primary
 - hosts: localhost
@@ -501,17 +550,6 @@
   connection: ssh
 
   tasks:
-    - name: Disable dnsmasq
-      service:
-        name: dnsmasq
-        enabled: no
-        state: stopped
-
-    - name: Remove dnsmasq unit
-      file:
-        path: /usr/lib/systemd/system/dnsmasq.service
-        state: absent
-
     - name: Reset failed systemd units
       shell: |
         systemctl daemon-reload
@@ -1016,8 +1054,11 @@
         group: root
         mode: u=r,g=r,o=r
 
-    - name: Reload apache
-      shell: apache2ctl graceful
+    - name: Restart apache
+      service:
+        name: apache2
+        enabled: yes
+        state: restarted
 
 - hosts: hypervisors
   any_errors_fatal: true
