@@ -1267,11 +1267,13 @@ class Instance(dbo):
         # github. Additionally, sometimes ports are not released correctly by a
         # domain destroy, which means we need to reassign on domain start.
         if not self._power_on_inner():
-            attempts = 0
+            attempts = 1
             while not self._power_on_inner() and attempts < 5:
-                self.log.warning(
-                    'Instance required an additional attempt to power on')
-                time.sleep(5)
+                self.add_event(
+                    EVENT_TYPE_STATUS,
+                    'instance required an additional attempt to power on',
+                    extra={'attempt': attempts})
+                time.sleep(1)
                 attempts += 1
 
             self.agent_state = constants.AGENT_NEVER_TALKED
@@ -1339,8 +1341,23 @@ class Instance(dbo):
                     # How did you end up here?
                     raise InstancePowerOnException()
 
-            domain.setAutostart(1)
-            self.update_power_state(lc.extract_power_state(domain))
+            try:
+                domain.setAutostart(1)
+            except lc.libvirt.libvirtError as e:
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'instance autostart configuration error',
+                    extra={'message': str(e)})
+                raise e
+
+            try:
+                self.update_power_state(lc.extract_power_state(domain))
+            except lc.libvirt.libvirtError as e:
+                self.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'failed to determine instance power state during initial power on',
+                    extra={'message': str(e)})
+                raise e
+
             self.add_event(EVENT_TYPE_AUDIT, 'poweron')
             return True
 

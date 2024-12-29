@@ -32,22 +32,27 @@ class RecordedOperation():
         self.start_time = time.time()
         return self
 
-    def __exit__(self, *args):
-        duration = time.time() - self.start_time
+    def __exit__(self, exc_type, exc_val, traceback):
+        duration = round(time.time() - self.start_time, 2)
 
         if duration < self.threshold:
             return
+
+        message = f'{self.operation} finished'
+        if exc_val:
+            message += f' ({str(exc_type)} exception raised)'
 
         object_type, object_uuid = self.unique_label()
         if object_uuid:
             if object_type:
                 eventlog.add_event(EVENT_TYPE_STATUS, object_type, object_uuid,
-                                   '%s complete' % self.operation, duration)
+                                   message, duration)
             else:
                 LOG.with_fields({
+                    'operation': self.operation,
                     'label': self.object,
-                    'duration': round(duration, 2)
-                }).info('Finish %s', self.operation)
+                    'duration': duration
+                }).info(message)
 
     def unique_label(self):
         if self.object:

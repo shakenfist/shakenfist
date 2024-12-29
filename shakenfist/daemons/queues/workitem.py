@@ -274,7 +274,7 @@ class Job(util_concurrency.Job):
                 inst.enqueue_delete_due_error('Image resize failed: %s' % e)
 
         except libvirt.libvirtError as e:
-            self.log.info('Libvirt Error: %s', e)
+            util_general.ignore_exception('Livirt Error in queue worker', e)
             if inst:
                 inst.enqueue_delete_due_error('Instance task failed: %s' % e)
 
