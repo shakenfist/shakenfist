@@ -1,6 +1,7 @@
 [Unit]
 Description=Shaken Fist API daemon
-After=multi-user.target
+After=sf-privexec.service
+Before=sf-sentinel-last.service
 PartOf=sf.target
 ReloadPropagatedFrom=sf.target
 
