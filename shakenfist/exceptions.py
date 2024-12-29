@@ -57,10 +57,6 @@ class InvalidLifecycleState(InstanceException):
     ...
 
 
-class InstancePowerOnException(InstanceException):
-    ...
-
-
 # Scheduler
 class SchedulerException(Exception):
     ...
