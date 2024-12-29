@@ -168,7 +168,7 @@ def main():
     LOG.info('Listening for incoming requests')
 
     workers = {}
-    while not EXIT.set():
+    while not EXIT.is_set():
         try:
             conn, _ = s.accept()
         except socket.timeout:
