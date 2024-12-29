@@ -39,14 +39,17 @@ def _is_gunicorn():
 
 
 def _log_results(**kwargs):
-    try:
+    truncated = False
+    if len(kwargs['stdout']) > 512:
+        kwargs['stdout'] = kwargs['stdout'][:512] + '...'
+        truncated = True
+    if len(kwargs['stderr']) > 512:
+        kwargs['stderr'] = kwargs['stderr'][:512] + '...'
+        truncated = True
+
+    if not truncated:
         LOG.with_fields(kwargs).debug('Command output')
-    except OSError:
-        # This happens when the log message is too long...
-        if len(kwargs['stdout']) > 512:
-            kwargs['stdout'] = kwargs['stdout'][:512] + '...'
-        if len(kwargs['stderr']) > 512:
-            kwargs['stderr'] = kwargs['stderr'][:512] + '...'
+    else:
         LOG.with_fields(kwargs).debug('Command output (truncated)')
 
 
