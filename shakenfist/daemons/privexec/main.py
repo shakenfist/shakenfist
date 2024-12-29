@@ -7,6 +7,7 @@ import os
 import signal
 import socket
 import subprocess
+import sys
 import threading
 import time
 
@@ -238,3 +239,7 @@ def main():
 
     LOG.info(f'There are {len(workers)} remaining workers')
     LOG.info('Stopped')
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

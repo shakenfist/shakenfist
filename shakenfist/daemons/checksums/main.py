@@ -5,9 +5,10 @@
 # more bytes of blob on a node than we can checksum before the checksum renewal
 # interval, we will never catch up. Our blob store isn't intended to be huge, so
 # that is ok for now.
+from functools import partial
 import os
 import time
-from functools import partial
+import sys
 
 from shakenfist_utilities import logs  # noreorder
 
@@ -62,3 +63,7 @@ def main():
     daemon.write_pid_file('checksums')
     m = Monitor('checksums')
     m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

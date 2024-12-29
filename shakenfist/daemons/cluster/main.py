@@ -2,10 +2,11 @@
 # urgent. Hard deleting data for example. Its therefore pretty relaxed about
 # obtaining the lock to do work et cetera. There is only one active cluster
 # maintenance daemon per cluster.
-import json
-import time
 from collections import defaultdict
 from functools import partial
+import json
+import sys
+import time
 
 import pyprctl
 from shakenfist_utilities import logs  # noreorder
@@ -514,3 +515,7 @@ def main():
     daemon.write_pid_file('cluster')
     m = Monitor('cluster')
     m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

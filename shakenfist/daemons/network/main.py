@@ -1,3 +1,4 @@
+import sys
 import time
 
 from shakenfist_utilities import logs  # noreorder
@@ -138,3 +139,7 @@ def main():
 
     m = Monitor('net')
     m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

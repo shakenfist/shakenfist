@@ -1,5 +1,6 @@
 import os
 import socket
+import sys
 import threading
 
 from shakenfist_utilities import logs  # noreorder
@@ -114,3 +115,7 @@ def main():
     daemon.write_pid_file('transfers')
     m = Monitor('transfers')
     m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

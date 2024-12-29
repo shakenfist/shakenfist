@@ -1,6 +1,7 @@
 import base64
 import os
 import select
+import sys
 import threading
 import time
 import uuid
@@ -710,3 +711,7 @@ def main():
     daemon.write_pid_file('sidechannel')
     m = Monitor('sidechannel')
     m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

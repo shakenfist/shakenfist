@@ -3,6 +3,7 @@
 # You should never manually stop this daemon!
 import setproctitle
 import signal
+import sys
 import threading
 import time
 
@@ -43,3 +44,7 @@ def main():
     n.set_daemon_state('sentinel-last', Node.DAEMON_STATE_STOPPED)
     n.state = Node.STATE_STOPPING
     LOG.info('Stopped')
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

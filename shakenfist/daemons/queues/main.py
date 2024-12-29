@@ -5,6 +5,7 @@ import psutil
 import pyprctl
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
+import sys
 
 from shakenfist import etcd
 from shakenfist.config import config
@@ -133,3 +134,7 @@ def main():
 
     m = Monitor('queues')
     m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

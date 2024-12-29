@@ -1,6 +1,7 @@
 import os
 import platform
 import re
+import sys
 import time
 
 import psutil
@@ -485,3 +486,7 @@ def main():
     daemon.write_pid_file('resources')
     m = Monitor('resources')
     m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

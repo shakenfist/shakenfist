@@ -1,10 +1,12 @@
+
+from collections import defaultdict
+from concurrent import futures
 import copy
 import json
 import os
 import pathlib
+import sys
 import time
-from collections import defaultdict
-from concurrent import futures
 
 import grpc
 from prometheus_client import Counter
@@ -299,3 +301,7 @@ def main():
     server.start()
     m.run()
     server.stop(1).wait()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

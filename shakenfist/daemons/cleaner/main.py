@@ -5,6 +5,7 @@ import pathlib
 import random
 import shutil
 import signal
+import sys
 import time
 
 
@@ -507,3 +508,7 @@ def main():
     daemon.write_pid_file('cleaner')
     m = Monitor('cleaner')
     m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)
