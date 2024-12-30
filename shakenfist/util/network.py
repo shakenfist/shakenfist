@@ -59,8 +59,14 @@ def _clean_ip_json(data):
 
 
 def check_for_interface(name, namespace=None, up=False):
+    log = LOG.with_fields({
+        'name': name,
+        'namespace': namespace
+    }
+    )
     if namespace:
         if not os.path.exists('/var/run/netns/%s' % namespace):
+            log.info('Interface is down, namespace missing')
             return False
 
     stdout, stderr = concurrency.execute(
@@ -69,11 +75,14 @@ def check_for_interface(name, namespace=None, up=False):
         suppress_command_logging=True)
 
     if stderr.rstrip('\n').endswith(' does not exist.'):
+        log.info('Interface is down, interface missing')
         return False
 
     if up:
         j = _clean_ip_json(stdout)
-        return 'UP' in j[0]['flags']
+        if 'UP' not in j[0]['flags']:
+            log.info('Interface is down, UP flag is missing')
+            return False
 
     return True
 

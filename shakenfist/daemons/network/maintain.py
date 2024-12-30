@@ -5,6 +5,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist import etcd
 from shakenfist.exceptions import LockException
 from shakenfist.exceptions import DeadNetwork
@@ -109,7 +110,8 @@ class Job(util_concurrency.Job):
 
                     if not n.is_okay():
                         if config.NODE_IS_NETWORK_NODE:
-                            LOG.with_fields({'network': n}).info(
+                            n.add_event(
+                                EVENT_TYPE_STATUS,
                                 'Recreating not okay network on network node')
                             n.create_on_network_node()
 
@@ -136,7 +138,8 @@ class Job(util_concurrency.Job):
                                     n.route_address(addr)
 
                         else:
-                            LOG.with_fields({'network': n}).info(
+                            n.add_event(
+                                EVENT_TYPE_STATUS,
                                 'Recreating not okay network on hypervisor')
                             n.create_on_hypervisor()
 

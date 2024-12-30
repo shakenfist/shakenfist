@@ -20,6 +20,7 @@ from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
+from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
@@ -380,7 +381,8 @@ class Network(dbo):
 
         subst = self.subst_dict()
         if not util_network.check_for_interface(subst['vx_bridge'], up=True):
-            self.log.warning('%s is not up', subst['vx_bridge'])
+            self.add_event(
+                EVENT_TYPE_STATUS, f'{subst["vx_bridge"]} is not up')
             return False
 
         return True
