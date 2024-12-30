@@ -176,8 +176,33 @@ class BaseTestCase(testtools.TestCase):
                 time.sleep(30)
                 retries += 1
 
+        # Gather debug information when this fails
+        self._emit_tracing_event({
+            'msg': ('Instance ready (cloud-init status) attempt failed. '
+                    'Gathering debug information and then raising '
+                    'TimeoutException'),
+            'instance_uuid': instance_uuid
+        })
+
+        for log_file in ['/var/log/cloud-init.log',
+                         '/var/log/cloud-init-output.log',
+                         '/var/log/syslog']:
+            try:
+                _, data = self.system_client.await_agent_command(
+                    instance_uuid, f'tail -50 {log_file}')
+                self._emit_tracing_event({
+                    'msg': f'Debug data from {log_file}',
+                    'data': data
+                })
+            except apiclient.AgentCommandError as e:
+                self._emit_tracing_event({
+                    'msg': f'Failed to gather debug data from {log_file}',
+                    'error': e
+                })
+
         raise TimeoutException(
-            'repeated attempts to detect cloud-init completion failed')
+            'repeated attempts to detect cloud-init completion for '
+            f'instance {instance_uuid} failed')
 
     def _await_instance_not_ready(self, instance_uuid):
         self._await_agent_state(instance_uuid, ready=False)
