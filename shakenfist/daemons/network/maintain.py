@@ -50,7 +50,14 @@ class Job(util_concurrency.Job):
                 # to use the more expensive interfaces_for_instance() method of
                 # looking up instance interfaces here if the instance cache hasn't
                 # been populated yet (i.e. the instance is still being created)
-                for inst in instance.Instances([instance.this_node_filter], prefilter='healthy'):
+                for inst in instance.Instances([instance.this_node_filter],
+                                               prefilter='healthy'):
+                    # Is the instance built yet?
+                    if inst.state.value in [dbo.STATE_INITIAL,
+                                            instance.Instance.STATE_PREFLIGHT,
+                                            dbo.STATE_CREATING]:
+                        continue
+
                     ifaces = inst.interfaces
                     if not ifaces:
                         ifaces = list(
@@ -140,7 +147,7 @@ class Job(util_concurrency.Job):
                         else:
                             n.add_event(
                                 EVENT_TYPE_STATUS,
-                                'Recreating not okay network on hypervisor')
+                                'recreating not okay network on hypervisor')
                             n.create_on_hypervisor()
 
                     n.ensure_mesh()
