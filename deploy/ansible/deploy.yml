@@ -92,7 +92,7 @@
         state: directory
         mode: "0755"
 
-    - name: Disable autostarting of dnsmasq on installation
+    - name: Disable auto-starting of dnsmasq on installation
       copy:
         content: |
           disable dnsmasq.service
@@ -499,7 +499,7 @@
         name: systemd-logind
         state: restarted
 
-    - name: Configure journald to not consume heaps of disks
+    - name: Configure journald to not consume heaps of disk
       copy:
         content: |
           [Journal]
@@ -1441,6 +1441,7 @@
     - name: Log SF target journal
       debug:
         msg: "{{ sf_systemd_journal.stdout.split('\n') }}"
+
 - hosts: etcd_master
   any_errors_fatal: true
   become: yes
