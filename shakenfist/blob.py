@@ -12,6 +12,7 @@ import time
 import uuid
 
 import magic
+from oslo_concurrency import lockutils
 import psutil
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
@@ -495,15 +496,29 @@ class Blob(dbo):
         attempts = 0
         while True:
             try:
-                return self._attempt_transfer(
-                    locks, affected_objects, partial_path, blob_path)
+                with lockutils.external_lock(
+                        f'blob-{self.uuid}-transfer',
+                        lock_path='/tmp', lock_file_prefix='sflock-'):
+                    # Check the blob didn't show up without us
+                    if os.path.exists(blob_path):
+                        self.observe()
+                        return
+
+                    # Attempt a transfer
+                    self._attempt_transfer(
+                        locks, affected_objects, partial_path, blob_path)
+                    return
             except (ConnectionRefusedError, BlobTransferSetupFailed,
                     BlobFetchFailed) as e:
                 attempts += 1
+                time.sleep(10)
                 if attempts > 3:
                     raise BlobFetchFailed(
                         'Repeated attempts to fetch blob failed: %s' % e)
 
+    # This method assumes the caller is holding the 'blob-{self.uuid}-transfer'
+    # external lock. Luckily the only caller right now is the one directly
+    # above here.
     def _attempt_transfer(self, locks, affected_objects, partial_path,
                           blob_path):
         add_event_multi(
@@ -636,7 +651,6 @@ class Blob(dbo):
                 EVENT_TYPE_AUDIT, affected_objects,
                 f'fetching required blob complete {direction_info}')
             self.observe()
-            return total_bytes_received
 
     def request_replication(self, allow_excess=0):
         absent_nodes = list(Nodes([], prefilter='inactive'))
