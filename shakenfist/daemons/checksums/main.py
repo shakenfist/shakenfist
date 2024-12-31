@@ -25,7 +25,7 @@ class Monitor(daemon.Daemon):
         last_defer_message = 0
         blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
 
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             if not self.cluster_stable():
                 if time.time() - last_defer_message > 10:
                     LOG.info('Cluster not yet stable, deferring maintenance')
@@ -51,10 +51,7 @@ class Monitor(daemon.Daemon):
                         if b.verify_size():
                             b.verify_checksum(urgent=False)
 
-                        self.exit.wait(5)
-                        self.check_daemon_state()
-                        if self.exit.is_set():
-                            break
+                        self.idle(5)
 
             self.idle(300)
 

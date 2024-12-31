@@ -192,7 +192,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
                 pass
 
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             try:
                 did_work = False
 

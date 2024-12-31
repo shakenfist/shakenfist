@@ -5,6 +5,7 @@
 from collections import defaultdict
 from functools import partial
 import json
+import os
 import sys
 import time
 
@@ -48,7 +49,7 @@ class Monitor(daemon.Daemon):
         # Attempt to acquire the cluster maintenance lock forever. We never
         # release the lock, it gets cleared on a crash. This is so that only
         # one node at a time is performing cluster maintenance.
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             self.lock = etcd.get_lock('cluster', None, None, ttl=300, timeout=10,
                                       op='Cluster maintenance')
             result = self.lock.acquire()
@@ -56,7 +57,7 @@ class Monitor(daemon.Daemon):
                 self.is_elected = True
                 return
 
-            self.exit.wait(5)
+            self.idle(5)
             self.check_daemon_state()
 
     def _cluster_wide_cleanup(self, last_loop_run):
@@ -482,7 +483,7 @@ class Monitor(daemon.Daemon):
         self.refresh_object_state_caches()
 
         last_loop_run = 0
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             pyprctl.set_name('idle')
             LOG.debug('This cluster thread is now idle and awaiting election')
             self._await_election()
@@ -494,7 +495,7 @@ class Monitor(daemon.Daemon):
                 continue
 
             # And then do regular cluster maintenance things
-            while self.is_elected and not self.exit.is_set():
+            while self.is_elected and not os.path.exists(self.abort_path):
                 self.lock.refresh()
 
                 pyprctl.set_name('active')

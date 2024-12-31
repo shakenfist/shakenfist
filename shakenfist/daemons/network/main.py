@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 
@@ -34,7 +35,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'stray-nics': stray_nics.Job
         }
 
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             try:
                 self.reap_workers()
 
@@ -68,13 +69,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                         self.workers[job_name]['thread'].join(0.2)
 
                     if needs_start:
-                        self.start_job(job_classes[job_name], [], job_name)
+                        self.start_job(
+                            job_classes[job_name], [job_name], job_name)
 
             except Exception as e:
                 util_general.ignore_exception('network worker', e)
 
-            self.exit.wait(5)
-            self.check_daemon_state()
+            self.idle(5)
 
 
 def main():

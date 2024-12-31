@@ -101,7 +101,9 @@ class CleanerTestCase(base.ShakenFistTestCase):
     @mock.patch('os.path.exists', side_effect=fake_exists)
     @mock.patch('time.time', return_value=7)
     @mock.patch('os.listdir', return_value=[])
-    def test_update_power_states(self, mock_listdir, mock_time, mock_exists):
+    @mock.patch('os.unlink')
+    def test_update_power_states(self, mock_unlink, mock_listdir, mock_time,
+                                 mock_exists):
         for id in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
             self.mock_etcd.create_instance(
                 id, id, set_state=instance.Instance.STATE_CREATED)

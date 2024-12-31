@@ -22,7 +22,10 @@ class TransferJob(util_concurrency.Job):
         super().__init__()
         self.name = name
         self.data = data
-        self.exit = threading.Event()
+
+        self.abort_path = f'/run/sf-transfers-{name}.abort'
+        if os.path.exists(self.abort_path):
+            os.unlink(self.abort_path)
 
     def execute(self):
         etcd.reset_client()
@@ -74,7 +77,7 @@ class TransferJob(util_concurrency.Job):
                     conn.send(d)
                     sent_bytes += len(d)
 
-                    if self.exit.is_set():
+                    if os.path.exists(self.abort_path):
                         break
                 conn.close()
 
@@ -87,7 +90,7 @@ class TransferJob(util_concurrency.Job):
 
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             try:
                 self.reap_workers()
 
@@ -107,8 +110,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             except Exception as e:
                 util_general.ignore_exception('transfer worker', e)
 
-            self.exit.wait(0.2)
-            self.check_daemon_state()
+            self.idle(0.2)
 
 
 def main():

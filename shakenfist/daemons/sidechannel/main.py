@@ -65,6 +65,7 @@ class SideChannelJob(util_concurrency.Job):
     def __init__(self, instance_uuid):
         super().__init__()
         self.instance_uuid = instance_uuid
+        self.abort_path = f'/run/sf-sidechannel-{instance_uuid}.abort'
 
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
@@ -363,7 +364,7 @@ class SideChannelJob(util_concurrency.Job):
                 'unique': str(time.time())
                 })
 
-            while not self.exit.is_set():
+            while not os.path.exists(self.abort_path):
                 for packet in self._await_client():
                     self.log.with_fields({'packet': packet}).error(
                         'Unexpected sidechannel client packet during startup, ignoring')
@@ -400,13 +401,13 @@ class SideChannelJob(util_concurrency.Job):
         if self.instance_ready == constants.AGENT_TOO_OLD:
             self.instance.add_event(
                 EVENT_TYPE_AUDIT, 'instance agent is too old, not executing commands')
-            while not self.exit.is_set():
+            while not os.path.exists(self.abort_path):
                 time.sleep(1)
 
         # Spin reading packets and responding until we see an error or are asked
         # to exit.
         try:
-            while not self.exit.is_set():
+            while not os.path.exists(self.abort_path):
                 for packet in self._await_client():
                     self.log.with_fields({'packet': packet}).error(
                         'Unexpected sidechannel client packet')
@@ -631,11 +632,11 @@ class Monitor(daemon.Daemon):
     def _run_inner(self):
         instance_sidechannel_cache = {}
 
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             try:
                 self.reap_single_instance_monitors()
 
-                if not self.exit.is_set():
+                if not os.path.exists(self.abort_path):
                     # Audit desired self.monitors
                     extra_instances = list(self.monitors.keys())
                     missing_instances = []
@@ -690,7 +691,7 @@ class Monitor(daemon.Daemon):
                     for instance_uuid in extra_instances:
                         self._request_thread_exit(instance_uuid)
 
-                    self.exit.wait(1)
+                    self.idle(1)
 
             except Exception as e:
                 util_general.ignore_exception('sidechannel monitor', e)

@@ -1,5 +1,6 @@
 # NOTE(mikal): this daemon's role is to notice that the node has been started
 # or shutdown. You should never manually stop this daemon!
+import os
 import setproctitle
 import signal
 import sys
@@ -27,7 +28,10 @@ signal.signal(signal.SIGTERM, exit_gracefully)
 
 
 def main():
-    global EXIT
+    abort_path = '/run/sf-sentinel-first.abort'
+    if os.path.exists(abort_path):
+        os.unlink(abort_path)
+
     LOG.info('Started')
     setproctitle.setproctitle('sf-sentinel-first')
 

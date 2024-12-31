@@ -63,7 +63,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         n = Node.from_db(config.NODE_NAME)
 
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             try:
                 self.reap_workers()
 
@@ -109,7 +109,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                     last_length = time.time()
 
                 if not self.dequeue_job(config.NODE_NAME, workitem.Job):
-                    self.exit.wait(0.2)
+                    self.idle(0.2)
 
             except Exception as e:
                 util_general.ignore_exception('queue worker', e)

@@ -59,6 +59,10 @@ class Job(util_concurrency.Job):
             'job': jobname
         })
 
+        self.abort_path = f'/run/sf-queues-{jobname}.abort'
+        if os.path.exists(self.abort_path):
+            os.unlink(self.abort_path)
+
     def execute(self):
         libvirt = util_libvirt.get_libvirt()
         self.log.info('Processing job')

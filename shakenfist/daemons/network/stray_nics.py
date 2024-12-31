@@ -1,3 +1,4 @@
+import os
 import time
 
 from shakenfist_utilities import logs  # noreorder
@@ -14,11 +15,19 @@ LOG, _ = logs.setup(__name__)
 
 
 class Job(util_concurrency.Job):
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+
+        self.abort_path = f'/run/sf-net-{name}.abort'
+        if os.path.exists(self.abort_path):
+            os.unlink(self.abort_path)
+
     def execute(self):
         LOG.info('Starting NIC IP reaper')
         last_loop = 0
 
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             if time.time() - last_loop < 30:
                 time.sleep(1)
                 continue

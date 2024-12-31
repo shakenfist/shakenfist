@@ -459,7 +459,7 @@ class Monitor(daemon.Daemon):
                     except (psutil.NoSuchProcess, FileNotFoundError):
                         i.kvm_pid = None
 
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             try:
                 if time.time() - last_metrics > config.SCHEDULER_CACHE_TIMEOUT:
                     update_metrics()
@@ -474,7 +474,7 @@ class Monitor(daemon.Daemon):
                     check_kvm_processess()
                     last_process_check = time.time()
 
-                self.exit.wait(1)
+                self.idle(1)
 
             except Exception as e:
                 util_general.ignore_exception('resource statistics', e)

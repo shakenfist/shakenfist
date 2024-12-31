@@ -96,7 +96,9 @@ class Daemon:
         self.log, _ = logs.setup(name)
         set_log_level(self.log, name)
 
-        self.exit = threading.Event()
+        self.abort_path = f'/run/sf-{name}.abort'
+        if os.path.exists(self.abort_path):
+            os.unlink(self.abort_path)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
         faulthandler.register(signal.SIGUSR1)
@@ -182,14 +184,17 @@ class Daemon:
             except ValueError:
                 # This might fail if grpc has already started shutting down
                 ...
-            self.exit.set()
+
+            with open(self.abort_path, 'w') as f:
+                f.write('1')
 
     def check_daemon_state(self):
         n = Node.from_db(config.NODE_NAME)
         daemon_state = n.get_daemon_state(self.daemon_name).value
         if daemon_state in [Node.DAEMON_STATE_STOPPED,
                             Node.DAEMON_STATE_STOPPING]:
-            self.exit.set()
+            with open(self.abort_path, 'w') as f:
+                f.write('1')
 
     def record_start(self):
         n = Node.from_db(config.NODE_NAME)
@@ -208,10 +213,10 @@ class Daemon:
         n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon stopped')
 
     def idle(self, seconds):
-        for _ in range(int(seconds / 5)):
-            self.exit.wait(5)
+        for _ in range(int(seconds / 0.2)):
+            time.sleep(0.2)
             self.check_daemon_state()
-            if self.exit.is_set():
+            if os.path.exists(self.abort_path):
                 break
 
 
@@ -241,7 +246,8 @@ class WorkerPoolDaemon(Daemon):
             while len(self.workers) > 0:
                 for thread_name in self.workers:
                     thread_ident = self.workers[thread_name]['thread'].ident
-                    self.workers[thread_name]['object'].exit.set()
+                    with open(self.workers[thread_name]['object'].abort_path, 'w') as f:
+                        f.write('1')
                     LOG.info(f'Sent exit event to {thread_name} thread '
                              f'with ident {thread_ident}')
 
