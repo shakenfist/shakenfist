@@ -299,9 +299,16 @@ class Blob(dbo):
 
     @property
     def ref_count(self):
-        """Counts artifact references to the blob"""
-        count = self._db_get_attribute('ref_count', {'ref_count': 0})
-        return int(count['ref_count'])
+        return int(self.ref_count_with_age['ref_count'])
+
+    @property
+    def ref_count_with_age(self):
+        count = self._db_get_attribute('ref_count', {
+            'ref_count': 0
+        })
+        if 'update_time' not in count:
+            count['update_time'] = time.time()
+        return count
 
     @property
     def transcoded(self):
@@ -378,9 +385,21 @@ class Blob(dbo):
     def ref_count_inc(self, baseobject, count=1):
         with self.get_lock_attr('ref_count', 'Increase reference count'):
             if self.state.value == self.STATE_DELETED:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, [baseobject, self],
+                    'attempt to use a deleted blob',
+                    extra={
+                        'blob_uuid': self.uuid,
+                        f'{baseobject.object_type}_uuid': baseobject.uuid
+                    })
                 raise BlobDeleted(self.uuid)
-            new_count = self.ref_count + count
-            self._db_set_attribute('ref_count', {'ref_count': new_count})
+
+            old_count = self.ref_count
+            new_count = old_count + count
+            self._db_set_attribute('ref_count', {
+                'ref_count': new_count,
+                'update_time': time.time()
+            })
             self.add_event(
                 EVENT_TYPE_MUTATE, 'incremented reference count',
                 extra={
@@ -391,25 +410,11 @@ class Blob(dbo):
                     })
             return new_count
 
-    def _delete_unused(self, new_count):
-        # If no references then the blob cannot be used, therefore delete.
-        if new_count == 0:
-            self.state = self.STATE_DELETED
-
-            for transcoded_blob_uuid in self.transcoded.values():
-                transcoded_blob = Blob.from_db(transcoded_blob_uuid)
-                if transcoded_blob:
-                    transcoded_blob.ref_count_dec(self)
-
-            depends_on = self.depends_on
-            if depends_on:
-                dep_blob = Blob.from_db(depends_on)
-                if dep_blob:
-                    dep_blob.ref_count_dec(self)
-
     def ref_count_dec(self, baseobject, count=1):
         with self.get_lock_attr('ref_count', 'Decrease reference count'):
-            new_count = self.ref_count - 1
+            old_count = self.ref_count
+            new_count = old_count - count
+
             if new_count < 0:
                 new_count = 0
                 self.add_event(
@@ -428,9 +433,25 @@ class Blob(dbo):
                         'reference_count': new_count
                         })
 
-            self._db_set_attribute('ref_count', {'ref_count': new_count})
-            self._delete_unused(new_count)
+            self._db_set_attribute('ref_count', {
+                'ref_count': new_count,
+                'update_time': time.time()
+            })
             return new_count
+
+    def cascading_delete(self):
+        self.state = self.STATE_DELETED
+
+        for transcoded_blob_uuid in self.transcoded.values():
+            transcoded_blob = Blob.from_db(transcoded_blob_uuid)
+            if transcoded_blob:
+                transcoded_blob.ref_count_dec(self)
+
+        depends_on = self.depends_on
+        if depends_on:
+            dep_blob = Blob.from_db(depends_on)
+            if dep_blob:
+                dep_blob.ref_count_dec(self)
 
     def ensure_local(self, locks, instance_object=None,
                      wait_for_other_transfers=True):

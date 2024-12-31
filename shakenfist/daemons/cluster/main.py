@@ -244,6 +244,18 @@ class Monitor(daemon.Daemon):
                 }).info('Blob has current fetches, ignoring')
                 continue
 
+            # If the blob's reference count has been zero for a while, we can
+            # reap it
+            ref_count = b.ref_count_with_age
+            if time.time() - ref_count['update_time'] > 300:
+                if ref_count['ref_count'] < 1:
+                    b.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'reference count has been zero or below for at least '
+                        'five minutes, cascading delete initiated')
+                    b.cascading_delete()
+                    continue
+
             locations = b.locations
             ignored_locations = []
             for n in absent_nodes:
@@ -480,17 +492,6 @@ class Monitor(daemon.Daemon):
                     LOG.info('Cluster not yet stable, deferring maintenance')
                     last_defer_message = time.time()
                 continue
-
-            # Infrequently ensure we have no blobs with a reference count of zero
-            orphan_blobs = []
-            for b in Blobs([], prefilter='active'):
-                if b.ref_count == 0:
-                    orphan_blobs.append(b)
-
-            for b in orphan_blobs:
-                self.log.with_fields({'blob': b}).error(
-                    'Blob has zero references, deleting')
-                b.state = Blob.STATE_DELETED
 
             # And then do regular cluster maintenance things
             while self.is_elected and not self.exit.is_set():
