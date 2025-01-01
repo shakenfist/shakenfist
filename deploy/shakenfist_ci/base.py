@@ -36,6 +36,10 @@ class WrongEventException(Exception):
     pass
 
 
+class RetryException(Exception):
+    pass
+
+
 def load_userdata(suite, name):
     test_dir = os.path.dirname(os.path.abspath(__file__))
     with open(f'{test_dir}/{suite}/files/{name}_userdata') as f:
@@ -79,10 +83,20 @@ class BaseTestCase(testtools.TestCase):
         # This method implements a simple tracing scheme to help work out what
         # the slow bits of a unit test are. This isn't really a complete thing,
         # its more of a proof of concept at this point.
+        event['ts'] = time.time()
+        event['ts_pretty'] = str(datetime.datetime.now())
+
+        if 'error' in event:
+            try:
+                json.dumps(event['error'])
+            except TypeError:
+                # Exception classes are not JSON serializable for example...
+                event['error_type'] = type(event['error']).__name__
+                event['error'] = str(event['error'])
+
         os.makedirs(TRACE_PATH, exist_ok=True)
-        with open(os.path.join(TRACE_PATH, f'{self._testMethodName}.json'), 'a') as f:
-            event['ts'] = time.time()
-            event['ts_pretty'] = str(datetime.datetime.now())
+        with open(os.path.join(TRACE_PATH, f'{self._testMethodName}.json'),
+                  'a') as f:
             f.write(json.dumps(event))
             f.write('\n')
 
@@ -137,6 +151,78 @@ class BaseTestCase(testtools.TestCase):
         return self._await_instance_event(
             instance_uuid, 'detected poweroff', after=after)
 
+    def _cloud_init_health_check_json(self, instance_uuid):
+        exit_code, data = self.system_client.await_agent_command(
+            instance_uuid, 'cloud-init status --wait --format json',
+            exit_codes=[0, 1, 2])
+
+        j = json.loads(data)
+
+        if exit_code == 0:
+            if j.get('status') == 'done':
+                self._emit_tracing_event({
+                    'msg': 'Instance ready (cloud-init status)',
+                    'instance_uuid': instance_uuid,
+                    'data': data
+                })
+                return
+            else:
+                raise RetryException()
+
+        # Older versions of cloud-init have a top level "error" key...
+        # https://discourse.ubuntu.com/t/spec-improve-error-and-warning-visibility/39765
+        if len(j.get('errors', [])) > 0:
+            self._emit_tracing_event({
+                'msg': 'cloud-init reports fatal errors',
+                'instance_uuid': instance_uuid,
+                'data': data
+            })
+            self.fail('cloud-init reports fatal errors')
+
+        # Newer versions of cloud-init have it per module.
+        for module in ['init-local', 'init', 'modules-config',
+                       'modules-final']:
+            if len(j.get(module, {}).get('errors', [])) > 0:
+                self._emit_tracing_event({
+                    'msg': f'cloud-init {module} reports fatal errors',
+                    'instance_uuid': instance_uuid,
+                    'data': data
+                })
+                self.fail(
+                    f'cloud-init {module} reports fatal errors')
+
+            if len(j.get(module, {}).get('recoverable_errors', [])) > 0:
+                self._emit_tracing_event({
+                    'msg': f'cloud-init {module} reports recoverable errors',
+                    'instance_uuid': instance_uuid,
+                    'data': data
+                })
+
+    def _cloud_init_health_check_older(self, instance_uuid):
+        exit_code, data = self.system_client.await_agent_command(
+            instance_uuid, 'cloud-init status --wait --long',
+            exit_codes=[0, 1, 2])
+        if exit_code == 0:
+            self._emit_tracing_event({
+                'msg': 'Instance ready (cloud-init status)',
+                'instance_uuid': instance_uuid,
+                'data': data
+            })
+            return
+
+        if data.find('status: error') != -1:
+            self._emit_tracing_event({
+                'msg': 'cloud-init reports fatal errors',
+                'instance_uuid': instance_uuid,
+                'data': data
+            })
+            self.fail('cloud-init reports fatal errors')
+
+        if data.find('status: done') != -1:
+            return
+
+        raise RetryException()
+
     def _await_instance_ready(self, instance_uuid):
         self._await_agent_state(instance_uuid, ready=True)
         self._emit_tracing_event({
@@ -144,16 +230,28 @@ class BaseTestCase(testtools.TestCase):
             'instance_uuid': instance_uuid
         })
 
+        # Probe to determine if cloud-init supports JSON output...
+        exit_code, data = self.system_client.await_agent_command(
+            instance_uuid, 'cloud-init status --format json 2> /dev/null',
+            exit_codes=[0, 1, 2])
+        has_json = exit_code == 0
+        self._emit_tracing_event({
+            'msg': 'cloud-init JSON support probe',
+            'instance_uuid': instance_uuid,
+            'has_json': has_json
+        })
+
         retries = 0
         while retries < 3:
             try:
-                self.system_client.await_agent_command(
-                    instance_uuid, 'cloud-init status --wait --long')
-                self._emit_tracing_event({
-                    'msg': 'Instance ready (cloud-init status)',
-                    'instance_uuid': instance_uuid
-                })
-                return
+                if has_json:
+                    return self._cloud_init_health_check_json(instance_uuid)
+                else:
+                    return self._cloud_init_health_check_older(instance_uuid)
+
+            except RetryException:
+                time.sleep(30)
+                retries += 1
 
             except apiclient.AgentCommandError as e:
                 self._emit_tracing_event({
@@ -166,8 +264,33 @@ class BaseTestCase(testtools.TestCase):
                 time.sleep(30)
                 retries += 1
 
+        # Gather debug information when this fails
+        self._emit_tracing_event({
+            'msg': ('Instance ready (cloud-init status) attempt failed. '
+                    'Gathering debug information and then raising '
+                    'TimeoutException'),
+            'instance_uuid': instance_uuid
+        })
+
+        for log_file in ['/var/log/cloud-init.log',
+                         '/var/log/cloud-init-output.log',
+                         '/var/log/syslog']:
+            try:
+                _, data = self.system_client.await_agent_command(
+                    instance_uuid, f'tail -50 {log_file}')
+                self._emit_tracing_event({
+                    'msg': f'Debug data from {log_file}',
+                    'data': data
+                })
+            except apiclient.AgentCommandError as e:
+                self._emit_tracing_event({
+                    'msg': f'Failed to gather debug data from {log_file}',
+                    'error': e
+                })
+
         raise TimeoutException(
-            'repeated attempts to detect cloud-init completion failed')
+            'repeated attempts to detect cloud-init completion for '
+            f'instance {instance_uuid} failed')
 
     def _await_instance_not_ready(self, instance_uuid):
         self._await_agent_state(instance_uuid, ready=False)

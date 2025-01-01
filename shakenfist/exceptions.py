@@ -192,6 +192,10 @@ class NatOnlyNetworksShouldNotHaveDnsMasq(NetworkException):
     ...
 
 
+class CannotAssignFloatingGateway(NetworkException):
+    ...
+
+
 # NetworkInterface
 class NetworkInterfaceException(Exception):
     ...
@@ -285,6 +289,23 @@ class InvalidIPAMAddress(IPAMException):
     ...
 
 
+# Nodes
+class NodeException(Exception):
+    ...
+
+
+class NodeShouldExist(NodeException):
+    ...
+
+
+class NoSuchDaemon(NodeException):
+    ...
+
+
+class NoSuchDaemonState(NodeException):
+    ...
+
+
 # Lockless update failures
 class LocklessUpdateFailed(Exception):
     ...
@@ -306,3 +327,25 @@ class AuthException(Exception):
 
 class CannotParseJWTIdentity(AuthException):
     ...
+
+
+# Utility exceptions
+class MissingPrivExecSocket(Exception):
+    ...
+
+
+class TruncatedPrivExecResponse(Exception):
+    ...
+
+
+class UnknownReplyException(Exception):
+    ...
+
+
+class ProcessExecutionError(Exception):
+    def __init__(self, stdout=None, stderr=None, exit_code=None, cmd=None):
+        super().__init__(stdout, stderr, exit_code, cmd)
+        self.exit_code = exit_code
+        self.stderr = stderr
+        self.stdout = stdout
+        self.cmd = cmd

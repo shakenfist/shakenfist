@@ -1,4 +1,5 @@
 # Copyright 2020 Michael Still
+import copy
 import ipaddress
 import os
 import random
@@ -7,7 +8,6 @@ import time
 from functools import partial
 from uuid import uuid4
 
-from oslo_concurrency import processutils
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
@@ -20,9 +20,13 @@ from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
+from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.eventlog import add_event_multi
+from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import IPManagerMissing
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
@@ -33,7 +37,7 @@ from shakenfist.tasks import RemoveDnsMasqNetworkTask
 from shakenfist.tasks import RemoveNATNetworkTask
 from shakenfist.tasks import UpdateDnsMasqNetworkTask
 from shakenfist.util import network as util_network
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -271,15 +275,44 @@ class Network(dbo):
             self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
         self._remove_item_in_attribute_list('networkinterfaces', ni.uuid)
 
-    def update_floating_gateway(self, gateway):
-        with self.get_lock_attr('routing', 'Update floating gateway'):
-            routing = self.routing
-            if routing.get('floating_gateway') and gateway:
-                self.log.with_fields({
-                    'old_gateway': routing['floating_gateway'],
-                    'new_gateway': gateway}).error('Clobbering previous floating gateway')
-            routing['floating_gateway'] = gateway
-            self._db_set_attribute('routing', routing)
+    def _update_floating_gateway(self, gateway):
+        original_routing = self.routing
+        original_gateway = original_routing.get('floating_gateway')
+        if original_gateway == gateway:
+            return True
+        if original_gateway:
+            return False
+
+        if not original_routing:
+            original_routing = None
+            updated_routing = {
+                'floating_gateway': gateway
+            }
+        else:
+            updated_routing = copy.copy(original_routing)
+            updated_routing['floating_gateway'] = gateway
+
+        return etcd.replace('attribute/network', self.uuid, 'routing',
+                            original_routing, updated_routing)
+
+    def assign_floating_gateway(self):
+        fn = floating_network()
+        floating_gateway = fn.ipam.reserve_random_free_address(
+            self.unique_label(), ipam.RESERVATION_TYPE_GATEWAY, '')
+        if self._update_floating_gateway(floating_gateway):
+            return
+        fn.ipam.release(floating_gateway)
+
+        if not self.floating_gateway:
+            raise CannotAssignFloatingGateway()
+
+    def unassign_floating_gateway(self):
+        floating_gateway = self.floating_gateway
+        if not floating_gateway:
+            return
+        fn = floating_network()
+        fn.ipam.release(floating_gateway)
+        self._update_floating_gateway(None)
 
     @property
     def _vx_veth_inner(self):
@@ -348,7 +381,8 @@ class Network(dbo):
 
         subst = self.subst_dict()
         if not util_network.check_for_interface(subst['vx_bridge'], up=True):
-            self.log.warning('%s is not up', subst['vx_bridge'])
+            self.add_event(
+                EVENT_TYPE_STATUS, f'{subst["vx_bridge"]} is not up')
             return False
 
         return True
@@ -376,24 +410,24 @@ class Network(dbo):
                 subst['vx_interface'], 'vxlan',
                 'id %(vx_id)s dev %(mesh_interface)s dstport 0'
                 % subst)
-            util_process.execute(None, 'sysctl -w net.ipv4.conf.'
-                                 '%(vx_interface)s.arp_notify=1' % subst)
+            util_concurrency.execute(
+                None, 'sysctl -w net.ipv4.conf.%(vx_interface)s.arp_notify=1' % subst)
 
         if not util_network.check_for_interface(subst['vx_bridge']):
             util_network.create_interface(subst['vx_bridge'], 'bridge', '')
-            util_process.execute(None, 'ip link set %(vx_interface)s '
-                                 'master %(vx_bridge)s' % subst)
-            util_process.execute(
+            util_concurrency.execute(
+                None, 'ip link set %(vx_interface)s master %(vx_bridge)s' % subst)
+            util_concurrency.execute(
                 None, 'ip link set %(vx_interface)s up' % subst)
-            util_process.execute(
+            util_concurrency.execute(
                 None, 'ip link set %(vx_bridge)s up' % subst)
-            util_process.execute(None, 'sysctl -w net.ipv4.conf.'
-                                 '%(vx_bridge)s.arp_notify=1' % subst)
-            util_process.execute(
+            util_concurrency.execute(
+                None, 'sysctl -w net.ipv4.conf.%(vx_bridge)s.arp_notify=1' % subst)
+            util_concurrency.execute(
                 None, 'brctl setfd %(vx_bridge)s 0' % subst)
-            util_process.execute(
+            util_concurrency.execute(
                 None, 'brctl stp %(vx_bridge)s off' % subst)
-            util_process.execute(
+            util_concurrency.execute(
                 None, 'brctl setageing %(vx_bridge)s 0' % subst)
 
     def create_on_hypervisor(self):
@@ -427,13 +461,21 @@ class Network(dbo):
 
             subst = self.subst_dict()
             if not os.path.exists('/var/run/netns/%s' % self.uuid):
-                util_process.execute(None, 'ip netns add %s' % self.uuid)
+                try:
+                    util_concurrency.execute(
+                        None, 'ip netns add %s' % self.uuid)
+                except ProcessExecutionError as e:
+                    r = re.compile(
+                        r'Cannot create namespace file ".*": File exists\n')
+                    m = r.match(e.stderr)
+                    if not m:
+                        raise e
 
             if not util_network.check_for_interface(subst['vx_veth_outer']):
                 util_network.create_interface(
                     subst['vx_veth_outer'], 'veth',
                     'peer name %(vx_veth_inner)s' % subst)
-                util_process.execute(
+                util_concurrency.execute(
                     None, 'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
 
                 # Refer to bug 952 for more details here, but it turns out
@@ -442,14 +484,14 @@ class Network(dbo):
                 # MTU and then re-specify it here.
                 subst['vx_bridge_mtu'] = util_network.get_interface_mtu(
                     subst['vx_bridge'])
-                util_process.execute(
+                util_concurrency.execute(
                     None,
                     'ip link set %(vx_veth_outer)s master %(vx_bridge)s '
                     'mtu %(vx_bridge_mtu)s' % subst)
 
-                util_process.execute(
+                util_concurrency.execute(
                     None, 'ip link set %(vx_veth_outer)s up' % subst)
-                util_process.execute(
+                util_concurrency.execute(
                     None, 'ip link set %(vx_veth_inner)s up' % subst,
                     namespace=self.uuid)
                 util_network.add_address_to_interface(
@@ -467,14 +509,14 @@ class Network(dbo):
                 # MTU and then re-specify it here.
                 subst['egress_bridge_mtu'] = util_network.get_interface_mtu(
                     subst['egress_bridge'])
-                util_process.execute(
+                util_concurrency.execute(
                     None,
                     'ip link set %(egress_veth_outer)s master %(egress_bridge)s '
                     'mtu %(egress_bridge_mtu)s' % subst)
 
-                util_process.execute(
+                util_concurrency.execute(
                     None, 'ip link set %(egress_veth_outer)s up' % subst)
-                util_process.execute(
+                util_concurrency.execute(
                     None, 'ip link set %(egress_veth_inner)s netns %(netns)s' % subst)
 
             if self.provide_nat:
@@ -482,15 +524,15 @@ class Network(dbo):
                 # we don't need to construct two identical ipmanagers one after
                 # the other.
                 try:
-                    fn = floating_network()
                     if not self.floating_gateway:
-                        self.update_floating_gateway(
-                            fn.ipam.reserve_random_free_address(
-                                self.unique_label(), ipam.RESERVATION_TYPE_GATEWAY, ''))
+                        self.assign_floating_gateway()
 
-                    subst['floating_router'] = fn.ipam.get_address_at_index(1)
-                    subst['floating_gateway'] = self.floating_gateway
-                    subst['floating_netmask'] = fn.netmask
+                    fn = floating_network()
+                    subst.update({
+                        'floating_router': fn.ipam.get_address_at_index(1),
+                        'floating_gateway': self.floating_gateway,
+                        'floating_netmask': fn.netmask
+                    })
                 except CongestedNetwork:
                     self.error = 'Unable to allocate floating gateway IP'
                     self.state = self.STATE_ERROR
@@ -507,18 +549,21 @@ class Network(dbo):
                         self.uuid, subst['floating_gateway'], subst['floating_netmask'],
                         subst['egress_veth_inner'])
 
-                default_routes = util_network.get_default_routes(
-                    subst['netns'])
-                if default_routes != [subst['floating_router']]:
-                    if default_routes:
-                        for default_route in default_routes:
-                            util_process.execute(
-                                None, 'route del default gw %s' % default_route,
-                                namespace=self.uuid)
+                needs_default_route = True
+                default_routes = util_network.get_default_routes(self.uuid)
+                if default_routes == [subst['floating_router']]:
+                    needs_default_route = False
+                elif default_routes:
+                    for default_route in default_routes:
+                        if default_route == subst['floating_router']:
+                            needs_default_route = False
+                        else:
+                            util_network.delete_default_route(
+                                self.uuid, default_route)
 
-                    util_process.execute(
-                        None, 'route add default gw %(floating_router)s' % subst,
-                        namespace=self.uuid)
+                if needs_default_route:
+                    util_network.add_default_route(
+                        self.uuid, subst['floating_router'])
 
                 self.enable_nat()
 
@@ -534,11 +579,11 @@ class Network(dbo):
             subst = self.subst_dict()
 
             if util_network.check_for_interface(subst['vx_bridge']):
-                util_process.execute(
+                util_concurrency.execute(
                     None, 'ip link delete %(vx_bridge)s' % subst)
 
             if util_network.check_for_interface(subst['vx_interface']):
-                util_process.execute(
+                util_concurrency.execute(
                     None, 'ip link delete %(vx_interface)s' % subst)
 
     # This method should only ever be called when you already know you're on
@@ -549,15 +594,15 @@ class Network(dbo):
             subst = self.subst_dict()
 
             if util_network.check_for_interface(subst['vx_veth_outer']):
-                util_process.execute(
+                util_concurrency.execute(
                     None, 'ip link delete %(vx_veth_outer)s' % subst)
 
             if util_network.check_for_interface(subst['egress_veth_outer']):
-                util_process.execute(
+                util_concurrency.execute(
                     None, 'ip link delete %(egress_veth_outer)s' % subst)
 
             if os.path.exists('/var/run/netns/%s' % self.uuid):
-                util_process.execute(None, 'ip netns del %s' % self.uuid)
+                util_concurrency.execute(None, 'ip netns del %s' % self.uuid)
 
             self.ipam.state = self.ipam.STATE_DELETED
             self.state = self.STATE_DELETED
@@ -629,19 +674,19 @@ class Network(dbo):
 
         subst = self.subst_dict()
         if not util_network.nat_rules_for_ipblock(self.network_address):
-            util_process.execute(
+            util_concurrency.execute(
                 None, 'echo 1 > /proc/sys/net/ipv4/ip_forward')
-            util_process.execute(
+            util_concurrency.execute(
                 None,
                 'iptables -w 10 -A FORWARD -o %(egress_veth_inner)s '
                 '-i %(vx_veth_inner)s -j ACCEPT' % subst,
                 namespace=self.uuid)
-            util_process.execute(
+            util_concurrency.execute(
                 None,
                 'iptables -w 10 -A FORWARD -i %(egress_veth_inner)s '
                 '-o %(vx_veth_inner)s -j ACCEPT' % subst,
                 namespace=self.uuid)
-            util_process.execute(
+            util_concurrency.execute(
                 None,
                 'iptables -w 10 -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
                 '-o %(egress_veth_inner)s -j MASQUERADE' % subst,
@@ -650,9 +695,7 @@ class Network(dbo):
     def remove_nat(self):
         if config.NODE_IS_NETWORK_NODE:
             if self.floating_gateway:
-                fn = floating_network()
-                fn.ipam.release(self.floating_gateway)
-                self.update_floating_gateway(None)
+                self.unassign_floating_gateway()
 
         else:
             etcd.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
@@ -698,7 +741,7 @@ class Network(dbo):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
 
         try:
-            stdout, _ = util_process.execute(
+            stdout, _ = util_concurrency.execute(
                 None,
                 'bridge fdb show brport %(vx_interface)s' % self.subst_dict(),
                 suppress_command_logging=True)
@@ -708,7 +751,7 @@ class Network(dbo):
                 if m:
                     yield m.group(1)
 
-        except processutils.ProcessExecutionError as e:
+        except ProcessExecutionError as e:
             if time.time() - self.state.update_time > 10:
                 self.log.warning('Mesh discovery failure: %s' % e)
 
@@ -782,11 +825,12 @@ class Network(dbo):
         subst['node'] = n
 
         try:
-            util_process.execute(None,
-                                 'bridge fdb append to 00:00:00:00:00:00 '
-                                 'dst %(node)s dev %(vx_interface)s' % subst)
+            util_concurrency.execute(
+                None,
+                'bridge fdb append to 00:00:00:00:00:00 '
+                'dst %(node)s dev %(vx_interface)s' % subst)
             self.add_event(EVENT_TYPE_MUTATE, 'added new mesh element', extra={'ip': n})
-        except processutils.ProcessExecutionError as e:
+        except ProcessExecutionError as e:
             self.log.with_fields({
                 'node': n,
                 'error': e}).info('Failed to add mesh element')
@@ -796,24 +840,28 @@ class Network(dbo):
         subst['node'] = n
 
         try:
-            util_process.execute(None,
-                                 'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
-                                 'dev %(vx_interface)s' % subst)
+            util_concurrency.execute(
+                None,
+                'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
+                'dev %(vx_interface)s' % subst)
             self.add_event(EVENT_TYPE_MUTATE, 'removed excess mesh element',
                            extra={'ip': n})
-        except processutils.ProcessExecutionError as e:
+        except ProcessExecutionError as e:
             self.log.with_fields({
                 'node': n,
                 'error': e}).info('Failed to remove mesh element')
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
-    def add_floating_ip(self, floating_address, inner_address):
-        self.add_event(EVENT_TYPE_AUDIT, 'adding floating ip',
-                       extra={
-                           'floating': floating_address,
-                           'inner': inner_address
-                       })
+    def add_floating_ip(self, floating_address, inner_address, affected_objects):
+        affected_objects.append(self)
+        affected_objects.append(('network', 'floating'))
+        add_event_multi(
+            EVENT_TYPE_AUDIT, affected_objects, 'adding floating ip',
+            extra={
+                'floating': floating_address,
+                'inner': inner_address
+            })
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['floating_address_as_hex'] = '%08x' % int(
@@ -823,11 +871,11 @@ class Network(dbo):
         util_network.create_interface(
             'flt-%(floating_address_as_hex)s-o' % subst, 'veth',
             'peer name flt-%(floating_address_as_hex)s-i' % subst)
-        util_process.execute(
+        util_concurrency.execute(
             None,  'ip link set flt-%(floating_address_as_hex)s-i netns %(netns)s' % subst)
         util_network.add_address_to_interface(
             self.uuid, floating_address, '32', 'flt-%(floating_address_as_hex)s-i' % subst)
-        util_process.execute(
+        util_concurrency.execute(
             None,
             'iptables -w 10 -t nat -A PREROUTING -d %(floating_address)s -j DNAT '
             '--to-destination %(inner_address)s' % subst,
@@ -835,12 +883,15 @@ class Network(dbo):
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
-    def remove_floating_ip(self, floating_address, inner_address):
-        self.add_event(EVENT_TYPE_AUDIT, 'removing floating',
-                       extra={
-                           'floating': floating_address,
-                           'inner': inner_address
-                       })
+    def remove_floating_ip(self, floating_address, inner_address, affected_objects):
+        affected_objects.append(self)
+        affected_objects.append(('network', 'floating'))
+        add_event_multi(
+            EVENT_TYPE_AUDIT, affected_objects, 'remove floating ip',
+            extra={
+                'floating': floating_address,
+                'inner': inner_address
+            })
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['floating_address_as_hex'] = '%08x' % int(
@@ -848,9 +899,9 @@ class Network(dbo):
         subst['inner_address'] = inner_address
 
         if util_network.check_for_interface('flt-%(floating_address_as_hex)s-o' % subst):
-            util_process.execute(None,
-                                 'ip link del flt-%(floating_address_as_hex)s-o'
-                                 % subst)
+            util_concurrency.execute(
+                None,
+                'ip link del flt-%(floating_address_as_hex)s-o' % subst)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
@@ -860,7 +911,7 @@ class Network(dbo):
             extra={'floating': floating_address})
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
-        util_process.execute(
+        util_concurrency.execute(
             None, 'ip route add %(floating_address)s/32 dev %(vx_bridge)s' % subst)
 
     # NOTE(mikal): this call only works on the network node, the API
@@ -871,7 +922,7 @@ class Network(dbo):
             extra={'floating': floating_address})
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
-        util_process.execute(
+        util_concurrency.execute(
             None, 'ip route del %(floating_address)s/32 dev %(vx_bridge)s' % subst)
 
 

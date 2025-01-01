@@ -13,7 +13,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import eventlog
 from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
@@ -32,21 +32,27 @@ class RecordedOperation():
         self.start_time = time.time()
         return self
 
-    def __exit__(self, *args):
-        duration = time.time() - self.start_time
+    def __exit__(self, exc_type, exc_val, traceback):
+        duration = round(time.time() - self.start_time, 2)
 
         if duration < self.threshold:
             return
+
+        message = f'{self.operation} finished'
+        if exc_val:
+            message += f' ({str(exc_type)} exception raised)'
 
         object_type, object_uuid = self.unique_label()
         if object_uuid:
             if object_type:
                 eventlog.add_event(EVENT_TYPE_STATUS, object_type, object_uuid,
-                                   '%s complete' % self.operation, duration)
+                                   message, duration)
             else:
                 LOG.with_fields({
+                    'operation': self.operation,
                     'label': self.object,
-                    'duration': duration}).info('Finish %s', self.operation)
+                    'duration': duration
+                }).info(message)
 
     def unique_label(self):
         if self.object:
@@ -144,7 +150,7 @@ def link_or_copy(source, destination):
     try:
         os.link(source, destination)
     except OSError:
-        util_process.execute([], f'cp {source} {destination}')
+        util_concurrency.execute([], f'cp {source} {destination}')
 
     pathlib.Path(destination).touch(exist_ok=True)
 

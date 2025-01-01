@@ -81,8 +81,10 @@ class Scheduler:
         self.refresh_metrics()
 
     def refresh_metrics(self):
+        self.log.debug('Refreshing metrics')
         self.metrics = get_active_node_metrics()
         self.metrics_updated = time.time()
+        self.log.debug(f'Have metrics for {len(self.metrics)} nodes')
 
     def _has_reasonable_queue_state(self, log_ctx, node):
         waiting = self.metrics[node].get('node_queue_waiting', 0)

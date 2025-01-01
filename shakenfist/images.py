@@ -24,7 +24,7 @@ from shakenfist.eventlog import add_event_multi
 from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -292,7 +292,7 @@ class ImageFetchHelper:
                 cache_path = os.path.join(
                     config.STORAGE_PATH, 'image_cache', b.uuid)
                 with util_general.RecordedOperation('decompress image', self.instance):
-                    util_process.execute(
+                    util_concurrency.execute(
                         [lock], f'gunzip -k -q -c {blob_path} > {cache_path}')
                 blob_path = cache_path
 

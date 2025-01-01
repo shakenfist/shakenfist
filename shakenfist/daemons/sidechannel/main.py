@@ -1,17 +1,19 @@
 import base64
 import os
 import select
-import signal
+import sys
+import threading
 import time
 import uuid
 
-import setproctitle
+import pyprctl
 from shakenfist_agent import protocol
 from shakenfist_utilities import logs  # noreorder
 from versions_comparison import Comparison
 
 from shakenfist import blob
 from shakenfist import constants
+from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import instance
 from shakenfist.agentoperation import AgentOperation
@@ -20,7 +22,7 @@ from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -59,10 +61,11 @@ def _sanitize_packet(in_packet):
     return out_packet
 
 
-class Monitor(daemon.Daemon):
-    def __init__(self, name):
-        super().__init__(name)
-        self.monitors = {}
+class SideChannelJob(util_concurrency.Job):
+    def __init__(self, instance_uuid):
+        super().__init__()
+        self.instance_uuid = instance_uuid
+        self.abort_path = f'/run/sf-sidechannel-{instance_uuid}.abort'
 
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
@@ -303,10 +306,13 @@ class Monitor(daemon.Daemon):
 
         os.unlink(blob_path + '.partial')
 
-    def single_instance_monitor(self, instance_uuid):
-        setproctitle.setproctitle('sf-sidechannel-%s' % instance_uuid)
+    def execute(self):
+        etcd.reset_client()
+        pyprctl.set_name(self.instance_uuid)
+        LOG.debug(
+            f'This sidechannel thread is handling instance {self.instance_uuid}')
 
-        self.instance = instance.Instance.from_db(instance_uuid)
+        self.instance = instance.Instance.from_db(self.instance_uuid)
         if not self.instance:
             return
         if 'sf-agent' not in self.instance.side_channels:
@@ -318,7 +324,7 @@ class Monitor(daemon.Daemon):
         self.instance.agent_state = constants.AGENT_NEVER_TALKED
         self.system_boot_time = 0
         self.last_data = time.time()
-        self.log = LOG.with_fields({'instance': instance_uuid})
+        self.log = LOG.with_fields({'instance': self.instance_uuid})
 
         # We use the existence of a console.log file in the instance directory
         # to indicate the instance has been created. This will be true even if
@@ -358,7 +364,7 @@ class Monitor(daemon.Daemon):
                 'unique': str(time.time())
                 })
 
-            while not self.exit.is_set():
+            while not os.path.exists(self.abort_path):
                 for packet in self._await_client():
                     self.log.with_fields({'packet': packet}).error(
                         'Unexpected sidechannel client packet during startup, ignoring')
@@ -395,13 +401,13 @@ class Monitor(daemon.Daemon):
         if self.instance_ready == constants.AGENT_TOO_OLD:
             self.instance.add_event(
                 EVENT_TYPE_AUDIT, 'instance agent is too old, not executing commands')
-            while not self.exit.is_set():
+            while not os.path.exists(self.abort_path):
                 time.sleep(1)
 
         # Spin reading packets and responding until we see an error or are asked
         # to exit.
         try:
-            while not self.exit.is_set():
+            while not os.path.exists(self.abort_path):
                 for packet in self._await_client():
                     self.log.with_fields({'packet': packet}).error(
                         'Unexpected sidechannel client packet')
@@ -584,29 +590,53 @@ class Monitor(daemon.Daemon):
                  'connection setup, restarting channel'), extra={'error': str(e)})
             return
 
+
+class Monitor(daemon.Daemon):
+    def __init__(self, name):
+        super().__init__(name)
+        self.monitors = {}
+
     def reap_single_instance_monitors(self):
         all_monitors = list(self.monitors.keys())
         for instance_uuid in all_monitors:
-            if not self.monitors[instance_uuid].is_alive():
-                self.monitors[instance_uuid].join(1)
-                LOG.info('Reaped dead sidechannel monitor with pid %d'
-                         % self.monitors[instance_uuid].pid)
+            t = self.monitors[instance_uuid]['thread']
+            if not t.is_alive():
+                t.join(1)
+                LOG.info(
+                    f'Reaped dead sidechannel monitor with ident {t.ident}')
                 eventlog.add_event(
                     EVENT_TYPE_AUDIT, 'instance', instance_uuid,
                     'sidechannel monitor ended')
                 del self.monitors[instance_uuid]
 
-    def run(self):
-        LOG.info('Starting')
-        shutdown_commenced = 0
-        running = True
+    def _request_all_threads_exit(self):
+        LOG.info('Requesting all threads exit')
+        all_monitors = self.monitors.keys()
+        for instance_uuid in all_monitors:
+            self._request_thread_exit(instance_uuid)
+
+    def _request_thread_exit(self, instance_uuid):
+        t = self.monitors[instance_uuid]
+        t['object'].exit.set()
+        eventlog.add_event(
+            EVENT_TYPE_AUDIT, 'instance', instance_uuid,
+            'sidechannel monitor instructed to exit')
+        self.monitors[instance_uuid]['thread'].join(0.5)
+
+        if not t['thread'].is_alive():
+            del self.monitors[instance_uuid]
+            eventlog.add_event(
+                EVENT_TYPE_AUDIT, 'instance', instance_uuid,
+                'sidechannel monitor finished')
+
+    def _run_inner(self):
         instance_sidechannel_cache = {}
 
-        while True:
+        while not os.path.exists(self.abort_path):
             try:
                 self.reap_single_instance_monitors()
 
-                if not self.exit.is_set():
+                if not os.path.exists(self.abort_path):
                     # Audit desired self.monitors
                     extra_instances = list(self.monitors.keys())
                     missing_instances = []
@@ -643,67 +673,46 @@ class Monitor(daemon.Daemon):
                         if 'sf-agent' not in instance_sidechannel_cache[instance_uuid]:
                             continue
 
-                        p = util_process.fork(
-                            self.single_instance_monitor, [instance_uuid],
-                            'sidechannel-new')
+                        sc_obj = SideChannelJob(instance_uuid)
+                        sc_thread = threading.Thread(
+                            target=sc_obj.run, daemon=True, name=instance_uuid)
+                        sc_thread.start()
 
-                        self.monitors[instance_uuid] = p
+                        self.monitors[instance_uuid] = {
+                            'object': sc_obj,
+                            'thread': sc_thread,
+                            'instance_uuid': instance_uuid
+                        }
                         eventlog.add_event(
                             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
                             'sidechannel monitor started')
 
                     # Cleanup extra monitors
                     for instance_uuid in extra_instances:
-                        p = self.monitors[instance_uuid]
-                        try:
-                            os.kill(p.pid, signal.SIGTERM)
-                            self.monitors[instance_uuid].join(1)
-                        except Exception:
-                            pass
+                        self._request_thread_exit(instance_uuid)
 
-                        del self.monitors[instance_uuid]
-                        eventlog.add_event(
-                            EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-                            'sidechannel monitor finished')
-
-                elif len(self.monitors) > 0:
-                    if running:
-                        shutdown_commenced = time.time()
-                        for instance_uuid in self.monitors:
-                            pid = self.monitors[instance_uuid].pid
-                            try:
-                                LOG.info('Sent SIGTERM to sidechannel-%s (pid %s)'
-                                         % (instance_uuid, pid))
-                                os.kill(pid, signal.SIGTERM)
-                            except ProcessLookupError:
-                                pass
-                            except OSError as e:
-                                LOG.warn('Failed to send SIGTERM to sidechannel-%s: %s'
-                                         % (instance_uuid, e))
-
-                        running = False
-
-                    if time.time() - shutdown_commenced > 10:
-                        LOG.warning('We have taken more than ten seconds to shut down')
-                        LOG.warning('Dumping thread traces')
-                        for instance_uuid in self.monitors:
-                            pid = self.monitors[instance_uuid].pid
-                            LOG.warning('sidechannel-%s daemon still running (pid %d)'
-                                        % (instance_uuid, pid))
-                            try:
-                                os.kill(pid, signal.SIGUSR1)
-                            except ProcessLookupError:
-                                pass
-                            except OSError as e:
-                                LOG.warn('Failed to send SIGUSR1 to sidechannel-%s: %s'
-                                         % (instance_uuid, e))
-
-                else:
-                    break
-
-                self.exit.wait(1)
+                    self.idle(1)
 
             except Exception as e:
                 util_general.ignore_exception('sidechannel monitor', e)
 
-        LOG.info('Terminated')
+        LOG.info('Stopping')
+
+        while self.monitors:
+            LOG.info('There are {len(self.monitors)} threads remaining')
+            self._request_all_threads_exit()
+            if self(self.monitors):
+                time.sleep(5)
+
+        LOG.info('There are {len(self.monitors)} threads remaining')
+        LOG.info('Stopped')
+
+
+def main():
+    daemon.write_pid_file('sidechannel')
+    m = Monitor('sidechannel')
+    m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

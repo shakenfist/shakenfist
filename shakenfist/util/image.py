@@ -9,7 +9,7 @@ from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist.config import config
 from shakenfist.node import Node
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
@@ -49,8 +49,8 @@ def identify(path):
     if not os.path.exists(path):
         return {}
 
-    out, _ = util_process.execute(None, 'qemu-img info --force-share %s' % path,
-                                  suppress_command_logging=True)
+    out, _ = util_concurrency.execute(
+        None, 'qemu-img info --force-share %s' % path, suppress_command_logging=True)
 
     data = {}
     for line in out.split('\n'):
@@ -104,22 +104,22 @@ def create_cow(locks, cache_file, disk_file, disk_size):
 
     if disk_size:
         qemu_command += ' %(disk_size)dG'
-        util_process.execute(
+        util_concurrency.execute(
             locks, qemu_command % {
                 'cache_file': cache_file,
                 'cluster_size': constants.QCOW2_CLUSTER_SIZE,
                 'disk_file': disk_file,
                 'disk_size': int(disk_size)
             },
-            iopriority=util_process.PRIORITY_LOW)
+            iopriority=util_concurrency.PRIORITY_LOW)
     else:
-        util_process.execute(
+        util_concurrency.execute(
             locks, qemu_command % {
                 'cache_file': cache_file,
                 'cluster_size': constants.QCOW2_CLUSTER_SIZE,
                 'disk_file': disk_file
             },
-            iopriority=util_process.PRIORITY_LOW)
+            iopriority=util_concurrency.PRIORITY_LOW)
 
 
 def create_qcow2(locks, cache_file, disk_file, disk_size=None):
@@ -128,15 +128,15 @@ def create_qcow2(locks, cache_file, disk_file, disk_size=None):
     if os.path.exists(disk_file):
         return
 
-    util_process.execute(
+    util_concurrency.execute(
         locks,
         'qemu-img convert -t none -o cluster_size=%s -O qcow2 %s %s -c'
         % (constants.QCOW2_CLUSTER_SIZE, cache_file, disk_file),
-        iopriority=util_process.PRIORITY_LOW)
+        iopriority=util_concurrency.PRIORITY_LOW)
     if disk_size:
-        util_process.execute(
+        util_concurrency.execute(
             locks, 'qemu-img resize %s %dG' % (disk_file, int(disk_size)),
-            iopriority=util_process.PRIORITY_LOW)
+            iopriority=util_concurrency.PRIORITY_LOW)
 
 
 def create_blank(locks, disk_file, disk_size):
@@ -145,10 +145,10 @@ def create_blank(locks, disk_file, disk_size):
     if os.path.exists(disk_file):
         return
 
-    util_process.execute(
+    util_concurrency.execute(
         locks, 'qemu-img create -o cluster_size=%s -f qcow2 %s %sG'
         % (constants.QCOW2_CLUSTER_SIZE, disk_file, disk_size),
-        iopriority=util_process.PRIORITY_LOW)
+        iopriority=util_concurrency.PRIORITY_LOW)
 
 
 def snapshot(locks, source, destination, thin=False):
@@ -185,8 +185,9 @@ def snapshot(locks, source, destination, thin=False):
             'backing': backing_uuid_with_extension
         }
 
-        util_process.execute(locks, ' '.join([cmd, source, temporary_location]),
-                             iopriority=util_process.PRIORITY_LOW, cwd=backing_path)
+        util_concurrency.execute(
+            locks, ' '.join([cmd, source, temporary_location]),
+            iopriority=util_concurrency.PRIORITY_LOW, cwd=backing_path)
 
         # TODO(mikal): its likely this move should be done with a low IO priority?
         shutil.move(temporary_location, destination)
@@ -203,6 +204,7 @@ def snapshot(locks, source, destination, thin=False):
         'cluster_size': constants.QCOW2_CLUSTER_SIZE
     }
 
-    util_process.execute(locks, ' '.join([cmd, source, destination]),
-                         iopriority=util_process.PRIORITY_LOW)
+    util_concurrency.execute(
+        locks, ' '.join([cmd, source, destination]),
+        iopriority=util_concurrency.PRIORITY_LOW)
     return None

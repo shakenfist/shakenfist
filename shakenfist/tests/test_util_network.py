@@ -16,7 +16,7 @@ class FakeConfigNormalNode(BaseSettings):
 
 
 class UtilTestCase(base.ShakenFistTestCase):
-    @mock.patch('shakenfist.util.process.execute',
+    @mock.patch('shakenfist.util.concurrency.execute',
                 return_value=(None, 'Device "banana0" does not exist.'))
     def test_check_for_interface_missing_interface(self, mock_execute):
         found = util_network.check_for_interface('banana0')
@@ -26,7 +26,7 @@ class UtilTestCase(base.ShakenFistTestCase):
             check_exit_code=[0, 1], namespace=None, suppress_command_logging=True)
 
     @mock.patch(
-        'shakenfist.util.process.execute',
+        'shakenfist.util.concurrency.execute',
         return_value=(
             'eth0: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500\n'
             'inet 172.17.0.1  netmask 255.255.0.0  broadcast 172.17.255.255\n'
@@ -44,7 +44,7 @@ class UtilTestCase(base.ShakenFistTestCase):
             check_exit_code=[0, 1], namespace=None, suppress_command_logging=True)
 
     @mock.patch(
-        'shakenfist.util.process.execute',
+        'shakenfist.util.concurrency.execute',
         return_value=(None, 'Device "banana0" does not exist.'))
     def test_get_interface_addresses_missing_interface(self, mock_execute):
         found = list(util_network.get_interface_addresses('eth0'))
@@ -54,7 +54,7 @@ class UtilTestCase(base.ShakenFistTestCase):
             check_exit_code=[0, 1], namespace=None)
 
     @mock.patch(
-        'shakenfist.util.process.execute',
+        'shakenfist.util.concurrency.execute',
         return_value=(
             """[ {},{
         "ifindex": 19,
@@ -89,7 +89,7 @@ class UtilTestCase(base.ShakenFistTestCase):
             check_exit_code=[0, 1], namespace=None)
 
     @mock.patch(
-        'shakenfist.util.process.execute',
+        'shakenfist.util.concurrency.execute',
         return_value=(
             """[ {},{
         "ifindex": 19,
@@ -125,7 +125,7 @@ class UtilTestCase(base.ShakenFistTestCase):
             check_exit_code=[0, 1], namespace='bananarama')
 
     @mock.patch(
-        'shakenfist.util.process.execute',
+        'shakenfist.util.concurrency.execute',
         return_value=('default via 192.168.1.247 dev enx8cae4cf14c31 proto dhcp metric 100\n'
                       'default via 192.168.1.247 dev wlp2s0 proto dhcp metric 600\n',
                       ''))
@@ -135,20 +135,20 @@ class UtilTestCase(base.ShakenFistTestCase):
         mock_execute.assert_called_with(
             None, 'ip route list default', namespace='mynamespace')
 
-    @mock.patch('shakenfist.util.process.execute')
+    @mock.patch('shakenfist.util.concurrency.execute')
     def test_create_interface_bridge(self, mock_execute):
         util_network.create_interface('eth0', 'bridge', '')
         mock_execute.assert_called_with(
             None, 'ip link add eth0 mtu 7950 type bridge ')
 
-    @mock.patch('shakenfist.util.process.execute')
+    @mock.patch('shakenfist.util.concurrency.execute')
     def test_create_interface_bridge_truncates(self, mock_execute):
         util_network.create_interface(
             'eth0rjkghjkfshgjksfhdjkghfdsjkg', 'bridge', '')
         mock_execute.assert_called_with(
             None, 'ip link add eth0rjkghjkfshg mtu 7950 type bridge ')
 
-    @mock.patch('shakenfist.util.process.execute')
+    @mock.patch('shakenfist.util.concurrency.execute')
     def test_create_interface_vxlan(self, mock_execute):
         util_network.create_interface(
             'vxlan1', 'vxlan', 'id 123 dev eth0 dstport 0')
@@ -156,7 +156,7 @@ class UtilTestCase(base.ShakenFistTestCase):
             None,
             'ip link add vxlan1 mtu 7950 type vxlan id 123 dev eth0 dstport 0')
 
-    @mock.patch('shakenfist.util.process.execute')
+    @mock.patch('shakenfist.util.concurrency.execute')
     def test_create_interface_veth(self, mock_execute):
         util_network.create_interface(
             'veth-foo-o', 'veth', 'peer name veth-foo-i')
@@ -165,7 +165,7 @@ class UtilTestCase(base.ShakenFistTestCase):
             'ip link add veth-foo-o mtu 7950 type veth peer name veth-foo-i')
 
     @mock.patch(
-        'shakenfist.util.process.execute',
+        'shakenfist.util.concurrency.execute',
         return_value=(
             'Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)\n'
             ' pkts bytes target     prot opt in     out     source               destination\n'

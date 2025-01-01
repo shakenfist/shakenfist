@@ -33,59 +33,65 @@ class NoopLock(Lock):
         pass
 
 
-VERSION_CACHE = None
+VERSION_CACHE_MINIMUM = None
+VERSION_CACHE_MAXIMUM = None
 VERSION_CACHE_AGE = 0
 OBJECT_NAMES = ['agentoperation', 'artifact', 'blob', 'dhcp', 'instance', 'ipam',
                 'namespace', 'network', 'networkinterface', 'node', 'upload']
 
 
-def get_minimum_object_version(objname):
-    global VERSION_CACHE
+def _maintain_version_cache(max_cache_age):
+    global VERSION_CACHE_MINIMUM
+    global VERSION_CACHE_MAXIMUM
     global VERSION_CACHE_AGE
 
-    if not VERSION_CACHE:
-        VERSION_CACHE = {}
-    elif time.time() - VERSION_CACHE_AGE > 300:
-        VERSION_CACHE = {}
-    elif objname in VERSION_CACHE:
-        return VERSION_CACHE[objname]
+    if not VERSION_CACHE_MINIMUM or not VERSION_CACHE_MAXIMUM:
+        VERSION_CACHE_MINIMUM = {}
+        VERSION_CACHE_MAXIMUM = {}
+    elif time.time() - VERSION_CACHE_AGE > max_cache_age:
+        VERSION_CACHE_MINIMUM = {}
+        VERSION_CACHE_MAXIMUM = {}
+    else:
+        # Cache up to date
+        return
 
     metrics = {}
 
     # Ignore metrics for deleted nodes, but include nodes in an error state
     # as they may return.
-    for k, d in etcd.get_all('metrics', None):
-        node_name = d['fqdn']
-        d['metrics']['metrics_age'] = time.time() - d.get('timestamp', 0)
-
-        # Discard very old metrics
-        if d['metrics']['metrics_age'] > 24 * 7 * 3600:
-            LOG.with_fields({
-                'node_name': node_name,
-                'from_key': k,
-                'metrics_age': d['metrics']['metrics_age']
-            }).debug('Ignoring very old metrics entry')
+    for node_uuid in cache.read_object_state_cache_many(
+            'node', [DatabaseBackedObject.STATE_INITIAL,
+                     DatabaseBackedObject.STATE_CREATED,
+                     'degraded']):
+        n = etcd.get('node', None, node_uuid)
+        if not n:
             continue
 
-        state = etcd.get('attribute/node', node_name, 'state')
-        if state and state['value'] != DatabaseBackedObject.STATE_DELETED:
-            metrics[node_name] = d['metrics']
-            LOG.with_fields({
-                'node_name': node_name,
-                'from_key': k,
-                'metrics_age': d['metrics']['metrics_age']
-            }).debug('Considering metrics entry')
-        else:
-            LOG.with_fields({
-                'node_name': node_name,
-                'from_key': k,
-                'metrics_age': d['metrics']['metrics_age']
-            }).debug('Ignoring metrics entry for deleted node')
+        node_name = n['fqdn']
+        d = etcd.get('metrics', n['fqdn'], None)
+        if not d:
+            continue
+
+        d['metrics']['metrics_age'] = \
+            round(time.time() - d.get('timestamp', 0), 2)
+        log = LOG.with_fields({
+            'node_name': node_name,
+            'metrics_age': d['metrics']['metrics_age']
+        })
+
+        # Discard very old metrics
+        if d['metrics']['metrics_age'] > 300:
+            log.warning('Ignoring very old metrics entry for active node')
+            continue
+
+        metrics[node_name] = d['metrics']
+        log.debug('Considering metrics entry')
 
     for possible_objname in OBJECT_NAMES:
         nodes_by_version = defaultdict(list, [])
         node_metric_age = {}
         minimum = inf
+        maximum = -1
 
         for node_name in metrics:
             node_metric_age[f'metrics age {node_name}'] = \
@@ -93,21 +99,30 @@ def get_minimum_object_version(objname):
             ver = metrics[node_name].get('object_version_%s' % possible_objname)
             if ver:
                 minimum = min(minimum, ver)
+                maximum = max(maximum, ver)
                 nodes_by_version[f'version {ver}'].append(node_name)
             else:
                 nodes_by_version['no version reported'].append(node_name)
 
         LOG.with_fields(nodes_by_version).with_fields(node_metric_age).with_fields({
-            'object_type': possible_objname}).debug('Object versions reported')
-        VERSION_CACHE[possible_objname] = minimum
+            'object_type': possible_objname,
+            'minimum': minimum,
+            'maximum': maximum
+        }).debug('Object versions reported')
+        VERSION_CACHE_MINIMUM[possible_objname] = minimum
+        VERSION_CACHE_MAXIMUM[possible_objname] = maximum
 
-    if VERSION_CACHE[objname] == inf:
-        LOG.with_fields({
-            'object_type': possible_objname
-        }).debug('No object versions reported, so discarding version cache')
-    else:
-        VERSION_CACHE_AGE = time.time()
-    return VERSION_CACHE[objname]
+    VERSION_CACHE_AGE = time.time()
+
+
+def get_minimum_object_version(objname, max_cache_age=300):
+    _maintain_version_cache(max_cache_age)
+    return VERSION_CACHE_MINIMUM.get(objname, inf)
+
+
+def get_maximum_object_version(objname, max_cache_age=300):
+    _maintain_version_cache(max_cache_age)
+    return VERSION_CACHE_MAXIMUM.get(objname, -1)
 
 
 class DatabaseBackedObject:
@@ -219,7 +234,10 @@ class DatabaseBackedObject:
                     log_as_error=True)
             return None
 
-        if 'uuid' not in static_values:
+        # Ignore old versions of objects for this check, because namespaces
+        # back in the day had neither a version or a uuid.
+        if (static_values.get('version') == cls.current_version and
+                'uuid' not in static_values):
             LOG.with_fields(static_values).with_fields(
                 {
                     'object_type': cls.object_type,
@@ -398,18 +416,23 @@ class DatabaseBackedObject:
     # Properties common to all objects which are routed to attributes
     @property
     def state(self):
-        db_data = self._db_get_attribute('state')
+        return self._state_read(state_attribute_name='state')
+
+    def _state_read(self, state_attribute_name='state'):
+        db_data = self._db_get_attribute(state_attribute_name)
         if not db_data:
             return State(None, 0)
         return State(**db_data)
 
-    def _state_update(self, new_value, skip_transition_validation=False):
-        with self.get_lock_attr('state', 'State update'):
-            orig = self.state
+    def _state_update(self, new_value, skip_transition_validation=False,
+                      state_attribute_name='state', message=None):
+        orig = self._state_read(state_attribute_name=state_attribute_name)
 
-            if orig.value == new_value:
-                return
+        if orig.value == new_value:
+            return
 
+        # Only standard states have validation right now
+        if state_attribute_name == 'state':
             if orig.value == self.STATE_DELETED:
                 LOG.with_fields(
                     {
@@ -419,7 +442,8 @@ class DatabaseBackedObject:
                         'new state': new_value
                     }).warn('Objects do not undelete')
                 raise exceptions.InvalidStateException(
-                    'Invalid state change from %s to %s for object=%s uuid=%s',
+                    'Invalid state change from %s to %s for '
+                    'object=%s uuid=%s',
                     orig.value, new_value, self.object_type, self.uuid)
 
             # Ensure state change is valid
@@ -430,15 +454,17 @@ class DatabaseBackedObject:
 
                 if new_value not in self.state_targets.get(orig.value, []):
                     raise exceptions.InvalidStateException(
-                        'Invalid state change from %s to %s for object=%s uuid=%s',
+                        'Invalid state change from %s to %s for '
+                        'object=%s uuid=%s',
                         orig.value, new_value, self.object_type, self.uuid)
 
-            new_state = State(new_value, time.time())
-            self._db_set_attribute('state', new_state)
+        new_state = State(new_value, time.time(), message=message)
+        self._db_set_attribute(state_attribute_name, new_state)
 
-            if not self.__in_memory_only:
-                cache.update_object_state_cache(
-                    self.object_type, self.uuid, orig.value, new_value)
+        # Only standard states are cached right now
+        if not self.__in_memory_only and state_attribute_name == 'state':
+            cache.update_object_state_cache(
+                self.object_type, self.uuid, orig.value, new_value)
 
     @state.setter
     def state(self, new_value):
@@ -549,9 +575,10 @@ def namespace_filter(namespace, o):
 
 
 class State:
-    def __init__(self, value, update_time):
+    def __init__(self, value, update_time, message=None):
         self.__value = value
         self.__update_time = update_time
+        self.__message = message
 
     def __repr__(self):
         return 'State(' + str(self.obj_dict()) + ')'
@@ -570,8 +597,15 @@ class State:
     def update_time(self):
         return self.__update_time
 
+    @property
+    def message(self):
+        return self.__message
+
     def obj_dict(self):
-        return {
+        retval = {
             'value': self.__value,
-            'update_time': self.__update_time,
+            'update_time': self.__update_time
         }
+        if self.__message:
+            retval['message'] = self.__message
+        return retval

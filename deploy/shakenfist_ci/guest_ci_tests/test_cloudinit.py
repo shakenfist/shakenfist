@@ -77,7 +77,7 @@ sudo echo 'banana' >  /tmp/output"""
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/ubuntu-2004',
+                    'base': 'sf://upload/system/debian-12',
                     'type': 'disk'
                 }
             ], None, None)

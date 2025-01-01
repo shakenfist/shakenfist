@@ -31,7 +31,7 @@ from shakenfist.tasks import DestroyNetworkTask
 from shakenfist.tasks import RouteAddressTask
 from shakenfist.tasks import UnrouteAddressTask
 from shakenfist.util.access_tokens import parse_jwt_identity
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -543,7 +543,7 @@ class NetworkPingEndpoint(sf_api.Resource):
 
         network_from_db.add_event(
             EVENT_TYPE_AUDIT, 'ping request from REST API')
-        out, err = util_process.execute(
+        out, err = util_concurrency.execute(
             None, f'ip netns exec {network_from_db.uuid} ping -c 10 {address}',
             check_exit_code=[0, 1])
         return {

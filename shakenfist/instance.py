@@ -97,12 +97,25 @@ class Instance(dbo):
     STATE_CREATED_ERROR = 'created-error'
     STATE_DELETE_WAIT_ERROR = 'delete-wait-error'
 
-    ACTIVE_STATES = {dbo.STATE_INITIAL, STATE_INITIAL_ERROR, STATE_PREFLIGHT,
-                     STATE_PREFLIGHT_ERROR, dbo.STATE_CREATING, STATE_CREATING_ERROR,
-                     dbo.STATE_CREATED, dbo.STATE_DELETE_WAIT, STATE_CREATED_ERROR,
-                     dbo.STATE_ERROR}
-    HEALTHY_STATES = {dbo.STATE_INITIAL, STATE_PREFLIGHT, dbo.STATE_CREATING,
-                      dbo.STATE_CREATED}
+    ACTIVE_STATES = {
+        dbo.STATE_INITIAL, STATE_INITIAL_ERROR, STATE_PREFLIGHT,
+        STATE_PREFLIGHT_ERROR, dbo.STATE_CREATING, STATE_CREATING_ERROR,
+        dbo.STATE_CREATED, dbo.STATE_DELETE_WAIT, STATE_CREATED_ERROR,
+        dbo.STATE_ERROR
+    }
+    HEALTHY_STATES = {
+        dbo.STATE_INITIAL, STATE_PREFLIGHT, dbo.STATE_CREATING,
+        dbo.STATE_CREATED
+    }
+    TERMINAL_STATES = {
+        dbo.STATE_DELETED, dbo.STATE_DELETE_WAIT, dbo.STATE_HARD_DELETED,
+        dbo.STATE_ERROR, STATE_INITIAL_ERROR, STATE_PREFLIGHT_ERROR,
+        STATE_CREATING_ERROR, STATE_CREATED_ERROR, STATE_DELETE_WAIT_ERROR
+    }
+    ERROR_STATES = {
+        dbo.STATE_ERROR, STATE_INITIAL_ERROR, STATE_PREFLIGHT_ERROR,
+        STATE_CREATING_ERROR, STATE_CREATED_ERROR, STATE_DELETE_WAIT_ERROR
+    }
 
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
@@ -412,6 +425,11 @@ class Instance(dbo):
     @property
     def instance_path(self):
         return os.path.join(config.STORAGE_PATH, 'instances', self.uuid)
+
+    # Calculated properties
+    @property
+    def domain_xml_path(self):
+        return os.path.join(self.instance_path, 'original_domain.xml')
 
     # Values routed to attributes, writes are via helper methods.
     @property
@@ -1220,7 +1238,7 @@ class Instance(dbo):
         # Libvirt re-writes the domain XML once loaded, so we store the XML
         # as generated as well so that we can debug. Note that this is _not_
         # the XML actually used by libvirt.
-        with open(os.path.join(self.instance_path, 'original_domain.xml'), 'w') as f:
+        with open(self.domain_xml_path, 'w') as f:
             f.write(x)
 
         return x
@@ -1248,65 +1266,105 @@ class Instance(dbo):
         # github. Additionally, sometimes ports are not released correctly by a
         # domain destroy, which means we need to reassign on domain start.
         if not self._power_on_inner():
-            attempts = 0
+            attempts = 1
             while not self._power_on_inner() and attempts < 5:
-                self.log.warning(
-                    'Instance required an additional attempt to power on')
-                time.sleep(5)
+                self.add_event(
+                    EVENT_TYPE_STATUS,
+                    'instance required an additional attempt to power on',
+                    extra={'attempt': attempts})
+                time.sleep(1)
                 attempts += 1
 
             self.agent_state = constants.AGENT_NEVER_TALKED
 
+    def _power_on_retry_prep(self, domain, message,
+                             needs_port_reallocation=False):
+        if needs_port_reallocation:
+            message += ' (TCP ports reallocated)'
+        self.add_event(
+            EVENT_TYPE_STATUS, 'instance power on requires new attempt',
+            extra={'message': message})
+
+        if needs_port_reallocation:
+            self.deallocate_instance_ports()
+            self.allocate_instance_ports()
+
+        # We need to delete the nvram file before we can undefine
+        # the domain. This will be recreated by libvirt on the next
+        # attempt.
+        nvram_path = os.path.join(self.instance_path, 'nvram')
+        if os.path.exists(nvram_path):
+            os.unlink(nvram_path)
+
+        if domain:
+            domain.undefine()
+
     def _power_on_inner(self):
         with util_libvirt.LibvirtConnection() as lc:
-            inst = lc.get_domain_from_sf_uuid(self.uuid)
-            if not inst:
-                inst = lc.define_xml(self._create_domain_xml())
-                if not inst:
-                    self.enqueue_delete_due_error(
-                        'power on failed to create domain')
-                    raise exceptions.NoDomainException()
+            try:
+                domain = lc.get_domain_from_sf_uuid(self.uuid)
+                if not domain:
+                    domain_xml = self._create_domain_xml()
+                    domain = lc.define_xml(domain_xml)
+                    if not domain:
+                        self.enqueue_delete_due_error(
+                            'power on failed to create domain')
+                        raise exceptions.NoDomainException()
+            except lc.libvirt.libvirtError as e:
+                if str(e).find("Invalid value for attribute 'port' in element "
+                               "'graphics'") != -1:
+                    self._power_on_retry_prep(
+                        None, str(e), needs_port_reallocation=True)
+                    return False
+                else:
+                    self._power_on_retry_prep(
+                        None, f'unhandled instance definition error: {str(e)}',
+                        needs_port_reallocation=True)
+                    return False
 
             try:
-                inst.create()
+                domain.create()
             except lc.libvirt.libvirtError as e:
                 if str(e).startswith('Requested operation is not valid: '
                                      'domain is already running'):
-                    pass
+                    return True
                 elif (str(e).find('Failed to find an available port: '
-                                  'Address already in use') != -1 or
-                      str(e).find('reds_init_socket: binding socket') != -1):
-                    self.add_event(
-                        EVENT_TYPE_STATUS,
-                        'instance ports clash during boot attempt',
-                        extra={'message': str(e)})
-
-                    # Free those ports and pick some new ones
-                    ports = self.ports
-                    self._free_console_port(ports['console_port'])
-                    self._free_console_port(ports['vdi_port'])
-                    self._free_console_port(ports['vdi_tls_port'])
-
-                    # We need to delete the nvram file before we can undefine
-                    # the domain. This will be recreated by libvirt on the next
-                    # attempt.
-                    nvram_path = os.path.join(self.instance_path, 'nvram')
-                    if os.path.exists(nvram_path):
-                        os.unlink(nvram_path)
-
-                    inst.undefine()
-
-                    self.ports = None
-                    self.allocate_instance_ports()
+                                  'Address already in use') != -1):
+                    self._power_on_retry_prep(
+                        domain, str(e), needs_port_reallocation=True)
+                    return False
+                elif str(e).find('reds_init_socket: binding socket') != -1:
+                    self._power_on_retry_prep(
+                        domain, str(e), needs_port_reallocation=True)
+                    return False
+                elif (str(e).find('internal error: process exited while '
+                                  'connecting to monitor') != -1):
+                    self._power_on_retry_prep(
+                        domain, str(e), needs_port_reallocation=False)
                     return False
                 else:
-                    self.add_event(
-                        EVENT_TYPE_AUDIT, 'instance start error',
-                        extra={'message': str(e)})
+                    self._power_on_retry_prep(
+                        None, f'unhandled instance start error: {str(e)}',
+                        needs_port_reallocation=True)
                     return False
 
-            inst.setAutostart(1)
-            self.update_power_state(lc.extract_power_state(inst))
+            try:
+                domain.setAutostart(1)
+            except lc.libvirt.libvirtError as e:
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'instance autostart configuration error',
+                    extra={'message': str(e)})
+                raise e
+
+            try:
+                self.update_power_state(lc.extract_power_state(domain))
+            except lc.libvirt.libvirtError as e:
+                self.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'failed to determine instance power state during initial power on',
+                    extra={'message': str(e)})
+                raise e
+
             self.add_event(EVENT_TYPE_AUDIT, 'poweron')
             return True
 

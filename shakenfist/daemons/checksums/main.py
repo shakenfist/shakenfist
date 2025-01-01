@@ -5,9 +5,10 @@
 # more bytes of blob on a node than we can checksum before the checksum renewal
 # interval, we will never catch up. Our blob store isn't intended to be huge, so
 # that is ok for now.
+from functools import partial
 import os
 import time
-from functools import partial
+import sys
 
 from shakenfist_utilities import logs  # noreorder
 
@@ -20,11 +21,17 @@ LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.Daemon):
-    def run(self):
-        LOG.info('Starting')
-
+    def _run_inner(self):
+        last_defer_message = 0
         blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
-        while not self.exit.is_set():
+
+        while not os.path.exists(self.abort_path):
+            if not self.cluster_stable():
+                if time.time() - last_defer_message > 10:
+                    LOG.info('Cluster not yet stable, deferring maintenance')
+                    last_defer_message = time.time()
+                continue
+
             for b in blob.Blobs([partial(blob.placement_filter, config.NODE_NAME)]):
                 blob_path = blob.Blob.filepath(b.uuid)
                 if os.path.exists(blob_path):
@@ -44,10 +51,16 @@ class Monitor(daemon.Daemon):
                         if b.verify_size():
                             b.verify_checksum(urgent=False)
 
-                        self.exit.wait(5)
-                        if self.exit.is_set():
-                            break
+                        self.idle(5)
 
-            self.exit.wait(300)
+            self.idle(300)
 
-        LOG.info('Terminated')
+
+def main():
+    daemon.write_pid_file('checksums')
+    m = Monitor('checksums')
+    m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

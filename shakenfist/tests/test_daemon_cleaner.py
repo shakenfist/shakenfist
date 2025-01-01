@@ -2,7 +2,7 @@ from unittest import mock
 
 from shakenfist import instance
 from shakenfist.config import BaseSettings
-from shakenfist.daemons import cleaner
+from shakenfist.daemons.cleaner import main as cleaner_main
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -87,10 +87,10 @@ class CleanerTestCase(base.ShakenFistTestCase):
         self.mock_libvirt = self.libvirt.start()
         self.addCleanup(self.libvirt.stop)
 
-        self.proctitle = mock.patch('setproctitle.setproctitle')
+        self.proctitle = mock.patch('pyprctl.set_name')
         self.mock_proctitle = self.proctitle.start()
         self.addCleanup(self.proctitle.stop)
-        self.config = mock.patch('shakenfist.daemons.cleaner.config',
+        self.config = mock.patch('shakenfist.daemons.cleaner.main.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
@@ -101,12 +101,14 @@ class CleanerTestCase(base.ShakenFistTestCase):
     @mock.patch('os.path.exists', side_effect=fake_exists)
     @mock.patch('time.time', return_value=7)
     @mock.patch('os.listdir', return_value=[])
-    def test_update_power_states(self, mock_listdir, mock_time, mock_exists):
+    @mock.patch('os.unlink')
+    def test_update_power_states(self, mock_unlink, mock_listdir, mock_time,
+                                 mock_exists):
         for id in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
             self.mock_etcd.create_instance(
                 id, id, set_state=instance.Instance.STATE_CREATED)
 
-        m = cleaner.Monitor('cleaner')
+        m = cleaner_main.Monitor('cleaner')
         m._update_power_states()
 
         for id, state in [('running', 'on'),

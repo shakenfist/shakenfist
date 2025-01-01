@@ -86,6 +86,25 @@
         group: root
         mode: u=r,g=r,o=r
 
+    - name: Make /etc/systemd/system-preset/
+      file:
+        path: /etc/systemd/system-preset
+        state: directory
+        mode: "0755"
+
+    - name: Disable auto-starting of dnsmasq on installation
+      copy:
+        content: |
+          disable dnsmasq.service
+        dest: /etc/systemd/system-preset/00-sf-disable-dnsmasq.preset
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Reload systemd
+      service:
+        daemon_reload: yes
+
     - name: Log network and primary node
       debug:
         msg:
@@ -115,7 +134,7 @@
 
     # We install libvirt, even on non-hypervisors, because we use it to track
     # the CPU topology and load of the node.
-    - name: Install non-hypervisor dependencies
+    - name: Install shared dependencies
       apt:
         name:
           - apparmor
@@ -123,12 +142,8 @@
           - bridge-utils
           - build-essential
           - cpu-checker
-          - dnsmasq
-          - dnsmasq-utils
-          - dnsutils
           - git
           - libmagic-dev
-          - libssl-dev
           - libssl-dev
           - libvirt-daemon-system
           - libvirt-dev
@@ -145,10 +160,20 @@
           - pwgen
           - qemu-utils
           - rsyslog
-          - tox
           - unzip
           - xxhash
         state: latest
+
+    - name: Enable desired services
+      service:
+        name: "{{ item }}.service"
+        enabled: yes
+        state: started
+      with_items:
+        - apparmor
+        - libvirtd
+        - prometheus-node-exporter
+        - rsyslog
 
     - name: Create python venv and install Shaken Fist server and agent packages
       shell: |
@@ -161,6 +186,30 @@
       shell: |
         /srv/shakenfist/venv/bin/pip install {{pip_extra}} {{client_package}}
       when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
+
+- hosts: network_node
+  gather_facts: yes
+  connection: ssh
+  become: yes
+
+  tasks:
+    - name: Install network node dependencies
+      apt:
+        name:
+          - dnsmasq
+          - dnsmasq-utils
+        state: latest
+
+    - name: Disable dnsmasq
+      service:
+        name: dnsmasq
+        enabled: no
+        state: stopped
+
+    - name: Remove dnsmasq unit
+      file:
+        path: /usr/lib/systemd/system/dnsmasq.service
+        state: absent
 
 # Setup the TLS CA on the primary
 - hosts: localhost
@@ -450,7 +499,7 @@
         name: systemd-logind
         state: restarted
 
-    - name: Configure journald to not consume heaps of disks
+    - name: Configure journald to not consume heaps of disk
       copy:
         content: |
           [Journal]
@@ -501,11 +550,10 @@
   connection: ssh
 
   tasks:
-    - name: Disable dnsmasq
-      service:
-        name: dnsmasq
-        enabled: no
-        state: stopped
+    - name: Reset failed systemd units
+      shell: |
+        systemctl daemon-reload
+        systemctl reset-failed
 
     - name: Check that we can run KVM
       shell: kvm-ok
@@ -1006,8 +1054,11 @@
         group: root
         mode: u=r,g=r,o=r
 
-    - name: Reload apache
-      shell: apache2ctl graceful
+    - name: Restart apache
+      service:
+        name: apache2
+        enabled: yes
+        state: restarted
 
 - hosts: hypervisors
   any_errors_fatal: true
@@ -1106,27 +1157,65 @@
         mode: u=r,g=r,o=r
       when: not config_stat_result.stat.exists
 
-    - name: Fetch systemd unit template from remote host
-      fetch:
-        src: "{{hostvars['localhost']['template_path']}}/sf.service"
-        dest: /tmp/{{ansible_host}}_sf.service
-        flat: yes
-        fail_on_missing: yes
-
-    - name: Write systemd unit on remote host
+    - name: Write systemd target unit on remote host
       template:
-        src: /tmp/{{ansible_host}}_sf.service
-        dest: /etc/systemd/system/sf.service
+        src: files/sf.target
+        dest: /etc/systemd/system/sf.target
         owner: root
         group: root
         mode: u=r,g=r,o=r
 
-    - name: Remove old systemd units
-      file:
-        dest: /lib/systemd/system/sf.service
-        state: absent
+    - name: Write systemd units on remote host
+      template:
+        src: files/sf.service
+        dest: /etc/systemd/system/sf-{{ item }}.service
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+      with_items:
+        - sentinel-first
+        - sentinel-last
+        - privexec
+        - checksums
+        - cleaner
+        - cluster
+        - net
+        - queues
+        - resources
+        - sidechannel
+        - transfers
 
-    - name: Ensure /var/run/sf exists
+    - name: Write systemd unit for API daemon
+      template:
+        src: files/sf-api.service
+        dest: /etc/systemd/system/sf-api.service
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Write systemd unit for eventlog daemon
+      template:
+        src: files/sf.service
+        dest: /etc/systemd/system/sf-{{ item }}.service
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+      vars:
+        item: eventlog
+      when: inventory_hostname in groups.get('eventlog_node', [])
+
+    # https://stackoverflow.com/questions/64701241/how-do-i-write-ansible-task-for-systemctl-set-default-graphical-target-without
+    - name: Make sure sf.target unit is the default
+      vars:
+        cmdCheck: systemctl get-default | grep -q ^sf.target$
+        cmdSet: systemctl set-default sf.target
+      ansible.builtin.shell:
+        cmd: '{{ cmdCheck }} && exit 0; {{ cmdSet }}; {{ cmdCheck }} && exit 1; exit 2'
+      register: _
+      changed_when: _.rc == 1
+      failed_when: _.rc == 2
+
+    - name: Ensure /var/run/sf exists for gunicorn
       file:
         path: /var/run/sf
         state: directory
@@ -1206,7 +1295,7 @@
       debug:
         msg: "{{etcd_config.stdout}}"
 
-- hosts: hypervisors, network_node, etcd_master, storage
+- hosts: hypervisors, network_node, etcd_master, storage, eventlog_node
   any_errors_fatal: true
   serial: 1
   become: yes
@@ -1215,12 +1304,143 @@
   connection: ssh
 
   tasks:
-    - name: Restart the SF daemon, one node at a time
+    - name: Reload systemd
       service:
-        name: sf
+        daemon_reload: yes
+
+- hosts: eventlog_node
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Ensure the node exists in etcd
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl initialise-node
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_NODE_NAME: "{{node_name}}"
+        SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+
+    - name: Register the eventlog daemon if this is an eventlog node
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl register-daemon eventlog
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_NODE_NAME: "{{node_name}}"
+        SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+      when: inventory_hostname in groups.get('eventlog_node', [])
+
+    # This must happen first to avoid gRPC event errors in the logs on single
+    # machine installs.
+    - name: Restart the eventlog daemon if this node is the eventlog node
+      service:
+        name: "sf-{{ item }}"
         enabled: yes
         state: restarted
-        daemon_reload: yes
+        daemon_reload: no
+      vars:
+        item: eventlog
+      when: inventory_hostname in groups.get('eventlog_node', [])
+
+- hosts: hypervisors, network_node, etcd_master, storage, eventlog_node
+  any_errors_fatal: true
+  serial: 1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Ensure the node exists in etcd
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl initialise-node
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_NODE_NAME: "{{node_name}}"
+        SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+
+    - name: Register the other SF daemons, one node at a time
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl register-daemon {{ item }}
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_NODE_NAME: "{{node_name}}"
+        SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+      with_items:
+        - sentinel-first
+        - sentinel-last
+        - privexec
+        - net
+        - resources
+        - sidechannel
+        - queues
+        - api
+        - checksums
+        - cleaner
+        - cluster
+        - transfers
+
+    # The ordering of units here is to match the order they must start in, not
+    # alphabetical order.
+    - name: Restart the other SF daemons, one node at a time
+      service:
+        name: "sf-{{ item }}"
+        enabled: yes
+        state: restarted
+        daemon_reload: no
+      with_items:
+        - sentinel-first
+        - privexec
+        - net
+        - resources
+        - sidechannel
+        - queues
+        - api
+        - checksums
+        - cleaner
+        - cluster
+        - transfers
+        - sentinel-last
+
+    - name: Make sure sf.target unit is active
+      vars:
+        cmdCheck: systemctl status sf.target
+        cmdSet: systemctl isolate sf.target
+      ansible.builtin.shell:
+        cmd: '{{ cmdCheck }} && exit 0; {{ cmdSet }}; {{ cmdCheck }} && exit 1; exit 2'
+      register: _
+      changed_when: _.rc == 1
+      failed_when: _.rc == 2
+
+    - name: Capture the list of running SF processes
+      shell: |
+        ps -ef | egrep "^root.*sf-"
+      register: sf_processes
+
+    - name: Log SF processes
+      debug:
+        msg: "{{ sf_processes.stdout.split('\n') }}"
+
+    - name: Capture the status of the SF target
+      shell: |
+        systemctl status sf.target
+      register: sf_systemd_status
+
+    - name: Log SF target status
+      debug:
+        msg: "{{ sf_systemd_status.stdout.split('\n') }}"
+
+    - name: Capture the SF target journal
+      shell: |
+        journalctl -u sf.target
+      register: sf_systemd_journal
+
+    - name: Log SF target journal
+      debug:
+        msg: "{{ sf_systemd_journal.stdout.split('\n') }}"
 
 - hosts: etcd_master
   any_errors_fatal: true

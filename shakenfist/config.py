@@ -45,11 +45,6 @@ class SFConfig(BaseSettings):
     ###################
 
     # API Options
-    API_PORT: int = Field(13000, description='Port for the REST API')
-    API_TIMEOUT: int = Field(
-        300,
-        description='How long gunicorn processes can use for a single request'
-    )
     API_ASYNC_WAIT: int = Field(
         15,
         description='How long we wait for an async operation to complete '
@@ -61,14 +56,6 @@ class SFConfig(BaseSettings):
     API_TOKEN_DURATION: int = Field(
         15,
         description='How long in minutes an API token is valid for.'
-    )
-    API_COMMAND_LINE: str = Field(
-        (
-            '/srv/shakenfist/venv/bin/gunicorn --workers %(workers)d --bind 0.0.0.0:%(port)d '
-            '--log-syslog --log-syslog-prefix sf --timeout %(timeout)s --name "%(name)s" '
-            '--pid /var/run/sf/gunicorn.pid --preload shakenfist.external_api.app:app'
-        ),
-        description='The gunicorn command line to use'
     )
     API_ADVERTISED_HOST: str = Field(
         'localhost',

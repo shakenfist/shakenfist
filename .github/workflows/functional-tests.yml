@@ -161,6 +161,7 @@ jobs:
           tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -253,7 +254,7 @@ jobs:
           echo
 
           failed=$(cat ${GITHUB_WORKSPACE}/failed | egrep "^FAIL: " | \
-              sed -z 's/^FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
+              sed -z 's/FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
 
           echo "Failed tests:"
           cat ${GITHUB_WORKSPACE}/failed
@@ -483,6 +484,7 @@ jobs:
           tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -533,7 +535,7 @@ jobs:
                 "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
 
           # Additional images used only by guest CI
-          if [ "${{ matrix.os.stestr_config }}" == "guest-ci.conf"]; then
+          if [ "${{ matrix.os.stestr_config }}" == "guest-ci.conf" ]; then
               ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
                   -o UserKnownHostsFile=/dev/null \
                   ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
@@ -767,6 +769,7 @@ jobs:
               debian@$primary:.
 
       - name: Run getsf installer on primary
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -954,6 +957,7 @@ jobs:
               debian@$primary:.
 
       - name: Run getsf installer on primary
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -1141,6 +1145,7 @@ jobs:
               debian@$primary:.
 
       - name: Run getsf to only install etcd, and then restore a backup
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -1152,6 +1157,7 @@ jobs:
               debian@$primary 'sudo chmod ugo+r /etc/sf/*; . /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-backup restore /srv/ci/backup-0.6.15-20230319'
 
       - name: Run getsf installer on primary
+        timeout-minutes: 30
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
@@ -1363,6 +1369,7 @@ jobs:
     needs:
       - functional_matrix_pr
       - enqueue_pr_comment
+      - sanity_checks
     if: always() && github.event_name != 'merge_group'
     permissions:
       actions: read

@@ -12,6 +12,7 @@ import time
 import uuid
 
 import magic
+from oslo_concurrency import lockutils
 import psutil
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
@@ -46,7 +47,7 @@ from shakenfist.tasks import HashBlobTask
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -298,9 +299,16 @@ class Blob(dbo):
 
     @property
     def ref_count(self):
-        """Counts artifact references to the blob"""
-        count = self._db_get_attribute('ref_count', {'ref_count': 0})
-        return int(count['ref_count'])
+        return int(self.ref_count_with_age['ref_count'])
+
+    @property
+    def ref_count_with_age(self):
+        count = self._db_get_attribute('ref_count', {
+            'ref_count': 0
+        })
+        if 'update_time' not in count:
+            count['update_time'] = time.time()
+        return count
 
     @property
     def transcoded(self):
@@ -377,9 +385,21 @@ class Blob(dbo):
     def ref_count_inc(self, baseobject, count=1):
         with self.get_lock_attr('ref_count', 'Increase reference count'):
             if self.state.value == self.STATE_DELETED:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, [baseobject, self],
+                    'attempt to use a deleted blob',
+                    extra={
+                        'blob_uuid': self.uuid,
+                        f'{baseobject.object_type}_uuid': baseobject.uuid
+                    })
                 raise BlobDeleted(self.uuid)
-            new_count = self.ref_count + count
-            self._db_set_attribute('ref_count', {'ref_count': new_count})
+
+            old_count = self.ref_count
+            new_count = old_count + count
+            self._db_set_attribute('ref_count', {
+                'ref_count': new_count,
+                'update_time': time.time()
+            })
             self.add_event(
                 EVENT_TYPE_MUTATE, 'incremented reference count',
                 extra={
@@ -390,25 +410,11 @@ class Blob(dbo):
                     })
             return new_count
 
-    def _delete_unused(self, new_count):
-        # If no references then the blob cannot be used, therefore delete.
-        if new_count == 0:
-            self.state = self.STATE_DELETED
-
-            for transcoded_blob_uuid in self.transcoded.values():
-                transcoded_blob = Blob.from_db(transcoded_blob_uuid)
-                if transcoded_blob:
-                    transcoded_blob.ref_count_dec(self)
-
-            depends_on = self.depends_on
-            if depends_on:
-                dep_blob = Blob.from_db(depends_on)
-                if dep_blob:
-                    dep_blob.ref_count_dec(self)
-
     def ref_count_dec(self, baseobject, count=1):
         with self.get_lock_attr('ref_count', 'Decrease reference count'):
-            new_count = self.ref_count - 1
+            old_count = self.ref_count
+            new_count = old_count - count
+
             if new_count < 0:
                 new_count = 0
                 self.add_event(
@@ -427,9 +433,25 @@ class Blob(dbo):
                         'reference_count': new_count
                         })
 
-            self._db_set_attribute('ref_count', {'ref_count': new_count})
-            self._delete_unused(new_count)
+            self._db_set_attribute('ref_count', {
+                'ref_count': new_count,
+                'update_time': time.time()
+            })
             return new_count
+
+    def cascading_delete(self):
+        self.state = self.STATE_DELETED
+
+        for transcoded_blob_uuid in self.transcoded.values():
+            transcoded_blob = Blob.from_db(transcoded_blob_uuid)
+            if transcoded_blob:
+                transcoded_blob.ref_count_dec(self)
+
+        depends_on = self.depends_on
+        if depends_on:
+            dep_blob = Blob.from_db(depends_on)
+            if dep_blob:
+                dep_blob.ref_count_dec(self)
 
     def ensure_local(self, locks, instance_object=None,
                      wait_for_other_transfers=True):
@@ -467,7 +489,7 @@ class Blob(dbo):
                     ('no activity on previous partial download in more than '
                      'five minutes. Removing and re-attempting.'),
                     extra={
-                        'partial file age': time.time() - st.st_mtime
+                        'partial file age': round(time.time() - st.st_mtime, 2)
                     })
                 os.unlink(partial_path)
             else:
@@ -478,7 +500,7 @@ class Blob(dbo):
                     EVENT_TYPE_AUDIT, affected_objects,
                     'waiting for existing download to complete',
                     extra={
-                        'partial file age': time.time() - st.st_mtime
+                        'partial file age': round(time.time() - st.st_mtime, 2)
                     }
                 )
                 time.sleep(10)
@@ -495,15 +517,29 @@ class Blob(dbo):
         attempts = 0
         while True:
             try:
-                return self._attempt_transfer(
-                    locks, affected_objects, partial_path, blob_path)
+                with lockutils.external_lock(
+                        f'blob-{self.uuid}-transfer',
+                        lock_path='/tmp', lock_file_prefix='sflock-'):
+                    # Check the blob didn't show up without us
+                    if os.path.exists(blob_path):
+                        self.observe()
+                        return
+
+                    # Attempt a transfer
+                    self._attempt_transfer(
+                        locks, affected_objects, partial_path, blob_path)
+                    return
             except (ConnectionRefusedError, BlobTransferSetupFailed,
                     BlobFetchFailed) as e:
                 attempts += 1
+                time.sleep(10)
                 if attempts > 3:
                     raise BlobFetchFailed(
                         'Repeated attempts to fetch blob failed: %s' % e)
 
+    # This method assumes the caller is holding the 'blob-{self.uuid}-transfer'
+    # external lock. Luckily the only caller right now is the one directly
+    # above here.
     def _attempt_transfer(self, locks, affected_objects, partial_path,
                           blob_path):
         add_event_multi(
@@ -636,7 +672,6 @@ class Blob(dbo):
                 EVENT_TYPE_AUDIT, affected_objects,
                 f'fetching required blob complete {direction_info}')
             self.observe()
-            return total_bytes_received
 
     def request_replication(self, allow_excess=0):
         absent_nodes = list(Nodes([], prefilter='inactive'))
@@ -759,10 +794,10 @@ class Blob(dbo):
         return True
 
     def _get_hash(self, hashtype='sha512', locks=None):
-        hash_out, _ = util_process.execute(
+        hash_out, _ = util_concurrency.execute(
             locks,
             f'{hashtype}sum {Blob.filepath(self.uuid)}',
-            iopriority=util_process.PRIORITY_LOW)
+            iopriority=util_concurrency.PRIORITY_LOW)
         return hash_out.split(' ')[0]
 
     def verify_checksum(self, hash=None, locks=None, urgent=True):

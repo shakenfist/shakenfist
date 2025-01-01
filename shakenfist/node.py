@@ -8,7 +8,10 @@ from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import GiB
+from shakenfist.exceptions import NoSuchDaemon
+from shakenfist.exceptions import NoSuchDaemonState
 from shakenfist.util import general as util_general
 
 
@@ -18,27 +21,50 @@ LOG, _ = logs.setup(__name__)
 class Node(dbo):
     object_type = 'node'
     initial_version = 2
-    current_version = 7
+    current_version = 8
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
     STATE_STOPPING = 'stopping'
     STATE_STOPPED = 'stopped'
+    STATE_DEGRADED = 'degraded'
 
-    ACTIVE_STATES = {dbo.STATE_CREATED}
+    # Note that this list of active states is duplicated in baseobject as well to
+    # avoid a circular import, and if changed must be updated there as well.
+    ACTIVE_STATES = {dbo.STATE_INITIAL, dbo.STATE_CREATED, STATE_DEGRADED}
     INACTIVE_STATES = {dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING}
 
+    # Remember that this list must align with what sf-ctl is called with in
+    # deploy.yml.
+    VALID_DAEMONS = ['eventlog', 'net', 'resources', 'sidechannel',
+                     'queues', 'api', 'checksums', 'cleaner', 'cluster',
+                     'transfers', 'privexec', 'sentinel-first', 'sentinel-last']
+
+    DAEMON_STATE_RUNNING = 'daemon-running'
+    DAEMON_STATE_STOPPING = 'daemon-stopping'
+    DAEMON_STATE_STOPPED = 'daemon-stopped'
+    VALID_DAEMON_STATES = [DAEMON_STATE_RUNNING, DAEMON_STATE_STOPPING,
+                           DAEMON_STATE_STOPPED]
+
     state_targets = {
-        None: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING),
+        None: (dbo.STATE_INITIAL),
+        dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING,
+                            STATE_DEGRADED),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING,
-                            STATE_STOPPING),
+                            STATE_STOPPING, STATE_DEGRADED),
         STATE_STOPPING: (STATE_STOPPED, dbo.STATE_DELETED, dbo.STATE_ERROR,
                          dbo.STATE_CREATED),
-        STATE_STOPPED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        STATE_STOPPED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR,
+                        STATE_DEGRADED),
+
+        # Some (but not all) components are not running correctly on the node
+        STATE_DEGRADED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR,
+                         STATE_MISSING, STATE_STOPPING),
 
         # A node can return from the dead...
-        dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED),
-        STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED, STATE_DEGRADED),
+        STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR,
+                        STATE_DEGRADED),
 
         # But not from being deleted.
         dbo.STATE_DELETED: None,
@@ -74,6 +100,10 @@ class Node(dbo):
         etcd.delete('attribute/node',  static_values['fqdn'], 'instances-active')
 
     @classmethod
+    def _upgrade_step_7_to_8(cls, static_values):
+        ...
+
+    @classmethod
     def new(cls, name, ip):
         n = Node.from_db(name, suppress_failure_audit=True)
         if n:
@@ -85,7 +115,8 @@ class Node(dbo):
             'version': cls.current_version
         })
         n = Node.from_db(name)
-        n.state = cls.STATE_CREATED
+        n.state = cls.STATE_INITIAL
+        n.add_event(EVENT_TYPE_AUDIT, 'node created')
         return n
 
     @classmethod
@@ -120,7 +151,74 @@ class Node(dbo):
             'release': self.installed_version
         })
         retval.update(self._db_get_attribute('roles', {}))
+
+        # And the states of the various daemons
+        for daemon in self.VALID_DAEMONS:
+            retval[f'daemon-{daemon}-state'] = \
+                self.get_daemon_state(daemon).value
+
         return retval
+
+    def get_registered_daemons(self):
+        return self._db_get_attribute('daemons').get('daemons', [])
+
+    def register_daemon(self, daemon):
+        if daemon not in self.VALID_DAEMONS:
+            raise NoSuchDaemon(f'Cannot register daemon "{daemon}" on node '
+                               f'{self.uuid}, as that daemon is unknown.')
+        self._add_item_in_attribute_list('daemons', daemon)
+        self.set_daemon_state(daemon, self.DAEMON_STATE_STOPPED)
+        self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon registered')
+
+    def deregister_daemon(self, daemon):
+        if daemon not in self.VALID_DAEMONS:
+            raise NoSuchDaemon(f'Cannot deregister daemon "{daemon}" on node '
+                               f'{self.uuid}, as that daemon is unknown.')
+        self._remove_item_in_attribute_list('daemons', daemon)
+        self._db_delete_attribute(f'daemon:{daemon}')
+        self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon deregistered')
+
+    def set_daemon_state(self, daemon, state, message=None):
+        if daemon not in self.VALID_DAEMONS:
+            raise NoSuchDaemon(f'Cannot set daemon state for "{daemon}" on node '
+                               f'{self.uuid}, as that daemon is unknown.')
+        if state not in self.VALID_DAEMON_STATES:
+            raise NoSuchDaemonState(f'The daemon state {state} does not exist')
+        self._state_update(state, state_attribute_name=f'daemon:{daemon}',
+                           message=message)
+
+        # Determine if the node should transition state based on this update
+        degraded = self.get_degraded_daemons()
+        degraded_or_stopping = [self.STATE_DEGRADED, self.STATE_STOPPING,
+                                self.STATE_STOPPED]
+        node_state = self.state.value
+
+        if node_state not in degraded_or_stopping and degraded:
+            self.add_event(
+                EVENT_TYPE_AUDIT,
+                'node is not stopping or stopped, but a daemon is not running '
+                'so entering degraded state', extra={'degraded': degraded})
+            self.state = self.STATE_DEGRADED
+        elif node_state == self.STATE_DEGRADED and not degraded:
+            self.add_event(EVENT_TYPE_AUDIT, 'node is no longer degraded')
+            self.state = self.STATE_CREATED
+
+    def get_daemon_state(self, daemon):
+        if daemon not in self.VALID_DAEMONS:
+            raise NoSuchDaemon(f'Cannot get daemon state for "{daemon}" on node '
+                               f'{self.uuid}, as that daemon is unknown.')
+        return self._state_read(state_attribute_name=f'daemon:{daemon}')
+
+    def get_degraded_daemons(self):
+        degraded = []
+        for daemon in self.get_registered_daemons():
+            daemon_state = self.get_daemon_state(daemon).value
+            if not daemon_state:
+                degraded.append(daemon)
+            if daemon_state in [self.DAEMON_STATE_STOPPING,
+                                self.DAEMON_STATE_STOPPED]:
+                degraded.append(daemon)
+        return degraded
 
     # Static values
     @property

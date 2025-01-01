@@ -1,6 +1,7 @@
 import os
 import platform
 import re
+import sys
 import time
 
 import psutil
@@ -20,11 +21,12 @@ from shakenfist.constants import EVENT_TYPE_RESOURCES
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.daemons import daemon
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import network as util_network
-from shakenfist.util import process as util_process
+from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -227,7 +229,7 @@ class Monitor(daemon.Daemon):
                 out = {}
                 times = p.cpu_times()
                 usage = (times.user + times.system)
-                age = time.time() - p.create_time()
+                age = round(time.time() - p.create_time(), 2)
                 out['process_cpu_time_%s' % smn] = usage
                 out['process_age_%s' % smn] = age
 
@@ -246,11 +248,13 @@ class Monitor(daemon.Daemon):
                 for child in shim.children():
                     try:
                         with child.oneshot():
-                            process_metrics.update(_emit_process_metrics(child))
+                            process_metrics.update(
+                                _emit_process_metrics(child))
 
                             for subchild in child.children():
                                 with subchild.oneshot():
-                                    process_metrics.update(_emit_process_metrics(subchild))
+                                    process_metrics.update(
+                                        _emit_process_metrics(subchild))
                     except (psutil.NoSuchProcess, FileNotFoundError):
                         ...
                 # Record etcd process metrics
@@ -258,34 +262,39 @@ class Monitor(daemon.Daemon):
                     for p in psutil.process_iter():
                         try:
                             if p.name().endswith('/etcd'):
-                                process_metrics.update(_emit_process_metrics(p))
+                                process_metrics.update(
+                                    _emit_process_metrics(p))
                         except (psutil.NoSuchProcess, FileNotFoundError):
                             ...
 
                 n.process_metrics = process_metrics
 
                 # What package versions do we have?
-                vers_out, _ = util_process.execute(
-                    None,
-                    ('dpkg-query --show --showformat=\'${Package}==${Version}\\n\' '
-                     '--no-pager'),
-                    suppress_command_logging=True)
-                versions = {}
-                for line in vers_out.split():
-                    package, version = line.split('==')
-                    versions[package] = version
-                n.dependency_versions = versions
+                try:
+                    vers_out, _ = util_concurrency.execute(
+                        None,
+                        ('dpkg-query --show --showformat=\'${Package}==${Version}\\n\' '
+                         '--no-pager'),
+                        suppress_command_logging=True)
+                    versions = {}
+                    for line in vers_out.split():
+                        package, version = line.split('==')
+                        versions[package] = version
+                    n.dependency_versions = versions
 
-                # Some versions are especially important and we make them easier
-                # to lookup
-                for package, attr in [('qemu-utils', 'qemu_version'),
-                                      ('libvirt-daemon', 'libvirt_version')]:
-                    ver = versions.get(package, 'none')
-                    if ':' in ver:
-                        ver = ver.split(':')[1]
-                    ver = re.split('[-+]', ver)[0]
-                    ver = parse_version(ver)
-                    n.__setattr__(attr, ver.release.parts)
+                    # Some versions are especially important and we make them easier
+                    # to lookup
+                    for package, attr in [('qemu-utils', 'qemu_version'),
+                                          ('libvirt-daemon', 'libvirt_version')]:
+                        ver = versions.get(package, 'none')
+                        if ':' in ver:
+                            ver = ver.split(':')[1]
+                        ver = re.split('[-+]', ver)[0]
+                        ver = parse_version(ver)
+                        n.__setattr__(attr, ver.release.parts)
+
+                except ProcessExecutionError:
+                    LOG.warning('Failed to lookup package versions')
 
                 # Log resources
                 n.add_event(
@@ -294,8 +303,8 @@ class Monitor(daemon.Daemon):
                 self.last_logged_resources = time.time()
             return retval
 
-    def run(self):
-        LOG.info('Starting')
+    def _run_inner(self):
+        daemon.health_check_privexec()
         gauges = {
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
         }
@@ -308,6 +317,9 @@ class Monitor(daemon.Daemon):
 
         # Some versions are static and only looked up at startup
         n = Node.from_db(config.NODE_NAME)
+        if not n:
+            raise exceptions.NodeShouldExist()
+
         n.python_version = platform.python_version_tuple()
         n.python_implementation = platform.python_implementation()
 
@@ -342,7 +354,8 @@ class Monitor(daemon.Daemon):
                                 continue
 
                             # Base libvirt statistics
-                            statistics = util_libvirt.extract_statistics(domain)
+                            statistics = util_libvirt.extract_statistics(
+                                domain)
 
                             # Power information
                             statistics['libvirt_raw_power_state'] = \
@@ -420,7 +433,8 @@ class Monitor(daemon.Daemon):
             for child in init.children():
                 try:
                     with child.oneshot():
-                        m = LIBVIRT_KVM_CMDLINE_RE.match(' '.join(child.cmdline()))
+                        m = LIBVIRT_KVM_CMDLINE_RE.match(
+                            ' '.join(child.cmdline()))
                         if m:
                             instance_uuid = m.group(1)
                             i = instance.Instance.from_db(instance_uuid)
@@ -445,7 +459,7 @@ class Monitor(daemon.Daemon):
                     except (psutil.NoSuchProcess, FileNotFoundError):
                         i.kvm_pid = None
 
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             try:
                 if time.time() - last_metrics > config.SCHEDULER_CACHE_TIMEOUT:
                     update_metrics()
@@ -460,9 +474,19 @@ class Monitor(daemon.Daemon):
                     check_kvm_processess()
                     last_process_check = time.time()
 
-                self.exit.wait(1)
+                self.idle(1)
 
             except Exception as e:
                 util_general.ignore_exception('resource statistics', e)
 
-        LOG.info('Terminated')
+            self.check_daemon_state()
+
+
+def main():
+    daemon.write_pid_file('resources')
+    m = Monitor('resources')
+    m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

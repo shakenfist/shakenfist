@@ -518,9 +518,16 @@ class InstancesEndpoint(sf_api.Resource):
         if placed_on:
             n = Node.from_db(placed_on, suppress_failure_audit=True)
             if not n:
-                return sf_api.error(404, 'Specified node does not exist')
-            if n.state.value != Node.STATE_CREATED:
-                return sf_api.error(404, 'Specified node not ready')
+                return sf_api.error(404, 'Specified node {placed_on} does not exist')
+            node_state = n.state.value
+            if node_state != Node.STATE_CREATED:
+                n.add_event(
+                    EVENT_TYPE_AUDIT, 'API query for node told node not ready',
+                    extra={
+                        'node_state': node_state,
+                        'degraded_daemons': n.get_degraded_daemons()
+                    })
+                return sf_api.error(404, f'Specified node {placed_on} not ready')
 
         # Make sure we've been given a valid configdrive option
         if not configdrive:
@@ -896,8 +903,7 @@ class InstanceInterfacesEndpoint(sf_api.Resource):
     @api_base.requires_instance_ownership
     @api_base.log_token_use
     def post(self, instance_ref=None, network=None, instance_from_db=None):
-        s = instance_from_db.state.value
-        if s == dbo.STATE_DELETED or s.endswith('-error'):
+        if instance_from_db.state.value in instance.Instance.TERMINAL_STATES:
             return sf_api.error(406, 'instance in invalid state for hot plug')
 
         err = _netdesc_safety_checks(network, instance_from_db.namespace)

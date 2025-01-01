@@ -82,4 +82,5 @@ nav:
        - "Networking": operator_guide/networking/overview.md
        - "Power States": operator_guide/power_states.md
        - "Python Versions": operator_guide/python_versions.md
+       - "Threads": operator_guide/threads.md
        - "Upgrades": "operator_guide/upgrades.md"

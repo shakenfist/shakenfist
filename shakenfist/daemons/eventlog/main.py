@@ -1,10 +1,12 @@
+
+from collections import defaultdict
+from concurrent import futures
 import copy
 import json
 import os
 import pathlib
+import sys
 import time
-from collections import defaultdict
-from concurrent import futures
 
 import grpc
 from prometheus_client import Counter
@@ -168,17 +170,17 @@ class Monitor(daemon.WorkerPoolDaemon):
             'pruned_sweep': Counter('pruned_sweep',
                                     'Number of databases checked for pruning')
         }
-        start_http_server(config.EVENTLOG_METRICS_PORT)
-
-    def run(self):
-        LOG.info('Starting')
-        prune_targets = []
-        prune_sweep_started = 0
 
         for event_type in EVENT_TYPES:
             self.counters[event_type] = Counter(
                 '%s_events' % event_type,
                 'Number of %s events seen' % event_type)
+
+        start_http_server(config.EVENTLOG_METRICS_PORT)
+
+    def _run_inner(self):
+        prune_targets = []
+        prune_sweep_started = 0
 
         eventlog.upgrade_data_store()
 
@@ -190,13 +192,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
                 pass
 
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        event_pb2_grpc.add_EventServiceServicer_to_server(
-            EventService(self), server)
-        server.add_insecure_port(f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}')
-        server.start()
-
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             try:
                 did_work = False
 
@@ -221,7 +217,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                     try:
                         with eventlog.EventLog(objtype, objuuid) as eventdb:
                             for k, v in results[(objtype, objuuid)]:
-                                event_type = v.get('event_type', EVENT_TYPE_HISTORIC)
+                                event_type = v.get(
+                                    'event_type', EVENT_TYPE_HISTORIC)
                                 eventdb.write_event(
                                     event_type, v['timestamp'], v['fqdn'],
                                     v.get('duration'), v['message'],
@@ -241,7 +238,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                     if not prune_targets:
                         # Only sweep all databases once a day
                         if time.time() - prune_sweep_started > 24 * 3600:
-                            event_path = os.path.join(config.STORAGE_PATH, 'events')
+                            event_path = os.path.join(
+                                config.STORAGE_PATH, 'events')
                             p = pathlib.Path(event_path)
                             for entpath in p.glob('**/*.lock'):
                                 entpath = str(entpath)[len(event_path) + 1:-5]
@@ -281,10 +279,29 @@ class Monitor(daemon.WorkerPoolDaemon):
                             did_work = True
 
                 if not did_work:
-                    self.exit.wait(10)
+                    self.idle(10)
 
             except Exception as e:
                 util_general.ignore_exception('eventlog daemon', e)
 
-        server.stop(1).wait()
-        LOG.info('Terminated')
+            self.check_daemon_state()
+
+
+def main():
+    daemon.write_pid_file('eventlog')
+    m = Monitor('eventlog')
+
+    # Start the grpc server very early
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    event_pb2_grpc.add_EventServiceServicer_to_server(
+        EventService(m), server)
+    server.add_insecure_port(
+        f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}')
+
+    server.start()
+    m.run()
+    server.stop(1).wait()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)

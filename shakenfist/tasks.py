@@ -275,9 +275,11 @@ class NetworkInterfaceTask(QueueTask):
         return self._interface_uuid
 
     def obj_dict(self):
-        return {**super().obj_dict(),
-                'network_uuid': self._network_uuid,
-                'interface_uuid': self._interface_uuid}
+        return {
+            **super().obj_dict(),
+            'network_uuid': self._network_uuid,
+            'interface_uuid': self._interface_uuid
+        }
 
 
 class FloatNetworkInterfaceTask(NetworkInterfaceTask):
@@ -287,11 +289,23 @@ class FloatNetworkInterfaceTask(NetworkInterfaceTask):
 class DefloatNetworkInterfaceTask(NetworkInterfaceTask):
     _name = 'network_interface_defloat'
 
+    def __init__(self, network_uuid, interface_uuid, floating):
+        super().__init__(network_uuid, interface_uuid)
+        self._floating = floating
+
+    def floating(self):
+        return self._floating
+
+    def obj_dict(self):
+        return {
+            **super().obj_dict(),
+            'floating': self._floating
+        }
+
+
 #
 # Image Tasks
 #
-
-
 class ImageTask(QueueTask):
     def __init__(self, url, namespace=None):
         super().__init__()
@@ -329,11 +343,10 @@ class FetchImageTask(ImageTask):
     def instance_uuid(self):
         return self._instance_uuid
 
+
 #
 # Snapshot Tasks
 #
-
-
 class SnapshotTask(QueueTask):
     _name = 'snapshot'
 
@@ -371,11 +384,10 @@ class SnapshotTask(QueueTask):
     def thin(self):
         return self._thin
 
+
 #
 # Blob tasks
 #
-
-
 class BlobTask(QueueTask):
     def __init__(self, blob_uuid):
         super().__init__()
@@ -403,7 +415,6 @@ class HashBlobTask(BlobTask):
 #
 # Image cache tasks
 #
-
 class ArchiveTranscodeTask(QueueTask):
     _name = 'archive_transcode'
 
@@ -435,7 +446,6 @@ class ArchiveTranscodeTask(QueueTask):
 #
 # Agent operation tasks
 #
-
 class PreflightAgentOperationTask(QueueTask):
     _name = 'preflight_agent_operation'
 

@@ -2,12 +2,14 @@
 # urgent. Hard deleting data for example. Its therefore pretty relaxed about
 # obtaining the lock to do work et cetera. There is only one active cluster
 # maintenance daemon per cluster.
-import json
-import time
 from collections import defaultdict
 from functools import partial
+import json
+import os
+import sys
+import time
 
-import setproctitle
+import pyprctl
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
@@ -47,14 +49,16 @@ class Monitor(daemon.Daemon):
         # Attempt to acquire the cluster maintenance lock forever. We never
         # release the lock, it gets cleared on a crash. This is so that only
         # one node at a time is performing cluster maintenance.
-        while not self.exit.is_set():
+        while not os.path.exists(self.abort_path):
             self.lock = etcd.get_lock('cluster', None, None, ttl=300, timeout=10,
                                       op='Cluster maintenance')
             result = self.lock.acquire()
             if result:
                 self.is_elected = True
                 return
-            self.exit.wait(10)
+
+            self.idle(5)
+            self.check_daemon_state()
 
     def _cluster_wide_cleanup(self, last_loop_run):
         LOG.info('Running cluster maintenance')
@@ -64,7 +68,8 @@ class Monitor(daemon.Daemon):
             per_node = defaultdict(list)
             for b in Blobs([], prefilter='active'):
                 if not b.locations:
-                    b.add_event(EVENT_TYPE_AUDIT, 'no locations for this blob, hard deleting.')
+                    b.add_event(EVENT_TYPE_AUDIT,
+                                'no locations for this blob, hard deleting.')
                     b.hard_delete()
 
                 for node in b.locations:
@@ -96,7 +101,8 @@ class Monitor(daemon.Daemon):
 
             network_uuid = objdata.get('network_uuid')
             if network_uuid:
-                n = network.Network.from_db(network_uuid, suppress_failure_audit=True)
+                n = network.Network.from_db(
+                    network_uuid, suppress_failure_audit=True)
                 if not n:
                     etcd.get_etcd_client().delete(k)
                     LOG.with_fields({
@@ -131,7 +137,8 @@ class Monitor(daemon.Daemon):
             if time.time() - ipm.state.update_time < 300:
                 continue
 
-            n = network.Network.from_db(ipm.network_uuid, suppress_failure_audit=True)
+            n = network.Network.from_db(
+                ipm.network_uuid, suppress_failure_audit=True)
             if not n and ipm.state.value != dbo.STATE_DELETED:
                 ipm.add_event(
                     EVENT_TYPE_AUDIT,
@@ -143,31 +150,33 @@ class Monitor(daemon.Daemon):
 
         # Cleanup floating IP reservations which refer to deleted objects
         fn = network.floating_network()
-        for addr in fn.ipam.in_use:
-            reservation = fn.ipam.get_reservation(addr)
-            if not reservation:
-                continue
-            if reservation['type'] not in [ipam.RESERVATION_TYPE_GATEWAY,
-                                           ipam.RESERVATION_TYPE_FLOATING,
-                                           ipam.RESERVATION_TYPE_ROUTED]:
-                continue
+        if fn:
+            for addr in fn.ipam.in_use:
+                reservation = fn.ipam.get_reservation(addr)
+                if not reservation:
+                    continue
+                if reservation['type'] not in [ipam.RESERVATION_TYPE_GATEWAY,
+                                               ipam.RESERVATION_TYPE_FLOATING,
+                                               ipam.RESERVATION_TYPE_ROUTED]:
+                    continue
 
-            leaked = False
-            object_type, object_uuid = reservation['user']
-            obj = OBJECT_NAMES_TO_CLASSES[object_type].from_db(object_uuid)
-            if not obj:
-                leaked = True
-            else:
-                s = obj.state
-                if (s.value == dbo.STATE_DELETED and
-                        time.time() - s.update_time > 300):
+                leaked = False
+                object_type, object_uuid = reservation['user']
+                obj = OBJECT_NAMES_TO_CLASSES[object_type].from_db(object_uuid)
+                if not obj:
                     leaked = True
+                else:
+                    s = obj.state
+                    if (s.value == dbo.STATE_DELETED and
+                            time.time() - s.update_time > 300):
+                        leaked = True
 
-            if leaked:
-                fn.ipam.release(addr)
-                eventlog.add_event_multi(
-                    EVENT_TYPE_AUDIT, [fn.ipam, (object_type, object_uuid)],
-                    'cleaned up an address which refers to a deleted object')
+                if leaked:
+                    fn.ipam.release(addr)
+                    eventlog.add_event_multi(
+                        EVENT_TYPE_AUDIT,
+                        [fn.ipam, (object_type, object_uuid)],
+                        'cleaned up an address which refers to a deleted object')
 
         # Cleanup old uploads which were never completed
         for upload in Uploads([]):
@@ -236,6 +245,18 @@ class Monitor(daemon.Daemon):
                 }).info('Blob has current fetches, ignoring')
                 continue
 
+            # If the blob's reference count has been zero for a while, we can
+            # reap it
+            ref_count = b.ref_count_with_age
+            if time.time() - ref_count['update_time'] > 300:
+                if ref_count['ref_count'] < 1:
+                    b.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'reference count has been zero or below for at least '
+                        'five minutes, cascading delete initiated')
+                    b.cascading_delete()
+                    continue
+
             locations = b.locations
             ignored_locations = []
             for n in absent_nodes:
@@ -272,7 +293,8 @@ class Monitor(daemon.Daemon):
                 # Only remove excess copies from nodes which are running
                 # low on disk. Do not end up with too few replicas.
                 overreplicated[b.uuid] = []
-                target = (config.BLOB_REPLICATION_FACTOR - len(in_use_locations))
+                target = (config.BLOB_REPLICATION_FACTOR -
+                          len(in_use_locations))
                 for n in low_disk_nodes:
                     if n in excess_locations:
                         overreplicated[b.uuid].append(n)
@@ -358,7 +380,7 @@ class Monitor(daemon.Daemon):
 
         # Node management
         for n in Nodes([]):
-            age = time.time() - n.last_seen
+            age = round(time.time() - n.last_seen, 2)
 
             LOG.with_fields(
                 {
@@ -368,15 +390,21 @@ class Monitor(daemon.Daemon):
                     'state': n.state.value
                 }).debug('Considering node status')
 
-            # Find nodes which have returned from being missing
-            if n.state.value == Node.STATE_CREATED:
+            # Find nodes which are now missing or have returned from being missing
+            if n.state.value in [Node.STATE_INITIAL, Node.STATE_CREATING,
+                                 Node.STATE_CREATED, Node.STATE_DEGRADED]:
                 if age > config.NODE_CHECKIN_MAXIMUM:
                     n.state = Node.STATE_MISSING
-                    n.add_event(EVENT_TYPE_AUDIT, 'node has gone missing')
+                    n.add_event(EVENT_TYPE_AUDIT, 'node has gone missing',
+                                extra={
+                                    'checkin_at': n.last_seen,
+                                    'checkin_age': age
+                                })
             elif n.state.value == Node.STATE_MISSING:
                 if age < config.NODE_CHECKIN_MAXIMUM:
                     n.state = Node.STATE_CREATED
-                    n.add_event(EVENT_TYPE_AUDIT, 'node returned from being missing')
+                    n.add_event(EVENT_TYPE_AUDIT,
+                                'node returned from being missing')
             elif n.state.value == Node.STATE_DELETED:
                 # Find instances on deleted nodes
                 for i in instance.healthy_instances_on_node(n):
@@ -449,42 +477,47 @@ class Monitor(daemon.Daemon):
                     cache.clobber_object_state_cache(
                         object_type, state, by_state[state])
 
-    def run(self):
-        LOG.info('Starting')
+    def _run_inner(self):
+        last_defer_message = 0
 
         self.refresh_object_state_caches()
 
         last_loop_run = 0
-        while not self.exit.is_set():
-            setproctitle.setproctitle(daemon.process_name('cluster') + ' idle')
+        while not os.path.exists(self.abort_path):
+            pyprctl.set_name('idle')
+            LOG.debug('This cluster thread is now idle and awaiting election')
             self._await_election()
 
-            # Infrequently ensure we have no blobs with a reference count of zero
-            orphan_blobs = []
-            for b in Blobs([], prefilter='active'):
-                if b.ref_count == 0:
-                    orphan_blobs.append(b)
-
-            for b in orphan_blobs:
-                self.log.with_fields({'blob': b}).error(
-                    'Blob has zero references, deleting')
-                b.state = Blob.STATE_DELETED
+            if not self.cluster_stable():
+                if time.time() - last_defer_message > 10:
+                    LOG.info('Cluster not yet stable, deferring maintenance')
+                    last_defer_message = time.time()
+                continue
 
             # And then do regular cluster maintenance things
-            while self.is_elected and not self.exit.is_set():
+            while self.is_elected and not os.path.exists(self.abort_path):
                 self.lock.refresh()
 
-                setproctitle.setproctitle(
-                    daemon.process_name('cluster') + ' active')
+                pyprctl.set_name('active')
+                LOG.debug('This cluster thread is now active')
                 self.lock.refresh()
 
                 self._cluster_wide_cleanup(last_loop_run)
                 last_loop_run = time.time()
                 self.lock.refresh()
 
-                self.exit.wait(60)
+                self.idle(60)
 
         # Stop being the cluster maintenance node if we were
         if self.lock.is_acquired():
             self.lock.release()
-        LOG.info('Terminated')
+
+
+def main():
+    daemon.write_pid_file('cluster')
+    m = Monitor('cluster')
+    m.run()
+
+    # This is here because sometimes the grpc bits don't shut down cleanly
+    # by themselves.
+    sys.exit(0)
