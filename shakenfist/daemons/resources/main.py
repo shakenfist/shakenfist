@@ -325,7 +325,6 @@ class Monitor(daemon.Daemon):
 
         last_metrics = 0
         last_billing = 0
-        last_process_check = 0
 
         def update_metrics():
             stats = self._get_stats()
@@ -344,70 +343,6 @@ class Monitor(daemon.Daemon):
             gauges['updated_at'].set_to_current_time()
 
         def emit_billing_statistics():
-            with util_libvirt.LibvirtConnection() as lc:
-                try:
-                    for domain in lc.get_sf_domains():
-                        if domain.name().startswith('sf:'):
-                            instance_uuid = domain.name().split(':')[1]
-                            inst = instance.Instance.from_db(instance_uuid)
-                            if not inst:
-                                continue
-
-                            # Base libvirt statistics
-                            statistics = util_libvirt.extract_statistics(
-                                domain)
-
-                            # Power information
-                            statistics['libvirt_raw_power_state'] = \
-                                lc.extract_power_state_pretty(domain)
-                            statistics['power_state'] = \
-                                lc.extract_power_state(domain)
-
-                            # Add in actual size on disk
-                            bd = inst.block_devices
-                            if bd:
-                                for disk in bd.get('devices', [{}]):
-                                    disk_path = disk.get('path')
-                                    disk_device = disk.get('device')
-                                    if disk_path and disk_device and os.path.exists(disk_path):
-                                        # Because nvme disks don't exist as full libvirt
-                                        # disks, they are missing from the statistics
-                                        # results.
-                                        if disk_device not in statistics['disk usage']:
-                                            statistics['disk usage'][disk_device] = {
-                                            }
-
-                                        statistics['disk usage'][disk_device][
-                                            'actual bytes on disk'] = os.stat(disk_path).st_size
-
-                            # Console log size
-                            console_path = os.path.join(
-                                inst.instance_path, 'console.log')
-                            if os.path.exists(console_path):
-                                st = os.stat(console_path)
-                                statistics['console_log_size'] = st.st_size
-                            else:
-                                statistics['console_log_size'] = 0
-
-                            # Add in OOM details
-                            try:
-                                pid = inst.kvm_pid
-                                if pid:
-                                    with open('/proc/%s/oom_score' % pid) as f:
-                                        statistics['oom_score'] = f.read()
-                                    with open('/proc/%s/oom_score_adj' % pid) as f:
-                                        statistics['oom_score_adj'] = f.read()
-
-                            except FileNotFoundError:
-                                ...
-
-                            inst.add_event(
-                                EVENT_TYPE_USAGE, 'usage', extra=statistics,
-                                suppress_event_logging=True)
-
-                except lc.libvirt.libvirtError as e:
-                    self.log.warning('Ignoring libvirt error: %s' % e)
-
             if not config.NODE_IS_NETWORK_NODE:
                 return
 
@@ -444,21 +379,6 @@ class Monitor(daemon.Daemon):
                 except (psutil.NoSuchProcess, FileNotFoundError):
                     ...
 
-        def check_kvm_processess():
-            # Ensure that all instances we think are running on this instance
-            # actually have a KVM process. This catches cases where libvirt
-            # crashed during startup, which happens during unpause if the
-            # apparmor profile is missing. This is a more expensive check
-            # because it reads etcd, so we do it less frequently.
-            for i in instance.Instances(
-                    [instance.this_node_filter], prefilter='active'):
-                pid = i.kvm_pid
-                if pid:
-                    try:
-                        psutil.Process(pid)
-                    except (psutil.NoSuchProcess, FileNotFoundError):
-                        i.kvm_pid = None
-
         while not os.path.exists(self.abort_path):
             try:
                 if time.time() - last_metrics > config.SCHEDULER_CACHE_TIMEOUT:
@@ -469,10 +389,6 @@ class Monitor(daemon.Daemon):
                     emit_billing_statistics()
                     identify_libvirt_processes()
                     last_billing = time.time()
-
-                if time.time() - last_process_check > config.USAGE_EVENT_FREQUENCY * 3:
-                    check_kvm_processess()
-                    last_process_check = time.time()
 
                 self.idle(1)
 

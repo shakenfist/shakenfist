@@ -2,7 +2,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import blob
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
-from shakenfist.baseoperation import BaseOperation
+from shakenfist.operations.baseoperation import BaseOperation
 
 
 LOG, _ = logs.setup(__name__)

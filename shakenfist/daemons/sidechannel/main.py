@@ -16,7 +16,7 @@ from shakenfist import constants
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import instance
-from shakenfist.agentoperation import AgentOperation
+from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon

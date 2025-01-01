@@ -20,6 +20,8 @@ from shakenfist import etcd
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
+from shakenfist.operations.baseoperation import get_all_user_facing_queue_names
+from shakenfist.operations.baseoperation import get_all_background_queue_names
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import libvirt as util_libvirt
 
@@ -284,29 +286,29 @@ class WorkerPoolDaemon(Daemon):
         }
         worker_thread.start()
 
-    def dequeue_job(self, queue_name, processing_class):
-        max_workers = self.present_cpus / 2
+    def dequeue_job(self, processing_class):
+        max_workers = max(3, self.present_cpus / 2)
         num_workers = len(self.workers)
 
         if num_workers > max_workers:
             return False
 
-        # High priority jobs
-        jobname_workitem = etcd.dequeue(queue_name)
-        if jobname_workitem:
-            args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
-            self.start_job(processing_class, args, jobname_workitem[0])
-            return True
+        for queue_name in get_all_user_facing_queue_names(config.NODE_NAME):
+            jobname_workitem = etcd.dequeue(queue_name)
+            if jobname_workitem:
+                args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
+                self.start_job(processing_class, args, jobname_workitem[0])
+                return True
 
-        # Low priority jobs
+        # Lower priority jobs reserve a number of workers for user facing things
         if num_workers > max_workers - 2:
             return False
 
-        jobname_workitem = etcd.dequeue(f'{queue_name}-background')
-        if jobname_workitem:
-            args = [f'{queue_name}-background', jobname_workitem[0],
-                    jobname_workitem[1]]
-            self.start_job(processing_class, args, jobname_workitem[0])
-            return True
+        for queue_name in get_all_background_queue_names(config.NODE_NAME):
+            jobname_workitem = etcd.dequeue(queue_name)
+            if jobname_workitem:
+                args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
+                self.start_job(processing_class, args, jobname_workitem[0])
+                return True
 
         return False

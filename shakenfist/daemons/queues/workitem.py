@@ -15,21 +15,20 @@ from shakenfist import instance
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist import scheduler
-from shakenfist.agentoperation import AgentOperation
+from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist import eventlog
+from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
 from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.tasks import DeleteNetworkWhenClean
 from shakenfist.tasks import DestroyNetworkTask
-from shakenfist.tasks import FetchBlobTask
 from shakenfist.tasks import FetchImageTask
 from shakenfist.tasks import FloatNetworkInterfaceTask
-from shakenfist.tasks import HashBlobTask
 from shakenfist.tasks import HotPlugInstanceInterfaceTask
 from shakenfist.tasks import HypervisorDestroyNetworkTask
 from shakenfist.tasks import InstanceTask
@@ -64,11 +63,23 @@ class Job(util_concurrency.Job):
             os.unlink(self.abort_path)
 
     def execute(self):
-        libvirt = util_libvirt.get_libvirt()
-        self.log.info('Processing job')
-
         pyprctl.set_name(self.jobname)
         LOG.debug(f'This worker thread is executing job {self.jobname}')
+
+        try:
+            if self.queue_name.find('-clusteroperation-') == -1:
+                self._old_style_execute()
+            else:
+                self._cluster_operation_execute()
+
+        finally:
+            etcd.resolve(self.queue_name, self.jobname)
+            LOG.debug(
+                f'This worker thread is finished executing job {self.jobname}')
+
+    def _old_style_execute(self):
+        libvirt = util_libvirt.get_libvirt()
+        self.log.info('Processing job')
 
         inst = None
         task = None
@@ -165,47 +176,6 @@ class Job(util_concurrency.Job):
                     n = network.Network.from_db(task.network_uuid())
                     n.delete_on_hypervisor()
 
-                elif isinstance(task, FetchBlobTask):
-                    bl = self.log.with_fields({'blob': task.blob_uuid()})
-                    metrics = etcd.get('metrics', config.NODE_NAME, None)
-                    if metrics:
-                        metrics = metrics.get('metrics', {})
-                    else:
-                        metrics = {}
-
-                    b = blob.Blob.from_db(task.blob_uuid())
-                    if not b:
-                        bl.info('Cannot replicate blob, not found')
-
-                    elif (int(metrics.get('disk_free_blobs', 0)) - int(b.size) <
-                          config.MINIMUM_FREE_DISK):
-                        bl.info('Cannot replicate blob, insufficient space')
-
-                    else:
-                        try:
-                            bl.info('Replicating blob')
-                            size = b.ensure_local(
-                                [], wait_for_other_transfers=False)
-                            bl.with_fields({
-                                'transferred': size,
-                                'expected': b.size
-                            }).info('Replicating blob complete')
-                        except exceptions.BlobMissing:
-                            bl.info('Cannot replicate blob, no online sources')
-
-                elif isinstance(task, HashBlobTask):
-                    bl = self.log.with_fields({'blob': task.blob_uuid()})
-                    b = blob.Blob.from_db(task.blob_uuid())
-
-                    if not b:
-                        bl.info('Cannot hash blob, not found')
-
-                    elif config.NODE_NAME not in b.locations:
-                        bl.info('Cannot hash blob, not on this node')
-
-                    else:
-                        b.verify_checksum(urgent=False)
-
                 elif isinstance(task, ArchiveTranscodeTask):
                     if not os.path.exists(task.cache_path()):
                         continue
@@ -293,10 +263,16 @@ class Job(util_concurrency.Job):
             if inst:
                 inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
-        finally:
-            etcd.resolve(self.queue_name, self.jobname)
-            LOG.debug(
-                f'This worker thread is finished executing job {self.jobname}')
+    def _cluster_operation_execute(self):
+        op_type = self.workitem.get('operation_type')
+        op_uuid = self.workitem.get('operation_uuid')
+        op = OPERATION_NAMES_TO_CLASSES[op_type].from_db(op_uuid)
+
+        if not op:
+            self.log.error('Operation not found')
+            return
+
+        op.execute()
 
 
 def image_fetch(url, namespace, inst):

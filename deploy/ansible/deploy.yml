@@ -1157,6 +1157,14 @@
         mode: u=r,g=r,o=r
       when: not config_stat_result.stat.exists
 
+    - name: Remove obsolete systemd units
+      file:
+        dest: /etc/systemd/system/{{ item }}
+        state: absent
+      with_items:
+        - sf.service
+        - sf-checksums.service
+
     - name: Write systemd target unit on remote host
       template:
         src: files/sf.target
@@ -1176,7 +1184,6 @@
         - sentinel-first
         - sentinel-last
         - privexec
-        - checksums
         - cleaner
         - cluster
         - net
@@ -1378,7 +1385,6 @@
         - sidechannel
         - queues
         - api
-        - checksums
         - cleaner
         - cluster
         - transfers
@@ -1399,7 +1405,6 @@
         - sidechannel
         - queues
         - api
-        - checksums
         - cleaner
         - cluster
         - transfers

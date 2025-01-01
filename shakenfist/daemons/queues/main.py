@@ -13,6 +13,7 @@ from shakenfist.daemons import daemon
 from shakenfist.daemons.queues import startup_tasks
 from shakenfist.daemons.queues import workitem
 from shakenfist.node import Node
+from shakenfist.operations.baseoperation import get_all_queue_names
 from shakenfist.util import general as util_general
 
 
@@ -99,16 +100,18 @@ class Monitor(daemon.WorkerPoolDaemon):
                             'than 30 seconds')
 
                 if time.time() - last_length > 10:
-                    processing, queued, deferred = etcd.get_queue_length(
-                        config.NODE_NAME)
-                    LOG.with_fields({
-                        'processing': processing,
-                        'queued': queued,
-                        'deferred': deferred
-                    }).debug('Queue length')
+                    for queue in get_all_queue_names(config.NODE_NAME):
+                        processing, queued, deferred = etcd.get_queue_length(
+                            queue)
+                        LOG.with_fields({
+                            'processing': processing,
+                            'queued': queued,
+                            'deferred': deferred,
+                            'queue': queue
+                        }).debug('Queue length')
                     last_length = time.time()
 
-                if not self.dequeue_job(config.NODE_NAME, workitem.Job):
+                if not self.dequeue_job(workitem.Job):
                     self.idle(0.2)
 
             except Exception as e:

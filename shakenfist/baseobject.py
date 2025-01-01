@@ -36,8 +36,20 @@ class NoopLock(Lock):
 VERSION_CACHE_MINIMUM = None
 VERSION_CACHE_MAXIMUM = None
 VERSION_CACHE_AGE = 0
-OBJECT_NAMES = ['agentoperation', 'artifact', 'blob', 'dhcp', 'instance', 'ipam',
-                'namespace', 'network', 'networkinterface', 'node', 'upload']
+OBJECT_NAMES = [
+    'agentoperation',
+    'artifact',
+    'blob',
+    'dhcp',
+    'instance',
+    'ipam',
+    'namespace',
+    'network',
+    'networkinterface',
+    'node',
+    'nodeinstanceoperation',
+    'upload'
+]
 
 
 def _maintain_version_cache(max_cache_age):

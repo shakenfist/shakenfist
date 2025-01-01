@@ -1,8 +1,9 @@
-from collections import defaultdict
+from enum import Enum
 import json
 import os
 import threading
 import time
+import uuid
 
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
@@ -22,7 +23,6 @@ from shakenfist import etcd_pb2
 from shakenfist import etcd_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
-from shakenfist.tasks import FetchBlobTask
 from shakenfist.tasks import QueueTask
 from shakenfist.util import callstack as util_callstack
 
@@ -408,6 +408,10 @@ class JSONEncoderCustomTypes(json.JSONEncoder):
             return obj.obj_dict()
         if type(obj) is baseobject.State:
             return obj.obj_dict()
+        if type(obj) is uuid.UUID:
+            return str(obj)
+        if isinstance(obj, Enum):
+            return obj.name
         return json.JSONEncoder.default(self, obj)
 
 
@@ -600,35 +604,6 @@ def get_outstanding_jobs():
         yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
     for data, metadata in get_etcd_client().get_prefix('/sf/queued'):
         yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
-
-
-def get_current_blob_transfers(absent_nodes=[]):
-    current_fetches = defaultdict(list)
-    for workname, workitem in get_outstanding_jobs():
-        # A workname looks like: /sf/queue/sf-3/jobname
-        _, _, phase, node, _ = workname.split('/')
-        if node == 'networknode':
-            continue
-        if node.endswith('-background'):
-            node = node[:-len('-background')]
-
-        for task in workitem:
-            if isinstance(task, FetchBlobTask):
-                if node in absent_nodes:
-                    LOG.with_fields({
-                        'blob': task.blob_uuid,
-                        'node': node,
-                        'phase': phase
-                    }).warning('Node is absent, ignoring fetch')
-                else:
-                    LOG.with_fields({
-                        'blob': task.blob_uuid,
-                        'node': node,
-                        'phase': phase
-                    }).info('Node is fetching blob')
-                    current_fetches[task.blob_uuid].append(node)
-
-    return current_fetches
 
 
 def restart_queues():

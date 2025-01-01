@@ -386,33 +386,6 @@ class SnapshotTask(QueueTask):
 
 
 #
-# Blob tasks
-#
-class BlobTask(QueueTask):
-    def __init__(self, blob_uuid):
-        super().__init__()
-        self._blob_uuid = blob_uuid
-
-    def obj_dict(self):
-        return {
-            **super().obj_dict(),
-            'blob_uuid': self._blob_uuid
-        }
-
-    # Data methods
-    def blob_uuid(self):
-        return self._blob_uuid
-
-
-class FetchBlobTask(BlobTask):
-    _name = 'blob_fetch'
-
-
-class HashBlobTask(BlobTask):
-    _name = 'blob_hash'
-
-
-#
 # Image cache tasks
 #
 class ArchiveTranscodeTask(QueueTask):

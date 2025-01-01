@@ -26,7 +26,7 @@ from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import network as sfnet
 from shakenfist import scheduler
-from shakenfist.agentoperation import AgentOperation
+from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
 from shakenfist.artifact import ARTIFACT_URL
 from shakenfist.artifact import BLOB_URL

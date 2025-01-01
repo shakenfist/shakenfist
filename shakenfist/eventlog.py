@@ -261,9 +261,20 @@ def upgrade_data_store():
         version = 2
         count = 0
         for objtype in [
-                'agentoperation', 'api-requests', 'artifact', 'blob', 'dhcp',
-                'instance', 'ipam', 'namespace', 'network', 'networkinterface',
-                'node', 'upload']:
+                'agentoperation',
+                'api-requests',
+                'artifact',
+                'blob',
+                'dhcp',
+                'instance',
+                'ipam',
+                'namespace',
+                'network',
+                'networkinterface',
+                'node',
+                'nodeinstanceoperation',
+                'upload'
+        ]:
             objroot = os.path.join(config.STORAGE_PATH, 'events', objtype)
             if os.path.exists(objroot):
                 for ent in os.listdir(objroot):

@@ -13,12 +13,12 @@ import uuid
 
 import magic
 from oslo_concurrency import lockutils
-import psutil
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import cache
 from shakenfist import etcd
+from shakenfist.etcd_schema.operations import nodebloboperation as nbo_schema
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
@@ -42,8 +42,6 @@ from shakenfist.exceptions import LocklessUpdateFailed
 from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
-from shakenfist.tasks import FetchBlobTask
-from shakenfist.tasks import HashBlobTask
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -230,6 +228,15 @@ class Blob(dbo):
             'incomplete_locations', {'locations': {}})
         for loc in locs['locations']:
             out.append(f'{loc} ({locs["locations"][loc]:.2f}%)')
+        return out
+
+    @property
+    def incomplete_healthy_locations(self):
+        absent_nodes = Nodes([], prefilter='inactive')
+        out = []
+        for loc in self.incomplete_locations:
+            if loc not in absent_nodes:
+                out.append(loc)
         return out
 
     def _update_incomplete_location_inner(self, percentage):
@@ -660,7 +667,7 @@ class Blob(dbo):
                     f'Fetching required blob {self.uuid} failed. We fetched '
                     f'{total_bytes_received} bytes, but expected {self.size}.')
 
-            if not self.verify_checksum(sha512_hash.hexdigest()):
+            if not self.verify_checksum(hash=sha512_hash.hexdigest()):
                 add_event_multi(
                     EVENT_TYPE_AUDIT, affected_objects,
                     f'fetching required blob failed, incorrect checksum {direction_info}')
@@ -674,17 +681,18 @@ class Blob(dbo):
             self.observe()
 
     def request_replication(self, allow_excess=0):
-        absent_nodes = list(Nodes([], prefilter='inactive'))
-
         present_nodes = list(Nodes([], prefilter='active'))
         present_nodes_len = len(present_nodes)
-
-        # We take current transfers into account when replicating, to avoid
-        # over replicating very large blobs
-        current_transfers = etcd.get_current_blob_transfers(
-            absent_nodes=absent_nodes).get(self.uuid, 0)
+        absent_nodes = list(Nodes([], prefilter='inactive'))
 
         with self.get_lock_attr('locations', 'Request replication'):
+            # We take current transfers into account when replicating, to avoid
+            # over replicating very large blobs
+            current_transfers = 0
+            for node in self.incomplete_locations:
+                if node not in absent_nodes:
+                    current_transfers += 1
+
             locations = self.locations
 
             # Filter out absent locations
@@ -723,12 +731,12 @@ class Blob(dbo):
                         nodes.remove(n)
 
                 for n in nodes[:targets]:
-                    etcd.enqueue(f'{n}-background', {
-                        'tasks': [
-                            FetchBlobTask(self.uuid),
-                            HashBlobTask(self.uuid)
-                            ]
-                    })
+                    nbo_schema.create_and_enqueue(
+                        n,
+                        self.uuid,
+                        [nbo_schema.model_tasks.ensure_local],
+                        nbo_schema.PRIORITY.BACKGROUND_HIGH_IO)
+                    self.update_incomplete_location(n, 0)
                     self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
 
@@ -746,34 +754,13 @@ class Blob(dbo):
     def checksums(self):
         return self._db_get_attribute('checksums')
 
-    def _remove_if_idle(self, msg):
-        # NOTE(mikal): we specifically don't lookup instance records in etcd here
-        # for two reasons -- we don't want to depend on a "higher level object",
-        # but also because it wouldn't cover instances that had somehow escaped
-        # tracking. Instead, we build our own `lsof` instead!
+    def _remove_corrupt_blob(self):
         blob_path = Blob.filepath(self.uuid)
-        users = 0
-        for pid in psutil.pids():
-            try:
-                p = psutil.Process(pid)
-                for f in p.open_files():
-                    if f.path.startswith(blob_path):
-                        users += 1
-                        self.log.warning('Process %d is using blob' % pid)
-            except FileNotFoundError:
-                # This is a race. The PID ended between us listing the PIDs and
-                # psutil trying to open its entry in /proc.
-                pass
-
-        if users == 0:
-            blob_path = Blob.filepath(self.uuid)
-            if os.path.exists(blob_path):
-                os.unlink(blob_path)
-            if os.path.exists(blob_path + '.partial'):
-                os.unlink(blob_path + '.partial')
-            self.drop_node_location(config.NODE_NAME)
-        else:
-            self.log.error('Not removing in-use blob replica %s' % msg)
+        if os.path.exists(blob_path):
+            os.unlink(blob_path)
+        if os.path.exists(blob_path + '.partial'):
+            os.unlink(blob_path + '.partial')
+        self.drop_node_location(config.NODE_NAME)
 
     def verify_size(self, partial=False):
         blob_path = Blob.filepath(self.uuid)
@@ -789,7 +776,7 @@ class Blob(dbo):
                                'node_size': st.st_size,
                                'node': config.NODE_NAME
                            })
-            self._remove_if_idle('with incorrect size')
+            self._remove_corrupt_blob()
             return False
         return True
 
@@ -826,9 +813,11 @@ class Blob(dbo):
         # If we're in a hurry but extra hashes are missing, enqueue those as
         # background tasks
         if needs_rehashing:
-            etcd.enqueue(f'{config.NODE_NAME}-background', {
-                    'tasks': [HashBlobTask(self.uuid)]
-                })
+            nbo_schema.create_and_enqueue(
+                config.NODE_NAME,
+                self.uuid,
+                [nbo_schema.model_tasks.verify_size_and_checksum],
+                nbo_schema.PRIORITY.BACKGROUND_HIGH_IO)
 
         # Validate / update our stored checksums
         with self.get_lock_attr('checksums', op='update checksums'):
@@ -844,7 +833,7 @@ class Blob(dbo):
                                        'node_hash': sha512_hash,
                                        'node': config.NODE_NAME
                                    })
-                    self._remove_if_idle('with incorrect checksum')
+                    self._remove_corrupt_blob()
                     return False
 
             if 'nodes' not in c:

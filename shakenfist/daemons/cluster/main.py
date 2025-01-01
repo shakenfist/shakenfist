@@ -10,6 +10,7 @@ import sys
 import time
 
 import pyprctl
+import schedule
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
@@ -30,10 +31,12 @@ from shakenfist.blob import placement_filter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
+from shakenfist.daemons.cluster import scheduled_tasks
 from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.upload import Uploads
+from shakenfist.util import general as util_general
 
 
 LOG, _ = logs.setup(__name__)
@@ -220,30 +223,12 @@ class Monitor(daemon.Daemon):
             minimum=0, maximum=(config.MINIMUM_FREE_DISK * 3),
             intention='blobs')
 
-        absent_nodes = []
-        for n in Nodes([], prefilter='inactive'):
-            LOG.with_fields({
-                'node': n.fqdn}).info('Node is absent for blob replication')
-            absent_nodes.append(n.fqdn)
-        LOG.info('Found %d inactive nodes' % len(absent_nodes))
-
         # We count fetches currently requested (or under way) as having completed
         # in order to stop over-replication for large blobs.
-        current_fetches = etcd.get_current_blob_transfers(
-            absent_nodes=absent_nodes)
-
         for b in Blobs([], prefilter='active'):
             instances = instance.instance_usage_for_blob_uuid(b.uuid)
             if instances:
                 in_use_blobs[b.uuid] += 1
-
-            # If there is current work for a blob, we ignore it until that
-            # work completes
-            if b.uuid in current_fetches:
-                LOG.with_fields({
-                    'blob': b.blob_uuid
-                }).info('Blob has current fetches, ignoring')
-                continue
 
             # If the blob's reference count has been zero for a while, we can
             # reap it
@@ -257,19 +242,7 @@ class Monitor(daemon.Daemon):
                     b.cascading_delete()
                     continue
 
-            locations = b.locations
-            ignored_locations = []
-            for n in absent_nodes:
-                if n in locations:
-                    locations.remove(n)
-                    ignored_locations.append(n)
-
-            if ignored_locations:
-                LOG.with_fields({
-                    'blob': b,
-                    'ignored_locations': ignored_locations
-                }).info('Ignored some blob locations as nodes are absent')
-
+            locations = b.locations + b.incomplete_healthy_locations
             delta = len(locations) - config.BLOB_REPLICATION_FACTOR
             if delta > 0:
                 # So... The blob replication factor is a target not a limit.
@@ -347,22 +320,12 @@ class Monitor(daemon.Daemon):
         # Replicate under replicated blobs, but only if we don't have heaps of
         # queued replications already
         for blob_uuid, excess in underreplicated:
-            LOG.with_fields({
-                'current': len(current_fetches),
-                'maximum': config.MAX_CONCURRENT_BLOB_TRANSFERS
-            }).info('Concurrent blob transfers')
-            if len(current_fetches) > config.MAX_CONCURRENT_BLOB_TRANSFERS:
-                LOG.info(
-                    'Too many concurrent blob transfers queued, not queueing more')
-                break
-
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 LOG.with_fields({
                     'blob': b
                 }).info('Blob under replicated, attempting to correct')
                 b.request_replication(allow_excess=excess)
-                current_fetches[blob_uuid].append('unknown')
         self.lock.refresh()
 
         # Find transcodes of not recently used blobs and reap them
@@ -488,21 +451,41 @@ class Monitor(daemon.Daemon):
             LOG.debug('This cluster thread is now idle and awaiting election')
             self._await_election()
 
+            pyprctl.set_name('active')
+            LOG.debug('This cluster thread is now active')
+
             if not self.cluster_stable():
                 if time.time() - last_defer_message > 10:
                     LOG.info('Cluster not yet stable, deferring maintenance')
                     last_defer_message = time.time()
                 continue
 
+            # Setup a schedule of things to do
+            schedule.every(5).minutes.do(
+                scheduled_tasks.per_blob_checks)
+            schedule.every(5).minutes.do(
+                scheduled_tasks.per_instance_checks_and_usage)
+
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):
                 self.lock.refresh()
 
-                pyprctl.set_name('active')
-                LOG.debug('This cluster thread is now active')
+                try:
+                    with util_general.RecordedOperation(
+                            'scheduled cluster operations', None, threshold=10):
+                        schedule.run_pending()
+                except Exception as e:
+                    util_general.ignore_exception('cluster', e)
+
                 self.lock.refresh()
 
-                self._cluster_wide_cleanup(last_loop_run)
+                try:
+                    with util_general.RecordedOperation(
+                            'cluster wide cleanup', None, threshold=10):
+                        self._cluster_wide_cleanup(last_loop_run)
+                except Exception as e:
+                    util_general.ignore_exception('cluster', e)
+
                 last_loop_run = time.time()
                 self.lock.refresh()
 

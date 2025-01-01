@@ -1,0 +1,174 @@
+import queue
+import time
+
+from shakenfist_utilities import logs                 # noreorder
+
+from shakenfist.cache import read_object_state_cache
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.blob import Blob
+from shakenfist.etcd_schema.operations import baseclusteroperation as bco_schema
+from shakenfist.etcd_schema.operations import nodebloboperation as nbo_schema
+from shakenfist.instance import Instance
+from shakenfist.node import Node
+from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
+from shakenfist.operations.nodeinstanceoperation import NodeInstanceOperation
+from shakenfist.util import general as util_general
+
+
+LOG, _ = logs.setup(__name__)
+BLOB_CHECKS_QUEUE = queue.Queue()
+INSTANCE_CHECKS_QUEUE = queue.Queue()
+
+
+@util_general.recorded_method
+def per_blob_checks():
+    global BLOB_CHECKS_QUEUE
+
+    start_time = time.time()
+    if BLOB_CHECKS_QUEUE.empty():
+        _fill_per_blob_queue()
+        LOG.info(
+            f'Refreshed per-blob queue with {BLOB_CHECKS_QUEUE.qsize()} items')
+
+    queue_fill_cost = time.time() - start_time
+    if queue_fill_cost > 10:
+        return
+
+    processed = _process_per_blob_queue(execution_limit=(10 - queue_fill_cost))
+    LOG.info(f'Processed {processed} items from per-blob queue')
+
+
+def _fill_per_blob_queue():
+    global BLOB_CHECKS_QUEUE
+
+    for blob_uuid in read_object_state_cache(Blob.object_type, Blob.STATE_CREATED):
+        b = Blob.from_db(blob_uuid)
+        if not b:
+            continue
+        BLOB_CHECKS_QUEUE.put(b)
+
+    LOG
+
+
+def _process_per_blob_queue(execution_limit=10):
+    global BLOB_CHECKS_QUEUE
+
+    processed = 0
+    start_time = time.time()
+    while True:
+        # Limit how long we spend in this loop
+        if time.time() - start_time > execution_limit:
+            return processed
+
+        try:
+            b = BLOB_CHECKS_QUEUE.get(block=False)
+        except queue.Empty:
+            return processed
+
+        processed += 1
+
+        if b.state.value != Blob.STATE_CREATED:
+            continue
+
+        # Every blob location should have a checksum performed at least every
+        # config.CHECKSUM_VERIFICATION_FREQUENCY seconds.
+        checksums = b.checksums
+        node_uuids = b.locations
+        requests = checksums.get('requests_by_node', {}).get(
+            config.NODE_NAME, [])
+
+        for node_uuid in node_uuids:
+            last_checksum = checksums.get(config.NODE_NAME, 0)
+            age = time.time() - last_checksum
+
+            if age < config.CHECKSUM_VERIFICATION_FREQUENCY:
+                continue
+
+            request_checksum = True
+            for op_type, op_uuid in requests:
+                op = OPERATION_NAMES_TO_CLASSES[op_type].from_db(op_uuid)
+                if op and op.state.value == BaseClusterOperation.STATE_QUEUED:
+                    request_checksum = False
+                    break
+
+            if request_checksum:
+                nbo_schema.create_and_enqueue(
+                    node_uuid,
+                    b.uuid,
+                    [nbo_schema.model_tasks.verify_size_and_checksum],
+                    bco_schema.PRIORITY.BACKGROUND_HIGH_IO)
+
+
+@util_general.recorded_method
+def per_instance_checks_and_usage():
+    global INSTANCE_CHECKS_QUEUE
+
+    start_time = time.time()
+    if INSTANCE_CHECKS_QUEUE.empty():
+        _fill_per_instance_queue()
+        LOG.info(
+            f'Refreshed per-blob queue with {INSTANCE_CHECKS_QUEUE.qsize()} '
+            'items')
+
+    queue_fill_cost = time.time() - start_time
+    if queue_fill_cost > 10:
+        return
+
+    processed = _process_per_instance_queue(
+        execution_limit=(10 - queue_fill_cost))
+    LOG.info(f'Processed {processed} items from per-instance queue')
+
+
+def _fill_per_instance_queue():
+    global INSTANCE_CHECKS_QUEUE
+
+    for instance_uuid in read_object_state_cache(
+            Instance.object_type, Instance.STATE_CREATED):
+        inst = Instance.from_db(instance_uuid)
+        if not inst:
+            continue
+
+        INSTANCE_CHECKS_QUEUE.put(inst)
+
+
+def _process_per_instance_queue(execution_limit=10):
+    global INSTANCE_CHECKS_QUEUE
+
+    processed = 0
+    start_time = time.time()
+    while True:
+        # Limit how long we spend in this loop
+        if time.time() - start_time > execution_limit:
+            return processed
+
+        try:
+            inst = INSTANCE_CHECKS_QUEUE.get(block=False)
+        except queue.Empty:
+            return processed
+
+        processed += 1
+
+        if inst.state.value != Instance.STATE_CREATED:
+            continue
+
+        placement = inst.placement
+        node = None
+        if placement and placement.get('node'):
+            node = Node.from_db(placement['node'])
+
+        if not node:
+            inst.add_event(
+                EVENT_TYPE_AUDIT,
+                ('instance in created state with no node placement, '
+                 'transitioning to error state'))
+            inst.state = Instance.STATE_ERROR
+            continue
+
+        nio = NodeInstanceOperation.new(
+            node.uuid,
+            inst.uuid,
+            ['collect_billing_statistics', 'health_check_kvm_process'],
+            bco_schema.PRIORITY.USER_FACING)
+        nio.enqueue()

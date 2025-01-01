@@ -28,9 +28,9 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import network
 from shakenfist import networkinterface
-from shakenfist.agentoperation import AgentOperation
-from shakenfist.agentoperation import AgentOperations
-from shakenfist.agentoperation import instance_filter as agent_instance_filter
+from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.operations.agentoperation import AgentOperations
+from shakenfist.operations.agentoperation import instance_filter as agent_instance_filter
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
