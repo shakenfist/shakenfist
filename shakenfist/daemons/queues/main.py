@@ -1,6 +1,6 @@
+import os
 import time
 
-import os
 import psutil
 import pyprctl
 import setproctitle

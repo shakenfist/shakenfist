@@ -2,11 +2,12 @@
 # Fist target run-level and therefore the node is stopping not going missing.
 # You should never manually stop this daemon!
 import os
-import setproctitle
 import signal
 import sys
 import threading
 import time
+
+import setproctitle
 
 from shakenfist_utilities import logs  # noreorder
 

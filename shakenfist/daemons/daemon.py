@@ -1,10 +1,10 @@
 import faulthandler
 import logging
-from math import inf
 import os
 import signal
 import threading
 import time
+from math import inf
 
 import pyprctl
 import setproctitle

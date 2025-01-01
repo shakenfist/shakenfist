@@ -3,8 +3,8 @@ import time
 import uuid
 
 import flask
-import requests
 import pyprctl
+import requests
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import blob
