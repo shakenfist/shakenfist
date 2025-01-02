@@ -85,3 +85,9 @@ class BaseClusterOperation(BaseOperation):
                 'operation_type': self.object_type,
                 'operation_uuid': self.uuid
             })
+
+    def execute(self):
+        self.state = self.STATE_EXECUTING
+        for t in self.tasks:
+            self.dispatch_task(t)
+        self.state = self.STATE_COMPLETE

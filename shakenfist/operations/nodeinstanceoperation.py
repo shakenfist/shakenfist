@@ -88,11 +88,9 @@ class NodeInstanceOperation(BaseClusterOperation):
             raise NoSuchInstance(task)
 
         try:
-            method_name = self._all_tasks[task]
-            self.__getattribute__(f'_{method_name}')(inst)
+            self.__getattribute__(f'_{task}')(inst)
         except Exception as e:
-            util_general.ignore_exception(
-                f'{self.object_type} task {self.uuid} failed: {e}')
+            util_general.ignore_exception('nodeinstanceoperation', e)
 
     def _collect_billing_statistics(self, inst):
         with util_libvirt.LibvirtConnection() as lc:

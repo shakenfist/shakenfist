@@ -19,6 +19,7 @@ from shakenfist import event_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
@@ -75,8 +76,13 @@ def _add_event_multi_inner(
         stub = event_pb2_grpc.EventServiceStub(channel)
 
         request = event_pb2.EventMultiRequest(
-            event_type=event_type, timestamp=timestamp, fqdn=config.NODE_NAME,
-            duration=duration, message=message, extra=json.dumps(extra))
+            event_type=event_type,
+            timestamp=timestamp,
+            fqdn=config.NODE_NAME,
+            duration=duration,
+            message=message,
+            extra=util_json.json_dump(extra)
+        )
 
         for object_type, object_uuid in simpler_objects:
             if not object_uuid:
@@ -123,7 +129,7 @@ def _add_event_inner(
                 object_type=object_type, object_uuid=object_uuid,
                 event_type=event_type, timestamp=timestamp,
                 fqdn=config.NODE_NAME, duration=duration,
-                message=message, extra=json.dumps(extra))
+                message=message, extra=util_json.json_dump(extra))
             response = stub.RecordEvent(request)
 
             if not response.ack:
@@ -311,7 +317,7 @@ def upgrade_data_store():
     if start_version != version:
         os.makedirs(os.path.dirname(version_path), exist_ok=True)
         with open(version_path, 'w') as f:
-            f.write(json.dumps({'version': version}, indent=4, sort_keys=True))
+            f.write(util_json.json_dump({'version': version}))
         LOG.info('Event datastore upgrade took %.02f seconds'
                  % (time.time() - start_time))
 
@@ -712,8 +718,7 @@ class EventLogChunk:
             'extra, correlation_id) '
             'VALUES (?, ?, ?, ?, ?, ?, ?)',
             (event_type, timestamp, fqdn, duration, message,
-             json.dumps(extra, cls=etcd.JSONEncoderCustomTypes),
-             correlation_id))
+             util_json.json_dump(extra), correlation_id))
         self.con.commit()
 
     def read_events(self, limit=100, event_type=None):

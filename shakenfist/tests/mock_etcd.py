@@ -10,12 +10,12 @@ from collections import defaultdict
 from itertools import count
 from unittest import mock
 
-from shakenfist import etcd
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
 from shakenfist.network import Network
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
+from shakenfist.util import json as util_json
 
 
 class MockEtcd():
@@ -139,7 +139,7 @@ class MockEtcd():
     # Newer gRPC methods
     def create_raw(self, path, data, lease=None):
         if path not in self.db:
-            self.db[path] = etcd._encode_data(data)
+            self.db[path] = util_json.json_dump(data).encode()
             self._trace(f'MockEtcd.create() {path} successful')
             return True
 
@@ -154,7 +154,7 @@ class MockEtcd():
         return d
 
     def put_raw(self, path, data, lease=None):
-        encoded = etcd._encode_data(data)
+        encoded = util_json.json_dump(data).encode()
         self.db[path] = encoded
         self._trace(f'MockEtcd.put() {path}: {encoded}')
 
@@ -165,8 +165,8 @@ class MockEtcd():
 
         for mutation in mutations:
             path = mutation['path']
-            ode = etcd._encode_data(mutation['original_data'])
-            nde = etcd._encode_data(mutation['new_data'])
+            ode = util_json.json_dump(mutation['original_data']).encode()
+            nde = util_json.json_dump(mutation['new_data']).encode()
 
             if not mutation['original_data']:
                 if path in self.db:
@@ -243,7 +243,7 @@ class MockEtcd():
                 'timestamp': time.time(),
                 'metrics': metrics,
             }
-            self.db[key] = etcd._encode_data(data)
+            self.db[key] = util_json.json_dump(data).encode()
 
     #
     # Database backed objects

@@ -1,12 +1,15 @@
 import json
 from unittest import mock
 
+from shakenfist_utilities import logs  # noreorder
+
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import tasks
 from shakenfist.config import BaseSettings
 from shakenfist.tests import base
-from shakenfist_utilities import logs  # noreorder
+from shakenfist.util import json as util_json
+
 
 LOG, _ = logs.setup(__name__)
 
@@ -155,7 +158,8 @@ class ActualLockTestCase(base.ShakenFistTestCase):
 
 class TaskEncodingETCDtestCase(base.ShakenFistTestCase):
     def test_encode_PreflightInstanceTask(self):
-        actual = etcd._encode_data(tasks.PreflightInstanceTask('fake_uuid'))
+        actual = util_json.json_dump(
+            tasks.PreflightInstanceTask('fake_uuid')).encode()
         expected = b"""{
     "instance_uuid": "fake_uuid",
     "network": [],
@@ -165,8 +169,8 @@ class TaskEncodingETCDtestCase(base.ShakenFistTestCase):
         self.assertEqual(expected, actual)
 
     def test_encode_StartInstanceTask(self):
-        actual = etcd._encode_data(
-            tasks.StartInstanceTask('fake_uuid', ['net_uuid']))
+        actual = util_json.json_dump(
+            tasks.StartInstanceTask('fake_uuid', ['net_uuid'])).encode()
         expected = b"""{
     "instance_uuid": "fake_uuid",
     "network": [
@@ -178,7 +182,8 @@ class TaskEncodingETCDtestCase(base.ShakenFistTestCase):
         self.assertEqual(expected, actual)
 
     def test_encode_DeleteInstanceTask(self):
-        actual = etcd._encode_data(tasks.DeleteInstanceTask('fake_uuid'))
+        actual = util_json.json_dump(
+            tasks.DeleteInstanceTask('fake_uuid')).encode()
         expected = b"""{
     "instance_uuid": "fake_uuid",
     "network": [],
@@ -188,7 +193,8 @@ class TaskEncodingETCDtestCase(base.ShakenFistTestCase):
         self.assertEqual(expected, actual)
 
     def test_encode_DeployNetworkTask(self):
-        actual = etcd._encode_data(tasks.DeployNetworkTask('fake_uuid'))
+        actual = util_json.json_dump(
+            tasks.DeployNetworkTask('fake_uuid')).encode()
 
         expected = b"""{
     "network_uuid": "fake_uuid",
@@ -198,8 +204,9 @@ class TaskEncodingETCDtestCase(base.ShakenFistTestCase):
         self.assertEqual(expected, actual)
 
     def test_encode_FetchImageTask(self):
-        actual = etcd._encode_data(
-            tasks.FetchImageTask('http://server/image', namespace='foo'))
+        actual = util_json.json_dump(
+            tasks.FetchImageTask('http://server/image',
+                                 namespace='foo')).encode()
         expected = b"""{
     "instance_uuid": null,
     "namespace": "foo",
@@ -209,11 +216,11 @@ class TaskEncodingETCDtestCase(base.ShakenFistTestCase):
 }"""
         self.assertEqual(expected, actual)
 
-        actual = etcd._encode_data(
+        actual = util_json.json_dump(
             tasks.FetchImageTask(
                 'http://server/image',
                 namespace='foo',
-                instance_uuid='fake_uuid'))
+                instance_uuid='fake_uuid')).encode()
         expected = b"""{
     "instance_uuid": "fake_uuid",
     "namespace": "foo",

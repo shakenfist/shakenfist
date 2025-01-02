@@ -1,9 +1,7 @@
-from enum import Enum
 import json
 import os
 import threading
 import time
-import uuid
 
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
@@ -18,13 +16,13 @@ import requests
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as util_random  # noreorder
 
-from shakenfist import baseobject
 from shakenfist import etcd_pb2
 from shakenfist import etcd_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
 from shakenfist.tasks import QueueTask
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
@@ -402,19 +400,6 @@ def _construct_key(objecttype, subtype, name):
     return f'/sf/{objecttype}/'
 
 
-class JSONEncoderCustomTypes(json.JSONEncoder):
-    def default(self, obj):
-        if QueueTask.__subclasscheck__(type(obj)):
-            return obj.obj_dict()
-        if type(obj) is baseobject.State:
-            return obj.obj_dict()
-        if type(obj) is uuid.UUID:
-            return str(obj)
-        if isinstance(obj, Enum):
-            return obj.name
-        return json.JSONEncoder.default(self, obj)
-
-
 def put(objecttype, subtype, name, data):
     path = _construct_key(objecttype, subtype, name)
     put_raw(path, data)
@@ -616,11 +601,6 @@ def restart_queues():
 
 
 # Direct etcd calls via gRPC
-def _encode_data(data):
-    return json.dumps(
-        data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes).encode()
-
-
 def _log_and_raise_error(rpc_error):
     code = None
     detail = None
@@ -736,7 +716,7 @@ def get_raw(path):
 @_retry_etcd_native_client
 def put_raw(path, new_data):
     path_encoded = path.encode()
-    new_data_encoded = _encode_data(new_data)
+    new_data_encoded = util_json.json_dump(new_data).encode()
     channel = get_etcd_native_client()
     stub = etcd_pb2_grpc.KVStub(channel)
 
@@ -790,8 +770,9 @@ def replace_many_raw(mutations):
 
     for mutation in mutations:
         path_encoded = mutation['path'].encode()
-        original_data_encoded = _encode_data(mutation['original_data'])
-        new_data_encoded = _encode_data(mutation['new_data'])
+        original_data_encoded = util_json.json_dump(
+            mutation['original_data']).encode()
+        new_data_encoded = util_json.json_dump(mutation['new_data']).encode()
 
         if mutation['original_data'] is None:
             comparisons.append(

@@ -17,6 +17,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
+from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
@@ -365,7 +366,8 @@ class DatabaseBackedObject:
 
         if self.__in_memory_only:
             self.__in_memory_values[attribute] = json.dumps(
-                value, indent=4, sort_keys=True, cls=etcd.JSONEncoderCustomTypes)
+                value, indent=4, sort_keys=True,
+                cls=util_json.JSONEncoderCustomTypes)
         else:
             etcd.put('attribute/%s' % self.object_type,
                      self.__uuid, attribute, value)

@@ -53,10 +53,7 @@ class NodeBlobOperation(BaseClusterOperation):
     # Tasks
     def execute(self):
         try:
-            self.state = self.STATE_EXECUTING
-            for t in self.tasks:
-                self.dispatch_task(t)
-            self.state = self.STATE_COMPLETE
+            super().execute()
         finally:
             etcd.delete_raw(
                 f'/sf/clusteroperations-by-blob/{self.blob_uuid}/{self.node_uuid}')
@@ -72,8 +69,7 @@ class NodeBlobOperation(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(b)
         except Exception as e:
-            util_general.ignore_exception(
-                f'{self.object_type} task {self.uuid} failed: {e}')
+            util_general.ignore_exception('nodebloboperation', e)
 
     def _verify_size_and_checksum(self, b):
         locations = b.locations
