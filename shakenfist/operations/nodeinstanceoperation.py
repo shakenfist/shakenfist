@@ -95,15 +95,18 @@ class NodeInstanceOperation(BaseClusterOperation):
     def _collect_billing_statistics(self, inst):
         with util_libvirt.LibvirtConnection() as lc:
             try:
+                statistics = {}
+
                 # Base libvirt statistics
                 domain = lc.get_domain_from_sf_uuid(inst.uuid)
-                statistics = util_libvirt.extract_statistics(domain)
+                if domain:
+                    statistics.update(util_libvirt.extract_statistics(domain))
 
-                # Power information
-                statistics['libvirt_raw_power_state'] = \
-                    lc.extract_power_state_pretty(domain)
-                statistics['power_state'] = \
-                    lc.extract_power_state(domain)
+                    # Power information
+                    statistics['libvirt_raw_power_state'] = \
+                        lc.extract_power_state_pretty(domain)
+                    statistics['power_state'] = \
+                        lc.extract_power_state(domain)
 
                 # Add in actual size on disk
                 bd = inst.block_devices
