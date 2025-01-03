@@ -239,7 +239,10 @@ class Blob(dbo):
                 out.append(loc)
         return out
 
-    def _update_incomplete_location_inner(self, percentage):
+    def _update_incomplete_location_inner(self, percentage, node=None):
+        if not node:
+            node = config.NODE_NAME
+
         original = etcd.get(f'attribute/{self.object_type}', self.uuid,
                             'incomplete_locations')
         if not original:
@@ -248,12 +251,12 @@ class Blob(dbo):
             updated = copy.deepcopy(original)
         changed = False
 
-        if config.NODE_NAME not in updated['locations']:
+        if node not in updated['locations']:
             changed = True
-            updated['locations'][config.NODE_NAME] = percentage
-        elif updated['locations'][config.NODE_NAME] != percentage:
+            updated['locations'][node] = percentage
+        elif updated['locations'][node] != percentage:
             changed = True
-            updated['locations'][config.NODE_NAME] = percentage
+            updated['locations'][node] = percentage
 
         if changed:
             return etcd.replace(f'attribute/{self.object_type}', self.uuid,
@@ -261,11 +264,11 @@ class Blob(dbo):
 
         return True
 
-    def update_incomplete_location(self, percentage):
+    def update_incomplete_location(self, percentage, node=None):
         percentage = round(percentage, 1)
         attempts = 0
         while attempts < 3:
-            if self._update_incomplete_location_inner(percentage):
+            if self._update_incomplete_location_inner(percentage, node=node):
                 return
             attempts += 1
             time.sleep(0.01)
@@ -736,7 +739,7 @@ class Blob(dbo):
                         self.uuid,
                         [nbo_schema.model_tasks.ensure_local],
                         nbo_schema.PRIORITY.BACKGROUND_HIGH_IO)
-                    self.update_incomplete_location(n, 0)
+                    self.update_incomplete_location(0, node=n)
                     self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
 
