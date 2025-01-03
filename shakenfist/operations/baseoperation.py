@@ -36,8 +36,8 @@ class BaseOperation(dbo):
 
 
 def get_all_queue_names(node_uuid):
-    return [get_all_user_facing_queue_names(node_uuid) +
-            get_all_background_queue_names(node_uuid)]
+    return (get_all_user_facing_queue_names(node_uuid) +
+            get_all_background_queue_names(node_uuid))
 
 
 def get_all_user_facing_queue_names(node_uuid):
