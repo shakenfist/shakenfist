@@ -175,6 +175,11 @@ class Monitor(daemon.Daemon):
                     # The domain has likely been deleted.
                     pass
 
+            # Metric name helper
+            def _safe_metric_name(name):
+                name = name.lower()
+                return re.sub(r'[^a-z0-9_]', '_', name)
+
             # Queue health statistics
             node_queue_waiting = 0
             node_queue_processing = 0
@@ -189,10 +194,11 @@ class Monitor(daemon.Daemon):
                     'queue': queue
                 }).debug('Queue length')
 
+                safe_metric_queue_name = _safe_metric_name(f'queue_{queue}')
                 retval.update({
-                    f'{queue}_processing': processing,
-                    f'{queue}_queued': queued,
-                    f'{queue}_deferred': deferred
+                    f'{safe_metric_queue_name}_processing': processing,
+                    f'{safe_metric_queue_name}_queued': queued,
+                    f'{safe_metric_queue_name}_deferred': deferred
                 })
 
                 node_queue_processing += processing
@@ -216,8 +222,8 @@ class Monitor(daemon.Daemon):
                     etcd.get_queue_length('networknode')
 
                 retval.update({
-                    'network_queue_processing': network_queue_processing,
-                    'network_queue_waiting': network_queue_waiting,
+                    'queue_network_processing': network_queue_processing,
+                    'queue_network_waiting': network_queue_waiting,
                 })
 
             if config.NODE_IS_EVENTLOG_NODE:
@@ -234,9 +240,6 @@ class Monitor(daemon.Daemon):
             # How much CPU time have the various SF components consumed since restart?
             # We only traverse two layers here, so its not worth doing something
             # recursive.
-            def _safe_metric_name(name):
-                return re.sub(r'[^a-zA-Z0-9]', '_', name)
-
             def _emit_process_metrics(p):
                 if time.time() - p.create_time() < 60:
                     # Ignore new processes
