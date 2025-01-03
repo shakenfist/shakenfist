@@ -59,7 +59,6 @@ def _health_checks():
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
         warned_locks = {}
-        last_length = 0
         last_third_party_health_check = 0
 
         n = Node.from_db(config.NODE_NAME)
@@ -98,18 +97,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                         LOG.with_fields(lock_details).error(
                             'Lock held by missing process on this node for more '
                             'than 30 seconds')
-
-                if time.time() - last_length > 10:
-                    for queue in get_all_queue_names(config.NODE_NAME):
-                        processing, queued, deferred = etcd.get_queue_length(
-                            queue)
-                        LOG.with_fields({
-                            'processing': processing,
-                            'queued': queued,
-                            'deferred': deferred,
-                            'queue': queue
-                        }).debug('Queue length')
-                    last_length = time.time()
 
                 if not self.dequeue_job(workitem.Job):
                     self.idle(0.2)

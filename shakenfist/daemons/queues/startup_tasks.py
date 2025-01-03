@@ -22,6 +22,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
+from shakenfist.operations.baseoperation import get_all_queue_names
 from shakenfist.util import general as util_general
 
 
@@ -212,14 +213,25 @@ def startup_tasks():
         etcd.put_raw('/sf/cache/_version', cache_version)
 
     # Log configuration on startup
-    for key, value in config.dict().items():
+    for key, value in config.model_dump().items():
         LOG.info(f'Configuration item {key} = {value}')
 
     daemon.set_log_level(LOG, 'main')
 
-    # Check in early and often, also reset processing queue items.
+    # Check in early and often
     etcd.clear_stale_locks()
-    etcd.restart_queues()
+
+    # Reset queues
+    for queue in get_all_queue_names(config.NODE_NAME):
+        etcd.restart_queue(queue)
+        processing, queued, deferred = etcd.get_queue_length(
+            queue)
+        LOG.with_fields({
+            'processing': processing,
+            'queued': queued,
+            'deferred': deferred,
+            'queue': queue
+        }).debug('Queue length')
 
     # Ensure the blob data store is the most recent version
     upgrade_blob_datastore()

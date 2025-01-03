@@ -569,7 +569,7 @@ def get_queue_length(queuename):
 
 
 @retry_etcd_forever
-def _restart_queue(queuename):
+def restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
 
     for data, metadata in get_etcd_client().get_prefix(
@@ -582,22 +582,6 @@ def _restart_queue(queuename):
             'jobname': jobname,
             'queuename': queuename,
             }).warning('Reset workitem')
-
-
-def get_outstanding_jobs():
-    for data, metadata in get_etcd_client().get_prefix('/sf/processing'):
-        yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
-    for data, metadata in get_etcd_client().get_prefix('/sf/queued'):
-        yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
-
-
-def restart_queues():
-    # Move things which were in processing back to the queue because
-    # we didn't complete them before crashing.
-    if config.NODE_IS_NETWORK_NODE:
-        _restart_queue('networknode')
-    _restart_queue(config.NODE_NAME)
-    _restart_queue(f'{config.NODE_NAME}-background')
 
 
 # Direct etcd calls via gRPC

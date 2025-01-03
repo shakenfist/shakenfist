@@ -23,6 +23,7 @@ from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
+from shakenfist.operations.baseoperation import get_all_queue_names
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import network as util_network
@@ -175,8 +176,28 @@ class Monitor(daemon.Daemon):
                     pass
 
             # Queue health statistics
-            node_queue_processing, node_queue_waiting, node_queue_deferred = \
-                etcd.get_queue_length(config.NODE_NAME)
+            node_queue_waiting = 0
+            node_queue_processing = 0
+            node_queue_deferred = 0
+
+            for queue in get_all_queue_names(config.NODE_NAME):
+                processing, queued, deferred = etcd.get_queue_length(queue)
+                LOG.with_fields({
+                    'processing': processing,
+                    'queued': queued,
+                    'deferred': deferred,
+                    'queue': queue
+                }).debug('Queue length')
+
+                retval.update({
+                    f'{queue}_processing': processing,
+                    f'{queue}_queued': queued,
+                    f'{queue}_deferred': deferred
+                })
+
+                node_queue_processing += processing
+                node_queue_waiting += queued
+                node_queue_deferred += deferred
 
             retval.update({
                 'cpu_total_instance_vcpus': total_instance_vcpus,

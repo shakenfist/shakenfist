@@ -39,19 +39,8 @@ class Job(util_concurrency.Job):
     def execute(self):
         LOG.info('Starting network worker')
         was_previously_idle = False
-        last_length = 0
 
         while not os.path.exists(self.abort_path):
-            if time.time() - last_length > 10:
-                processing, queued, deferred = etcd.get_queue_length(
-                    'networknode')
-                LOG.with_fields({
-                    'processing': processing,
-                    'queued': queued,
-                    'deferred': deferred
-                }).debug('Queue length')
-                last_length = time.time()
-
             jobname_workitem = etcd.dequeue('networknode')
             if not jobname_workitem:
                 if not was_previously_idle:
