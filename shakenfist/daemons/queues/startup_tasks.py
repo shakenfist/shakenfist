@@ -2,19 +2,16 @@ import json
 import os
 import pathlib
 import time
-from collections import defaultdict
 from functools import partial
 
 import pyprctl
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import cache
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import network
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_ITERATORS
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist.blob import placement_filter
@@ -191,26 +188,6 @@ def startup_tasks():
     # If you ran this, it means we're not shutting down any more
     n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
     n.add_event(EVENT_TYPE_AUDIT, f'node is running v{version}')
-
-    # Ensure we have a consistent cache of object states if the cache is entirely
-    # absent.
-    cache_version = etcd.get_raw('/sf/cache/_version')
-    if not cache_version:
-        cache_version = {'version': 0}
-
-    if cache_version['version'] != 2:
-        # We don't need to step through various upgrades, we just rebuild
-        # the entire cache from scratch instead.
-        for obj_type in OBJECT_NAMES_TO_ITERATORS:
-            with etcd.get_lock('cache', None, obj_type, op='Cache upgrade'):
-                by_state = defaultdict(dict)
-                for obj in OBJECT_NAMES_TO_ITERATORS[obj_type]([]):
-                    by_state[obj.state.value][obj.uuid] = time.time()
-                for state in by_state:
-                    cache.clobber_object_state_cache(
-                        obj_type, state, by_state[state])
-        cache_version['version'] = 2
-        etcd.put_raw('/sf/cache/_version', cache_version)
 
     # Log configuration on startup
     for key, value in config.model_dump().items():

@@ -13,7 +13,6 @@ from shakenfist.daemons import daemon
 from shakenfist.daemons.queues import startup_tasks
 from shakenfist.daemons.queues import workitem
 from shakenfist.node import Node
-from shakenfist.operations.baseoperation import get_all_queue_names
 from shakenfist.util import general as util_general
 
 

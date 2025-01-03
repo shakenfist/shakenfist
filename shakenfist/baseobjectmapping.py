@@ -25,16 +25,3 @@ OBJECT_NAMES_TO_CLASSES = {
     'nodeinstanceoperation': nodeinstanceoperation.NodeInstanceOperation,
     'upload': upload.Upload
 }
-
-# dhcp does not have an iterator
-OBJECT_NAMES_TO_ITERATORS = {
-    'agentoperation': agentoperation.AgentOperations,
-    'artifact': artifact.Artifacts,
-    'blob': blob.Blobs,
-    'instance': instance.Instances,
-    'ipam': ipam.IPAMs,
-    'namespace': namespace.Namespaces,
-    'network': network.Networks,
-    'networkinterface': networkinterface.NetworkInterfaces,
-    'node': node.Nodes
-}

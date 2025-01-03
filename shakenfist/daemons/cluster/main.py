@@ -24,7 +24,6 @@ from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_ITERATORS
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist.blob import placement_filter
@@ -83,8 +82,10 @@ class Monitor(daemon.Daemon):
             self.lock.refresh()
 
         # Cleanup soft deleted objects
-        for objtype in OBJECT_NAMES_TO_ITERATORS:
-            for obj in OBJECT_NAMES_TO_ITERATORS[objtype]([], prefilter='deleted'):
+        for objtype in OBJECT_NAMES_TO_CLASSES:
+            for obj_uuid in cache.read_object_state_cache(
+                    objtype, dbo.STATE_DELETED):
+                obj = OBJECT_NAMES_TO_CLASSES[objtype].from_db(obj_uuid)
                 if time.time() - obj.state.update_time > config.CLEANER_DELAY:
                     obj.hard_delete()
         self.lock.refresh()
@@ -407,7 +408,7 @@ class Monitor(daemon.Daemon):
                         etcd.resolve(queue_name, jobname)
 
         # Remove old entries from the hard-deleted state caches
-        for object_type in OBJECT_NAMES_TO_ITERATORS:
+        for object_type in OBJECT_NAMES_TO_CLASSES:
             with etcd.get_lock('cache', None, object_type, op='Hard deleted prune'):
                 hd = etcd.get('cache', object_type, 'hard-deleted')
                 if hd:
@@ -420,7 +421,7 @@ class Monitor(daemon.Daemon):
         LOG.info('Cluster maintenance loop complete')
 
     def refresh_object_state_caches(self):
-        for object_type in OBJECT_NAMES_TO_ITERATORS:
+        for object_type in OBJECT_NAMES_TO_CLASSES:
             with etcd.get_lock('cache', None, object_type, op='Cache refresh'):
                 by_state = {
                     '_all_': {},
@@ -431,7 +432,10 @@ class Monitor(daemon.Daemon):
                     if state:
                         by_state[state] = {}
 
-                for obj in OBJECT_NAMES_TO_ITERATORS[object_type]([]):
+                for key, _ in etcd.get_prefix(f'/sf/{object_type}'):
+                    obj_uuid = key.split('/')[-1]
+                    obj = OBJECT_NAMES_TO_CLASSES[object_type].from_db(
+                        obj_uuid)
                     if obj.state.value:
                         by_state[obj.state.value][obj.uuid] = time.time()
                         by_state['_all_'][obj.uuid] = time.time()
@@ -439,6 +443,8 @@ class Monitor(daemon.Daemon):
                 for state in by_state:
                     cache.clobber_object_state_cache(
                         object_type, state, by_state[state])
+
+        etcd.put_raw('/sf/cache/_version', {'version': 2})
 
     def _run_inner(self):
         last_defer_message = 0
