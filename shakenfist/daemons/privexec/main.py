@@ -148,7 +148,7 @@ class PrivExecJob:
 
 
 def write_pid_file():
-    with open('/run/sf-privexec.pid', 'w') as f:
+    with open('/run/sf/privexec.pid', 'w') as f:
         f.write(f'{os.getpid()}')
 
 

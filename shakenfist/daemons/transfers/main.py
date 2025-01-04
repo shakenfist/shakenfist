@@ -23,7 +23,7 @@ class TransferJob(util_concurrency.Job):
         self.name = name
         self.data = data
 
-        self.abort_path = f'/run/sf-transfers-{name}.abort'
+        self.abort_path = f'/run/sf/transfers-{name}.abort'
         if os.path.exists(self.abort_path):
             os.unlink(self.abort_path)
 

@@ -28,7 +28,7 @@ signal.signal(signal.SIGTERM, exit_gracefully)
 
 
 def main():
-    abort_path = '/run/sf-sentinel-first.abort'
+    abort_path = '/run/sf/sentinel-first.abort'
     if os.path.exists(abort_path):
         os.unlink(abort_path)
 

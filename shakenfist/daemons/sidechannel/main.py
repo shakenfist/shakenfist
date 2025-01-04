@@ -65,7 +65,7 @@ class SideChannelJob(util_concurrency.Job):
     def __init__(self, instance_uuid):
         super().__init__()
         self.instance_uuid = instance_uuid
-        self.abort_path = f'/run/sf-sidechannel-{instance_uuid}.abort'
+        self.abort_path = f'/run/sf/sidechannel-{instance_uuid}.abort'
 
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:

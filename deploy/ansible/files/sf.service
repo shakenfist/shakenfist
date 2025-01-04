@@ -48,7 +48,7 @@ RestartSec=5
 # Note that this _does_not_ create the PID file, it merely causes it to be
 # cleaned up when the unit stops. The PID file is created in the main() for
 # each daemon instead.
-PIDFile=/run/sf-{{ item }}.pid
+PIDFile=/run/sf/{{ item }}.pid
 
 [Install]
 WantedBy=sf.target

@@ -16,7 +16,7 @@ class Job(util_concurrency.Job):
         super().__init__()
         self.name = name
 
-        self.abort_path = f'/run/sf-net-{name}.abort'
+        self.abort_path = f'/run/sf/net-{name}.abort'
         if os.path.exists(self.abort_path):
             os.unlink(self.abort_path)
 

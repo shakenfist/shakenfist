@@ -67,7 +67,7 @@ def set_log_level(log, name):
 
 
 def write_pid_file(daemon_name):
-    with open(f'/run/{DAEMON_NAMES[daemon_name]}.pid', 'w') as f:
+    with open(f'/run/sf/{daemon_name}.pid', 'w') as f:
         f.write(f'{os.getpid()}')
 
 
@@ -98,7 +98,7 @@ class Daemon:
         self.log, _ = logs.setup(name)
         set_log_level(self.log, name)
 
-        self.abort_path = f'/run/sf-{name}.abort'
+        self.abort_path = f'/run/sf/{name}.abort'
         if os.path.exists(self.abort_path):
             os.unlink(self.abort_path)
         signal.signal(signal.SIGTERM, self.exit_gracefully)

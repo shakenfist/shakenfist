@@ -58,7 +58,7 @@ class Job(util_concurrency.Job):
             'job': jobname
         })
 
-        self.abort_path = f'/run/sf-queues-{jobname}.abort'
+        self.abort_path = f'/run/sf/queues-{jobname}.abort'
         if os.path.exists(self.abort_path):
             os.unlink(self.abort_path)
 

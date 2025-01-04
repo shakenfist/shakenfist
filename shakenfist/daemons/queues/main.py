@@ -24,12 +24,12 @@ def _check_other_daemon(n, daemon_name, override_daemon_name=None):
     if override_daemon_name:
         recorded_daemon_name = override_daemon_name
 
-    if not os.path.exists(f'/run/sf-{daemon_name}.pid'):
+    if not os.path.exists(f'/run/sf/{daemon_name}.pid'):
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='pid file missing')
 
     try:
-        with open(f'/run/sf-{daemon_name}.pid') as f:
+        with open(f'/run/sf/{daemon_name}.pid') as f:
             pid = int(f.read())
             psutil.Process(pid)
             n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_RUNNING)
