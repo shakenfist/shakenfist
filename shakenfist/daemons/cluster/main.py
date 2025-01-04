@@ -436,7 +436,15 @@ class Monitor(daemon.Daemon):
                     obj_uuid = key.split('/')[-1]
                     obj = OBJECT_NAMES_TO_CLASSES[object_type].from_db(
                         obj_uuid)
-                    if obj.state.value:
+                    if obj:
+                        if obj.state.value not in by_state:
+                            LOG.with_fields({
+                                'state': obj.state.value,
+                                'object_type': object_type,
+                                'object_uuid': obj_uuid
+                            }).error('Unknown state!')
+                            continue
+
                         by_state[obj.state.value][obj.uuid] = time.time()
                         by_state['_all_'][obj.uuid] = time.time()
 
