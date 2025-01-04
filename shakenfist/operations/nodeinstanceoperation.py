@@ -91,6 +91,7 @@ class NodeInstanceOperation(BaseClusterOperation):
             self.__getattribute__(f'_{task}')(inst)
         except Exception as e:
             util_general.ignore_exception('nodeinstanceoperation', e)
+            self.state = NodeInstanceOperation.STATE_ERROR
 
     def _collect_billing_statistics(self, inst):
         with util_libvirt.LibvirtConnection() as lc:

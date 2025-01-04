@@ -18,6 +18,7 @@ class BaseOperation(dbo):
     STATE_PREFLIGHT = 'preflight'
     STATE_EXECUTING = 'executing'
     STATE_COMPLETE = 'complete'
+    STATE_ABORT = 'abort'
 
     ACTIVE_STATES = {dbo.STATE_CREATED, STATE_QUEUED,
                      STATE_EXECUTING, STATE_COMPLETE}
@@ -28,8 +29,10 @@ class BaseOperation(dbo):
                             dbo.STATE_ERROR),
         STATE_PREFLIGHT: (STATE_QUEUED, dbo.STATE_DELETED, dbo.STATE_ERROR),
         STATE_QUEUED: (STATE_EXECUTING, dbo.STATE_DELETED, dbo.STATE_ERROR),
-        STATE_EXECUTING: (STATE_COMPLETE, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        STATE_EXECUTING: (STATE_COMPLETE, dbo.STATE_DELETED, dbo.STATE_ERROR,
+                          STATE_ABORT),
         STATE_COMPLETE: (dbo.STATE_DELETED),
+        STATE_ABORT: (dbo.STATE_DELETED),
         dbo.STATE_ERROR: (dbo.STATE_DELETED),
         dbo.STATE_DELETED: None,
     }
@@ -87,7 +90,12 @@ class BaseClusterOperation(BaseOperation):
             })
 
     def execute(self):
-        self.state = self.STATE_EXECUTING
+        self.state = BaseClusterOperation.STATE_EXECUTING
         for t in self.tasks:
             self.dispatch_task(t)
-        self.state = self.STATE_COMPLETE
+            if self.state.value in [BaseClusterOperation.STATE_ABORT,
+                                    BaseClusterOperation.STATE_DELETED,
+                                    BaseClusterOperation.STATE_ERROR]:
+                return
+
+        self.state = BaseClusterOperation.STATE_COMPLETE

@@ -70,10 +70,6 @@ class LowResourceException(SchedulerException):
     ...
 
 
-class AbortInstanceStartException(SchedulerException):
-    ...
-
-
 # Database
 class DatabaseException(Exception):
     ...

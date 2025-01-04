@@ -87,10 +87,6 @@ class InstanceTask(QueueTask):
                 'network': self._network}
 
 
-class PreflightInstanceTask(InstanceTask):
-    _name = 'instance_preflight'
-
-
 class StartInstanceTask(InstanceTask):
     _name = 'instance_start'
 

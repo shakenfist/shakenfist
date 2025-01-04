@@ -44,12 +44,12 @@ from shakenfist.external_api import util as api_util
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
+from shakenfist.operations.nodeinstancenetdescoperation import NodeInstanceNetDescOperation
 from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.tasks import FetchImageTask
 from shakenfist.tasks import FloatNetworkInterfaceTask
 from shakenfist.tasks import HotPlugInstanceInterfaceTask
 from shakenfist.tasks import PreflightAgentOperationTask
-from shakenfist.tasks import PreflightInstanceTask
 from shakenfist.tasks import StartInstanceTask
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util import general as util_general
@@ -773,8 +773,10 @@ class InstancesEndpoint(sf_api.Resource):
         tasks.append(StartInstanceTask(inst.uuid, network))
         tasks.extend(float_tasks)
 
-        # Enqueue creation tasks on desired node task queue
-        etcd.enqueue(placement, {'tasks': tasks})
+        cluster_op = NodeInstanceNetDescOperation.new(
+            candidates[0], self.instance_uuid, self.net_desc,
+            self.tasks, self.priority, self.request_id)
+        cluster_op.enqueue()
         return inst.external_view()
 
     @swag_from(api_base.swagger_helper(

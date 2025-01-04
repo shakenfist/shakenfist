@@ -7,28 +7,6 @@ from shakenfist.tests import base
 
 class TasksEqTestCase(base.ShakenFistTestCase):
     def test_QueueTask_eq(self):
-        self.assertEqual(tasks.PreflightInstanceTask('abcd'),
-                         tasks.PreflightInstanceTask('abcd'))
-
-        self.assertEqual(tasks.PreflightInstanceTask('abcd', []),
-                         tasks.PreflightInstanceTask('abcd', []))
-
-        self.assertEqual(tasks.PreflightInstanceTask('abcd'),
-                         tasks.PreflightInstanceTask('abcd', []))
-
-        self.assertNotEqual(tasks.PreflightInstanceTask('abcd'),
-                            tasks.PreflightInstanceTask('abcd', ['netuuid']))
-
-        self.assertEqual(tasks.PreflightInstanceTask('abcd', ['a1', 'b2']),
-                         tasks.PreflightInstanceTask('abcd', ['a1', 'b2']))
-
-        self.assertNotEqual(tasks.PreflightInstanceTask('abcd', ['a1', 'b2']),
-                            tasks.PreflightInstanceTask('abcd', ['a1']))
-
-        with testtools.ExpectedException(NotImplementedError):
-            self.assertEqual(tasks.PreflightInstanceTask('abcd', ['a1', 'b2']),
-                             42)
-
         self.assertEqual(tasks.DeleteInstanceTask('abcd'),
                          tasks.DeleteInstanceTask('abcd'))
 

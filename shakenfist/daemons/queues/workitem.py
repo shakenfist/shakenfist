@@ -15,7 +15,6 @@ from shakenfist import images
 from shakenfist import instance
 from shakenfist import network
 from shakenfist import networkinterface
-from shakenfist import scheduler
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -34,7 +33,6 @@ from shakenfist.tasks import HotPlugInstanceInterfaceTask
 from shakenfist.tasks import HypervisorDestroyNetworkTask
 from shakenfist.tasks import InstanceTask
 from shakenfist.tasks import PreflightAgentOperationTask
-from shakenfist.tasks import PreflightInstanceTask
 from shakenfist.tasks import QueueTask
 from shakenfist.tasks import SnapshotTask
 from shakenfist.tasks import StartInstanceTask
@@ -127,21 +125,6 @@ class Job(util_concurrency.Job):
                     if not n:
                         n = 'system'
                     image_fetch(task.url(), n, inst)
-
-                elif isinstance(task, PreflightInstanceTask):
-                    s = inst.state.value
-                    if s in instance.Instance.TERMINAL_STATES:
-                        self.log.warning(
-                            'You cannot preflight an instance in state %s, '
-                            'skipping task' % s)
-                        continue
-
-                    redirect_to = instance_preflight(inst, task.network())
-                    if redirect_to:
-                        self.log.info(
-                            f'Redirecting instance start to {redirect_to}')
-                        etcd.enqueue(redirect_to, self.workitem)
-                        return
 
                 elif isinstance(task, StartInstanceTask):
                     instance_start(inst, task.network())
@@ -309,47 +292,6 @@ def image_fetch(url, namespace, inst):
                 EVENT_TYPE_AUDIT, 'updating image failed, using already cached version',
                 extra={'message': msg})
 
-
-def instance_preflight(inst, netdescs):
-    inst.state = instance.Instance.STATE_PREFLIGHT
-
-    # Try to place on this node
-    s = scheduler.Scheduler()
-    try:
-        s.find_candidates(inst, netdescs, candidates=[config.NODE_NAME])
-        return None
-
-    except exceptions.LowResourceException as e:
-        inst.add_event(EVENT_TYPE_AUDIT, 'schedule failed, insufficient resources',
-                       extra={'message': str(e)})
-
-    # Unsuccessful placement, check if reached placement attempt limit
-    db_placement = inst.placement
-    if db_placement['placement_attempts'] > 3:
-        raise exceptions.AbortInstanceStartException(
-            'Too many start attempts')
-
-    # Try placing on another node
-    try:
-        if inst.requested_placement:
-            # TODO(andy): Ask Mikal why this is not the current node?
-            candidates = [inst.requested_placement]
-        else:
-            candidates = []
-            for node in s.metrics.keys():
-                if node != config.NODE_NAME:
-                    candidates.append(node)
-
-        candidates = s.find_candidates(inst, netdescs, candidates=candidates)
-        inst.place_instance(candidates[0])
-        return candidates[0]
-
-    except exceptions.LowResourceException as e:
-        inst.add_event(EVENT_TYPE_AUDIT, 'schedule failed, insufficient resources',
-                       extra={'message': str(e)})
-        # This raise implies delete above
-        raise exceptions.AbortInstanceStartException(
-            'Unable to find suitable node')
 
 
 def instance_start(inst, netdescs):
