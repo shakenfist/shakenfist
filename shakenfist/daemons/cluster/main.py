@@ -51,7 +51,7 @@ class Monitor(daemon.Daemon):
         # Attempt to acquire the cluster maintenance lock forever. We never
         # release the lock, it gets cleared on a crash. This is so that only
         # one node at a time is performing cluster maintenance.
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             self.lock = etcd.get_lock('cluster', None, None, ttl=300, timeout=10,
                                       op='Cluster maintenance')
             result = self.lock.acquire()
@@ -460,7 +460,7 @@ class Monitor(daemon.Daemon):
         self.refresh_object_state_caches()
 
         last_loop_run = 0
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             pyprctl.set_name('idle')
             LOG.debug('This cluster thread is now idle and awaiting election')
             self._await_election()

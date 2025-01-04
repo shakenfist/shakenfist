@@ -24,8 +24,7 @@ class TransferJob(util_concurrency.Job):
         self.data = data
 
         self.abort_path = f'/run/sf/transfers-{name}.abort'
-        if os.path.exists(self.abort_path):
-            os.unlink(self.abort_path)
+        daemon.clear_abort_path(self.abort_path)
 
     def execute(self):
         etcd.reset_client()
@@ -90,7 +89,7 @@ class TransferJob(util_concurrency.Job):
 
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             try:
                 self.reap_workers()
 

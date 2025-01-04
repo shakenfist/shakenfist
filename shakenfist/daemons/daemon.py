@@ -71,6 +71,22 @@ def write_pid_file(daemon_name):
         f.write(f'{os.getpid()}')
 
 
+def clear_abort_path(abort_path):
+    if os.path.exists(abort_path):
+        LOG.info(f'Clearing abort file: {abort_path}')
+        os.unlink(abort_path)
+
+
+def set_abort_path(abort_path):
+    LOG.info(f'Setting abort file: {abort_path}')
+    with open(abort_path, 'w') as f:
+        f.write('1')
+
+
+def check_abort_path(abort_path):
+    return not os.path.exists(abort_path)
+
+
 def health_check_privexec():
     try:
         stdout, stderr = util_concurrency.execute(None, 'whoami')
@@ -99,8 +115,7 @@ class Daemon:
         set_log_level(self.log, name)
 
         self.abort_path = f'/run/sf/{name}.abort'
-        if os.path.exists(self.abort_path):
-            os.unlink(self.abort_path)
+        clear_abort_path(self.abort_path)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
         faulthandler.register(signal.SIGUSR1)
@@ -187,16 +202,14 @@ class Daemon:
                 # This might fail if grpc has already started shutting down
                 ...
 
-            with open(self.abort_path, 'w') as f:
-                f.write('1')
+            set_abort_path(self.abort_path)
 
     def check_daemon_state(self):
         n = Node.from_db(config.NODE_NAME)
         daemon_state = n.get_daemon_state(self.daemon_name).value
         if daemon_state in [Node.DAEMON_STATE_STOPPED,
                             Node.DAEMON_STATE_STOPPING]:
-            with open(self.abort_path, 'w') as f:
-                f.write('1')
+            set_abort_path(self.abort_path)
 
     def record_start(self):
         n = Node.from_db(config.NODE_NAME)
@@ -248,8 +261,8 @@ class WorkerPoolDaemon(Daemon):
             while len(self.workers) > 0:
                 for thread_name in self.workers:
                     thread_ident = self.workers[thread_name]['thread'].ident
-                    with open(self.workers[thread_name]['object'].abort_path, 'w') as f:
-                        f.write('1')
+                    set_abort_path(
+                        self.workers[thread_name]['object'].abort_path)
                     LOG.info(f'Sent exit event to {thread_name} thread '
                              f'with ident {thread_ident}')
 

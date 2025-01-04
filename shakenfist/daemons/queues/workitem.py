@@ -8,6 +8,7 @@ import pyprctl
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import blob
+from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import images
@@ -59,8 +60,7 @@ class Job(util_concurrency.Job):
         })
 
         self.abort_path = f'/run/sf/queues-{jobname}.abort'
-        if os.path.exists(self.abort_path):
-            os.unlink(self.abort_path)
+        daemon.clear_abort_path(self.abort_path)
 
     def execute(self):
         pyprctl.set_name(self.jobname)

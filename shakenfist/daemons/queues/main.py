@@ -62,7 +62,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         n = Node.from_db(config.NODE_NAME)
 
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             try:
                 self.reap_workers()
 

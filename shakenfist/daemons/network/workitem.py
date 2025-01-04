@@ -1,10 +1,10 @@
 import flask
-import os
 import pyprctl
 import time
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import network
@@ -33,14 +33,13 @@ class Job(util_concurrency.Job):
         self.name = name
 
         self.abort_path = f'/run/sf/net-{name}.abort'
-        if os.path.exists(self.abort_path):
-            os.unlink(self.abort_path)
+        daemon.clear_abort_path(self.abort_path)
 
     def execute(self):
         LOG.info('Starting network worker')
         was_previously_idle = False
 
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             jobname_workitem = etcd.dequeue('networknode')
             if not jobname_workitem:
                 if not was_previously_idle:

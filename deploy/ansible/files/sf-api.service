@@ -12,6 +12,7 @@ Group=root
 
 EnvironmentFile=/etc/sf/config
 ExecStartPre=/bin/sh -c '/srv/shakenfist/venv/bin/sf-ctl verify-config'
+ExecStartPre=/bin/sh -c 'rm -f /run/sf/gunicorn.pid'
 ExecStart=/bin/sh -c '/srv/shakenfist/venv/bin/gunicorn --workers 5 --bind 0.0.0.0:13000 --log-syslog --log-syslog-prefix sf --timeout 300 --name "sf-api" --pid /run/sf/gunicorn.pid --preload shakenfist.external_api.app:app'
 
 Restart=on-failure

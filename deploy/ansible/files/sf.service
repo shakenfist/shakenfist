@@ -22,10 +22,9 @@ Description=Shaken Fist {{ item }} daemon
 # systemd with the current options.
 {% if item == "sentinel-first" %}
 After=multi-user.target
-TimeoutStopSec=90s
 {% elif item == "privexec" %}
 After=sf-sentinel-first.service
-{% else %}
+{% elif item != "sentinel-last" %}
 After=sf-privexec.service
 Before=sf-sentinel-last.service
 {% endif%}
@@ -38,7 +37,8 @@ Group=root
 
 EnvironmentFile=/etc/sf/config
 ExecStartPre=/bin/sh -c '/srv/shakenfist/venv/bin/sf-ctl verify-config'
-ExecStartPre=/bin/sh -c 'rm -f /run/sf-{{ item }}*.abort'
+ExecStartPre=/bin/sh -c 'rm -f /run/sf/{{ item }}*.abort'
+ExecStartPre=/bin/sh -c 'rm -f /run/sf/{{ item }}*.pid'
 ExecStart=/bin/sh -c '/srv/shakenfist/venv/bin/sf-{{ item }}'
 ExecStop=/bin/sh -c '/srv/shakenfist/venv/bin/sf-ctl stop {{ item }}'
 

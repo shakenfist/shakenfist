@@ -364,7 +364,7 @@ class SideChannelJob(util_concurrency.Job):
                 'unique': str(time.time())
                 })
 
-            while not os.path.exists(self.abort_path):
+            while daemon.check_abort_path(self.abort_path):
                 for packet in self._await_client():
                     self.log.with_fields({'packet': packet}).error(
                         'Unexpected sidechannel client packet during startup, ignoring')
@@ -401,13 +401,13 @@ class SideChannelJob(util_concurrency.Job):
         if self.instance_ready == constants.AGENT_TOO_OLD:
             self.instance.add_event(
                 EVENT_TYPE_AUDIT, 'instance agent is too old, not executing commands')
-            while not os.path.exists(self.abort_path):
+            while daemon.check_abort_path(self.abort_path):
                 time.sleep(1)
 
         # Spin reading packets and responding until we see an error or are asked
         # to exit.
         try:
-            while not os.path.exists(self.abort_path):
+            while daemon.check_abort_path(self.abort_path):
                 for packet in self._await_client():
                     self.log.with_fields({'packet': packet}).error(
                         'Unexpected sidechannel client packet')
@@ -632,7 +632,7 @@ class Monitor(daemon.Daemon):
     def _run_inner(self):
         instance_sidechannel_cache = {}
 
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             try:
                 self.reap_single_instance_monitors()
 

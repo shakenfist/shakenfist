@@ -1,9 +1,9 @@
 from collections import defaultdict
-import os
 import time
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.daemons import daemon
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import network as util_network
 
@@ -17,14 +17,13 @@ class Job(util_concurrency.Job):
         self.name = name
 
         self.abort_path = f'/run/sf/net-{name}.abort'
-        if os.path.exists(self.abort_path):
-            os.unlink(self.abort_path)
+        daemon.clear_abort_path(self.abort_path)
 
     def execute(self):
         LOG.info('Starting MTU watchdog')
         last_loop = 0
 
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             if time.time() - last_loop < 30:
                 time.sleep(1)
                 continue

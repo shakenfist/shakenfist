@@ -403,7 +403,7 @@ class Monitor(daemon.Daemon):
                 except (psutil.NoSuchProcess, FileNotFoundError):
                     ...
 
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             try:
                 if time.time() - last_metrics > config.SCHEDULER_CACHE_TIMEOUT:
                     update_metrics()
