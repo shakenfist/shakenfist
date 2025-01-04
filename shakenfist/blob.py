@@ -18,7 +18,7 @@ from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import cache
 from shakenfist import etcd
-from shakenfist.etcd_schema.operations import nodebloboperation as nbo_schema
+from shakenfist.etcd_schema.operations import node_blob_op as nbo_schema
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config

@@ -11,7 +11,7 @@ from shakenfist.etcd_schema.operations.util import base_mutations
 from shakenfist.etcd_schema.operations.util import enqueue
 
 
-object_type = 'nodeinstancenetdescoperation'
+object_type = 'node_inst_netdesc_op'
 initial_version = 1
 current_version = 1
 

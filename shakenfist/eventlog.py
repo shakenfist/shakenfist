@@ -278,7 +278,7 @@ def upgrade_data_store():
                 'network',
                 'networkinterface',
                 'node',
-                'nodeinstanceoperation',
+                'node_inst_op',
                 'upload'
         ]:
             objroot = os.path.join(config.STORAGE_PATH, 'events', objtype)

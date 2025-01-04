@@ -14,7 +14,7 @@ from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 
 
-class NodeInstanceOperationException(BaseOperationException):
+class NodeInstOpException(BaseOperationException):
     def __init__(self, task, message):
         super().__init__(message)
         self.task_type = task.object_type
@@ -23,18 +23,18 @@ class NodeInstanceOperationException(BaseOperationException):
         self.node_uuid = task.node_uuid
 
 
-class NoSuchTask(NodeInstanceOperationException):
+class NoSuchTask(NodeInstOpException):
     def __init__(self, task):
         super().__init__(task, 'no such task')
 
 
-class NoSuchInstance(NodeInstanceOperationException):
+class NoSuchInstance(NodeInstOpException):
     def __init__(self, task):
         super().__init__(task, 'instance missing')
 
 
-class NodeInstanceOperation(BaseClusterOperation):
-    object_type = 'nodeinstanceoperation'
+class NodeInstOp(BaseClusterOperation):
+    object_type = 'node_inst_op'
     initial_version = 1
     current_version = 1
 
@@ -51,7 +51,7 @@ class NodeInstanceOperation(BaseClusterOperation):
             raise InvalidPriorityException(priority)
 
         operation_uuid = str(uuid4())
-        NodeInstanceOperation._db_create(operation_uuid, {
+        NodeInstOp._db_create(operation_uuid, {
             'uuid': operation_uuid,
             'node_uuid': node_uuid,
             'instance_uuid': instance_uuid,
@@ -60,7 +60,7 @@ class NodeInstanceOperation(BaseClusterOperation):
             'tasks': tasks,
             'version': cls.current_version
         })
-        o = NodeInstanceOperation.from_db(operation_uuid)
+        o = NodeInstOp.from_db(operation_uuid)
         o.state = cls.STATE_INITIAL
         return o
 
@@ -90,8 +90,8 @@ class NodeInstanceOperation(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task}')(inst)
         except Exception as e:
-            util_general.ignore_exception('nodeinstanceoperation', e)
-            self.state = NodeInstanceOperation.STATE_ERROR
+            util_general.ignore_exception('node_inst_op', e)
+            self.state = NodeInstOp.STATE_ERROR
 
     def _collect_billing_statistics(self, inst):
         with util_libvirt.LibvirtConnection() as lc:

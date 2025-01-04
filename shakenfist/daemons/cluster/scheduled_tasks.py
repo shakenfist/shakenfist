@@ -8,12 +8,12 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.blob import Blob
 from shakenfist.etcd_schema.operations import baseclusteroperation as bco_schema
-from shakenfist.etcd_schema.operations import nodebloboperation as nbo_schema
+from shakenfist.etcd_schema.operations import node_blob_op as nbo_schema
 from shakenfist.instance import Instance
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
-from shakenfist.operations.nodeinstanceoperation import NodeInstanceOperation
+from shakenfist.operations.node_inst_op import NodeInstOp
 from shakenfist.util import general as util_general
 
 
@@ -166,7 +166,7 @@ def _process_per_instance_queue(execution_limit=10):
             inst.state = Instance.STATE_ERROR
             continue
 
-        nio = NodeInstanceOperation.new(
+        nio = NodeInstOp.new(
             node.uuid,
             inst.uuid,
             ['collect_billing_statistics', 'health_check_kvm_process'],

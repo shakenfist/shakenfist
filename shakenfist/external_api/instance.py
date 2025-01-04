@@ -44,7 +44,7 @@ from shakenfist.external_api import util as api_util
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
-from shakenfist.operations.nodeinstancenetdescoperation import NodeInstanceNetDescOperation
+from shakenfist.operations.node_inst_netdesc_op import NodeInstNetDescOp
 from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.tasks import FetchImageTask
 from shakenfist.tasks import FloatNetworkInterfaceTask
@@ -773,7 +773,7 @@ class InstancesEndpoint(sf_api.Resource):
         tasks.append(StartInstanceTask(inst.uuid, network))
         tasks.extend(float_tasks)
 
-        cluster_op = NodeInstanceNetDescOperation.new(
+        cluster_op = NodeInstNetDescOp.new(
             candidates[0], self.instance_uuid, self.net_desc,
             self.tasks, self.priority, self.request_id)
         cluster_op.enqueue()

@@ -8,7 +8,7 @@ from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist import node
 from shakenfist.operations import agentoperation
-from shakenfist.operations import nodeinstanceoperation
+from shakenfist.operations import node_inst_op
 from shakenfist import upload
 
 OBJECT_NAMES_TO_CLASSES = {
@@ -22,6 +22,6 @@ OBJECT_NAMES_TO_CLASSES = {
     'network': network.Network,
     'networkinterface': networkinterface.NetworkInterface,
     'node': node.Node,
-    'nodeinstanceoperation': nodeinstanceoperation.NodeInstanceOperation,
+    'node_inst_op': node_inst_op.NodeInstOp,
     'upload': upload.Upload
 }

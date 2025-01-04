@@ -4,13 +4,13 @@ from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
-from shakenfist.etcd_schema.operations import nodebloboperation as schema
+from shakenfist.etcd_schema.operations import node_blob_op as schema
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import general as util_general
 
 
-class NodeBlobOperationException(BaseOperationException):
+class NodeBlobOpException(BaseOperationException):
     def __init__(self, task, message):
         super().__init__(message)
         self.task_type = task.object_type
@@ -19,17 +19,17 @@ class NodeBlobOperationException(BaseOperationException):
         self.node_uuid = task.node_uuid
 
 
-class NoSuchTask(NodeBlobOperationException):
+class NoSuchTask(NodeBlobOpException):
     def __init__(self, task):
         super().__init__(task, 'no such task')
 
 
-class NoSuchBlob(NodeBlobOperationException):
+class NoSuchBlob(NodeBlobOpException):
     def __init__(self, task):
         super().__init__(task, 'blob missing')
 
 
-class NodeBlobOperation(BaseClusterOperation):
+class NodeBlobOp(BaseClusterOperation):
     object_type = schema.object_type
     initial_version = schema.initial_version
     current_version = schema.nbo_current_version
@@ -69,7 +69,7 @@ class NodeBlobOperation(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(b)
         except Exception as e:
-            util_general.ignore_exception('nodebloboperation', e)
+            util_general.ignore_exception('node_blob_op', e)
 
     def _verify_size_and_checksum(self, b):
         locations = b.locations

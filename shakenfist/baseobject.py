@@ -48,7 +48,7 @@ OBJECT_NAMES = [
     'network',
     'networkinterface',
     'node',
-    'nodeinstanceoperation',
+    'node_inst_op',
     'upload'
 ]
 

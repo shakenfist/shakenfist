@@ -17,7 +17,7 @@ from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 
 
-class NodeInstanceNetDescOperationException(BaseOperationException):
+class NodeInstNetDescOpException(BaseOperationException):
     def __init__(self, task, message):
         super().__init__(message)
         self.task_type = task.object_type
@@ -27,23 +27,23 @@ class NodeInstanceNetDescOperationException(BaseOperationException):
         self.net_desc = task.net_desc
 
 
-class NoSuchTask(NodeInstanceNetDescOperationException):
+class NoSuchTask(NodeInstNetDescOpException):
     def __init__(self, task):
         super().__init__(task, 'no such task')
 
 
-class NoSuchInstance(NodeInstanceNetDescOperationException):
+class NoSuchInstance(NodeInstNetDescOpException):
     def __init__(self, task):
         super().__init__(task, 'instance missing')
 
 
-class AbortInstanceStart(NodeInstanceNetDescOperationException):
+class AbortInstanceStart(NodeInstNetDescOpException):
     def __init__(self, task):
         super().__init__(task, 'instance missing')
 
 
-class NodeInstanceNetDescOperation(BaseClusterOperation):
-    object_type = 'nodeinstancenetdescoperation'
+class NodeInstNetDescOp(BaseClusterOperation):
+    object_type = 'node_inst_netdesc_op'
     initial_version = 1
     current_version = 1
 
@@ -61,7 +61,7 @@ class NodeInstanceNetDescOperation(BaseClusterOperation):
             raise InvalidPriorityException(priority)
 
         operation_uuid = str(uuid4())
-        NodeInstanceNetDescOperation._db_create(operation_uuid, {
+        NodeInstNetDescOp._db_create(operation_uuid, {
             'uuid': operation_uuid,
             'node_uuid': node_uuid,
             'instance_uuid': instance_uuid,
@@ -71,7 +71,7 @@ class NodeInstanceNetDescOperation(BaseClusterOperation):
             'tasks': tasks,
             'version': cls.current_version
         })
-        o = NodeInstanceNetDescOperation.from_db(operation_uuid)
+        o = NodeInstNetDescOp.from_db(operation_uuid)
         o.state = cls.STATE_INITIAL
         return o
 
@@ -105,11 +105,11 @@ class NodeInstanceNetDescOperation(BaseClusterOperation):
             self.__getattribute__(f'_{task}')(inst)
         except AbortInstanceStart:
             inst.state = Instance.STATE_ERROR
-            self.state = NodeInstanceNetDescOperation.STATE_ABORT
+            self.state = NodeInstNetDescOp.STATE_ABORT
         except Exception as e:
-            util_general.ignore_exception('nodeinstancenetdescoperation', e)
+            util_general.ignore_exception('node_inst_netdesc_op', e)
             inst.state = Instance.STATE_ERROR
-            self.state = NodeInstanceNetDescOperation.STATE_ERROR
+            self.state = NodeInstNetDescOp.STATE_ERROR
 
     def _instance_preflight(self, inst):
         state = inst.state.value
@@ -154,11 +154,11 @@ class NodeInstanceNetDescOperation(BaseClusterOperation):
                                            candidates=candidates)
             inst.place_instance(candidates[0])
 
-            redirected = NodeInstanceNetDescOperation.new(
+            redirected = NodeInstNetDescOp.new(
                 candidates[0], self.instance_uuid, self.net_desc,
                 self.tasks, self.priority, self.request_id)
             redirected.enqueue()
-            self.state = NodeInstanceNetDescOperation.STATE_ABORT
+            self.state = NodeInstNetDescOp.STATE_ABORT
 
         except LowResourceException as e:
             inst.add_event(
