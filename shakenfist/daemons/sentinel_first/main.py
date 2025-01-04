@@ -46,24 +46,6 @@ def main():
 
     LOG.info('Stopping')
 
-    # The default systemd timeout is 90 seconds, so wait just a bit less than
-    # that, although it shouldn't be needed. This shouldn't really be needed
-    # as systemd should have done this already, but the logging might one day
-    # be helpful.
-    start_time = time.time()
-    all_daemons = n.get_registered_daemons()
-    while all_daemons and time.time() - start_time < 80:
-        for degraded in n.get_degraded_daemons():
-            if degraded in all_daemons:
-                all_daemons.remove(degraded)
-
-        duration = round(time.time() - start_time, 2)
-        LOG.with_fields({
-            'have_waited': duration,
-            'remaining_daemons': all_daemons
-        }).info('Waiting for daemons to stop')
-        time.sleep(5)
-
     n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_STOPPED)
     n.state = Node.STATE_STOPPED
     LOG.info('Stopped')
