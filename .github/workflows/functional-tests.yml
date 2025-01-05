@@ -51,6 +51,41 @@ jobs:
         run: |
           /usr/bin/tox -epy3
 
+      - name: List failing tests
+        if: failure()
+        id: failures
+        run: |
+          echo "Gathering list of failed tests..."
+          touch ${GITHUB_WORKSPACE}/failed
+          /usr/bin/tox -efailing || true > ${GITHUB_WORKSPACE}/failed
+          echo
+
+          failed=$(cat ${GITHUB_WORKSPACE}/failed | egrep "^FAIL: " | \
+              sed -z 's/FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
+
+          echo "Failed tests:"
+          cat ${GITHUB_WORKSPACE}/failed
+          echo
+
+          echo "failures<<EOF" >> ${GITHUB_OUTPUT}
+          echo "${failed}" >> ${GITHUB_OUTPUT}
+          echo "EOF" >> ${GITHUB_OUTPUT}
+          echo "GITHUB_OUTPUT is:"
+          cat ${GITHUB_OUTPUT}
+
+      - name: Generate coverage report
+        timeout-minutes: 10
+        run: |
+          /usr/bin/tox -ecover
+          zip -r cover.zip cover
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          retention-days: 90
+          if-no-files-found: error
+          path: cover.zip
+
       # Failures get announced here before we cancel stuff
       - uses: slackapi/slack-github-action@v2.0.0
         if: failure()

@@ -179,33 +179,6 @@ class TaskEncodingETCDtestCase(base.ShakenFistTestCase):
 }"""
         self.assertEqual(expected, actual)
 
-    def test_encode_FetchImageTask(self):
-        actual = util_json.json_dump(
-            tasks.FetchImageTask('http://server/image',
-                                 namespace='foo')).encode()
-        expected = b"""{
-    "instance_uuid": null,
-    "namespace": "foo",
-    "task": "image_fetch",
-    "url": "http://server/image",
-    "version": 1
-}"""
-        self.assertEqual(expected, actual)
-
-        actual = util_json.json_dump(
-            tasks.FetchImageTask(
-                'http://server/image',
-                namespace='foo',
-                instance_uuid='fake_uuid')).encode()
-        expected = b"""{
-    "instance_uuid": "fake_uuid",
-    "namespace": "foo",
-    "task": "image_fetch",
-    "url": "http://server/image",
-    "version": 1
-}"""
-        self.assertEqual(expected, actual)
-
 
 #
 # General ETCD operations

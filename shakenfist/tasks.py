@@ -4,7 +4,6 @@ from shakenfist.exceptions import NetworkNotListTaskException
 from shakenfist.exceptions import NoInstanceTaskException
 from shakenfist.exceptions import NoNetworkInterfaceTaskException
 from shakenfist.exceptions import NoNetworkTaskException
-from shakenfist.exceptions import NoURLImageFetchTaskException
 
 
 class QueueTask:
@@ -85,10 +84,6 @@ class InstanceTask(QueueTask):
         return {**super().obj_dict(),
                 'instance_uuid': self._instance_uuid,
                 'network': self._network}
-
-
-class StartInstanceTask(InstanceTask):
-    _name = 'instance_start'
 
 
 class DeleteInstanceTask(InstanceTask):
@@ -297,47 +292,6 @@ class DefloatNetworkInterfaceTask(NetworkInterfaceTask):
             **super().obj_dict(),
             'floating': self._floating
         }
-
-
-#
-# Image Tasks
-#
-class ImageTask(QueueTask):
-    def __init__(self, url, namespace=None):
-        super().__init__()
-        self._url = url
-        self._namespace = namespace
-
-        if not isinstance(url, str):
-            raise NoURLImageFetchTaskException
-
-    def obj_dict(self):
-        return {**super().obj_dict(),
-                'url': self._url,
-                'namespace': self._namespace}
-
-    # Data methods
-    def url(self):
-        return self._url
-
-    def namespace(self):
-        return self._namespace
-
-
-class FetchImageTask(ImageTask):
-    _name = 'image_fetch'
-
-    def __init__(self, url, namespace=None, instance_uuid=None):
-        super().__init__(url, namespace=namespace)
-        self._instance_uuid = instance_uuid
-
-    def obj_dict(self):
-        return {**super().obj_dict(),
-                'instance_uuid': self._instance_uuid}
-
-    # Data methods
-    def instance_uuid(self):
-        return self._instance_uuid
 
 
 #

@@ -9,7 +9,6 @@ from shakenfist import blob
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import images
 from shakenfist import instance
 from shakenfist import network
 from shakenfist import networkinterface
@@ -20,20 +19,18 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist import eventlog
+from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
 from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.tasks import DeleteNetworkWhenClean
 from shakenfist.tasks import DestroyNetworkTask
-from shakenfist.tasks import FetchImageTask
-from shakenfist.tasks import FloatNetworkInterfaceTask
 from shakenfist.tasks import HotPlugInstanceInterfaceTask
 from shakenfist.tasks import HypervisorDestroyNetworkTask
 from shakenfist.tasks import InstanceTask
 from shakenfist.tasks import PreflightAgentOperationTask
 from shakenfist.tasks import QueueTask
 from shakenfist.tasks import SnapshotTask
-from shakenfist.tasks import StartInstanceTask
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
@@ -105,7 +102,7 @@ class Job(util_concurrency.Job):
                         raise exceptions.InstanceNotInDBException(
                             task.instance_uuid())
 
-                for t in [FetchImageTask, SnapshotTask, HotPlugInstanceInterfaceTask]:
+                for t in [SnapshotTask, HotPlugInstanceInterfaceTask]:
                     if isinstance(task, t):
                         inst = instance.Instance.from_db(task.instance_uuid())
                         break
@@ -118,16 +115,7 @@ class Job(util_concurrency.Job):
                 })
                 self.log.info('Starting task')
 
-                if isinstance(task, FetchImageTask):
-                    n = task.namespace()
-                    if not n:
-                        n = 'system'
-                    image_fetch(task.url(), n, inst)
-
-                elif isinstance(task, StartInstanceTask):
-                    instance_start(inst, task.network())
-
-                elif isinstance(task, HotPlugInstanceInterfaceTask):
+                if isinstance(task, HotPlugInstanceInterfaceTask):
                     inst.hot_plug_interface(
                         task.network_uuid(), task.interface_uuid())
 
@@ -138,13 +126,9 @@ class Job(util_concurrency.Job):
                         util_general.ignore_exception(
                             'instance %s delete task' % inst, e)
 
-                elif isinstance(task, FloatNetworkInterfaceTask):
-                    # Just punt it to the network node now that the interface is ready
-                    etcd.enqueue('networknode', task)
-
                 elif isinstance(task, SnapshotTask):
-                    snapshot(inst, task.disk(), task.artifact_uuid(), task.blob_uuid(),
-                             task.thin())
+                    snapshot(inst, task.disk(), task.artifact_uuid(),
+                             task.blob_uuid(), task.thin())
 
                 elif isinstance(task, DeleteNetworkWhenClean):
                     # This is a historical concept, it turns out the network node
@@ -253,102 +237,45 @@ class Job(util_concurrency.Job):
             self.log.error('Operation not found')
             return
 
+        for dep in op.depends_on:
+            dep_op = OPERATION_NAMES_TO_CLASSES[dep['op_type']].from_db(
+                dep['op_uuid'])
+            if not dep_op:
+                op.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'cancelling operation, as dependency does not exist',
+                    extra={
+                        'dep_object_type': dep_op.op_type,
+                        'dep_object_uuid': dep_op.op_uuid
+                    })
+                op.state = BaseClusterOperation.STATE_ERROR
+                return
+
+            dep_op_state = dep_op.state.value
+            if dep_op_state in [BaseClusterOperation.STATE_ERROR,
+                                BaseClusterOperation.STATE_DELETED,
+                                BaseClusterOperation.STATE_ABORT]:
+                op.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'aborting operation, as dependency is unsuitable',
+                    extra={
+                        'dep_object_type': dep_op.op_type,
+                        'dep_object_uuid': dep_op.op_uuid,
+                        'dep_object_state': dep_op_state
+                    })
+                op.state = BaseClusterOperation.STATE_ABORT
+                return
+
+            if dep_op_state in [BaseClusterOperation.STATE_INITIAL,
+                                BaseClusterOperation.STATE_QUEUED,
+                                BaseClusterOperation.STATE_PREFLIGHT,
+                                BaseClusterOperation.STATE_EXECUTING]:
+                # Dependency not yet ready, we should defer
+                etcd.enqueue(self.queue_name, self.workitem, delay=15)
+                return
+
+        # Dependencies (if any) are complete, we're good to go!
         op.execute()
-
-
-def image_fetch(url, namespace, inst):
-    a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
-                          create_if_new=True)
-    try:
-        # TODO(andy): Wait up to 15 mins for another queue process to download
-        # the required image. This will be changed to queue on a
-        # "waiting_image_fetch" queue but this works now.
-        images.ImageFetchHelper(inst, a).get_image()
-        a.add_event(EVENT_TYPE_AUDIT, 'artifact fetch complete')
-
-    except (exceptions.HTTPError, requests.exceptions.RequestException,
-            requests.exceptions.ConnectionError) as e:
-        # Clean common problems to store in events
-        msg = str(e)
-        if msg.find('Name or service not known'):
-            msg = 'DNS error'
-        if msg.find('No address associated with hostname'):
-            msg = 'DNS error'
-
-        # If the artifact has never successfully downloaded, then we are
-        # clearly in an error state. However, if we already have a copy of the
-        # artifact and the serving web site is experiencing a transient error
-        # we should not mark the entire artifact as in error.
-        if (a.state.value in [Artifact.STATE_INITIAL, Artifact.STATE_CREATING] or
-                msg != 'DNS error'):
-            a.state = Artifact.STATE_ERROR
-            a.error = msg
-            raise exceptions.ImageFetchTaskFailedException(
-                f'Failed to fetch image: {url} Exception: {e}')
-        else:
-            a.add_event(
-                EVENT_TYPE_AUDIT, 'updating image failed, using already cached version',
-                extra={'message': msg})
-
-
-
-def instance_start(inst, netdescs):
-    if inst.state.value in instance.Instance.TERMINAL_STATES:
-        inst.add_event(
-            EVENT_TYPE_STATUS, 'you cannot start an instance in a terminal state')
-        return
-
-    with inst.get_lock(ttl=900, op='Instance start', global_scope=False):
-        try:
-            # Ensure networks are connected to this node
-            iface_uuids = []
-            for netdesc in netdescs:
-                iface_uuids.append(netdesc['iface_uuid'])
-                n = network.Network.from_db(netdesc['network_uuid'])
-                if not n:
-                    inst.enqueue_delete_due_error(
-                        'missing network: %s' % netdesc['network_uuid'])
-                    return
-
-                if n.state.value != dbo.STATE_CREATED:
-                    inst.enqueue_delete_due_error(
-                        'network is not active: %s' % n.uuid)
-                    return
-
-                # We must record interfaces very early for the vxlan leak
-                # detection code in the net daemon to work correctly.
-                ni = networkinterface.NetworkInterface.from_db(
-                    netdesc['iface_uuid'])
-                if ni.state.value not in dbo.ACTIVE_STATES:
-                    inst.add_event(
-                        EVENT_TYPE_STATUS,
-                        'you cannot start an instance with an inactive network '
-                        'interface.',
-                        extra={
-                            'networkinterface': ni.uuid,
-                            'state': ni.state.value
-                        })
-                    inst.enqueue_delete_due_error(
-                        'Network interface is inactive')
-                    return
-
-                ni.state = dbo.STATE_CREATED
-                n.create_on_hypervisor()
-                n.ensure_mesh()
-                n.update_dnsmasq()
-
-            # Allocate console and VDI ports
-            inst.allocate_instance_ports()
-
-            # Now we can start the instance
-            with util_general.RecordedOperation('instance creation', inst):
-                inst.create(iface_uuids)
-
-        except exceptions.InvalidStateException as e:
-            # This instance is in an error or deleted state. Given the check
-            # at the top of this method, that indicates a race.
-            inst.enqueue_delete_due_error('invalid state transition: %s' % e)
-            return
 
 
 def instance_delete(inst):

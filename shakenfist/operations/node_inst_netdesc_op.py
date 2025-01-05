@@ -1,81 +1,94 @@
-import os
-from uuid import uuid4
-
-import psutil
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.constants import EVENT_TYPE_USAGE
-from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
+from shakenfist import etcd
+from shakenfist.etcd_schema.operations import node_inst_netdesc_op as schema
+from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import LowResourceException
+from shakenfist.exceptions import InvalidStateException
 from shakenfist.instance import Instance
+from shakenfist.network import Network
+from shakenfist.networkinterface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
-from shakenfist.operations.baseoperation import InvalidPriorityException
 from shakenfist import scheduler
+from shakenfist.tasks import FloatNetworkInterfaceTask
 from shakenfist.util import general as util_general
-from shakenfist.util import libvirt as util_libvirt
+
+
+LOG, HANDLER = logs.setup(__name__)
 
 
 class NodeInstNetDescOpException(BaseOperationException):
-    def __init__(self, task, message):
+    def __init__(self, op, message):
         super().__init__(message)
-        self.task_type = task.object_type
-        self.task_uuid = task.uuid
-        self.instance_uuid = task.instance_uuid
-        self.node_uuid = task.node_uuid
-        self.net_desc = task.net_desc
+        self.op_type = op.object_type
+        self.op_uuid = op.uuid
+        self.instance_uuid = op.instance_uuid
+        self.node_uuid = op.node_uuid
+        self.net_desc = op.net_desc
+        self.tasks = op.tasks
 
 
 class NoSuchTask(NodeInstNetDescOpException):
-    def __init__(self, task):
-        super().__init__(task, 'no such task')
+    def __init__(self, op, task):
+        super().__init__(op, f'no such task {task}')
 
 
 class NoSuchInstance(NodeInstNetDescOpException):
-    def __init__(self, task):
-        super().__init__(task, 'instance missing')
+    def __init__(self, op):
+        super().__init__(op, 'instance missing')
+
+
+class InvalidNetDesc(NodeInstNetDescOpException):
+    def __init__(self, op):
+        super().__init__(op, 'invalid net_desc')
 
 
 class AbortInstanceStart(NodeInstNetDescOpException):
-    def __init__(self, task):
-        super().__init__(task, 'instance missing')
+    def __init__(self, op):
+        super().__init__(op, 'instance missing')
 
 
 class NodeInstNetDescOp(BaseClusterOperation):
-    object_type = 'node_inst_netdesc_op'
-    initial_version = 1
-    current_version = 1
+    object_type = schema.object_type.name.lower()
+    initial_version = schema.initial_version
+    current_version = schema.current_version
 
     def __init__(self, static_values):
         self.upgrade(static_values)
         super().__init__(static_values)
 
+        self.__node_uuid = static_values['node_uuid']
         self.__instance_uuid = static_values['instance_uuid']
-        self.__tasks = static_values['tasks']
+        self.__net_desc = static_values['net_desc']
 
-    @classmethod
-    def new(cls, node_uuid, instance_uuid, net_desc, tasks, priority,
-            request_id=None):
-        if priority not in PRIORITY:
-            raise InvalidPriorityException(priority)
+        # Convert tasks names back into enum entries
+        self.__tasks = []
+        for task_name in static_values['tasks']:
+            try:
+                self.__tasks.append(schema.model_tasks[task_name])
+            except KeyError as e:
+                self.state = self.STATE_ERROR
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'unknown task {task_name}: {e}')
+                raise e
 
-        operation_uuid = str(uuid4())
-        NodeInstNetDescOp._db_create(operation_uuid, {
-            'uuid': operation_uuid,
-            'node_uuid': node_uuid,
-            'instance_uuid': instance_uuid,
-            'net_desc': net_desc,
-            'priority': priority,
-            'request_id': request_id,
-            'tasks': tasks,
-            'version': cls.current_version
+        self.log = LOG.with_fields({
+            'operation_type': self.object_type,
+            'operation_uuid': self.uuid,
+            'node_uuid': self.node_uuid,
+            'instance_uuid': self.instance_uuid,
+            'net_desc': self.net_desc,
+            'tasks': self.tasks
         })
-        o = NodeInstNetDescOp.from_db(operation_uuid)
-        o.state = cls.STATE_INITIAL
-        return o
 
     # Static values
+    @property
+    def node_uuid(self):
+        return self.__node_uuid
+
     @property
     def instance_uuid(self):
         return self.__instance_uuid
@@ -89,20 +102,21 @@ class NodeInstNetDescOp(BaseClusterOperation):
         return self.__tasks
 
     # Tasks
-    _all_tasks = [
-        'instance_preflight'
-    ]
-
     def dispatch_task(self, task):
-        if task not in self._all_tasks:
-            raise NoSuchTask(task)
+        if task not in schema.model_tasks:
+            self.log.warning(f'Task {task} not in {schema.model_tasks}')
+            raise NoSuchTask(self, task)
 
         inst = Instance.from_db(self.instance_uuid)
         if not inst:
-            raise NoSuchInstance(task)
+            self.log.warning(f'Instance {self.instance_uuid} missing')
+            raise NoSuchInstance(self)
+
+        # NOTE(mikal): an empty net_desc is in fact valid, we do not force
+        # instances to always have a network.
 
         try:
-            self.__getattribute__(f'_{task}')(inst)
+            self.__getattribute__(f'_{task.name}')(inst)
         except AbortInstanceStart:
             inst.state = Instance.STATE_ERROR
             self.state = NodeInstNetDescOp.STATE_ABORT
@@ -137,11 +151,11 @@ class NodeInstNetDescOp(BaseClusterOperation):
         # Unsuccessful placement, check if reached placement attempt limit
         db_placement = inst.placement
         if db_placement['placement_attempts'] > 3:
-            raise AbortInstanceStart('Too many start attempts')
+            raise AbortInstanceStart(self, 'Too many start attempts')
 
         # Or if the user asked for a specific node which is now at capacity
         if inst.requested_placement:
-            raise AbortInstanceStart('Requested node lacks resources')
+            raise AbortInstanceStart(self, 'Requested node lacks resources')
 
         # Try placing on another node
         try:
@@ -161,7 +175,88 @@ class NodeInstNetDescOp(BaseClusterOperation):
             self.state = NodeInstNetDescOp.STATE_ABORT
 
         except LowResourceException as e:
-            inst.add_event(
-                EVENT_TYPE_AUDIT, 'reschedule failed, insufficient resources',
+            add_event_multi(
+                EVENT_TYPE_AUDIT,
+                [self, inst],
+                'reschedule failed, insufficient resources',
                 extra={'message': str(e)})
-            raise AbortInstanceStart('Unable to find suitable node')
+            raise AbortInstanceStart(self, 'Unable to find suitable node')
+
+    def _instance_start(self, inst):
+        if not inst:
+            self.add_event(EVENT_TYPE_AUDIT, 'task requires an instance')
+            raise AbortInstanceStart(self, 'Task requires an instance')
+
+        if inst.state.value in Instance.TERMINAL_STATES:
+            add_event_multi(
+                EVENT_TYPE_AUDIT,
+                [self, inst],
+                'you cannot start an instance in a terminal state')
+            raise AbortInstanceStart(self, 'Instance in terminal state')
+
+        with inst.get_lock(ttl=900, op='Instance start', global_scope=False):
+            try:
+                # Ensure networks are connected to this node
+                iface_uuids = []
+                float_tasks = []
+                for netdesc in self.net_desc:
+                    iface_uuids.append(netdesc['iface_uuid'])
+                    n = Network.from_db(netdesc['network_uuid'])
+                    if not n:
+                        add_event_multi(
+                            EVENT_TYPE_AUDIT,
+                            [self, inst, ('network', netdesc['network_uuid'])],
+                            f'missing network: {netdesc["network_uuid"]}')
+                        inst.enqueue_delete_due_error(
+                            f'missing network: {netdesc["network_uuid"]}')
+                        raise AbortInstanceStart(self, 'Missing network')
+
+                    if n.state.value != Network.STATE_CREATED:
+                        add_event_multi(
+                            EVENT_TYPE_AUDIT,
+                            [self, inst, n],
+                            f'network is not active: {n.uuid}')
+                        inst.enqueue_delete_due_error(
+                            f'network is not active: {n.uuid}')
+                        raise AbortInstanceStart(self, 'Inactive network')
+
+                    # We must record interfaces very early for the vxlan leak
+                    # detection code in the net daemon to work correctly.
+                    ni = NetworkInterface.from_db(netdesc['iface_uuid'])
+                    if ni.state.value not in NetworkInterface.ACTIVE_STATES:
+                        add_event_multi(
+                            EVENT_TYPE_AUDIT,
+                            [self, inst, n, ni],
+                            ('you cannot start an instance with an inactive '
+                             'network interface.'))
+                        inst.enqueue_delete_due_error(
+                            'Network interface is inactive')
+                        raise AbortInstanceStart(
+                            self, 'Inactive network interface')
+
+                    ni.state = NetworkInterface.STATE_CREATED
+                    n.create_on_hypervisor()
+                    n.ensure_mesh()
+                    n.update_dnsmasq()
+
+                    if ni.floating:
+                        float_tasks.append(
+                            FloatNetworkInterfaceTask(n.uuid, ni.uuid))
+
+                # Allocate console and VDI ports
+                inst.allocate_instance_ports()
+
+                # Now we can start the instance
+                with util_general.RecordedOperation('instance creation', inst):
+                    inst.create(iface_uuids)
+
+                # And now float any required interfaces
+                for ft in float_tasks:
+                    etcd.enqueue('networknode', ft)
+
+            except InvalidStateException as e:
+                # This instance is in an error or deleted state. Given the check
+                # at the top of this method, that indicates a race.
+                inst.enqueue_delete_due_error(
+                    'invalid state transition: %s' % e)
+                return

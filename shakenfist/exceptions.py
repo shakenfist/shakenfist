@@ -135,10 +135,6 @@ class NoURLImageFetchTaskException(TaskException):
     ...
 
 
-class ImageFetchTaskFailedException(TaskException):
-    ...
-
-
 class NoInstanceTaskException(TaskException):
     ...
 

@@ -20,22 +20,8 @@ class BaseOperation(dbo):
     STATE_COMPLETE = 'complete'
     STATE_ABORT = 'abort'
 
-    ACTIVE_STATES = {dbo.STATE_CREATED, STATE_QUEUED,
-                     STATE_EXECUTING, STATE_COMPLETE}
-
-    state_targets = {
-        None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
-        dbo.STATE_INITIAL: (STATE_PREFLIGHT, STATE_QUEUED, dbo.STATE_DELETED,
-                            dbo.STATE_ERROR),
-        STATE_PREFLIGHT: (STATE_QUEUED, dbo.STATE_DELETED, dbo.STATE_ERROR),
-        STATE_QUEUED: (STATE_EXECUTING, dbo.STATE_DELETED, dbo.STATE_ERROR),
-        STATE_EXECUTING: (STATE_COMPLETE, dbo.STATE_DELETED, dbo.STATE_ERROR,
-                          STATE_ABORT),
-        STATE_COMPLETE: (dbo.STATE_DELETED),
-        STATE_ABORT: (dbo.STATE_DELETED),
-        dbo.STATE_ERROR: (dbo.STATE_DELETED),
-        dbo.STATE_DELETED: None,
-    }
+    ACTIVE_STATES = {dbo.STATE_CREATED, STATE_QUEUED, STATE_EXECUTING,
+                     STATE_COMPLETE}
 
 
 def get_all_queue_names(node_uuid):
@@ -46,30 +32,45 @@ def get_all_queue_names(node_uuid):
 def get_all_user_facing_queue_names(node_uuid):
     return [
         node_uuid,
-        f'{node_uuid}-clusteroperation-USER_WAITING',
-        f'{node_uuid}-clusteroperation-USER_FACING'
+        f'{node_uuid}-clusteroperation-user_waiting',
+        'any-clusteroperation-user_waiting',
+        f'{node_uuid}-clusteroperation-user_facing',
+        'any-clusteroperation-user_facing'
     ]
 
 
 def get_all_background_queue_names(node_uuid):
     return [
-        f'{node_uuid}-clusteroperation-BACKGROUND',
+        f'{node_uuid}-clusteroperation-background',
+        'any-clusteroperation-background',
         f'{node_uuid}-background',
-        f'{node_uuid}-clusteroperation-BACKGROUND_HIGH_IO'
+        f'{node_uuid}-clusteroperation-background_high_io',
+        'any-clusteroperation-background_high_io'
     ]
 
 
 class BaseClusterOperation(BaseOperation):
+    # Note that cluster operations are created in etcd transactions and don't
+    # have .new() methods. They therefore jump straight to queued as an initial
+    # state.
+    state_targets = {
+        None: (BaseOperation.STATE_QUEUED),
+        BaseOperation.STATE_QUEUED: (BaseOperation.STATE_EXECUTING,
+                                     dbo.STATE_DELETED, dbo.STATE_ERROR),
+        BaseOperation.STATE_EXECUTING: (BaseOperation.STATE_COMPLETE,
+                                        dbo.STATE_DELETED, dbo.STATE_ERROR,
+                                        BaseOperation.STATE_ABORT),
+        BaseOperation.STATE_COMPLETE: (dbo.STATE_DELETED),
+        BaseOperation.STATE_ABORT: (dbo.STATE_DELETED),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED),
+        dbo.STATE_DELETED: None,
+    }
+
     def __init__(self, static_values):
         super().__init__(static_values['uuid'], static_values.get('version'))
-        self.__node_uuid = static_values['node_uuid']
         self.__priority = static_values['priority']
         self.__request_id = static_values.get('request_id')
-
-    # Static values
-    @property
-    def node_uuid(self):
-        return self.__node_uuid
+        self.__depends_on = static_values.get('depends_on')
 
     @property
     def priority(self):
@@ -78,6 +79,12 @@ class BaseClusterOperation(BaseOperation):
     @property
     def request_id(self):
         return self.__request_id
+
+    @property
+    def depends_on(self):
+        if not self.__depends_on or len(self.__depends_on) == 0:
+            return []
+        return self.__depends_on
 
     # Methods
     def enqueue(self):

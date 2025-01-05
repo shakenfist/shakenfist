@@ -1,70 +1,76 @@
 import os
-from uuid import uuid4
 
 import psutil
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
-from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.etcd_schema.operations import node_inst_op as schema
 from shakenfist.instance import Instance
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
-from shakenfist.operations.baseoperation import InvalidPriorityException
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 
 
+LOG, HANDLER = logs.setup(__name__)
+
+
 class NodeInstOpException(BaseOperationException):
-    def __init__(self, task, message):
+    def __init__(self, op, message):
         super().__init__(message)
-        self.task_type = task.object_type
-        self.task_uuid = task.uuid
-        self.instance_uuid = task.instance_uuid
-        self.node_uuid = task.node_uuid
+        self.op_type = op.object_type
+        self.op_uuid = op.uuid
+        self.instance_uuid = op.instance_uuid
+        self.node_uuid = op.node_uuid
 
 
 class NoSuchTask(NodeInstOpException):
-    def __init__(self, task):
-        super().__init__(task, 'no such task')
+    def __init__(self, op, task):
+        super().__init__(op, f'no such task {task}')
 
 
 class NoSuchInstance(NodeInstOpException):
-    def __init__(self, task):
-        super().__init__(task, 'instance missing')
+    def __init__(self, op):
+        super().__init__(op, 'instance missing')
 
 
 class NodeInstOp(BaseClusterOperation):
-    object_type = 'node_inst_op'
-    initial_version = 1
-    current_version = 1
+    object_type = schema.object_type.name.lower()
+    initial_version = schema.initial_version
+    current_version = schema.current_version
 
     def __init__(self, static_values):
         self.upgrade(static_values)
         super().__init__(static_values)
 
+        self.__node_uuid = static_values['node_uuid']
         self.__instance_uuid = static_values['instance_uuid']
-        self.__tasks = static_values['tasks']
 
-    @classmethod
-    def new(cls, node_uuid, instance_uuid, tasks, priority, request_id=None):
-        if priority not in PRIORITY:
-            raise InvalidPriorityException(priority)
+        # Convert tasks names back into enum entries
+        self.__tasks = []
+        for task_name in static_values['tasks']:
+            try:
+                self.__tasks.append(schema.model_tasks[task_name])
+            except KeyError as e:
+                self.state = self.STATE_ERROR
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'unknown task {task_name}: {e}')
+                raise e
 
-        operation_uuid = str(uuid4())
-        NodeInstOp._db_create(operation_uuid, {
-            'uuid': operation_uuid,
-            'node_uuid': node_uuid,
-            'instance_uuid': instance_uuid,
-            'priority': priority,
-            'request_id': request_id,
-            'tasks': tasks,
-            'version': cls.current_version
+        self.log = LOG.with_fields({
+            'operation_type': self.object_type,
+            'operation_uuid': self.uuid,
+            'node_uuid': self.node_uuid,
+            'instance_uuid': self.instance_uuid,
+            'tasks': self.tasks
         })
-        o = NodeInstOp.from_db(operation_uuid)
-        o.state = cls.STATE_INITIAL
-        return o
 
     # Static values
+    @property
+    def node_uuid(self):
+        return self.__node_uuid
+
     @property
     def instance_uuid(self):
         return self.__instance_uuid
@@ -74,24 +80,23 @@ class NodeInstOp(BaseClusterOperation):
         return self.__tasks
 
     # Tasks
-    _all_tasks = [
-        'collect_billing_statistics',
-        'health_check_kvm_process'
-    ]
-
     def dispatch_task(self, task):
-        if task not in self._all_tasks:
-            raise NoSuchTask(task)
+        if task not in schema.model_tasks:
+            self.log.warning(f'Task {task} not in {schema.model_tasks}')
+            raise NoSuchTask(self, task)
 
         inst = Instance.from_db(self.instance_uuid)
         if not inst:
-            raise NoSuchInstance(task)
+            self.log.warning(f'Instance {self.instance_uuid} missing')
+            raise NoSuchInstance(self)
 
         try:
-            self.__getattribute__(f'_{task}')(inst)
+            self.__getattribute__(f'_{task.name}')(inst)
         except Exception as e:
             util_general.ignore_exception('node_inst_op', e)
             self.state = NodeInstOp.STATE_ERROR
+            if self.inst:
+                self.inst.state = Instance.STATE_ERROR
 
     def _collect_billing_statistics(self, inst):
         with util_libvirt.LibvirtConnection() as lc:

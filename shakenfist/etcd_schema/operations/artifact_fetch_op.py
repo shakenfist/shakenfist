@@ -21,21 +21,20 @@ from shakenfist.etcd_schema.operations.util import enqueue
 LOG, HANDLER = logs.setup(__name__)
 
 
-object_type = CLUSTER_OPERATIONS.node_inst_op
+object_type = CLUSTER_OPERATIONS.artifact_fetch_op
 initial_version = 1
 current_version = 1
 
 
 class model_tasks(Enum):
-    collect_billing_statistics = 1
-    health_check_kvm_process = 2
+    image_fetch = 1
 
 
 class model(BaseModel):
     uuid: UUID4
-    # This should be a UUID, but there's some history...
-    node_uuid: str
-    instance_uuid: UUID4
+    namespace: str
+    url: str
+    instance_uuid: Optional[UUID4]
     priority: PRIORITY
     request_id: Optional[str]
     tasks: List[model_tasks]
@@ -51,14 +50,18 @@ class model(BaseModel):
         return [t.name for t in tasks]
 
 
-def create_and_enqueue(node_uuid, instance_uuid, tasks, priority, request_id=None,
-                       depends_on=None):
+def create_and_enqueue(namespace, url, instance_uuid, tasks, priority,
+                       request_id=None, depends_on=None, target_node=None):
     operation_uuid = str(uuid4())
+
+    if not target_node:
+        target_node = 'any'
 
     try:
         m = model(
             uuid=operation_uuid,
-            node_uuid=node_uuid,
+            namespace=namespace,
+            url=url,
             instance_uuid=instance_uuid,
             priority=priority,
             request_id=request_id,
@@ -69,7 +72,8 @@ def create_and_enqueue(node_uuid, instance_uuid, tasks, priority, request_id=Non
     except ValidationError as exc:
         LOG.with_fields({
             'uuid': operation_uuid,
-            'node_uuid': node_uuid,
+            'namespace': namespace,
+            'url': url,
             'instance_uuid': instance_uuid,
             'priority': priority,
             'request_id': request_id,
@@ -80,6 +84,7 @@ def create_and_enqueue(node_uuid, instance_uuid, tasks, priority, request_id=Non
         raise exc
 
     mutations, job_name, queue_name, work_item = \
-        base_mutations(object_type.name.lower(), m.model_dump(mode='json'))
+        base_mutations(object_type.name.lower(), m.model_dump(mode='json'),
+                       target_node=target_node)
     enqueue(mutations, job_name, queue_name, work_item)
     return object_type, operation_uuid

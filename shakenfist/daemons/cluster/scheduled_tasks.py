@@ -9,11 +9,11 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.blob import Blob
 from shakenfist.etcd_schema.operations import baseclusteroperation as bco_schema
 from shakenfist.etcd_schema.operations import node_blob_op as nbo_schema
+from shakenfist.etcd_schema.operations import node_inst_op as nio_schema
 from shakenfist.instance import Instance
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
-from shakenfist.operations.node_inst_op import NodeInstOp
 from shakenfist.util import general as util_general
 
 
@@ -98,7 +98,7 @@ def _process_per_blob_queue(execution_limit=10):
                     node_uuid,
                     b.uuid,
                     [nbo_schema.model_tasks.verify_size_and_checksum],
-                    bco_schema.PRIORITY.BACKGROUND_HIGH_IO)
+                    bco_schema.PRIORITY.background_high_io)
 
 
 @util_general.recorded_method
@@ -166,9 +166,12 @@ def _process_per_instance_queue(execution_limit=10):
             inst.state = Instance.STATE_ERROR
             continue
 
-        nio = NodeInstOp.new(
+        nio_schema.create_and_enqueue(
             node.uuid,
             inst.uuid,
-            ['collect_billing_statistics', 'health_check_kvm_process'],
-            bco_schema.PRIORITY.USER_FACING)
-        nio.enqueue()
+            [
+                nio_schema.model_tasks.collect_billing_statistics,
+                nio_schema.model_tasks.health_check_kvm_process
+            ],
+            bco_schema.PRIORITY.user_facing
+        )

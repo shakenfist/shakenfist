@@ -738,7 +738,7 @@ class Blob(dbo):
                         n,
                         self.uuid,
                         [nbo_schema.model_tasks.ensure_local],
-                        nbo_schema.PRIORITY.BACKGROUND_HIGH_IO)
+                        nbo_schema.PRIORITY.background_high_io)
                     self.update_incomplete_location(0, node=n)
                     self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
@@ -820,7 +820,7 @@ class Blob(dbo):
                 config.NODE_NAME,
                 self.uuid,
                 [nbo_schema.model_tasks.verify_size_and_checksum],
-                nbo_schema.PRIORITY.BACKGROUND_HIGH_IO)
+                nbo_schema.PRIORITY.background_high_io)
 
         # Validate / update our stored checksums
         with self.get_lock_attr('checksums', op='update checksums'):

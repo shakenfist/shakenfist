@@ -271,6 +271,7 @@ def upgrade_data_store():
                 'agentoperation',
                 'api-requests',
                 'artifact',
+                'artifact_fetch_op',
                 'blob',
                 'dhcp',
                 'instance',
@@ -279,7 +280,9 @@ def upgrade_data_store():
                 'network',
                 'networkinterface',
                 'node',
+                'node_blob_op',
                 'node_inst_op',
+                'node_inst_netdesc_op',
                 'upload'
         ]:
             objroot = os.path.join(config.STORAGE_PATH, 'events', objtype)
@@ -409,7 +412,7 @@ class EventLog:
                 continue
 
             try:
-                _, yearmonth = ent.split('.')
+                _, yearmonth = ent.split('/')[-1].split('.')
                 if '-' in yearmonth:
                     # Entries like -journal, -wal, -shm that internals of sqlite
                     continue

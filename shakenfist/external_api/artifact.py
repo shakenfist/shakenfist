@@ -20,7 +20,11 @@ from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import constants
-from shakenfist import etcd
+from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.etcd_schema.operations.artifact_fetch_op \
+    import create_and_enqueue as ce_artifact_fetch_op
+from shakenfist.etcd_schema.operations.artifact_fetch_op \
+    import model_tasks as artifact_fetch_op_tasks
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist.artifact import Artifact
@@ -33,10 +37,10 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
+from shakenfist.external_api import util as api_util
 from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
 from shakenfist.namespace import namespace_is_trusted
-from shakenfist.tasks import FetchImageTask
 from shakenfist.upload import Upload
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util import general as util_general
@@ -311,9 +315,13 @@ class ArtifactsEndpoint(sf_api.Resource):
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True
 
-        etcd.enqueue(config.NODE_NAME, {
-            'tasks': [FetchImageTask(url, namespace=namespace)],
-        })
+        ce_artifact_fetch_op(
+            namespace,
+            url,
+            None,
+            [artifact_fetch_op_tasks.image_fetch],
+            PRIORITY.user_facing,
+            request_id=api_util.get_request_id())
 
         return a.external_view()
 
