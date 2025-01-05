@@ -222,27 +222,27 @@ def add_event_multi(
             log.info('Added event')
 
     # *** Note that the APIs are different here!
-    #
-    # Try the new way
-    attempts = 0
-    while attempts < 3:
-        try:
-            # Here we get an exception on error, because there's only one
-            # message sent.
-            _add_event_multi_inner(
-                event_type, log, timestamp, simpler_objects, message,
-                duration=duration, extra=extra)
-            return
-        except grpc.RpcError:
-            attempts += 1
-            time.sleep(0.2)
+    if not config.EVENTLOG_SUPPRESS_GRPC:
+        # Try the new way
+        attempts = 0
+        while attempts < 3:
+            try:
+                # Here we get an exception on error, because there's only one
+                # message sent.
+                _add_event_multi_inner(
+                    event_type, log, timestamp, simpler_objects, message,
+                    duration=duration, extra=extra)
+                return
+            except grpc.RpcError:
+                attempts += 1
+                time.sleep(0.2)
 
-    # Try the old way
-    simpler_objects = _add_event_inner(
-        event_type, log, timestamp, simpler_objects, message,
-        duration=duration, extra=extra)
-    if not simpler_objects:
-        return
+        # Try the old way
+        simpler_objects = _add_event_inner(
+            event_type, log, timestamp, simpler_objects, message,
+            duration=duration, extra=extra)
+        if not simpler_objects:
+            return
 
     # And then the dead letter queue for the remainders
     _add_event_dlq_inner(
