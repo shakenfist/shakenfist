@@ -5,7 +5,7 @@ psutil>=5.9.0                      # bsd
 # them for the develop branch as required. Releases never update requirements.
 shakenfist-agent==0.3.18           # apache2
 shakenfist-utilities==0.7.2        # apache2
-clingwrap==1.6.7                   # apache2
+clingwrap==1.6.9                   # apache2
 
 fixtures==4.1.0                    # apache2
 PyYAML==6.0.2                      # mit
