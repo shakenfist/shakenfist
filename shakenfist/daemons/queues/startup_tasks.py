@@ -4,7 +4,6 @@ import pathlib
 import time
 from functools import partial
 
-import pyprctl
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -20,6 +19,7 @@ from shakenfist.daemons import daemon
 from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_queue_names
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 
 
@@ -183,7 +183,7 @@ def startup_tasks():
         })
 
     version = util_general.get_version()
-    pyprctl.set_name('main-v%s' % version)
+    util_concurrency.set_thread_name('main-v%s' % version)
 
     # If you ran this, it means we're not shutting down any more
     n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)

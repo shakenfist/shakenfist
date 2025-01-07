@@ -2,7 +2,6 @@ import time
 
 import os
 import psutil
-import pyprctl
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 import sys
@@ -13,6 +12,7 @@ from shakenfist.daemons import daemon
 from shakenfist.daemons.queues import startup_tasks
 from shakenfist.daemons.queues import workitem
 from shakenfist.node import Node
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 
 
@@ -113,7 +113,7 @@ def main():
     # ourselves here too.
     name = f'{daemon.process_name("queues")} startup'
     setproctitle.setproctitle(name)
-    pyprctl.set_name(name)
+    util_concurrency.set_thread_name(name)
     _health_checks()
 
     start_time = time.time()

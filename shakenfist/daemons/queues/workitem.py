@@ -3,8 +3,6 @@ import time
 import uuid
 
 import flask
-import requests
-import pyprctl
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import blob
@@ -61,7 +59,7 @@ class Job(util_concurrency.Job):
         daemon.clear_abort_path(self.abort_path)
 
     def execute(self):
-        pyprctl.set_name(self.jobname)
+        util_concurrency.set_thread_name(self.jobname)
         LOG.debug(f'This worker thread is executing job {self.jobname}')
 
         try:

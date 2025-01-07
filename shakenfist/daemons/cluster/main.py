@@ -9,7 +9,6 @@ import os
 import sys
 import time
 
-import pyprctl
 import schedule
 from shakenfist_utilities import logs  # noreorder
 
@@ -35,6 +34,7 @@ from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.upload import Uploads
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 
 
@@ -461,11 +461,11 @@ class Monitor(daemon.Daemon):
 
         last_loop_run = 0
         while daemon.check_abort_path(self.abort_path):
-            pyprctl.set_name('idle')
+            util_concurrency.set_thread_name('idle')
             LOG.debug('This cluster thread is now idle and awaiting election')
             self._await_election()
 
-            pyprctl.set_name('active')
+            util_concurrency.set_thread_name('active')
             LOG.debug('This cluster thread is now active')
 
             if not self.cluster_stable():

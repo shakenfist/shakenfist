@@ -6,7 +6,6 @@ import signal
 import threading
 import time
 
-import pyprctl
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 
@@ -110,7 +109,7 @@ class Daemon:
 
         procname = process_name(name)
         setproctitle.setproctitle(procname)
-        pyprctl.set_name(procname)
+        util_concurrency.set_thread_name(procname)
         self.log, _ = logs.setup(name)
         set_log_level(self.log, name)
 

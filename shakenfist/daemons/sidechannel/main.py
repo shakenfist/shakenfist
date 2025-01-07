@@ -6,7 +6,6 @@ import threading
 import time
 import uuid
 
-import pyprctl
 from shakenfist_agent import protocol
 from shakenfist_utilities import logs  # noreorder
 from versions_comparison import Comparison
@@ -308,7 +307,7 @@ class SideChannelJob(util_concurrency.Job):
 
     def execute(self):
         etcd.reset_client()
-        pyprctl.set_name(self.instance_uuid)
+        util_concurrency.set_thread_name(self.instance_uuid)
         LOG.debug(
             f'This sidechannel thread is handling instance {self.instance_uuid}')
 

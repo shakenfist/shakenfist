@@ -1,5 +1,4 @@
 import flask
-import pyprctl
 import time
 
 from shakenfist_utilities import logs  # noreorder
@@ -43,14 +42,14 @@ class Job(util_concurrency.Job):
             jobname_workitem = etcd.dequeue('networknode')
             if not jobname_workitem:
                 if not was_previously_idle:
-                    pyprctl.set_name('idle')
+                    util_concurrency.set_thread_name('idle')
                     LOG.debug('This network thread is now idle')
                     was_previously_idle = True
                 time.sleep(0.2)
 
             else:
                 jobname, workitem = jobname_workitem
-                pyprctl.set_name(jobname)
+                util_concurrency.set_thread_name(jobname)
                 LOG.debug(
                     f'This network thread is now processing job {jobname}')
 
