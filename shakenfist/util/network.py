@@ -96,12 +96,6 @@ def get_interface_addresses(name, namespace=None):
     for elem in _clean_ip_json(stdout):
         for addr_info in elem.get('addr_info', []):
             addresses.append(addr_info['local'])
-
-    LOG.with_fields({
-        'namespace': namespace,
-        'device': name,
-        'addresses': addresses
-    }).debug('Found addresses')
     return addresses
 
 

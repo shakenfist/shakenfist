@@ -207,14 +207,6 @@ def add_event_multi(
     for object_type, object_uuid in simpler_objects:
         log = log.with_fields({object_type: object_uuid})
 
-    # If your eventlog server isn't setup, we get cranky. Note that this
-    # happens during unit test discovery for py3 unit tests.
-    if not config.EVENTLOG_NODE_IP:
-        caller = util_callstack.generate_traceback()
-        log.error('Cannot record event, no configured server! Caller was:\n'
-                  f'{caller}')
-        return
-
     if not suppress_event_logging:
         if log_as_error:
             log.error('Added event')
@@ -223,6 +215,15 @@ def add_event_multi(
 
     # *** Note that the APIs are different here!
     if not config.EVENTLOG_SUPPRESS_GRPC:
+        # If your eventlog server isn't setup, we get cranky. Note that this
+        # happens during unit test discovery for py3 unit tests.
+        if not config.EVENTLOG_NODE_IP:
+            caller = util_callstack.generate_traceback()
+            log.error(
+                'Cannot record event, no configured server! Caller was:\n'
+                f'{caller}')
+            return
+
         # Try the new way
         attempts = 0
         while attempts < 3:
