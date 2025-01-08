@@ -96,3 +96,5 @@ typing-extensions==4.12.2
 verboselogs==1.7
 wraps==0.13.0
 zipp==3.21.0
+zope.event==5.0
+zope.interface==7.2
