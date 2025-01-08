@@ -8,7 +8,6 @@
 #   - Has complete CI coverage:
 import os
 import uuid
-from collections import defaultdict
 from functools import partial
 
 import flask
@@ -26,6 +25,10 @@ from shakenfist.etcd_schema.operations.artifact_fetch_op \
     import create_and_enqueue as afo_create_and_enqueue
 from shakenfist.etcd_schema.operations.artifact_fetch_op \
     import model_tasks as afo_tasks
+from shakenfist.etcd_schema.operations.node_inst_op \
+    import create_and_enqueue as nio_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_inst_op \
+    import model_tasks as nio_tasks
 from shakenfist.etcd_schema.operations.node_inst_netdesc_op \
     import create_and_enqueue as nino_create_and_enqueue
 from shakenfist.etcd_schema.operations.node_inst_netdesc_op \
@@ -54,7 +57,6 @@ from shakenfist.external_api import util as api_util
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
-from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.tasks import HotPlugInstanceInterfaceTask
 from shakenfist.tasks import PreflightAgentOperationTask
 from shakenfist.util.access_tokens import parse_jwt_identity
@@ -831,7 +833,6 @@ class InstancesEndpoint(sf_api.Resource):
             namespace = parse_jwt_identity()[0]
 
         waiting_for = []
-        tasks_by_node = defaultdict(list)
         for inst in instance.Instances([partial(baseobject.namespace_filter, namespace)]):
             inst.add_event(
                 EVENT_TYPE_AUDIT, 'delete request via delete all from REST API')
@@ -843,11 +844,10 @@ class InstancesEndpoint(sf_api.Resource):
             else:
                 node = db_placement['node']
 
-            tasks_by_node[node].append(DeleteInstanceTask(inst.uuid))
+            nio_create_and_enqueue(
+                node, inst.uuid, [nio_tasks.instance_delete],
+                PRIORITY.user_facing)
             waiting_for.append(inst.uuid)
-
-        for node in tasks_by_node:
-            etcd.enqueue(node, {'tasks': tasks_by_node[node]})
 
         return waiting_for
 

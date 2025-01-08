@@ -11,7 +11,6 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import network
-from shakenfist import networkinterface
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -22,12 +21,10 @@ from shakenfist import eventlog
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
 from shakenfist.tasks import ArchiveTranscodeTask
-from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.tasks import DeleteNetworkWhenClean
 from shakenfist.tasks import DestroyNetworkTask
 from shakenfist.tasks import HotPlugInstanceInterfaceTask
 from shakenfist.tasks import HypervisorDestroyNetworkTask
-from shakenfist.tasks import InstanceTask
 from shakenfist.tasks import PreflightAgentOperationTask
 from shakenfist.tasks import QueueTask
 from shakenfist.tasks import SnapshotTask
@@ -96,12 +93,6 @@ class Job(util_concurrency.Job):
                     raise exceptions.UnknownTaskException(
                         'Task was not decoded: %s' % task)
 
-                if InstanceTask.__subclasscheck__(type(task)):
-                    inst = instance.Instance.from_db(task.instance_uuid())
-                    if not inst:
-                        raise exceptions.InstanceNotInDBException(
-                            task.instance_uuid())
-
                 for t in [SnapshotTask, HotPlugInstanceInterfaceTask]:
                     if isinstance(task, t):
                         inst = instance.Instance.from_db(task.instance_uuid())
@@ -118,13 +109,6 @@ class Job(util_concurrency.Job):
                 if isinstance(task, HotPlugInstanceInterfaceTask):
                     inst.hot_plug_interface(
                         task.network_uuid(), task.interface_uuid())
-
-                elif isinstance(task, DeleteInstanceTask):
-                    try:
-                        instance_delete(inst)
-                    except Exception as e:
-                        util_general.ignore_exception(
-                            'instance %s delete task' % inst, e)
 
                 elif isinstance(task, SnapshotTask):
                     snapshot(inst, task.disk(), task.artifact_uuid(),
@@ -201,12 +185,6 @@ class Job(util_concurrency.Job):
             self.log.info('Deferring job as blob is already being transferred')
             etcd.enqueue(config.NODE_NAME, self.workitem, delay=60)
 
-        except exceptions.ImageFetchTaskFailedException as e:
-            # Usually caused by external issue and not an application error
-            self.log.info('Fetch Image Error: %s', e)
-            if inst:
-                inst.enqueue_delete_due_error('Image fetch failed: %s' % e)
-
         except exceptions.ImagesCannotShrinkException as e:
             self.log.info('Fetch Resize Error: %s', e)
             if inst:
@@ -276,68 +254,6 @@ class Job(util_concurrency.Job):
 
         # Dependencies (if any) are complete, we're good to go!
         op.execute()
-
-
-def instance_delete(inst):
-    with inst.get_lock(op='Instance delete', global_scope=False):
-        # There are two delete state flows:
-        #   - error transition states (preflight-error etc) to error
-        #   - created to deleted
-
-        # If the instance is deleted already, we're done here.
-        if inst.state.value == dbo.STATE_DELETED:
-            return
-
-        # We don't need delete_wait for the error states as they're already
-        # in a transition state.
-        if inst.state.value not in instance.Instance.ERROR_STATES:
-            inst.state = dbo.STATE_DELETE_WAIT
-
-        # Create list of networks used by instance. We cannot use the
-        # interfaces cached in the instance here, because the instance
-        # may have failed to get to the point where it populates that
-        # field (an image fetch failure for example).
-        instance_networks = []
-        interfaces = []
-        for ni in networkinterface.interfaces_for_instance(inst):
-            if ni:
-                interfaces.append(ni)
-                if ni.network_uuid not in instance_networks:
-                    instance_networks.append(ni.network_uuid)
-
-        # Stop the instance
-        inst.power_off()
-
-        # Delete the instance's interfaces
-        for ni in interfaces:
-            ni.delete()
-
-        # Create list of networks used by all other instances
-        host_networks = []
-        for i in instance.Instances([instance.this_node_filter], prefilter='active'):
-            if not i.uuid == inst.uuid:
-                for iface_uuid in inst.interfaces:
-                    ni = networkinterface.NetworkInterface.from_db(iface_uuid)
-                    if ni and ni.network_uuid not in host_networks:
-                        host_networks.append(ni.network_uuid)
-
-        inst.delete()
-
-        # Check each network used by the deleted instance
-        for network_uuid in instance_networks:
-            n = network.Network.from_db(network_uuid)
-            if not n:
-                continue
-
-            if n.state.value == dbo.STATE_DELETE_WAIT:
-                continue
-
-            n.update_dnsmasq()
-
-            if not config.NODE_IS_NETWORK_NODE and network_uuid not in host_networks:
-                # We are not the network node and the network not used by any
-                # other instance on this hypervisor, therefore clean it up
-                n.delete_on_hypervisor()
 
 
 def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):

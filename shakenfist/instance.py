@@ -25,7 +25,13 @@ from shakenfist import blob
 from shakenfist import cache
 from shakenfist import constants
 from shakenfist import etcd
+from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.etcd_schema.operations.node_inst_op \
+    import create_and_enqueue as nio_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_inst_op \
+    import model_tasks as nio_tasks
 from shakenfist import exceptions
+from shakenfist.external_api import util as api_util
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.operations.agentoperation import AgentOperation
@@ -37,7 +43,6 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
-from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.tasks import SnapshotTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -1478,9 +1483,9 @@ class Instance(dbo):
         self.add_event(EVENT_TYPE_AUDIT, 'console log cleared')
 
     def enqueue_delete_remote(self, node):
-        etcd.enqueue(node, {
-            'tasks': [DeleteInstanceTask(self.uuid)]
-        })
+        nio_create_and_enqueue(
+            node, self.uuid, [nio_tasks.instance_delete], PRIORITY.user_facing,
+            request_id=api_util.get_request_id())
 
     def enqueue_delete_due_error(self, error_msg):
         # Error needs to be set immediately so that API clients get

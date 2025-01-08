@@ -29,6 +29,7 @@ current_version = 1
 class model_tasks(Enum):
     collect_billing_statistics = 1
     health_check_kvm_process = 2
+    instance_delete = 3
 
 
 class model(BaseModel):

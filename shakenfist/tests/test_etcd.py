@@ -5,10 +5,8 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import tasks
 from shakenfist.config import BaseSettings
 from shakenfist.tests import base
-from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
@@ -154,30 +152,6 @@ class ActualLockTestCase(base.ShakenFistTestCase):
 
         mock_get_holder.assert_called_with(key_prefix='current')
         mock_release.assert_not_called()
-
-
-class TaskEncodingETCDtestCase(base.ShakenFistTestCase):
-    def test_encode_DeleteInstanceTask(self):
-        actual = util_json.json_dump(
-            tasks.DeleteInstanceTask('fake_uuid')).encode()
-        expected = b"""{
-    "instance_uuid": "fake_uuid",
-    "network": [],
-    "task": "instance_delete",
-    "version": 1
-}"""
-        self.assertEqual(expected, actual)
-
-    def test_encode_DeployNetworkTask(self):
-        actual = util_json.json_dump(
-            tasks.DeployNetworkTask('fake_uuid')).encode()
-
-        expected = b"""{
-    "network_uuid": "fake_uuid",
-    "task": "network_deploy",
-    "version": 1
-}"""
-        self.assertEqual(expected, actual)
 
 
 #

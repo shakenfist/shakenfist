@@ -1,6 +1,5 @@
 import flask
 
-from shakenfist.exceptions import NetworkNotListTaskException
 from shakenfist.exceptions import NoInstanceTaskException
 from shakenfist.exceptions import NoNetworkInterfaceTaskException
 from shakenfist.exceptions import NoNetworkTaskException
@@ -49,45 +48,6 @@ class QueueTask:
     def obj_dict(self):
         return {'task': self._name,
                 'version': self._version}
-
-
-#
-# Instance Tasks
-#
-class InstanceTask(QueueTask):
-    def __init__(self, instance_uuid, network=None):
-        super().__init__()
-        self._instance_uuid = instance_uuid
-
-        # Only set network if deliberately set in function parameter. This
-        # avoids setting _network to None which is not iterable.
-        self._network = []
-        if network:
-            self._network = network
-
-        # General checks
-        if not instance_uuid:
-            raise NoInstanceTaskException(
-                'No instance specified for InstanceTask')
-        if not isinstance(instance_uuid, str):
-            raise NoInstanceTaskException('Instance UUID is not a string')
-        if not isinstance(self._network, list):
-            raise NetworkNotListTaskException()
-
-    def instance_uuid(self):
-        return self._instance_uuid
-
-    def network(self):
-        return self._network
-
-    def obj_dict(self):
-        return {**super().obj_dict(),
-                'instance_uuid': self._instance_uuid,
-                'network': self._network}
-
-
-class DeleteInstanceTask(InstanceTask):
-    _name = 'instance_delete'
 
 
 class HotPlugInstanceInterfaceTask(QueueTask):

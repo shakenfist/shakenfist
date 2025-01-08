@@ -3,10 +3,16 @@ import os
 import psutil
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.etcd_schema.operations import node_inst_op as schema
 from shakenfist.instance import Instance
+from shakenfist.instance import Instances
+from shakenfist.instance import this_node_filter
+from shakenfist.network import Network
+from shakenfist.networkinterface import interfaces_for_instance
+from shakenfist.networkinterface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import general as util_general
@@ -167,3 +173,65 @@ class NodeInstOp(BaseClusterOperation):
                 inst.kvm_pid = None
                 inst.state = Instance.STATE_ERROR
                 inst.add_event(EVENT_TYPE_AUDIT, 'kvm process missing')
+
+    def _instance_delete(self, inst):
+        with inst.get_lock(op='Instance delete', global_scope=False):
+            # There are two delete state flows:
+            #   - error transition states (preflight-error etc) to error
+            #   - created to deleted
+
+            # If the instance is deleted already, we're done here.
+            if inst.state.value == Instance.STATE_DELETED:
+                return
+
+            # We don't need delete_wait for the error states as they're already
+            # in a transition state.
+            if inst.state.value not in Instance.ERROR_STATES:
+                inst.state = Instance.STATE_DELETE_WAIT
+
+            # Create list of networks used by instance. We cannot use the
+            # interfaces cached in the instance here, because the instance
+            # may have failed to get to the point where it populates that
+            # field (an image fetch failure for example).
+            instance_networks = []
+            interfaces = []
+            for ni in interfaces_for_instance(inst):
+                if ni:
+                    interfaces.append(ni)
+                    if ni.network_uuid not in instance_networks:
+                        instance_networks.append(ni.network_uuid)
+
+            # Stop the instance
+            inst.power_off()
+
+            # Delete the instance's interfaces
+            for ni in interfaces:
+                ni.delete()
+
+            # Create list of networks used by all other instances
+            host_networks = []
+            for i in Instances([this_node_filter], prefilter='active'):
+                if not i.uuid == inst.uuid:
+                    for iface_uuid in inst.interfaces:
+                        ni = NetworkInterface.from_db(iface_uuid)
+                        if ni and ni.network_uuid not in host_networks:
+                            host_networks.append(ni.network_uuid)
+
+            inst.delete()
+
+            # Check each network used by the deleted instance
+            for network_uuid in instance_networks:
+                n = Network.from_db(network_uuid)
+                if not n:
+                    continue
+
+                if n.state.value == Network.STATE_DELETE_WAIT:
+                    continue
+
+                n.update_dnsmasq()
+
+                if (not config.NODE_IS_NETWORK_NODE and
+                        network_uuid not in host_networks):
+                    # We are not the network node and the network not used by any
+                    # other instance on this hypervisor, therefore clean it up
+                    n.delete_on_hypervisor()
