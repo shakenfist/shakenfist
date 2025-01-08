@@ -1271,7 +1271,7 @@
             HTTP_PROXY "{{hostvars['localhost']['http_proxy']}}"
       environment:
         SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
-      when: "{{hostvars['localhost']['http_proxy']}}"
+      when: hostvars['localhost']['http_proxy']
 
     - name: Log additional config
       debug:
