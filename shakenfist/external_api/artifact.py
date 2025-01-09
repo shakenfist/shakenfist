@@ -22,9 +22,9 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import constants
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.etcd_schema.operations.artifact_fetch_op \
-    import create_and_enqueue as ce_artifact_fetch_op
+    import create_and_enqueue as afo_create_and_enqueue
 from shakenfist.etcd_schema.operations.artifact_fetch_op \
-    import model_tasks as artifact_fetch_op_tasks
+    import model_tasks as afo_tasks
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist.artifact import Artifact
@@ -314,11 +314,11 @@ class ArtifactsEndpoint(sf_api.Resource):
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True
 
-        ce_artifact_fetch_op(
+        afo_create_and_enqueue(
             namespace,
             url,
             None,
-            [artifact_fetch_op_tasks.image_fetch],
+            [afo_tasks.image_fetch],
             PRIORITY.user_facing,
             request_id=util_general.get_request_id())
 
