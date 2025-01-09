@@ -1,4 +1,3 @@
-import flask
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
@@ -53,10 +52,3 @@ def safe_get_network_interface(interface_uuid):
         return None, None, sf_api.error(404, 'interface not found')
 
     return ni, n, None
-
-
-def get_request_id():
-    try:
-        return flask.request.environ.get('FLASK_REQUEST_ID')
-    except RuntimeError:
-        return None

@@ -37,7 +37,6 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
-from shakenfist.external_api import util as api_util
 from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
 from shakenfist.namespace import namespace_is_trusted
@@ -321,7 +320,7 @@ class ArtifactsEndpoint(sf_api.Resource):
             None,
             [artifact_fetch_op_tasks.image_fetch],
             PRIORITY.user_facing,
-            request_id=api_util.get_request_id())
+            request_id=util_general.get_request_id())
 
         return a.external_view()
 

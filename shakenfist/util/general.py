@@ -8,6 +8,7 @@ import uuid
 
 import cpuinfo
 import distro
+import flask
 from pbr.version import VersionInfo
 from shakenfist_utilities import logs  # noreorder
 
@@ -152,3 +153,10 @@ def valid_uuid4(uuid_string):
     except ValueError:
         return False
     return True
+
+
+def get_request_id():
+    try:
+        return flask.request.environ.get('FLASK_REQUEST_ID')
+    except RuntimeError:
+        return None

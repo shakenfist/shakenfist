@@ -784,7 +784,7 @@ class InstancesEndpoint(sf_api.Resource):
                 inst.uuid,
                 [afo_tasks.image_fetch],
                 PRIORITY.user_waiting,
-                request_id=api_util.get_request_id(),
+                request_id=util_general.get_request_id(),
                 target_node=placement)
             instance_start_dependencies.append(
                 Dependency(op_type=op_type, op_uuid=op_uuid))
@@ -799,7 +799,7 @@ class InstancesEndpoint(sf_api.Resource):
             [nino_tasks.instance_preflight,
              nino_tasks.instance_start],
             PRIORITY.user_waiting,
-            request_id=api_util.get_request_id(),
+            request_id=util_general.get_request_id(),
             depends_on=instance_start_dependencies)
         return inst.external_view()
 

@@ -31,7 +31,6 @@ from shakenfist.etcd_schema.operations.node_inst_op \
 from shakenfist.etcd_schema.operations.node_inst_op \
     import model_tasks as nio_tasks
 from shakenfist import exceptions
-from shakenfist.external_api import util as api_util
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.operations.agentoperation import AgentOperation
@@ -1485,7 +1484,7 @@ class Instance(dbo):
     def enqueue_delete_remote(self, node):
         nio_create_and_enqueue(
             node, self.uuid, [nio_tasks.instance_delete], PRIORITY.user_facing,
-            request_id=api_util.get_request_id())
+            request_id=util_general.get_request_id())
 
     def enqueue_delete_due_error(self, error_msg):
         # Error needs to be set immediately so that API clients get
