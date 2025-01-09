@@ -35,6 +35,7 @@ class NodeInstOpTestCase(base.ShakenFistTestCase):
             request_id=None,
             tasks=[model_tasks.health_check_kvm_process],
             depends_on=[],
+            runs_after=[],
             version=current_version
         )
 
@@ -46,6 +47,7 @@ class NodeInstOpTestCase(base.ShakenFistTestCase):
         self.assertEqual(None, serialized['request_id'])
         self.assertEqual(['health_check_kvm_process'], serialized['tasks'])
         self.assertEqual([], serialized['depends_on'])
+        self.assertEqual([], serialized['runs_after'])
         self.assertEqual(current_version, serialized['version'])
 
     def test_model_bad_version(self):
@@ -63,6 +65,7 @@ class NodeInstOpTestCase(base.ShakenFistTestCase):
             request_id=None,
             tasks=[model_tasks.health_check_kvm_process],
             depends_on=[],
+            runs_after=[],
             version=current_version + 1
         )
 
@@ -87,6 +90,7 @@ class NodeInstOpTestCase(base.ShakenFistTestCase):
             {
                 'instance_uuid': '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7',
                 'depends_on': None,
+                'runs_after': None,
                 'node_uuid': 'sf-1',
                 'priority': 'user_facing',
                 'request_id': None,

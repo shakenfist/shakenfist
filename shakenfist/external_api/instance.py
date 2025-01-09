@@ -800,7 +800,10 @@ class InstancesEndpoint(sf_api.Resource):
              nino_tasks.instance_start],
             PRIORITY.user_waiting,
             request_id=util_general.get_request_id(),
-            depends_on=instance_start_dependencies)
+            depends_on=instance_start_dependencies,
+            runs_after=[inst.last_cluster_operation])
+        inst.set_last_cluster_operation(op_type, op_uuid)
+
         return inst.external_view()
 
     @swag_from(api_base.swagger_helper(
@@ -844,9 +847,11 @@ class InstancesEndpoint(sf_api.Resource):
             else:
                 node = db_placement['node']
 
-            nio_create_and_enqueue(
+            op_type, op_uuid = nio_create_and_enqueue(
                 node, inst.uuid, [nio_tasks.instance_delete],
-                PRIORITY.user_facing)
+                PRIORITY.user_facing, runs_after=[inst.last_cluster_operation])
+            inst.set_last_cluster_operation(op_type, op_uuid)
+
             waiting_for.append(inst.uuid)
 
         return waiting_for

@@ -215,6 +215,7 @@ class Job(util_concurrency.Job):
             self.log.error('Operation not found')
             return
 
+        # Ensure our dependencies are met.
         for dep in op.depends_on:
             dep_op = OPERATION_NAMES_TO_CLASSES[dep['op_type']].from_db(
                 dep['op_uuid'])
@@ -223,8 +224,8 @@ class Job(util_concurrency.Job):
                     EVENT_TYPE_AUDIT,
                     'cancelling operation, as dependency does not exist',
                     extra={
-                        'dep_object_type': dep_op.op_type,
-                        'dep_object_uuid': dep_op.op_uuid
+                        'dep_object_type': dep_op.object_type,
+                        'dep_object_uuid': dep_op.uuid
                     })
                 op.state = BaseClusterOperation.STATE_ERROR
                 return
@@ -237,8 +238,8 @@ class Job(util_concurrency.Job):
                     EVENT_TYPE_AUDIT,
                     'aborting operation, as dependency is unsuitable',
                     extra={
-                        'dep_object_type': dep_op.op_type,
-                        'dep_object_uuid': dep_op.op_uuid,
+                        'dep_object_type': dep_op.object_type,
+                        'dep_object_uuid': dep_op.uuid,
                         'dep_object_state': dep_op_state
                     })
                 op.state = BaseClusterOperation.STATE_ABORT
@@ -252,7 +253,33 @@ class Job(util_concurrency.Job):
                 etcd.enqueue(self.queue_name, self.workitem, delay=15)
                 return
 
-        # Dependencies (if any) are complete, we're good to go!
+        # Ensure that we are running after any runs_after requirements.
+        for dep in op.runs_after:
+            dep_op = OPERATION_NAMES_TO_CLASSES[dep['op_type']].from_db(
+                dep['op_uuid'])
+            if not dep_op:
+                # Not fatal because otherwise a missing cluster operation
+                # could cause the entire cluster to stop being able to manage
+                # a given object.
+                op.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'warning, runs_after dependency is missing',
+                    extra={
+                        'dep_object_type': dep_op.object_type,
+                        'dep_object_uuid': dep_op.uuid
+                    })
+                continue
+
+            dep_op_state = dep_op.state.value
+            if dep_op_state in [BaseClusterOperation.STATE_INITIAL,
+                                BaseClusterOperation.STATE_QUEUED,
+                                BaseClusterOperation.STATE_PREFLIGHT,
+                                BaseClusterOperation.STATE_EXECUTING]:
+                # Dependency not yet ready, we should defer
+                etcd.enqueue(self.queue_name, self.workitem, delay=15)
+                return
+
+        # We're good to go!
         op.execute()
 
 

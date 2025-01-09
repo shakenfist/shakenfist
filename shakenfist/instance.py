@@ -35,7 +35,8 @@ from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.operations.agentoperation import AgentOperations
-from shakenfist.operations.agentoperation import instance_filter as agent_instance_filter
+from shakenfist.operations.agentoperation \
+    import instance_filter as agent_instance_filter
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
@@ -91,7 +92,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 14
+    current_version = 15
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -247,6 +248,10 @@ class Instance(dbo):
                     etcd.put(
                         'attribute/instance', static_values['uuid'],
                         'block_devices', bd)
+
+    @classmethod
+    def _upgrade_step_14_to_15(cls, static_values):
+        pass
 
     @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
@@ -567,6 +572,21 @@ class Instance(dbo):
         if self.kvm_pid == pid:
             return
         self._db_set_attribute('kvm_pid', {'pid': pid})
+
+    @property
+    def last_cluster_operation(self):
+        return self._db_get_attribute('last_cluster_operation')
+
+    def set_last_cluster_operation(self, op_type, op_uuid):
+        with self.get_lock_attr('last_cluster_operation',
+                                'Update last cluster op'):
+            self._db_set_attribute(
+                'last_cluster_operation',
+                {
+                    'op_type': op_type,
+                    'op_uuid': op_uuid
+                }
+            )
 
     # Implementation
     def _initialize_block_devices(self):
@@ -1491,9 +1511,14 @@ class Instance(dbo):
         self.add_event(EVENT_TYPE_AUDIT, 'console log cleared')
 
     def enqueue_delete_remote(self, node):
-        nio_create_and_enqueue(
-            node, self.uuid, [nio_tasks.instance_delete], PRIORITY.user_facing,
+        op_type, op_uuid = nio_create_and_enqueue(
+            node,
+            self.uuid,
+            [nio_tasks.instance_delete],
+            PRIORITY.user_facing,
+            runs_after=[self.last_cluster_operation],
             request_id=util_general.get_request_id())
+        self.set_last_cluster_operation(op_type, op_uuid)
 
     def enqueue_delete_due_error(self, error_msg):
         # Error needs to be set immediately so that API clients get

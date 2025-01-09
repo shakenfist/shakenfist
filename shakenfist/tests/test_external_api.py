@@ -67,10 +67,14 @@ class FakeInstance(BaseFakeObject):
         self.placement = {'node': placement}
         self.version = 2
         self.interfaces = []
+        self.last_cluster_operation = None
 
     def add_event(self, eventtype, message, duration=None, extra=None,
                   suppress_event_logging=False, log_as_error=False):
         ...
+
+    def set_last_cluster_operation(self, op_type, op_uuid):
+        self.last_cluster_operation = (op_type, op_uuid)
 
 
 class FakeNetwork(BaseFakeObject):

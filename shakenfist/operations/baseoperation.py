@@ -1,5 +1,4 @@
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.etcd import enqueue as etcd_enqueue
 
 
 class BaseOperationException(Exception):
@@ -71,6 +70,7 @@ class BaseClusterOperation(BaseOperation):
         self.__priority = static_values['priority']
         self.__request_id = static_values.get('request_id')
         self.__depends_on = static_values.get('depends_on')
+        self.__runs_after = static_values.get('runs_after')
 
     @property
     def priority(self):
@@ -86,16 +86,13 @@ class BaseClusterOperation(BaseOperation):
             return []
         return self.__depends_on
 
-    # Methods
-    def enqueue(self):
-        self.state = self.STATE_QUEUED
-        etcd_enqueue(
-            f'{self.node_uuid}-clusteroperation-{self.priority}',
-            {
-                'operation_type': self.object_type,
-                'operation_uuid': self.uuid
-            })
+    @property
+    def runs_after(self):
+        if not self.__runs_after or len(self.__runs_after) == 0:
+            return []
+        return self.__runs_after
 
+    # Methods
     def execute(self):
         self.state = BaseClusterOperation.STATE_EXECUTING
         for t in self.tasks:

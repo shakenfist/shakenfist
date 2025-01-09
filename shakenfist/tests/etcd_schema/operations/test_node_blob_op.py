@@ -38,6 +38,7 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
                 model_tasks.verify_size_and_checksum
             ],
             depends_on=[],
+            runs_after=[],
             version=current_version
         )
 
@@ -52,6 +53,7 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
             'verify_size_and_checksum'
         ], serialized['tasks'])
         self.assertEqual([], serialized['depends_on'])
+        self.assertEqual([], serialized['runs_after'])
         self.assertEqual(current_version, serialized['version'])
 
     def test_model_bad_version(self):
@@ -72,6 +74,7 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
                 model_tasks.verify_size_and_checksum
             ],
             depends_on=[],
+            runs_after=[],
             version=current_version + 1
         )
 
@@ -96,6 +99,7 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
             {
                 'blob_uuid': '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7',
                 'depends_on': None,
+                'runs_after': None,
                 'node_uuid': 'sf-1',
                 'priority': 'background_high_io',
                 'request_id': None,

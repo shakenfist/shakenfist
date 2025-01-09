@@ -27,6 +27,7 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
     def test_model(self):
         u1 = str(uuid4())
         u2 = str(uuid4())
+        u3 = str(uuid4())
 
         d = model(
             uuid=u1,
@@ -40,6 +41,12 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
                 Dependency(
                     op_type=CLUSTER_OPERATIONS.node_blob_op,
                     op_uuid=u2
+                )
+            ],
+            runs_after=[
+                Dependency(
+                    op_type=CLUSTER_OPERATIONS.node_blob_op,
+                    op_uuid=u3
                 )
             ],
             version=current_version
@@ -62,11 +69,21 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
             ],
             serialized['depends_on']
         )
+        self.assertEqual(
+            [
+                {
+                    'op_type': 'node_blob_op',
+                    'op_uuid': u3
+                }
+            ],
+            serialized['runs_after']
+        )
         self.assertEqual(current_version, serialized['version'])
 
     def test_model_bad_version(self):
         u1 = str(uuid4())
         u2 = str(uuid4())
+        u3 = str(uuid4())
 
         self.assertRaises(
             ValidationError,
@@ -82,6 +99,12 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
                 Dependency(
                     op_type=CLUSTER_OPERATIONS.node_blob_op,
                     op_uuid=u2
+                )
+            ],
+            runs_after=[
+                Dependency(
+                    op_type=CLUSTER_OPERATIONS.node_blob_op,
+                    op_uuid=u3
                 )
             ],
             version=current_version + 1
@@ -106,6 +129,7 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             {
                 'depends_on': None,
+                'runs_after': None,
                 'instance_uuid': None,
                 'namespace': 'system',
                 'priority': 'user_facing',

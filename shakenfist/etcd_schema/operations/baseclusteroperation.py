@@ -26,3 +26,18 @@ class Dependency(BaseModel):
     @field_serializer('op_type')
     def serialize_op_type(self, op_type: CLUSTER_OPERATIONS, _info):
         return op_type.name
+
+
+def _convert_deps(deps):
+    if deps and len(deps) > 0:
+        converted = []
+        for op in deps:
+            if op:
+                converted.append(
+                    Dependency(
+                        op_type=CLUSTER_OPERATIONS[op['op_type']],
+                        op_uuid=op['op_uuid']
+                    )
+                )
+        return converted
+    return None

@@ -12,6 +12,8 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.etcd_schema.operations.baseclusteroperation \
     import CLUSTER_OPERATIONS
+from shakenfist.etcd_schema.operations.baseclusteroperation \
+    import _convert_deps
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.etcd_schema.operations.baseclusteroperation import Dependency
 from shakenfist.etcd_schema.operations.util import base_mutations
@@ -42,6 +44,7 @@ class model(BaseModel):
     request_id: Optional[str]
     tasks: List[model_tasks]
     depends_on: Optional[List[Dependency]]
+    runs_after: Optional[List[Dependency]]
     version: int = Field(ge=initial_version, le=current_version)
 
     @field_serializer('priority')
@@ -54,10 +57,11 @@ class model(BaseModel):
 
 
 def create_and_enqueue(node_uuid, instance_uuid, net_desc, tasks, priority,
-                       request_id=None, depends_on=None):
+                       request_id=None, depends_on=None, runs_after=None):
     operation_uuid = str(uuid4())
 
     try:
+        runs_after_as_deps = _convert_deps(runs_after)
         m = model(
             uuid=operation_uuid,
             node_uuid=node_uuid,
@@ -67,6 +71,7 @@ def create_and_enqueue(node_uuid, instance_uuid, net_desc, tasks, priority,
             request_id=request_id,
             tasks=tasks,
             depends_on=depends_on,
+            runs_after=runs_after_as_deps,
             version=current_version
         )
     except ValidationError as exc:
@@ -79,6 +84,7 @@ def create_and_enqueue(node_uuid, instance_uuid, net_desc, tasks, priority,
             'request_id': request_id,
             'tasks': tasks,
             'depends_on': depends_on,
+            'runs_after': runs_after,
             'version': current_version
         }).error(f'etcd schema validation error: {exc}')
         raise exc

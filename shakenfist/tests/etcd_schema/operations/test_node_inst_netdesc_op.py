@@ -31,6 +31,7 @@ class NodeInstNetdescOpTestCase(base.ShakenFistTestCase):
         u3 = str(uuid4())
         u4 = str(uuid4())
         u5 = str(uuid4())
+        u6 = str(uuid4())
 
         d = model(
             uuid=u1,
@@ -53,6 +54,12 @@ class NodeInstNetdescOpTestCase(base.ShakenFistTestCase):
                 {
                     'op_type': afo_object_type,
                     'op_uuid': u4
+                }
+            ],
+            runs_after=[
+                {
+                    'op_type': afo_object_type,
+                    'op_uuid': u6
                 }
             ],
             version=current_version
@@ -81,6 +88,14 @@ class NodeInstNetdescOpTestCase(base.ShakenFistTestCase):
         ],
             serialized['depends_on']
         )
+        self.assertEqual([
+            {
+                'op_type': 'artifact_fetch_op',
+                'op_uuid': u6
+            }
+        ],
+            serialized['runs_after']
+        )
         self.assertEqual(current_version, serialized['version'])
 
     def test_model_bad_version(self):
@@ -89,6 +104,7 @@ class NodeInstNetdescOpTestCase(base.ShakenFistTestCase):
         u3 = str(uuid4())
         u4 = str(uuid4())
         u5 = str(uuid4())
+        u6 = str(uuid4())
 
         self.assertRaises(
             ValidationError,
@@ -107,6 +123,7 @@ class NodeInstNetdescOpTestCase(base.ShakenFistTestCase):
             request_id=None,
             tasks=[model_tasks.instance_preflight],
             depends_on=[(afo_object_type, u4)],
+            runs_after=[(afo_object_type, u6)],
             version=current_version + 1
         )
 
@@ -149,6 +166,7 @@ class NodeInstNetdescOpTestCase(base.ShakenFistTestCase):
                     }
                 ],
                 'depends_on': None,
+                'runs_after': None,
                 'node_uuid': 'sf-1',
                 'priority': 'user_waiting',
                 'request_id': None,
