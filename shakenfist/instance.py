@@ -363,6 +363,15 @@ class Instance(dbo):
                 'snapshot_ignores': disk.get('snapshot_ignores')
             })
 
+        # Mix in not yet executed agent operations. If you want to see _all_
+        # agent operations, then use the agentoperation REST API instead.
+        i['agent_operations_queue'] = []
+        ops = self.agent_operations
+        for agentop_uuid in ops.get('queued', []):
+            aop = AgentOperation.from_db(agentop_uuid)
+            if aop:
+                i['agent_operations_queue'].append(aop.external_view())
+
         return i
 
     # Static values

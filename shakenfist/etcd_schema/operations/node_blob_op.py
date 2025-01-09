@@ -83,7 +83,9 @@ def create_and_enqueue(node_uuid, blob_uuid, tasks, priority, request_id=None,
         base_mutations(object_type.name.lower(), m.model_dump(mode='json'))
     mutations.append(
         {
-            'path': f'/sf/clusteroperations-by-blob/{blob_uuid}/{node_uuid}',
+            'path': (
+                f'/sf/clusteroperations-by-blob/{blob_uuid}/{operation_uuid}'
+            ),
             'original_data': None,
             'new_data': work_item
         },
