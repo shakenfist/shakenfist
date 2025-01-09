@@ -11,10 +11,10 @@ import sys
 import threading
 import time
 
-from shakenfist_utilities import random      # noreorder
-
 from google.protobuf.message import DecodeError
 import psutil
+import setproctitle
+from shakenfist_utilities import random      # noreorder
 from shakenfist_utilities import logs
 
 from shakenfist import privexec_pb2
@@ -158,6 +158,7 @@ def main():
     global EXIT
 
     write_pid_file()
+    setproctitle.setproctitle('sf-privexec')
 
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
