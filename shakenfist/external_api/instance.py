@@ -29,6 +29,10 @@ from shakenfist.etcd_schema.operations.node_inst_op \
     import create_and_enqueue as nio_create_and_enqueue
 from shakenfist.etcd_schema.operations.node_inst_op \
     import model_tasks as nio_tasks
+from shakenfist.etcd_schema.operations.node_inst_iface_op \
+    import create_and_enqueue as niio_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_inst_iface_op \
+    import model_tasks as niio_tasks
 from shakenfist.etcd_schema.operations.node_inst_netdesc_op \
     import create_and_enqueue as nino_create_and_enqueue
 from shakenfist.etcd_schema.operations.node_inst_netdesc_op \
@@ -57,7 +61,6 @@ from shakenfist.external_api import util as api_util
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
-from shakenfist.tasks import HotPlugInstanceInterfaceTask
 from shakenfist.tasks import PreflightAgentOperationTask
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util import general as util_general
@@ -949,19 +952,24 @@ class InstanceInterfacesEndpoint(sf_api.Resource):
                 return sf_api.error(406, 'instance interfae list invalid')
             order = last_iface.order + 1
 
-        float_task, netdesc, err = _netdesc_allocate_address(
+        netdesc, err = _netdesc_allocate_address(
             instance_from_db, network, order)
         if err:
             return err
 
-        tasks = [HotPlugInstanceInterfaceTask(
-            instance_from_db.uuid, netdesc['network_uuid'], netdesc['iface_uuid'])]
-
-        if float_task:
-            tasks.append(float_task)
+        op_type, op_uuid = niio_create_and_enqueue(
+            instance_from_db.placement['node'],
+            instance_from_db.uuid,
+            netdesc['network_uuid'],
+            netdesc['iface_uuid'],
+            [niio_tasks.hot_plug_instance_interface],
+            PRIORITY.user_waiting,
+            request_id=util_general.get_request_id(),
+            depends_on=None,
+            runs_after=[instance_from_db.last_cluster_operation])
+        instance_from_db.set_last_cluster_operation(op_type, op_uuid)
         instance_from_db.interfaces_append(netdesc['iface_uuid'])
 
-        etcd.enqueue(instance_from_db.placement['node'], {'tasks': tasks})
         return NetworkInterface.from_db(netdesc['iface_uuid']).external_view()
 
 

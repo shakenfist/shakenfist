@@ -27,8 +27,8 @@ class NodeInstOpException(BaseOperationException):
         super().__init__(message)
         self.op_type = op.object_type
         self.op_uuid = op.uuid
-        self.instance_uuid = op.instance_uuid
         self.node_uuid = op.node_uuid
+        self.instance_uuid = op.instance_uuid
 
 
 class NoSuchTask(NodeInstOpException):
@@ -101,8 +101,8 @@ class NodeInstOp(BaseClusterOperation):
         except Exception as e:
             util_general.ignore_exception('node_inst_op', e)
             self.state = NodeInstOp.STATE_ERROR
-            if self.inst:
-                self.inst.state = Instance.STATE_ERROR
+            if inst:
+                inst.state = Instance.STATE_ERROR
 
     def _collect_billing_statistics(self, inst):
         with util_libvirt.LibvirtConnection() as lc:

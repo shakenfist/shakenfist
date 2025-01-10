@@ -281,6 +281,7 @@ def upgrade_data_store():
                 'networkinterface',
                 'node',
                 'node_blob_op',
+                'node_inst_iface_op',
                 'node_inst_op',
                 'node_inst_netdesc_op',
                 'upload'

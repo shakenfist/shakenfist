@@ -23,7 +23,6 @@ from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLA
 from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.tasks import DeleteNetworkWhenClean
 from shakenfist.tasks import DestroyNetworkTask
-from shakenfist.tasks import HotPlugInstanceInterfaceTask
 from shakenfist.tasks import HypervisorDestroyNetworkTask
 from shakenfist.tasks import PreflightAgentOperationTask
 from shakenfist.tasks import QueueTask
@@ -93,7 +92,7 @@ class Job(util_concurrency.Job):
                     raise exceptions.UnknownTaskException(
                         'Task was not decoded: %s' % task)
 
-                for t in [SnapshotTask, HotPlugInstanceInterfaceTask]:
+                for t in [SnapshotTask]:
                     if isinstance(task, t):
                         inst = instance.Instance.from_db(task.instance_uuid())
                         break
@@ -106,11 +105,7 @@ class Job(util_concurrency.Job):
                 })
                 self.log.info('Starting task')
 
-                if isinstance(task, HotPlugInstanceInterfaceTask):
-                    inst.hot_plug_interface(
-                        task.network_uuid(), task.interface_uuid())
-
-                elif isinstance(task, SnapshotTask):
+                if isinstance(task, SnapshotTask):
                     snapshot(inst, task.disk(), task.artifact_uuid(),
                              task.blob_uuid(), task.thin())
 

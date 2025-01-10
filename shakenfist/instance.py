@@ -30,6 +30,7 @@ from shakenfist.etcd_schema.operations.node_inst_op \
     import create_and_enqueue as nio_create_and_enqueue
 from shakenfist.etcd_schema.operations.node_inst_op \
     import model_tasks as nio_tasks
+from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist import network
 from shakenfist import networkinterface
@@ -1733,15 +1734,7 @@ class Instance(dbo):
 
         return blob_uuid
 
-    def hot_plug_interface(self, network_uuid, interface_uuid):
-        n = network.Network.from_db(network_uuid)
-        if not n:
-            raise exceptions.NetworkMissing(network_uuid)
-
-        iface = networkinterface.NetworkInterface.from_db(interface_uuid)
-        if not iface:
-            raise exceptions.NetworkInterfaceException(interface_uuid)
-
+    def hot_plug_interface(self, n, ni):
         n.create_on_hypervisor()
         n.ensure_mesh()
         n.update_dnsmasq()
@@ -1754,9 +1747,9 @@ class Instance(dbo):
       <mtu size='{mtu}'/>
       </interface>
       """.format(
-                macaddr=iface.macaddr,
+                macaddr=ni.macaddr,
                 bridge=n.subst_dict()['vx_bridge'],
-                model=iface.model,
+                model=ni.model,
                 mtu=config.MAX_HYPERVISOR_MTU - 50
             )
 
@@ -1764,11 +1757,8 @@ class Instance(dbo):
                      lc.libvirt.VIR_DOMAIN_AFFECT_LIVE)
             inst = lc.get_domain_from_sf_uuid(self.uuid)
             inst.attachDeviceFlags(device_xml, flags=flags)
-            self.add_event(
-                EVENT_TYPE_AUDIT, 'hot plugged interface', extra={
-                    'networkinterface': interface_uuid,
-                    'network': network_uuid
-                })
+            add_event_multi(
+                EVENT_TYPE_AUDIT, [self, n, ni], 'hot plugged interface')
 
 
 class Instances(dbo_iter):

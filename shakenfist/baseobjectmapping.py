@@ -10,6 +10,7 @@ from shakenfist import networkinterface
 from shakenfist import node
 from shakenfist.operations import agentoperation
 from shakenfist.operations import node_blob_op
+from shakenfist.operations import node_inst_iface_op
 from shakenfist.operations import node_inst_op
 from shakenfist.operations import node_inst_netdesc_op
 from shakenfist import upload
@@ -27,6 +28,7 @@ OBJECT_NAMES_TO_CLASSES = {
     'networkinterface': networkinterface.NetworkInterface,
     'node': node.Node,
     'node_blob_op': node_blob_op.NodeBlobOp,
+    'node_inst_iface_op': node_inst_iface_op.NodeInstIfaceOp,
     'node_inst_op': node_inst_op.NodeInstOp,
     'node_inst_netdesc_op': node_inst_netdesc_op.NodeInstNetDescOp,
     'upload': upload.Upload
