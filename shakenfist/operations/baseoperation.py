@@ -55,7 +55,8 @@ class BaseClusterOperation(BaseOperation):
     state_targets = {
         None: (BaseOperation.STATE_QUEUED),
         BaseOperation.STATE_QUEUED: (BaseOperation.STATE_EXECUTING,
-                                     dbo.STATE_DELETED, dbo.STATE_ERROR),
+                                     dbo.STATE_DELETED, dbo.STATE_ERROR,
+                                     BaseOperation.STATE_ABORT),
         BaseOperation.STATE_EXECUTING: (BaseOperation.STATE_COMPLETE,
                                         dbo.STATE_DELETED, dbo.STATE_ERROR,
                                         BaseOperation.STATE_ABORT),
