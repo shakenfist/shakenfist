@@ -18,7 +18,12 @@ from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import cache
 from shakenfist import etcd
-from shakenfist.etcd_schema.operations import node_blob_op as nbo_schema
+from shakenfist.etcd_schema.operations.baseclusteroperation \
+    import PRIORITY
+from shakenfist.etcd_schema.operations.node_blob_op \
+    import create_and_enqueue as nbo_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_blob_op \
+    import model_tasks as nbo_tasks
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
@@ -734,11 +739,11 @@ class Blob(dbo):
                         nodes.remove(n)
 
                 for n in nodes[:targets]:
-                    nbo_schema.create_and_enqueue(
+                    nbo_create_and_enqueue(
                         n,
                         self.uuid,
-                        [nbo_schema.model_tasks.ensure_local],
-                        nbo_schema.PRIORITY.background_high_io)
+                        [nbo_tasks.ensure_local],
+                        PRIORITY.background_high_io)
                     self.update_incomplete_location(0, node=n)
                     self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
@@ -816,11 +821,11 @@ class Blob(dbo):
         # If we're in a hurry but extra hashes are missing, enqueue those as
         # background tasks
         if needs_rehashing:
-            nbo_schema.create_and_enqueue(
+            nbo_create_and_enqueue(
                 config.NODE_NAME,
                 self.uuid,
-                [nbo_schema.model_tasks.verify_size_and_checksum],
-                nbo_schema.PRIORITY.background_high_io)
+                [nbo_tasks.verify_size_and_checksum],
+                PRIORITY.background_high_io)
 
         # Validate / update our stored checksums
         with self.get_lock_attr('checksums', op='update checksums'):
