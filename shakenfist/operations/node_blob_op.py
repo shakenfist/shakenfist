@@ -7,8 +7,10 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist.etcd_schema.operations import node_blob_op as schema
+from shakenfist.exceptions import BlobAlreadyBeingTransferred
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.operations.baseoperation import ReEnqueued
 from shakenfist.util import general as util_general
 
 
@@ -100,6 +102,9 @@ class NodeBlobOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(b)
         except Exception as e:
+            if isinstance(e, ReEnqueued):
+                raise e
+
             util_general.ignore_exception('node_blob_op', e)
             self.state = NodeBlobOp.STATE_ERROR
 
@@ -129,4 +134,7 @@ class NodeBlobOp(BaseClusterOperation):
                 EVENT_TYPE_AUDIT, 'cannot replicate blob, insufficient space')
             return
 
-        b.ensure_local([], wait_for_other_transfers=False)
+        try:
+            b.ensure_local([], wait_for_other_transfers=False)
+        except BlobAlreadyBeingTransferred:
+            self.defer()

@@ -1,4 +1,7 @@
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist import etcd
 
 
 class BaseOperationException(Exception):
@@ -6,9 +9,13 @@ class BaseOperationException(Exception):
         self.message = message
 
 
-class InvalidPriorityException(Exception):
+class InvalidPriorityException(BaseOperationException):
     def __init__(self, task, priority):
         super().__init__(f'{priority} is not a valid priority')
+
+
+class ReEnqueued(Exception):
+    ...
 
 
 class BaseOperation(dbo):
@@ -95,12 +102,26 @@ class BaseClusterOperation(BaseOperation):
 
     # Methods
     def execute(self):
-        self.state = BaseClusterOperation.STATE_EXECUTING
-        for t in self.tasks:
-            self.dispatch_task(t)
-            if self.state.value in [BaseClusterOperation.STATE_ABORT,
-                                    BaseClusterOperation.STATE_DELETED,
-                                    BaseClusterOperation.STATE_ERROR]:
-                return
+        try:
+            self.state = BaseClusterOperation.STATE_EXECUTING
+            for t in self.tasks:
+                self.dispatch_task(t)
+                if self.state.value in [BaseClusterOperation.STATE_ABORT,
+                                        BaseClusterOperation.STATE_DELETED,
+                                        BaseClusterOperation.STATE_ERROR]:
+                    return
+            self.state = BaseClusterOperation.STATE_COMPLETE
 
-        self.state = BaseClusterOperation.STATE_COMPLETE
+        except ReEnqueued:
+            ...
+
+    def defer(self, delay=15):
+        # Re-enqueue this operation for a retry after delay seconds
+        self.add_event(
+            EVENT_TYPE_STATUS, f'Execution deferred for {delay} seconds')
+        work_item = {
+            'operation_type': self.object_type,
+            'operation_uuid': self.uuid
+        }
+        etcd.enqueue(config.NODE_NAME, work_item, delay=delay)
+        raise ReEnqueued()
