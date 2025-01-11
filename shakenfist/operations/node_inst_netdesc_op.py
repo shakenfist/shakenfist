@@ -5,8 +5,9 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist.etcd_schema.operations import node_inst_netdesc_op as schema
 from shakenfist.eventlog import add_event_multi
-from shakenfist.exceptions import LowResourceException
+from shakenfist.exceptions import ImagesCannotShrinkException
 from shakenfist.exceptions import InvalidStateException
+from shakenfist.exceptions import LowResourceException
 from shakenfist.instance import Instance
 from shakenfist.network import Network
 from shakenfist.networkinterface import NetworkInterface
@@ -47,8 +48,8 @@ class InvalidNetDesc(NodeInstNetDescOpException):
 
 
 class AbortInstanceStart(NodeInstNetDescOpException):
-    def __init__(self, op):
-        super().__init__(op, 'instance missing')
+    def __init__(self, op, message):
+        super().__init__(op, message)
 
 
 class NodeInstNetDescOp(BaseClusterOperation):
@@ -117,12 +118,12 @@ class NodeInstNetDescOp(BaseClusterOperation):
 
         try:
             self.__getattribute__(f'_{task.name}')(inst)
-        except AbortInstanceStart:
-            inst.state = Instance.STATE_ERROR
+        except AbortInstanceStart as e:
+            inst.enqueue_delete_due_error(e.message)
             self.state = NodeInstNetDescOp.STATE_ABORT
         except Exception as e:
             util_general.ignore_exception('node_inst_netdesc_op', e)
-            inst.state = Instance.STATE_ERROR
+            inst.enqueue_delete_due_error(f'Unhandled error: {e}')
             self.state = NodeInstNetDescOp.STATE_ERROR
 
     def _instance_preflight(self, inst):
@@ -260,3 +261,7 @@ class NodeInstNetDescOp(BaseClusterOperation):
                 inst.enqueue_delete_due_error(
                     'invalid state transition: %s' % e)
                 return
+
+            except ImagesCannotShrinkException as e:
+                if inst:
+                    inst.enqueue_delete_due_error(f'Image resize failed: {e}')

@@ -14,7 +14,6 @@ from shakenfist import network
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist import eventlog
@@ -174,16 +173,6 @@ class Job(util_concurrency.Job):
                     self.log.error('Unhandled task was dropped')
 
                 self.log.info('Task complete')
-
-        except exceptions.BlobAlreadyBeingTransferred:
-            # Re-enqueue this job to run in a minute
-            self.log.info('Deferring job as blob is already being transferred')
-            etcd.enqueue(config.NODE_NAME, self.workitem, delay=60)
-
-        except exceptions.ImagesCannotShrinkException as e:
-            self.log.info('Fetch Resize Error: %s', e)
-            if inst:
-                inst.enqueue_delete_due_error('Image resize failed: %s' % e)
 
         except libvirt.libvirtError as e:
             util_general.ignore_exception('Livirt Error in queue worker', e)
