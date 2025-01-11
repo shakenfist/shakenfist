@@ -33,6 +33,10 @@ from shakenfist.daemons.cluster import scheduled_tasks
 from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
+from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import get_all_queue_names
+from shakenfist.operations.clusteroperationmapping \
+    import OPERATION_NAMES_TO_CLASSES
 from shakenfist.upload import Uploads
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
@@ -397,14 +401,33 @@ class Monitor(daemon.Daemon):
                     b.request_replication()
 
                 # Clean up any lingering queue tasks
-                for queue_name in [n.uuid, f'{n.uuid}-background']:
+                for queue_name in get_all_queue_names(n.uuid):
                     while jobname_workitem := etcd.dequeue(queue_name):
-                        jobname, _ = jobname_workitem
-                        LOG.with_fields({
-                            'jobname': jobname,
-                            'node': n.uuid,
-                            'queue': queue_name
-                        }).info('Deleting work item for deleted node')
+                        jobname, workitem = jobname_workitem
+                        n.add_event(
+                            EVENT_TYPE_AUDIT,
+                            'deleting work item for deleted node',
+                            extra={
+                                'jobname': jobname,
+                                'queue': queue_name
+                            })
+
+                        # Cluster operations might have dependencies
+                        if queue_name.find('-clusteroperation-') != -1:
+                            op_type = workitem.get('operation_type')
+                            op_uuid = workitem.get('operation_uuid')
+                            op = OPERATION_NAMES_TO_CLASSES[op_type].from_db(
+                                op_uuid)
+                            op.state = BaseClusterOperation.STATE_ABORT
+                            eventlog.add_event_multi(
+                                EVENT_TYPE_AUDIT,
+                                [n, op],
+                                'aborted operation for deleted node',
+                                extra={
+                                    'jobname': jobname,
+                                    'queue': queue_name
+                                })
+
                         etcd.resolve(queue_name, jobname)
 
         # Remove old entries from the hard-deleted state caches
