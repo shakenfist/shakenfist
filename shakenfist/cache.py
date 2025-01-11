@@ -24,7 +24,7 @@ def read_object_state_cache_many(object_type, states):
     # a lock to receive a consistent view of the cache, so long as everything
     # can be fetched in a single etcd API request.
     out = []
-    for key, data in etcd.get_prefix('/sf/cache/%s' % object_type):
+    for key, data in etcd.get_prefix(f'/sf/cache/{object_type}'):
         if type(data) is not dict:
             LOG.error(f'Ignoring malformed cache entry {key} = {data}')
             continue
@@ -37,29 +37,22 @@ def read_object_state_cache_many(object_type, states):
     return out
 
 
+def read_object_state_cache_all(object_type):
+    # The same as above, but return all states not a filtered view.
+    out = []
+    for key, data in etcd.get_prefix(f'/sf/cache/{object_type}'):
+        if type(data) is not dict:
+            LOG.error(f'Ignoring malformed cache entry {key} = {data}')
+            continue
+
+        uuids = list(data.keys())
+        if uuids:
+            out.extend(uuids)
+    return out
+
+
 def _update_object_state_cache_attempt(object_type, object_uuid, old_state, new_state):
     mutations = []
-
-    # We have a special case list of objects in all states
-    original = etcd.get('cache', object_type, '_all_')
-    if not original:
-        updated = {}
-    else:
-        updated = copy.deepcopy(original)
-    changed = False
-
-    if new_state == 'hard-deleted' and object_uuid in updated:
-        del updated[object_uuid]
-        changed = True
-    elif object_uuid not in updated:
-        updated[object_uuid] = time.time()
-        changed = True
-    if changed:
-        mutations.append({
-            'path': etcd._construct_key('cache', object_type, '_all_'),
-            'original_data': original,
-            'new_data': updated
-        })
 
     # And then the actual per-state cache
     if old_state:

@@ -459,8 +459,8 @@ def delete(objecttype, subtype, name):
 
 
 @retry_etcd_forever
-def delete_all(objecttype, subtype):
-    path = _construct_key(objecttype, subtype, None)
+def delete_all(objecttype, subtype, name=None):
+    path = _construct_key(objecttype, subtype, name)
     get_etcd_client().delete_prefix(path)
 
 
@@ -832,9 +832,9 @@ def replace_many_raw(mutations):
                 if original_values_by_path[kvs.key] != kvs.value:
                     failures.append(
                         {
-                            'path': kvs.key.decode(),
+                            'path': kvs.key,
                             'desired': original_values_by_path[kvs.key],
-                            'actual': kvs.value.decode(),
+                            'actual': kvs.value,
                             'replacement': new_values_by_path[kvs.key]
                         }
                     )
@@ -843,7 +843,7 @@ def replace_many_raw(mutations):
     for key in original_values_by_path:
         failures.append(
             {
-                'path': key.decode(),
+                'path': key,
                 'desired': original_values_by_path[key],
                 'actual': None,
                 'replacement': new_values_by_path[key]

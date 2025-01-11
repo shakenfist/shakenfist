@@ -424,7 +424,6 @@ class Monitor(daemon.Daemon):
         for object_type in OBJECT_NAMES_TO_CLASSES:
             with etcd.get_lock('cache', None, object_type, op='Cache refresh'):
                 by_state = {
-                    '_all_': {},
                     'deleted': {}
                 }
 
@@ -446,13 +445,15 @@ class Monitor(daemon.Daemon):
                             continue
 
                         by_state[obj.state.value][obj.uuid] = time.time()
-                        by_state['_all_'][obj.uuid] = time.time()
 
                 for state in by_state:
                     cache.clobber_object_state_cache(
                         object_type, state, by_state[state])
 
-        etcd.put_raw('/sf/cache/_version', {'version': 2})
+                # Remove the obsolete _all_ meta state
+                etcd.delete_all('cache', object_type, '_all_')
+
+        etcd.put_raw('/sf/cache/_version', {'version': 3})
 
     def _run_inner(self):
         last_defer_message = 0

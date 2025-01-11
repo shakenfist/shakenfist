@@ -1793,7 +1793,7 @@ def instances_in_namespace(namespace):
 
 
 def all_instances():
-    for object_uuid in cache.read_object_state_cache(Instance.object_type, '_all_'):
+    for object_uuid in cache.read_object_state_cache_all(Instance.object_type):
         i = Instance.from_db(object_uuid)
         if i:
             yield i
