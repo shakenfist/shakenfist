@@ -5,7 +5,6 @@ import copy
 import json
 import os
 import pathlib
-import sys
 import time
 
 import grpc
@@ -304,4 +303,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

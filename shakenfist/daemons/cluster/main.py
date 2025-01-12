@@ -6,7 +6,6 @@ from collections import defaultdict
 from functools import partial
 import json
 import os
-import sys
 import time
 
 import schedule
@@ -541,4 +540,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

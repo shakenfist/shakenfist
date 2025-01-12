@@ -76,8 +76,8 @@ def clear_abort_path(abort_path):
         os.unlink(abort_path)
 
 
-def set_abort_path(abort_path):
-    LOG.info(f'Setting abort file: {abort_path}')
+def set_abort_path(abort_path, source):
+    LOG.info(f'Setting abort file: {abort_path} ({source})')
     with open(abort_path, 'w') as f:
         f.write('1')
 
@@ -201,14 +201,14 @@ class Daemon:
                 # This might fail if grpc has already started shutting down
                 ...
 
-            set_abort_path(self.abort_path)
+            set_abort_path(self.abort_path, 'from exit_gracefully')
 
     def check_daemon_state(self):
         n = Node.from_db(config.NODE_NAME)
         daemon_state = n.get_daemon_state(self.daemon_name).value
         if daemon_state in [Node.DAEMON_STATE_STOPPED,
                             Node.DAEMON_STATE_STOPPING]:
-            set_abort_path(self.abort_path)
+            set_abort_path(self.abort_path, 'from check_daemon_state')
 
     def record_start(self):
         n = Node.from_db(config.NODE_NAME)
@@ -261,7 +261,8 @@ class WorkerPoolDaemon(Daemon):
                 for thread_name in self.workers:
                     thread_ident = self.workers[thread_name]['thread'].ident
                     set_abort_path(
-                        self.workers[thread_name]['object'].abort_path)
+                        self.workers[thread_name]['object'].abort_path,
+                        'worker thread cleanup')
                     LOG.info(f'Sent exit event to {thread_name} thread '
                              f'with ident {thread_ident}')
 

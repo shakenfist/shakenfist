@@ -1,7 +1,6 @@
 import base64
 import os
 import select
-import sys
 import threading
 import time
 import uuid
@@ -714,4 +713,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

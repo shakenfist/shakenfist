@@ -5,7 +5,6 @@ import pathlib
 import random
 import shutil
 import signal
-import sys
 import time
 
 
@@ -511,4 +510,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

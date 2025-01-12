@@ -3,7 +3,6 @@
 # You should never manually stop this daemon!
 import setproctitle
 import signal
-import sys
 import time
 
 from shakenfist_utilities import logs  # noreorder
@@ -21,7 +20,7 @@ def exit_gracefully(sig, _frame):
     global EXIT
     if sig == signal.SIGTERM:
         LOG.info('Received SIGTERM')
-        daemon.set_abort_path(ABORT_PATH)
+        daemon.set_abort_path(ABORT_PATH, 'from sentinel last exit_gracefully')
 
 
 signal.signal(signal.SIGTERM, exit_gracefully)
@@ -48,4 +47,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

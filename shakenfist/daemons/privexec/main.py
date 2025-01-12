@@ -7,7 +7,6 @@ import os
 import signal
 import socket
 import subprocess
-import sys
 import threading
 import time
 
@@ -229,4 +228,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

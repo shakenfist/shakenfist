@@ -1,6 +1,5 @@
 import os
 import socket
-import sys
 import threading
 
 from shakenfist_utilities import logs  # noreorder
@@ -119,4 +118,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)
