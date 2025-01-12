@@ -41,7 +41,9 @@ def get_all_user_facing_queue_names(node_uuid):
         f'{node_uuid}-clusteroperation-user_waiting',
         'any-clusteroperation-user_waiting',
         f'{node_uuid}-clusteroperation-user_facing',
-        'any-clusteroperation-user_facing'
+        'any-clusteroperation-user_facing',
+        f'{node_uuid}-clusteroperation-user_facing_high_io',
+        'any-clusteroperation-user_facing_high_io'
     ]
 
 

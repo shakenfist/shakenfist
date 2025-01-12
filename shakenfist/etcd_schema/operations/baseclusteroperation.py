@@ -8,6 +8,7 @@ from pydantic import UUID4
 class PRIORITY(Enum):
     user_waiting = 10
     user_facing = 20
+    user_facing_high_io = 25
     background = 30
     background_high_io = 40
 
@@ -18,6 +19,7 @@ class CLUSTER_OPERATIONS(Enum):
     node_inst_netdesc_op = 3
     artifact_fetch_op = 4
     node_inst_iface_op = 5
+    node_inst_snap_op = 6
 
 
 class Dependency(BaseModel):

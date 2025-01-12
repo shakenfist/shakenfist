@@ -118,7 +118,7 @@ class NodeInstIfaceOp(BaseClusterOperation):
             self.log.warning(f'Network {self.network_uuid} missing')
             raise NoSuchNetwork(self)
 
-        ni = Network.from_db(self.interface_uuid)
+        ni = NetworkInterface.from_db(self.interface_uuid)
         if not ni:
             self.log.warning(
                 f'Network interface {self.interface_uuid} missing')

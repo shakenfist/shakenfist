@@ -9,10 +9,8 @@ from shakenfist import blob
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import instance
 from shakenfist import network
 from shakenfist.operations.agentoperation import AgentOperation
-from shakenfist.artifact import Artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
@@ -25,7 +23,6 @@ from shakenfist.tasks import DestroyNetworkTask
 from shakenfist.tasks import HypervisorDestroyNetworkTask
 from shakenfist.tasks import PreflightAgentOperationTask
 from shakenfist.tasks import QueueTask
-from shakenfist.tasks import SnapshotTask
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
@@ -91,11 +88,6 @@ class Job(util_concurrency.Job):
                     raise exceptions.UnknownTaskException(
                         'Task was not decoded: %s' % task)
 
-                for t in [SnapshotTask]:
-                    if isinstance(task, t):
-                        inst = instance.Instance.from_db(task.instance_uuid())
-                        break
-
                 if inst:
                     self.log = self.log.with_fields({'instance': inst})
 
@@ -104,11 +96,7 @@ class Job(util_concurrency.Job):
                 })
                 self.log.info('Starting task')
 
-                if isinstance(task, SnapshotTask):
-                    snapshot(inst, task.disk(), task.artifact_uuid(),
-                             task.blob_uuid(), task.thin())
-
-                elif isinstance(task, DeleteNetworkWhenClean):
+                if isinstance(task, DeleteNetworkWhenClean):
                     # This is a historical concept, it turns out the network node
                     # now just defers the delete task until there are no interfaces,
                     # so we don't need this at all.
@@ -265,39 +253,6 @@ class Job(util_concurrency.Job):
 
         # We're good to go!
         op.execute()
-
-
-def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):
-    a = Artifact.from_db(artifact_uuid)
-    if a.state.value == Artifact.STATE_DELETED:
-        # The artifact was deleted before the queued blob creation occurred
-        return
-
-    try:
-        b = blob.snapshot_disk(disk, blob_uuid, thin=thin)
-    except exceptions.BlobDependencyMissing:
-        return
-
-    if a.state.value == Artifact.STATE_DELETED:
-        # The artifact was deleted while we were creating the blob, just delete
-        # the blob too.
-        b.state = blob.Blob.STATE_DELETED
-        return
-
-    if inst.state.value == instance.Instance.STATE_DELETED:
-        # If the instance we were snapshotting has been deleted by the time we
-        # finish the snapshot, then just delete the blob.
-        b.state = blob.Blob.STATE_DELETED
-        return
-
-    try:
-        a.add_index(b.uuid)
-        a.state = Artifact.STATE_CREATED
-    except exceptions.BlobDeleted:
-        if a.state.value != Artifact.STATE_DELETED:
-            a.state = Artifact.STATE_ERROR
-    except exceptions.InvalidStateException:
-        b.ref_count_dec(a)
 
 
 def preflight_agent_operation(agentop_uuid):

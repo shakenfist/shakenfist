@@ -209,47 +209,6 @@ class DefloatNetworkInterfaceTask(NetworkInterfaceTask):
 
 
 #
-# Snapshot Tasks
-#
-class SnapshotTask(QueueTask):
-    _name = 'snapshot'
-
-    def __init__(self, instance_uuid, disk, artifact_uuid, blob_uuid, thin=False):
-        super().__init__()
-        self._instance_uuid = instance_uuid
-        self._disk = disk
-        self._artifact_uuid = artifact_uuid
-        self._blob_uuid = blob_uuid
-        self._thin = thin
-
-    def obj_dict(self):
-        return {
-            **super().obj_dict(),
-            'instance_uuid': self._instance_uuid,
-            'disk': self._disk,
-            'artifact_uuid': self._artifact_uuid,
-            'blob_uuid': self._blob_uuid,
-            'thin': self._thin
-        }
-
-    # Data methods
-    def instance_uuid(self):
-        return self._instance_uuid
-
-    def disk(self):
-        return self._disk
-
-    def artifact_uuid(self):
-        return self._artifact_uuid
-
-    def blob_uuid(self):
-        return self._blob_uuid
-
-    def thin(self):
-        return self._thin
-
-
-#
 # Image cache tasks
 #
 class ArchiveTranscodeTask(QueueTask):

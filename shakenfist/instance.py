@@ -30,6 +30,10 @@ from shakenfist.etcd_schema.operations.node_inst_op \
     import create_and_enqueue as nio_create_and_enqueue
 from shakenfist.etcd_schema.operations.node_inst_op \
     import model_tasks as nio_tasks
+from shakenfist.etcd_schema.operations.node_inst_snap_op \
+    import create_and_enqueue as niso_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_inst_snap_op \
+    import model_tasks as niso_tasks
 from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist import network
@@ -44,7 +48,6 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
-from shakenfist.tasks import SnapshotTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import libvirt as util_libvirt
@@ -1601,12 +1604,20 @@ class Instance(dbo):
                 a.state = artifact.Artifact.STATE_CREATED
 
             else:
-                etcd.enqueue(config.NODE_NAME, {
-                    'tasks': [SnapshotTask(self.uuid, disk, a.uuid, blob_uuid,
-                                           thin=thin)],
-                })
+                op_type, op_uuid = niso_create_and_enqueue(
+                    config.NODE_NAME,
+                    self.uuid,
+                    disk,
+                    a.uuid,
+                    blob_uuid,
+                    thin,
+                    [niso_tasks.instance_snapshot],
+                    PRIORITY.user_facing_high_io,
+                    runs_after=[self.last_cluster_operation],
+                    request_id=util_general.get_request_id())
+                self.set_last_cluster_operation(op_type, op_uuid)
 
-        self.add_event(EVENT_TYPE_AUDIT, 'snapshot', extra=out)
+        self.add_event(EVENT_TYPE_AUDIT, 'snapshot requested', extra=out)
         return out
 
     def archive_console_log(self):
