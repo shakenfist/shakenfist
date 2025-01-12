@@ -21,12 +21,10 @@ from shakenfist import exceptions
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
-from shakenfist.tasks import DeleteNetworkWhenClean
 from shakenfist.tasks import DestroyNetworkTask
 from shakenfist.tasks import RouteAddressTask
 from shakenfist.tasks import UnrouteAddressTask
@@ -57,8 +55,6 @@ def _delete_network(network_from_db, wait_interfaces=None):
     network_from_db.add_event(EVENT_TYPE_AUDIT, 'delete request from REST API')
     if wait_interfaces:
         n.state = network.Network.STATE_DELETE_WAIT
-        etcd.enqueue(config.NODE_NAME,
-                     {'tasks': [DeleteNetworkWhenClean(n.uuid, wait_interfaces)]})
     else:
         etcd.enqueue('networknode', DestroyNetworkTask(n.uuid))
 

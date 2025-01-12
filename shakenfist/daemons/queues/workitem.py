@@ -18,8 +18,6 @@ from shakenfist import eventlog
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
 from shakenfist.tasks import ArchiveTranscodeTask
-from shakenfist.tasks import DeleteNetworkWhenClean
-from shakenfist.tasks import DestroyNetworkTask
 from shakenfist.tasks import HypervisorDestroyNetworkTask
 from shakenfist.tasks import PreflightAgentOperationTask
 from shakenfist.tasks import QueueTask
@@ -96,14 +94,7 @@ class Job(util_concurrency.Job):
                 })
                 self.log.info('Starting task')
 
-                if isinstance(task, DeleteNetworkWhenClean):
-                    # This is a historical concept, it turns out the network node
-                    # now just defers the delete task until there are no interfaces,
-                    # so we don't need this at all.
-                    etcd.enqueue('networknode', DestroyNetworkTask(
-                        task.network_uuid()))
-
-                elif isinstance(task, HypervisorDestroyNetworkTask):
+                if isinstance(task, HypervisorDestroyNetworkTask):
                     n = network.Network.from_db(task.network_uuid())
                     n.delete_on_hypervisor()
 
