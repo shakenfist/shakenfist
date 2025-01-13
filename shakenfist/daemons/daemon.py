@@ -6,7 +6,6 @@ import signal
 import threading
 import time
 
-import psutil
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 
@@ -241,6 +240,9 @@ class WorkerPoolDaemon(Daemon):
         self.workers = {}
         self.present_cpus = util_libvirt.get_cpu_count()
 
+        self.metrics = {}
+        self.metrics_acquired_at = 0
+
     def run(self):
         try:
             LOG.info('Starting')
@@ -322,14 +324,16 @@ class WorkerPoolDaemon(Daemon):
         # busy_time is in milliseconds per second, so a value of 1,000 is 100%
         # busy. You can record more than 100% if there is more than one disk
         # in the system doing IO at the time.
-        disk_counters = psutil.disk_io_counters()
-        busy_percent = disk_counters.busy_time / 1000.0 * 100
+        if time.time() - self.metrics_acquired_at > 30:
+            self.metrics = etcd.get('metrics', config.NODE_NAME, {})
+            self.metrics_acquired_at = time.time()
 
+        metrics_values = self.metrics.get('metrics', {})
+        disk_busy = int(metrics_values.get(
+            'disk_busy_time_delta_per_seconds', '0'))
         for queue_name in get_all_background_queue_names(config.NODE_NAME):
-            if queue_name.find('high_io') != -1 and busy_percent > 80.0:
-                LOG.debug(
-                    f'Skipping {queue_name} queue as disk is {busy_percent}% '
-                    'busy')
+            if queue_name.find('high_io') != -1 and disk_busy > 800:
+                LOG.debug('Skipping {queue_name} queue as local disk is busy')
                 continue
 
             jobname_workitem = etcd.dequeue(queue_name)

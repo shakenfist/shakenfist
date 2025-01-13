@@ -155,7 +155,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free_instances': 200*GiB,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12,
-            'disk_busy_time': 1000
+            'disk_busy_time_delta_per_sec': 2000
         })
 
         fake_inst = self.mock_etcd.create_instance(

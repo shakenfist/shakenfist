@@ -167,11 +167,12 @@ class Scheduler:
         # busy_time is in milliseconds per second, so a value of 1,000 is 100%
         # busy. You can record more than 100% if there is more than one disk
         # in the system doing IO at the time.
-        busy_time = int(self.metrics[node].get('disk_busy_time', '0'))
+        busy_time = int(
+            self.metrics[node].get('disk_busy_time_delta_per_sec', '0'))
         if busy_time > 1200:
             log_ctx.with_fields({
                 'node': node,
-                'busy_time': busy_time
+                'busy_time_delta_per_sec': busy_time
             }).debug('Scheduling on node would exceed maximum disk bandwidth')
             return False
 

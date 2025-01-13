@@ -47,6 +47,9 @@ class Monitor(daemon.Daemon):
     def _get_stats(self):
         n = Node.from_db(config.NODE_NAME)
 
+        old_metrics = etcd.get('metrics', config.NODE_NAME, {})
+        timestamp = time.time()
+
         with util_libvirt.LibvirtConnection() as lc:
             # What's special about this node?
             retval = {
@@ -136,6 +139,10 @@ class Monitor(daemon.Daemon):
                 'disk_used': used
             })
 
+            # NOTE(mikal): these are _counters_ -- that is, like gauges in
+            # prometheus the numbers continue to increase forever and aren't
+            # all that meaningful unless you know the number from last time
+            # you read the counter and how long has passed in between.
             disk_counters = psutil.disk_io_counters()
             retval.update({
                 'disk_read_bytes': disk_counters.read_bytes,
@@ -143,12 +150,34 @@ class Monitor(daemon.Daemon):
                 'disk_busy_time': disk_counters.busy_time
             })
 
-            # Network info
             net_counters = psutil.net_io_counters()
             retval.update({
                 'network_read_bytes': net_counters.bytes_recv,
                 'network_write_bytes': net_counters.bytes_sent,
             })
+
+            if old_metrics and 'timestamp' in old_metrics:
+                spacing = timestamp - old_metrics['timestamp']
+                old_metrics_values = old_metrics.get('metrics', {})
+                retval['timestamp_spacing'] = spacing
+
+                for counter in ['disk_read_bytes', 'disk_write_bytes',
+                                'disk_busy_time', 'network_read_bytes',
+                                'network_write_bytes']:
+                    if counter not in old_metrics_values:
+                        continue
+
+                    old_counter_value = int(old_metrics_values[counter])
+                    new_counter_value = int(retval[counter])
+                    if old_counter_value > new_counter_value:
+                        continue
+
+                    delta = new_counter_value - old_counter_value
+                    retval[f'{counter}_delta'] = delta
+                    retval[f'{counter}_delta_per_second'] = \
+                        delta / spacing
+            else:
+                LOG.info('Skipping delta metrics as we have no previous reading')
 
             # Virtual machine consumption info
             total_instances = 0
@@ -429,7 +458,7 @@ class Monitor(daemon.Daemon):
 
         while daemon.check_abort_path(self.abort_path):
             try:
-                if time.time() - last_metrics > config.SCHEDULER_CACHE_TIMEOUT:
+                if time.time() - last_metrics > 60:
                     update_metrics()
                     last_metrics = time.time()
 
@@ -438,12 +467,10 @@ class Monitor(daemon.Daemon):
                     identify_libvirt_processes()
                     last_billing = time.time()
 
-                self.idle(1)
-
             except Exception as e:
                 util_general.ignore_exception('resource statistics', e)
 
-            self.check_daemon_state()
+            self.idle(1)
 
 
 def main():
