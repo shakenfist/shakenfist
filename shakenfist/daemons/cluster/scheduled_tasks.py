@@ -191,8 +191,8 @@ def _log_and_update_metrics_for_queue(queue, log_prefix):
 
 
 def log_cluster_queue_lengths():
-    for queuename in get_general_user_facing_queue_names(config.NODE_NAME):
+    for queuename in get_general_user_facing_queue_names():
         _log_and_update_metrics_for_queue(queuename, 'Cluster user facing')
 
-    for queuename in get_general_background_queue_names(config.NODE_NAME):
+    for queuename in get_general_background_queue_names():
         _log_and_update_metrics_for_queue(queuename, 'Cluster background')
