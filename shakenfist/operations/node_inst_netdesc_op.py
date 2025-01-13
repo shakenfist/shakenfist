@@ -140,8 +140,7 @@ class NodeInstNetDescOp(BaseClusterOperation):
         # Try to place on this node
         s = scheduler.Scheduler()
         try:
-            s.find_candidates(inst, self.net_desc,
-                              candidates=[config.NODE_NAME])
+            s.find_candidates(inst, candidates=[config.NODE_NAME])
             return None
 
         except LowResourceException as e:
@@ -165,8 +164,7 @@ class NodeInstNetDescOp(BaseClusterOperation):
                 if node != config.NODE_NAME:
                     candidates.append(node)
 
-            candidates = s.find_candidates(inst, self.net_desc,
-                                           candidates=candidates)
+            candidates = s.find_candidates(inst, candidates=candidates)
             inst.place_instance(candidates[0])
 
             redirected = NodeInstNetDescOp.new(

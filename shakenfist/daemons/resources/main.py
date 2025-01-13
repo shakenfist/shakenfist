@@ -321,8 +321,10 @@ class Monitor(daemon.Daemon):
 
                 # Log resources
                 n.add_event(
-                    EVENT_TYPE_RESOURCES, 'updated node resources and package versions',
-                    extra=retval, suppress_event_logging=True)
+                    EVENT_TYPE_RESOURCES,
+                    'updated node resources and package versions',
+                    extra=retval,
+                    suppress_event_logging=True)
                 self.last_logged_resources = time.time()
             return retval
 

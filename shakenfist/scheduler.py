@@ -8,9 +8,9 @@ from collections import defaultdict
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
+from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import networkinterface
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import GiB
@@ -162,61 +162,27 @@ class Scheduler:
             return False
         return True
 
-    def _find_most_matching_networks(self, requested_networks, candidates):
+    def _log_and_raise_on_error(self, related_objects, stage, candidates):
         if not candidates:
-            return []
+            add_event_multi(
+                EVENT_TYPE_AUDIT, related_objects,
+                f'schedule has no candidates at stage {stage}, aborting',
+                extra={'candidates': candidates})
+            raise exceptions.LowResourceException(
+                f'No nodes remaining at scheduling stage {stage}')
 
-        # Find number of matching networks on each node. We need to be careful
-        # how we do this to avoid repeatedly scanning the etcd repository.
-        per_node = defaultdict(list)
-        for inst in instance.all_instances():
-            n = inst.placement
-            if n.get('node'):
-                per_node[n['node']].append(inst)
+        add_event_multi(
+            EVENT_TYPE_AUDIT, related_objects,
+            f'schedule at stage {stage}', extra={'candidates': candidates})
 
-        candidates_network_matches = {}
-        for n in candidates:
-            candidates_network_matches[n] = 0
+    def find_candidates(self, inst, candidates=None):
+        related_objects = [inst]
+        if candidates:
+            for node_uuid in candidates:
+                related_objects.append(('node', node_uuid))
+        add_event_multi(
+            EVENT_TYPE_AUDIT, related_objects, 'started scheduling')
 
-            # Make a list of networks for the node
-            present_networks = []
-            for inst in per_node.get(n, []):
-                for iface_uuid in inst.interfaces:
-                    ni = networkinterface.NetworkInterface.from_db(iface_uuid)
-                    if not ni:
-                        LOG.with_fields({
-                            'instance': inst.uuid,
-                            'networkinterface': iface_uuid
-                        }).error('Interface missing while attempting schedule')
-                    elif ni.network_uuid not in present_networks:
-                        present_networks.append(ni.network_uuid)
-
-            # Count the requested networks present on this node
-            for network in present_networks:
-                if network in requested_networks:
-                    candidates_network_matches[n] += 1
-
-        # Store candidate nodes keyed by number of matches
-        candidates_by_network_matches = defaultdict(list)
-        for n in candidates:
-            matches = candidates_network_matches[n]
-            candidates_by_network_matches[matches].append(n)
-
-        # Find maximum matches of networks on a node
-        max_matches = max(candidates_by_network_matches.keys())
-
-        # Check that the maximum is not just the network node.
-        # (Network node always has every network.)
-        net_node = get_network_node()
-        if (max_matches == 1 and
-                candidates_by_network_matches[max_matches][0] == net_node.uuid):
-            # No preference, all candidates are a reasonable choice
-            return candidates
-
-        # Return list of candidates that has maximum networks
-        return candidates_by_network_matches[max_matches]
-
-    def find_candidates(self, inst, network, candidates=None):
         with util_general.RecordedOperation('schedule', inst):
             log_ctx = self.log.with_fields({'instance': inst})
 
@@ -226,75 +192,68 @@ class Scheduler:
                 self.refresh_metrics()
 
             if candidates:
-                inst.add_event(EVENT_TYPE_AUDIT, 'schedule forced candidates',
-                               extra={'candidates': candidates})
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, related_objects,
+                    'schedule forced candidates',
+                    extra={'candidates': candidates})
                 for n in candidates:
                     if n not in self.metrics:
+                        add_event_multi(
+                            EVENT_TYPE_AUDIT, related_objects,
+                            f'schedule candidate {n} lacks metrics, aborting',
+                            extra={'candidates': candidates})
                         raise exceptions.CandidateNodeNotFoundException(n)
             else:
                 candidates = []
                 for n in self.metrics.keys():
                     candidates.append(n)
-            inst.add_event(EVENT_TYPE_AUDIT, 'schedule initial candidates',
-                           extra={'candidates': candidates})
+            add_event_multi(
+                EVENT_TYPE_AUDIT, related_objects,
+                'schedule initial candidates',
+                extra={'candidates': candidates})
 
             # Ensure all specified nodes are hypervisors
             for c in list(candidates):
                 if not self.metrics[c].get('is_hypervisor', False):
                     candidates.remove(c)
-            inst.add_event(EVENT_TYPE_AUDIT, 'schedule are hypervisors',
-                           extra={'candidates': candidates})
-
-            if not candidates:
-                raise exceptions.LowResourceException('No nodes with metrics')
+            self._log_and_raise_on_error(
+                related_objects, 'is_hypervisor', candidates)
 
             # Don't use nodes which aren't keeping up with queue jobs
             for c in list(candidates):
                 if not self._has_reasonable_queue_state(log_ctx, c):
                     candidates.remove(c)
-            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have reasonable queue state',
-                           extra={'candidates': candidates})
+            self._log_and_raise_on_error(
+                related_objects, 'queue_state', candidates)
 
             # Can we host that many vCPUs?
             for c in list(candidates):
                 max_cpu = self.metrics[c].get('cpu_max_per_instance', 0)
                 if inst.cpus > max_cpu:
                     candidates.remove(c)
-            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough actual cpu',
-                           extra={'candidates': candidates})
-            if not candidates:
-                raise exceptions.LowResourceException(
-                    'Requested vCPUs exceeds vCPU limit')
+            self._log_and_raise_on_error(
+                related_objects, 'cpu_max_per_instance', candidates)
 
             # Do we have enough idle CPU?
             for c in list(candidates):
                 if not self._has_sufficient_cpu(log_ctx, inst.cpus, c):
                     candidates.remove(c)
-            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle cpu',
-                           extra={'candidates': candidates})
-            if not candidates:
-                raise exceptions.LowResourceException(
-                    'No nodes with enough idle CPU')
+            self._log_and_raise_on_error(
+                related_objects, 'sufficient_idle_cpu', candidates)
 
             # Do we have enough idle RAM?
             for c in list(candidates):
                 if not self._has_sufficient_ram(log_ctx, inst.memory, c):
                     candidates.remove(c)
-            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle ram',
-                           extra={'candidates': candidates})
-            if not candidates:
-                raise exceptions.LowResourceException(
-                    'No nodes with enough idle RAM')
+            self._log_and_raise_on_error(
+                related_objects, 'sufficient_idle_memory', candidates)
 
             # Do we have enough idle disk?
             for c in list(candidates):
                 if not self._has_sufficient_disk(log_ctx, inst, c):
                     candidates.remove(c)
-            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle disk',
-                           extra={'candidates': candidates})
-            if not candidates:
-                raise exceptions.LowResourceException(
-                    'No nodes with enough disk space')
+            self._log_and_raise_on_error(
+                related_objects, 'sufficient_idle_disk', candidates)
 
             # Filter by affinity, if any has been specified
             by_affinity = defaultdict(list)
@@ -324,8 +283,10 @@ class Scheduler:
 
             highest_affinity = sorted(by_affinity, reverse=True)[0]
             candidates = by_affinity[highest_affinity]
-            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have highest affinity',
-                           extra={'candidates': candidates})
+            add_event_multi(
+                EVENT_TYPE_AUDIT, related_objects,
+                'schedule have highest affinity',
+                extra={'candidates': candidates})
 
             # Order candidates by current CPU load
             by_load = defaultdict(list)
@@ -335,13 +296,17 @@ class Scheduler:
 
             lowest_load = sorted(by_load)[0]
             candidates = by_load[lowest_load]
-            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have lowest cpu load',
-                           extra={'candidates': candidates})
+            add_event_multi(
+                EVENT_TYPE_AUDIT, related_objects,
+                'schedule have lowest cpu load',
+                extra={'candidates': candidates})
 
             # Return a shuffled list of options
             random.shuffle(candidates)
-            inst.add_event(EVENT_TYPE_AUDIT, 'schedule final candidates',
-                           extra={'candidates': candidates})
+            add_event_multi(
+                EVENT_TYPE_AUDIT, related_objects,
+                'schedule final candidates',
+                extra={'candidates': candidates})
             return candidates
 
     def summarize_resources(self):

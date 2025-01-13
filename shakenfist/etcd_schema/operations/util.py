@@ -1,3 +1,4 @@
+import copy
 import time
 
 from shakenfist_utilities import logs                 # noreorder
@@ -53,12 +54,17 @@ def base_mutations(object_type, metadata, target_node=None):
 
     correlation_id = sf_random.random_id()
     tasks_str = ', '.join(metadata['tasks'])
-    msg = f'operation created with tasks {tasks_str}'
+    msg = f'{object_type} operation created with tasks {tasks_str}'
 
     objs = [(object_type, metadata['uuid'])]
     for key in metadata:
         if key.endswith('_uuid'):
             objs.append((key.replace('_uuid', ''), metadata[key]))
+
+    extra = copy.deepcopy(metadata)
+    extra['op_uuid'] = extra['uuid']
+    del extra['uuid']
+    extra['op_type'] = object_type
 
     for ot, ou in objs:
         mutations.append(
