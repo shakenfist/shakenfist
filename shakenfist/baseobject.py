@@ -442,7 +442,7 @@ class DatabaseBackedObject:
 
         # Only standard states have validation right now
         if state_attribute_name == 'state':
-            if orig.value == self.STATE_DELETED:
+            if orig.value == self.STATE_DELETED and self.object_type != 'node':
                 LOG.with_fields(
                     {
                         'uuid': self.uuid,
