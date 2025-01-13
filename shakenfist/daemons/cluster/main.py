@@ -498,6 +498,8 @@ class Monitor(daemon.Daemon):
                 continue
 
             # Setup a schedule of things to do
+            schedule.every(1).minutes.do(
+                scheduled_tasks.log_cluster_queue_lengths)
             schedule.every(5).minutes.do(
                 scheduled_tasks.per_blob_checks)
             schedule.every(5).minutes.do(

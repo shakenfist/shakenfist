@@ -22,7 +22,8 @@ from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
-from shakenfist.operations.baseoperation import get_all_queue_names
+from shakenfist.operations.baseoperation import get_all_background_queue_names
+from shakenfist.operations.baseoperation import get_node_user_facing_queue_names
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import network as util_network
@@ -183,15 +184,19 @@ class Monitor(daemon.Daemon):
             node_queue_waiting = 0
             node_queue_processing = 0
             node_queue_deferred = 0
+            node_background_queue_waiting = 0
+            node_background_queue_processing = 0
+            node_background_queue_deferred = 0
 
-            for queue in get_all_queue_names(config.NODE_NAME):
+            def _log_and_update_metrics_for_queue(
+                    queue, log_prefix):
                 processing, queued, deferred = etcd.get_queue_length(queue)
                 LOG.with_fields({
                     'processing': processing,
                     'queued': queued,
                     'deferred': deferred,
                     'queue': queue
-                }).debug('Queue length')
+                }).debug(f'{log_prefix} queue length')
 
                 safe_metric_queue_name = _safe_metric_name(f'queue_{queue}')
                 retval.update({
@@ -200,9 +205,23 @@ class Monitor(daemon.Daemon):
                     f'{safe_metric_queue_name}_deferred': deferred
                 })
 
+                return processing, queued, deferred
+
+            for queue in get_node_user_facing_queue_names(config.NODE_NAME):
+                processing, queued, deferred = _log_and_update_metrics_for_queue(
+                    queue, 'Node specific user facing')
+
                 node_queue_processing += processing
                 node_queue_waiting += queued
                 node_queue_deferred += deferred
+
+            for queue in get_all_background_queue_names(config.NODE_NAME):
+                processing, queued, deferred = _log_and_update_metrics_for_queue(
+                    queue, 'Node specific background')
+
+                node_background_queue_processing += processing
+                node_background_queue_waiting += queued
+                node_background_queue_deferred += deferred
 
             retval.update({
                 'cpu_total_instance_vcpus': total_instance_vcpus,
@@ -213,7 +232,10 @@ class Monitor(daemon.Daemon):
                 'instances_active': total_active_instances,
                 'node_queue_processing': node_queue_processing,
                 'node_queue_waiting': node_queue_waiting,
-                'node_queue_deferred': node_queue_deferred
+                'node_queue_deferred': node_queue_deferred,
+                'node_background_queue_processing': node_background_queue_processing,
+                'node_background_queue_waiting': node_background_queue_waiting,
+                'node_background_queue_deferred': node_background_queue_deferred
             })
 
             if config.NODE_IS_NETWORK_NODE:

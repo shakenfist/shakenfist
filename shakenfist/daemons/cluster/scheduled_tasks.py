@@ -7,12 +7,15 @@ from shakenfist.cache import read_object_state_cache
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.blob import Blob
+from shakenfist import etcd
 from shakenfist.etcd_schema.operations import baseclusteroperation as bco_schema
 from shakenfist.etcd_schema.operations import node_blob_op as nbo_schema
 from shakenfist.etcd_schema.operations import node_inst_op as nio_schema
 from shakenfist.instance import Instance
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import get_general_background_queue_names
+from shakenfist.operations.baseoperation import get_general_user_facing_queue_names
 from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
 from shakenfist.util import general as util_general
 
@@ -175,3 +178,21 @@ def _process_per_instance_queue(execution_limit=10):
             ],
             bco_schema.PRIORITY.user_facing
         )
+
+
+def _log_and_update_metrics_for_queue(queue, log_prefix):
+    processing, queued, deferred = etcd.get_queue_length(queue)
+    LOG.with_fields({
+        'processing': processing,
+        'queued': queued,
+        'deferred': deferred,
+        'queue': queue
+    }).debug(f'{log_prefix} queue length')
+
+
+def log_cluster_queue_lengths():
+    for queuename in get_general_user_facing_queue_names(config.NODE_NAME):
+        _log_and_update_metrics_for_queue(queuename, 'Cluster user facing')
+
+    for queuename in get_general_background_queue_names(config.NODE_NAME):
+        _log_and_update_metrics_for_queue(queuename, 'Cluster background')

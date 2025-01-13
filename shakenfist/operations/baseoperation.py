@@ -31,18 +31,25 @@ class BaseOperation(dbo):
 
 
 def get_all_queue_names(node_uuid):
-    return (get_all_user_facing_queue_names(node_uuid) +
-            get_all_background_queue_names(node_uuid))
+    return (get_node_user_facing_queue_names(node_uuid) +
+            get_general_user_facing_queue_names() +
+            get_all_background_queue_names(node_uuid) +
+            get_general_background_queue_names())
 
 
-def get_all_user_facing_queue_names(node_uuid):
+def get_node_user_facing_queue_names(node_uuid):
     return [
         node_uuid,
         f'{node_uuid}-clusteroperation-user_waiting',
-        'any-clusteroperation-user_waiting',
         f'{node_uuid}-clusteroperation-user_facing',
+        f'{node_uuid}-clusteroperation-user_facing_high_io'
+    ]
+
+
+def get_general_user_facing_queue_names():
+    return [
+        'any-clusteroperation-user_waiting',
         'any-clusteroperation-user_facing',
-        f'{node_uuid}-clusteroperation-user_facing_high_io',
         'any-clusteroperation-user_facing_high_io'
     ]
 
@@ -50,9 +57,14 @@ def get_all_user_facing_queue_names(node_uuid):
 def get_all_background_queue_names(node_uuid):
     return [
         f'{node_uuid}-clusteroperation-background',
-        'any-clusteroperation-background',
         f'{node_uuid}-background',
-        f'{node_uuid}-clusteroperation-background_high_io',
+        f'{node_uuid}-clusteroperation-background_high_io'
+    ]
+
+
+def get_general_background_queue_names(node_uuid):
+    return [
+        'any-clusteroperation-background',
         'any-clusteroperation-background_high_io'
     ]
 
