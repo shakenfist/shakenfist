@@ -156,18 +156,18 @@ class Job(util_concurrency.Job):
         except libvirt.libvirtError as e:
             util_general.ignore_exception('Livirt Error in queue worker', e)
             if inst:
-                inst.enqueue_delete_due_error('Instance task failed: %s' % e)
+                inst.enqueue_delete_due_error('instance task failed: %s' % e)
 
         except exceptions.InstanceException as e:
             self.log.info('Instance Error: %s', e)
             if inst:
-                inst.enqueue_delete_due_error('Instance task failed: %s' % e)
+                inst.enqueue_delete_due_error('instance task failed: %s' % e)
 
         except Exception as e:
             # Logging ignored exception - this should be investigated
             util_general.ignore_exception('queue worker', e)
             if inst:
-                inst.enqueue_delete_due_error('Failed queue task: %s' % e)
+                inst.enqueue_delete_due_error('failed queue task: %s' % e)
 
     def _cluster_operation_execute(self):
         op_type = self.workitem.get('operation_type')

@@ -753,7 +753,7 @@ class Instance(dbo):
             self.state = self.STATE_CREATED
         else:
             self.add_event(EVENT_TYPE_AUDIT, 'instance failed to power on')
-            self.enqueue_delete_due_error('Instance failed to power on')
+            self.enqueue_delete_due_error('instance failed to power on')
 
     def _delete_on_hypervisor(self):
         if config.ARCHIVE_INSTANCE_CONSOLE_DURATION > 0:
