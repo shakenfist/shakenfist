@@ -6,6 +6,7 @@ import signal
 import threading
 import time
 
+import psutil
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 
@@ -317,7 +318,20 @@ class WorkerPoolDaemon(Daemon):
         if num_workers > max_workers - 2:
             return False
 
+        # We also wont do background high_io jobs if the disks are really busy.
+        # busy_time is in milliseconds per second, so a value of 1,000 is 100%
+        # busy. You can record more than 100% if there is more than one disk
+        # in the system doing IO at the time.
+        disk_counters = psutil.disk_io_counters()
+        busy_percent = disk_counters.busy_time / 1000.0 * 100
+
         for queue_name in get_all_background_queue_names(config.NODE_NAME):
+            if queue_name.find('high_io') != -1 and busy_percent > 80.0:
+                LOG.debug(
+                    f'Skipping {queue_name} queue as disk is {busy_percent}% '
+                    'busy')
+                continue
+
             jobname_workitem = etcd.dequeue(queue_name)
             if jobname_workitem:
                 args = [queue_name, jobname_workitem[0], jobname_workitem[1]]

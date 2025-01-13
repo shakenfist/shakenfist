@@ -37,6 +37,16 @@ def get_all_queue_names(node_uuid):
             get_general_background_queue_names())
 
 
+def get_all_user_facing_queue_names(node_uuid):
+    return (get_node_user_facing_queue_names(node_uuid) +
+            get_general_user_facing_queue_names())
+
+
+def get_all_background_queue_names(node_uuid):
+    return (get_all_background_queue_names(node_uuid) +
+            get_general_background_queue_names())
+
+
 def get_node_user_facing_queue_names(node_uuid):
     return [
         node_uuid,

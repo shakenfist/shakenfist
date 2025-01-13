@@ -140,6 +140,7 @@ class Monitor(daemon.Daemon):
             retval.update({
                 'disk_read_bytes': disk_counters.read_bytes,
                 'disk_write_bytes': disk_counters.write_bytes,
+                'disk_busy_time': disk_counters.busy_time
             })
 
             # Network info
