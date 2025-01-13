@@ -136,4 +136,4 @@ class NodeInstIfaceOp(BaseClusterOperation):
         inst.hot_plug_interface(n, ni)
         if ni.floating:
             etcd.enqueue(
-                'networknode', [FloatNetworkInterfaceTask(n.uuid, ni.uuid)])
+                'networknode', FloatNetworkInterfaceTask(n.uuid, ni.uuid))
