@@ -143,6 +143,31 @@ class LowResourceTestCase(SchedulerTestCase):
                                 scheduler.Scheduler().find_candidates,
                                 fake_inst)
         self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_free_disk',
+            str(exc))
+
+    def test_not_enough_disk_bandwidth(self):
+        self.mock_etcd.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 200*GiB,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12,
+            'disk_busy_time': 1000
+        })
+
+        fake_inst = self.mock_etcd.create_instance(
+            'fake-inst', 'fakeuuid', disk_spec=[{
+                'base': 'cirros',
+                'size': 21
+            }])
+
+        exc = self.assertRaises(exceptions.LowResourceException,
+                                scheduler.Scheduler().find_candidates,
+                                fake_inst)
+        self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_idle_disk',
             str(exc))
 

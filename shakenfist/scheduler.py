@@ -162,6 +162,20 @@ class Scheduler:
             return False
         return True
 
+    def _has_idle_disk_bandwidth(self, log_ctx, inst, node):
+        # We also avoid starting new instances on hypervisors with busy disk.
+        # busy_time is in milliseconds per second, so a value of 1,000 is 100%
+        # busy. You can record more than 100% if there is more than one disk
+        # in the system doing IO at the time.
+        busy_time = int(self.metrics[node].get('disk_busy_time', '0'))
+        if busy_time > 900:
+            log_ctx.with_fields({
+                'node': node
+            }).debug('Scheduling on node would maximum disk bandwidth')
+            return False
+
+        return True
+
     def _log_and_raise_on_error(self, related_objects, stage, candidates):
         if not candidates:
             add_event_multi(
@@ -248,9 +262,16 @@ class Scheduler:
             self._log_and_raise_on_error(
                 related_objects, 'sufficient_idle_memory', candidates)
 
-            # Do we have enough idle disk?
+            # Do we have enough free disk?
             for c in list(candidates):
                 if not self._has_sufficient_disk(log_ctx, inst, c):
+                    candidates.remove(c)
+            self._log_and_raise_on_error(
+                related_objects, 'sufficient_free_disk', candidates)
+
+            # Are the disks really busy?
+            for c in list(candidates):
+                if not self._has_idle_disk_bandwidth(log_ctx, inst, c):
                     candidates.remove(c)
             self._log_and_raise_on_error(
                 related_objects, 'sufficient_idle_disk', candidates)
