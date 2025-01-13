@@ -117,11 +117,6 @@ def _maintain_version_cache(max_cache_age):
             else:
                 nodes_by_version['no version reported'].append(node_name)
 
-        LOG.with_fields(nodes_by_version).with_fields(node_metric_age).with_fields({
-            'object_type': possible_objname,
-            'minimum': minimum,
-            'maximum': maximum
-        }).debug('Object versions reported')
         VERSION_CACHE_MINIMUM[possible_objname] = minimum
         VERSION_CACHE_MAXIMUM[possible_objname] = maximum
 
