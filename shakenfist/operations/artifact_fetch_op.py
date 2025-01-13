@@ -127,6 +127,9 @@ class ArtifactFetchOp(BaseClusterOperation):
                     msg != 'DNS error'):
                 a.state = Artifact.STATE_ERROR
                 a.error = msg
+                if inst:
+                    inst.enqueue_delete_due_error(
+                        f'failed to fetch image: {msg}')
                 self.state = ArtifactFetchOp.STATE_ERROR
 
             else:
