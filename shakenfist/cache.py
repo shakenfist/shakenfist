@@ -23,37 +23,61 @@ def _check_cache_version():
 
 
 def refresh_object_state_caches():
+    timestamp = time.time()
     for object_type in constants.OBJECT_NAMES_TO_CLASSES:
-        with etcd.get_lock('cache', None, object_type, op='Cache refresh'):
-            by_state = {
-                'deleted': {}
-            }
+        by_state = {
+            'deleted': {}
+        }
 
-            for state in constants.get_object_class(object_type).state_targets:
-                if state:
-                    by_state[state] = {}
+        for state in constants.get_object_class(object_type).state_targets:
+            if state:
+                by_state[state] = {}
 
-            for key, _ in etcd.get_prefix(f'/sf/{object_type}'):
-                obj_uuid = key.split('/')[-1]
-                obj = constants.get_object_class(object_type).from_db(
-                    obj_uuid)
-                if obj:
-                    if obj.state.value not in by_state:
-                        LOG.with_fields({
-                            'state': obj.state.value,
-                            'object_type': object_type,
-                            'object_uuid': obj_uuid
-                        }).error('Unknown state!')
-                        continue
+        for key, _ in etcd.get_prefix(f'/sf/{object_type}'):
+            obj_uuid = key.split('/')[-1]
+            obj = constants.get_object_class(object_type).from_db(
+                obj_uuid)
+            if obj:
+                if obj.state.value not in by_state:
+                    LOG.with_fields({
+                        'state': obj.state.value,
+                        'object_type': object_type,
+                        'object_uuid': obj_uuid
+                    }).error('Unknown state!')
+                    continue
 
-                    by_state[obj.state.value][obj.uuid] = time.time()
+                by_state[obj.state.value][obj.uuid] = time.time()
 
-            for state in by_state:
-                clobber_object_state_cache(
-                    object_type, state, by_state[state])
+        # NOTE(mikal): I am a bit concerned about the maximum transaction
+        # size here, so we do a transaction per object type per state. We don't
+        # hold a lock because the readers never take it so what's the point?
+        previous_states = []
+        for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}'):
+            state = key.split('/')[-1]
+            if state not in previous_states:
+                previous_states.append(state)
 
-            # Remove the obsolete _all_ meta state
-            etcd.delete_all('cache', object_type, '_all_')
+        for state in by_state:
+            if state in previous_states:
+                previous_states.remove(state)
+
+            etcd.delete_prefix(f'/sf/cache/{object_type}/{state}')
+            mutations = []
+
+            for objuuid in by_state[state]:
+                path = f'/sf/cache/{object_type}/{state}/{objuuid}'
+                mutations.append({
+                    'path': path,
+                    'original_data': None,
+                    'new_data': {
+                        'timestamp': timestamp
+                    }
+                })
+
+            etcd.replace_many_raw(mutations)
+
+        for state in previous_states:
+            etcd.delete_prefix(f'/sf/cache/{object_type}/{state}')
 
     etcd.put_raw('/sf/cache/_version', {'version': CACHE_VERSION})
 
@@ -146,27 +170,6 @@ def update_object_state_cache(object_type, object_uuid, old_state, new_state):
     raise exceptions.LocklessUpdateFailed(
         f'Lockless object state cache update for {object_type} {object_uuid} '
         f'from {old_state} to {new_state} failed. Failures:\n{failure_dump}')
-
-
-def clobber_object_state_cache(object_type, state, object_uuids):
-    # Caller is assumed to be holding a lock. This does not check version, as it
-    # is how we update versions.
-    # NOTE(mikal): we _should_ be able to do this in a single transaction once
-    # we've gotten rid of etcd3gw entirely.
-    etcd.delete_prefix(f'/sf/cache/{object_type}/{state}')
-
-    timestamp = time.time()
-    mutations = []
-    for objuuid in object_uuids:
-        path = f'/sf/cache/{object_type}/{state}/{objuuid}'
-        mutations.append({
-            'path': path,
-            'original_data': None,
-            'new_data': {
-                'timestamp': timestamp
-            }
-        })
-    return etcd.replace_many_raw(mutations)
 
 
 # Blob hash caches live in etcd under /sf/blob_by_hash/...algorithm.../...hash...
