@@ -107,9 +107,14 @@ class NodeInstOp(BaseClusterOperation):
     def _collect_billing_statistics(self, inst):
         with util_libvirt.LibvirtConnection() as lc:
             try:
-                statistics = {}
+                # The basic structure
+                statistics = {
+                    'cpu usage': {},
+                    'disk usage': {},
+                    'network usage': {}
+                }
 
-                # Base libvirt statistics
+                # Base libvirt statistics, if the domaine exists
                 domain = lc.get_domain_from_sf_uuid(inst.uuid)
                 if domain:
                     statistics.update(util_libvirt.extract_statistics(domain))
