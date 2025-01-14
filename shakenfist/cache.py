@@ -1,4 +1,3 @@
-import copy
 import time
 
 from shakenfist_utilities import logs  # noreorder
@@ -8,14 +7,29 @@ from shakenfist import exceptions
 
 
 LOG, _ = logs.setup(__name__)
+CACHE_VERSION = 4
 
 
-# Object state caches live in etcd under /sf/cache/...objectype.../...state...
+def _check_cache_version():
+    version = etcd.get_raw('/sf/cache/_version')
+    if not version:
+        version = {}
+    current = version.get('version', 0) == CACHE_VERSION
+    if not current:
+        LOG.warning('Cache version is not current!')
+    return current
+
+
+# Object state caches live in etcd under
+#     /sf/cache/...object_type.../...state.../...uuid...
 def read_object_state_cache(object_type, state):
-    c = etcd.get('cache', object_type, state)
-    if not c:
-        c = {}
-    return c
+    if not _check_cache_version():
+        return None
+
+    out = []
+    for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}/{state}'):
+        out.append(key.split('/')[-1])
+    return out
 
 
 def read_object_state_cache_many(object_type, states):
@@ -23,31 +37,25 @@ def read_object_state_cache_many(object_type, states):
     # as an etcd API range request, which is atomic. It therefore does not need
     # a lock to receive a consistent view of the cache, so long as everything
     # can be fetched in a single etcd API request.
-    out = []
-    for key, data in etcd.get_prefix(f'/sf/cache/{object_type}'):
-        if type(data) is not dict:
-            LOG.error(f'Ignoring malformed cache entry {key} = {data}')
-            continue
+    if not _check_cache_version():
+        return None
 
-        state = key.split('/')[-1]
+    out = []
+    for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}'):
+        state = key.split('/')[-2]
         if state and state in states:
-            uuids = list(data.keys())
-            if uuids:
-                out.extend(uuids)
+            out.append(key.split('/')[-1])
     return out
 
 
 def read_object_state_cache_all(object_type):
     # The same as above, but return all states not a filtered view.
-    out = []
-    for key, data in etcd.get_prefix(f'/sf/cache/{object_type}'):
-        if type(data) is not dict:
-            LOG.error(f'Ignoring malformed cache entry {key} = {data}')
-            continue
+    if not _check_cache_version():
+        return None
 
-        uuids = list(data.keys())
-        if uuids:
-            out.extend(uuids)
+    out = []
+    for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}'):
+        out.append(key.split('/')[-1])
     return out
 
 
@@ -56,37 +64,29 @@ def _update_object_state_cache_attempt(object_type, object_uuid, old_state, new_
 
     # And then the actual per-state cache
     if old_state:
-        original = etcd.get('cache', object_type, old_state)
-        if not original:
-            updated = {}
-        else:
-            updated = copy.deepcopy(original)
+        path = f'/sf/cache/{object_type}/{old_state}/{object_uuid}'
+        mutations.append({
+            'path': path,
+            'original_data': etcd.get_raw(path),
+            'new_data': None
+        })
 
-        if object_uuid in updated:
-            del updated[object_uuid]
-            mutations.append({
-                'path': etcd._construct_key('cache', object_type, old_state),
-                'original_data': original,
-                'new_data': updated
-            })
-
-    original = etcd.get('cache', object_type, new_state)
-    if not original:
-        updated = {}
-    else:
-        updated = copy.deepcopy(original)
-
-    updated[object_uuid] = time.time()
+    path = f'/sf/cache/{object_type}/{new_state}/{object_uuid}'
     mutations.append({
-        'path': etcd._construct_key('cache', object_type, new_state),
-        'original_data': original,
-        'new_data': updated
+        'path': path,
+        'original_data': None,
+        'new_data': {
+            'timestamp': time.time()
+        }
     })
 
     return etcd.replace_many_raw(mutations)
 
 
 def update_object_state_cache(object_type, object_uuid, old_state, new_state):
+    if not _check_cache_version():
+        return None
+
     attempts = 0
     failures = []
     while attempts < 3:
@@ -111,12 +111,31 @@ def update_object_state_cache(object_type, object_uuid, old_state, new_state):
 
 
 def clobber_object_state_cache(object_type, state, object_uuids):
-    # Caller is assumed to be holding a lock
-    etcd.put('cache', object_type, state, object_uuids)
+    # Caller is assumed to be holding a lock. This does not check version, as it
+    # is how we update versions.
+    # NOTE(mikal): we _should_ be able to do this in a single transaction once
+    # we've gotten rid of etcd3gw entirely.
+    etcd.delete_prefix(f'/sf/cache/{object_type}/{state}')
+
+    timestamp = time.time()
+    mutations = []
+    for objuuid in object_uuids:
+        path = f'/sf/cache/{object_type}/{state}/{objuuid}'
+        mutations.append({
+            'path': path,
+            'original_data': None,
+            'new_data': {
+                'timestamp': timestamp
+            }
+        })
+    return etcd.replace_many_raw(mutations)
 
 
 # Blob hash caches live in etcd under /sf/blob_by_hash/...algorithm.../...hash...
 def update_blob_hash_cache(blob_uuid, hashes):
+    if not _check_cache_version():
+        return None
+
     for alg in hashes:
         with etcd.get_lock('blob_by_hash', alg, hashes[alg],
                            op='Blob hash cache update'):
@@ -131,6 +150,9 @@ def update_blob_hash_cache(blob_uuid, hashes):
 
 
 def search_blob_hash_cache(alg, hash):
+    if not _check_cache_version():
+        return None
+
     c = etcd.get('blob_by_hash', alg, hash)
     if not c:
         return []

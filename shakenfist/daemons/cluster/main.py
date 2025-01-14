@@ -475,7 +475,7 @@ class Monitor(daemon.Daemon):
                 # Remove the obsolete _all_ meta state
                 etcd.delete_all('cache', object_type, '_all_')
 
-        etcd.put_raw('/sf/cache/_version', {'version': 3})
+        etcd.put_raw('/sf/cache/_version', {'version': cache.CACHE_VERSION})
 
     def _run_inner(self):
         last_defer_message = 0
