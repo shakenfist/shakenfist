@@ -227,6 +227,8 @@ class Scheduler:
                 EVENT_TYPE_AUDIT, related_objects,
                 'schedule initial candidates',
                 extra={'candidates': candidates})
+            self._log_and_raise_on_error(
+                related_objects, 'pre_schedule', candidates)
 
             # Ensure all specified nodes are hypervisors
             for c in list(candidates):

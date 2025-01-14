@@ -11,10 +11,10 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.baseobject import get_maximum_object_version
 from shakenfist.baseobject import get_minimum_object_version
-from shakenfist.baseobject import OBJECT_NAMES
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import get_object_class
+from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist import etcd
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import ProcessExecutionError
@@ -153,8 +153,8 @@ class Daemon:
         # Does the cluster have a stable set of object versions across nodes?
         # We should generally avoid cleanup operations if there is still an
         # upgrade in flight.
-        for objname in OBJECT_NAMES:
-            current_version = OBJECT_NAMES_TO_CLASSES[objname].current_version
+        for objname in OBJECT_NAMES_TO_CLASSES:
+            current_version = get_object_class(objname).current_version
             minimum = get_minimum_object_version(objname, max_cache_age=5)
             maximum = get_maximum_object_version(objname, max_cache_age=5)
             log = LOG.with_fields({

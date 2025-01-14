@@ -2,6 +2,7 @@ import time
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import constants
 from shakenfist import etcd
 from shakenfist import exceptions
 
@@ -16,8 +17,45 @@ def _check_cache_version():
         version = {}
     current = version.get('version', 0) == CACHE_VERSION
     if not current:
-        LOG.warning('Cache version is not current!')
+        LOG.warning('Cache version is not current version, rebuilding')
+        refresh_object_state_caches()
     return current
+
+
+def refresh_object_state_caches():
+    for object_type in constants.OBJECT_NAMES_TO_CLASSES:
+        with etcd.get_lock('cache', None, object_type, op='Cache refresh'):
+            by_state = {
+                'deleted': {}
+            }
+
+            for state in constants.get_object_class(object_type).state_targets:
+                if state:
+                    by_state[state] = {}
+
+            for key, _ in etcd.get_prefix(f'/sf/{object_type}'):
+                obj_uuid = key.split('/')[-1]
+                obj = constants.get_object_class(object_type).from_db(
+                    obj_uuid)
+                if obj:
+                    if obj.state.value not in by_state:
+                        LOG.with_fields({
+                            'state': obj.state.value,
+                            'object_type': object_type,
+                            'object_uuid': obj_uuid
+                        }).error('Unknown state!')
+                        continue
+
+                    by_state[obj.state.value][obj.uuid] = time.time()
+
+            for state in by_state:
+                clobber_object_state_cache(
+                    object_type, state, by_state[state])
+
+            # Remove the obsolete _all_ meta state
+            etcd.delete_all('cache', object_type, '_all_')
+
+    etcd.put_raw('/sf/cache/_version', {'version': CACHE_VERSION})
 
 
 # Object state caches live in etcd under
@@ -38,7 +76,7 @@ def read_object_state_cache_many(object_type, states):
     # a lock to receive a consistent view of the cache, so long as everything
     # can be fetched in a single etcd API request.
     if not _check_cache_version():
-        return None
+        return []
 
     out = []
     for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}'):
@@ -51,7 +89,7 @@ def read_object_state_cache_many(object_type, states):
 def read_object_state_cache_all(object_type):
     # The same as above, but return all states not a filtered view.
     if not _check_cache_version():
-        return None
+        return []
 
     out = []
     for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}'):

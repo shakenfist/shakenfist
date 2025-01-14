@@ -37,20 +37,6 @@ class NoopLock(Lock):
 VERSION_CACHE_MINIMUM = None
 VERSION_CACHE_MAXIMUM = None
 VERSION_CACHE_AGE = 0
-OBJECT_NAMES = [
-    'agentoperation',
-    'artifact',
-    'blob',
-    'dhcp',
-    'instance',
-    'ipam',
-    'namespace',
-    'network',
-    'networkinterface',
-    'node',
-    'node_inst_op',
-    'upload'
-]
 
 
 def _maintain_version_cache(max_cache_age):
@@ -100,7 +86,7 @@ def _maintain_version_cache(max_cache_age):
         metrics[node_name] = d['metrics']
         log.debug('Considering metrics entry')
 
-    for possible_objname in OBJECT_NAMES:
+    for possible_objname in constants.OBJECT_NAMES:
         nodes_by_version = defaultdict(list, [])
         node_metric_age = {}
         minimum = inf

@@ -10,11 +10,12 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import network
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist.blob import placement_filter
 from shakenfist.config import config
+from shakenfist.constants import get_object_class
+from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
@@ -173,7 +174,7 @@ def startup_tasks():
     stats = {}
     for obj in OBJECT_NAMES_TO_CLASSES:
         stats['object_version_%s' % obj] = \
-            OBJECT_NAMES_TO_CLASSES[obj].current_version
+            get_object_class(obj).current_version
     etcd.put(
         'metrics', config.NODE_NAME, None,
         {

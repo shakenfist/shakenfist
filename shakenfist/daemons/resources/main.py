@@ -14,11 +14,12 @@ from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_RESOURCES
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
+from shakenfist.constants import get_object_class
+from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
@@ -286,7 +287,7 @@ class Monitor(daemon.Daemon):
             # What object versions do we support?
             for obj in OBJECT_NAMES_TO_CLASSES:
                 retval['object_version_%s' % obj] = \
-                    OBJECT_NAMES_TO_CLASSES[obj].current_version
+                    get_object_class(obj).current_version
 
             # How much CPU time have the various SF components consumed since restart?
             # We only traverse two layers here, so its not worth doing something

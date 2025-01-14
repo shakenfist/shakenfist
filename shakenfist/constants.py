@@ -1,3 +1,5 @@
+import importlib
+
 # Note the most exciting constants ever
 KiB = 1024
 MiB = 1024 * 1024
@@ -76,3 +78,58 @@ API_REQUESTS = 'api-requests'
 
 # Blob hashing algorithms
 BLOB_HASH_ALGORITHMS = ['sha1', 'sha256', 'sha512', 'xxh128']
+
+# Object names, noting that api-requests is a "meta" object.
+OBJECT_NAMES = [
+    'agentoperation',
+    'api-requests',
+    'artifact',
+    'artifact_fetch_op',
+    'blob',
+    'dhcp',
+    'instance',
+    'ipam',
+    'namespace',
+    'network',
+    'networkinterface',
+    'node',
+    'node_blob_op',
+    'node_inst_iface_op',
+    'node_inst_op',
+    'node_inst_netdesc_op',
+    'upload'
+]
+
+OBJECT_NAMES_TO_CLASSES = {
+    'agentoperation': 'operations.agentoperation.AgentOperation',
+    'artifact': 'artifact.Artifact',
+    'artifact_fetch_op': 'operations.artifact_fetch_op.ArtifactFetchOp',
+    'blob': 'blob.Blob',
+    'dhcp': 'managed_executables.dnsmasq.DnsMasq',
+    'instance': 'instance.Instance',
+    'ipam': 'ipam.IPAM',
+    'namespace': 'namespace.Namespace',
+    'network': 'network.Network',
+    'networkinterface': 'networkinterface.NetworkInterface',
+    'node': 'node.Node',
+    'node_blob_op': 'operations.node_blob_op.NodeBlobOp',
+    'node_inst_iface_op': 'operations.node_inst_iface_op.NodeInstIfaceOp',
+    'node_inst_op': 'operations.node_inst_op.NodeInstOp',
+    'node_inst_netdesc_op': 'operations.node_inst_netdesc_op.NodeInstNetDescOp',
+    'upload': 'upload.Upload'
+}
+
+
+class NoSuchObject(Exception):
+    ...
+
+
+def get_object_class(object_type):
+    cls = OBJECT_NAMES_TO_CLASSES.get(object_type)
+    if not cls:
+        raise NoSuchObject(object_type)
+
+    lib_name = '.'.join(cls.split('.')[:-1])
+    cls_name = cls.split('.')[-1]
+    lib = importlib.import_module(f'shakenfist.{lib_name}')
+    return getattr(lib, cls_name)

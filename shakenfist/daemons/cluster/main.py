@@ -21,12 +21,13 @@ from shakenfist import namespace
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist.blob import placement_filter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import get_object_class
+from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.daemons.cluster import scheduled_tasks
 from shakenfist.node import Node
@@ -88,7 +89,7 @@ class Monitor(daemon.Daemon):
         for objtype in OBJECT_NAMES_TO_CLASSES:
             for obj_uuid in cache.read_object_state_cache(
                     objtype, dbo.STATE_DELETED):
-                obj = OBJECT_NAMES_TO_CLASSES[objtype].from_db(obj_uuid)
+                obj = get_object_class(objtype).from_db(obj_uuid)
                 if time.time() - obj.state.update_time > config.CLEANER_DELAY:
                     obj.hard_delete()
         self.lock.refresh()
@@ -169,7 +170,7 @@ class Monitor(daemon.Daemon):
 
                 leaked = False
                 object_type, object_uuid = reservation['user']
-                obj = OBJECT_NAMES_TO_CLASSES[object_type].from_db(object_uuid)
+                obj = get_object_class(object_type).from_db(object_uuid)
                 if not obj:
                     leaked = True
                 else:
@@ -442,47 +443,11 @@ class Monitor(daemon.Daemon):
         # And we're done
         LOG.info('Cluster maintenance loop complete')
 
-    def refresh_object_state_caches(self):
-        for object_type in OBJECT_NAMES_TO_CLASSES:
-            with etcd.get_lock('cache', None, object_type, op='Cache refresh'):
-                by_state = {
-                    'deleted': {}
-                }
-
-                for state in OBJECT_NAMES_TO_CLASSES[object_type].state_targets:
-                    if state:
-                        by_state[state] = {}
-
-                for key, _ in etcd.get_prefix(f'/sf/{object_type}'):
-                    obj_uuid = key.split('/')[-1]
-                    obj = OBJECT_NAMES_TO_CLASSES[object_type].from_db(
-                        obj_uuid)
-                    if obj:
-                        if obj.state.value not in by_state:
-                            LOG.with_fields({
-                                'state': obj.state.value,
-                                'object_type': object_type,
-                                'object_uuid': obj_uuid
-                            }).error('Unknown state!')
-                            continue
-
-                        by_state[obj.state.value][obj.uuid] = time.time()
-
-                for state in by_state:
-                    cache.clobber_object_state_cache(
-                        object_type, state, by_state[state])
-
-                # Remove the obsolete _all_ meta state
-                etcd.delete_all('cache', object_type, '_all_')
-
-        etcd.put_raw('/sf/cache/_version', {'version': cache.CACHE_VERSION})
-
     def _run_inner(self):
         last_defer_message = 0
-
-        self.refresh_object_state_caches()
-
         last_loop_run = 0
+        cache.refresh_object_state_caches()
+
         while daemon.check_abort_path(self.abort_path):
             util_concurrency.set_thread_name('idle')
             LOG.debug('This cluster thread is now idle and awaiting election')
