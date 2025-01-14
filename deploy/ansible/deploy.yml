@@ -1323,6 +1323,14 @@
   connection: ssh
 
   tasks:
+    - name: Bootstrap caches in etcd
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl rebuild-etcd-caches
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_NODE_NAME: "{{node_name}}"
+        SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+
     - name: Ensure the node exists in etcd
       shell: |
         /srv/shakenfist/venv/bin/sf-ctl initialise-node

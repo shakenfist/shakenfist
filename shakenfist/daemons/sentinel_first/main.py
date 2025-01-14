@@ -6,6 +6,7 @@ import time
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.cache import refresh_object_state_caches
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.node import Node
@@ -30,6 +31,7 @@ def main():
 
     LOG.info('Started')
     setproctitle.setproctitle('sf-sentinel-first')
+    refresh_object_state_caches()
 
     n = Node.from_db(config.NODE_NAME)
     n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_RUNNING)

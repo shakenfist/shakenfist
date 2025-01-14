@@ -446,7 +446,6 @@ class Monitor(daemon.Daemon):
     def _run_inner(self):
         last_defer_message = 0
         last_loop_run = 0
-        cache.refresh_object_state_caches()
 
         while daemon.check_abort_path(self.abort_path):
             util_concurrency.set_thread_name('idle')

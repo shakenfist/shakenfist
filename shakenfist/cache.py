@@ -11,17 +11,6 @@ LOG, _ = logs.setup(__name__)
 CACHE_VERSION = 4
 
 
-def _check_cache_version():
-    version = etcd.get_raw('/sf/cache/_version')
-    if not version:
-        version = {}
-    current = version.get('version', 0) == CACHE_VERSION
-    if not current:
-        LOG.warning('Cache version is not current version, rebuilding')
-        refresh_object_state_caches()
-    return current
-
-
 def refresh_object_state_caches():
     timestamp = time.time()
     for object_type in constants.OBJECT_NAMES_TO_CLASSES:
@@ -85,9 +74,6 @@ def refresh_object_state_caches():
 # Object state caches live in etcd under
 #     /sf/cache/...object_type.../...state.../...uuid...
 def read_object_state_cache(object_type, state):
-    if not _check_cache_version():
-        return None
-
     out = []
     for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}/{state}'):
         out.append(key.split('/')[-1])
@@ -99,9 +85,6 @@ def read_object_state_cache_many(object_type, states):
     # as an etcd API range request, which is atomic. It therefore does not need
     # a lock to receive a consistent view of the cache, so long as everything
     # can be fetched in a single etcd API request.
-    if not _check_cache_version():
-        return []
-
     out = []
     for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}'):
         state = key.split('/')[-2]
@@ -112,9 +95,6 @@ def read_object_state_cache_many(object_type, states):
 
 def read_object_state_cache_all(object_type):
     # The same as above, but return all states not a filtered view.
-    if not _check_cache_version():
-        return []
-
     out = []
     for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}'):
         out.append(key.split('/')[-1])
@@ -146,9 +126,6 @@ def _update_object_state_cache_attempt(object_type, object_uuid, old_state, new_
 
 
 def update_object_state_cache(object_type, object_uuid, old_state, new_state):
-    if not _check_cache_version():
-        return None
-
     attempts = 0
     failures = []
     while attempts < 3:
@@ -174,9 +151,6 @@ def update_object_state_cache(object_type, object_uuid, old_state, new_state):
 
 # Blob hash caches live in etcd under /sf/blob_by_hash/...algorithm.../...hash...
 def update_blob_hash_cache(blob_uuid, hashes):
-    if not _check_cache_version():
-        return None
-
     for alg in hashes:
         with etcd.get_lock('blob_by_hash', alg, hashes[alg],
                            op='Blob hash cache update'):
@@ -191,9 +165,6 @@ def update_blob_hash_cache(blob_uuid, hashes):
 
 
 def search_blob_hash_cache(alg, hash):
-    if not _check_cache_version():
-        return None
-
     c = etcd.get('blob_by_hash', alg, hash)
     if not c:
         return []
