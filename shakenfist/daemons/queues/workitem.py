@@ -1,17 +1,11 @@
-import flask
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.daemons import daemon
 from shakenfist import etcd
-from shakenfist import exceptions
-from shakenfist import network
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
-from shakenfist.tasks import QueueTask
 from shakenfist.util import concurrency as util_concurrency
-from shakenfist.util import general as util_general
-from shakenfist.util import libvirt as util_libvirt
 
 
 LOG, _ = logs.setup(__name__)
