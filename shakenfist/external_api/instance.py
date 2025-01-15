@@ -25,6 +25,10 @@ from shakenfist.etcd_schema.operations.artifact_fetch_op \
     import create_and_enqueue as afo_create_and_enqueue
 from shakenfist.etcd_schema.operations.artifact_fetch_op \
     import model_tasks as afo_tasks
+from shakenfist.etcd_schema.operations.node_aop_op \
+    import create_and_enqueue as na_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_aop_op \
+    import model_tasks as na_tasks
 from shakenfist.etcd_schema.operations.node_inst_op \
     import create_and_enqueue as nio_create_and_enqueue
 from shakenfist.etcd_schema.operations.node_inst_op \
@@ -61,7 +65,6 @@ from shakenfist.external_api import util as api_util
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
-from shakenfist.tasks import PreflightAgentOperationTask
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util import general as util_general
 
@@ -1490,8 +1493,10 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
             EVENT_TYPE_AUDIT, 'queued agent command requiring preflight',
             extra={'agentoperation': o.uuid, 'commands': commands})
         o.state = AgentOperation.STATE_PREFLIGHT
-        etcd.enqueue(instance_from_db.placement['node'],
-                     {'tasks': [PreflightAgentOperationTask(o.uuid)]})
+        na_create_and_enqueue(
+            instance_from_db.placement['node'], o.uuid,
+            [na_tasks.preflight],
+            PRIORITY.user_facing)
         return o.external_view()
 
 

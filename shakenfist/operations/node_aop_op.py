@@ -1,0 +1,112 @@
+from shakenfist_utilities import logs  # noreorder
+
+from shakenfist.blob import Blob
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.etcd_schema.operations import node_aop_op as schema
+from shakenfist.instance import Instance
+from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.util import general as util_general
+
+
+LOG, HANDLER = logs.setup(__name__)
+
+
+class NodeAgentopOpException(BaseOperationException):
+    def __init__(self, op, message):
+        super().__init__(message)
+        self.op_type = op.object_type
+        self.op_uuid = op.uuid
+        self.node_uuid = op.node_uuid
+        self.agentoperation_uuid = op.agentoperation_uuid
+
+
+class NoSuchTask(NodeAgentopOpException):
+    def __init__(self, op, task):
+        super().__init__(op, f'no such task {task}')
+
+
+class NoSuchAgentOperation(NodeAgentopOpException):
+    def __init__(self, op):
+        super().__init__(op, 'instance missing')
+
+
+class NodeAgentopOp(BaseClusterOperation):
+    object_type = schema.object_type.name.lower()
+    initial_version = schema.initial_version
+    current_version = schema.current_version
+
+    def __init__(self, static_values):
+        self.upgrade(static_values)
+        super().__init__(static_values)
+
+        self.__node_uuid = static_values['node_uuid']
+        self.__agentoperation_uuid = static_values['agentoperation_uuid']
+
+        # Convert tasks names back into enum entries
+        self.__tasks = []
+        for task_name in static_values['tasks']:
+            try:
+                self.__tasks.append(schema.model_tasks[task_name])
+            except KeyError as e:
+                self.state = self.STATE_ERROR
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'unknown task {task_name}: {e}')
+                raise e
+
+        self.log = LOG.with_fields({
+            'operation_type': self.object_type,
+            'operation_uuid': self.uuid,
+            'node_uuid': self.node_uuid,
+            'agentoperation_uuid': self.agentoperation_uuid,
+            'tasks': self.tasks
+        })
+
+    # Static values
+    @property
+    def node_uuid(self):
+        return self.__node_uuid
+
+    @property
+    def agentoperation_uuid(self):
+        return self.__agentoperation_uuid
+
+    @property
+    def tasks(self):
+        return self.__tasks
+
+    # Tasks
+    def dispatch_task(self, task):
+        if task not in schema.model_tasks:
+            self.log.warning(f'Task {task} not in {schema.model_tasks}')
+            raise NoSuchTask(self, task)
+
+        aop = AgentOperation.from_db(self.agentoperation_uuid)
+        if not aop:
+            self.log.warning(
+                f'Agent operation {self.agentoperation_uuid} missing')
+            raise NoSuchAgentOperation(self)
+
+        try:
+            self.__getattribute__(f'_{task.name}')(aop)
+        except Exception as e:
+            util_general.ignore_exception('node_aop_op', e)
+            self.state = NodeAgentopOp.STATE_ERROR
+            aop.state = Instance.STATE_ERROR
+
+    def _preflight(self, aop):
+        if not aop.state.value == AgentOperation.STATE_PREFLIGHT:
+            return
+
+        for command in aop.commands:
+            if command['command'] == 'put-blob':
+                b = Blob.from_db(command['blob_uuid'])
+                if not b:
+                    aop.error = ('preflight failure, blob missing: '
+                                 f'command["blob_uuid"]')
+                    self.state = NodeAgentopOp.STATE_ERROR
+                    return
+                b.ensure_local([])
+
+        aop.state = AgentOperation.STATE_QUEUED

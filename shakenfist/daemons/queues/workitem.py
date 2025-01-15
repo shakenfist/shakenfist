@@ -12,7 +12,6 @@ from shakenfist import eventlog
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
 from shakenfist.tasks import HypervisorDestroyNetworkTask
-from shakenfist.tasks import PreflightAgentOperationTask
 from shakenfist.tasks import QueueTask
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
@@ -90,9 +89,6 @@ class Job(util_concurrency.Job):
                 if isinstance(task, HypervisorDestroyNetworkTask):
                     n = network.Network.from_db(task.network_uuid())
                     n.delete_on_hypervisor()
-
-                elif isinstance(task, PreflightAgentOperationTask):
-                    preflight_agent_operation(task.agentop_uuid())
 
                 else:
                     self.log.error('Unhandled task was dropped')
@@ -190,22 +186,3 @@ class Job(util_concurrency.Job):
 
         # We're good to go!
         op.execute()
-
-
-def preflight_agent_operation(agentop_uuid):
-    agentop = AgentOperation.from_db(agentop_uuid)
-    if not agentop:
-        return
-
-    if not agentop.state.value == AgentOperation.STATE_PREFLIGHT:
-        return
-
-    for command in agentop.commands:
-        if command['command'] == 'put-blob':
-            b = blob.Blob.from_db(command['blob_uuid'])
-            if not b:
-                agentop.error = 'preflight failure, blob missing: %s' % command['blob_uuid']
-                return
-            b.ensure_local([])
-
-    agentop.state = AgentOperation.STATE_QUEUED
