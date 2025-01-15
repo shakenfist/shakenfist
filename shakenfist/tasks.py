@@ -194,37 +194,6 @@ class DefloatNetworkInterfaceTask(NetworkInterfaceTask):
 
 
 #
-# Image cache tasks
-#
-class ArchiveTranscodeTask(QueueTask):
-    _name = 'archive_transcode'
-
-    def __init__(self, blob_uuid, cache_path, transcode_description):
-        super().__init__()
-        self._blob_uuid = blob_uuid
-        self._cache_path = cache_path
-        self._transcode_description = transcode_description
-
-    def obj_dict(self):
-        return {
-            **super().obj_dict(),
-            'blob_uuid': self._blob_uuid,
-            'cache_path': self._cache_path,
-            'transcode_description': self._transcode_description
-        }
-
-    # Data methods
-    def blob_uuid(self):
-        return self._blob_uuid
-
-    def cache_path(self):
-        return self._cache_path
-
-    def transcode_description(self):
-        return self._transcode_description
-
-
-#
 # Agent operation tasks
 #
 class PreflightAgentOperationTask(QueueTask):

@@ -20,6 +20,7 @@ class CLUSTER_OPERATIONS(Enum):
     artifact_fetch_op = 4
     node_inst_iface_op = 5
     node_inst_snap_op = 6
+    imagecache_op = 7
 
 
 class Dependency(BaseModel):
