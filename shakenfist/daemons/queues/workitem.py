@@ -1,17 +1,13 @@
 import flask
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import blob
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import network
-from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist import eventlog
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
-from shakenfist.tasks import HypervisorDestroyNetworkTask
 from shakenfist.tasks import QueueTask
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
@@ -42,74 +38,11 @@ class Job(util_concurrency.Job):
         LOG.debug(f'This worker thread is executing job {self.jobname}')
 
         try:
-            if self.queue_name.find('-clusteroperation-') == -1:
-                self._old_style_execute()
-            else:
-                self._cluster_operation_execute()
-
+            self._cluster_operation_execute()
         finally:
             etcd.resolve(self.queue_name, self.jobname)
             LOG.debug(
                 f'This worker thread is finished executing job {self.jobname}')
-
-    def _old_style_execute(self):
-        libvirt = util_libvirt.get_libvirt()
-        self.log.info('Processing job')
-
-        inst = None
-        task = None
-        try:
-            for task in self.workitem.get('tasks', []):
-                self.log = self.log.with_fields({'task': task})
-
-                # Tasks should log with the request id of the API request that
-                # caused them, if there was in fact one.
-                request_id = task.request_id()
-                try:
-                    if request_id:
-                        flask.request.environ['REQUEST_ID'] = request_id
-                    else:
-                        if 'REQUEST_ID' in flask.request.environ:
-                            del flask.request.environ['REQUEST_ID']
-                except RuntimeError:
-                    ...
-
-                if not QueueTask.__subclasscheck__(type(task)):
-                    raise exceptions.UnknownTaskException(
-                        'Task was not decoded: %s' % task)
-
-                if inst:
-                    self.log = self.log.with_fields({'instance': inst})
-
-                self.log = self.log.with_fields({
-                    'task_name': task.name()
-                })
-                self.log.info('Starting task')
-
-                if isinstance(task, HypervisorDestroyNetworkTask):
-                    n = network.Network.from_db(task.network_uuid())
-                    n.delete_on_hypervisor()
-
-                else:
-                    self.log.error('Unhandled task was dropped')
-
-                self.log.info('Task complete')
-
-        except libvirt.libvirtError as e:
-            util_general.ignore_exception('Livirt Error in queue worker', e)
-            if inst:
-                inst.enqueue_delete_due_error('instance task failed: %s' % e)
-
-        except exceptions.InstanceException as e:
-            self.log.info('Instance Error: %s', e)
-            if inst:
-                inst.enqueue_delete_due_error('instance task failed: %s' % e)
-
-        except Exception as e:
-            # Logging ignored exception - this should be investigated
-            util_general.ignore_exception('queue worker', e)
-            if inst:
-                inst.enqueue_delete_due_error('failed queue task: %s' % e)
 
     def _cluster_operation_execute(self):
         op_type = self.workitem.get('operation_type')

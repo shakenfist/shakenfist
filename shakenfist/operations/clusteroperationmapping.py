@@ -6,6 +6,7 @@ from shakenfist.operations.node_inst_iface_op import NodeInstIfaceOp
 from shakenfist.operations.node_inst_op import NodeInstOp
 from shakenfist.operations.node_inst_netdesc_op import NodeInstNetDescOp
 from shakenfist.operations.node_inst_snap_op import NodeInstSnapOp
+from shakenfist.operations.node_net_op import NodeNetOp
 
 
 OPERATION_NAMES_TO_CLASSES = {
@@ -16,5 +17,6 @@ OPERATION_NAMES_TO_CLASSES = {
     'node_inst_iface_op': NodeInstIfaceOp,
     'node_inst_op': NodeInstOp,
     'node_inst_netdesc_op': NodeInstNetDescOp,
-    'node_inst_snap_op': NodeInstSnapOp
+    'node_inst_snap_op': NodeInstSnapOp,
+    'node_net_op': NodeNetOp
 }

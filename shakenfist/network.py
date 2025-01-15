@@ -21,6 +21,11 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.etcd_schema.operations.node_net_op \
+    import create_and_enqueue as nn_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_net_op \
+    import model_tasks as nn_tasks
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
@@ -31,11 +36,11 @@ from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.tasks import DeployNetworkTask
-from shakenfist.tasks import HypervisorDestroyNetworkTask
 from shakenfist.tasks import RemoveDHCPLeaseNetworkTask
 from shakenfist.tasks import RemoveDnsMasqNetworkTask
 from shakenfist.tasks import RemoveNATNetworkTask
 from shakenfist.tasks import UpdateDnsMasqNetworkTask
+from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
 from shakenfist.util import concurrency as util_concurrency
 
@@ -611,10 +616,12 @@ class Network(dbo):
         # just catching strays, apart from on the network node where we
         # absolutely need to do this thing.
         for n in Nodes([], prefilter='active'):
-            etcd.enqueue(n.uuid,
-                         {'tasks': [
-                             HypervisorDestroyNetworkTask(self.uuid)
-                         ]})
+            nn_create_and_enqueue(
+                n.uuid,
+                self.uuid,
+                [nn_tasks.network_destroy],
+                PRIORITY.user_facing,
+                request_id=util_general.get_request_id())
 
         self.remove_dnsmasq()
         self.remove_nat()

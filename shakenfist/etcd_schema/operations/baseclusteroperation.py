@@ -22,6 +22,7 @@ class CLUSTER_OPERATIONS(Enum):
     node_inst_snap_op = 6
     imagecache_op = 7
     node_aop_op = 8
+    node_net_op = 9
 
 
 class Dependency(BaseModel):

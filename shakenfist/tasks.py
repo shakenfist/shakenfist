@@ -80,10 +80,6 @@ class DestroyNetworkTask(NetworkTask):
     _name = 'network_destroy'
 
 
-class HypervisorDestroyNetworkTask(NetworkTask):
-    _name = 'hypervisor_network_destroy'
-
-
 class UpdateDnsMasqNetworkTask(NetworkTask):
     # Slightly wrong name for historical reasons
     _name = 'network_update_dhcp'
