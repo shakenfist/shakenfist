@@ -165,6 +165,6 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
 def set_thread_name(name):
     try:
         import pyprctl
-        pyprctl.set_thread_name(name)
+        pyprctl.set_name(name)
     except (ImportError, AttributeError) as e:
         LOG.debug(f'Failed to change thread name to {name}: {e}')
