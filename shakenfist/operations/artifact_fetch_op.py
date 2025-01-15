@@ -5,7 +5,9 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.artifact import Artifact
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.etcd_schema.operations import artifact_fetch_op as schema
+from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import HTTPError
+from shakenfist.exceptions import TooManyMatches
 from shakenfist import images
 from shakenfist.instance import Instance
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -98,9 +100,22 @@ class ArtifactFetchOp(BaseClusterOperation):
             self.state = ArtifactFetchOp.STATE_ERROR
 
     def _image_fetch(self, inst):
-        a = Artifact.from_url(
-            Artifact.TYPE_IMAGE, self.url, namespace=self.namespace,
-            create_if_new=True)
+        try:
+            a = Artifact.from_url(
+                Artifact.TYPE_IMAGE, self.url, namespace=self.namespace,
+                create_if_new=True)
+        except TooManyMatches as e:
+            self.add_event(
+                EVENT_TYPE_AUDIT,
+                (f'too many matches for URL {self.url} in namespace '
+                 f'{self.namespace}'))
+            raise e
+
+        add_event_multi(
+            EVENT_TYPE_AUDIT,
+            [self, a],
+            (f'URL {self.url} in namespace {self.namespace} maps to artifact '
+             f'{a.uuid}.'))
 
         try:
             # TODO(andy): Wait up to 15 mins for another queue process to download
