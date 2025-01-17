@@ -14,8 +14,8 @@ from shakenfist.etcd_schema.operations import node_inst_op as nio_schema
 from shakenfist.instance import Instance
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
-from shakenfist.operations.baseoperation import get_general_background_queue_names
-from shakenfist.operations.baseoperation import get_general_user_facing_queue_names
+from shakenfist.operations.baseoperation import get_general_background_node_queues
+from shakenfist.operations.baseoperation import get_general_user_facing_node_queues
 from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
 from shakenfist.util import general as util_general
 
@@ -191,8 +191,8 @@ def _log_and_update_metrics_for_queue(queue, log_prefix):
 
 
 def log_cluster_queue_lengths():
-    for queuename in get_general_user_facing_queue_names():
+    for queuename in get_general_user_facing_node_queues():
         _log_and_update_metrics_for_queue(queuename, 'Cluster user facing')
 
-    for queuename in get_general_background_queue_names():
+    for queuename in get_general_background_node_queues():
         _log_and_update_metrics_for_queue(queuename, 'Cluster background')

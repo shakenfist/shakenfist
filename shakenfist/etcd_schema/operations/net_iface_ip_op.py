@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import List
+from typing import Literal
 from typing import Optional
+from typing import Union
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -8,6 +10,7 @@ from pydantic import field_serializer
 from pydantic import Field
 from pydantic import UUID4
 from pydantic import ValidationError
+from pydantic.networks import IPvAnyAddress
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.etcd_schema.operations.baseclusteroperation \
@@ -23,22 +26,21 @@ from shakenfist.etcd_schema.operations.util import enqueue
 LOG, HANDLER = logs.setup(__name__)
 
 
-object_type = CLUSTER_OPERATIONS.node_inst_iface_op
+object_type = CLUSTER_OPERATIONS.net_iface_ip_op
 initial_version = 1
 current_version = 1
 
 
 class model_tasks(Enum):
-    hot_plug_instance_interface = 1
+    interface_defloat = 1
 
 
 class model(BaseModel):
     uuid: UUID4
-    # This should be a UUID, but there's some history...
-    node_uuid: str
-    instance_uuid: UUID4
-    network_uuid: UUID4
+    network_uuid: Union[UUID4, Literal['floating']]
     interface_uuid: UUID4
+    # Note that the actual code only supports Ipv4 right now...
+    ip: IPvAnyAddress
     priority: PRIORITY
     request_id: Optional[str]
     tasks: List[model_tasks]
@@ -55,19 +57,17 @@ class model(BaseModel):
         return [t.name for t in tasks]
 
 
-def create_and_enqueue(node_uuid, instance_uuid, network_uuid, interface_uuid,
-                       tasks, priority, request_id=None, depends_on=None,
-                       runs_after=None):
+def create_and_enqueue(network_uuid, interface_uuid, ip, tasks, priority,
+                       request_id=None, depends_on=None, runs_after=None):
     operation_uuid = str(uuid4())
 
     try:
         runs_after_as_deps = _convert_deps(runs_after)
         m = model(
             uuid=operation_uuid,
-            node_uuid=node_uuid,
-            instance_uuid=instance_uuid,
             network_uuid=network_uuid,
             interface_uuid=interface_uuid,
+            ip=ip,
             priority=priority,
             request_id=request_id,
             tasks=tasks,
@@ -78,10 +78,9 @@ def create_and_enqueue(node_uuid, instance_uuid, network_uuid, interface_uuid,
     except ValidationError as exc:
         LOG.with_fields({
             'uuid': operation_uuid,
-            'node_uuid': node_uuid,
-            'instance_uuid': instance_uuid,
             'network_uuid': network_uuid,
             'interface_uuid': interface_uuid,
+            'ip': ip,
             'priority': priority,
             'request_id': request_id,
             'tasks': tasks,
@@ -92,6 +91,7 @@ def create_and_enqueue(node_uuid, instance_uuid, network_uuid, interface_uuid,
         raise exc
 
     mutations, job_name, queue_name, work_item = \
-        base_mutations(object_type.name.lower(), m.model_dump(mode='json'))
+        base_mutations(object_type.name.lower(), m.model_dump(mode='json'),
+                       target='networknode')
     enqueue(mutations, job_name, queue_name, work_item)
     return object_type, operation_uuid

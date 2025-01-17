@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 from unittest import mock
+from uuid import uuid4
 
 import bcrypt
 
@@ -228,14 +229,14 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                                headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-        self.assertEqual('12345678-1234-4321-1234-000000000001',
+        self.assertEqual('12345678-1234-4321-8234-000000000001',
                          resp.get_json().get('uuid'))
 
         resp = self.client.get('/instances/bob',
                                headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-        self.assertEqual('12345678-1234-4321-1234-000000000003',
+        self.assertEqual('12345678-1234-4321-8234-000000000003',
                          resp.get_json().get('uuid'))
 
         # Instance by name - WRONG
@@ -244,11 +245,11 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(404, resp.status_code)
 
         # Instance by UUID
-        resp = self.client.get('/instances/12345678-1234-4321-1234-000000000001',
+        resp = self.client.get('/instances/12345678-1234-4321-8234-000000000003',
                                headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-        self.assertEqual('12345678-1234-4321-1234-000000000001',
+        self.assertEqual('12345678-1234-4321-8234-000000000003',
                          resp.get_json().get('uuid'))
 
         # Instance by UUID - WRONG
@@ -275,14 +276,14 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                                headers={'Authorization': self.auth_token_two})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-        self.assertEqual('12345678-1234-4321-1234-000000000002',
+        self.assertEqual('12345678-1234-4321-8234-000000000002',
                          resp.get_json().get('uuid'))
 
         resp = self.client.get('/instances/bob',
                                headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-        self.assertEqual('12345678-1234-4321-1234-000000000003',
+        self.assertEqual('12345678-1234-4321-8234-000000000003',
                          resp.get_json().get('uuid'))
 
         # Instance by name - WRONG name
@@ -298,7 +299,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     def test_get_instance_metadata(self):
         self.mock_etcd.create_instance('banana', metadata={'a': 'a', 'b': 'b'})
         resp = self.client.get(
-            '/instances/12345678-1234-4321-1234-000000000001/metadata',
+            '/instances/12345678-1234-4321-8234-000000000001/metadata',
             headers={'Authorization': self.auth_token})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
         self.assertEqual('application/json', resp.content_type)
@@ -307,7 +308,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     def test_put_instance_metadata(self):
         self.mock_etcd.create_instance('banana')
         resp = self.client.put(
-            '/instances/12345678-1234-4321-1234-000000000001/metadata/foo',
+            '/instances/12345678-1234-4321-8234-000000000001/metadata/foo',
             headers={'Authorization': self.auth_token},
             data=json.dumps({
                 'key': 'foo',
@@ -318,12 +319,13 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(
             {'foo': 'bar'},
             json.loads(self.mock_etcd.db[
-                '/sf/attribute/instance/12345678-1234-4321-1234-000000000001/metadata']))
+                '/sf/attribute/instance/12345678-1234-4321-8234-000000000001'
+                '/metadata']))
 
     def test_post_instance_metadata(self):
         self.mock_etcd.create_instance('banana')
         resp = self.client.post(
-            '/instances/12345678-1234-4321-1234-000000000001/metadata',
+            '/instances/12345678-1234-4321-8234-000000000001/metadata',
             headers={'Authorization': self.auth_token},
             data=json.dumps({
                 'key': 'foo',
@@ -334,7 +336,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(
             {'foo': 'bar'},
             json.loads(self.mock_etcd.db[
-                '/sf/attribute/instance/12345678-1234-4321-1234-000000000001/metadata']))
+                '/sf/attribute/instance/12345678-1234-4321-8234-000000000001/'
+                'metadata']))
 
     def test_get_network(self):
         self.mock_etcd.create_network('barry')
@@ -346,14 +349,14 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                                headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-        self.assertEqual('12345678-1234-4321-1234-000000000001',
+        self.assertEqual('12345678-1234-4321-8234-000000000001',
                          resp.get_json().get('uuid'))
 
         resp = self.client.get('/networks/bob',
                                headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-        self.assertEqual('12345678-1234-4321-1234-000000000003',
+        self.assertEqual('12345678-1234-4321-8234-000000000003',
                          resp.get_json().get('uuid'))
 
         # Instance by name - WRONG
@@ -362,15 +365,15 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(404, resp.status_code)
 
         # Instance by UUID
-        resp = self.client.get('/networks/12345678-1234-4321-1234-000000000001',
+        resp = self.client.get('/networks/12345678-1234-4321-8234-000000000001',
                                headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-        self.assertEqual('12345678-1234-4321-1234-000000000001',
+        self.assertEqual('12345678-1234-4321-8234-000000000001',
                          resp.get_json().get('uuid'))
 
         # Instance by UUID - WRONG
-        resp = self.client.get('/networks/12345678-1234-4321-1234-111111111111',
+        resp = self.client.get('/networks/12345678-1234-4321-8234-111111111111',
                                headers={'Authorization': self.auth_token})
         self.assertEqual(404, resp.status_code)
 
@@ -378,7 +381,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.mock_etcd.create_network('banana', namespace='foo',
                                       metadata={'a': 'a', 'b': 'b'})
         resp = self.client.get(
-            '/networks/12345678-1234-4321-1234-000000000001/metadata',
+            '/networks/12345678-1234-4321-8234-000000000001/metadata',
             headers={'Authorization': self.auth_token})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
         self.assertEqual(200, resp.status_code)
@@ -387,7 +390,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     def test_put_network_metadata(self):
         self.mock_etcd.create_network('banana', namespace='foo')
         resp = self.client.put(
-            '/networks/12345678-1234-4321-1234-000000000001/metadata/foo',
+            '/networks/12345678-1234-4321-8234-000000000001/metadata/foo',
             headers={'Authorization': self.auth_token},
             data=json.dumps({
                 'key': 'foo',
@@ -398,12 +401,12 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(
             {'foo': 'bar'},
             json.loads(self.mock_etcd.db[
-                '/sf/attribute/network/12345678-1234-4321-1234-000000000001/metadata']))
+                '/sf/attribute/network/12345678-1234-4321-8234-000000000001/metadata']))
 
     def test_post_network_metadata(self):
         self.mock_etcd.create_network('banana', namespace='foo')
         resp = self.client.post(
-            '/networks/12345678-1234-4321-1234-000000000001/metadata',
+            '/networks/12345678-1234-4321-8234-000000000001/metadata',
             headers={'Authorization': self.auth_token},
             data=json.dumps({
                 'key': 'foo',
@@ -414,27 +417,27 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(
             {'foo': 'bar'},
             json.loads(self.mock_etcd.db[
-                '/sf/attribute/network/12345678-1234-4321-1234-000000000001/metadata']))
+                '/sf/attribute/network/12345678-1234-4321-8234-000000000001/metadata']))
 
     def test_delete_instance_metadata(self):
         self.mock_etcd.create_instance('banana',
                                        metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
-            '/instances/12345678-1234-4321-1234-000000000001/metadata/foo',
+            '/instances/12345678-1234-4321-8234-000000000001/metadata/foo',
             headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual(None, resp.get_json())
         self.assertEqual(
             {'real': 'smart'},
             json.loads(self.mock_etcd.db[
-                '/sf/attribute/instance/12345678-1234-4321-1234-000000000001/metadata']))
+                '/sf/attribute/instance/12345678-1234-4321-8234-000000000001/metadata']))
 
     def test_delete_instance_metadata_bad_key(self):
         # We now just silently ignore deletes of things which don't exist
         self.mock_etcd.create_instance(
             'banana', metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
-            '/instances/12345678-1234-4321-1234-000000000001/metadata/wrong',
+            '/instances/12345678-1234-4321-8234-000000000001/metadata/wrong',
             headers={'Authorization': self.auth_token})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
@@ -443,21 +446,21 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.mock_etcd.create_network('banana', namespace='foo',
                                       metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
-            '/networks/12345678-1234-4321-1234-000000000001/metadata/foo',
+            '/networks/12345678-1234-4321-8234-000000000001/metadata/foo',
             headers={'Authorization': self.auth_token})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'real': 'smart'},
             json.loads(self.mock_etcd.db[
-                '/sf/attribute/network/12345678-1234-4321-1234-000000000001/metadata']))
+                '/sf/attribute/network/12345678-1234-4321-8234-000000000001/metadata']))
 
     def test_delete_network_metadata_bad_key(self):
         # We now just silently ignore deletes of things which don't exist
         self.mock_etcd.create_network('banana', namespace='system',
                                       metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
-            '/networks/12345678-1234-4321-1234-000000000001/metadata/wrong',
+            '/networks/12345678-1234-4321-8234-000000000001/metadata/wrong',
             headers={'Authorization': self.auth_token})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
@@ -465,20 +468,22 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
 class ExternalApiNetworkInterfaceTestCase(ExternalApiTestCase):
     def test_get_network_interface(self):
+        id1 = str(uuid4)
+        id2 = str(uuid4)
+
         net = self.mock_etcd.create_network('barrynet')
         nd = self.mock_etcd.generate_netdesc(net.uuid)
         self.mock_etcd.create_network_interface(
-            uuid='88888888-1234-4321-1234-000000000001',
+            uuid=id1,
             netdesc=nd,
-            instance_uuid='9999999-1234-4321-1234-000000000001')
+            instance_uuid=id2)
 
         # Get NetworkInterface
         resp = self.client.get('/networks/barrynet/interfaces',
                                headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-        self.assertEqual('88888888-1234-4321-1234-000000000001',
-                         resp.get_json()[0].get('uuid'))
+        self.assertEqual(id1, resp.get_json()[0].get('uuid'))
 
 
 class ExternalApiInstanceTestCase(ExternalApiTestCase):

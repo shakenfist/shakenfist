@@ -107,7 +107,11 @@ class MockEtcd():
 
     def next_uuid(self):
         """Generate predictable UUIDs that are unique during the testcase"""
-        return '12345678-1234-4321-1234-%012i' % next(self.obj_counter)
+        # NOTE(mikal): there are version and variant fields in uuid4's that
+        # pydantic enforces.
+        #               version    variant
+        #                     *    *
+        return '12345678-1234-4321-8234-%012i' % next(self.obj_counter)
 
     def _trace(self, m):
         if self.emit_tracing:

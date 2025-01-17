@@ -126,10 +126,15 @@ def _add_event_inner(
 
         for object_type, object_uuid in simpler_objects:
             request = event_pb2.EventRequest(
-                object_type=object_type, object_uuid=object_uuid,
-                event_type=event_type, timestamp=timestamp,
-                fqdn=config.NODE_NAME, duration=duration,
-                message=message, extra=util_json.json_dump(extra))
+                object_type=object_type,
+                object_uuid=object_uuid,
+                event_type=event_type,
+                timestamp=timestamp,
+                fqdn=config.NODE_NAME,
+                duration=duration,
+                message=message,
+                extra=util_json.json_dump(extra)
+            )
             response = stub.RecordEvent(request)
 
             if not response.ack:

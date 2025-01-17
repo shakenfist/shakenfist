@@ -19,9 +19,10 @@ from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
-from shakenfist.operations.baseoperation import get_all_queue_names
+from shakenfist.operations.baseoperation import get_all_node_queues
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
+from shakenfist.util import json as util_json
 
 
 LOG, HANDLER = logs.setup('main')
@@ -85,7 +86,7 @@ def upgrade_blob_datastore():
     if start_version != version:
         os.makedirs(os.path.dirname(version_path), exist_ok=True)
         with open(version_path, 'w') as f:
-            f.write(json.dumps({'version': version}, indent=4, sort_keys=True))
+            f.write(util_json.json_dump({'version': version}))
         LOG.info('Blob datastore upgrade took %.02f seconds'
                  % (time.time() - start_time))
 
@@ -200,7 +201,7 @@ def startup_tasks():
     etcd.clear_stale_locks()
 
     # Reset queues
-    for queue in get_all_queue_names(config.NODE_NAME):
+    for queue in get_all_node_queues(config.NODE_NAME):
         etcd.restart_queue(queue)
         processing, queued, deferred = etcd.get_queue_length(
             queue)

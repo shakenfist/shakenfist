@@ -13,7 +13,9 @@ from shakenfist.etcd_schema.operations.node_inst_netdesc_op import model_tasks
 from shakenfist.etcd_schema.operations.baseclusteroperation \
     import CLUSTER_OPERATIONS
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
-from shakenfist.operations.node_inst_netdesc_op import NodeInstNetDescOp
+from shakenfist.operations.clusteroperationmapping \
+    import OPERATION_NAMES_TO_CLASSES
+from shakenfist.operations.node_inst_netdesc_op import NodeInstNetdescOp
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -222,6 +224,10 @@ class NodeInstNetdescOpTestCase(base.ShakenFistTestCase):
             PRIORITY.user_facing
         )
 
-        nio = NodeInstNetDescOp.from_db(op_uuid)
+        nio = NodeInstNetdescOp.from_db(op_uuid)
         self.assertNotEqual(None, nio)
         self.assertEqual('queued', nio.state.value)
+
+    def test_object_mapping(self):
+        self.assertTrue(
+            NodeInstNetdescOp.object_type in OPERATION_NAMES_TO_CLASSES)

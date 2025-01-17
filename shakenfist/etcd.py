@@ -20,7 +20,6 @@ from shakenfist import etcd_pb2
 from shakenfist import etcd_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
-from shakenfist.tasks import QueueTask
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import json as util_json
 
@@ -470,6 +469,7 @@ def delete_prefix(path):
     LOG.info('etcd deleteprefix %s' % path)
 
 
+@retry_etcd_forever
 def enqueue(queuename, workitem, delay=0):
     entry_time = time.time() + delay
     jobname = f'{entry_time}-{util_random.random_id()}'
@@ -479,45 +479,6 @@ def enqueue(queuename, workitem, delay=0):
         'queuename': queuename,
         'workitem': workitem,
         }).info('Enqueued workitem')
-
-
-def _all_subclasses(cls):
-    all = cls.__subclasses__()
-    for sc in cls.__subclasses__():
-        all += _all_subclasses(sc)
-    return all
-
-
-def _find_class(task_item):
-    if not isinstance(task_item, dict):
-        return task_item
-
-    item = task_item
-    for task_class in _all_subclasses(QueueTask):
-        if task_class.name() and task_item.get('task') == task_class.name():
-            del task_item['task']
-            # This is where new QueueTask subclass versions should be handled
-            del task_item['version']
-            item = task_class(**task_item)
-            break
-
-    return item
-
-
-def decodeTasks(obj):
-    if not isinstance(obj, dict):
-        return obj
-
-    if 'tasks' in obj:
-        task_list = []
-        for task_item in obj['tasks']:
-            task_list.append(_find_class(task_item))
-        return {'tasks': task_list}
-
-    if 'task' in obj:
-        return _find_class(obj)
-
-    return obj
 
 
 @retry_etcd_forever
@@ -533,7 +494,7 @@ def dequeue(queuename):
         if float(jobname.split('-')[0]) > time.time():
             return None
 
-        workitem = json.loads(data, object_hook=decodeTasks)
+        workitem = json.loads(data)
         put('processing', queuename, jobname, workitem)
         client.delete(metadata['key'])
         LOG.with_fields({
@@ -756,7 +717,8 @@ def replace_many_raw(mutations):
         path_encoded = mutation['path'].encode()
         original_data_encoded = util_json.json_dump(
             mutation['original_data']).encode()
-        new_data_encoded = util_json.json_dump(mutation['new_data']).encode()
+        new_data_encoded = util_json.json_dump(
+            mutation['new_data']).encode()
 
         if mutation['original_data'] is None:
             comparisons.append(

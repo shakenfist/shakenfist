@@ -3,21 +3,26 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from shakenfist.etcd_schema.operations.node_blob_op import create_and_enqueue
-from shakenfist.etcd_schema.operations.node_blob_op import current_version
-from shakenfist.etcd_schema.operations.node_blob_op import model
-from shakenfist.etcd_schema.operations.node_blob_op import model_tasks
+from shakenfist.constants import TRANSCODE_DESCRIPTION
+from shakenfist.etcd_schema.operations.imgcache_op import create_and_enqueue
+from shakenfist.etcd_schema.operations.imgcache_op import current_version
+from shakenfist.etcd_schema.operations.imgcache_op import model
+from shakenfist.etcd_schema.operations.imgcache_op import model_tasks
 from shakenfist.etcd_schema.operations.baseclusteroperation \
     import CLUSTER_OPERATIONS
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.operations.imgcache_op import ImageCacheOp
 from shakenfist.operations.clusteroperationmapping \
     import OPERATION_NAMES_TO_CLASSES
-from shakenfist.operations.node_blob_op import NodeBlobOp
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
 
-class NodeBlobOpTestCase(base.ShakenFistTestCase):
+CACHE_PATH = ('/srv/shakenfist/image_cache/'
+              '17e5983f-ca2c-4c16-aa07-2d7f82ee584d.qcow2')
+
+
+class ImageCacheOpTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
@@ -33,14 +38,13 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
             uuid=u1,
             node_uuid=u2,
             blob_uuid=u3,
+            cache_path=CACHE_PATH,
+            transcode_description=TRANSCODE_DESCRIPTION,
+            tasks=[model_tasks.archive_transcode],
             priority=PRIORITY.background_high_io,
             request_id=None,
-            tasks=[
-                model_tasks.ensure_local,
-                model_tasks.verify_size_and_checksum
-            ],
-            depends_on=[],
-            runs_after=[],
+            depends_on=None,
+            runs_after=None,
             version=current_version
         )
 
@@ -48,35 +52,29 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
         self.assertEqual(u1, serialized['uuid'])
         self.assertEqual(u2, serialized['node_uuid'])
         self.assertEqual(u3, serialized['blob_uuid'])
+        self.assertEqual(CACHE_PATH, serialized['cache_path'])
+        self.assertEqual(
+            TRANSCODE_DESCRIPTION, serialized['transcode_description'])
         self.assertEqual('background_high_io', serialized['priority'])
         self.assertEqual(None, serialized['request_id'])
-        self.assertEqual([
-            'ensure_local',
-            'verify_size_and_checksum'
-        ], serialized['tasks'])
-        self.assertEqual([], serialized['depends_on'])
-        self.assertEqual([], serialized['runs_after'])
+        self.assertEqual(['archive_transcode'], serialized['tasks'])
+        self.assertEqual(None, serialized['depends_on'])
+        self.assertEqual(None, serialized['runs_after'])
         self.assertEqual(current_version, serialized['version'])
 
     def test_model_bad_version(self):
         u1 = str(uuid4())
         u2 = str(uuid4())
-        u3 = str(uuid4())
 
         self.assertRaises(
             ValidationError,
             model,
             uuid=u1,
             node_uuid=u2,
-            blob_uuid=u3,
+            cache_path=CACHE_PATH,
+            transcode_description=TRANSCODE_DESCRIPTION,
+            tasks=[model_tasks.archive_transcode],
             priority=PRIORITY.background_high_io,
-            request_id=None,
-            tasks=[
-                model_tasks.ensure_local,
-                model_tasks.verify_size_and_checksum
-            ],
-            depends_on=[],
-            runs_after=[],
             version=current_version + 1
         )
 
@@ -86,30 +84,35 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
     )
     @mock.patch('time.time', return_value=123.0)
     def test_create_and_enqueue(self, _mock_time, _mock_id):
-        node_uuid = 'sf-1'
-        blob_uuid = '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7'
+        u1 = str(uuid4())
+        u2 = str(uuid4())
+
         op_type, op_uuid = create_and_enqueue(
-            node_uuid, blob_uuid, [
-                model_tasks.ensure_local,
-                model_tasks.verify_size_and_checksum
-            ],
+            u1,
+            u2,
+            CACHE_PATH,
+            TRANSCODE_DESCRIPTION,
+            [model_tasks.archive_transcode],
             PRIORITY.background_high_io
         )
-        self.assertEqual(CLUSTER_OPERATIONS.node_blob_op, op_type)
+
+        self.assertEqual(CLUSTER_OPERATIONS.imgcache_op, op_type)
 
         self.assertEqual(
             {
-                'blob_uuid': '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7',
+                'node_uuid': u1,
+                'blob_uuid': u2,
+                'cache_path': CACHE_PATH,
+                'transcode_description': TRANSCODE_DESCRIPTION,
                 'depends_on': None,
                 'runs_after': None,
-                'node_uuid': 'sf-1',
                 'priority': 'background_high_io',
                 'request_id': None,
-                'tasks': ['ensure_local', 'verify_size_and_checksum'],
+                'tasks': ['archive_transcode'],
                 'uuid': op_uuid,
                 'version': 1
             },
-            self.mock_etcd.get_raw(f'/sf/node_blob_op/{op_uuid}')
+            self.mock_etcd.get_raw(f'/sf/imgcache_op/{op_uuid}')
         )
         self.assertEqual(
             {
@@ -117,35 +120,38 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
                 'update_time': 123.0
             },
             self.mock_etcd.get_raw(
-                f'/sf/attribute/node_blob_op/{op_uuid}/state')
+                f'/sf/attribute/imgcache_op/{op_uuid}/state')
         )
         self.assertEqual(
             {
-                'operation_type': 'node_blob_op',
+                'operation_type': 'imgcache_op',
                 'operation_uuid': op_uuid
             },
             self.mock_etcd.get_raw(
                 (
-                    '/sf/queue/sf-1-clusteroperation-background_high_io/'
+                    f'/sf/queue/{u1}-clusteroperation-background_high_io/'
                     '123.0-asdjfhkjadsfh'
                 )
             )
         )
 
     def test_load_from_etcd(self):
-        node_uuid = 'sf-1'
-        blob_uuid = '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7'
+        u1 = str(uuid4())
+        u2 = str(uuid4())
+
         _, op_uuid = create_and_enqueue(
-            node_uuid, blob_uuid, [
-                model_tasks.ensure_local,
-                model_tasks.verify_size_and_checksum
-            ],
+            u1,
+            u2,
+            CACHE_PATH,
+            TRANSCODE_DESCRIPTION,
+            [model_tasks.archive_transcode],
             PRIORITY.background_high_io
         )
 
-        nbo = NodeBlobOp.from_db(op_uuid)
-        self.assertNotEqual(None, nbo)
-        self.assertEqual('queued', nbo.state.value)
+        ico = ImageCacheOp.from_db(op_uuid)
+        self.assertNotEqual(None, ico)
+        self.assertEqual('queued', ico.state.value)
 
     def test_object_mapping(self):
-        self.assertTrue(NodeBlobOp.object_type in OPERATION_NAMES_TO_CLASSES)
+        self.assertTrue(
+            ImageCacheOp.object_type in OPERATION_NAMES_TO_CLASSES)

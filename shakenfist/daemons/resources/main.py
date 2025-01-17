@@ -23,8 +23,8 @@ from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
-from shakenfist.operations.baseoperation import get_all_background_queue_names
-from shakenfist.operations.baseoperation import get_node_user_facing_queue_names
+from shakenfist.operations.baseoperation import get_all_background_node_queues
+from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import network as util_network
@@ -238,7 +238,7 @@ class Monitor(daemon.Daemon):
 
                 return processing, queued, deferred
 
-            for queue in get_node_user_facing_queue_names(config.NODE_NAME):
+            for queue in get_node_user_facing_node_queues(config.NODE_NAME):
                 processing, queued, deferred = _log_and_update_metrics_for_queue(
                     queue, 'Node specific user facing')
 
@@ -246,7 +246,7 @@ class Monitor(daemon.Daemon):
                 node_queue_waiting += queued
                 node_queue_deferred += deferred
 
-            for queue in get_all_background_queue_names(config.NODE_NAME):
+            for queue in get_all_background_node_queues(config.NODE_NAME):
                 processing, queued, deferred = _log_and_update_metrics_for_queue(
                     queue, 'Node specific background')
 

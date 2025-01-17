@@ -25,20 +25,19 @@ from shakenfist.etcd_schema.operations.util import enqueue
 LOG, HANDLER = logs.setup(__name__)
 
 
-object_type = CLUSTER_OPERATIONS.node_net_op
+object_type = CLUSTER_OPERATIONS.net_iface_op
 initial_version = 1
 current_version = 1
 
 
 class model_tasks(Enum):
-    network_destroy = 1
+    interface_float = 1
 
 
 class model(BaseModel):
     uuid: UUID4
-    # This should be a UUID, but there's some history...
-    node_uuid: str
     network_uuid: Union[UUID4, Literal['floating']]
+    interface_uuid: UUID4
     priority: PRIORITY
     request_id: Optional[str]
     tasks: List[model_tasks]
@@ -55,7 +54,7 @@ class model(BaseModel):
         return [t.name for t in tasks]
 
 
-def create_and_enqueue(node_uuid, network_uuid, tasks, priority,
+def create_and_enqueue(network_uuid, interface_uuid, tasks, priority,
                        request_id=None, depends_on=None, runs_after=None):
     operation_uuid = str(uuid4())
 
@@ -63,8 +62,8 @@ def create_and_enqueue(node_uuid, network_uuid, tasks, priority,
         runs_after_as_deps = _convert_deps(runs_after)
         m = model(
             uuid=operation_uuid,
-            node_uuid=node_uuid,
             network_uuid=network_uuid,
+            interface_uuid=interface_uuid,
             priority=priority,
             request_id=request_id,
             tasks=tasks,
@@ -75,8 +74,8 @@ def create_and_enqueue(node_uuid, network_uuid, tasks, priority,
     except ValidationError as exc:
         LOG.with_fields({
             'uuid': operation_uuid,
-            'node_uuid': node_uuid,
             'network_uuid': network_uuid,
+            'interface_uuid': interface_uuid,
             'priority': priority,
             'request_id': request_id,
             'tasks': tasks,
@@ -87,6 +86,7 @@ def create_and_enqueue(node_uuid, network_uuid, tasks, priority,
         raise exc
 
     mutations, job_name, queue_name, work_item = \
-        base_mutations(object_type.name.lower(), m.model_dump(mode='json'))
+        base_mutations(object_type.name.lower(), m.model_dump(mode='json'),
+                       target='networknode')
     enqueue(mutations, job_name, queue_name, work_item)
     return object_type, operation_uuid

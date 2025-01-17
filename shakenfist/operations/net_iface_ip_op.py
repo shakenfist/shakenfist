@@ -1,52 +1,47 @@
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist import etcd
-from shakenfist.etcd_schema.operations import node_inst_iface_op as schema
-from shakenfist.instance import Instance
+from shakenfist.etcd_schema.operations import net_iface_ip_op as schema
 from shakenfist.network import Network
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
-from shakenfist.tasks import FloatNetworkInterfaceTask
 from shakenfist.util import general as util_general
 
 
 LOG, HANDLER = logs.setup(__name__)
 
 
-class NodeInstIfaceOpException(BaseOperationException):
+class NetIfaceIPOpException(BaseOperationException):
     def __init__(self, op, message):
         super().__init__(message)
         self.op_type = op.object_type
         self.op_uuid = op.uuid
-        self.node_uuid = op.node_uuid
-        self.instance_uuid = op.instance_uuid
         self.network_uuid = op.network_uuid
         self.interface_uuid = op.interface_uuid
 
 
-class NoSuchTask(NodeInstIfaceOpException):
+class NoSuchTask(NetIfaceIPOpException):
     def __init__(self, op, task):
         super().__init__(op, f'no such task {task}')
 
 
-class NoSuchInstance(NodeInstIfaceOpException):
-    def __init__(self, op):
-        super().__init__(op, 'instance missing')
-
-
-class NoSuchNetwork(NodeInstIfaceOpException):
+class NoSuchNetwork(NetIfaceIPOpException):
     def __init__(self, op):
         super().__init__(op, 'network missing')
 
 
-class NoSuchInterface(NodeInstIfaceOpException):
+class NoSuchNetworkInterface(NetIfaceIPOpException):
     def __init__(self, op):
         super().__init__(op, 'network interface missing')
 
 
-class NodeInstIfaceOp(BaseClusterOperation):
+class InvalidStateForTask(NetIfaceIPOpException):
+    def __init__(self, op):
+        super().__init__(op, 'network not in a state which allows this task')
+
+
+class NetIfaceIPOp(BaseClusterOperation):
     object_type = schema.object_type.name.lower()
     initial_version = schema.initial_version
     current_version = schema.current_version
@@ -55,10 +50,9 @@ class NodeInstIfaceOp(BaseClusterOperation):
         self.upgrade(static_values)
         super().__init__(static_values)
 
-        self.__node_uuid = static_values['node_uuid']
-        self.__instance_uuid = static_values['instance_uuid']
         self.__network_uuid = static_values['network_uuid']
         self.__interface_uuid = static_values['interface_uuid']
+        self.__ip = static_values['ip']
 
         # Convert tasks names back into enum entries
         self.__tasks = []
@@ -74,22 +68,13 @@ class NodeInstIfaceOp(BaseClusterOperation):
         self.log = LOG.with_fields({
             'operation_type': self.object_type,
             'operation_uuid': self.uuid,
-            'node_uuid': self.node_uuid,
-            'instance_uuid': self.instance_uuid,
             'network_uuid': self.network_uuid,
             'interface_uuid': self.interface_uuid,
+            'ip': self.ip,
             'tasks': self.tasks
         })
 
     # Static values
-    @property
-    def node_uuid(self):
-        return self.__node_uuid
-
-    @property
-    def instance_uuid(self):
-        return self.__instance_uuid
-
     @property
     def network_uuid(self):
         return self.__network_uuid
@@ -97,6 +82,10 @@ class NodeInstIfaceOp(BaseClusterOperation):
     @property
     def interface_uuid(self):
         return self.__interface_uuid
+
+    @property
+    def ip(self):
+        return self.__ip
 
     @property
     def tasks(self):
@@ -108,32 +97,23 @@ class NodeInstIfaceOp(BaseClusterOperation):
             self.log.warning(f'Task {task} not in {schema.model_tasks}')
             raise NoSuchTask(self, task)
 
-        inst = Instance.from_db(self.instance_uuid)
-        if not inst:
-            self.log.warning(f'Instance {self.instance_uuid} missing')
-            raise NoSuchInstance(self)
-
         n = Network.from_db(self.network_uuid)
         if not n:
             self.log.warning(f'Network {self.network_uuid} missing')
             raise NoSuchNetwork(self)
 
         ni = NetworkInterface.from_db(self.interface_uuid)
-        if not ni:
+        if not n:
             self.log.warning(
                 f'Network interface {self.interface_uuid} missing')
-            raise NoSuchInterface(self)
+            raise NoSuchNetworkInterface(self)
 
         try:
-            self.__getattribute__(f'_{task.name}')(inst, n, ni)
+            self.__getattribute__(f'_{task.name}')(n, ni)
         except Exception as e:
-            util_general.ignore_exception('node_inst_iface_op', e)
-            self.state = NodeInstIfaceOp.STATE_ERROR
-            inst.state = Instance.STATE_ERROR
-            ni.state = NetworkInterface.STATE_ERROR
+            util_general.ignore_exception('net_iface_ip_op', e)
+            self.state = NetIfaceIPOp.STATE_ERROR
 
-    def _hot_plug_instance_interface(self, inst, n, ni):
-        inst.hot_plug_interface(n, ni)
-        if ni.floating:
-            etcd.enqueue(
-                'networknode', FloatNetworkInterfaceTask(n.uuid, ni.uuid))
+    def _interface_defloat(self, n, ni):
+        n.remove_floating_ip(
+            self.ip, ni.ipv4, [ni, ('instance', ni.instance_uuid)])

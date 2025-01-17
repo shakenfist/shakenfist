@@ -2,6 +2,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist import etcd
+from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 
 
 class BaseOperationException(Exception):
@@ -30,24 +31,24 @@ class BaseOperation(dbo):
                      STATE_COMPLETE}
 
 
-def get_all_queue_names(node_uuid):
-    return (get_node_user_facing_queue_names(node_uuid) +
-            get_general_user_facing_queue_names() +
-            get_node_background_queue_names(node_uuid) +
-            get_general_background_queue_names())
+def get_all_node_queues(node_uuid):
+    return (get_node_user_facing_node_queues(node_uuid) +
+            get_general_user_facing_node_queues() +
+            get_node_background_node_queues(node_uuid) +
+            get_general_background_node_queues())
 
 
-def get_all_user_facing_queue_names(node_uuid):
-    return (get_node_user_facing_queue_names(node_uuid) +
-            get_general_user_facing_queue_names())
+def get_all_user_facing_node_queues(node_uuid):
+    return (get_node_user_facing_node_queues(node_uuid) +
+            get_general_user_facing_node_queues())
 
 
-def get_all_background_queue_names(node_uuid):
-    return (get_node_background_queue_names(node_uuid) +
-            get_general_background_queue_names())
+def get_all_background_node_queues(node_uuid):
+    return (get_node_background_node_queues(node_uuid) +
+            get_general_background_node_queues())
 
 
-def get_node_user_facing_queue_names(node_uuid):
+def get_node_user_facing_node_queues(node_uuid):
     return [
         node_uuid,
         f'{node_uuid}-clusteroperation-user_waiting',
@@ -56,7 +57,7 @@ def get_node_user_facing_queue_names(node_uuid):
     ]
 
 
-def get_node_background_queue_names(node_uuid):
+def get_node_background_node_queues(node_uuid):
     return [
         f'{node_uuid}-clusteroperation-background',
         f'{node_uuid}-background',
@@ -64,7 +65,7 @@ def get_node_background_queue_names(node_uuid):
     ]
 
 
-def get_general_user_facing_queue_names():
+def get_general_user_facing_node_queues():
     return [
         'any-clusteroperation-user_waiting',
         'any-clusteroperation-user_facing',
@@ -72,10 +73,21 @@ def get_general_user_facing_queue_names():
     ]
 
 
-def get_general_background_queue_names():
+def get_general_background_node_queues():
     return [
         'any-clusteroperation-background',
         'any-clusteroperation-background_high_io'
+    ]
+
+
+def get_all_network_queues():
+    return [
+        'networknode',
+        'networknode-clusteroperation-user_waiting',
+        'networknode-clusteroperation-user_facing',
+        'networknode-clusteroperation-user_facing_high_io'
+        'networknode-clusteroperation-background',
+        'networknode-clusteroperation-background_high_io'
     ]
 
 
@@ -99,7 +111,7 @@ class BaseClusterOperation(BaseOperation):
 
     def __init__(self, static_values):
         super().__init__(static_values['uuid'], static_values.get('version'))
-        self.__priority = static_values['priority']
+        self.__priority = PRIORITY[static_values['priority']]
         self.__request_id = static_values.get('request_id')
         self.__depends_on = static_values.get('depends_on')
         self.__runs_after = static_values.get('runs_after')

@@ -7,7 +7,6 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
-from shakenfist import etcd
 from shakenfist.exceptions import LockException
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import ProcessExecutionError
@@ -15,7 +14,12 @@ from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import network
 from shakenfist import networkinterface
-from shakenfist.tasks import DestroyNetworkTask
+from shakenfist.etcd_schema.operations.baseclusteroperation \
+    import PRIORITY
+from shakenfist.etcd_schema.operations.net_op \
+    import create_and_enqueue as net_create_and_enqueue
+from shakenfist.etcd_schema.operations.net_op \
+    import model_tasks as net_tasks
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import network as util_network
 
@@ -110,8 +114,11 @@ class Job(util_concurrency.Job):
                         if not n.networkinterfaces:
                             LOG.with_fields({'network': n}).info(
                                 'Removing stray delete_wait network')
-                            etcd.enqueue(
-                                'networknode', DestroyNetworkTask(n.uuid))
+                            op_type, op_uuid = net_create_and_enqueue(
+                                n.uuid,
+                                [net_tasks.network_destroy],
+                                PRIORITY.user_facing)
+                            n.set_last_cluster_operation(op_type, op_uuid)
 
                         # We skip maintenance on all delete_wait networks
                         continue

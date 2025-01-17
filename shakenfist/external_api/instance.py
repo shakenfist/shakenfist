@@ -32,9 +32,9 @@ from shakenfist.etcd_schema.operations.node_inst_op \
     import create_and_enqueue as nio_create_and_enqueue
 from shakenfist.etcd_schema.operations.node_inst_op \
     import model_tasks as nio_tasks
-from shakenfist.etcd_schema.operations.node_inst_iface_op \
+from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
     import create_and_enqueue as niio_create_and_enqueue
-from shakenfist.etcd_schema.operations.node_inst_iface_op \
+from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
     import model_tasks as niio_tasks
 from shakenfist.etcd_schema.operations.node_inst_netdesc_op \
     import create_and_enqueue as nino_create_and_enqueue
@@ -305,11 +305,10 @@ def _netdesc_allocate_address(inst, netdesc, order):
     n = sfnet.Network.from_db(netdesc['network_uuid'])
     if not n:
         inst.enqueue_delete_due_error(
-            'missing network %s during IP allocation phase'
-            % netdesc['network_uuid'])
+            'missing network  during IP allocation phase')
         return (
             None,
-            sf_api.error(404, 'network %s not found' % netdesc['network_uuid'])
+            sf_api.error(404, f'network {netdesc["network_uuid"]} not found')
         )
 
     # NOTE(mikal): we now support interfaces with no address on them
@@ -333,9 +332,9 @@ def _netdesc_allocate_address(inst, netdesc, order):
                         % netdesc['network_uuid'])
                     return None, sf_api.error(
                         409, 'address %s in use' % netdesc['address'])
+
     except exceptions.CongestedNetwork as e:
-        inst.enqueue_delete_due_error(
-            'cannot allocate address: %s' % e)
+        inst.enqueue_delete_due_error('cannot allocate address: %s' % e)
         return None, sf_api.error(507, str(e), suppress_traceback=True)
 
     if 'model' not in netdesc or not netdesc['model']:
@@ -358,8 +357,7 @@ def _netdesc_allocate_address(inst, netdesc, order):
                 return None, err
 
     except exceptions.CongestedNetwork as e:
-        inst.enqueue_delete_due_error(
-            'cannot allocate address: %s' % e)
+        inst.enqueue_delete_due_error('cannot allocate address: %s' % e)
         return None, sf_api.error(507, str(e), suppress_traceback=True)
 
     # Include the interface uuid in the network description we
@@ -718,6 +716,11 @@ class InstancesEndpoint(sf_api.Resource):
             side_channels=side_channels
         )
         inst.add_event(EVENT_TYPE_AUDIT, 'create request from REST API')
+        inst.add_event(
+            EVENT_TYPE_AUDIT, 'requested networking configuration',
+            extra={
+                'networks': network
+            })
 
         # Initialise metadata
         if metadata:
@@ -728,12 +731,18 @@ class InstancesEndpoint(sf_api.Resource):
         updated_networks = []
         if network:
             for netdesc in network:
-                netdesc, err = _netdesc_allocate_address(
-                    inst, netdesc, order)
+                netdesc, err = _netdesc_allocate_address(inst, netdesc, order)
                 if err:
                     return err
                 updated_networks.append(netdesc)
                 order += 1
+
+        inst.add_event(
+            EVENT_TYPE_AUDIT,
+            'post address allocation networking configuration',
+            extra={
+                'networks': updated_networks
+            })
 
         # Store interfaces soon as they are allocated to the instance
         inst.interfaces = [i['iface_uuid'] for i in updated_networks]
@@ -852,8 +861,12 @@ class InstancesEndpoint(sf_api.Resource):
                 node = db_placement['node']
 
             op_type, op_uuid = nio_create_and_enqueue(
-                node, inst.uuid, [nio_tasks.instance_delete],
-                PRIORITY.user_facing, runs_after=[inst.last_cluster_operation])
+                node,
+                inst.uuid,
+                [nio_tasks.instance_delete],
+                PRIORITY.user_facing,
+                runs_after=[inst.last_cluster_operation],
+                request_id=util_general.get_request_id())
             inst.set_last_cluster_operation(op_type, op_uuid)
 
             waiting_for.append(inst.uuid)
@@ -1495,7 +1508,8 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
         na_create_and_enqueue(
             instance_from_db.placement['node'], o.uuid,
             [na_tasks.preflight],
-            PRIORITY.user_facing)
+            PRIORITY.user_facing,
+            request_id=util_general.get_request_id())
         return o.external_view()
 
 

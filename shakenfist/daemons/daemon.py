@@ -19,8 +19,8 @@ from shakenfist import etcd
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
-from shakenfist.operations.baseoperation import get_all_user_facing_queue_names
-from shakenfist.operations.baseoperation import get_all_background_queue_names
+from shakenfist.operations.baseoperation import get_all_user_facing_node_queues
+from shakenfist.operations.baseoperation import get_all_background_node_queues
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import libvirt as util_libvirt
 
@@ -309,7 +309,7 @@ class WorkerPoolDaemon(Daemon):
         if num_workers > max_workers:
             return False
 
-        for queue_name in get_all_user_facing_queue_names(config.NODE_NAME):
+        for queue_name in get_all_user_facing_node_queues(config.NODE_NAME):
             jobname_workitem = etcd.dequeue(queue_name)
             if jobname_workitem:
                 args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
@@ -331,7 +331,7 @@ class WorkerPoolDaemon(Daemon):
         metrics_values = self.metrics.get('metrics', {})
         disk_busy = int(metrics_values.get(
             'disk_busy_time_delta_per_seconds', '0'))
-        for queue_name in get_all_background_queue_names(config.NODE_NAME):
+        for queue_name in get_all_background_node_queues(config.NODE_NAME):
             if queue_name.find('high_io') != -1 and disk_busy > 800:
                 LOG.debug('Skipping {queue_name} queue as local disk is busy')
                 continue

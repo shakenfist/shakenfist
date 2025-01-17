@@ -13,6 +13,8 @@ from shakenfist.etcd_schema.operations.baseclusteroperation \
     import Dependency
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.artifact_fetch_op import ArtifactFetchOp
+from shakenfist.operations.clusteroperationmapping \
+    import OPERATION_NAMES_TO_CLASSES
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -174,3 +176,7 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
         afo = ArtifactFetchOp.from_db(op_uuid)
         self.assertNotEqual(None, afo)
         self.assertEqual('queued', afo.state.value)
+
+    def test_object_mapping(self):
+        self.assertTrue(
+            ArtifactFetchOp.object_type in OPERATION_NAMES_TO_CLASSES)

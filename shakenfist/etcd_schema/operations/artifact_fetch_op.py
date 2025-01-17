@@ -92,6 +92,6 @@ def create_and_enqueue(namespace, url, instance_uuid, tasks, priority,
 
     mutations, job_name, queue_name, work_item = \
         base_mutations(object_type.name.lower(), m.model_dump(mode='json'),
-                       target_node=target_node)
+                       target=target_node)
     enqueue(mutations, job_name, queue_name, work_item)
     return object_type, operation_uuid

@@ -25,19 +25,21 @@ from shakenfist.etcd_schema.operations.util import enqueue
 LOG, HANDLER = logs.setup(__name__)
 
 
-object_type = CLUSTER_OPERATIONS.node_net_op
+object_type = CLUSTER_OPERATIONS.net_op
 initial_version = 1
 current_version = 1
 
 
 class model_tasks(Enum):
-    network_destroy = 1
+    network_deploy = 1
+    network_destroy = 2
+    network_update_dnsmasq = 3
+    network_remove_dnsmasq = 4
+    network_remove_nat = 5
 
 
 class model(BaseModel):
     uuid: UUID4
-    # This should be a UUID, but there's some history...
-    node_uuid: str
     network_uuid: Union[UUID4, Literal['floating']]
     priority: PRIORITY
     request_id: Optional[str]
@@ -55,15 +57,14 @@ class model(BaseModel):
         return [t.name for t in tasks]
 
 
-def create_and_enqueue(node_uuid, network_uuid, tasks, priority,
-                       request_id=None, depends_on=None, runs_after=None):
+def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
+                       depends_on=None, runs_after=None):
     operation_uuid = str(uuid4())
 
     try:
         runs_after_as_deps = _convert_deps(runs_after)
         m = model(
             uuid=operation_uuid,
-            node_uuid=node_uuid,
             network_uuid=network_uuid,
             priority=priority,
             request_id=request_id,
@@ -75,7 +76,6 @@ def create_and_enqueue(node_uuid, network_uuid, tasks, priority,
     except ValidationError as exc:
         LOG.with_fields({
             'uuid': operation_uuid,
-            'node_uuid': node_uuid,
             'network_uuid': network_uuid,
             'priority': priority,
             'request_id': request_id,
@@ -87,6 +87,7 @@ def create_and_enqueue(node_uuid, network_uuid, tasks, priority,
         raise exc
 
     mutations, job_name, queue_name, work_item = \
-        base_mutations(object_type.name.lower(), m.model_dump(mode='json'))
+        base_mutations(object_type.name.lower(), m.model_dump(mode='json'),
+                       target='networknode')
     enqueue(mutations, job_name, queue_name, work_item)
     return object_type, operation_uuid

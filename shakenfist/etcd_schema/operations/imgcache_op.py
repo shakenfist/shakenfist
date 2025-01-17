@@ -23,7 +23,7 @@ from shakenfist.etcd_schema.operations.util import enqueue
 LOG, HANDLER = logs.setup(__name__)
 
 
-object_type = CLUSTER_OPERATIONS.imagecache_op
+object_type = CLUSTER_OPERATIONS.imgcache_op
 initial_version = 1
 current_version = 1
 

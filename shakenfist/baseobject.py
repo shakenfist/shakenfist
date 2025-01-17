@@ -346,9 +346,7 @@ class DatabaseBackedObject:
             self.add_event(EVENT_TYPE_MUTATE, 'set attribute', extra=event_values)
 
         if self.__in_memory_only:
-            self.__in_memory_values[attribute] = json.dumps(
-                value, indent=4, sort_keys=True,
-                cls=util_json.JSONEncoderCustomTypes)
+            self.__in_memory_values[attribute] = util_json.json_dump(value)
         else:
             etcd.put('attribute/%s' % self.object_type,
                      self.__uuid, attribute, value)

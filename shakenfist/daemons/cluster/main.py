@@ -4,7 +4,6 @@
 # maintenance daemon per cluster.
 from collections import defaultdict
 from functools import partial
-import json
 import os
 import time
 
@@ -34,12 +33,13 @@ from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.operations.baseoperation import BaseClusterOperation
-from shakenfist.operations.baseoperation import get_all_queue_names
+from shakenfist.operations.baseoperation import get_all_node_queues
 from shakenfist.operations.clusteroperationmapping \
     import OPERATION_NAMES_TO_CLASSES
 from shakenfist.upload import Uploads
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
+from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
@@ -100,8 +100,7 @@ class Monitor(daemon.Daemon):
             when = objdata.get('when')
             if not when:
                 objdata['when'] = time.time()
-                etcd.get_etcd_client().put(
-                    k, json.dumps(objdata, indent=4, sort_keys=True))
+                etcd.get_etcd_client().put(k, util_json.json_dump(objdata))
                 continue
 
             if time.time() - when < 300:
@@ -401,7 +400,7 @@ class Monitor(daemon.Daemon):
                     b.request_replication()
 
                 # Clean up any lingering queue tasks
-                for queue_name in get_all_queue_names(n.uuid):
+                for queue_name in get_all_node_queues(n.uuid):
                     while jobname_workitem := etcd.dequeue(queue_name):
                         jobname, workitem = jobname_workitem
                         n.add_event(

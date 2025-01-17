@@ -1,6 +1,7 @@
 import json
 import logging
 from unittest import mock
+from uuid import uuid4
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -51,8 +52,13 @@ class NetworksDeleteNoneTestCase(base.ShakenFistTestCase):
 
         self.mock_etcd.create_namespace('system', 'key1', 'bar')
         self.mock_etcd.create_namespace('foo', 'key1', 'bar')
-        self.mock_etcd.create_network('banana', uuid='123', namespace='foo',
-                                      set_state=dbo.STATE_DELETED)
+
+        self.network_id = str(uuid4())
+        self.mock_etcd.create_network(
+            'banana',
+            uuid=self.network_id,
+            namespace='foo',
+            set_state=dbo.STATE_DELETED)
 
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
@@ -104,8 +110,13 @@ class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
 
         self.mock_etcd.create_namespace('system', 'key1', 'bar')
         self.mock_etcd.create_namespace('foo', 'key1', 'bar')
+
+        self.network_id = str(uuid4())
         self.mock_etcd.create_network(
-            name='foonet', uuid='123', namespace='foo', set_state=dbo.STATE_CREATED)
+            name='foonet',
+            uuid=self.network_id,
+            namespace='foo',
+            set_state=dbo.STATE_CREATED)
 
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
@@ -125,5 +136,5 @@ class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
                                       'confirm': True,
                                       'namespace': 'foo'
                                   }))
-        self.assertEqual(['123'], resp.get_json())
+        self.assertEqual([self.network_id], resp.get_json())
         self.assertEqual(200, resp.status_code)

@@ -1,25 +1,13 @@
-import flask
 import time
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist import etcd
-from shakenfist import exceptions
-from shakenfist import network
-from shakenfist.networkinterface import NetworkInterface
-from shakenfist.tasks import DefloatNetworkInterfaceTask
-from shakenfist.tasks import DeployNetworkTask
-from shakenfist.tasks import DestroyNetworkTask
-from shakenfist.tasks import FloatNetworkInterfaceTask
-from shakenfist.tasks import NetworkInterfaceTask
-from shakenfist.tasks import NetworkTask
-from shakenfist.tasks import RemoveDHCPLeaseNetworkTask
-from shakenfist.tasks import RemoveDnsMasqNetworkTask
-from shakenfist.tasks import RemoveNATNetworkTask
-from shakenfist.tasks import RouteAddressTask
-from shakenfist.tasks import UnrouteAddressTask
-from shakenfist.tasks import UpdateDnsMasqNetworkTask
+from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import get_all_network_queues
+from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -38,8 +26,16 @@ class Job(util_concurrency.Job):
         LOG.info('Starting network worker')
         was_previously_idle = False
 
+        # NOTE(mikal): there's really nothing stopping us from processing a bunch
+        # of these jobs in parallel with a pool of workers, but I am not sure its
+        # worth the complexity right now. Are we really going to be changing
+        # networks that much?
         while daemon.check_abort_path(self.abort_path):
-            jobname_workitem = etcd.dequeue('networknode')
+            for queue_name in get_all_network_queues():
+                jobname_workitem = etcd.dequeue(queue_name)
+                if jobname_workitem:
+                    break
+
             if not jobname_workitem:
                 if not was_previously_idle:
                     util_concurrency.set_thread_name('idle')
@@ -53,152 +49,83 @@ class Job(util_concurrency.Job):
                 LOG.debug(
                     f'This network thread is now processing job {jobname}')
 
-                # Tasks should log with the request id of the API request that
-                # caused them, if there was in fact one.
-                request_id = workitem.request_id()
                 try:
-                    if request_id:
-                        flask.request.environ['REQUEST_ID'] = request_id
-                    else:
-                        if 'REQUEST_ID' in flask.request.environ:
-                            del flask.request.environ['REQUEST_ID']
-                except RuntimeError:
-                    ...
-
-                try:
-                    log_ctx = LOG.with_fields({'workitem': workitem})
-                    log_ctx.info('Starting work item')
-
-                    if NetworkTask.__subclasscheck__(type(workitem)):
-                        self._process_network_workitem(log_ctx, workitem)
-                    elif NetworkInterfaceTask.__subclasscheck__(type(workitem)):
-                        self._process_networkinterface_workitem(
-                            log_ctx, workitem)
-                    else:
-                        raise exceptions.UnknownTaskException(
-                            'Network workitem was not decoded: %s' % workitem)
-
+                    self._cluster_operation_execute(workitem)
                 finally:
-                    etcd.resolve('networknode', jobname)
+                    etcd.resolve(queue_name, jobname)
 
-    def _process_network_workitem(self, log_ctx, workitem):
-        log_ctx = log_ctx.with_fields({'network': workitem.network_uuid()})
-        n = network.Network.from_db(workitem.network_uuid())
-        if not n:
-            log_ctx.warning('Received work item for non-existent network')
+    def _cluster_operation_execute(self, workitem):
+        op_type = workitem.get('operation_type')
+        op_uuid = workitem.get('operation_uuid')
+        op = OPERATION_NAMES_TO_CLASSES[op_type].from_db(op_uuid)
+
+        if not op:
+            self.log.error('Operation not found')
             return
 
-        # NOTE(mikal): there's really nothing stopping us from processing a bunch
-        # of these jobs in parallel with a pool of workers, but I am not sure its
-        # worth the complexity right now. Are we really going to be changing
-        # networks that much?
-
-        #
-        # Tasks valid for a network in ANY STATE
-        #
-        if isinstance(workitem, RemoveDnsMasqNetworkTask):
-            n.remove_dnsmasq()
-            return
-
-        if isinstance(workitem, RemoveNATNetworkTask):
-            n.remove_nat()
-            return
-
-        if isinstance(workitem, UnrouteAddressTask):
-            n.unroute_address(workitem.ipv4())
-
-        #
-        # Tasks that should NOT operate on a DEAD network
-        #
-        if n.is_dead() and n.state.value != network.Network.STATE_DELETE_WAIT:
-            log_ctx.with_fields({'state': n.state,
-                                 'workitem': workitem}).info(
-                'Received work item for a dead network and not delete_wait')
-            return
-
-        if isinstance(workitem, DestroyNetworkTask):
-            if n.networkinterfaces:
-                log_ctx.with_fields(
-                    {'networkinterfaces': n.networkinterfaces}).info(
-                    'DestroyNetworkTask for network with interfaces, deferring.')
-                etcd.enqueue('networknode', workitem, delay=60)
+        # Ensure our dependencies are met.
+        for dep in op.depends_on:
+            dep_op = OPERATION_NAMES_TO_CLASSES[dep['op_type']].from_db(
+                dep['op_uuid'])
+            if not dep_op:
+                op.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'cancelling operation, as dependency does not exist',
+                    extra={
+                        'dep_object_type': dep_op.object_type,
+                        'dep_object_uuid': dep_op.uuid
+                    })
+                op.state = BaseClusterOperation.STATE_ERROR
                 return
 
-            try:
-                n.delete_on_network_node()
-            except exceptions.DeadNetwork as e:
-                log_ctx.with_fields({'exception': e}).warning(
-                    'DestroyNetworkTask on dead network')
-            return
+            dep_op_state = dep_op.state.value
+            if dep_op_state in [BaseClusterOperation.STATE_ERROR,
+                                BaseClusterOperation.STATE_DELETED,
+                                BaseClusterOperation.STATE_ABORT]:
+                op.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'aborting operation, as dependency is unsuitable',
+                    extra={
+                        'dep_object_type': dep_op.object_type,
+                        'dep_object_uuid': dep_op.uuid,
+                        'dep_object_state': dep_op_state
+                    })
+                op.state = BaseClusterOperation.STATE_ABORT
+                return
 
-        #
-        # Tasks that should NOT operate on a DEAD or DELETE_WAIT network
-        #
-        if n.is_dead():
-            log_ctx.with_fields({'state': n.state,
-                                 'workitem': workitem}).info(
-                'Received work item for a dead network')
-            return
+            if dep_op_state in [BaseClusterOperation.STATE_INITIAL,
+                                BaseClusterOperation.STATE_QUEUED,
+                                BaseClusterOperation.STATE_PREFLIGHT,
+                                BaseClusterOperation.STATE_EXECUTING]:
+                # Dependency not yet ready, we should defer
+                op.defer()
+                return
 
-        try:
-            if isinstance(workitem, DeployNetworkTask):
-                n.create_on_network_node()
-                n.ensure_mesh()
+        # Ensure that we are running after any runs_after requirements.
+        for dep in op.runs_after:
+            dep_op = OPERATION_NAMES_TO_CLASSES[dep['op_type']].from_db(
+                dep['op_uuid'])
+            if not dep_op:
+                # Not fatal because otherwise a missing cluster operation
+                # could cause the entire cluster to stop being able to manage
+                # a given object.
+                op.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'warning, runs_after dependency is missing',
+                    extra={
+                        'dep_object_type': dep_op.object_type,
+                        'dep_object_uuid': dep_op.uuid
+                    })
+                continue
 
-            elif isinstance(workitem, UpdateDnsMasqNetworkTask):
-                n.create_on_network_node()
-                n.ensure_mesh()
+            dep_op_state = dep_op.state.value
+            if dep_op_state in [BaseClusterOperation.STATE_INITIAL,
+                                BaseClusterOperation.STATE_QUEUED,
+                                BaseClusterOperation.STATE_PREFLIGHT,
+                                BaseClusterOperation.STATE_EXECUTING]:
+                # Dependency not yet ready, we should defer
+                op.defer()
+                return
 
-            elif isinstance(workitem, RemoveDHCPLeaseNetworkTask):
-                n.remove_dhcp_lease(workitem.ipv4(), workitem.macaddr())
-
-            elif isinstance(workitem, RouteAddressTask):
-                n.route_address(workitem.ipv4())
-
-        except exceptions.DeadNetwork as e:
-            log_ctx.with_fields({'exception': e}).warning(
-                'Network task on dead network')
-
-    def _process_networkinterface_workitem(self, log_ctx, workitem):
-        log_ctx = log_ctx.with_fields({
-            'networkinterface': workitem.interface_uuid()})
-        n = network.Network.from_db(workitem.network_uuid())
-        if not n:
-            log_ctx.warning('Received work item for non-existent network')
-            return
-
-        ni = NetworkInterface.from_db(workitem.interface_uuid())
-        if not ni:
-            log_ctx.warning(
-                'Received work item for non-existent network interface')
-            return
-
-        # Tasks that should not operate on a dead or delete waiting network
-        if n.is_dead() and n.state.value != network.Network.STATE_DELETE_WAIT:
-            log_ctx.with_fields({'state': n.state,
-                                 'workitem': workitem}).info(
-                'Received work item for a completely dead network')
-            return
-
-        if isinstance(workitem, DefloatNetworkInterfaceTask):
-            n.remove_floating_ip(
-                workitem.floating(), ni.ipv4,
-                [ni, ('instance', ni.instance_uuid)])
-            return
-
-        # Tasks that should not operate on a dead network
-        if n.is_dead():
-            log_ctx.with_fields({'state': n.state,
-                                 'workitem': workitem}).info(
-                'Received work item for a dead network')
-            return
-
-        if isinstance(workitem, FloatNetworkInterfaceTask):
-            floating = ni.floating.get('floating_address')
-            if not floating:
-                log_ctx.warning(
-                    'Not floating an interface with no floating address')
-            else:
-                n.add_floating_ip(
-                    floating, ni.ipv4, [ni, ('instance', ni.instance_uuid)])
-            return
+        # We're good to go!
+        op.execute()

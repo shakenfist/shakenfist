@@ -11,9 +11,9 @@ from shakenfist import etcd
 LOG, _ = logs.setup(__name__)
 
 
-def base_mutations(object_type, metadata, target_node=None):
-    if not target_node:
-        target_node = metadata['node_uuid']
+def base_mutations(object_type, metadata, target=None):
+    if not target:
+        target = metadata['node_uuid']
 
     # Cleanup some enumisms in the metadata
     # object_type = object_type.name
@@ -22,7 +22,7 @@ def base_mutations(object_type, metadata, target_node=None):
     creation_time = time.time()
     job_name = f'{creation_time}-{sf_random.random_id()}'
     queue_name = (
-        f'/sf/queue/{target_node}-clusteroperation-{metadata["priority"]}'
+        f'/sf/queue/{target}-clusteroperation-{metadata["priority"]}'
     )
     work_item = {
         'operation_type': object_type,

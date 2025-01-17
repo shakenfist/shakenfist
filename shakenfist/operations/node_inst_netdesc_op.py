@@ -13,15 +13,18 @@ from shakenfist.network import Network
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.etcd_schema.operations.net_iface_op \
+    import create_and_enqueue as ni_create_and_enqueue
+from shakenfist.etcd_schema.operations.net_iface_op \
+    import model_tasks as ni_tasks
 from shakenfist import scheduler
-from shakenfist.tasks import FloatNetworkInterfaceTask
 from shakenfist.util import general as util_general
 
 
 LOG, HANDLER = logs.setup(__name__)
 
 
-class NodeInstNetDescOpException(BaseOperationException):
+class NodeInstNetdescOpException(BaseOperationException):
     def __init__(self, op, message):
         super().__init__(message)
         self.op_type = op.object_type
@@ -32,27 +35,27 @@ class NodeInstNetDescOpException(BaseOperationException):
         self.tasks = op.tasks
 
 
-class NoSuchTask(NodeInstNetDescOpException):
+class NoSuchTask(NodeInstNetdescOpException):
     def __init__(self, op, task):
         super().__init__(op, f'no such task {task}')
 
 
-class NoSuchInstance(NodeInstNetDescOpException):
+class NoSuchInstance(NodeInstNetdescOpException):
     def __init__(self, op):
         super().__init__(op, 'instance missing')
 
 
-class InvalidNetDesc(NodeInstNetDescOpException):
+class InvalidNetdesc(NodeInstNetdescOpException):
     def __init__(self, op):
         super().__init__(op, 'invalid net_desc')
 
 
-class AbortInstanceStart(NodeInstNetDescOpException):
+class AbortInstanceStart(NodeInstNetdescOpException):
     def __init__(self, op, message):
         super().__init__(op, message)
 
 
-class NodeInstNetDescOp(BaseClusterOperation):
+class NodeInstNetdescOp(BaseClusterOperation):
     object_type = schema.object_type.name.lower()
     initial_version = schema.initial_version
     current_version = schema.current_version
@@ -120,11 +123,11 @@ class NodeInstNetDescOp(BaseClusterOperation):
             self.__getattribute__(f'_{task.name}')(inst)
         except AbortInstanceStart as e:
             inst.enqueue_delete_due_error(e.message)
-            self.state = NodeInstNetDescOp.STATE_ABORT
+            self.state = NodeInstNetdescOp.STATE_ABORT
         except Exception as e:
             util_general.ignore_exception('node_inst_netdesc_op', e)
             inst.enqueue_delete_due_error(f'Unhandled error: {e}')
-            self.state = NodeInstNetDescOp.STATE_ERROR
+            self.state = NodeInstNetdescOp.STATE_ERROR
 
     def _instance_preflight(self, inst):
         state = inst.state.value
@@ -167,11 +170,11 @@ class NodeInstNetDescOp(BaseClusterOperation):
             candidates = s.find_candidates(inst, candidates=candidates)
             inst.place_instance(candidates[0])
 
-            redirected = NodeInstNetDescOp.new(
+            redirected = NodeInstNetdescOp.new(
                 candidates[0], self.instance_uuid, self.net_desc,
                 self.tasks, self.priority, self.request_id)
             redirected.enqueue()
-            self.state = NodeInstNetDescOp.STATE_ABORT
+            self.state = NodeInstNetdescOp.STATE_ABORT
 
         except LowResourceException as e:
             add_event_multi(
@@ -238,9 +241,14 @@ class NodeInstNetDescOp(BaseClusterOperation):
                     n.ensure_mesh()
                     n.update_dnsmasq()
 
-                    if ni.floating:
-                        float_tasks.append(
-                            FloatNetworkInterfaceTask(n.uuid, ni.uuid))
+                    if ni.floating['floating_address']:
+                        op_type, op_uuid = ni_create_and_enqueue(
+                            n.uuid,
+                            ni.uuid,
+                            [ni_tasks.interface_float],
+                            priority=self.priority,
+                            request_id=self.request_id)
+                        n.set_last_cluster_operation(op_type, op_uuid)
 
                 # Allocate console and VDI ports
                 inst.allocate_instance_ports()

@@ -3,7 +3,7 @@ import json
 import uuid
 
 from shakenfist import baseobject
-from shakenfist.tasks import QueueTask
+
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
@@ -11,8 +11,6 @@ from shakenfist.tasks import QueueTask
 
 class JSONEncoderCustomTypes(json.JSONEncoder):
     def default(self, obj):
-        if QueueTask.__subclasscheck__(type(obj)):
-            return obj.obj_dict()
         if type(obj) is baseobject.State:
             return obj.obj_dict()
         if type(obj) is uuid.UUID:
