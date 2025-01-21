@@ -32,15 +32,19 @@ class model_tasks(Enum):
     instance_snapshot = 1
 
 
+class snapshot(BaseModel):
+    disk: dict
+    artifact_uuid: UUID4
+    blob_uuid: UUID4
+    thin: bool
+
+
 class model(BaseModel):
     uuid: UUID4
     # This should be a UUID, but there's some history...
     node_uuid: str
     instance_uuid: UUID4
-    disk: dict
-    artifact_uuid: UUID4
-    blob_uuid: UUID4
-    thin: bool
+    snapshots: List[snapshot]
     priority: PRIORITY
     request_id: Optional[str]
     tasks: List[model_tasks]
@@ -57,9 +61,8 @@ class model(BaseModel):
         return [t.name for t in tasks]
 
 
-def create_and_enqueue(node_uuid, instance_uuid, disk, artifact_uuid,
-                       blob_uuid, thin, tasks, priority, request_id=None,
-                       depends_on=None, runs_after=None):
+def create_and_enqueue(node_uuid, instance_uuid, snapshots, tasks, priority,
+                       request_id=None, depends_on=None, runs_after=None):
     operation_uuid = str(uuid4())
 
     try:
@@ -68,10 +71,7 @@ def create_and_enqueue(node_uuid, instance_uuid, disk, artifact_uuid,
             uuid=operation_uuid,
             node_uuid=node_uuid,
             instance_uuid=instance_uuid,
-            disk=disk,
-            artifact_uuid=artifact_uuid,
-            blob_uuid=blob_uuid,
-            thin=thin,
+            snapshots=snapshots,
             priority=priority,
             request_id=request_id,
             tasks=tasks,
@@ -84,10 +84,7 @@ def create_and_enqueue(node_uuid, instance_uuid, disk, artifact_uuid,
             'uuid': operation_uuid,
             'node_uuid': node_uuid,
             'instance_uuid': instance_uuid,
-            'disk': disk,
-            'artifact_uuid': artifact_uuid,
-            'blob_uuid': blob_uuid,
-            'thin': thin,
+            'snapshots': snapshots,
             'priority': priority,
             'request_id': request_id,
             'tasks': tasks,

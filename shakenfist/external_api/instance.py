@@ -800,7 +800,7 @@ class InstancesEndpoint(sf_api.Resource):
                 request_id=util_general.get_request_id(),
                 target_node=placement)
             instance_start_dependencies.append(
-                Dependency(op_type=op_type, op_uuid=op_uuid))
+                dependency(op_type=op_type, op_uuid=op_uuid))
 
         # Then request the instance start
         if not instance_start_dependencies:

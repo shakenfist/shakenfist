@@ -33,6 +33,8 @@ from shakenfist.etcd_schema.operations.node_inst_op \
 from shakenfist.etcd_schema.operations.node_inst_snap_op \
     import create_and_enqueue as niso_create_and_enqueue
 from shakenfist.etcd_schema.operations.node_inst_snap_op \
+    import snapshot as niso_snapshot
+from shakenfist.etcd_schema.operations.node_inst_snap_op \
     import model_tasks as niso_tasks
 from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
@@ -1564,6 +1566,7 @@ class Instance(dbo):
         self.log.with_fields({'devices': disks}).info('Devices for snapshot')
 
         out = {}
+        snapshots = []
         for disk in disks:
             if disk['snapshot_ignores']:
                 continue
@@ -1604,18 +1607,22 @@ class Instance(dbo):
                 a.state = artifact.Artifact.STATE_CREATED
 
             else:
-                op_type, op_uuid = niso_create_and_enqueue(
-                    config.NODE_NAME,
-                    self.uuid,
-                    disk,
-                    a.uuid,
-                    blob_uuid,
-                    thin,
-                    [niso_tasks.instance_snapshot],
-                    PRIORITY.user_facing_high_io,
-                    runs_after=[self.last_cluster_operation],
-                    request_id=util_general.get_request_id())
-                self.set_last_cluster_operation(op_type, op_uuid)
+                snapshots.append(niso_snapshot(
+                    disk=disk,
+                    artifact_uuid=a.uuid,
+                    blob_uuid=blob_uuid,
+                    thin=thin
+                ))
+
+        op_type, op_uuid = niso_create_and_enqueue(
+            config.NODE_NAME,
+            self.uuid,
+            snapshots,
+            [niso_tasks.instance_snapshot],
+            PRIORITY.user_facing_high_io,
+            runs_after=[self.last_cluster_operation],
+            request_id=util_general.get_request_id())
+        self.set_last_cluster_operation(op_type, op_uuid)
 
         self.add_event(EVENT_TYPE_AUDIT, 'snapshot requested', extra=out)
         return out

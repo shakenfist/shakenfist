@@ -9,6 +9,7 @@ from shakenfist.etcd_schema.operations.node_inst_snap_op \
     import current_version
 from shakenfist.etcd_schema.operations.node_inst_snap_op import model
 from shakenfist.etcd_schema.operations.node_inst_snap_op import model_tasks
+from shakenfist.etcd_schema.operations.node_inst_snap_op import snapshot
 from shakenfist.etcd_schema.operations.baseclusteroperation \
     import CLUSTER_OPERATIONS
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
@@ -29,26 +30,32 @@ class NodeInstSnapOpTestCase(base.ShakenFistTestCase):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
 
+        self.artifact_uuid = str(uuid4())
+        self.blob_uuid = str(uuid4())
+        self.snapshots = [
+            snapshot(
+                disk={
+                    'type': 'qcow2',
+                    'device': 'vda',
+                    'path': DISK_PATH,
+                    'snapshot_ignores': False
+                },
+                artifact_uuid=self.artifact_uuid,
+                blob_uuid=self.blob_uuid,
+                thin=False
+            )
+        ]
+
     def test_model(self):
         u1 = str(uuid4())
         u2 = str(uuid4())
         u3 = str(uuid4())
-        u4 = str(uuid4())
-        u5 = str(uuid4())
 
         d = model(
             uuid=u1,
             node_uuid=u2,
             instance_uuid=u3,
-            disk={
-                'type': 'qcow2',
-                'device': 'vda',
-                'path': DISK_PATH,
-                'snapshot_ignores': False
-            },
-            artifact_uuid=u4,
-            blob_uuid=u5,
-            thin=False,
+            snapshots=self.snapshots,
             priority=PRIORITY.user_waiting,
             request_id=None,
             tasks=[
@@ -63,15 +70,19 @@ class NodeInstSnapOpTestCase(base.ShakenFistTestCase):
         self.assertEqual(u1, serialized['uuid'])
         self.assertEqual(u2, serialized['node_uuid'])
         self.assertEqual(u3, serialized['instance_uuid'])
-        self.assertEqual({
-            'type': 'qcow2',
-            'device': 'vda',
-            'path': DISK_PATH,
-            'snapshot_ignores': False
-        }, serialized['disk'])
-        self.assertEqual(u4, serialized['artifact_uuid'])
-        self.assertEqual(u5, serialized['blob_uuid'])
-        self.assertEqual(False, serialized['thin'])
+        self.assertEqual([
+            {
+                'disk': {
+                    'type': 'qcow2',
+                    'device': 'vda',
+                    'path': DISK_PATH,
+                    'snapshot_ignores': False
+                },
+                'artifact_uuid': self.artifact_uuid,
+                'blob_uuid': self.blob_uuid,
+                'thin': False
+            }
+        ], serialized['snapshots'])
         self.assertEqual('user_waiting', serialized['priority'])
         self.assertEqual(None, serialized['request_id'])
         self.assertEqual(['instance_snapshot'], serialized['tasks'])
@@ -83,9 +94,6 @@ class NodeInstSnapOpTestCase(base.ShakenFistTestCase):
         u1 = str(uuid4())
         u2 = str(uuid4())
         u3 = str(uuid4())
-        u4 = str(uuid4())
-        u4 = str(uuid4())
-        u5 = str(uuid4())
 
         self.assertRaises(
             ValidationError,
@@ -93,14 +101,7 @@ class NodeInstSnapOpTestCase(base.ShakenFistTestCase):
             uuid=u1,
             node_uuid=u2,
             instance_uuid=u3,
-            disk={
-                'type': 'qcow2',
-                'device': 'vda',
-                'path': DISK_PATH,
-                'snapshot_ignores': False
-            },
-            artifact_uuid=u4,
-            blob_uuid=u5,
+            snapshots=self.snapshots,
             priority=PRIORITY.user_waiting,
             request_id=None,
             tasks=[model_tasks.instance_snapshot],
@@ -117,21 +118,11 @@ class NodeInstSnapOpTestCase(base.ShakenFistTestCase):
     def test_create_and_enqueue(self, _mock_time, _mock_id):
         node_uuid = 'sf-1'
         instance_uuid = '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7'
-        artifact_uuid = '4c8ad117-8c78-4df0-8471-3dc1f1af6f2e'
-        blob_uuid = 'a7a25f51-99fe-4a7e-be64-16d230609d51'
 
         op_type, op_uuid = create_and_enqueue(
             node_uuid,
             instance_uuid,
-            {
-                'type': 'qcow2',
-                'device': 'vda',
-                'path': DISK_PATH,
-                'snapshot_ignores': False
-            },
-            artifact_uuid,
-            blob_uuid,
-            False,
+            self.snapshots,
             [model_tasks.instance_snapshot],
             PRIORITY.user_waiting
         )
@@ -140,15 +131,19 @@ class NodeInstSnapOpTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             {
                 'instance_uuid': '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7',
-                'disk': {
-                    'type': 'qcow2',
-                    'device': 'vda',
-                    'path': DISK_PATH,
-                    'snapshot_ignores': False
-                },
-                'artifact_uuid': '4c8ad117-8c78-4df0-8471-3dc1f1af6f2e',
-                'blob_uuid': 'a7a25f51-99fe-4a7e-be64-16d230609d51',
-                'thin': False,
+                'snapshots': [
+                    {
+                        'disk': {
+                            'type': 'qcow2',
+                            'device': 'vda',
+                            'path': DISK_PATH,
+                            'snapshot_ignores': False
+                        },
+                        'artifact_uuid': self.artifact_uuid,
+                        'blob_uuid': self.blob_uuid,
+                        'thin': False
+                    }
+                ],
                 'depends_on': None,
                 'runs_after': None,
                 'node_uuid': 'sf-1',
@@ -184,21 +179,23 @@ class NodeInstSnapOpTestCase(base.ShakenFistTestCase):
     def test_load_from_etcd(self):
         node_uuid = 'sf-1'
         instance_uuid = '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7'
-        artifact_uuid = '4c8ad117-8c78-4df0-8471-3dc1f1af6f2e'
-        blob_uuid = 'a7a25f51-99fe-4a7e-be64-16d230609d51'
 
         _, op_uuid = create_and_enqueue(
             node_uuid,
             instance_uuid,
-            {
-                'type': 'qcow2',
-                'device': 'vda',
-                'path': DISK_PATH,
-                'snapshot_ignores': False
-            },
-            artifact_uuid,
-            blob_uuid,
-            False,
+            [
+                {
+                    'disk': {
+                        'type': 'qcow2',
+                        'device': 'vda',
+                        'path': DISK_PATH,
+                        'snapshot_ignores': False
+                    },
+                    'artifact_uuid': self.artifact_uuid,
+                    'blob_uuid': self.blob_uuid,
+                    'thin': False
+                }
+            ],
             [model_tasks.instance_snapshot],
             PRIORITY.user_facing
         )

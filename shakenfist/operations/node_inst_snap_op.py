@@ -66,10 +66,7 @@ class NodeInstSnapOp(BaseClusterOperation):
 
         self.__node_uuid = static_values['node_uuid']
         self.__instance_uuid = static_values['instance_uuid']
-        self.__disk = static_values['disk']
-        self.__artifact_uuid = static_values['artifact_uuid']
-        self.__blob_uuid = static_values['blob_uuid']
-        self.__thin = static_values['thin']
+        self.__snapshots = static_values['snapshots']
 
         # Convert tasks names back into enum entries
         self.__tasks = []
@@ -87,12 +84,12 @@ class NodeInstSnapOp(BaseClusterOperation):
             'operation_uuid': self.uuid,
             'node_uuid': self.node_uuid,
             'instance_uuid': self.instance_uuid,
-            'disk': self.disk,
-            'artifact_uuid': self.artifact_uuid,
-            'blob_uuid': self.blob_uuid,
-            'thin': self.thin,
+            'snapshots': self.snapshots,
             'tasks': self.tasks
         })
+
+        self.accumulated_artifacts = []
+        self.accumulated_blobs = []
 
     # Static values
     @property
@@ -104,20 +101,8 @@ class NodeInstSnapOp(BaseClusterOperation):
         return self.__instance_uuid
 
     @property
-    def disk(self):
-        return self.__disk
-
-    @property
-    def artifact_uuid(self):
-        return self.__artifact_uuid
-
-    @property
-    def blob_uuid(self):
-        return self.__blob_uuid
-
-    @property
-    def thin(self):
-        return self.__thin
+    def snapshots(self):
+        return self.__snapshots
 
     @property
     def tasks(self):
@@ -134,19 +119,8 @@ class NodeInstSnapOp(BaseClusterOperation):
             self.log.warning(f'Instance {self.instance_uuid} missing')
             raise NoSuchInstance(self)
 
-        a = Artifact.from_db(self.artifact_uuid)
-        if not a:
-            self.log.warning(f'Artifact {self.network_uuid} missing')
-            raise NoSuchArtifact(self)
-        if a.state.value == Artifact.STATE_DELETED:
-            self.log.warning(f'Artifact {self.network_uuid} is deleted')
-            raise NoSuchArtifact(self)
-
-        # The blob UUID has been allocated, but the blob object has not yet
-        # been created.
-
         try:
-            self.__getattribute__(f'_{task.name}')(inst, a)
+            self.__getattribute__(f'_{task.name}')(inst)
         except AbortSnapshot:
             self.state = NodeInstSnapOp.STATE_ABORT
             self.add_event(EVENT_TYPE_AUDIT, 'Snapshot aborted')
@@ -158,30 +132,46 @@ class NodeInstSnapOp(BaseClusterOperation):
             util_general.ignore_exception('node_inst_snap_op', e)
             self.state = NodeInstSnapOp.STATE_ERROR
             inst.state = Instance.STATE_ERROR
-            a.state = Artifact.STATE_ERROR
-
-    def _instance_snapshot(self, inst, a):
-        b = snapshot_disk(self.disk, self.blob_uuid, thin=self.thin)
-
-        if a.state.value == Artifact.STATE_DELETED:
-            # The artifact was deleted while we were creating the blob, just
-            # delete the blob too.
-            b.state = Blob.STATE_DELETED
-            return
-
-        if inst.state.value == Instance.STATE_DELETED:
-            # If the instance we were snapshotting has been deleted by the time
-            # we finish the snapshot, then just delete the blob.
-            b.state = Blob.STATE_DELETED
-            return
-
-        try:
-            a.add_index(b.uuid)
-            a.state = Artifact.STATE_CREATED
-        except BlobDeleted:
-            if a.state.value != Artifact.STATE_DELETED:
+            for a in self.accumulated_artifacts:
                 a.state = Artifact.STATE_ERROR
-            raise AbortSnapshot()
-        except InvalidStateException:
-            b.ref_count_dec(a)
-            raise AbortSnapshot()
+            for b in self.accumulated_blobs:
+                b.state = Blob.STATE_ERROR
+
+    def _instance_snapshot(self, inst):
+        for s in self.snapshots:
+            a = Artifact.from_db(s['artifact_uuid'])
+            if not a:
+                self.log.warning(f'Artifact {s["artifact_uuid"]} missing')
+                raise NoSuchArtifact(self)
+            if a.state.value == Artifact.STATE_DELETED:
+                self.log.warning(f'Artifact {s["artifact_uuid"]} is deleted')
+                raise NoSuchArtifact(self)
+            self.accumulated_artifacts.append(a)
+
+            # The blob UUID has been allocated, but the blob object has not yet
+            # been created.
+            b = snapshot_disk(s['disk'], s['blob_uuid'], thin=s['thin'])
+            self.accumulated_blobs.append(b)
+
+            if a.state.value == Artifact.STATE_DELETED:
+                # The artifact was deleted while we were creating the blob, just
+                # delete the blob too.
+                b.state = Blob.STATE_DELETED
+                return
+
+            if inst.state.value == Instance.STATE_DELETED:
+                # If the instance we were snapshotting has been deleted by the time
+                # we finish the snapshot, then just delete the blob.
+                b.state = Blob.STATE_DELETED
+                return
+
+            try:
+                a.add_index(b.uuid)
+                a.state = Artifact.STATE_CREATED
+            except BlobDeleted:
+                if a.state.value != Artifact.STATE_DELETED:
+                    a.state = Artifact.STATE_ERROR
+                raise AbortSnapshot()
+            except InvalidStateException:
+                b.ref_count_dec(a)
+                raise AbortSnapshot()
