@@ -66,7 +66,7 @@ class CLUSTER_OPERATIONS(Enum):
     # ... interface_defloat
 
 
-class Dependency(BaseModel):
+class dependency(BaseModel):
     op_type: CLUSTER_OPERATIONS
     op_uuid: UUID4
 
@@ -81,7 +81,7 @@ def _convert_deps(deps):
         for op in deps:
             if op:
                 converted.append(
-                    Dependency(
+                    dependency(
                         op_type=CLUSTER_OPERATIONS[op['op_type']],
                         op_uuid=op['op_uuid']
                     )

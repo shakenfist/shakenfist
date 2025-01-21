@@ -10,7 +10,7 @@ from shakenfist.etcd_schema.operations.artifact_fetch_op import model_tasks
 from shakenfist.etcd_schema.operations.baseclusteroperation \
     import CLUSTER_OPERATIONS
 from shakenfist.etcd_schema.operations.baseclusteroperation \
-    import Dependency
+    import dependency
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.artifact_fetch_op import ArtifactFetchOp
 from shakenfist.operations.clusteroperationmapping \
@@ -40,13 +40,13 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
             request_id=None,
             tasks=[model_tasks.image_fetch],
             depends_on=[
-                Dependency(
+                dependency(
                     op_type=CLUSTER_OPERATIONS.node_blob_op,
                     op_uuid=u2
                 )
             ],
             runs_after=[
-                Dependency(
+                dependency(
                     op_type=CLUSTER_OPERATIONS.node_blob_op,
                     op_uuid=u3
                 )
@@ -98,13 +98,13 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
             request_id=None,
             tasks=[model_tasks.image_fetch],
             depends_on=[
-                Dependency(
+                dependency(
                     op_type=CLUSTER_OPERATIONS.node_blob_op,
                     op_uuid=u2
                 )
             ],
             runs_after=[
-                Dependency(
+                dependency(
                     op_type=CLUSTER_OPERATIONS.node_blob_op,
                     op_uuid=u3
                 )

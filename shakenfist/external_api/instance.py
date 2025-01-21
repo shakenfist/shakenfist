@@ -18,7 +18,7 @@ from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
-from shakenfist.etcd_schema.operations.baseclusteroperation import Dependency
+from shakenfist.etcd_schema.operations.baseclusteroperation import dependency
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.etcd_schema.operations.artifact_fetch_op \
     import create_and_enqueue as afo_create_and_enqueue

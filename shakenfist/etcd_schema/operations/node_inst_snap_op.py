@@ -15,7 +15,7 @@ from shakenfist.etcd_schema.operations.baseclusteroperation \
 from shakenfist.etcd_schema.operations.baseclusteroperation \
     import _convert_deps
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
-from shakenfist.etcd_schema.operations.baseclusteroperation import Dependency
+from shakenfist.etcd_schema.operations.baseclusteroperation import dependency
 from shakenfist.etcd_schema.operations.util import base_mutations
 from shakenfist.etcd_schema.operations.util import enqueue
 
@@ -44,8 +44,8 @@ class model(BaseModel):
     priority: PRIORITY
     request_id: Optional[str]
     tasks: List[model_tasks]
-    depends_on: Optional[List[Dependency]]
-    runs_after: Optional[List[Dependency]]
+    depends_on: Optional[List[dependency]]
+    runs_after: Optional[List[dependency]]
     version: int = Field(ge=initial_version, le=current_version)
 
     @field_serializer('priority')
