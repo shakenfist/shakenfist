@@ -368,7 +368,7 @@ def clear_stale_locks():
 
     for data, metadata in client.get_prefix(
             LOCK_PREFIX + '/', sort_order='ascend', sort_target='key'):
-        lockname = str(metadata['key']).replace(LOCK_PREFIX + '/', '')
+        lockname = metadata['key'].decode().replace(LOCK_PREFIX + '/', '')
         holder = json.loads(data)
         node = holder['node']
         pid = int(holder['pid'])
@@ -471,14 +471,32 @@ def delete_prefix(path):
 
 @retry_etcd_forever
 def enqueue(queuename, workitem, delay=0):
-    entry_time = time.time() + delay
-    jobname = f'{entry_time}-{util_random.random_id()}'
-    put('queue', queuename, jobname, workitem)
+    # This might retry if we clash with another enqueue at literally (to the
+    # millisecond) the same time. It should be unlikely?
+    attempts = 0
+
+    while attempts < 3:
+        entry_time = time.time() + delay
+        jobname = f'{entry_time}-{util_random.random_id()}'
+        if create_raw(f'/sf/queue/{queuename}/{jobname}', workitem):
+            LOG.with_fields({
+                'jobname': jobname,
+                'queuename': queuename,
+                'workitem': workitem,
+                'attempt': attempts
+            }).info('Enqueued workitem')
+            return
+
+        attempts += 1
+
     LOG.with_fields({
         'jobname': jobname,
         'queuename': queuename,
         'workitem': workitem,
-        }).info('Enqueued workitem')
+        'attempt': attempts
+    }).error('Repeated attempts to enqueue workitem failed')
+    raise exceptions.CannotEnqueueWork(
+        'Repeated attempts to enqueue workitem failed')
 
 
 @retry_etcd_forever
@@ -488,22 +506,44 @@ def dequeue(queuename):
 
     for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
                                             sort_target='key', limit=1):
-        jobname = str(metadata['key']).split('/')[-1].rstrip("'")
+        path = metadata['key'].decode()
+        data = data.decode()
+        jobname = path.split('/')[-1]
+        workitem = json.loads(data)
 
         # Ensure that this task isn't in the future
         if float(jobname.split('-')[0]) > time.time():
             return None
 
-        workitem = json.loads(data)
-        put('processing', queuename, jobname, workitem)
-        client.delete(metadata['key'])
-        LOG.with_fields({
-            'jobname': jobname,
-            'queuename': queuename,
-            'workitem': workitem,
+        # Attempt to claim the job in a transaction
+        new_path = path.replace('queue', 'processing')
+        success = replace_many_raw([
+            {
+                'path': path,
+                'original_data': data,
+                'new_data': None
+            },
+            {
+                'path': new_path,
+                'original_data': None,
+                'new_data': data
+            },
+        ])
+        if success:
+            LOG.with_fields({
+                'jobname': jobname,
+                'queuename': queuename,
+                'workitem': workitem,
             }).info('Moved workitem from queue to processing')
-
-        return jobname, workitem
+            return jobname, workitem
+        else:
+            LOG.with_fields({
+                'jobname': jobname,
+                'queuename': queuename,
+                'workitem': workitem,
+            }).debug(
+                'Failed to move workitem from queue to processing. '
+                'Possibly racing another worker?')
 
     return None
 
@@ -704,6 +744,8 @@ def transactional_delete_raw(path, original_data):
     }])[0]
 
 
+# NOTE(mikal): note that mutations are expected to use strings in their
+# descriptions, not bytes.
 @_retry_etcd_native_client
 def replace_many_raw(mutations):
     original_values_by_path = {}

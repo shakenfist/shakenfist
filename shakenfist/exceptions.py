@@ -99,6 +99,10 @@ class PrefixNotInCache(DatabaseException):
     ...
 
 
+class CannotEnqueueWork(DatabaseException):
+    ...
+
+
 # Virt
 class VirtException(Exception):
     ...
