@@ -414,12 +414,6 @@ def replace(objecttype, subtype, name, original_data, new_data):
     }])[0]
 
 
-@retry_etcd_forever
-def delete_raw(path):
-    LOG.info('etcd delete %s' % path)
-    return get_etcd_client().delete(path)
-
-
 def delete(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
     return delete_raw(path)
@@ -714,6 +708,24 @@ def put_raw(path, new_data):
         )
     except grpc.RpcError as rpc_error:
         _log_and_raise_error(rpc_error)
+
+
+@_retry_etcd_native_client
+def delete_raw(path):
+    path_encoded = path.encode()
+    channel = get_etcd_native_client()
+    stub = etcd_pb2_grpc.KVStub(channel)
+
+    try:
+        resp = stub.DeleteRange(
+            etcd_pb2.DeleteRangeRequest(
+                key=path_encoded
+            )
+        )
+    except grpc.RpcError as rpc_error:
+        _log_and_raise_error(rpc_error)
+
+    return resp.deleted == 1
 
 
 def create_raw(path, new_data):

@@ -79,11 +79,11 @@ class MockEtcd():
         self.etcd_put_raw.start()
         self.test_obj.addCleanup(self.etcd_put_raw.stop)
 
-        self.etcd_delete = mock.patch(
-            'shakenfist.etcd.WrappedEtcdClient.delete',
-            side_effect=self.delete)
-        self.etcd_delete.start()
-        self.test_obj.addCleanup(self.etcd_delete.stop)
+        self.etcd_delete_raw = mock.patch(
+            'shakenfist.etcd.delete_raw',
+            side_effect=self.delete_raw)
+        self.etcd_delete_raw.start()
+        self.test_obj.addCleanup(self.etcd_delete_raw.stop)
 
         self.etcd_delete_prefix = mock.patch(
             'shakenfist.etcd.WrappedEtcdClient.delete_prefix',
@@ -134,7 +134,7 @@ class MockEtcd():
                 return ret
         return ret
 
-    def delete(self, path):
+    def delete_raw(self, path):
         if path in self.db:
             del self.db[path]
             self._trace('MockEtcd.delete() %s' % path)

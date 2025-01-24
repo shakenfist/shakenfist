@@ -44,6 +44,11 @@ class KVStub(object):
                 request_serializer=etcd__pb2.PutRequest.SerializeToString,
                 response_deserializer=etcd__pb2.PutResponse.FromString,
                 _registered_method=True)
+        self.DeleteRange = channel.unary_unary(
+                '/etcdserverpb.KV/DeleteRange',
+                request_serializer=etcd__pb2.DeleteRangeRequest.SerializeToString,
+                response_deserializer=etcd__pb2.DeleteRangeResponse.FromString,
+                _registered_method=True)
         self.Txn = channel.unary_unary(
                 '/etcdserverpb.KV/Txn',
                 request_serializer=etcd__pb2.TxnRequest.SerializeToString,
@@ -70,6 +75,15 @@ class KVServicer(object):
         """Put puts the given key into the key-value store.
         A put request increments the revision of the key-value store
         and generates one event in the event history.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteRange(self, request, context):
+        """DeleteRange deletes the given range from the key-value store.
+        A delete request increments the revision of the key-value store
+        and generates a delete event in the event history for every deleted key.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -106,6 +120,11 @@ def add_KVServicer_to_server(servicer, server):
                     servicer.Put,
                     request_deserializer=etcd__pb2.PutRequest.FromString,
                     response_serializer=etcd__pb2.PutResponse.SerializeToString,
+            ),
+            'DeleteRange': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteRange,
+                    request_deserializer=etcd__pb2.DeleteRangeRequest.FromString,
+                    response_serializer=etcd__pb2.DeleteRangeResponse.SerializeToString,
             ),
             'Txn': grpc.unary_unary_rpc_method_handler(
                     servicer.Txn,
@@ -172,6 +191,33 @@ class KV(object):
             '/etcdserverpb.KV/Put',
             etcd__pb2.PutRequest.SerializeToString,
             etcd__pb2.PutResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteRange(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/etcdserverpb.KV/DeleteRange',
+            etcd__pb2.DeleteRangeRequest.SerializeToString,
+            etcd__pb2.DeleteRangeResponse.FromString,
             options,
             channel_credentials,
             insecure,
