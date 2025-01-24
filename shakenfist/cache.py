@@ -22,7 +22,7 @@ def refresh_object_state_caches():
             if state:
                 by_state[state] = {}
 
-        for key, _ in etcd.get_prefix(f'/sf/{object_type}'):
+        for key, _ in etcd.get_prefix_raw(f'/sf/{object_type}'):
             obj_uuid = key.split('/')[-1]
             obj = constants.get_object_class(object_type).from_db(
                 obj_uuid)
@@ -41,7 +41,7 @@ def refresh_object_state_caches():
         # size here, so we do a transaction per object type per state. We don't
         # hold a lock because the readers never take it so what's the point?
         previous_states = []
-        for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}'):
+        for key, _ in etcd.get_prefix_raw(f'/sf/cache/{object_type}'):
             state = key.split('/')[-1]
             if state not in previous_states:
                 previous_states.append(state)
@@ -75,7 +75,7 @@ def refresh_object_state_caches():
 #     /sf/cache/...object_type.../...state.../...uuid...
 def read_object_state_cache(object_type, state):
     out = []
-    for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}/{state}'):
+    for key, _ in etcd.get_prefix_raw(f'/sf/cache/{object_type}/{state}'):
         out.append(key.split('/')[-1])
     return out
 
@@ -86,7 +86,7 @@ def read_object_state_cache_many(object_type, states):
     # a lock to receive a consistent view of the cache, so long as everything
     # can be fetched in a single etcd API request.
     out = []
-    for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}'):
+    for key, _ in etcd.get_prefix_raw(f'/sf/cache/{object_type}'):
         state = key.split('/')[-2]
         if state and state in states:
             out.append(key.split('/')[-1])
@@ -96,12 +96,13 @@ def read_object_state_cache_many(object_type, states):
 def read_object_state_cache_all(object_type):
     # The same as above, but return all states not a filtered view.
     out = []
-    for key, _ in etcd.get_prefix(f'/sf/cache/{object_type}'):
+    for key, _ in etcd.get_prefix_raw(f'/sf/cache/{object_type}'):
         out.append(key.split('/')[-1])
     return out
 
 
-def _update_object_state_cache_attempt(object_type, object_uuid, old_state, new_state):
+def _update_object_state_cache_attempt(
+        object_type, object_uuid, old_state, new_state):
     mutations = []
 
     # And then the actual per-state cache

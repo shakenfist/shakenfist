@@ -6,8 +6,6 @@ import time
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
-from etcd3gw.utils import _encode
-from etcd3gw.utils import _increment_last_byte
 from google.rpc import error_details_pb2
 import grpc
 from grpc_status import rpc_status
@@ -52,23 +50,6 @@ class WrappedEtcdClient(Etcd3Client):
             host=host, port=port, protocol=protocol, ca_cert=ca_cert,
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
             api_path=api_path)
-
-    # Replace the upstream implementation with one which allows for limits on range
-    # queries instead of just erroring out for big result sets.
-    def get_prefix(self, key_prefix, sort_order=None, sort_target=None, limit=0):
-        """Get a range of keys with a prefix.
-
-        :param sort_order: 'ascend' or 'descend' or None
-        :param key_prefix: first key in range
-
-        :returns: sequence of (value, metadata) tuples
-        """
-        return self.get(key_prefix,
-                        metadata=True,
-                        range_end=_encode(_increment_last_byte(key_prefix)),
-                        sort_order=sort_order,
-                        sort_target=sort_target,
-                        limit=limit)
 
     # Wrap post() to retry on errors. These errors are caused by our long lived
     # connections sometimes being dropped.
@@ -364,17 +345,13 @@ def clear_stale_locks():
     # Remove all locks held by former processes on this node. This is required
     # after an unclean restart, otherwise we need to wait for these locks to
     # timeout and that can take a long time.
-    client = get_etcd_client()
-
-    for data, metadata in client.get_prefix(
-            LOCK_PREFIX + '/', sort_order='ascend', sort_target='key'):
-        lockname = metadata['key'].decode().replace(LOCK_PREFIX + '/', '')
-        holder = json.loads(data)
+    for key, holder in get_prefix_raw(LOCK_PREFIX + '/'):
+        lockname = key.replace(LOCK_PREFIX + '/', '')
         node = holder['node']
         pid = int(holder['pid'])
 
         if node == config.NODE_NAME and not psutil.pid_exists(pid):
-            client.delete(metadata['key'])
+            delete_raw(key)
             LOG.with_fields({'lock': lockname,
                              'old-pid': pid,
                              'old-node': node,
@@ -384,8 +361,8 @@ def clear_stale_locks():
 @retry_etcd_forever
 def get_existing_locks():
     key_val = {}
-    for value in get_etcd_client().get_prefix(LOCK_PREFIX + '/'):
-        key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
+    for key, holder in get_prefix_raw(LOCK_PREFIX + '/'):
+        key_val[key] = holder
     return key_val
 
 
@@ -414,26 +391,17 @@ def get(objecttype, subtype, name):
     return get_raw(path)
 
 
-@retry_etcd_forever
-def get_prefix(path, sort_order=None, sort_target='key', limit=0):
-    for data, metadata in get_etcd_client().get_prefix(
-            path, sort_order=sort_order, sort_target='key', limit=limit):
-        yield str(metadata['key'].decode('utf-8')), json.loads(data)
-
-
-def get_all(objecttype, subtype, prefix=None, sort_order=None, limit=0):
+def get_all(objecttype, subtype, prefix=None, limit=0):
     path = _construct_key(objecttype, subtype, prefix)
-    return get_prefix(path, sort_order=sort_order, sort_target='key', limit=limit)
+    return get_prefix_raw(path, limit=limit)
 
 
-@retry_etcd_forever
-def get_all_dict(objecttype, subtype=None, sort_order=None, limit=0):
+def get_all_dict(objecttype, subtype=None, limit=0):
     path = _construct_key(objecttype, subtype, None)
     key_val = {}
 
-    for value in get_etcd_client().get_prefix(
-            path, sort_order=sort_order, sort_target='key', limit=limit):
-        key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
+    for key, value in get_prefix_raw(path, limit=limit):
+        key_val[key] = value
 
     return key_val
 
@@ -499,17 +467,10 @@ def enqueue(queuename, workitem, delay=0):
         'Repeated attempts to enqueue workitem failed')
 
 
-@retry_etcd_forever
 def dequeue(queuename):
     queue_path = _construct_key('queue', queuename, None)
-    client = get_etcd_client()
-
-    for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
-                                            sort_target='key', limit=1):
-        path = metadata['key'].decode()
-        data = data.decode()
+    for path, workitem in get_prefix_raw(queue_path, limit=1):
         jobname = path.split('/')[-1]
-        workitem = json.loads(data)
 
         # Ensure that this task isn't in the future
         if float(jobname.split('-')[0]) > time.time():
@@ -520,13 +481,13 @@ def dequeue(queuename):
         success = replace_many_raw([
             {
                 'path': path,
-                'original_data': data,
+                'original_data': workitem,
                 'new_data': None
             },
             {
                 'path': new_path,
                 'original_data': None,
-                'new_data': data
+                'new_data': workitem
             },
         ])
         if success:
@@ -569,14 +530,11 @@ def get_queue_length(queuename):
     return processing, queued, deferred
 
 
-@retry_etcd_forever
 def restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
 
-    for data, metadata in get_etcd_client().get_prefix(
-            queue_path, sort_order='ascend'):
-        jobname = str(metadata['key']).split('/')[-1].rstrip("'")
-        workitem = json.loads(data)
+    for path, workitem in get_prefix_raw(queue_path):
+        jobname = path.split('/')[-1]
         put('queue', queuename, jobname, workitem)
         delete('processing', queuename, jobname)
         LOG.with_fields({
@@ -695,6 +653,44 @@ def get_raw(path):
     if len(resp.kvs) > 0:
         kvs = resp.kvs[0]
         return json.loads(kvs.value.decode())
+    return None
+
+
+@_retry_etcd_native_client
+def get_prefix_raw(path, limit=0):
+    path_encoded = path.encode()
+
+    # From the etcd API docs: "If range_end is key plus one (e.g.,
+    # "aa"+1 == "ab", "a\xff"+1 == "b"), then the range represents all keys
+    # prefixed with key."
+    #
+    #     https://etcd.io/docs/v3.3/learning/api/#key-ranges
+    #
+    # Note that this implementation assumes our keys are basically ASCII, that
+    # is that we will never have a last byte of 0xFF (because we'd have to
+    # carry if we did).
+    range_end = bytearray(path_encoded)
+    range_end[-1] = range_end[-1] + 1
+    range_end = bytes(range_end)
+
+    channel = get_etcd_native_client()
+    stub = etcd_pb2_grpc.KVStub(channel)
+
+    try:
+        resp = stub.Range(
+            etcd_pb2.RangeRequest(
+                key=path_encoded,
+                range_end=range_end,
+                limit=limit,
+                sort_order=etcd_pb2.RangeRequest.ASCEND,
+                sort_target=etcd_pb2.RangeRequest.KEY
+            )
+        )
+    except grpc.RpcError as rpc_error:
+        _log_and_raise_error(rpc_error)
+
+    for kvs in resp.kvs:
+        yield kvs.key.decode(), json.loads(kvs.value.decode())
     return None
 
 

@@ -67,11 +67,11 @@ class MockEtcd():
         self.etcd_get_raw.start()
         self.test_obj.addCleanup(self.etcd_get_raw.stop)
 
-        self.etcd_get_prefix = mock.patch(
-            'shakenfist.etcd.WrappedEtcdClient.get_prefix',
-            side_effect=self.get_prefix)
-        self.etcd_get_prefix.start()
-        self.test_obj.addCleanup(self.etcd_get_prefix.stop)
+        self.etcd_get_prefix_raw = mock.patch(
+            'shakenfist.etcd.get_prefix_raw',
+            side_effect=self.get_prefix_raw)
+        self.etcd_get_prefix_raw.start()
+        self.test_obj.addCleanup(self.etcd_get_prefix_raw.stop)
 
         self.etcd_put_raw = mock.patch(
             'shakenfist.etcd.put_raw',
@@ -121,12 +121,17 @@ class MockEtcd():
     # DB operations - Low level
     #
 
-    def get_prefix(self, path, sort_order=None, sort_target=None, limit=0):
+    def get_prefix_raw(self, path, limit=0):
         ret = []
         for k in sorted(self.db):
             if k.startswith(path):
-                ret.append((self.db[k].decode(), {'key': k.encode('utf-8')}))
-                self._trace('MockEtcd.delete_prefix() %s' % k)
+                d = json.loads(self.db[k].decode())
+                ret.append((k, d))
+                self._trace(
+                    f'MockEtcd.get_prefix_raw({path}) included key {k}: {d}')
+
+            if limit > 0 and len(ret) == limit:
+                return ret
         return ret
 
     def delete(self, path):
