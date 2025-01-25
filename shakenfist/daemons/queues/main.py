@@ -1,11 +1,9 @@
+import os
 import time
 
-import os
 import psutil
-import pyprctl
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
-import sys
 
 from shakenfist import etcd
 from shakenfist.config import config
@@ -13,6 +11,7 @@ from shakenfist.daemons import daemon
 from shakenfist.daemons.queues import startup_tasks
 from shakenfist.daemons.queues import workitem
 from shakenfist.node import Node
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 
 
@@ -24,12 +23,12 @@ def _check_other_daemon(n, daemon_name, override_daemon_name=None):
     if override_daemon_name:
         recorded_daemon_name = override_daemon_name
 
-    if not os.path.exists(f'/run/sf-{daemon_name}.pid'):
+    if not os.path.exists(f'/run/sf/{daemon_name}.pid'):
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='pid file missing')
 
     try:
-        with open(f'/run/sf-{daemon_name}.pid') as f:
+        with open(f'/run/sf/{daemon_name}.pid') as f:
             pid = int(f.read())
             psutil.Process(pid)
             n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_RUNNING)
@@ -57,13 +56,14 @@ def _health_checks():
 
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
+        daemon.health_check_privexec()
+
         warned_locks = {}
-        last_length = 0
         last_third_party_health_check = 0
 
         n = Node.from_db(config.NODE_NAME)
 
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             try:
                 self.reap_workers()
 
@@ -98,17 +98,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                             'Lock held by missing process on this node for more '
                             'than 30 seconds')
 
-                if time.time() - last_length > 10:
-                    processing, queued, deferred = etcd.get_queue_length(
-                        config.NODE_NAME)
-                    LOG.with_fields({
-                        'processing': processing,
-                        'queued': queued,
-                        'deferred': deferred
-                    }).debug('Queue length')
-                    last_length = time.time()
-
-                if not self.dequeue_job(config.NODE_NAME, workitem.Job):
+                if not self.dequeue_job(workitem.Job):
                     self.idle(0.2)
 
             except Exception as e:
@@ -124,7 +114,7 @@ def main():
     # ourselves here too.
     name = f'{daemon.process_name("queues")} startup'
     setproctitle.setproctitle(name)
-    pyprctl.set_name(name)
+    util_concurrency.set_thread_name(name)
     _health_checks()
 
     start_time = time.time()
@@ -137,4 +127,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

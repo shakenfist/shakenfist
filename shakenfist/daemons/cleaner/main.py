@@ -5,7 +5,6 @@ import pathlib
 import random
 import shutil
 import signal
-import sys
 import time
 
 
@@ -458,7 +457,7 @@ class Monitor(daemon.Daemon):
         last_libvirt_log_clean = 0
 
         n = node.Node.from_db(config.NODE_NAME)
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             if not self.cluster_stable():
                 if time.time() - last_defer_message > 10:
                     LOG.info('Cluster not yet stable, deferring maintenance')
@@ -511,4 +510,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

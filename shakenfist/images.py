@@ -10,7 +10,6 @@ import requests
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import blob
-from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.artifact import Artifact
 from shakenfist.artifact import BLOB_URL
@@ -20,8 +19,12 @@ from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import LOCK_REFRESH_SECONDS
 from shakenfist.constants import QCOW2_CLUSTER_SIZE
 from shakenfist.constants import TRANSCODE_DESCRIPTION
+from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.etcd_schema.operations.imgcache_op \
+    import create_and_enqueue as ic_create_and_enqueue
+from shakenfist.etcd_schema.operations.imgcache_op \
+    import model_tasks as ic_tasks
 from shakenfist.eventlog import add_event_multi
-from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import concurrency as util_concurrency
@@ -319,13 +322,14 @@ class ImageFetchHelper:
 
                 # We will cache this transcode, but we do it later as part of a
                 # task so the instance isn't waiting for it.
-                etcd.enqueue(
-                    f'{config.NODE_NAME}-background',
-                    {
-                        'tasks': [
-                            ArchiveTranscodeTask(
-                                b.uuid, cache_path, TRANSCODE_DESCRIPTION)]
-                    })
+                ic_create_and_enqueue(
+                    config.NODE_NAME,
+                    b.uuid,
+                    cache_path,
+                    TRANSCODE_DESCRIPTION,
+                    [ic_tasks.archive_transcode],
+                    PRIORITY.background_high_io,
+                    request_id=util_general.get_request_id())
 
         shutil.chown(cache_path, config.LIBVIRT_USER, config.LIBVIRT_GROUP)
         add_event_multi(

@@ -175,6 +175,11 @@ service KV {
     // and generates one event in the event history.
     rpc Put(PutRequest) returns (PutResponse) {}
 
+    // DeleteRange deletes the given range from the key-value store.
+    // A delete request increments the revision of the key-value store
+    // and generates a delete event in the event history for every deleted key.
+    rpc DeleteRange(DeleteRangeRequest) returns (DeleteRangeResponse) {}
+
     // Txn processes multiple requests in a single transaction.
     // A txn request increments the revision of the key-value store
     // and generates events with the same revision for every completed request.

@@ -1,3 +1,5 @@
+import importlib
+
 # Note the most exciting constants ever
 KiB = 1024
 MiB = 1024 * 1024
@@ -76,3 +78,69 @@ API_REQUESTS = 'api-requests'
 
 # Blob hashing algorithms
 BLOB_HASH_ALGORITHMS = ['sha1', 'sha256', 'sha512', 'xxh128']
+
+# Object names, noting that api-requests is a "meta" object.
+OBJECT_NAMES = [
+    'agentoperation',
+    'api-requests',
+    'artifact',
+    'artifact_fetch_op',
+    'blob',
+    'dhcp',
+    'imgcache_op',
+    'instance',
+    'ipam',
+    'namespace',
+    'net_iface_op',
+    'net_iface_ip_op',
+    'net_ip_op',
+    'net_macaddr_ip_op',
+    'net_op',
+    'network',
+    'networkinterface',
+    'node',
+    'node_blob_op',
+    'node_inst_net_iface_op',
+    'node_inst_op',
+    'node_inst_netdesc_op',
+    'upload'
+]
+
+OBJECT_NAMES_TO_CLASSES = {
+    'agentoperation': 'operations.agentoperation.AgentOperation',
+    'artifact': 'artifact.Artifact',
+    'artifact_fetch_op': 'operations.artifact_fetch_op.ArtifactFetchOp',
+    'blob': 'blob.Blob',
+    'dhcp': 'managed_executables.dnsmasq.DnsMasq',
+    'imgcache_op': 'operations.imgcache_op.ImageCacheOp',
+    'instance': 'instance.Instance',
+    'ipam': 'ipam.IPAM',
+    'namespace': 'namespace.Namespace',
+    'net_iface_op': 'operations.net_iface_op.NetIfaceOp',
+    'net_ip_op': 'operations.net_ip_op.NetIPOp',
+    'net_macaddr_ip_op': 'operations.net_macaddr_ip_op.NetMacaddrIPOp',
+    'net_op': 'operations.net_op.NetOp',
+    'network': 'network.Network',
+    'networkinterface': 'networkinterface.NetworkInterface',
+    'node': 'node.Node',
+    'node_blob_op': 'operations.node_blob_op.NodeBlobOp',
+    'node_inst_net_iface_op': 'operations.node_inst_net_iface_op.NodeInstNetIfaceOp',
+    'node_inst_op': 'operations.node_inst_op.NodeInstOp',
+    'node_inst_netdesc_op': 'operations.node_inst_netdesc_op.NodeInstNetdescOp',
+    'upload': 'upload.Upload'
+}
+
+
+class NoSuchObject(Exception):
+    ...
+
+
+def get_object_class(object_type):
+    cls = OBJECT_NAMES_TO_CLASSES.get(object_type)
+    if not cls:
+        raise NoSuchObject(object_type)
+
+    lib_name = '.'.join(cls.split('.')[:-1])
+    cls_name = cls.split('.')[-1]
+    lib = importlib.import_module(f'shakenfist.{lib_name}')
+    return getattr(lib, cls_name)

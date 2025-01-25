@@ -4,12 +4,10 @@
 # maintenance daemon per cluster.
 from collections import defaultdict
 from functools import partial
-import json
 import os
-import sys
 import time
 
-import pyprctl
+import schedule
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
@@ -22,18 +20,26 @@ from shakenfist import namespace
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_ITERATORS
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist.blob import placement_filter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import get_object_class
+from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
+from shakenfist.daemons.cluster import scheduled_tasks
 from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
+from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import get_all_node_queues
+from shakenfist.operations.clusteroperationmapping \
+    import OPERATION_NAMES_TO_CLASSES
 from shakenfist.upload import Uploads
+from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import general as util_general
+from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
@@ -49,7 +55,7 @@ class Monitor(daemon.Daemon):
         # Attempt to acquire the cluster maintenance lock forever. We never
         # release the lock, it gets cleared on a crash. This is so that only
         # one node at a time is performing cluster maintenance.
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             self.lock = etcd.get_lock('cluster', None, None, ttl=300, timeout=10,
                                       op='Cluster maintenance')
             result = self.lock.acquire()
@@ -80,8 +86,10 @@ class Monitor(daemon.Daemon):
             self.lock.refresh()
 
         # Cleanup soft deleted objects
-        for objtype in OBJECT_NAMES_TO_ITERATORS:
-            for obj in OBJECT_NAMES_TO_ITERATORS[objtype]([], prefilter='deleted'):
+        for objtype in OBJECT_NAMES_TO_CLASSES:
+            for obj_uuid in cache.read_object_state_cache(
+                    objtype, dbo.STATE_DELETED):
+                obj = get_object_class(objtype).from_db(obj_uuid)
                 if time.time() - obj.state.update_time > config.CLEANER_DELAY:
                     obj.hard_delete()
         self.lock.refresh()
@@ -92,8 +100,7 @@ class Monitor(daemon.Daemon):
             when = objdata.get('when')
             if not when:
                 objdata['when'] = time.time()
-                etcd.get_etcd_client().put(
-                    k, json.dumps(objdata, indent=4, sort_keys=True))
+                etcd.get_etcd_client().put(k, util_json.json_dump(objdata))
                 continue
 
             if time.time() - when < 300:
@@ -162,7 +169,7 @@ class Monitor(daemon.Daemon):
 
                 leaked = False
                 object_type, object_uuid = reservation['user']
-                obj = OBJECT_NAMES_TO_CLASSES[object_type].from_db(object_uuid)
+                obj = get_object_class(object_type).from_db(object_uuid)
                 if not obj:
                     leaked = True
                 else:
@@ -220,30 +227,12 @@ class Monitor(daemon.Daemon):
             minimum=0, maximum=(config.MINIMUM_FREE_DISK * 3),
             intention='blobs')
 
-        absent_nodes = []
-        for n in Nodes([], prefilter='inactive'):
-            LOG.with_fields({
-                'node': n.fqdn}).info('Node is absent for blob replication')
-            absent_nodes.append(n.fqdn)
-        LOG.info('Found %d inactive nodes' % len(absent_nodes))
-
         # We count fetches currently requested (or under way) as having completed
         # in order to stop over-replication for large blobs.
-        current_fetches = etcd.get_current_blob_transfers(
-            absent_nodes=absent_nodes)
-
         for b in Blobs([], prefilter='active'):
             instances = instance.instance_usage_for_blob_uuid(b.uuid)
             if instances:
                 in_use_blobs[b.uuid] += 1
-
-            # If there is current work for a blob, we ignore it until that
-            # work completes
-            if b.uuid in current_fetches:
-                LOG.with_fields({
-                    'blob': b.blob_uuid
-                }).info('Blob has current fetches, ignoring')
-                continue
 
             # If the blob's reference count has been zero for a while, we can
             # reap it
@@ -257,19 +246,7 @@ class Monitor(daemon.Daemon):
                     b.cascading_delete()
                     continue
 
-            locations = b.locations
-            ignored_locations = []
-            for n in absent_nodes:
-                if n in locations:
-                    locations.remove(n)
-                    ignored_locations.append(n)
-
-            if ignored_locations:
-                LOG.with_fields({
-                    'blob': b,
-                    'ignored_locations': ignored_locations
-                }).info('Ignored some blob locations as nodes are absent')
-
+            locations = b.locations + b.incomplete_healthy_locations
             delta = len(locations) - config.BLOB_REPLICATION_FACTOR
             if delta > 0:
                 # So... The blob replication factor is a target not a limit.
@@ -347,22 +324,12 @@ class Monitor(daemon.Daemon):
         # Replicate under replicated blobs, but only if we don't have heaps of
         # queued replications already
         for blob_uuid, excess in underreplicated:
-            LOG.with_fields({
-                'current': len(current_fetches),
-                'maximum': config.MAX_CONCURRENT_BLOB_TRANSFERS
-            }).info('Concurrent blob transfers')
-            if len(current_fetches) > config.MAX_CONCURRENT_BLOB_TRANSFERS:
-                LOG.info(
-                    'Too many concurrent blob transfers queued, not queueing more')
-                break
-
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 LOG.with_fields({
                     'blob': b
                 }).info('Blob under replicated, attempting to correct')
                 b.request_replication(allow_excess=excess)
-                current_fetches[blob_uuid].append('unknown')
         self.lock.refresh()
 
         # Find transcodes of not recently used blobs and reap them
@@ -433,18 +400,37 @@ class Monitor(daemon.Daemon):
                     b.request_replication()
 
                 # Clean up any lingering queue tasks
-                for queue_name in [n.uuid, f'{n.uuid}-background']:
+                for queue_name in get_all_node_queues(n.uuid):
                     while jobname_workitem := etcd.dequeue(queue_name):
-                        jobname, _ = jobname_workitem
-                        LOG.with_fields({
-                            'jobname': jobname,
-                            'node': n.uuid,
-                            'queue': queue_name
-                        }).info('Deleting work item for deleted node')
+                        jobname, workitem = jobname_workitem
+                        n.add_event(
+                            EVENT_TYPE_AUDIT,
+                            'deleting work item for deleted node',
+                            extra={
+                                'jobname': jobname,
+                                'queue': queue_name
+                            })
+
+                        # Cluster operations might have dependencies
+                        if queue_name.find('-clusteroperation-') != -1:
+                            op_type = workitem.get('operation_type')
+                            op_uuid = workitem.get('operation_uuid')
+                            op = OPERATION_NAMES_TO_CLASSES[op_type].from_db(
+                                op_uuid)
+                            op.state = BaseClusterOperation.STATE_ABORT
+                            eventlog.add_event_multi(
+                                EVENT_TYPE_AUDIT,
+                                [n, op],
+                                'aborted operation for deleted node',
+                                extra={
+                                    'jobname': jobname,
+                                    'queue': queue_name
+                                })
+
                         etcd.resolve(queue_name, jobname)
 
         # Remove old entries from the hard-deleted state caches
-        for object_type in OBJECT_NAMES_TO_ITERATORS:
+        for object_type in OBJECT_NAMES_TO_CLASSES:
             with etcd.get_lock('cache', None, object_type, op='Hard deleted prune'):
                 hd = etcd.get('cache', object_type, 'hard-deleted')
                 if hd:
@@ -456,37 +442,17 @@ class Monitor(daemon.Daemon):
         # And we're done
         LOG.info('Cluster maintenance loop complete')
 
-    def refresh_object_state_caches(self):
-        for object_type in OBJECT_NAMES_TO_ITERATORS:
-            with etcd.get_lock('cache', None, object_type, op='Cache refresh'):
-                by_state = {
-                    '_all_': {},
-                    'deleted': {}
-                }
-
-                for state in OBJECT_NAMES_TO_CLASSES[object_type].state_targets:
-                    if state:
-                        by_state[state] = {}
-
-                for obj in OBJECT_NAMES_TO_ITERATORS[object_type]([]):
-                    if obj.state.value:
-                        by_state[obj.state.value][obj.uuid] = time.time()
-                        by_state['_all_'][obj.uuid] = time.time()
-
-                for state in by_state:
-                    cache.clobber_object_state_cache(
-                        object_type, state, by_state[state])
-
     def _run_inner(self):
         last_defer_message = 0
-
-        self.refresh_object_state_caches()
-
         last_loop_run = 0
-        while not os.path.exists(self.abort_path):
-            pyprctl.set_name('idle')
+
+        while daemon.check_abort_path(self.abort_path):
+            util_concurrency.set_thread_name('idle')
             LOG.debug('This cluster thread is now idle and awaiting election')
             self._await_election()
+
+            util_concurrency.set_thread_name('active')
+            LOG.debug('This cluster thread is now active')
 
             if not self.cluster_stable():
                 if time.time() - last_defer_message > 10:
@@ -494,15 +460,34 @@ class Monitor(daemon.Daemon):
                     last_defer_message = time.time()
                 continue
 
+            # Setup a schedule of things to do
+            schedule.every(1).minutes.do(
+                scheduled_tasks.log_cluster_queue_lengths)
+            schedule.every(5).minutes.do(
+                scheduled_tasks.per_blob_checks)
+            schedule.every(5).minutes.do(
+                scheduled_tasks.per_instance_checks_and_usage)
+
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):
                 self.lock.refresh()
 
-                pyprctl.set_name('active')
-                LOG.debug('This cluster thread is now active')
+                try:
+                    with util_general.RecordedOperation(
+                            'scheduled cluster operations', None, threshold=10):
+                        schedule.run_pending()
+                except Exception as e:
+                    util_general.ignore_exception('cluster', e)
+
                 self.lock.refresh()
 
-                self._cluster_wide_cleanup(last_loop_run)
+                try:
+                    with util_general.RecordedOperation(
+                            'cluster wide cleanup', None, threshold=10):
+                        self._cluster_wide_cleanup(last_loop_run)
+                except Exception as e:
+                    util_general.ignore_exception('cluster', e)
+
                 last_loop_run = time.time()
                 self.lock.refresh()
 
@@ -520,4 +505,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

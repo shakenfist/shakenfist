@@ -1,7 +1,6 @@
 import os
 import platform
 import re
-import sys
 import time
 
 import psutil
@@ -15,14 +14,17 @@ from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_RESOURCES
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
+from shakenfist.constants import get_object_class
+from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
+from shakenfist.operations.baseoperation import get_all_background_node_queues
+from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import network as util_network
@@ -45,6 +47,9 @@ class Monitor(daemon.Daemon):
 
     def _get_stats(self):
         n = Node.from_db(config.NODE_NAME)
+
+        old_metrics = etcd.get('metrics', config.NODE_NAME, {})
+        timestamp = time.time()
 
         with util_libvirt.LibvirtConnection() as lc:
             # What's special about this node?
@@ -135,18 +140,45 @@ class Monitor(daemon.Daemon):
                 'disk_used': used
             })
 
+            # NOTE(mikal): these are _counters_ -- that is, like gauges in
+            # prometheus the numbers continue to increase forever and aren't
+            # all that meaningful unless you know the number from last time
+            # you read the counter and how long has passed in between.
             disk_counters = psutil.disk_io_counters()
             retval.update({
                 'disk_read_bytes': disk_counters.read_bytes,
                 'disk_write_bytes': disk_counters.write_bytes,
+                'disk_busy_time': disk_counters.busy_time
             })
 
-            # Network info
             net_counters = psutil.net_io_counters()
             retval.update({
                 'network_read_bytes': net_counters.bytes_recv,
                 'network_write_bytes': net_counters.bytes_sent,
             })
+
+            if old_metrics and 'timestamp' in old_metrics:
+                spacing = timestamp - old_metrics['timestamp']
+                old_metrics_values = old_metrics.get('metrics', {})
+                retval['timestamp_spacing'] = spacing
+
+                for counter in ['disk_read_bytes', 'disk_write_bytes',
+                                'disk_busy_time', 'network_read_bytes',
+                                'network_write_bytes']:
+                    if counter not in old_metrics_values:
+                        continue
+
+                    old_counter_value = int(old_metrics_values[counter])
+                    new_counter_value = int(retval[counter])
+                    if old_counter_value > new_counter_value:
+                        continue
+
+                    delta = new_counter_value - old_counter_value
+                    retval[f'{counter}_delta'] = delta
+                    retval[f'{counter}_delta_per_second'] = \
+                        delta / spacing
+            else:
+                LOG.info('Skipping delta metrics as we have no previous reading')
 
             # Virtual machine consumption info
             total_instances = 0
@@ -174,9 +206,53 @@ class Monitor(daemon.Daemon):
                     # The domain has likely been deleted.
                     pass
 
+            # Metric name helper
+            def _safe_metric_name(name):
+                name = name.lower()
+                return re.sub(r'[^a-z0-9_]', '_', name)
+
             # Queue health statistics
-            node_queue_processing, node_queue_waiting, node_queue_deferred = \
-                etcd.get_queue_length(config.NODE_NAME)
+            node_queue_waiting = 0
+            node_queue_processing = 0
+            node_queue_deferred = 0
+            node_background_queue_waiting = 0
+            node_background_queue_processing = 0
+            node_background_queue_deferred = 0
+
+            def _log_and_update_metrics_for_queue(
+                    queue, log_prefix):
+                processing, queued, deferred = etcd.get_queue_length(queue)
+                LOG.with_fields({
+                    'processing': processing,
+                    'queued': queued,
+                    'deferred': deferred,
+                    'queue': queue
+                }).debug(f'{log_prefix} queue length')
+
+                safe_metric_queue_name = _safe_metric_name(f'queue_{queue}')
+                retval.update({
+                    f'{safe_metric_queue_name}_processing': processing,
+                    f'{safe_metric_queue_name}_queued': queued,
+                    f'{safe_metric_queue_name}_deferred': deferred
+                })
+
+                return processing, queued, deferred
+
+            for queue in get_node_user_facing_node_queues(config.NODE_NAME):
+                processing, queued, deferred = _log_and_update_metrics_for_queue(
+                    queue, 'Node specific user facing')
+
+                node_queue_processing += processing
+                node_queue_waiting += queued
+                node_queue_deferred += deferred
+
+            for queue in get_all_background_node_queues(config.NODE_NAME):
+                processing, queued, deferred = _log_and_update_metrics_for_queue(
+                    queue, 'Node specific background')
+
+                node_background_queue_processing += processing
+                node_background_queue_waiting += queued
+                node_background_queue_deferred += deferred
 
             retval.update({
                 'cpu_total_instance_vcpus': total_instance_vcpus,
@@ -187,7 +263,10 @@ class Monitor(daemon.Daemon):
                 'instances_active': total_active_instances,
                 'node_queue_processing': node_queue_processing,
                 'node_queue_waiting': node_queue_waiting,
-                'node_queue_deferred': node_queue_deferred
+                'node_queue_deferred': node_queue_deferred,
+                'node_background_queue_processing': node_background_queue_processing,
+                'node_background_queue_waiting': node_background_queue_waiting,
+                'node_background_queue_deferred': node_background_queue_deferred
             })
 
             if config.NODE_IS_NETWORK_NODE:
@@ -195,8 +274,8 @@ class Monitor(daemon.Daemon):
                     etcd.get_queue_length('networknode')
 
                 retval.update({
-                    'network_queue_processing': network_queue_processing,
-                    'network_queue_waiting': network_queue_waiting,
+                    'queue_network_processing': network_queue_processing,
+                    'queue_network_waiting': network_queue_waiting,
                 })
 
             if config.NODE_IS_EVENTLOG_NODE:
@@ -208,14 +287,11 @@ class Monitor(daemon.Daemon):
             # What object versions do we support?
             for obj in OBJECT_NAMES_TO_CLASSES:
                 retval['object_version_%s' % obj] = \
-                    OBJECT_NAMES_TO_CLASSES[obj].current_version
+                    get_object_class(obj).current_version
 
             # How much CPU time have the various SF components consumed since restart?
             # We only traverse two layers here, so its not worth doing something
             # recursive.
-            def _safe_metric_name(name):
-                return re.sub(r'[^a-zA-Z0-9]', '_', name)
-
             def _emit_process_metrics(p):
                 if time.time() - p.create_time() < 60:
                     # Ignore new processes
@@ -298,8 +374,10 @@ class Monitor(daemon.Daemon):
 
                 # Log resources
                 n.add_event(
-                    EVENT_TYPE_RESOURCES, 'updated node resources and package versions',
-                    extra=retval, suppress_event_logging=True)
+                    EVENT_TYPE_RESOURCES,
+                    'updated node resources and package versions',
+                    extra=retval,
+                    suppress_event_logging=True)
                 self.last_logged_resources = time.time()
             return retval
 
@@ -325,7 +403,6 @@ class Monitor(daemon.Daemon):
 
         last_metrics = 0
         last_billing = 0
-        last_process_check = 0
 
         def update_metrics():
             stats = self._get_stats()
@@ -344,70 +421,6 @@ class Monitor(daemon.Daemon):
             gauges['updated_at'].set_to_current_time()
 
         def emit_billing_statistics():
-            with util_libvirt.LibvirtConnection() as lc:
-                try:
-                    for domain in lc.get_sf_domains():
-                        if domain.name().startswith('sf:'):
-                            instance_uuid = domain.name().split(':')[1]
-                            inst = instance.Instance.from_db(instance_uuid)
-                            if not inst:
-                                continue
-
-                            # Base libvirt statistics
-                            statistics = util_libvirt.extract_statistics(
-                                domain)
-
-                            # Power information
-                            statistics['libvirt_raw_power_state'] = \
-                                lc.extract_power_state_pretty(domain)
-                            statistics['power_state'] = \
-                                lc.extract_power_state(domain)
-
-                            # Add in actual size on disk
-                            bd = inst.block_devices
-                            if bd:
-                                for disk in bd.get('devices', [{}]):
-                                    disk_path = disk.get('path')
-                                    disk_device = disk.get('device')
-                                    if disk_path and disk_device and os.path.exists(disk_path):
-                                        # Because nvme disks don't exist as full libvirt
-                                        # disks, they are missing from the statistics
-                                        # results.
-                                        if disk_device not in statistics['disk usage']:
-                                            statistics['disk usage'][disk_device] = {
-                                            }
-
-                                        statistics['disk usage'][disk_device][
-                                            'actual bytes on disk'] = os.stat(disk_path).st_size
-
-                            # Console log size
-                            console_path = os.path.join(
-                                inst.instance_path, 'console.log')
-                            if os.path.exists(console_path):
-                                st = os.stat(console_path)
-                                statistics['console_log_size'] = st.st_size
-                            else:
-                                statistics['console_log_size'] = 0
-
-                            # Add in OOM details
-                            try:
-                                pid = inst.kvm_pid
-                                if pid:
-                                    with open('/proc/%s/oom_score' % pid) as f:
-                                        statistics['oom_score'] = f.read()
-                                    with open('/proc/%s/oom_score_adj' % pid) as f:
-                                        statistics['oom_score_adj'] = f.read()
-
-                            except FileNotFoundError:
-                                ...
-
-                            inst.add_event(
-                                EVENT_TYPE_USAGE, 'usage', extra=statistics,
-                                suppress_event_logging=True)
-
-                except lc.libvirt.libvirtError as e:
-                    self.log.warning('Ignoring libvirt error: %s' % e)
-
             if not config.NODE_IS_NETWORK_NODE:
                 return
 
@@ -444,24 +457,9 @@ class Monitor(daemon.Daemon):
                 except (psutil.NoSuchProcess, FileNotFoundError):
                     ...
 
-        def check_kvm_processess():
-            # Ensure that all instances we think are running on this instance
-            # actually have a KVM process. This catches cases where libvirt
-            # crashed during startup, which happens during unpause if the
-            # apparmor profile is missing. This is a more expensive check
-            # because it reads etcd, so we do it less frequently.
-            for i in instance.Instances(
-                    [instance.this_node_filter], prefilter='active'):
-                pid = i.kvm_pid
-                if pid:
-                    try:
-                        psutil.Process(pid)
-                    except (psutil.NoSuchProcess, FileNotFoundError):
-                        i.kvm_pid = None
-
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             try:
-                if time.time() - last_metrics > config.SCHEDULER_CACHE_TIMEOUT:
+                if time.time() - last_metrics > 60:
                     update_metrics()
                     last_metrics = time.time()
 
@@ -470,16 +468,10 @@ class Monitor(daemon.Daemon):
                     identify_libvirt_processes()
                     last_billing = time.time()
 
-                if time.time() - last_process_check > config.USAGE_EVENT_FREQUENCY * 3:
-                    check_kvm_processess()
-                    last_process_check = time.time()
-
-                self.idle(1)
-
             except Exception as e:
                 util_general.ignore_exception('resource statistics', e)
 
-            self.check_daemon_state()
+            self.idle(1)
 
 
 def main():
@@ -489,4 +481,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

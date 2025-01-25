@@ -1,4 +1,3 @@
-from collections import defaultdict
 import json
 import os
 import threading
@@ -7,8 +6,6 @@ import time
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
-from etcd3gw.utils import _encode
-from etcd3gw.utils import _increment_last_byte
 from google.rpc import error_details_pb2
 import grpc
 from grpc_status import rpc_status
@@ -17,14 +14,12 @@ import requests
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as util_random  # noreorder
 
-from shakenfist import baseobject
 from shakenfist import etcd_pb2
 from shakenfist import etcd_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
-from shakenfist.tasks import FetchBlobTask
-from shakenfist.tasks import QueueTask
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
@@ -55,23 +50,6 @@ class WrappedEtcdClient(Etcd3Client):
             host=host, port=port, protocol=protocol, ca_cert=ca_cert,
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
             api_path=api_path)
-
-    # Replace the upstream implementation with one which allows for limits on range
-    # queries instead of just erroring out for big result sets.
-    def get_prefix(self, key_prefix, sort_order=None, sort_target=None, limit=0):
-        """Get a range of keys with a prefix.
-
-        :param sort_order: 'ascend' or 'descend' or None
-        :param key_prefix: first key in range
-
-        :returns: sequence of (value, metadata) tuples
-        """
-        return self.get(key_prefix,
-                        metadata=True,
-                        range_end=_encode(_increment_last_byte(key_prefix)),
-                        sort_order=sort_order,
-                        sort_target=sort_target,
-                        limit=limit)
 
     # Wrap post() to retry on errors. These errors are caused by our long lived
     # connections sometimes being dropped.
@@ -367,17 +345,13 @@ def clear_stale_locks():
     # Remove all locks held by former processes on this node. This is required
     # after an unclean restart, otherwise we need to wait for these locks to
     # timeout and that can take a long time.
-    client = get_etcd_client()
-
-    for data, metadata in client.get_prefix(
-            LOCK_PREFIX + '/', sort_order='ascend', sort_target='key'):
-        lockname = str(metadata['key']).replace(LOCK_PREFIX + '/', '')
-        holder = json.loads(data)
+    for key, holder in get_prefix_raw(LOCK_PREFIX + '/'):
+        lockname = key.replace(LOCK_PREFIX + '/', '')
         node = holder['node']
         pid = int(holder['pid'])
 
         if node == config.NODE_NAME and not psutil.pid_exists(pid):
-            client.delete(metadata['key'])
+            delete_raw(key)
             LOG.with_fields({'lock': lockname,
                              'old-pid': pid,
                              'old-node': node,
@@ -387,8 +361,8 @@ def clear_stale_locks():
 @retry_etcd_forever
 def get_existing_locks():
     key_val = {}
-    for value in get_etcd_client().get_prefix(LOCK_PREFIX + '/'):
-        key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
+    for key, holder in get_prefix_raw(LOCK_PREFIX + '/'):
+        key_val[key] = holder
     return key_val
 
 
@@ -400,15 +374,6 @@ def _construct_key(objecttype, subtype, name):
     if subtype:
         return f'/sf/{objecttype}/{subtype}/'
     return f'/sf/{objecttype}/'
-
-
-class JSONEncoderCustomTypes(json.JSONEncoder):
-    def default(self, obj):
-        if QueueTask.__subclasscheck__(type(obj)):
-            return obj.obj_dict()
-        if type(obj) is baseobject.State:
-            return obj.obj_dict()
-        return json.JSONEncoder.default(self, obj)
 
 
 def put(objecttype, subtype, name, data):
@@ -426,26 +391,17 @@ def get(objecttype, subtype, name):
     return get_raw(path)
 
 
-@retry_etcd_forever
-def get_prefix(path, sort_order=None, sort_target='key', limit=0):
-    for data, metadata in get_etcd_client().get_prefix(
-            path, sort_order=sort_order, sort_target='key', limit=limit):
-        yield str(metadata['key'].decode('utf-8')), json.loads(data)
-
-
-def get_all(objecttype, subtype, prefix=None, sort_order=None, limit=0):
+def get_all(objecttype, subtype, prefix=None, limit=0):
     path = _construct_key(objecttype, subtype, prefix)
-    return get_prefix(path, sort_order=sort_order, sort_target='key', limit=limit)
+    return get_prefix_raw(path, limit=limit)
 
 
-@retry_etcd_forever
-def get_all_dict(objecttype, subtype=None, sort_order=None, limit=0):
+def get_all_dict(objecttype, subtype=None, limit=0):
     path = _construct_key(objecttype, subtype, None)
     key_val = {}
 
-    for value in get_etcd_client().get_prefix(
-            path, sort_order=sort_order, sort_target='key', limit=limit):
-        key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
+    for key, value in get_prefix_raw(path, limit=limit):
+        key_val[key] = value
 
     return key_val
 
@@ -458,20 +414,14 @@ def replace(objecttype, subtype, name, original_data, new_data):
     }])[0]
 
 
-@retry_etcd_forever
-def delete_raw(path):
-    LOG.info('etcd delete %s' % path)
-    return get_etcd_client().delete(path)
-
-
 def delete(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
     return delete_raw(path)
 
 
 @retry_etcd_forever
-def delete_all(objecttype, subtype):
-    path = _construct_key(objecttype, subtype, None)
+def delete_all(objecttype, subtype, name=None):
+    path = _construct_key(objecttype, subtype, name)
     get_etcd_client().delete_prefix(path)
 
 
@@ -481,79 +431,74 @@ def delete_prefix(path):
     LOG.info('etcd deleteprefix %s' % path)
 
 
+@retry_etcd_forever
 def enqueue(queuename, workitem, delay=0):
-    entry_time = time.time() + delay
-    jobname = f'{entry_time}-{util_random.random_id()}'
-    put('queue', queuename, jobname, workitem)
+    # This might retry if we clash with another enqueue at literally (to the
+    # millisecond) the same time. It should be unlikely?
+    attempts = 0
+
+    while attempts < 3:
+        entry_time = time.time() + delay
+        jobname = f'{entry_time}-{util_random.random_id()}'
+        if create_raw(f'/sf/queue/{queuename}/{jobname}', workitem):
+            LOG.with_fields({
+                'jobname': jobname,
+                'queuename': queuename,
+                'workitem': workitem,
+                'attempt': attempts
+            }).info('Enqueued workitem')
+            return
+
+        attempts += 1
+
     LOG.with_fields({
         'jobname': jobname,
         'queuename': queuename,
         'workitem': workitem,
-        }).info('Enqueued workitem')
+        'attempt': attempts
+    }).error('Repeated attempts to enqueue workitem failed')
+    raise exceptions.CannotEnqueueWork(
+        'Repeated attempts to enqueue workitem failed')
 
 
-def _all_subclasses(cls):
-    all = cls.__subclasses__()
-    for sc in cls.__subclasses__():
-        all += _all_subclasses(sc)
-    return all
-
-
-def _find_class(task_item):
-    if not isinstance(task_item, dict):
-        return task_item
-
-    item = task_item
-    for task_class in _all_subclasses(QueueTask):
-        if task_class.name() and task_item.get('task') == task_class.name():
-            del task_item['task']
-            # This is where new QueueTask subclass versions should be handled
-            del task_item['version']
-            item = task_class(**task_item)
-            break
-
-    return item
-
-
-def decodeTasks(obj):
-    if not isinstance(obj, dict):
-        return obj
-
-    if 'tasks' in obj:
-        task_list = []
-        for task_item in obj['tasks']:
-            task_list.append(_find_class(task_item))
-        return {'tasks': task_list}
-
-    if 'task' in obj:
-        return _find_class(obj)
-
-    return obj
-
-
-@retry_etcd_forever
 def dequeue(queuename):
     queue_path = _construct_key('queue', queuename, None)
-    client = get_etcd_client()
-
-    for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
-                                            sort_target='key', limit=1):
-        jobname = str(metadata['key']).split('/')[-1].rstrip("'")
+    for path, workitem in get_prefix_raw(queue_path, limit=1):
+        jobname = path.split('/')[-1]
 
         # Ensure that this task isn't in the future
         if float(jobname.split('-')[0]) > time.time():
             return None
 
-        workitem = json.loads(data, object_hook=decodeTasks)
-        put('processing', queuename, jobname, workitem)
-        client.delete(metadata['key'])
-        LOG.with_fields({
-            'jobname': jobname,
-            'queuename': queuename,
-            'workitem': workitem,
+        # Attempt to claim the job in a transaction
+        new_path = path.replace('queue', 'processing')
+        success, _ = replace_many_raw([
+            {
+                'path': path,
+                'original_data': workitem,
+                'new_data': None
+            },
+            {
+                'path': new_path,
+                'original_data': None,
+                'new_data': workitem
+            },
+        ])
+        if success:
+            LOG.with_fields({
+                'jobname': jobname,
+                'queuename': queuename,
+                'workitem': workitem,
             }).info('Moved workitem from queue to processing')
-
-        return jobname, workitem
+            return jobname, workitem
+        else:
+            LOG.with_fields({
+                'jobname': jobname,
+                'queuename': queuename,
+                'workitem': workitem,
+            }).debug(
+                'Failed to move workitem from queue to processing. '
+                'Possibly racing another worker?')
 
     return None
 
@@ -579,14 +524,11 @@ def get_queue_length(queuename):
     return processing, queued, deferred
 
 
-@retry_etcd_forever
-def _restart_queue(queuename):
+def restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
 
-    for data, metadata in get_etcd_client().get_prefix(
-            queue_path, sort_order='ascend'):
-        jobname = str(metadata['key']).split('/')[-1].rstrip("'")
-        workitem = json.loads(data)
+    for path, workitem in get_prefix_raw(queue_path):
+        jobname = path.split('/')[-1]
         put('queue', queuename, jobname, workitem)
         delete('processing', queuename, jobname)
         LOG.with_fields({
@@ -595,57 +537,7 @@ def _restart_queue(queuename):
             }).warning('Reset workitem')
 
 
-def get_outstanding_jobs():
-    for data, metadata in get_etcd_client().get_prefix('/sf/processing'):
-        yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
-    for data, metadata in get_etcd_client().get_prefix('/sf/queued'):
-        yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
-
-
-def get_current_blob_transfers(absent_nodes=[]):
-    current_fetches = defaultdict(list)
-    for workname, workitem in get_outstanding_jobs():
-        # A workname looks like: /sf/queue/sf-3/jobname
-        _, _, phase, node, _ = workname.split('/')
-        if node == 'networknode':
-            continue
-        if node.endswith('-background'):
-            node = node[:-len('-background')]
-
-        for task in workitem:
-            if isinstance(task, FetchBlobTask):
-                if node in absent_nodes:
-                    LOG.with_fields({
-                        'blob': task.blob_uuid,
-                        'node': node,
-                        'phase': phase
-                    }).warning('Node is absent, ignoring fetch')
-                else:
-                    LOG.with_fields({
-                        'blob': task.blob_uuid,
-                        'node': node,
-                        'phase': phase
-                    }).info('Node is fetching blob')
-                    current_fetches[task.blob_uuid].append(node)
-
-    return current_fetches
-
-
-def restart_queues():
-    # Move things which were in processing back to the queue because
-    # we didn't complete them before crashing.
-    if config.NODE_IS_NETWORK_NODE:
-        _restart_queue('networknode')
-    _restart_queue(config.NODE_NAME)
-    _restart_queue(f'{config.NODE_NAME}-background')
-
-
 # Direct etcd calls via gRPC
-def _encode_data(data):
-    return json.dumps(
-        data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes).encode()
-
-
 def _log_and_raise_error(rpc_error):
     code = None
     detail = None
@@ -759,9 +651,47 @@ def get_raw(path):
 
 
 @_retry_etcd_native_client
+def get_prefix_raw(path, limit=0):
+    path_encoded = path.encode()
+
+    # From the etcd API docs: "If range_end is key plus one (e.g.,
+    # "aa"+1 == "ab", "a\xff"+1 == "b"), then the range represents all keys
+    # prefixed with key."
+    #
+    #     https://etcd.io/docs/v3.3/learning/api/#key-ranges
+    #
+    # Note that this implementation assumes our keys are basically ASCII, that
+    # is that we will never have a last byte of 0xFF (because we'd have to
+    # carry if we did).
+    range_end = bytearray(path_encoded)
+    range_end[-1] = range_end[-1] + 1
+    range_end = bytes(range_end)
+
+    channel = get_etcd_native_client()
+    stub = etcd_pb2_grpc.KVStub(channel)
+
+    try:
+        resp = stub.Range(
+            etcd_pb2.RangeRequest(
+                key=path_encoded,
+                range_end=range_end,
+                limit=limit,
+                sort_order=etcd_pb2.RangeRequest.ASCEND,
+                sort_target=etcd_pb2.RangeRequest.KEY
+            )
+        )
+    except grpc.RpcError as rpc_error:
+        _log_and_raise_error(rpc_error)
+
+    for kvs in resp.kvs:
+        yield kvs.key.decode(), json.loads(kvs.value.decode())
+    return None
+
+
+@_retry_etcd_native_client
 def put_raw(path, new_data):
     path_encoded = path.encode()
-    new_data_encoded = _encode_data(new_data)
+    new_data_encoded = util_json.json_dump(new_data).encode()
     channel = get_etcd_native_client()
     stub = etcd_pb2_grpc.KVStub(channel)
 
@@ -778,6 +708,24 @@ def put_raw(path, new_data):
         )
     except grpc.RpcError as rpc_error:
         _log_and_raise_error(rpc_error)
+
+
+@_retry_etcd_native_client
+def delete_raw(path):
+    path_encoded = path.encode()
+    channel = get_etcd_native_client()
+    stub = etcd_pb2_grpc.KVStub(channel)
+
+    try:
+        resp = stub.DeleteRange(
+            etcd_pb2.DeleteRangeRequest(
+                key=path_encoded
+            )
+        )
+    except grpc.RpcError as rpc_error:
+        _log_and_raise_error(rpc_error)
+
+    return resp.deleted == 1
 
 
 def create_raw(path, new_data):
@@ -804,6 +752,8 @@ def transactional_delete_raw(path, original_data):
     }])[0]
 
 
+# NOTE(mikal): note that mutations are expected to use strings in their
+# descriptions, not bytes.
 @_retry_etcd_native_client
 def replace_many_raw(mutations):
     original_values_by_path = {}
@@ -815,8 +765,10 @@ def replace_many_raw(mutations):
 
     for mutation in mutations:
         path_encoded = mutation['path'].encode()
-        original_data_encoded = _encode_data(mutation['original_data'])
-        new_data_encoded = _encode_data(mutation['new_data'])
+        original_data_encoded = util_json.json_dump(
+            mutation['original_data']).encode()
+        new_data_encoded = util_json.json_dump(
+            mutation['new_data']).encode()
 
         if mutation['original_data'] is None:
             comparisons.append(
@@ -892,9 +844,9 @@ def replace_many_raw(mutations):
                 if original_values_by_path[kvs.key] != kvs.value:
                     failures.append(
                         {
-                            'path': kvs.key.decode(),
+                            'path': kvs.key,
                             'desired': original_values_by_path[kvs.key],
-                            'actual': kvs.value.decode(),
+                            'actual': kvs.value,
                             'replacement': new_values_by_path[kvs.key]
                         }
                     )
@@ -903,7 +855,7 @@ def replace_many_raw(mutations):
     for key in original_values_by_path:
         failures.append(
             {
-                'path': key.decode(),
+                'path': key,
                 'desired': original_values_by_path[key],
                 'actual': None,
                 'replacement': new_values_by_path[key]

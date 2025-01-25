@@ -17,6 +17,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
+from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
@@ -36,8 +37,6 @@ class NoopLock(Lock):
 VERSION_CACHE_MINIMUM = None
 VERSION_CACHE_MAXIMUM = None
 VERSION_CACHE_AGE = 0
-OBJECT_NAMES = ['agentoperation', 'artifact', 'blob', 'dhcp', 'instance', 'ipam',
-                'namespace', 'network', 'networkinterface', 'node', 'upload']
 
 
 def _maintain_version_cache(max_cache_age):
@@ -87,7 +86,7 @@ def _maintain_version_cache(max_cache_age):
         metrics[node_name] = d['metrics']
         log.debug('Considering metrics entry')
 
-    for possible_objname in OBJECT_NAMES:
+    for possible_objname in constants.OBJECT_NAMES:
         nodes_by_version = defaultdict(list, [])
         node_metric_age = {}
         minimum = inf
@@ -104,11 +103,6 @@ def _maintain_version_cache(max_cache_age):
             else:
                 nodes_by_version['no version reported'].append(node_name)
 
-        LOG.with_fields(nodes_by_version).with_fields(node_metric_age).with_fields({
-            'object_type': possible_objname,
-            'minimum': minimum,
-            'maximum': maximum
-        }).debug('Object versions reported')
         VERSION_CACHE_MINIMUM[possible_objname] = minimum
         VERSION_CACHE_MAXIMUM[possible_objname] = maximum
 
@@ -352,8 +346,7 @@ class DatabaseBackedObject:
             self.add_event(EVENT_TYPE_MUTATE, 'set attribute', extra=event_values)
 
         if self.__in_memory_only:
-            self.__in_memory_values[attribute] = json.dumps(
-                value, indent=4, sort_keys=True, cls=etcd.JSONEncoderCustomTypes)
+            self.__in_memory_values[attribute] = util_json.json_dump(value)
         else:
             etcd.put('attribute/%s' % self.object_type,
                      self.__uuid, attribute, value)
@@ -433,7 +426,7 @@ class DatabaseBackedObject:
 
         # Only standard states have validation right now
         if state_attribute_name == 'state':
-            if orig.value == self.STATE_DELETED:
+            if orig.value == self.STATE_DELETED and self.object_type != 'node':
                 LOG.with_fields(
                     {
                         'uuid': self.uuid,

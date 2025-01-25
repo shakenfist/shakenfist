@@ -1,11 +1,11 @@
 import json
 import logging
 from unittest import mock
+from uuid import uuid4
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.config import SFConfig
-from shakenfist import etcd
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.tests import base
@@ -235,8 +235,10 @@ class AuthWithLingeringNetwork(base.ShakenFistTestCase):
         self.mock_etcd.setup()
 
         self.mock_etcd.create_namespace('foo', 'key1', 'banana')
+
+        self.network_id = str(uuid4())
         self.mock_etcd.create_network(
-            name='foonet', uuid='123', namespace='foo')
+            name='foonet', uuid=self.network_id, namespace='foo')
 
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.
@@ -495,7 +497,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
 
     def test_get_namespace_metadata(self):
         self.mock_etcd.db['/sf/attribute/namespace/system/metadata'] = \
-            etcd._encode_data({'a': 'a', 'b': 'b'})
+            json.dumps({'a': 'a', 'b': 'b'}, indent=4, sort_keys=True).encode()
         resp = self.client.get(
             '/auth/namespaces/system/metadata', headers={'Authorization': self.auth_token})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
@@ -513,7 +515,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
-            etcd._encode_data({'foo': 'bar'}),
+            json.dumps({'foo': 'bar'}, indent=4, sort_keys=True).encode(),
             self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
 
     @mock.patch('shakenfist.etcd.get_lock')
@@ -527,19 +529,22 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
-            etcd._encode_data({'foo': 'bar'}),
+            json.dumps({'foo': 'bar'}, indent=4, sort_keys=True).encode(),
             self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
 
     @mock.patch('shakenfist.etcd.get_lock')
     def test_delete_namespace_metadata(self, mock_get_lock):
         self.mock_etcd.db['/sf/attribute/namespace/system/metadata'] = \
-            etcd._encode_data({'foo': 'bar', 'real': 'smart'})
+            json.dumps(
+                {'foo': 'bar', 'real': 'smart'},
+                indent=4,
+                sort_keys=True).encode()
         resp = self.client.delete('/auth/namespaces/system/metadata/foo',
                                   headers={'Authorization': self.auth_token})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
-            etcd._encode_data({'real': 'smart'}),
+            json.dumps({'real': 'smart'}, indent=4, sort_keys=True).encode(),
             self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
 
     @mock.patch('shakenfist.etcd.get_lock')

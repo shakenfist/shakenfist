@@ -10,7 +10,7 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.agentoperation import AgentOperation
+from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base

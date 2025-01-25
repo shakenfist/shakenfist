@@ -45,9 +45,9 @@ class LowResourceTestCase(SchedulerTestCase):
         fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().find_candidates,
-                                fake_inst,
-                                [])
-        self.assertEqual('No nodes with metrics', str(exc))
+                                fake_inst)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage is_hypervisor', str(exc))
 
     def test_requested_too_many_cpu(self):
         self.mock_etcd.set_node_metrics_same({
@@ -59,9 +59,10 @@ class LowResourceTestCase(SchedulerTestCase):
         fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid', cpus=6)
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().find_candidates,
-                                fake_inst,
-                                [])
-        self.assertEqual('Requested vCPUs exceeds vCPU limit', str(exc))
+                                fake_inst)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage cpu_max_per_instance',
+            str(exc))
 
     def test_not_enough_cpu(self):
         self.mock_etcd.set_node_metrics_same({
@@ -77,9 +78,10 @@ class LowResourceTestCase(SchedulerTestCase):
         fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().find_candidates,
-                                fake_inst,
-                                [])
-        self.assertEqual('No nodes with enough idle CPU', str(exc))
+                                fake_inst)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_idle_cpu',
+            str(exc))
 
     def test_not_enough_ram_for_system(self):
         self.mock_etcd.set_node_metrics_same({
@@ -95,9 +97,10 @@ class LowResourceTestCase(SchedulerTestCase):
         fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().find_candidates,
-                                fake_inst,
-                                [])
-        self.assertEqual('No nodes with enough idle RAM', str(exc))
+                                fake_inst)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_idle_memory',
+            str(exc))
 
     def test_not_enough_ram_on_node(self):
         self.mock_etcd.set_node_metrics_same({
@@ -114,9 +117,10 @@ class LowResourceTestCase(SchedulerTestCase):
         fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().find_candidates,
-                                fake_inst,
-                                [])
-        self.assertEqual('No nodes with enough idle RAM', str(exc))
+                                fake_inst)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_idle_memory',
+            str(exc))
 
     def test_not_enough_disk(self):
         self.mock_etcd.set_node_metrics_same({
@@ -137,16 +141,42 @@ class LowResourceTestCase(SchedulerTestCase):
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().find_candidates,
-                                fake_inst,
-                                [])
-        self.assertEqual('No nodes with enough disk space', str(exc))
+                                fake_inst)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_free_disk',
+            str(exc))
+
+    def test_not_enough_disk_bandwidth(self):
+        self.mock_etcd.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 200*GiB,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12,
+            'disk_busy_time_delta_per_sec': 2000
+        })
+
+        fake_inst = self.mock_etcd.create_instance(
+            'fake-inst', 'fakeuuid', disk_spec=[{
+                'base': 'cirros',
+                'size': 21
+            }])
+
+        exc = self.assertRaises(exceptions.LowResourceException,
+                                scheduler.Scheduler().find_candidates,
+                                fake_inst)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_idle_disk',
+            str(exc))
 
     def test_ok(self):
         self.mock_etcd.set_node_metrics_same()
 
         fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
 
-        nodes = scheduler.Scheduler().find_candidates(fake_inst, [])
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
         self.assertSetEqual(set(self.mock_etcd.node_names)-{'node1_net', },
                             set(nodes))
 
@@ -160,9 +190,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.mock_etcd.set_node_metrics_same()
 
         fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
-        nets = [{'network_uuid': 'uuid-net2'}]
-
-        nodes = scheduler.Scheduler().find_candidates(fake_inst, nets)
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
         self.assertSetEqual(set(self.mock_etcd.node_names)-{'node1_net', },
                             set(nodes))
 
@@ -177,7 +205,7 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
     def test_only_two(self):
         fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         nodes = scheduler.Scheduler().find_candidates(
-            fake_inst, [], candidates=['node1_net', 'node2'])
+            fake_inst, candidates=['node1_net', 'node2'])
         self.assertSetEqual({'node2', }, set(nodes))
 
     def test_no_such_node(self):
@@ -185,7 +213,7 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
         self.assertRaises(
             exceptions.CandidateNodeNotFoundException,
             scheduler.Scheduler().find_candidates,
-            fake_inst, [], candidates=['barry'])
+            fake_inst, candidates=['barry'])
 
 
 class MetricsRefreshTestCase(SchedulerTestCase):
@@ -205,7 +233,7 @@ class MetricsRefreshTestCase(SchedulerTestCase):
         fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
 
         s = scheduler.Scheduler()
-        s.find_candidates(fake_inst, None)
+        s.find_candidates(fake_inst)
         self.assertEqual(22000, s.metrics['node1_net']['memory_available'])
 
         self.mock_etcd.set_node_metrics_same({
@@ -218,7 +246,7 @@ class MetricsRefreshTestCase(SchedulerTestCase):
             'cpu_available': 12
         })
         s.metrics_updated = time.time() - 400
-        s.find_candidates(fake_inst, None)
+        s.find_candidates(fake_inst)
         self.assertEqual(11000, s.metrics['node1_net']['memory_available'])
 
 
@@ -244,7 +272,7 @@ class AffinityTestCase(SchedulerTestCase):
                 },
             })
 
-        nodes = scheduler.Scheduler().find_candidates(inst, [])
+        nodes = scheduler.Scheduler().find_candidates(inst)
         self.assertSetEqual({'node3'}, set(nodes))
 
     def test_anti_affinity_single_inst(self):
@@ -261,7 +289,7 @@ class AffinityTestCase(SchedulerTestCase):
                     "nerd": -100
                 },
             })
-        nodes = scheduler.Scheduler().find_candidates(inst, [])
+        nodes = scheduler.Scheduler().find_candidates(inst)
         self.assertSetEqual({'node2', 'node4'}, set(nodes))
 
     def test_anti_affinity_multiple_inst(self):
@@ -282,7 +310,7 @@ class AffinityTestCase(SchedulerTestCase):
                     "nerd": -100
                 },
             })
-        nodes = scheduler.Scheduler().find_candidates(inst, [])
+        nodes = scheduler.Scheduler().find_candidates(inst)
         self.assertSetEqual({'node2'}, set(nodes))
 
     def test_anti_affinity_multiple_inst_different_tags(self):
@@ -303,5 +331,5 @@ class AffinityTestCase(SchedulerTestCase):
                     "nerd": -100
                 },
             })
-        nodes = scheduler.Scheduler().find_candidates(inst, [])
+        nodes = scheduler.Scheduler().find_candidates(inst)
         self.assertSetEqual({'node3'}, set(nodes))

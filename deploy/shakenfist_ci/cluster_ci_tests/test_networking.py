@@ -97,9 +97,14 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self._emit_tracing_event({
+            'msg': (f'inst1 is uuid {inst1["uuid"]} on network '
+                    f'{self.net_one["uuid"]}')
+        }
+        )
 
         inst2 = self.test_client.create_instance(
-            'test-overlap-cidr-1', 1, 1024,
+            'test-overlap-cidr-2', 1, 1024,
             [
                 {
                     'network_uuid': self.net_three['uuid']
@@ -112,6 +117,11 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self._emit_tracing_event({
+            'msg': (f'inst2 is uuid {inst2["uuid"]} on network '
+                    f'{self.net_three["uuid"]}')
+        }
+        )
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst2['uuid'])
@@ -122,12 +132,15 @@ class TestNetworking(base.BaseNamespacedTestCase):
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
         self.assertEqual(1, len(nics))
         for iface in nics:
-            self.assertEqual('created', iface['state'],
-                             'Interface %s is not in correct state' % iface['uuid'])
+            self.assertEqual(
+                'created',
+                iface['state'],
+                'Interface %s is not in correct state' % iface['uuid'])
 
-        results = self._await_command(inst1['uuid'], 'ping -c 3 %s' % nics[0]['ipv4'])
-        self.assertEqual(1, results['return-code'],
-                         'Incorrect return code: %s' % results)
+        results = self._await_command(
+            inst1['uuid'], 'ping -c 3 %s' % nics[0]['ipv4'])
+        self.assertEqual(
+            1, results['return-code'], 'Incorrect return code: %s' % results)
         self.assertEqual('', results['stderr'])
         self.assertTrue(' 100% packet' in results['stdout'])
 

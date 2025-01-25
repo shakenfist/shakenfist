@@ -6,20 +6,21 @@ import signal
 import threading
 import time
 
-import pyprctl
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.baseobject import get_maximum_object_version
 from shakenfist.baseobject import get_minimum_object_version
-from shakenfist.baseobject import OBJECT_NAMES
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import get_object_class
+from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist import etcd
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
+from shakenfist.operations.baseoperation import get_all_user_facing_node_queues
+from shakenfist.operations.baseoperation import get_all_background_node_queues
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import libvirt as util_libvirt
 
@@ -65,8 +66,24 @@ def set_log_level(log, name):
 
 
 def write_pid_file(daemon_name):
-    with open(f'/run/{DAEMON_NAMES[daemon_name]}.pid', 'w') as f:
+    with open(f'/run/sf/{daemon_name}.pid', 'w') as f:
         f.write(f'{os.getpid()}')
+
+
+def clear_abort_path(abort_path):
+    if os.path.exists(abort_path):
+        LOG.info(f'Clearing abort file: {abort_path}')
+        os.unlink(abort_path)
+
+
+def set_abort_path(abort_path, source):
+    LOG.info(f'Setting abort file: {abort_path} ({source})')
+    with open(abort_path, 'w') as f:
+        f.write('1')
+
+
+def check_abort_path(abort_path):
+    return not os.path.exists(abort_path)
 
 
 def health_check_privexec():
@@ -92,13 +109,12 @@ class Daemon:
 
         procname = process_name(name)
         setproctitle.setproctitle(procname)
-        pyprctl.set_name(procname)
+        util_concurrency.set_thread_name(procname)
         self.log, _ = logs.setup(name)
         set_log_level(self.log, name)
 
-        self.abort_path = f'/run/sf-{name}.abort'
-        if os.path.exists(self.abort_path):
-            os.unlink(self.abort_path)
+        self.abort_path = f'/run/sf/{name}.abort'
+        clear_abort_path(self.abort_path)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
         faulthandler.register(signal.SIGUSR1)
@@ -137,8 +153,8 @@ class Daemon:
         # Does the cluster have a stable set of object versions across nodes?
         # We should generally avoid cleanup operations if there is still an
         # upgrade in flight.
-        for objname in OBJECT_NAMES:
-            current_version = OBJECT_NAMES_TO_CLASSES[objname].current_version
+        for objname in OBJECT_NAMES_TO_CLASSES:
+            current_version = get_object_class(objname).current_version
             minimum = get_minimum_object_version(objname, max_cache_age=5)
             maximum = get_maximum_object_version(objname, max_cache_age=5)
             log = LOG.with_fields({
@@ -185,16 +201,14 @@ class Daemon:
                 # This might fail if grpc has already started shutting down
                 ...
 
-            with open(self.abort_path, 'w') as f:
-                f.write('1')
+            set_abort_path(self.abort_path, 'from exit_gracefully')
 
     def check_daemon_state(self):
         n = Node.from_db(config.NODE_NAME)
         daemon_state = n.get_daemon_state(self.daemon_name).value
         if daemon_state in [Node.DAEMON_STATE_STOPPED,
                             Node.DAEMON_STATE_STOPPING]:
-            with open(self.abort_path, 'w') as f:
-                f.write('1')
+            set_abort_path(self.abort_path, 'from check_daemon_state')
 
     def record_start(self):
         n = Node.from_db(config.NODE_NAME)
@@ -226,6 +240,9 @@ class WorkerPoolDaemon(Daemon):
         self.workers = {}
         self.present_cpus = util_libvirt.get_cpu_count()
 
+        self.metrics = {}
+        self.metrics_acquired_at = 0
+
     def run(self):
         try:
             LOG.info('Starting')
@@ -246,8 +263,9 @@ class WorkerPoolDaemon(Daemon):
             while len(self.workers) > 0:
                 for thread_name in self.workers:
                     thread_ident = self.workers[thread_name]['thread'].ident
-                    with open(self.workers[thread_name]['object'].abort_path, 'w') as f:
-                        f.write('1')
+                    set_abort_path(
+                        self.workers[thread_name]['object'].abort_path,
+                        'worker thread cleanup')
                     LOG.info(f'Sent exit event to {thread_name} thread '
                              f'with ident {thread_ident}')
 
@@ -284,29 +302,44 @@ class WorkerPoolDaemon(Daemon):
         }
         worker_thread.start()
 
-    def dequeue_job(self, queue_name, processing_class):
-        max_workers = self.present_cpus / 2
+    def dequeue_job(self, processing_class):
+        max_workers = max(3, self.present_cpus / 2)
         num_workers = len(self.workers)
 
         if num_workers > max_workers:
             return False
 
-        # High priority jobs
-        jobname_workitem = etcd.dequeue(queue_name)
-        if jobname_workitem:
-            args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
-            self.start_job(processing_class, args, jobname_workitem[0])
-            return True
+        for queue_name in get_all_user_facing_node_queues(config.NODE_NAME):
+            jobname_workitem = etcd.dequeue(queue_name)
+            if jobname_workitem:
+                args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
+                self.start_job(processing_class, args, jobname_workitem[0])
+                return True
 
-        # Low priority jobs
+        # Lower priority jobs reserve a number of workers for user facing things
         if num_workers > max_workers - 2:
             return False
 
-        jobname_workitem = etcd.dequeue(f'{queue_name}-background')
-        if jobname_workitem:
-            args = [f'{queue_name}-background', jobname_workitem[0],
-                    jobname_workitem[1]]
-            self.start_job(processing_class, args, jobname_workitem[0])
-            return True
+        # We also wont do background high_io jobs if the disks are really busy.
+        # busy_time is in milliseconds per second, so a value of 1,000 is 100%
+        # busy. You can record more than 100% if there is more than one disk
+        # in the system doing IO at the time.
+        if time.time() - self.metrics_acquired_at > 30:
+            self.metrics = etcd.get('metrics', config.NODE_NAME, {})
+            self.metrics_acquired_at = time.time()
+
+        metrics_values = self.metrics.get('metrics', {})
+        disk_busy = int(metrics_values.get(
+            'disk_busy_time_delta_per_seconds', '0'))
+        for queue_name in get_all_background_node_queues(config.NODE_NAME):
+            if queue_name.find('high_io') != -1 and disk_busy > 800:
+                LOG.debug('Skipping {queue_name} queue as local disk is busy')
+                continue
+
+            jobname_workitem = etcd.dequeue(queue_name)
+            if jobname_workitem:
+                args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
+                self.start_job(processing_class, args, jobname_workitem[0])
+                return True
 
         return False

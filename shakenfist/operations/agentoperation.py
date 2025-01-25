@@ -1,8 +1,9 @@
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import blob
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
-from shakenfist.baseoperation import BaseOperation
+from shakenfist.operations.baseoperation import BaseOperation
 
 
 LOG, _ = logs.setup(__name__)
@@ -12,6 +13,22 @@ class AgentOperation(BaseOperation):
     object_type = 'agentoperation'
     initial_version = 1
     current_version = 1
+
+    state_targets = {
+        None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
+        dbo.STATE_INITIAL: (BaseOperation.STATE_PREFLIGHT,
+                            BaseOperation.STATE_QUEUED, dbo.STATE_DELETED,
+                            dbo.STATE_ERROR),
+        BaseOperation.STATE_PREFLIGHT: (BaseOperation.STATE_QUEUED,
+                                        dbo.STATE_DELETED, dbo.STATE_ERROR),
+        BaseOperation.STATE_QUEUED: (BaseOperation.STATE_EXECUTING,
+                                     dbo.STATE_DELETED, dbo.STATE_ERROR),
+        BaseOperation.STATE_EXECUTING: (BaseOperation.STATE_COMPLETE,
+                                        dbo.STATE_DELETED, dbo.STATE_ERROR),
+        BaseOperation.STATE_COMPLETE: (dbo.STATE_DELETED),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED),
+        dbo.STATE_DELETED: None,
+    }
 
     def __init__(self, static_values):
         self.upgrade(static_values)

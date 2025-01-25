@@ -1,5 +1,4 @@
 from collections import defaultdict
-import os
 import time
 
 from shakenfist_utilities import logs  # noreorder
@@ -7,7 +6,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist import etcd
+from shakenfist.daemons import daemon
 from shakenfist.exceptions import LockException
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import ProcessExecutionError
@@ -15,7 +14,12 @@ from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import network
 from shakenfist import networkinterface
-from shakenfist.tasks import DestroyNetworkTask
+from shakenfist.etcd_schema.operations.baseclusteroperation \
+    import PRIORITY
+from shakenfist.etcd_schema.operations.net_op \
+    import create_and_enqueue as net_create_and_enqueue
+from shakenfist.etcd_schema.operations.net_op \
+    import model_tasks as net_tasks
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import network as util_network
 
@@ -31,15 +35,14 @@ class Job(util_concurrency.Job):
         super().__init__()
         self.name = name
 
-        self.abort_path = f'/run/sf-net-{name}.abort'
-        if os.path.exists(self.abort_path):
-            os.unlink(self.abort_path)
+        self.abort_path = f'/run/sf/net-{name}.abort'
+        daemon.clear_abort_path(self.abort_path)
 
     def execute(self):
         LOG.info('Starting network maintenance')
         last_loop = 0
 
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             if time.time() - last_loop < 30:
                 time.sleep(1)
                 continue
@@ -111,8 +114,11 @@ class Job(util_concurrency.Job):
                         if not n.networkinterfaces:
                             LOG.with_fields({'network': n}).info(
                                 'Removing stray delete_wait network')
-                            etcd.enqueue(
-                                'networknode', DestroyNetworkTask(n.uuid))
+                            op_type, op_uuid = net_create_and_enqueue(
+                                n.uuid,
+                                [net_tasks.network_destroy],
+                                PRIORITY.user_facing)
+                            n.set_last_cluster_operation(op_type, op_uuid)
 
                         # We skip maintenance on all delete_wait networks
                         continue

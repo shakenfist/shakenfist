@@ -5,7 +5,6 @@ import copy
 import json
 import os
 import pathlib
-import sys
 import time
 
 import grpc
@@ -192,7 +191,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
                 pass
 
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             try:
                 did_work = False
 
@@ -304,4 +303,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

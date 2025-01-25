@@ -25,20 +25,31 @@ from shakenfist import blob
 from shakenfist import cache
 from shakenfist import constants
 from shakenfist import etcd
+from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.etcd_schema.operations.node_inst_op \
+    import create_and_enqueue as nio_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_inst_op \
+    import model_tasks as nio_tasks
+from shakenfist.etcd_schema.operations.node_inst_snap_op \
+    import create_and_enqueue as niso_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_inst_snap_op \
+    import snapshot as niso_snapshot
+from shakenfist.etcd_schema.operations.node_inst_snap_op \
+    import model_tasks as niso_tasks
+from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist import network
 from shakenfist import networkinterface
-from shakenfist.agentoperation import AgentOperation
-from shakenfist.agentoperation import AgentOperations
-from shakenfist.agentoperation import instance_filter as agent_instance_filter
+from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.operations.agentoperation import AgentOperations
+from shakenfist.operations.agentoperation \
+    import instance_filter as agent_instance_filter
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
-from shakenfist.tasks import DeleteInstanceTask
-from shakenfist.tasks import SnapshotTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import libvirt as util_libvirt
@@ -87,7 +98,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 14
+    current_version = 15
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -124,9 +135,10 @@ class Instance(dbo):
         STATE_PREFLIGHT: (dbo.STATE_CREATING, dbo.STATE_DELETE_WAIT,
                           dbo.STATE_DELETED, STATE_PREFLIGHT_ERROR),
         dbo.STATE_CREATING: (dbo.STATE_CREATED, dbo.STATE_DELETE_WAIT,
-                             dbo.STATE_DELETED, STATE_CREATING_ERROR),
+                             dbo.STATE_DELETED, STATE_CREATING_ERROR,
+                             dbo.STATE_ERROR),
         dbo.STATE_CREATED: (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED,
-                            STATE_CREATED_ERROR),
+                            STATE_CREATED_ERROR, dbo.STATE_ERROR),
         STATE_INITIAL_ERROR: (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED,
                               dbo.STATE_ERROR),
         STATE_PREFLIGHT_ERROR: (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED,
@@ -245,6 +257,10 @@ class Instance(dbo):
                         'block_devices', bd)
 
     @classmethod
+    def _upgrade_step_14_to_15(cls, static_values):
+        pass
+
+    @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
             disk_spec=None, user_data=None, video=None, requested_placement=None,
             instance_uuid=None, uefi=False, configdrive=None, nvram_template=None,
@@ -358,6 +374,15 @@ class Instance(dbo):
                 'blob_uuid': disk.get('blob_uuid'),
                 'snapshot_ignores': disk.get('snapshot_ignores')
             })
+
+        # Mix in not yet executed agent operations. If you want to see _all_
+        # agent operations, then use the agentoperation REST API instead.
+        i['agent_operations_queue'] = []
+        ops = self.agent_operations
+        for agentop_uuid in ops.get('queued', []):
+            aop = AgentOperation.from_db(agentop_uuid)
+            if aop:
+                i['agent_operations_queue'].append(aop.external_view())
 
         return i
 
@@ -555,6 +580,21 @@ class Instance(dbo):
             return
         self._db_set_attribute('kvm_pid', {'pid': pid})
 
+    @property
+    def last_cluster_operation(self):
+        return self._db_get_attribute('last_cluster_operation')
+
+    def set_last_cluster_operation(self, op_type, op_uuid):
+        with self.get_lock_attr('last_cluster_operation',
+                                'Update last cluster op'):
+            self._db_set_attribute(
+                'last_cluster_operation',
+                {
+                    'op_type': op_type,
+                    'op_uuid': op_uuid
+                }
+            )
+
     # Implementation
     def _initialize_block_devices(self):
         blob_refs = defaultdict(int)
@@ -715,7 +755,7 @@ class Instance(dbo):
             self.state = self.STATE_CREATED
         else:
             self.add_event(EVENT_TYPE_AUDIT, 'instance failed to power on')
-            self.enqueue_delete_due_error('Instance failed to power on')
+            self.enqueue_delete_due_error('instance failed to power on')
 
     def _delete_on_hypervisor(self):
         if config.ARCHIVE_INSTANCE_CONSOLE_DURATION > 0:
@@ -1008,7 +1048,7 @@ class Instance(dbo):
                           rr_name='latest',
                           joliet_path='/openstack/latest')
 
-        # meta_data.json -- note that limits on hostname are imposted at the API layer
+        # meta_data.json -- note that limits on hostname are imposed at the API layer
         md = json.dumps({
             'random_seed': base64.b64encode(os.urandom(512)).decode('ascii'),
             'uuid': self.uuid,
@@ -1478,9 +1518,14 @@ class Instance(dbo):
         self.add_event(EVENT_TYPE_AUDIT, 'console log cleared')
 
     def enqueue_delete_remote(self, node):
-        etcd.enqueue(node, {
-            'tasks': [DeleteInstanceTask(self.uuid)]
-        })
+        op_type, op_uuid = nio_create_and_enqueue(
+            node,
+            self.uuid,
+            [nio_tasks.instance_delete],
+            PRIORITY.user_facing,
+            runs_after=[self.last_cluster_operation],
+            request_id=util_general.get_request_id())
+        self.set_last_cluster_operation(op_type, op_uuid)
 
     def enqueue_delete_due_error(self, error_msg):
         # Error needs to be set immediately so that API clients get
@@ -1521,6 +1566,7 @@ class Instance(dbo):
         self.log.with_fields({'devices': disks}).info('Devices for snapshot')
 
         out = {}
+        snapshots = []
         for disk in disks:
             if disk['snapshot_ignores']:
                 continue
@@ -1561,12 +1607,24 @@ class Instance(dbo):
                 a.state = artifact.Artifact.STATE_CREATED
 
             else:
-                etcd.enqueue(config.NODE_NAME, {
-                    'tasks': [SnapshotTask(self.uuid, disk, a.uuid, blob_uuid,
-                                           thin=thin)],
-                })
+                snapshots.append(niso_snapshot(
+                    disk=disk,
+                    artifact_uuid=a.uuid,
+                    blob_uuid=blob_uuid,
+                    thin=thin
+                ))
 
-        self.add_event(EVENT_TYPE_AUDIT, 'snapshot', extra=out)
+        op_type, op_uuid = niso_create_and_enqueue(
+            config.NODE_NAME,
+            self.uuid,
+            snapshots,
+            [niso_tasks.instance_snapshot],
+            PRIORITY.user_facing_high_io,
+            runs_after=[self.last_cluster_operation],
+            request_id=util_general.get_request_id())
+        self.set_last_cluster_operation(op_type, op_uuid)
+
+        self.add_event(EVENT_TYPE_AUDIT, 'snapshot requested', extra=out)
         return out
 
     def archive_console_log(self):
@@ -1695,15 +1753,7 @@ class Instance(dbo):
 
         return blob_uuid
 
-    def hot_plug_interface(self, network_uuid, interface_uuid):
-        n = network.Network.from_db(network_uuid)
-        if not n:
-            raise exceptions.NetworkMissing(network_uuid)
-
-        iface = networkinterface.NetworkInterface.from_db(interface_uuid)
-        if not iface:
-            raise exceptions.NetworkInterfaceException(interface_uuid)
-
+    def hot_plug_interface(self, n, ni):
         n.create_on_hypervisor()
         n.ensure_mesh()
         n.update_dnsmasq()
@@ -1716,9 +1766,9 @@ class Instance(dbo):
       <mtu size='{mtu}'/>
       </interface>
       """.format(
-                macaddr=iface.macaddr,
+                macaddr=ni.macaddr,
                 bridge=n.subst_dict()['vx_bridge'],
-                model=iface.model,
+                model=ni.model,
                 mtu=config.MAX_HYPERVISOR_MTU - 50
             )
 
@@ -1726,11 +1776,8 @@ class Instance(dbo):
                      lc.libvirt.VIR_DOMAIN_AFFECT_LIVE)
             inst = lc.get_domain_from_sf_uuid(self.uuid)
             inst.attachDeviceFlags(device_xml, flags=flags)
-            self.add_event(
-                EVENT_TYPE_AUDIT, 'hot plugged interface', extra={
-                    'networkinterface': interface_uuid,
-                    'network': network_uuid
-                })
+            add_event_multi(
+                EVENT_TYPE_AUDIT, [self, n, ni], 'hot plugged interface')
 
 
 class Instances(dbo_iter):
@@ -1765,7 +1812,7 @@ def instances_in_namespace(namespace):
 
 
 def all_instances():
-    for object_uuid in cache.read_object_state_cache(Instance.object_type, '_all_'):
+    for object_uuid in cache.read_object_state_cache_all(Instance.object_type):
         i = Instance.from_db(object_uuid)
         if i:
             yield i

@@ -15,23 +15,28 @@ from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
-from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
-from shakenfist.tasks import DeleteNetworkWhenClean
-from shakenfist.tasks import DestroyNetworkTask
-from shakenfist.tasks import RouteAddressTask
-from shakenfist.tasks import UnrouteAddressTask
+from shakenfist.etcd_schema.operations.baseclusteroperation \
+    import PRIORITY
+from shakenfist.etcd_schema.operations.net_op \
+    import create_and_enqueue as net_create_and_enqueue
+from shakenfist.etcd_schema.operations.net_op \
+    import model_tasks as net_tasks
+from shakenfist.etcd_schema.operations.net_ip_op \
+    import create_and_enqueue as nip_create_and_enqueue
+from shakenfist.etcd_schema.operations.net_ip_op \
+    import model_tasks as nip_tasks
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import general as util_general
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -57,10 +62,13 @@ def _delete_network(network_from_db, wait_interfaces=None):
     network_from_db.add_event(EVENT_TYPE_AUDIT, 'delete request from REST API')
     if wait_interfaces:
         n.state = network.Network.STATE_DELETE_WAIT
-        etcd.enqueue(config.NODE_NAME,
-                     {'tasks': [DeleteNetworkWhenClean(n.uuid, wait_interfaces)]})
     else:
-        etcd.enqueue('networknode', DestroyNetworkTask(n.uuid))
+        op_type, op_uuid = net_create_and_enqueue(
+            n.uuid,
+            [net_tasks.network_destroy],
+            PRIORITY.user_facing,
+            request_id=util_general.get_request_id())
+        n.set_last_cluster_operation(op_type, op_uuid)
 
 
 network_get_example = """{
@@ -597,7 +605,14 @@ class NetworkRouteAddressEndpoint(sf_api.Resource):
             return sf_api.error(507, str(e), suppress_traceback=True)
 
         network_from_db.add_event(EVENT_TYPE_AUDIT, 'route request from REST API')
-        etcd.enqueue('networknode', RouteAddressTask(network_from_db.uuid, address))
+        op_type, op_uuid = nip_create_and_enqueue(
+            network_from_db.uuid,
+            address,
+            [nip_tasks.route_address],
+            priority=PRIORITY.user_facing,
+            request_id=util_general.get_request_id()
+        )
+        network_from_db.set_last_cluster_operation(op_type, op_uuid)
         return address
 
 
@@ -626,7 +641,14 @@ class NetworkUnrouteAddressEndpoint(sf_api.Resource):
             return sf_api.error(403, 'address not routed by this network')
 
         network_from_db.add_event(EVENT_TYPE_AUDIT, 'unroute request from REST API')
-        etcd.enqueue('networknode', UnrouteAddressTask(network_from_db.uuid, address))
+        op_type, op_uuid = nip_create_and_enqueue(
+            network_from_db.uuid,
+            address,
+            [nip_tasks.unroute_address],
+            priority=PRIORITY.user_facing,
+            request_id=util_general.get_request_id()
+        )
+        network_from_db.set_last_cluster_operation(op_type, op_uuid)
 
 
 class NetworkDNSAddressEndpoint(sf_api.Resource):

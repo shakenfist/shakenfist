@@ -8,6 +8,7 @@ import uuid
 
 import cpuinfo
 import distro
+import flask
 from pbr.version import VersionInfo
 from shakenfist_utilities import logs  # noreorder
 
@@ -42,30 +43,21 @@ class RecordedOperation():
         if exc_val:
             message += f' ({str(exc_type)} exception raised)'
 
-        object_type, object_uuid = self.unique_label()
-        if object_uuid:
-            if object_type:
-                eventlog.add_event(EVENT_TYPE_STATUS, object_type, object_uuid,
-                                   message, duration)
-            else:
-                LOG.with_fields({
-                    'operation': self.operation,
-                    'label': self.object,
-                    'duration': duration
-                }).info(message)
-
-    def unique_label(self):
         if self.object:
-            if isinstance(self.object, str):
-                object_type = None
-                object_uuid = self.object
-            else:
-                object_type, object_uuid = self.object.unique_label()
+            eventlog.add_event_multi(
+                EVENT_TYPE_STATUS, [self.object], message, duration)
         else:
-            object_type = None
-            object_uuid = None
+            LOG.with_fields({
+                'operation': self.operation,
+                'duration': duration
+            }).info(message)
 
-        return object_type, object_uuid
+
+def recorded_method(func):
+    def wrapper(*args, **kwargs):
+        with RecordedOperation(f'{func} execution', None):
+            return func(*args, **kwargs)
+    return wrapper
 
 
 CACHED_VERSION = None
@@ -161,3 +153,10 @@ def valid_uuid4(uuid_string):
     except ValueError:
         return False
     return True
+
+
+def get_request_id():
+    try:
+        return flask.request.environ.get('FLASK_REQUEST_ID')
+    except RuntimeError:
+        return None

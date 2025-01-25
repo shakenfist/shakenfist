@@ -8,7 +8,6 @@
 #   - Has complete CI coverage:
 import os
 import uuid
-from collections import defaultdict
 from functools import partial
 
 import flask
@@ -19,14 +18,35 @@ from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
-from shakenfist import etcd
+from shakenfist.etcd_schema.operations.baseclusteroperation import dependency
+from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.etcd_schema.operations.artifact_fetch_op \
+    import create_and_enqueue as afo_create_and_enqueue
+from shakenfist.etcd_schema.operations.artifact_fetch_op \
+    import model_tasks as afo_tasks
+from shakenfist.etcd_schema.operations.node_aop_op \
+    import create_and_enqueue as na_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_aop_op \
+    import model_tasks as na_tasks
+from shakenfist.etcd_schema.operations.node_inst_op \
+    import create_and_enqueue as nio_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_inst_op \
+    import model_tasks as nio_tasks
+from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
+    import create_and_enqueue as niio_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
+    import model_tasks as niio_tasks
+from shakenfist.etcd_schema.operations.node_inst_netdesc_op \
+    import create_and_enqueue as nino_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_inst_netdesc_op \
+    import model_tasks as nino_tasks
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import network as sfnet
 from shakenfist import scheduler
-from shakenfist.agentoperation import AgentOperation
+from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
 from shakenfist.artifact import ARTIFACT_URL
 from shakenfist.artifact import BLOB_URL
@@ -44,13 +64,6 @@ from shakenfist.external_api import util as api_util
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
-from shakenfist.tasks import DeleteInstanceTask
-from shakenfist.tasks import FetchImageTask
-from shakenfist.tasks import FloatNetworkInterfaceTask
-from shakenfist.tasks import HotPlugInstanceInterfaceTask
-from shakenfist.tasks import PreflightAgentOperationTask
-from shakenfist.tasks import PreflightInstanceTask
-from shakenfist.tasks import StartInstanceTask
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util import general as util_general
 
@@ -292,10 +305,11 @@ def _netdesc_allocate_address(inst, netdesc, order):
     n = sfnet.Network.from_db(netdesc['network_uuid'])
     if not n:
         inst.enqueue_delete_due_error(
-            'missing network %s during IP allocation phase'
-            % netdesc['network_uuid'])
-        return None, None, sf_api.error(
-            404, 'network %s not found' % netdesc['network_uuid'])
+            'missing network  during IP allocation phase')
+        return (
+            None,
+            sf_api.error(404, f'network {netdesc["network_uuid"]} not found')
+        )
 
     # NOTE(mikal): we now support interfaces with no address on them
     # (thanks OpenStack Kolla), which are special cased here. To not
@@ -316,12 +330,12 @@ def _netdesc_allocate_address(inst, netdesc, order):
                     inst.enqueue_delete_due_error(
                         'failed to reserve an IP on network %s'
                         % netdesc['network_uuid'])
-                    return None, None, sf_api.error(
+                    return None, sf_api.error(
                         409, 'address %s in use' % netdesc['address'])
+
     except exceptions.CongestedNetwork as e:
-        inst.enqueue_delete_due_error(
-            'cannot allocate address: %s' % e)
-        return None, None, sf_api.error(507, str(e), suppress_traceback=True)
+        inst.enqueue_delete_due_error('cannot allocate address: %s' % e)
+        return None, sf_api.error(507, str(e), suppress_traceback=True)
 
     if 'model' not in netdesc or not netdesc['model']:
         netdesc['model'] = 'virtio'
@@ -334,27 +348,23 @@ def _netdesc_allocate_address(inst, netdesc, order):
     }).with_fields(netdesc).info('Interface allocated')
     ni = NetworkInterface.new(iface_uuid, netdesc, inst.uuid, order)
 
-    float_task = None
     try:
         if 'float' in netdesc and netdesc['float']:
             err = api_util.assign_floating_ip(ni)
             if err:
                 inst.enqueue_delete_due_error(
                     'interface float failed: %s' % err)
-                return None, None, err
+                return None, err
 
-            float_task = FloatNetworkInterfaceTask(
-                netdesc['network_uuid'], iface_uuid)
     except exceptions.CongestedNetwork as e:
-        inst.enqueue_delete_due_error(
-            'cannot allocate address: %s' % e)
-        return None, None, sf_api.error(507, str(e), suppress_traceback=True)
+        inst.enqueue_delete_due_error('cannot allocate address: %s' % e)
+        return None, sf_api.error(507, str(e), suppress_traceback=True)
 
     # Include the interface uuid in the network description we
     # pass through to the instance start task.
     netdesc['iface_uuid'] = iface_uuid
 
-    return float_task, netdesc, None
+    return netdesc, None
 
 
 instances_get_example = """[
@@ -706,6 +716,11 @@ class InstancesEndpoint(sf_api.Resource):
             side_channels=side_channels
         )
         inst.add_event(EVENT_TYPE_AUDIT, 'create request from REST API')
+        inst.add_event(
+            EVENT_TYPE_AUDIT, 'requested networking configuration',
+            extra={
+                'networks': network
+            })
 
         # Initialise metadata
         if metadata:
@@ -713,18 +728,21 @@ class InstancesEndpoint(sf_api.Resource):
 
         # Allocate IP addresses
         order = 0
-        float_tasks = []
         updated_networks = []
         if network:
             for netdesc in network:
-                float_task, netdesc, err = _netdesc_allocate_address(
-                    inst, netdesc, order)
+                netdesc, err = _netdesc_allocate_address(inst, netdesc, order)
                 if err:
                     return err
-                if float_task:
-                    float_tasks.append(float_task)
                 updated_networks.append(netdesc)
                 order += 1
+
+        inst.add_event(
+            EVENT_TYPE_AUDIT,
+            'post address allocation networking configuration',
+            extra={
+                'networks': updated_networks
+            })
 
         # Store interfaces soon as they are allocated to the instance
         inst.interfaces = [i['iface_uuid'] for i in updated_networks]
@@ -735,11 +753,11 @@ class InstancesEndpoint(sf_api.Resource):
         try:
             # Have we been placed?
             if not placed_on:
-                candidates = SCHEDULER.find_candidates(inst, updated_networks)
+                candidates = SCHEDULER.find_candidates(inst)
                 placement = candidates[0]
 
             else:
-                SCHEDULER.find_candidates(inst, network, candidates=[placed_on])
+                SCHEDULER.find_candidates(inst, candidates=[placed_on])
                 placement = placed_on
 
         except exceptions.LowResourceException as e:
@@ -758,23 +776,47 @@ class InstancesEndpoint(sf_api.Resource):
         # Record placement
         inst.place_instance(placement)
 
-        # Create a queue entry for the instance start
-        tasks = [PreflightInstanceTask(inst.uuid, network)]
+        # Request the artifact fetches immediately
+        instance_start_dependencies = []
+
         for disk in inst.disk_spec:
             disk_base = disk.get('base')
             if disk.get('blob_uuid'):
-                tasks.append(FetchImageTask(
-                    '{}{}'.format(BLOB_URL, disk['blob_uuid']),
-                    namespace=namespace, instance_uuid=inst.uuid))
+                url = f'{BLOB_URL}{disk["blob_uuid"]}'
             elif not util_general.noneish(disk_base):
-                tasks.append(FetchImageTask(
-                    disk['base'],
-                    namespace=namespace, instance_uuid=inst.uuid))
-        tasks.append(StartInstanceTask(inst.uuid, network))
-        tasks.extend(float_tasks)
+                url = disk['base']
 
-        # Enqueue creation tasks on desired node task queue
-        etcd.enqueue(placement, {'tasks': tasks})
+            # TODO(mikal): I would really like the target_node not to be set
+            # here so that any node in the cluster could start downloading
+            # this image ASAP. Unfortunately, image download is also comingled
+            # with populating the local image cache for instance start at the
+            # moment and I need to tease that apart first.
+            op_type, op_uuid = afo_create_and_enqueue(
+                namespace,
+                url,
+                inst.uuid,
+                [afo_tasks.image_fetch],
+                PRIORITY.user_waiting,
+                request_id=util_general.get_request_id(),
+                target_node=placement)
+            instance_start_dependencies.append(
+                dependency(op_type=op_type, op_uuid=op_uuid))
+
+        # Then request the instance start
+        if not instance_start_dependencies:
+            instance_start_dependencies = None
+        op_type, op_uuid = nino_create_and_enqueue(
+            placement,
+            inst.uuid,
+            updated_networks,
+            [nino_tasks.instance_preflight,
+             nino_tasks.instance_start],
+            PRIORITY.user_waiting,
+            request_id=util_general.get_request_id(),
+            depends_on=instance_start_dependencies,
+            runs_after=[inst.last_cluster_operation])
+        inst.set_last_cluster_operation(op_type, op_uuid)
+
         return inst.external_view()
 
     @swag_from(api_base.swagger_helper(
@@ -807,7 +849,6 @@ class InstancesEndpoint(sf_api.Resource):
             namespace = parse_jwt_identity()[0]
 
         waiting_for = []
-        tasks_by_node = defaultdict(list)
         for inst in instance.Instances([partial(baseobject.namespace_filter, namespace)]):
             inst.add_event(
                 EVENT_TYPE_AUDIT, 'delete request via delete all from REST API')
@@ -819,11 +860,16 @@ class InstancesEndpoint(sf_api.Resource):
             else:
                 node = db_placement['node']
 
-            tasks_by_node[node].append(DeleteInstanceTask(inst.uuid))
-            waiting_for.append(inst.uuid)
+            op_type, op_uuid = nio_create_and_enqueue(
+                node,
+                inst.uuid,
+                [nio_tasks.instance_delete],
+                PRIORITY.user_facing,
+                runs_after=[inst.last_cluster_operation],
+                request_id=util_general.get_request_id())
+            inst.set_last_cluster_operation(op_type, op_uuid)
 
-        for node in tasks_by_node:
-            etcd.enqueue(node, {'tasks': tasks_by_node[node]})
+            waiting_for.append(inst.uuid)
 
         return waiting_for
 
@@ -920,19 +966,24 @@ class InstanceInterfacesEndpoint(sf_api.Resource):
                 return sf_api.error(406, 'instance interfae list invalid')
             order = last_iface.order + 1
 
-        float_task, netdesc, err = _netdesc_allocate_address(
+        netdesc, err = _netdesc_allocate_address(
             instance_from_db, network, order)
         if err:
             return err
 
-        tasks = [HotPlugInstanceInterfaceTask(
-            instance_from_db.uuid, netdesc['network_uuid'], netdesc['iface_uuid'])]
-
-        if float_task:
-            tasks.append(float_task)
+        op_type, op_uuid = niio_create_and_enqueue(
+            instance_from_db.placement['node'],
+            instance_from_db.uuid,
+            netdesc['network_uuid'],
+            netdesc['iface_uuid'],
+            [niio_tasks.hot_plug_instance_interface],
+            PRIORITY.user_waiting,
+            request_id=util_general.get_request_id(),
+            depends_on=None,
+            runs_after=[instance_from_db.last_cluster_operation])
+        instance_from_db.set_last_cluster_operation(op_type, op_uuid)
         instance_from_db.interfaces_append(netdesc['iface_uuid'])
 
-        etcd.enqueue(instance_from_db.placement['node'], {'tasks': tasks})
         return NetworkInterface.from_db(netdesc['iface_uuid']).external_view()
 
 
@@ -1454,8 +1505,11 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
             EVENT_TYPE_AUDIT, 'queued agent command requiring preflight',
             extra={'agentoperation': o.uuid, 'commands': commands})
         o.state = AgentOperation.STATE_PREFLIGHT
-        etcd.enqueue(instance_from_db.placement['node'],
-                     {'tasks': [PreflightAgentOperationTask(o.uuid)]})
+        na_create_and_enqueue(
+            instance_from_db.placement['node'], o.uuid,
+            [na_tasks.preflight],
+            PRIORITY.user_facing,
+            request_id=util_general.get_request_id())
         return o.external_view()
 
 

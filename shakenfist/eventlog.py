@@ -19,6 +19,7 @@ from shakenfist import event_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
@@ -75,8 +76,13 @@ def _add_event_multi_inner(
         stub = event_pb2_grpc.EventServiceStub(channel)
 
         request = event_pb2.EventMultiRequest(
-            event_type=event_type, timestamp=timestamp, fqdn=config.NODE_NAME,
-            duration=duration, message=message, extra=json.dumps(extra))
+            event_type=event_type,
+            timestamp=timestamp,
+            fqdn=config.NODE_NAME,
+            duration=duration,
+            message=message,
+            extra=util_json.json_dump(extra)
+        )
 
         for object_type, object_uuid in simpler_objects:
             if not object_uuid:
@@ -120,10 +126,15 @@ def _add_event_inner(
 
         for object_type, object_uuid in simpler_objects:
             request = event_pb2.EventRequest(
-                object_type=object_type, object_uuid=object_uuid,
-                event_type=event_type, timestamp=timestamp,
-                fqdn=config.NODE_NAME, duration=duration,
-                message=message, extra=json.dumps(extra))
+                object_type=object_type,
+                object_uuid=object_uuid,
+                event_type=event_type,
+                timestamp=timestamp,
+                fqdn=config.NODE_NAME,
+                duration=duration,
+                message=message,
+                extra=util_json.json_dump(extra)
+            )
             response = stub.RecordEvent(request)
 
             if not response.ack:
@@ -201,14 +212,6 @@ def add_event_multi(
     for object_type, object_uuid in simpler_objects:
         log = log.with_fields({object_type: object_uuid})
 
-    # If your eventlog server isn't setup, we get cranky. Note that this
-    # happens during unit test discovery for py3 unit tests.
-    if not config.EVENTLOG_NODE_IP:
-        caller = util_callstack.generate_traceback()
-        log.error('Cannot record event, no configured server! Caller was:\n'
-                  f'{caller}')
-        return
-
     if not suppress_event_logging:
         if log_as_error:
             log.error('Added event')
@@ -216,27 +219,36 @@ def add_event_multi(
             log.info('Added event')
 
     # *** Note that the APIs are different here!
-    #
-    # Try the new way
-    attempts = 0
-    while attempts < 3:
-        try:
-            # Here we get an exception on error, because there's only one
-            # message sent.
-            _add_event_multi_inner(
-                event_type, log, timestamp, simpler_objects, message,
-                duration=duration, extra=extra)
+    if not config.EVENTLOG_SUPPRESS_GRPC:
+        # If your eventlog server isn't setup, we get cranky. Note that this
+        # happens during unit test discovery for py3 unit tests.
+        if not config.EVENTLOG_NODE_IP:
+            caller = util_callstack.generate_traceback()
+            log.error(
+                'Cannot record event, no configured server! Caller was:\n'
+                f'{caller}')
             return
-        except grpc.RpcError:
-            attempts += 1
-            time.sleep(0.2)
 
-    # Try the old way
-    simpler_objects = _add_event_inner(
-        event_type, log, timestamp, simpler_objects, message,
-        duration=duration, extra=extra)
-    if not simpler_objects:
-        return
+        # Try the new way
+        attempts = 0
+        while attempts < 3:
+            try:
+                # Here we get an exception on error, because there's only one
+                # message sent.
+                _add_event_multi_inner(
+                    event_type, log, timestamp, simpler_objects, message,
+                    duration=duration, extra=extra)
+                return
+            except grpc.RpcError:
+                attempts += 1
+                time.sleep(0.2)
+
+        # Try the old way
+        simpler_objects = _add_event_inner(
+            event_type, log, timestamp, simpler_objects, message,
+            duration=duration, extra=extra)
+        if not simpler_objects:
+            return
 
     # And then the dead letter queue for the remainders
     _add_event_dlq_inner(
@@ -260,10 +272,7 @@ def upgrade_data_store():
         # sqlite database.
         version = 2
         count = 0
-        for objtype in [
-                'agentoperation', 'api-requests', 'artifact', 'blob', 'dhcp',
-                'instance', 'ipam', 'namespace', 'network', 'networkinterface',
-                'node', 'upload']:
+        for objtype in constants.OBJECT_NAMES:
             objroot = os.path.join(config.STORAGE_PATH, 'events', objtype)
             if os.path.exists(objroot):
                 for ent in os.listdir(objroot):
@@ -300,7 +309,7 @@ def upgrade_data_store():
     if start_version != version:
         os.makedirs(os.path.dirname(version_path), exist_ok=True)
         with open(version_path, 'w') as f:
-            f.write(json.dumps({'version': version}, indent=4, sort_keys=True))
+            f.write(util_json.json_dump({'version': version}))
         LOG.info('Event datastore upgrade took %.02f seconds'
                  % (time.time() - start_time))
 
@@ -391,7 +400,7 @@ class EventLog:
                 continue
 
             try:
-                _, yearmonth = ent.split('.')
+                _, yearmonth = ent.split('/')[-1].split('.')
                 if '-' in yearmonth:
                     # Entries like -journal, -wal, -shm that internals of sqlite
                     continue
@@ -701,8 +710,7 @@ class EventLogChunk:
             'extra, correlation_id) '
             'VALUES (?, ?, ?, ?, ?, ?, ?)',
             (event_type, timestamp, fqdn, duration, message,
-             json.dumps(extra, cls=etcd.JSONEncoderCustomTypes),
-             correlation_id))
+             util_json.json_dump(extra), correlation_id))
         self.con.commit()
 
     def read_events(self, limit=100, event_type=None):

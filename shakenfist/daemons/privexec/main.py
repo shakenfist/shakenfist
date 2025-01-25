@@ -7,14 +7,13 @@ import os
 import signal
 import socket
 import subprocess
-import sys
 import threading
 import time
 
-from shakenfist_utilities import random      # noreorder
-
 from google.protobuf.message import DecodeError
 import psutil
+import setproctitle
+from shakenfist_utilities import random      # noreorder
 from shakenfist_utilities import logs
 
 from shakenfist import privexec_pb2
@@ -76,18 +75,7 @@ class PrivExecJob:
         if request.working_directory != '':
             working_directory = request.working_directory
 
-        LOG.with_fields({
-            'request_id': request.request_id,
-            'execution_id': request.execution_id,
-            'command': command,
-            'working_directory': working_directory,
-            'environment_variables': env_variables,
-            'current_io_priority': current_iopriority,
-            'requested_io_priority': requested_iopriority
-        }).debug('Executing command')
-
         start_time = time.time()
-
         pipe = subprocess.PIPE
         obj = subprocess.Popen(
             command, stdin=pipe, stdout=pipe, stderr=pipe, close_fds=True,
@@ -102,6 +90,11 @@ class PrivExecJob:
         LOG.with_fields({
             'request_id': request.request_id,
             'execution_id': request.execution_id,
+            'command': command,
+            'working_directory': working_directory,
+            'environment_variables': env_variables,
+            'current_io_priority': current_iopriority,
+            'requested_io_priority': requested_iopriority,
             'exit_code': exit_code,
             'duration': duration
         }).debug('Executed command')
@@ -148,7 +141,7 @@ class PrivExecJob:
 
 
 def write_pid_file():
-    with open('/run/sf-privexec.pid', 'w') as f:
+    with open('/run/sf/privexec.pid', 'w') as f:
         f.write(f'{os.getpid()}')
 
 
@@ -158,6 +151,7 @@ def main():
     global EXIT
 
     write_pid_file()
+    setproctitle.setproctitle('sf-privexec')
 
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
@@ -177,10 +171,6 @@ def main():
 
         if conn:
             thread_name = random.random_id()
-            LOG.with_fields({
-                'thread_name': thread_name
-            }).info('Accepted incoming request')
-
             worker_object = PrivExecJob(conn)
             worker_thread = threading.Thread(
                 target=worker_object.run, daemon=True, name=thread_name)
@@ -196,10 +186,6 @@ def main():
                 remaining_workers[thread_name] = workers[thread_name]
             else:
                 thread_ident = workers[thread_name]['thread'].ident
-                LOG.with_fields({
-                    'thread_name': thread_name,
-                    'thread_ident': thread_ident
-                }).info('Reaping thread.')
                 workers[thread_name]['thread'].join(0.2)
         workers = remaining_workers
 
@@ -242,4 +228,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

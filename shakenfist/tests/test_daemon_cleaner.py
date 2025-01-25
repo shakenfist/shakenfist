@@ -87,9 +87,6 @@ class CleanerTestCase(base.ShakenFistTestCase):
         self.mock_libvirt = self.libvirt.start()
         self.addCleanup(self.libvirt.stop)
 
-        self.proctitle = mock.patch('pyprctl.set_name')
-        self.mock_proctitle = self.proctitle.start()
-        self.addCleanup(self.proctitle.stop)
         self.config = mock.patch('shakenfist.daemons.cleaner.main.config',
                                  fake_config)
         self.mock_config = self.config.start()

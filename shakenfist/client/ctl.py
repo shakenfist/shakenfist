@@ -35,9 +35,10 @@ sf_config.verify_config(skip_auth_seed=True)
 config = sf_config.config
 
 # These imports _must_ occur after the extra config setup has run.
-from shakenfist import etcd                  # noqa
-from shakenfist.namespace import Namespace   # noqa
-from shakenfist.node import Node             # noqa
+from shakenfist.cache import refresh_object_state_caches   # noqa
+from shakenfist import etcd                                # noqa
+from shakenfist.namespace import Namespace                 # noqa
+from shakenfist.node import Node                           # noqa
 
 
 @click.group()
@@ -145,6 +146,12 @@ def stop(daemon):
     n.set_daemon_state(daemon, Node.DAEMON_STATE_STOPPING)
 
 
+@click.command()
+def rebuild_etcd_caches():
+    refresh_object_state_caches()
+    click.echo('etcd caches rebuilt.')
+
+
 cli.add_command(bootstrap_system_key)
 cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
@@ -153,3 +160,4 @@ cli.add_command(initialise_node)
 cli.add_command(register_daemon)
 cli.add_command(deregister_daemon)
 cli.add_command(stop)
+cli.add_command(rebuild_etcd_caches)

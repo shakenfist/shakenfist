@@ -9,7 +9,10 @@ from shakenfist import exceptions
 from shakenfist import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
-from shakenfist.tasks import DefloatNetworkInterfaceTask
+from shakenfist.etcd_schema.operations.net_iface_ip_op \
+    import create_and_enqueue as nii_create_and_enqueue
+from shakenfist.etcd_schema.operations.net_iface_ip_op \
+    import model_tasks as nii_tasks
 from shakenfist.util import network as util_network
 
 
@@ -141,9 +144,12 @@ class NetworkInterface(dbo):
     def delete(self):
         floating_address = self.floating['floating_address']
         if floating_address:
-            task = DefloatNetworkInterfaceTask(
-                self.network_uuid, self.uuid, floating_address)
-            etcd.enqueue('networknode', task)
+            op_type, op_uuid = nii_create_and_enqueue(
+                self.network_uuid, self.uuid, floating_address,
+                [nii_tasks.interface_defloat])
+            n = network.Network.from_db(self.network_uuid)
+            if n:
+                n.set_last_cluster_operation(op_type, op_uuid)
 
             fn = network.floating_network()
             fn.ipam.release(floating_address)

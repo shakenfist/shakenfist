@@ -21,6 +21,19 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.etcd_schema.operations.net_op \
+    import create_and_enqueue as net_create_and_enqueue
+from shakenfist.etcd_schema.operations.net_op \
+    import model_tasks as net_tasks
+from shakenfist.etcd_schema.operations.net_macaddr_ip_op \
+    import create_and_enqueue as nmi_create_and_enqueue
+from shakenfist.etcd_schema.operations.net_macaddr_ip_op \
+    import model_tasks as nmi_tasks
+from shakenfist.etcd_schema.operations.node_net_op \
+    import create_and_enqueue as nn_create_and_enqueue
+from shakenfist.etcd_schema.operations.node_net_op \
+    import model_tasks as nn_tasks
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
@@ -30,12 +43,7 @@ from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
-from shakenfist.tasks import DeployNetworkTask
-from shakenfist.tasks import HypervisorDestroyNetworkTask
-from shakenfist.tasks import RemoveDHCPLeaseNetworkTask
-from shakenfist.tasks import RemoveDnsMasqNetworkTask
-from shakenfist.tasks import RemoveNATNetworkTask
-from shakenfist.tasks import UpdateDnsMasqNetworkTask
+from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
 from shakenfist.util import concurrency as util_concurrency
 
@@ -46,7 +54,7 @@ LOG, _ = logs.setup(__name__)
 class Network(dbo):
     object_type = 'network'
     initial_version = 2
-    current_version = 6
+    current_version = 7
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -120,6 +128,10 @@ class Network(dbo):
     def _upgrade_step_5_to_6(cls, static_values):
         etcd.put('attribute/network', static_values['uuid'], 'hosteddns', {})
 
+    @classmethod
+    def _upgrade_step_6_to_7(cls, static_values):
+        ...
+
     @staticmethod
     def allocate_vxid(net_id):
         reservation = {
@@ -165,7 +177,13 @@ class Network(dbo):
         n.state = Network.STATE_INITIAL
 
         # Networks should immediately appear on the network node
-        etcd.enqueue('networknode', DeployNetworkTask(network_uuid))
+        op_type, op_uuid = net_create_and_enqueue(
+            n.uuid,
+            [net_tasks.network_deploy],
+            PRIORITY.user_waiting,
+            runs_after=[n.last_cluster_operation],
+            request_id=util_general.get_request_id())
+        n.set_last_cluster_operation(op_type, op_uuid)
 
         return n
 
@@ -236,6 +254,23 @@ class Network(dbo):
     @property
     def vxid(self):
         return self.__vxid
+
+    # NOTE(mikal): these are only used to sequence operations on the network
+    # node, not network operations on a single hypervisor.
+    @property
+    def last_cluster_operation(self):
+        return self._db_get_attribute('last_cluster_operation')
+
+    def set_last_cluster_operation(self, op_type, op_uuid):
+        with self.get_lock_attr('last_cluster_operation',
+                                'Update last cluster op'):
+            self._db_set_attribute(
+                'last_cluster_operation',
+                {
+                    'op_type': op_type,
+                    'op_uuid': op_uuid
+                }
+            )
 
     # Calculated values
     @property
@@ -611,10 +646,12 @@ class Network(dbo):
         # just catching strays, apart from on the network node where we
         # absolutely need to do this thing.
         for n in Nodes([], prefilter='active'):
-            etcd.enqueue(n.uuid,
-                         {'tasks': [
-                             HypervisorDestroyNetworkTask(self.uuid)
-                         ]})
+            nn_create_and_enqueue(
+                n.uuid,
+                self.uuid,
+                [nn_tasks.network_destroy],
+                PRIORITY.user_facing,
+                request_id=util_general.get_request_id())
 
         self.remove_dnsmasq()
         self.remove_nat()
@@ -642,8 +679,10 @@ class Network(dbo):
                 d = self._get_dnsmasq_object()
                 d.remove_lease(ipv4, macaddr)
         else:
-            etcd.enqueue('networknode',
-                         RemoveDHCPLeaseNetworkTask(self.uuid, ipv4, macaddr))
+            op_type, op_uuid = nmi_create_and_enqueue(
+                self.uuid, macaddr, ipv4, [nmi_tasks.remove_dhcp_lease],
+                PRIORITY.user_facing)
+            self.set_last_cluster_operation(op_type, op_uuid)
 
     def update_dnsmasq(self):
         if not self.provide_dhcp and not self.provide_dns:
@@ -654,7 +693,11 @@ class Network(dbo):
                 d = self._get_dnsmasq_object()
                 d.restart()
         else:
-            etcd.enqueue('networknode', UpdateDnsMasqNetworkTask(self.uuid))
+            net_create_and_enqueue(
+                self.uuid,
+                [net_tasks.network_update_dnsmasq],
+                priority=PRIORITY.user_facing_high_io
+            )
 
     def remove_dnsmasq(self):
         if not self.provide_dhcp and not self.provide_dns:
@@ -666,7 +709,11 @@ class Network(dbo):
                 d.terminate()
                 d.state = dnsmasq.DnsMasq.STATE_DELETED
         else:
-            etcd.enqueue('networknode', RemoveDnsMasqNetworkTask(self.uuid))
+            net_create_and_enqueue(
+                self.uuid,
+                [net_tasks.network_remove_dnsmasq],
+                priority=PRIORITY.user_facing
+            )
 
     def enable_nat(self):
         if not config.NODE_IS_NETWORK_NODE:
@@ -698,7 +745,11 @@ class Network(dbo):
                 self.unassign_floating_gateway()
 
         else:
-            etcd.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
+            net_create_and_enqueue(
+                self.uuid,
+                [net_tasks.network_remove_nat],
+                priority=PRIORITY.user_facing
+            )
 
     def update_dns_entry(self, name, value):
         if not self.provide_dns:
@@ -714,7 +765,11 @@ class Network(dbo):
                 d = self._get_dnsmasq_object()
                 d.restart()
         else:
-            etcd.enqueue('networknode', UpdateDnsMasqNetworkTask(self.uuid))
+            net_create_and_enqueue(
+                self.uuid,
+                [net_tasks.network_update_dnsmasq],
+                priority=PRIORITY.user_facing_high_io
+            )
 
     def remove_dns_entry(self, name):
         if not self.provide_dns:
@@ -731,7 +786,11 @@ class Network(dbo):
                 d = self._get_dnsmasq_object()
                 d.restart()
         else:
-            etcd.enqueue('networknode', UpdateDnsMasqNetworkTask(self.uuid))
+            net_create_and_enqueue(
+                self.uuid,
+                [net_tasks.network_update_dnsmasq],
+                priority=PRIORITY.user_facing_high_io
+            )
 
     def discover_mesh(self):
         # The floating network does not have a vxlan mesh

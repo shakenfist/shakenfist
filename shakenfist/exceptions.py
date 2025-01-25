@@ -70,10 +70,6 @@ class LowResourceException(SchedulerException):
     ...
 
 
-class AbortInstanceStartException(SchedulerException):
-    ...
-
-
 # Database
 class DatabaseException(Exception):
     ...
@@ -100,6 +96,10 @@ class PreExistingReadOnlyCache(DatabaseException):
 
 
 class PrefixNotInCache(DatabaseException):
+    ...
+
+
+class CannotEnqueueWork(DatabaseException):
     ...
 
 
@@ -136,10 +136,6 @@ class UnknownTaskException(TaskException):
 
 
 class NoURLImageFetchTaskException(TaskException):
-    ...
-
-
-class ImageFetchTaskFailedException(TaskException):
     ...
 
 

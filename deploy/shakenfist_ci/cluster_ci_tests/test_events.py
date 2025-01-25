@@ -25,7 +25,7 @@ class TestEvents(base.BaseNamespacedTestCase):
 
     def test_instance_events(self):
         inst1 = self.test_client.create_instance(
-            'test-provided-dns', 1, 1024,
+            'test-instance-events', 1, 1024,
             [
                 {
                     'network_uuid': self.net_one['uuid']

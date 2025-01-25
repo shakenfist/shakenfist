@@ -1,5 +1,3 @@
-import os
-import sys
 import time
 
 from shakenfist_utilities import logs  # noreorder
@@ -35,7 +33,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'stray-nics': stray_nics.Job
         }
 
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             try:
                 self.reap_workers()
 
@@ -143,4 +141,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

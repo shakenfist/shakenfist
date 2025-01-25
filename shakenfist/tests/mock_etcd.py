@@ -10,12 +10,12 @@ from collections import defaultdict
 from itertools import count
 from unittest import mock
 
-from shakenfist import etcd
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
 from shakenfist.network import Network
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
+from shakenfist.util import json as util_json
 
 
 class MockEtcd():
@@ -67,11 +67,11 @@ class MockEtcd():
         self.etcd_get_raw.start()
         self.test_obj.addCleanup(self.etcd_get_raw.stop)
 
-        self.etcd_get_prefix = mock.patch(
-            'shakenfist.etcd.WrappedEtcdClient.get_prefix',
-            side_effect=self.get_prefix)
-        self.etcd_get_prefix.start()
-        self.test_obj.addCleanup(self.etcd_get_prefix.stop)
+        self.etcd_get_prefix_raw = mock.patch(
+            'shakenfist.etcd.get_prefix_raw',
+            side_effect=self.get_prefix_raw)
+        self.etcd_get_prefix_raw.start()
+        self.test_obj.addCleanup(self.etcd_get_prefix_raw.stop)
 
         self.etcd_put_raw = mock.patch(
             'shakenfist.etcd.put_raw',
@@ -79,11 +79,11 @@ class MockEtcd():
         self.etcd_put_raw.start()
         self.test_obj.addCleanup(self.etcd_put_raw.stop)
 
-        self.etcd_delete = mock.patch(
-            'shakenfist.etcd.WrappedEtcdClient.delete',
-            side_effect=self.delete)
-        self.etcd_delete.start()
-        self.test_obj.addCleanup(self.etcd_delete.stop)
+        self.etcd_delete_raw = mock.patch(
+            'shakenfist.etcd.delete_raw',
+            side_effect=self.delete_raw)
+        self.etcd_delete_raw.start()
+        self.test_obj.addCleanup(self.etcd_delete_raw.stop)
 
         self.etcd_delete_prefix = mock.patch(
             'shakenfist.etcd.WrappedEtcdClient.delete_prefix',
@@ -107,7 +107,11 @@ class MockEtcd():
 
     def next_uuid(self):
         """Generate predictable UUIDs that are unique during the testcase"""
-        return '12345678-1234-4321-1234-%012i' % next(self.obj_counter)
+        # NOTE(mikal): there are version and variant fields in uuid4's that
+        # pydantic enforces.
+        #               version    variant
+        #                     *    *
+        return '12345678-1234-4321-8234-%012i' % next(self.obj_counter)
 
     def _trace(self, m):
         if self.emit_tracing:
@@ -117,15 +121,20 @@ class MockEtcd():
     # DB operations - Low level
     #
 
-    def get_prefix(self, path, sort_order=None, sort_target=None, limit=0):
+    def get_prefix_raw(self, path, limit=0):
         ret = []
         for k in sorted(self.db):
             if k.startswith(path):
-                ret.append((self.db[k].decode(), {'key': k.encode('utf-8')}))
-                self._trace('MockEtcd.delete_prefix() %s' % k)
+                d = json.loads(self.db[k].decode())
+                ret.append((k, d))
+                self._trace(
+                    f'MockEtcd.get_prefix_raw({path}) included key {k}: {d}')
+
+            if limit > 0 and len(ret) == limit:
+                return ret
         return ret
 
-    def delete(self, path):
+    def delete_raw(self, path):
         if path in self.db:
             del self.db[path]
             self._trace('MockEtcd.delete() %s' % path)
@@ -139,7 +148,7 @@ class MockEtcd():
     # Newer gRPC methods
     def create_raw(self, path, data, lease=None):
         if path not in self.db:
-            self.db[path] = etcd._encode_data(data)
+            self.db[path] = util_json.json_dump(data).encode()
             self._trace(f'MockEtcd.create() {path} successful')
             return True
 
@@ -154,7 +163,7 @@ class MockEtcd():
         return d
 
     def put_raw(self, path, data, lease=None):
-        encoded = etcd._encode_data(data)
+        encoded = util_json.json_dump(data).encode()
         self.db[path] = encoded
         self._trace(f'MockEtcd.put() {path}: {encoded}')
 
@@ -165,8 +174,8 @@ class MockEtcd():
 
         for mutation in mutations:
             path = mutation['path']
-            ode = etcd._encode_data(mutation['original_data'])
-            nde = etcd._encode_data(mutation['new_data'])
+            ode = util_json.json_dump(mutation['original_data']).encode()
+            nde = util_json.json_dump(mutation['new_data']).encode()
 
             if not mutation['original_data']:
                 if path in self.db:
@@ -243,7 +252,7 @@ class MockEtcd():
                 'timestamp': time.time(),
                 'metrics': metrics,
             }
-            self.db[key] = etcd._encode_data(data)
+            self.db[key] = util_json.json_dump(data).encode()
 
     #
     # Database backed objects

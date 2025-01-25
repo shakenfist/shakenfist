@@ -2,27 +2,27 @@ import json
 import os
 import pathlib
 import time
-from collections import defaultdict
 from functools import partial
 
-import pyprctl
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import cache
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import network
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_ITERATORS
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist.blob import placement_filter
 from shakenfist.config import config
+from shakenfist.constants import get_object_class
+from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
+from shakenfist.operations.baseoperation import get_all_node_queues
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
+from shakenfist.util import json as util_json
 
 
 LOG, HANDLER = logs.setup('main')
@@ -86,7 +86,7 @@ def upgrade_blob_datastore():
     if start_version != version:
         os.makedirs(os.path.dirname(version_path), exist_ok=True)
         with open(version_path, 'w') as f:
-            f.write(json.dumps({'version': version}, indent=4, sort_keys=True))
+            f.write(util_json.json_dump({'version': version}))
         LOG.info('Blob datastore upgrade took %.02f seconds'
                  % (time.time() - start_time))
 
@@ -175,7 +175,7 @@ def startup_tasks():
     stats = {}
     for obj in OBJECT_NAMES_TO_CLASSES:
         stats['object_version_%s' % obj] = \
-            OBJECT_NAMES_TO_CLASSES[obj].current_version
+            get_object_class(obj).current_version
     etcd.put(
         'metrics', config.NODE_NAME, None,
         {
@@ -185,41 +185,32 @@ def startup_tasks():
         })
 
     version = util_general.get_version()
-    pyprctl.set_name('main-v%s' % version)
+    util_concurrency.set_thread_name('main-v%s' % version)
 
     # If you ran this, it means we're not shutting down any more
     n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
     n.add_event(EVENT_TYPE_AUDIT, f'node is running v{version}')
 
-    # Ensure we have a consistent cache of object states if the cache is entirely
-    # absent.
-    cache_version = etcd.get_raw('/sf/cache/_version')
-    if not cache_version:
-        cache_version = {'version': 0}
-
-    if cache_version['version'] != 2:
-        # We don't need to step through various upgrades, we just rebuild
-        # the entire cache from scratch instead.
-        for obj_type in OBJECT_NAMES_TO_ITERATORS:
-            with etcd.get_lock('cache', None, obj_type, op='Cache upgrade'):
-                by_state = defaultdict(dict)
-                for obj in OBJECT_NAMES_TO_ITERATORS[obj_type]([]):
-                    by_state[obj.state.value][obj.uuid] = time.time()
-                for state in by_state:
-                    cache.clobber_object_state_cache(
-                        obj_type, state, by_state[state])
-        cache_version['version'] = 2
-        etcd.put_raw('/sf/cache/_version', cache_version)
-
     # Log configuration on startup
-    for key, value in config.dict().items():
+    for key, value in config.model_dump().items():
         LOG.info(f'Configuration item {key} = {value}')
 
     daemon.set_log_level(LOG, 'main')
 
-    # Check in early and often, also reset processing queue items.
+    # Check in early and often
     etcd.clear_stale_locks()
-    etcd.restart_queues()
+
+    # Reset queues
+    for queue in get_all_node_queues(config.NODE_NAME):
+        etcd.restart_queue(queue)
+        processing, queued, deferred = etcd.get_queue_length(
+            queue)
+        LOG.with_fields({
+            'processing': processing,
+            'queued': queued,
+            'deferred': deferred,
+            'queue': queue
+        }).debug('Queue length')
 
     # Ensure the blob data store is the most recent version
     upgrade_blob_datastore()

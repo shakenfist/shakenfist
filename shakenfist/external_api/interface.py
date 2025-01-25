@@ -10,14 +10,22 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
-from shakenfist.tasks import DefloatNetworkInterfaceTask
-from shakenfist.tasks import FloatNetworkInterfaceTask
+from shakenfist.etcd_schema.operations.baseclusteroperation \
+    import PRIORITY
+from shakenfist.etcd_schema.operations.net_iface_op \
+    import create_and_enqueue as ni_create_and_enqueue
+from shakenfist.etcd_schema.operations.net_iface_op \
+    import model_tasks as ni_tasks
+from shakenfist.etcd_schema.operations.net_iface_ip_op \
+    import create_and_enqueue as nii_create_and_enqueue
+from shakenfist.etcd_schema.operations.net_iface_ip_op \
+    import model_tasks as nii_tasks
+from shakenfist.util import general as util_general
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -77,7 +85,13 @@ class InterfaceFloatEndpoint(sf_api.Resource):
             return sf_api.error(507, str(e), suppress_traceback=True)
 
         ni.add_event(EVENT_TYPE_AUDIT, 'float request from REST API')
-        etcd.enqueue('networknode', FloatNetworkInterfaceTask(n.uuid, interface_uuid))
+        op_type, op_uuid = ni_create_and_enqueue(
+            n.uuid,
+            interface_uuid,
+            [ni_tasks.interface_float],
+            priority=PRIORITY.user_waiting,
+            request_id=util_general.get_request_id())
+        n.set_last_cluster_operation(op_type, op_uuid)
 
 
 class InterfaceDefloatEndpoint(sf_api.Resource):
@@ -97,7 +111,14 @@ class InterfaceDefloatEndpoint(sf_api.Resource):
         # Address is freed as part of the job, so code is "unbalanced" compared
         # to above for reasons.
         ni.add_event(EVENT_TYPE_AUDIT, 'defloat request from REST API')
-        etcd.enqueue('networknode', DefloatNetworkInterfaceTask(n.uuid, interface_uuid))
+        op_type, op_uuid = nii_create_and_enqueue(
+            n.uuid,
+            interface_uuid,
+            ni.floating,
+            [nii_tasks.interface_defloat],
+            priority=PRIORITY.user_facing,
+            request_id=util_general.get_request_id())
+        n.set_last_cluster_operation(op_type, op_uuid)
 
 
 class InterfaceMetadatasEndpoint(sf_api.Resource):

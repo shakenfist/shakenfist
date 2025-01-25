@@ -1,12 +1,10 @@
 import base64
 import os
 import select
-import sys
 import threading
 import time
 import uuid
 
-import pyprctl
 from shakenfist_agent import protocol
 from shakenfist_utilities import logs  # noreorder
 from versions_comparison import Comparison
@@ -16,7 +14,7 @@ from shakenfist import constants
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import instance
-from shakenfist.agentoperation import AgentOperation
+from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
@@ -65,7 +63,7 @@ class SideChannelJob(util_concurrency.Job):
     def __init__(self, instance_uuid):
         super().__init__()
         self.instance_uuid = instance_uuid
-        self.abort_path = f'/run/sf-sidechannel-{instance_uuid}.abort'
+        self.abort_path = f'/run/sf/sidechannel-{instance_uuid}.abort'
 
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
@@ -308,7 +306,7 @@ class SideChannelJob(util_concurrency.Job):
 
     def execute(self):
         etcd.reset_client()
-        pyprctl.set_name(self.instance_uuid)
+        util_concurrency.set_thread_name(self.instance_uuid)
         LOG.debug(
             f'This sidechannel thread is handling instance {self.instance_uuid}')
 
@@ -364,7 +362,7 @@ class SideChannelJob(util_concurrency.Job):
                 'unique': str(time.time())
                 })
 
-            while not os.path.exists(self.abort_path):
+            while daemon.check_abort_path(self.abort_path):
                 for packet in self._await_client():
                     self.log.with_fields({'packet': packet}).error(
                         'Unexpected sidechannel client packet during startup, ignoring')
@@ -401,13 +399,13 @@ class SideChannelJob(util_concurrency.Job):
         if self.instance_ready == constants.AGENT_TOO_OLD:
             self.instance.add_event(
                 EVENT_TYPE_AUDIT, 'instance agent is too old, not executing commands')
-            while not os.path.exists(self.abort_path):
+            while daemon.check_abort_path(self.abort_path):
                 time.sleep(1)
 
         # Spin reading packets and responding until we see an error or are asked
         # to exit.
         try:
-            while not os.path.exists(self.abort_path):
+            while daemon.check_abort_path(self.abort_path):
                 for packet in self._await_client():
                     self.log.with_fields({'packet': packet}).error(
                         'Unexpected sidechannel client packet')
@@ -632,7 +630,7 @@ class Monitor(daemon.Daemon):
     def _run_inner(self):
         instance_sidechannel_cache = {}
 
-        while not os.path.exists(self.abort_path):
+        while daemon.check_abort_path(self.abort_path):
             try:
                 self.reap_single_instance_monitors()
 
@@ -715,4 +713,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

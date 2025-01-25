@@ -66,8 +66,10 @@ class Node(dbo):
         STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR,
                         STATE_DEGRADED),
 
-        # But not from being deleted.
-        dbo.STATE_DELETED: None,
+        # And even from being deleted. This is because you need to delete the
+        # node to get the instances on the node to be marked as gone, but then
+        # you might repair the node and return it to service.
+        dbo.STATE_DELETED: (dbo.STATE_CREATED),
     }
 
     def __init__(self, static_values):

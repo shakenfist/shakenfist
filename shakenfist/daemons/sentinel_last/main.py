@@ -1,37 +1,33 @@
 # NOTE(mikal): this daemon's role is to notice that you've exited the Shaken
 # Fist target run-level and therefore the node is stopping not going missing.
 # You should never manually stop this daemon!
-import os
 import setproctitle
 import signal
-import sys
-import threading
 import time
 
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
+from shakenfist.daemons import daemon
 from shakenfist.node import Node
 
 
 LOG, _ = logs.setup(__name__)
-EXIT = threading.Event()
+ABORT_PATH = '/run/sf/sentinel-last.abort'
 
 
 def exit_gracefully(sig, _frame):
     global EXIT
     if sig == signal.SIGTERM:
         LOG.info('Received SIGTERM')
-        EXIT.set()
+        daemon.set_abort_path(ABORT_PATH, 'from sentinel last exit_gracefully')
 
 
 signal.signal(signal.SIGTERM, exit_gracefully)
 
 
 def main():
-    abort_path = '/run/sf-sentinel-first.abort'
-    if os.path.exists(abort_path):
-        os.unlink(abort_path)
+    daemon.clear_abort_path(ABORT_PATH)
 
     LOG.info('Started')
     setproctitle.setproctitle('sf-sentinel-last')
@@ -39,7 +35,7 @@ def main():
     n = Node.from_db(config.NODE_NAME)
     n.set_daemon_state('sentinel-last', Node.DAEMON_STATE_RUNNING)
 
-    while not EXIT.is_set():
+    while daemon.check_abort_path(ABORT_PATH):
         LOG.debug('Checking in')
         Node.observe_this_node()
         time.sleep(15)
@@ -51,4 +47,5 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    sys.exit(0)
+    LOG.info('Terminating ourselves')
+    raise SystemExit(0)

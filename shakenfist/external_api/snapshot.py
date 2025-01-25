@@ -20,6 +20,7 @@ from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
 
+
 LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 

@@ -206,9 +206,7 @@ class IPAM(dbo):
             return self.cached_ipmanager_object.in_use.keys()
 
         reservations = []
-        for _, data in etcd.get_prefix(self.reservations_path,
-                                       sort_order='ascend',
-                                       sort_target='key'):
+        for _, data in etcd.get_prefix_raw(self.reservations_path):
             reservations.append(data['address'])
         return reservations
 
@@ -302,10 +300,7 @@ class IPAM(dbo):
         # removed and its immediately allocated, but at the same time we
         # remove its halo by using a transactional_delete_raw.
         freed = 0
-        for key, data in etcd.get_prefix(
-                self.reservations_path,
-                sort_order='ascend',
-                sort_target='key'):
+        for key, data in etcd.get_prefix_raw(self.reservations_path):
             if (data['type'] == RESERVATION_TYPE_DELETION_HALO and
                     time.time() - data['when'] > duration):
                 if etcd.transactional_delete_raw(key, data):
@@ -313,10 +308,7 @@ class IPAM(dbo):
         return freed
 
     def get_haloed_addresses(self):
-        for _, data in etcd.get_prefix(
-                self.reservations_path,
-                sort_order='ascend',
-                sort_target='key'):
+        for _, data in etcd.get_prefix_raw(self.reservations_path):
             if data['type'] == RESERVATION_TYPE_DELETION_HALO:
                 yield data['address']
 
