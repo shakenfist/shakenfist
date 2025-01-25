@@ -144,7 +144,7 @@ def update_object_state_cache(object_type, object_uuid, old_state, new_state):
             f'    {f["path"]}:\n'
             f'        actual: {f["actual"]}\n'
             f'        desired: {f["desired"]}\n'
-            f'        replacement: {f"replacement"}')
+            f'        replacement: {f["replacement"]}')
     failure_dump = '\n'.join(failure_strings)
     raise exceptions.LocklessUpdateFailed(
         f'Lockless object state cache update for {object_type} {object_uuid} '

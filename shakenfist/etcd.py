@@ -472,7 +472,7 @@ def dequeue(queuename):
 
         # Attempt to claim the job in a transaction
         new_path = path.replace('queue', 'processing')
-        success = replace_many_raw([
+        success, _ = replace_many_raw([
             {
                 'path': path,
                 'original_data': workitem,
