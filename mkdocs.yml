@@ -69,6 +69,7 @@ nav:
             - "Upload (/upload/)": developer_guide/api_reference/upload.md
         - "Authentication": developer_guide/authentication.md
         - "CI API coverage": developer_guide/ci_api_coverage.md
+        - "In guest agent design": developer_guide/in_guest_agent.md
         - "Release process": developer_guide/release_process.md
         - "Standards": developer_guide/standards.md
         - "State machine": developer_guide/state_machine.md

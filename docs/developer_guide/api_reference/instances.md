@@ -640,6 +640,7 @@ following operations via the agent:
 
     * [POST ​/instances​/{instance_ref}​/agent​/execute](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_execute): execute a command within an instance and return results.
     * [POST /instances/{instance_ref}/agent/put](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_put): copy a blob into an instance at the specified location with the specified permissions.
+    * [POST /instances/{instance_ref}/agent/get](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_get): get a file from an instance at the specified location and make it available as a blob.
 
 ??? example "Python API client: execute a command on an instance"
 

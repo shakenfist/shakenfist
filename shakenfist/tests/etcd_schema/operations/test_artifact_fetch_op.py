@@ -54,7 +54,7 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
             version=current_version
         )
 
-        serialized = d.model_dump(mode='json')
+        serialized = d.model_dump(mode='json', by_alias=True)
         self.assertEqual(u1, serialized['uuid'])
         self.assertEqual('system', serialized['namespace'])
         self.assertEqual('http://www.shakenfist.com', serialized['url'])

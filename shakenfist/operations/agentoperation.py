@@ -3,6 +3,13 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import blob
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.etcd_schema.operations.agent_op \
+    import current_version as ao_current_version
+from shakenfist.etcd_schema.operations.agent_op \
+    import initial_version as ao_initial_version
+from shakenfist.etcd_schema.operations.agent_op import model as ao_model
+from shakenfist.etcd_schema.operations.agent_op \
+    import object_type as ao_object_type
 from shakenfist.operations.baseoperation import BaseOperation
 
 
@@ -10,9 +17,9 @@ LOG, _ = logs.setup(__name__)
 
 
 class AgentOperation(BaseOperation):
-    object_type = 'agentoperation'
-    initial_version = 1
-    current_version = 1
+    object_type = ao_object_type
+    initial_version = ao_initial_version
+    current_version = ao_current_version
 
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
@@ -41,13 +48,15 @@ class AgentOperation(BaseOperation):
 
     @classmethod
     def new(cls, operation_uuid, namespace, instance_uuid, commands):
-        AgentOperation._db_create(operation_uuid, {
-            'uuid': operation_uuid,
-            'namespace': namespace,
-            'instance_uuid': instance_uuid,
-            'commands': commands,
-            'version': cls.current_version
-        })
+        ao = ao_model(
+            uuid=operation_uuid,
+            namespace=namespace,
+            instance_uuid=instance_uuid,
+            commands=commands,
+            version=ao_current_version)
+
+        AgentOperation._db_create(
+            operation_uuid, ao.model_dump(mode='json', by_alias=True))
         o = AgentOperation.from_db(operation_uuid)
         o.state = cls.STATE_INITIAL
         return o

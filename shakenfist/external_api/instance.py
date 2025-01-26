@@ -18,6 +18,7 @@ from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
+from shakenfist.etcd_schema.operations import agent_op
 from shakenfist.etcd_schema.operations.baseclusteroperation import dependency
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.etcd_schema.operations.artifact_fetch_op \
@@ -1484,16 +1485,8 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
             return self.api_error(404, 'blob not found')
 
         commands = [
-            {
-                'command': 'put-blob',
-                'blob_uuid': blob_uuid,
-                'path': path
-            },
-            {
-                'command': 'chmod',
-                'path': path,
-                'mode': mode
-            }
+            agent_op.put_blob_command(blob_uuid=blob_uuid, path=path),
+            agent_op.chmod_command(path=path, mode=mode)
         ]
 
         instance_from_db.add_event(
@@ -1507,7 +1500,7 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
         o.state = AgentOperation.STATE_PREFLIGHT
         na_create_and_enqueue(
             instance_from_db.placement['node'], o.uuid,
-            [na_tasks.preflight],
+            [na_tasks.preflight, na_tasks.execute],
             PRIORITY.user_facing,
             request_id=util_general.get_request_id())
         return o.external_view()
@@ -1534,12 +1527,7 @@ class InstanceAgentGetEndpoint(sf_api.Resource):
         if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
 
-        commands = [
-            {
-                'command': 'get-file',
-                'path': path
-            }
-        ]
+        commands = [agent_op.get_file_command(path=path)]
 
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'agent operation get-file request from REST API')
@@ -1550,6 +1538,11 @@ class InstanceAgentGetEndpoint(sf_api.Resource):
             EVENT_TYPE_AUDIT, 'queued agent command not requiring preflight',
             extra={'agentoperation': o.uuid, 'commands': commands})
         o.state = AgentOperation.STATE_QUEUED
+        na_create_and_enqueue(
+            instance_from_db.placement['node'], o.uuid,
+            [na_tasks.execute],
+            PRIORITY.user_facing,
+            request_id=util_general.get_request_id())
         return o.external_view()
 
 
@@ -1574,11 +1567,7 @@ class InstanceAgentExecuteEndpoint(sf_api.Resource):
             return sf_api.error(400, 'instance agent not ready')
 
         commands = [
-            {
-                'command': 'execute',
-                'commandline': command_line,
-                'block-for-result': True
-            }
+            agent_op.execute_command(commandline=command_line, block=True)
         ]
 
         instance_from_db.add_event(
@@ -1590,6 +1579,11 @@ class InstanceAgentExecuteEndpoint(sf_api.Resource):
             EVENT_TYPE_AUDIT, 'queued agent command not requiring preflight',
             extra={'agentoperation': o.uuid, 'commands': commands})
         o.state = AgentOperation.STATE_QUEUED
+        na_create_and_enqueue(
+            instance_from_db.placement['node'], o.uuid,
+            [na_tasks.execute],
+            PRIORITY.user_facing,
+            request_id=util_general.get_request_id())
         return o.external_view()
 
 

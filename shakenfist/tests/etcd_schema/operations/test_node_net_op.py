@@ -41,7 +41,7 @@ class NodeNetOpTestCase(base.ShakenFistTestCase):
             version=current_version
         )
 
-        serialized = d.model_dump(mode='json')
+        serialized = d.model_dump(mode='json', by_alias=True)
         self.assertEqual(u1, serialized['uuid'])
         self.assertEqual(u2, serialized['node_uuid'])
         self.assertEqual(u3, serialized['network_uuid'])

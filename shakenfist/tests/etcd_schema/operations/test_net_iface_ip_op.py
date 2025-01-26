@@ -42,7 +42,7 @@ class NetIfaceIPOpTestCase(base.ShakenFistTestCase):
             version=current_version
         )
 
-        serialized = d.model_dump(mode='json')
+        serialized = d.model_dump(mode='json', by_alias=True)
         self.assertEqual(u1, serialized['uuid'])
         self.assertEqual(u2, serialized['network_uuid'])
         self.assertEqual(u3, serialized['interface_uuid'])
@@ -91,7 +91,7 @@ class NetIfaceIPOpTestCase(base.ShakenFistTestCase):
             version=current_version
         )
 
-        serialized = d.model_dump(mode='json')
+        serialized = d.model_dump(mode='json', by_alias=True)
         self.assertEqual('floating', serialized['network_uuid'])
 
     def test_model_bad_network_uuid(self):
