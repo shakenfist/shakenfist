@@ -157,10 +157,8 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
                 'operation_uuid': op_uuid
             },
             self.mock_etcd.get_raw(
-                (
                     '/sf/queue/any-clusteroperation-user_facing/'
                     '123.0-asdjfhkjadsfh'
-                )
             )
         )
 

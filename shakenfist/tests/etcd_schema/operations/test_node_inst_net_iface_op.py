@@ -2,7 +2,9 @@ from unittest import mock
 from uuid import uuid4
 
 from pydantic import ValidationError
-
+from shakenfist.etcd_schema.operations.baseclusteroperation \
+    import CLUSTER_OPERATIONS
+from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
     import create_and_enqueue
 from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
@@ -10,9 +12,6 @@ from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
 from shakenfist.etcd_schema.operations.node_inst_net_iface_op import model
 from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
     import model_tasks
-from shakenfist.etcd_schema.operations.baseclusteroperation \
-    import CLUSTER_OPERATIONS
-from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.clusteroperationmapping \
     import OPERATION_NAMES_TO_CLASSES
 from shakenfist.operations.node_inst_net_iface_op import NodeInstNetIfaceOp
@@ -139,10 +138,8 @@ class NodeInstNetIfaceOpTestCase(base.ShakenFistTestCase):
                 'operation_uuid': op_uuid
             },
             self.mock_etcd.get_raw(
-                (
                     '/sf/queue/sf-1-clusteroperation-user_waiting/'
                     '123.0-asdjfhkjadsfh'
-                )
             )
         )
 
