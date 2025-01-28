@@ -21,7 +21,7 @@ webargs==8.6.0                     # mit
 py-cpuinfo==9.0.0                  # mit
 distro==1.9.0                      # apache2
 pbr==6.1.0                         # apache2
-setuptools==75.5.0                 # mit
+setuptools==75.8.0                 # mit
 symbolicmode==2.0.1                # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
 version-comparison==0.2            # mit
 pycdlib==1.14.0                    # lgpl
