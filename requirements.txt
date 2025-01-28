@@ -41,10 +41,10 @@ flasgger==0.9.7.1                  # mit
 Flask-JWT-Extended==4.6.0          # mit
 flask-request-id-middleware==1.1   # mit
 
-protobuf==5.28.3                   # bsd
-grpcio==1.67.1                     # apache2
-grpcio-status==1.67.1              # apache2
-grpcio-tools==1.67.1               # apache2
+protobuf==5.29.3                   # bsd
+grpcio==1.70.0                     # apache2
+grpcio-status==1.70.0              # apache2
+grpcio-tools==1.70.0               # apache2
 googleapis-common-protos==1.66.0   # apache2
 
 requests==2.32.3                   # apache2
