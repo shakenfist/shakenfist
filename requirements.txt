@@ -100,3 +100,4 @@ wraps==0.13.0
 zipp==3.21.0
 zope.event==5.0
 zope.interface==7.2
+pydantic-extra-types==2.10.2
