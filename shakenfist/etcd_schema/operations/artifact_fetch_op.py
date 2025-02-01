@@ -39,9 +39,9 @@ class model(BaseModel):
     instance_uuid: Optional[UUID4]
     priority: PRIORITY
     request_id: Optional[str]
-    tasks: List[model_tasks]
-    depends_on: Optional[List[dependency]]
-    runs_after: Optional[List[dependency]]
+    tasks: list[model_tasks]
+    depends_on: Optional[list[dependency]]
+    runs_after: Optional[list[dependency]]
     version: int = Field(ge=initial_version, le=current_version)
 
     @field_serializer('priority')
@@ -49,7 +49,7 @@ class model(BaseModel):
         return priority.name
 
     @field_serializer('tasks')
-    def serialize_tasks(self, tasks: List[model_tasks], _info):
+    def serialize_tasks(self, tasks: list[model_tasks], _info):
         return [t.name for t in tasks]
 
 
