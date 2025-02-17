@@ -20,6 +20,7 @@ from shakenfist.blob import Blobs
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.daemons.cleaner import scheduled_tasks
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.util import general as util_general
@@ -472,6 +473,8 @@ class Monitor(daemon.Daemon):
             with util_general.RecordedOperation('maintain blobs', n,
                                                 threshold=1):
                 self._maintain_blobs()
+
+            scheduled_tasks.remove_stray_lock_files()
 
             if time.time() - last_missing_blob_check > 300:
                 with util_general.RecordedOperation('find missing blobs', n,

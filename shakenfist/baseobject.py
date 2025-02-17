@@ -387,7 +387,7 @@ class DatabaseBackedObject:
         if not global_scope:
             return lockutils.external_lock(
                 f'{self.object_type}-{self.uuid}',
-                lock_path='/tmp', lock_file_prefix='sflock-')
+                lock_path='/run/lock', lock_file_prefix='sflock-')
 
         return etcd.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
                              log_ctx=self.log, op=op, timeout=timeout)
@@ -400,7 +400,7 @@ class DatabaseBackedObject:
         if not global_scope:
             return lockutils.external_lock(
                 f'{self.object_type}-{self.uuid}-{name}',
-                lock_path='/tmp', lock_file_prefix='sflock-')
+                lock_path='/run/lock', lock_file_prefix='sflock-')
 
         return etcd.get_lock('attribute/%s' % self.object_type,
                              self.__uuid, name, op=op, ttl=ttl, timeout=timeout,
