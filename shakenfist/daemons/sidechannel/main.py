@@ -39,7 +39,7 @@ class PutException(Exception):
     ...
 
 
-class SFSocketAgent(protocol.SocketAgent):
+class SFSocketAgent(protocol.UnixDomainSocketAgent):
     def __init__(self, inst, path, logger=None):
         super().__init__(path, logger=logger)
         self.log = LOG.with_fields({'instance': inst})
