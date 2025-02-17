@@ -2,7 +2,7 @@ from unittest import mock
 
 from shakenfist import instance
 from shakenfist.config import BaseSettings
-from shakenfist.daemons.cleaner import main as cleaner_main
+from shakenfist.daemons.cleaner import scheduled_tasks as cleaner_st
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -105,8 +105,7 @@ class CleanerTestCase(base.ShakenFistTestCase):
             self.mock_etcd.create_instance(
                 id, id, set_state=instance.Instance.STATE_CREATED)
 
-        m = cleaner_main.Monitor('cleaner')
-        m._update_power_states()
+        cleaner_st.update_power_states()
 
         for id, state in [('running', 'on'),
                           ('shutoff', 'off'),
