@@ -12,6 +12,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
+from shakenfist.constants import NoSuchObject
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
 from shakenfist.util import concurrency as util_concurrency
@@ -35,21 +36,39 @@ def remove_stray_lock_files():
         # Lock files used to be in /tmp, they're now in /run/lock
         for path in ['/tmp', '/run/lock']:
             for lock_file in os.listdir(path):
+                full_path = os.path.join(path, lock_file)
+
+                if lock_file.startswith('sflock-api-requests'):
+                    # This isn't a real object type, so we just use lock
+                    # modified time instead
+                    if os.stat(full_path).st_mtime > 600:
+                        os.unlink(full_path)
+                    continue
+
                 m = LOCKFILE_RE.match(lock_file)
                 if m:
-                    lock_files[(m.group(1), m.group(2))].append(
-                        os.path.join(path, lock_file))
+                    obj_type = m.group(1)
+                    obj_uuid = m.group(2)
+                    lock_files[(obj_type, obj_uuid)].append(full_path)
 
     for obj_type, obj_uuid in lock_files:
-        o = get_object_class(obj_type).from_db(obj_uuid)
-        if not o:
-            _remove_locks(lock_files[(obj_type, obj_uuid)])
-            LOG.info(f'Remove stale local locks for {obj_type} {obj_uuid}')
-            continue
+        try:
+            o = get_object_class(obj_type).from_db(
+                obj_uuid, suppress_failure_audit=True)
+            if not o:
+                _remove_locks(lock_files[(obj_type, obj_uuid)])
+                LOG.info(f'Remove stale local locks for {obj_type} {obj_uuid}')
+                continue
 
-        if o.state.value == dbo.STATE_DELETED:
-            _remove_locks(lock_files[(obj_type, obj_uuid)])
-            o.add_event(EVENT_TYPE_AUDIT, 'removed local locks')
+            if o.state.value == dbo.STATE_DELETED:
+                _remove_locks(lock_files[(obj_type, obj_uuid)])
+                o.add_event(EVENT_TYPE_AUDIT, 'removed local locks')
+
+        except NoSuchObject:
+            LOG.with_fields({
+                obj_type: obj_uuid,
+                'files': lock_files[obj_type, obj_uuid]
+            }).error('Failed to process potentially stray lock')
 
 
 def _delete_instance_files(instance_uuid):

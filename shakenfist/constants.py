@@ -99,10 +99,13 @@ OBJECT_NAMES = [
     'network',
     'networkinterface',
     'node',
+    'node_aop_op',
     'node_blob_op',
     'node_inst_net_iface_op',
-    'node_inst_op',
     'node_inst_netdesc_op',
+    'node_inst_op',
+    'node_inst_snap_op',
+    'node_net_op',
     'upload'
 ]
 
@@ -123,10 +126,13 @@ OBJECT_NAMES_TO_CLASSES = {
     'network': 'network.Network',
     'networkinterface': 'networkinterface.NetworkInterface',
     'node': 'node.Node',
+    'node_aop_op': 'operations.node_aop_op.NodeAgentopOp',
     'node_blob_op': 'operations.node_blob_op.NodeBlobOp',
     'node_inst_net_iface_op': 'operations.node_inst_net_iface_op.NodeInstNetIfaceOp',
-    'node_inst_op': 'operations.node_inst_op.NodeInstOp',
     'node_inst_netdesc_op': 'operations.node_inst_netdesc_op.NodeInstNetdescOp',
+    'node_inst_op': 'operations.node_inst_op.NodeInstOp',
+    'node_inst_snap_op': 'operations.node_inst_snap_op.NodeInstSnapOp',
+    'node_net_op': 'operations.node_net_op.NodeNetOp',
     'upload': 'upload.Upload'
 }
 
