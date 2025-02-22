@@ -226,6 +226,7 @@ class DnsMasqTestCase(testtools.TestCase):
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=False,
                                 provide_dns=False)
+        d._read_templates()
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
@@ -279,6 +280,7 @@ class DnsMasqTestCase(testtools.TestCase):
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=True,
                                 provide_dns=False)
+        d._read_templates()
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
@@ -333,6 +335,7 @@ class DnsMasqTestCase(testtools.TestCase):
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=False, provide_nat=False,
                                 provide_dns=True)
+        d._read_templates()
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
@@ -406,6 +409,7 @@ class DnsMasqTestCase(testtools.TestCase):
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=True,
                                 provide_dns=True)
+        d._read_templates()
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
@@ -488,6 +492,7 @@ class DnsMasqTestCase(testtools.TestCase):
 
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n)
+        d._read_templates()
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
@@ -538,6 +543,7 @@ class DnsMasqTestCase(testtools.TestCase):
 
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dns=True)
+        d._read_templates()
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
@@ -591,6 +597,7 @@ class DnsMasqTestCase(testtools.TestCase):
         n.update_dns_entry('www.google.com', '6.6.6.6')
         n.remove_dns_entry('www.google.com')
         d = dnsmasq.DnsMasq.new(n, provide_dns=True)
+        d._read_templates()
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
