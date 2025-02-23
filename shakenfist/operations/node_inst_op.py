@@ -10,9 +10,9 @@ from shakenfist.etcd_schema.operations import node_inst_op as schema
 from shakenfist.instance import Instance
 from shakenfist.instance import Instances
 from shakenfist.instance import this_node_filter
-from shakenfist.network import Network
-from shakenfist.networkinterface import interfaces_for_instance
-from shakenfist.networkinterface import NetworkInterface
+from shakenfist.network.network import Network
+from shakenfist.network.interface import interfaces_for_instance
+from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import general as util_general

@@ -2,7 +2,7 @@ import time
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import network
+from shakenfist.network import network
 from shakenfist.daemons.network import floating_ip_reaper
 from shakenfist.daemons.network import maintain
 from shakenfist.daemons.network import mtus

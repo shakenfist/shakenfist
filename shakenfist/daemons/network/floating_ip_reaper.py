@@ -5,8 +5,8 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.daemons import daemon
 from shakenfist import ipam
-from shakenfist import network
-from shakenfist import networkinterface
+from shakenfist.network import network
+from shakenfist.network import interface
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -55,7 +55,7 @@ class Job(util_concurrency.Job):
             LOG.info('Found floating gateways: %s' % floating_gateways)
 
             floating_addresses = []
-            for ni in networkinterface.NetworkInterfaces([], prefilter='active'):
+            for ni in interface.NetworkInterfaces([], prefilter='active'):
                 fa = ni.floating.get('floating_address')
                 if fa:
                     floating_addresses.append(fa)

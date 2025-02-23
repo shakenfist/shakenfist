@@ -8,7 +8,7 @@ from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import exceptions
-from shakenfist import network
+from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT

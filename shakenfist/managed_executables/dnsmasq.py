@@ -3,7 +3,7 @@ import signal
 import time
 
 from shakenfist import instance
-from shakenfist import networkinterface
+from shakenfist.network import interface
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
@@ -126,7 +126,7 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         allowed_leases = {}
 
         for ni_uuid in self.network.networkinterfaces:
-            ni = networkinterface.NetworkInterface.from_db(ni_uuid)
+            ni = interface.NetworkInterface.from_db(ni_uuid)
             if not ni:
                 continue
 

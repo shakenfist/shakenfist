@@ -9,7 +9,7 @@ import six
 import testtools
 from pydantic import AnyHttpUrl
 from pydantic import IPvAnyAddress
-from shakenfist import network
+from shakenfist.network import network
 from shakenfist.config import BaseSettings
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.managed_executables import dnsmasq

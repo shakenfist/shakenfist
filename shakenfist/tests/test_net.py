@@ -3,7 +3,7 @@ from unittest import mock
 
 import testtools
 from shakenfist import exceptions
-from shakenfist import network
+from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
 from shakenfist.tests import base
@@ -47,15 +47,16 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
                                NODE_MESH_IP='1.1.1.2',
                                NETWORK_NODE_IP='1.1.1.2',
                                NODE_IS_NETWORK_NODE=False)
-        self.config = mock.patch('shakenfist.network.config', fake_config)
+        self.config = mock.patch(
+            'shakenfist.network.network.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
     #
     #  is_okay()
     #
-    @mock.patch('shakenfist.network.Network.is_created', return_value=True)
-    @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=False)
+    @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=False)
     def test_is_okay_yes(self, mock_is_dnsmasq, mock_is_created):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
@@ -66,8 +67,8 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
 
-    @mock.patch('shakenfist.network.Network.is_created', return_value=False)
-    @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_created', return_value=False)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
     def test_is_okay_not_created(self, mock_is_dnsmasq, mock_is_created):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
@@ -78,8 +79,8 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
         n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_okay())
 
-    @mock.patch('shakenfist.network.Network.is_created', return_value=True)
-    @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=False)
+    @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=False)
     def test_is_okay_no_dns(self, mock_is_dnsmasq, mock_is_created):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
@@ -99,15 +100,16 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                                NODE_MESH_IP='1.1.1.2',
                                NETWORK_NODE_IP='1.1.1.2',
                                NODE_IS_NETWORK_NODE=True)
-        self.config = mock.patch('shakenfist.network.config', fake_config)
+        self.config = mock.patch(
+            'shakenfist.network.network.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
     #
     #  is_okay()
     #
-    @mock.patch('shakenfist.network.Network.is_created', return_value=True)
-    @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
     def test_is_okay_yes(self, mock_is_dnsmasq, mock_is_created):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
@@ -118,8 +120,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
 
-    @mock.patch('shakenfist.network.Network.is_created', return_value=False)
-    @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_created', return_value=False)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
     def test_is_okay_not_created(self, mock_is_dnsmasq, mock_is_created):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
@@ -130,8 +132,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_okay())
 
-    @mock.patch('shakenfist.network.Network.is_created', return_value=True)
-    @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=False)
+    @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=False)
     def test_is_okay_no_masq(self, mock_is_dnsmasq, mock_is_created):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
@@ -142,8 +144,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_okay())
 
-    @mock.patch('shakenfist.network.Network.is_created', return_value=True)
-    @mock.patch('shakenfist.network.Network.is_dnsmasq_running', return_value=False)
+    @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=False)
     def test_is_okay_no_masq_no_dhcp(self, mock_is_dnsmasq, mock_is_created):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()

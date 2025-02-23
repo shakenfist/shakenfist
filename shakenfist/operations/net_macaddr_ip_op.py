@@ -2,7 +2,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.etcd_schema.operations import net_macaddr_ip_op as schema
-from shakenfist.network import Network
+from shakenfist.network.network import Network
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import general as util_general

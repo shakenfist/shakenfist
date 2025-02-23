@@ -17,8 +17,8 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import baseobject
 from shakenfist import eventlog
 from shakenfist import exceptions
-from shakenfist import network
-from shakenfist import networkinterface
+from shakenfist.network import network
+from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
@@ -399,7 +399,7 @@ class NetworkInterfacesEndpoint(sf_api.Resource):
     def get(self, network_ref=None, network_from_db=None):
         out = []
         for ni_uuid in network_from_db.networkinterfaces:
-            ni = networkinterface.NetworkInterface.from_db(ni_uuid)
+            ni = interface.NetworkInterface.from_db(ni_uuid)
             if not ni:
                 continue
             out.append(ni.external_view())

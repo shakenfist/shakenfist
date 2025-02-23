@@ -12,7 +12,7 @@ from versions import parse_version
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import network
+from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_RESOURCES

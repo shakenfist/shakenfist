@@ -2,10 +2,10 @@ from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import ipam
-from shakenfist import network
+from shakenfist.network import network
 from shakenfist.daemons import daemon
 from shakenfist.instance import Instance
-from shakenfist.networkinterface import NetworkInterface
+from shakenfist.network.interface import NetworkInterface
 from shakenfist.util.access_tokens import parse_jwt_identity
 
 

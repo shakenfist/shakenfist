@@ -12,8 +12,8 @@ from unittest import mock
 
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
-from shakenfist.network import Network
-from shakenfist.networkinterface import NetworkInterface
+from shakenfist.network.network import Network
+from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist.util import json as util_json
 

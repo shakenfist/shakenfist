@@ -269,10 +269,21 @@ def upgrade_data_store():
 
     if version == 1:
         # Version two is sharded, and uses an EventLog chain instead of a single
-        # sqlite database.
+        # sqlite database. This list of objects is as existed at the time of the
+        # resharding. It is assumed that the event store has not been offline
+        # while the other object types were created.
         version = 2
         count = 0
-        for objtype in constants.OBJECT_NAMES:
+        for objtype in [
+                    'api-requests',
+                    'artifact',
+                    'blob',
+                    'instance',
+                    'namespace',
+                    'network',
+                    'networkinterface',
+                    'node'
+                ]:
             objroot = os.path.join(config.STORAGE_PATH, 'events', objtype)
             if os.path.exists(objroot):
                 for ent in os.listdir(objroot):
@@ -305,6 +316,15 @@ def upgrade_data_store():
 
         if count > 0:
             LOG.info('Resharded %d event log databases' % count)
+
+    if version == 2:
+        # Version three handled the rename of "networkinterface" to "interface".
+        objroot = os.path.join(config.STORAGE_PATH, 'events')
+        networkinterfaces = os.path.join(objroot, 'networkinterface')
+        interfaces = os.path.join(objroot, 'interface')
+        if os.path.exists(networkinterfaces):
+            os.rename(networkinterfaces, interfaces)
+        version = 3
 
     if start_version != version:
         os.makedirs(os.path.dirname(version_path), exist_ok=True)

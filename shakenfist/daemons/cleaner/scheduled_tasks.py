@@ -37,19 +37,23 @@ def remove_stray_lock_files():
         for path in ['/tmp', '/run/lock']:
             for lock_file in os.listdir(path):
                 full_path = os.path.join(path, lock_file)
+                handled = False
 
-                if lock_file.startswith('sflock-api-requests'):
-                    # This isn't a real object type, so we just use lock
-                    # modified time instead
-                    if os.stat(full_path).st_mtime > 600:
-                        os.unlink(full_path)
-                    continue
+                for special_case in ['api-requests', 'networkinterface']:
+                    if lock_file.startswith(f'sflock-{special_case}'):
+                        # This isn't a real object type, so we just use lock
+                        # modified time instead
+                        if os.stat(full_path).st_mtime > 600:
+                            os.unlink(full_path)
+                        handled = True
+                        continue
 
-                m = LOCKFILE_RE.match(lock_file)
-                if m:
-                    obj_type = m.group(1)
-                    obj_uuid = m.group(2)
-                    lock_files[(obj_type, obj_uuid)].append(full_path)
+                if not handled:
+                    m = LOCKFILE_RE.match(lock_file)
+                    if m:
+                        obj_type = m.group(1)
+                        obj_uuid = m.group(2)
+                        lock_files[(obj_type, obj_uuid)].append(full_path)
 
     for obj_type, obj_uuid in lock_files:
         try:
