@@ -1,5 +1,4 @@
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist import etcd
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
@@ -13,10 +12,6 @@ class BaseOperationException(Exception):
 class InvalidPriorityException(BaseOperationException):
     def __init__(self, task, priority):
         super().__init__(f'{priority} is not a valid priority')
-
-
-class ReEnqueued(Exception):
-    ...
 
 
 class CannotDeferUnqueued(Exception):
@@ -145,24 +140,21 @@ class BaseClusterOperation(BaseOperation):
     def queue_name(self):
         return self._queue_name
 
-    @property.setter
-    def queue_name(self, queue_name):
-        self._queue_name = queue_name
+    @queue_name.setter
+    def queue_name(self, name):
+        self._queue_name = name
 
     # Methods
     def execute(self):
-        try:
-            self.state = BaseClusterOperation.STATE_EXECUTING
-            for t in self.tasks:
-                self.dispatch_task(t)
-                if self.state.value in [BaseClusterOperation.STATE_ABORT,
-                                        BaseClusterOperation.STATE_DELETED,
-                                        BaseClusterOperation.STATE_ERROR]:
-                    return
-            self.state = BaseClusterOperation.STATE_COMPLETE
-
-        except ReEnqueued:
-            ...
+        self.state = BaseClusterOperation.STATE_EXECUTING
+        for t in self.tasks:
+            self.dispatch_task(t)
+            if self.state.value in [BaseClusterOperation.STATE_ABORT,
+                                    BaseClusterOperation.STATE_DELETED,
+                                    BaseClusterOperation.STATE_ERROR,
+                                    BaseClusterOperation.STATE_QUEUED]:
+                return
+        self.state = BaseClusterOperation.STATE_COMPLETE
 
     def defer(self, delay=15):
         if not self.queue_name:
@@ -177,4 +169,4 @@ class BaseClusterOperation(BaseOperation):
             'operation_uuid': self.uuid
         }
         etcd.enqueue(self.queue_name, work_item, delay=delay)
-        raise ReEnqueued()
+        self.state = self.STATE_QUEUED

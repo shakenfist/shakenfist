@@ -50,11 +50,11 @@ class Job(util_concurrency.Job):
                     f'This network thread is now processing job {jobname}')
 
                 try:
-                    self._cluster_operation_execute(workitem)
+                    self._cluster_operation_execute(queue_name, workitem)
                 finally:
                     etcd.resolve(queue_name, jobname)
 
-    def _cluster_operation_execute(self, workitem):
+    def _cluster_operation_execute(self, queue_name, workitem):
         op_type = workitem.get('operation_type')
         op_uuid = workitem.get('operation_uuid')
         op = OPERATION_NAMES_TO_CLASSES[op_type].from_db(op_uuid)
@@ -63,7 +63,7 @@ class Job(util_concurrency.Job):
             self.log.error('Operation not found')
             return
 
-        op.queue_name = self.queue_name
+        op.queue_name = queue_name
 
         # Ensure our dependencies are met.
         for dep in op.depends_on:

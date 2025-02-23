@@ -24,6 +24,7 @@ from shakenfist.daemons import daemon
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_background_node_queues
+from shakenfist.operations.baseoperation import get_all_network_queues
 from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
