@@ -21,7 +21,7 @@ from shakenfist.util import libvirt as util_libvirt
 
 
 LOG, _ = logs.setup(__name__)
-LOCKFILE_RE = re.compile(r'^sflock-([a-z_\-]+)-([a-zA-Z0-9\-]{36}).*')
+LOCKFILE_RE = re.compile(r'^sflock-([a-z]+)-([a-zA-Z0-9\-]{36}).*')
 
 
 def _remove_locks(paths):
