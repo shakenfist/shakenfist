@@ -15,8 +15,8 @@ from shakenfist import instance
 from shakenfist import node
 from shakenfist import upload
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob
-from shakenfist.blob import Blobs
+from shakenfist.storage.blob import Blob
+from shakenfist.storage.blob import Blobs
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS

@@ -2,7 +2,7 @@ import os
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.blob import Blob
+from shakenfist.storage.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd

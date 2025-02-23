@@ -6,7 +6,7 @@ from shakenfist_utilities import logs                 # noreorder
 from shakenfist.cache import read_object_state_cache
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.blob import Blob
+from shakenfist.storage.blob import Blob
 from shakenfist import etcd
 from shakenfist.etcd_schema.operations import baseclusteroperation as bco_schema
 from shakenfist.etcd_schema.operations import node_blob_op as nbo_schema

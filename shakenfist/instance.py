@@ -21,7 +21,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
 from shakenfist import baseobject
-from shakenfist import blob
+from shakenfist.storage import blob
 from shakenfist import cache
 from shakenfist import constants
 from shakenfist import etcd

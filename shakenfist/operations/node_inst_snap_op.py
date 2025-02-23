@@ -3,8 +3,8 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.etcd_schema.operations import node_inst_snap_op as schema
 from shakenfist.artifact import Artifact
-from shakenfist.blob import Blob
-from shakenfist.blob import snapshot_disk
+from shakenfist.storage.blob import Blob
+from shakenfist.storage.blob import snapshot_disk
 from shakenfist.exceptions import BlobDeleted
 from shakenfist.exceptions import BlobDependencyMissing
 from shakenfist.exceptions import InvalidStateException

@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.blob import Blob
+from shakenfist.storage.blob import Blob
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.etcd_schema.operations import imgcache_op as schema

@@ -54,7 +54,7 @@ from shakenfist.artifact import LABEL_URL
 from shakenfist.artifact import SNAPSHOT_URL
 from shakenfist.artifact import UPLOAD_URL
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob
+from shakenfist.storage.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon

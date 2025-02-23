@@ -1,6 +1,6 @@
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import blob
+from shakenfist.storage import blob
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.operations.baseoperation import BaseOperation

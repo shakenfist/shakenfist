@@ -110,7 +110,7 @@ OBJECT_NAMES_TO_CLASSES = {
     'agentoperation': 'operations.agentoperation.AgentOperation',
     'artifact': 'artifact.Artifact',
     'artifact_fetch_op': 'operations.artifact_fetch_op.ArtifactFetchOp',
-    'blob': 'blob.Blob',
+    'blob': 'storage.blob.Blob',
     'dhcp': 'managed_executables.dnsmasq.DnsMasq',
     'imgcache_op': 'operations.imgcache_op.ImageCacheOp',
     'instance': 'instance.Instance',

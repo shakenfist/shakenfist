@@ -9,7 +9,7 @@ from shakenfist_agent import protocol
 from shakenfist_utilities import logs  # noreorder
 from versions_comparison import Comparison
 
-from shakenfist import blob
+from shakenfist.storage import blob
 from shakenfist import constants
 from shakenfist import etcd
 from shakenfist import eventlog

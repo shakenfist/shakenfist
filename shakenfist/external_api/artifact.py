@@ -32,7 +32,7 @@ from shakenfist.artifact import Artifacts
 from shakenfist.artifact import namespace_exact_filter
 from shakenfist.artifact import namespace_or_shared_filter
 from shakenfist.artifact import UPLOAD_URL
-from shakenfist.blob import Blob
+from shakenfist.storage.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon

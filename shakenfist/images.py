@@ -9,7 +9,7 @@ import uuid
 import requests
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import blob
+from shakenfist.storage import blob
 from shakenfist import exceptions
 from shakenfist.artifact import Artifact
 from shakenfist.artifact import BLOB_URL

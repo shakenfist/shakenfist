@@ -20,8 +20,8 @@ from webargs.flaskparser import use_kwargs
 
 from shakenfist import cache
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob
-from shakenfist.blob import Blobs
+from shakenfist.storage.blob import Blob
+from shakenfist.storage.blob import Blobs
 from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon

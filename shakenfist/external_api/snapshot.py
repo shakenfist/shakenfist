@@ -12,7 +12,7 @@ from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
-from shakenfist import blob
+from shakenfist.storage import blob
 from shakenfist.artifact import Artifacts
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT

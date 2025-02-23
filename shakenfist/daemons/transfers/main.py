@@ -4,7 +4,7 @@ import threading
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import blob
+from shakenfist.storage import blob
 from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config

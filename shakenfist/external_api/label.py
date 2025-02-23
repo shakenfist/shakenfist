@@ -18,7 +18,7 @@ from shakenfist.artifact import LABEL_URL
 from shakenfist.artifact import type_filter
 from shakenfist.artifact import url_filter
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob
+from shakenfist.storage.blob import Blob
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import LabelHierarchyTooDeep

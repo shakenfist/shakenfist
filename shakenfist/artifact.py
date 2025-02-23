@@ -5,7 +5,7 @@ from uuid import uuid4
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
-from shakenfist import blob
+from shakenfist.storage import blob
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo

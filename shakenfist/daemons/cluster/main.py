@@ -20,9 +20,9 @@ from shakenfist import namespace
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob
-from shakenfist.blob import Blobs
-from shakenfist.blob import placement_filter
+from shakenfist.storage.blob import Blob
+from shakenfist.storage.blob import Blobs
+from shakenfist.storage.blob import placement_filter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
