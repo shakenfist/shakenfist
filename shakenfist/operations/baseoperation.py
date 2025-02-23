@@ -54,7 +54,6 @@ def get_all_background_node_queues(node_uuid):
 
 def get_node_user_facing_node_queues(node_uuid):
     return [
-        node_uuid,
         f'{node_uuid}-clusteroperation-user_waiting',
         f'{node_uuid}-clusteroperation-user_facing',
         f'{node_uuid}-clusteroperation-user_facing_high_io'
@@ -86,7 +85,6 @@ def get_general_background_node_queues():
 
 def get_all_network_queues():
     return [
-        'networknode',
         'networknode-clusteroperation-user_waiting',
         'networknode-clusteroperation-user_facing',
         'networknode-clusteroperation-user_facing_high_io'

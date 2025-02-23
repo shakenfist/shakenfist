@@ -270,12 +270,20 @@ class Monitor(daemon.Daemon):
             })
 
             if config.NODE_IS_NETWORK_NODE:
-                network_queue_processing, network_queue_waiting, node_queue_deferred = \
-                    etcd.get_queue_length('networknode')
+                network_waiting = 0
+                network_processing = 0
+                network_deferred = 0
+
+                for queue in get_all_network_queues():
+                    processing, queued, deferred = etcd.get_queue_length(queue)
+                    network_waiting += queued
+                    network_processing += processing
+                    network_deferred += deferred
 
                 retval.update({
-                    'queue_network_processing': network_queue_processing,
-                    'queue_network_waiting': network_queue_waiting,
+                    'queue_network_processing': network_processing,
+                    'queue_network_waiting': network_waiting,
+                    'queue_network_deferred': network_deferred
                 })
 
             if config.NODE_IS_EVENTLOG_NODE:

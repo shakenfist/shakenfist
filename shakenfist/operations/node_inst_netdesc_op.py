@@ -259,7 +259,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
 
                 # And now float any required interfaces
                 for ft in float_tasks:
-                    etcd.enqueue('networknode', ft)
+                    etcd.enqueue('networknode-clusteroperation-user_waiting', ft)
 
             except InvalidStateException as e:
                 # This instance is in an error or deleted state. Given the check

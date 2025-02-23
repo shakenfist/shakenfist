@@ -87,6 +87,6 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
 
     mutations, job_name, queue_name, work_item = \
         base_mutations(object_type.name.lower(), m.model_dump(mode='json'),
-                       target='networknode')
+                       target='networknode-clusteroperation-user_waiting')
     enqueue(mutations, job_name, queue_name, work_item)
     return object_type, operation_uuid
