@@ -63,6 +63,8 @@ class Job(util_concurrency.Job):
             self.log.error('Operation not found')
             return
 
+        op.queue_name = self.queue_name
+
         # Ensure our dependencies are met.
         for dep in op.depends_on:
             dep_op = OPERATION_NAMES_TO_CLASSES[dep['op_type']].from_db(

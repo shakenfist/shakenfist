@@ -19,6 +19,10 @@ class ReEnqueued(Exception):
     ...
 
 
+class CannotDeferUnqueued(Exception):
+    ...
+
+
 class BaseOperation(dbo):
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_QUEUED = 'queued'
@@ -116,6 +120,9 @@ class BaseClusterOperation(BaseOperation):
         self.__depends_on = static_values.get('depends_on')
         self.__runs_after = static_values.get('runs_after')
 
+        # We only know this if we have been dequeued
+        self._queue_name = None
+
     @property
     def priority(self):
         return self.__priority
@@ -136,6 +143,14 @@ class BaseClusterOperation(BaseOperation):
             return []
         return self.__runs_after
 
+    @property
+    def queue_name(self):
+        return self._queue_name
+
+    @property.setter
+    def queue_name(self, queue_name):
+        self._queue_name = queue_name
+
     # Methods
     def execute(self):
         try:
@@ -152,6 +167,10 @@ class BaseClusterOperation(BaseOperation):
             ...
 
     def defer(self, delay=15):
+        if not self.queue_name:
+            raise CannotDeferUnqueued(
+                'You cannot defer a cluster operation which has not been queued')
+
         # Re-enqueue this operation for a retry after delay seconds
         self.add_event(
             EVENT_TYPE_STATUS, f'Execution deferred for {delay} seconds')
@@ -159,5 +178,5 @@ class BaseClusterOperation(BaseOperation):
             'operation_type': self.object_type,
             'operation_uuid': self.uuid
         }
-        etcd.enqueue(config.NODE_NAME, work_item, delay=delay)
+        etcd.enqueue(self.queue_name, work_item, delay=delay)
         raise ReEnqueued()
