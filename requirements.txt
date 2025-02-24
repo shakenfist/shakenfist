@@ -53,10 +53,10 @@ chardet==5.2.0                     # lgpl
 urllib3==2.2.3                     # mit
 
 # These must move as a set
-pydantic==2.9.2                    # mit
-pydantic-settings==2.5.2           # mit
-pydantic-core==2.23.4              # (indirect dependency)
-pydantic-extra-types               # mit
+pydantic==2.10.6                   # mit
+pydantic-settings==2.8.0           # mit
+pydantic-core==2.27.2              # (indirect dependency)
+pydantic-extra-types==2.10.2       # (indirect dependency)
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt
@@ -100,4 +100,3 @@ wraps==0.15.0
 zipp==3.21.0
 zope.event==5.0
 zope.interface==7.2
-pydantic-extra-types==2.10.2
