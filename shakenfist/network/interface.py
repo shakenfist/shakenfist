@@ -9,6 +9,8 @@ from shakenfist import exceptions
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.etcd_schema.operations.baseclusteroperation \
+    import PRIORITY
 from shakenfist.etcd_schema.operations.net_iface_ip_op \
     import create_and_enqueue as nii_create_and_enqueue
 from shakenfist.etcd_schema.operations.net_iface_ip_op \
@@ -145,8 +147,11 @@ class NetworkInterface(dbo):
         floating_address = self.floating['floating_address']
         if floating_address:
             op_type, op_uuid = nii_create_and_enqueue(
-                self.network_uuid, self.uuid, floating_address,
-                [nii_tasks.interface_defloat])
+                self.network_uuid,
+                self.uuid,
+                floating_address,
+                [nii_tasks.interface_defloat],
+                priority=PRIORITY.user_facing)
             n = network.Network.from_db(self.network_uuid)
             if n:
                 n.set_last_cluster_operation(op_type, op_uuid)
