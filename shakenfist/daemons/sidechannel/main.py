@@ -5,9 +5,9 @@ import threading
 import time
 import uuid
 
+import semver
 from shakenfist_agent import protocol
 from shakenfist_utilities import logs  # noreorder
-from versions_comparison import Comparison
 
 from shakenfist import blob
 from shakenfist import constants
@@ -84,9 +84,13 @@ class SideChannelJob(util_concurrency.Job):
                 self.instance.add_event(
                     EVENT_TYPE_AUDIT, 'detected agent version',
                     extra={'version': agent_version})
-                versions = Comparison(agent_version.split(' ')[1], MINIMUM_AGENT_VERSION)
-                lesser = versions.get_lesser()
-                if lesser and lesser == agent_version:
+
+                agent_version_trimmed = agent_version.split(' ')[1]
+                agent_version_parsed = semver.Version.parse(
+                    agent_version_trimmed)
+                minimum_version_parsed = semver.Version.parse(
+                    MINIMUM_AGENT_VERSION)
+                if agent_version_parsed < minimum_version_parsed:
                     self.instance_ready = constants.AGENT_TOO_OLD
                     self.instance.agent_state = constants.AGENT_TOO_OLD
                     return True

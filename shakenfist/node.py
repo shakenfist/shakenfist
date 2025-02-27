@@ -1,7 +1,7 @@
 import time
 from collections import defaultdict
 
-import versions
+import semver
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
@@ -277,10 +277,15 @@ class Node(dbo):
         if value != self.dependency_versions:
             self._db_set_attribute('dependency_versions', value)
 
+    def _version_tuple_to_semver(self, t):
+        while len(t) < 3:
+            t.append(0)
+        return semver.Version(major=t[0], minor=t[1], patch=t[2])
+
     @property
     def qemu_version(self):
         v = self._db_get_attribute('qemu_version')
-        return versions.version.Version.from_parts(*v)
+        return self._version_tuple_to_semver(v)
 
     @qemu_version.setter
     def qemu_version(self, value):
@@ -290,7 +295,7 @@ class Node(dbo):
     @property
     def libvirt_version(self):
         v = self._db_get_attribute('libvirt_version')
-        return versions.version.Version.from_parts(*v)
+        return self._version_tuple_to_semver(v)
 
     @libvirt_version.setter
     def libvirt_version(self, value):
@@ -300,7 +305,7 @@ class Node(dbo):
     @property
     def python_version(self):
         v = self._db_get_attribute('python_version')
-        return versions.version.Version.from_parts(*v)
+        return self._version_tuple_to_semver(v)
 
     @python_version.setter
     def python_version(self, value):

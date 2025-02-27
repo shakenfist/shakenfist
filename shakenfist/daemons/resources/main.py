@@ -7,7 +7,6 @@ import psutil
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
 from shakenfist_utilities import logs  # noreorder
-from versions import parse_version
 
 from shakenfist import etcd
 from shakenfist import exceptions
@@ -354,7 +353,9 @@ class Monitor(daemon.Daemon):
 
                 n.process_metrics = process_metrics
 
-                # What package versions do we have?
+                # What package versions do we have? Debian package versions are
+                # a mess and this will need tweaking if other host distributions
+                # are added.
                 try:
                     vers_out, _ = util_concurrency.execute(
                         None,
@@ -371,12 +372,21 @@ class Monitor(daemon.Daemon):
                     # to lookup
                     for package, attr in [('qemu-utils', 'qemu_version'),
                                           ('libvirt-daemon', 'libvirt_version')]:
+                        # Versions like:
+                        #     libvirt-daemon==7.0.0-3+deb11u3
+                        #     qemu-system-x86==1:5.2+dfsg-11+deb11u3
+                        #     xxhash==0.8.0-2
                         ver = versions.get(package, 'none')
                         if ':' in ver:
                             ver = ver.split(':')[1]
-                        ver = re.split('[-+]', ver)[0]
-                        ver = parse_version(ver)
-                        n.__setattr__(attr, ver.release.parts)
+                        ver = ver.split('-')[0]
+                        ver = ver.split('+')[0]
+
+                        elements = ver.split('.')
+                        while len(elements) < 3:
+                            elements.append('0')
+                        int_elements = [int(x) for x in elements]
+                        n.__setattr__(attr, int_elements)
 
                 except ProcessExecutionError:
                     LOG.warning('Failed to lookup package versions')
