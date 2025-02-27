@@ -47,6 +47,8 @@ class Job(util_concurrency.Job):
             self.log.error('Operation not found')
             return
 
+        op.queue_name = self.queue_name
+
         # Ensure our dependencies are met.
         for dep in op.depends_on:
             dep_op = OPERATION_NAMES_TO_CLASSES[dep['op_type']].from_db(
@@ -82,7 +84,7 @@ class Job(util_concurrency.Job):
                                 BaseClusterOperation.STATE_PREFLIGHT,
                                 BaseClusterOperation.STATE_EXECUTING]:
                 # Dependency not yet ready, we should defer
-                etcd.enqueue(self.queue_name, self.workitem, delay=15)
+                op.defer()
                 return
 
         # Ensure that we are running after any runs_after requirements.
@@ -108,7 +110,7 @@ class Job(util_concurrency.Job):
                                 BaseClusterOperation.STATE_PREFLIGHT,
                                 BaseClusterOperation.STATE_EXECUTING]:
                 # Dependency not yet ready, we should defer
-                etcd.enqueue(self.queue_name, self.workitem, delay=15)
+                op.defer()
                 return
 
         # We're good to go!

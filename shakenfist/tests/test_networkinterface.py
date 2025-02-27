@@ -1,6 +1,6 @@
 from unittest import mock
 
-from shakenfist.networkinterface import NetworkInterfaces
+from shakenfist.network.interface import NetworkInterfaces
 from shakenfist.tests import base
 
 

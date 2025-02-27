@@ -1,10 +1,7 @@
 import errno
-import json
 import os
 import pathlib
 import random
-import shutil
-import signal
 import time
 
 
@@ -14,278 +11,19 @@ from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import node
 from shakenfist import upload
-from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist.config import config
-from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.daemons.cleaner import scheduled_tasks
 from shakenfist.daemons import daemon
-from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.util import general as util_general
-from shakenfist.util import libvirt as util_libvirt
-from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.Daemon):
-    def _delete_instance_files(self, instance_uuid):
-        instance_path = os.path.join(
-            config.STORAGE_PATH, 'instances', instance_uuid)
-        if os.path.exists(instance_path):
-            shutil.rmtree(instance_path)
-
-        # And possibly an apparmor profile?
-        libvirt_profile_path = '/etc/apparmor.d/libvirt/libvirt-' + instance_uuid
-        if os.path.exists(libvirt_profile_path):
-            os.unlink(libvirt_profile_path)
-        libvirt_profile_path += '.files'
-        if os.path.exists(libvirt_profile_path):
-            os.unlink(libvirt_profile_path)
-
-    def _delete_with_virsh(self, instance_uuid, inst):
-        log_ctx = LOG.with_fields({'instance': instance_uuid})
-        try:
-            log_ctx.warning('Destroying instance using virsh')
-            util_concurrency.execute(
-                None, 'virsh destroy "sf:%s"' % instance_uuid)
-            util_concurrency.execute(
-                None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
-            self._delete_instance_files(instance_uuid)
-            log_ctx.warning('Destroying instance using virsh succeeded')
-            if inst:
-                inst.add_event(
-                    EVENT_TYPE_AUDIT,  'enforced delete via virsh method succeeded')
-                return True
-
-        except ProcessExecutionError:
-            log_ctx.warning('Destroying instance using virsh failed')
-            if inst:
-                inst.add_event(EVENT_TYPE_AUDIT,
-                               'enforced delete via virsh failed')
-            return False
-
-    def _delete_with_kill(self, instance_uuid, inst):
-        log_ctx = LOG.with_fields({'instance': instance_uuid})
-        try:
-            log_ctx.warning('Destroying instance using SIGKILL')
-            stdout, _ = util_concurrency.execute(None, 'aa-status --json')
-            status = json.loads(stdout)
-            profile = 'libvirt-%s' % instance_uuid
-            for proc in status['processes']['/usr/bin/qemu-system-x86_64']:
-                if proc['profile'] == profile:
-                    os.kill(int(proc['pid']), signal.SIGKILL)
-
-            try:
-                util_concurrency.execute(
-                    None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
-            except ProcessExecutionError:
-                pass
-
-            self._delete_instance_files(instance_uuid)
-            log_ctx.warning('Destroying instance using SIGKILL succeeded')
-            if inst:
-                inst.add_event(
-                    EVENT_TYPE_AUDIT, 'enforced delete via SIGKILL succeeded')
-        except ProcessExecutionError:
-            log_ctx.warning('Destroying instance using SIGKILL failed')
-            if inst:
-                inst.add_event(
-                    EVENT_TYPE_AUDIT, 'enforced delete via SIGKILL failed')
-
-    def _update_power_states(self):
-        with util_libvirt.LibvirtConnection() as lc:
-            try:
-                seen = []
-
-                # Active VMs have an ID. Active means running in libvirt
-                # land.
-                for domain in lc.get_sf_domains():
-                    instance_uuid = domain.name().split(':')[1]
-                    log_ctx = LOG.with_fields({'instance': instance_uuid})
-                    log_ctx.debug('Instance is running')
-
-                    inst = instance.Instance.from_db(instance_uuid)
-                    if not inst:
-                        # Instance is SF but not in database. Kill to reduce load.
-                        if not self._delete_with_virsh(instance_uuid, None):
-                            self._delete_with_kill(instance_uuid, None)
-                        continue
-
-                    inst.place_instance(config.NODE_NAME)
-                    seen.append(domain.name())
-
-                    db_state = inst.state
-                    if db_state.value == dbo.STATE_DELETED:
-                        # NOTE(mikal): a delete might be in-flight in the queue.
-                        # We only worry about instances which should have gone
-                        # away five minutes ago.
-                        if time.time() - db_state.update_time < 300:
-                            continue
-
-                        attempts = inst.enforced_deletes_increment()
-                        if attempts > 6:
-                            # I give up.
-                            pass
-
-                        elif attempts > 4:
-                            self._delete_with_kill(instance_uuid, inst)
-
-                        elif attempts > 2:
-                            self._delete_with_virsh(instance_uuid, inst)
-
-                        else:
-                            inst.delete()
-
-                        log_ctx.with_fields({'attempt': attempts}).warning(
-                            'Deleting stray instance')
-                        continue
-
-                    state = lc.extract_power_state(domain)
-                    inst.update_power_state(state)
-                    if state == 'crashed':
-                        if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
-                            util_concurrency.execute(
-                                None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
-                            inst.state.value = dbo.STATE_DELETED
-                        else:
-                            inst.state = inst.state.value + '-error'
-
-            except lc.libvirt.libvirtError as e:
-                LOG.debug('Failed to lookup running domains: %s' % e)
-
-            try:
-                # Inactive VMs just have a name, and are powered off
-                # in our state system.
-                all_libvirt_uuids = []
-                for domain in lc.get_all_domains():
-                    domain_name = domain.name()
-                    all_libvirt_uuids.append(domain.UUIDString())
-
-                    if not domain_name.startswith('sf:'):
-                        continue
-
-                    if domain_name not in seen:
-                        instance_uuid = domain_name.split(':')[1]
-                        log_ctx = LOG.with_fields({'instance': instance_uuid})
-                        inst = instance.Instance.from_db(instance_uuid)
-                        log_ctx.debug('Inspecting absent instance')
-
-                        if not inst:
-                            # Instance is SF but not in database. Kill because
-                            # unknown.
-                            log_ctx.warning(
-                                'Removing unknown inactive instance')
-                            self._delete_instance_files(instance_uuid)
-                            try:
-                                # TODO(mikal): work out if we can pass
-                                # VIR_DOMAIN_UNDEFINE_NVRAM with virDomainUndefineFlags()
-                                domain.undefine()
-                            except lc.libvirt.libvirtError:
-                                util_concurrency.execute(
-                                    None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
-                            continue
-
-                        db_state = inst.state
-                        if db_state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
-                            # NOTE(mikal): a delete might be in-flight in the queue.
-                            # We only worry about instances which should have gone
-                            # away five minutes ago.
-                            if time.time() - db_state.update_time < 300:
-                                continue
-
-                            self._delete_instance_files(instance_uuid)
-                            try:
-                                # TODO(mikal): work out if we can pass
-                                # VIR_DOMAIN_UNDEFINE_NVRAM with virDomainUndefineFlags()
-                                domain.undefine()
-                            except lc.libvirt.libvirtError:
-                                util_concurrency.execute(
-                                    None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
-
-                            inst.add_event(EVENT_TYPE_AUDIT,
-                                           'deleted stray instance')
-                            if db_state.value != dbo.STATE_DELETED:
-                                inst.state.value = dbo.STATE_DELETED
-                            continue
-
-                        inst.place_instance(config.NODE_NAME)
-
-                        db_power = inst.power_state
-                        log_ctx.debug(
-                            'Instance expected power state %s, actually off' % db_power)
-                        if not os.path.exists(inst.instance_path):
-                            # If we're inactive and our files aren't on disk,
-                            # we have a problem.
-                            inst.add_event(EVENT_TYPE_AUDIT,
-                                           'instance files missing')
-                            if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
-                                inst.state.value = dbo.STATE_DELETED
-                            else:
-                                inst.state = inst.state.value + '-error'
-
-                        elif not db_power or db_power['power_state'] != 'off':
-                            inst.update_power_state('off')
-                            inst.add_event(EVENT_TYPE_AUDIT,
-                                           'detected poweroff')
-
-            except lc.libvirt.libvirtError as e:
-                LOG.debug('Failed to lookup all domains: %s' % e)
-
-            # libvirt on Debian 11 fails to clean up apparmor profiles for VMs
-            # which are no longer running, so we do that here. Note that this list
-            # of UUIDs is _libvirt_ UUIDs, not SF UUIDs and includes _all_ VMs
-            # defined on the hypervisor. SF _does_ however set the libvirt UUID
-            # to match the SF UUID in libvirt.tmpl.
-            libvirt_profile_path = '/etc/apparmor.d/libvirt'
-            if os.path.exists(libvirt_profile_path):
-                for ent in os.listdir(libvirt_profile_path):
-                    if not ent.startswith('libvirt-'):
-                        continue
-                    if len(ent) not in [44, 50]:
-                        continue
-
-                    entpath = os.path.join(libvirt_profile_path, ent)
-                    st = os.stat(entpath)
-                    if time.time() - st.st_mtime < config.CLEANER_DELAY * 2:
-                        continue
-
-                    u = ent.replace('libvirt-', '').replace('.files', '')
-                    if (u not in all_libvirt_uuids and
-                            not os.path.exists(os.path.join(
-                                config.STORAGE_PATH, 'instances', u))):
-                        if os.path.isdir(entpath):
-                            shutil.rmtree(entpath)
-                        else:
-                            os.unlink(entpath)
-                        LOG.info(
-                            'Removed old libvirt apparmor path %s' % entpath)
-
-    def _clear_old_libvirt_logs(self):
-        if not os.path.exists(config.LIBVIRT_LOG_PATH):
-            return
-
-        # Collect all valid instance UUIDs (that is, instances that have not
-        # been hard deleted).
-        all_instances = []
-        for i in instance.all_instances():
-            all_instances.append(i.uuid)
-
-        # Now delete all libvirt log files which look like a SF instance, but
-        # where the instance doesn't exist.
-        for ent in os.listdir(config.LIBVIRT_LOG_PATH):
-            if not ent.startswith('sf:'):
-                continue
-
-            uuid = ent.split(':')[1].split('.')[0]
-            if uuid in all_instances:
-                continue
-
-            LOG.debug('Removing stale libvirt log %s' % ent)
-            os.unlink(os.path.join(config.LIBVIRT_LOG_PATH, ent))
-
     def _maintain_blobs(self):
         # Find orphaned and deleted blobs still on disk
         blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
@@ -467,11 +205,14 @@ class Monitor(daemon.Daemon):
             # Update power state of all instances on this hypervisor
             with util_general.RecordedOperation('update power states', n,
                                                 threshold=1):
-                self._update_power_states()
+                self._remove_stale_uploads
 
             with util_general.RecordedOperation('maintain blobs', n,
                                                 threshold=1):
                 self._maintain_blobs()
+
+            scheduled_tasks.update_power_states()
+            scheduled_tasks.remove_stray_lock_files()
 
             if time.time() - last_missing_blob_check > 300:
                 with util_general.RecordedOperation('find missing blobs', n,
@@ -497,7 +238,7 @@ class Monitor(daemon.Daemon):
             if time.time() - last_libvirt_log_clean > 1800:
                 with util_general.RecordedOperation('libvirt log cleanup', n,
                                                     threshold=1):
-                    self._clear_old_libvirt_logs()
+                    scheduled_tasks.clear_old_libvirt_logs()
                     last_libvirt_log_clean = time.time()
 
             self.idle(60)

@@ -7,8 +7,8 @@ from shakenfist.etcd_schema.operations.net_iface_op \
     import model_tasks as ni_tasks
 from shakenfist.etcd_schema.operations import node_inst_net_iface_op as schema
 from shakenfist.instance import Instance
-from shakenfist.network import Network
-from shakenfist.networkinterface import NetworkInterface
+from shakenfist.network.network import Network
+from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import general as util_general

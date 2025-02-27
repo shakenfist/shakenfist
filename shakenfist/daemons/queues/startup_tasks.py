@@ -9,7 +9,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist import instance
-from shakenfist import network
+from shakenfist.network import network
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist.blob import placement_filter
@@ -17,7 +17,7 @@ from shakenfist.config import config
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
-from shakenfist.networkinterface import interfaces_for_instance
+from shakenfist.network.interface import interfaces_for_instance
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_node_queues
 from shakenfist.util import concurrency as util_concurrency

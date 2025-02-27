@@ -14,7 +14,7 @@ from shakenfist import baseobject
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import ipam
-from shakenfist import networkinterface
+from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
@@ -110,8 +110,8 @@ class Network(dbo):
     @classmethod
     def _upgrade_step_3_to_4(cls, static_values):
         nis = []
-        for ni in networkinterface.NetworkInterfaces(
-                [partial(networkinterface.network_uuid_filter, static_values['uuid'])],
+        for ni in interface.NetworkInterfaces(
+                [partial(interface.network_uuid_filter, static_values['uuid'])],
                 prefilter='active'):
             nis.append(ni.uuid)
         etcd.put('attribute/network', static_values['uuid'], 'networkinterfaces',
@@ -829,7 +829,7 @@ class Network(dbo):
 
             instances = []
             for ni_uuid in self.networkinterfaces:
-                ni = networkinterface.NetworkInterface.from_db(ni_uuid)
+                ni = interface.NetworkInterface.from_db(ni_uuid)
                 if ni.instance_uuid not in instances:
                     instances.append(ni.instance_uuid)
 

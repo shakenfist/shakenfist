@@ -12,8 +12,8 @@ from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
 from shakenfist import ipam
-from shakenfist import network
-from shakenfist import networkinterface
+from shakenfist.network import network
+from shakenfist.network import interface
 from shakenfist.etcd_schema.operations.baseclusteroperation \
     import PRIORITY
 from shakenfist.etcd_schema.operations.net_op \
@@ -73,10 +73,10 @@ class Job(util_concurrency.Job):
                     ifaces = inst.interfaces
                     if not ifaces:
                         ifaces = list(
-                            networkinterface.interfaces_for_instance(inst))
+                            interface.interfaces_for_instance(inst))
 
                     for iface_uuid in ifaces:
-                        ni = networkinterface.NetworkInterface.from_db(
+                        ni = interface.NetworkInterface.from_db(
                             iface_uuid)
                         if not ni:
                             LOG.with_fields({
@@ -141,7 +141,7 @@ class Job(util_concurrency.Job):
                             # that we also need to re-create all of the floating IPs for
                             # that network.
                             for ni_uuid in n.networkinterfaces:
-                                ni = networkinterface.NetworkInterface.from_db(
+                                ni = interface.NetworkInterface.from_db(
                                     ni_uuid)
                                 if not ni:
                                     continue

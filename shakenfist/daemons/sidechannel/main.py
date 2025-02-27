@@ -39,7 +39,7 @@ class PutException(Exception):
     ...
 
 
-class SFSocketAgent(protocol.SocketAgent):
+class SFSocketAgent(protocol.UnixDomainSocketAgent):
     def __init__(self, inst, path, logger=None):
         super().__init__(path, logger=logger)
         self.log = LOG.with_fields({'instance': inst})
@@ -122,7 +122,7 @@ class SideChannelJob(util_concurrency.Job):
                 self.instance_ready = new_state
                 self.instance.agent_state = new_state
                 if new_state in [constants.AGENT_READY, constants.AGENT_READY_DEGRADED]:
-                    self.sc_client.send_packet({
+                    self.sc_client.send_v1_packet({
                         'command': 'gather-facts',
                         'unique': str(time.time())
                         })
@@ -134,7 +134,7 @@ class SideChannelJob(util_concurrency.Job):
             return True
 
         elif command == 'ping':
-            self.sc_client.send_packet({
+            self.sc_client.send_v1_packet({
                 'command': 'pong',
                 'unique': packet['unique']
             })
@@ -213,7 +213,7 @@ class SideChannelJob(util_concurrency.Job):
 
     def _handle_get_file(self, agentop, count, command):
         unique = 'agentop:%s:%d' % (agentop.uuid, count)
-        self.sc_client.send_packet({
+        self.sc_client.send_v1_packet({
             'command': 'get-file',
             'path': command['path'],
             'unique': unique
@@ -357,7 +357,7 @@ class SideChannelJob(util_concurrency.Job):
         first_attempt = time.time()
         last_attempt = time.time()
         try:
-            self.sc_client.send_packet({
+            self.sc_client.send_v1_packet({
                 'command': 'is-system-running',
                 'unique': str(time.time())
                 })
@@ -373,7 +373,7 @@ class SideChannelJob(util_concurrency.Job):
 
                 # Retry every now and then
                 if time.time() - last_attempt > 30:
-                    self.sc_client.send_packet({
+                    self.sc_client.send_v1_packet({
                         'command': 'is-system-running',
                         'unique': str(time.time())
                         })
@@ -441,7 +441,7 @@ class SideChannelJob(util_concurrency.Job):
                                 inpacket = {}
                                 for outpacket in self._send_file(
                                         'put-file', blob_path, command['path'], unique):
-                                    self.sc_client.send_packet(outpacket)
+                                    self.sc_client.send_v1_packet(outpacket)
 
                                     # Wait for a matching ACK
                                     for inpacket in self._await_client():
@@ -461,7 +461,7 @@ class SideChannelJob(util_concurrency.Job):
 
                             elif command['command'] == 'chmod':
                                 unique = 'agentop:%s:%d' % (agentop.uuid, count)
-                                self.sc_client.send_packet({
+                                self.sc_client.send_v1_packet({
                                     'command': 'chmod',
                                     'path': command['path'],
                                     'mode': command['mode'],
@@ -482,7 +482,7 @@ class SideChannelJob(util_concurrency.Job):
 
                             elif command['command'] == 'chown':
                                 unique = 'agentop:%s:%d' % (agentop.uuid, count)
-                                self.sc_client.send_packet({
+                                self.sc_client.send_v1_packet({
                                     'command': 'chown',
                                     'user': command['user'],
                                     'group': command['group'],
@@ -503,7 +503,7 @@ class SideChannelJob(util_concurrency.Job):
 
                             elif command['command'] == 'execute':
                                 unique = 'agentop:%s:%d' % (agentop.uuid, count)
-                                self.sc_client.send_packet({
+                                self.sc_client.send_v1_packet({
                                     'command': 'execute',
                                     'command-line': command['commandline'],
                                     'block-for-result': True,

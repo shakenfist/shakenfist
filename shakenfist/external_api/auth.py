@@ -16,7 +16,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
 from shakenfist import instance
-from shakenfist import network
+from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon

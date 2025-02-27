@@ -44,7 +44,7 @@ from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import ipam
-from shakenfist import network as sfnet
+from shakenfist.network import network as sfnet
 from shakenfist import scheduler
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
@@ -62,7 +62,7 @@ from shakenfist.external_api import agentoperation as api_agentoperation
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
 from shakenfist.namespace import namespace_is_trusted
-from shakenfist.networkinterface import NetworkInterface
+from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util import general as util_general

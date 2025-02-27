@@ -12,7 +12,7 @@ from versions import parse_version
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import network
+from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_RESOURCES
@@ -24,6 +24,7 @@ from shakenfist.daemons import daemon
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_background_node_queues
+from shakenfist.operations.baseoperation import get_all_network_queues
 from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
@@ -270,12 +271,20 @@ class Monitor(daemon.Daemon):
             })
 
             if config.NODE_IS_NETWORK_NODE:
-                network_queue_processing, network_queue_waiting, node_queue_deferred = \
-                    etcd.get_queue_length('networknode')
+                network_waiting = 0
+                network_processing = 0
+                network_deferred = 0
+
+                for queue in get_all_network_queues():
+                    processing, queued, deferred = etcd.get_queue_length(queue)
+                    network_waiting += queued
+                    network_processing += processing
+                    network_deferred += deferred
 
                 retval.update({
-                    'queue_network_processing': network_queue_processing,
-                    'queue_network_waiting': network_queue_waiting,
+                    'queue_network_processing': network_processing,
+                    'queue_network_waiting': network_waiting,
+                    'queue_network_deferred': network_deferred
                 })
 
             if config.NODE_IS_EVENTLOG_NODE:

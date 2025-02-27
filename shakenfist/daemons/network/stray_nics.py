@@ -6,8 +6,8 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import network
-from shakenfist.networkinterface import NetworkInterface
+from shakenfist.network import network
+from shakenfist.network.interface import NetworkInterface
 from shakenfist.util import concurrency as util_concurrency
 
 

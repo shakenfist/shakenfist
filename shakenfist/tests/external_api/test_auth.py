@@ -564,7 +564,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
 
     @mock.patch('shakenfist.artifact.Artifact.from_url')
-    @mock.patch('shakenfist.network.Network._db_get_attribute',
+    @mock.patch('shakenfist.network.network.Network._db_get_attribute',
                 return_value={'value': dbo.STATE_CREATED, 'update_time': 2})
     @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.ipmanager.IPManager.from_db')

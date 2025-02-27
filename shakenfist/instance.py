@@ -38,8 +38,8 @@ from shakenfist.etcd_schema.operations.node_inst_snap_op \
     import model_tasks as niso_tasks
 from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
-from shakenfist import network
-from shakenfist import networkinterface
+from shakenfist.network import network
+from shakenfist.network import interface
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.operations.agentoperation import AgentOperations
 from shakenfist.operations.agentoperation \
@@ -355,7 +355,7 @@ class Instance(dbo):
         # for clients.
         i['interfaces'] = []
         for iface_uuid in self.interfaces:
-            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
+            ni = interface.NetworkInterface.from_db(iface_uuid)
             if not ni:
                 self.log.with_fields({'networkinterface': ni}).error(
                     'Network interface missing')
@@ -1096,7 +1096,7 @@ class Instance(dbo):
         detected_dns_servers = []
         have_default_route = False
         for iface_uuid in self.interfaces:
-            iface = networkinterface.NetworkInterface.from_db(iface_uuid)
+            iface = interface.NetworkInterface.from_db(iface_uuid)
             if iface.ipv4:
                 devname = 'eth%d' % iface.order
                 nd['links'].append(
@@ -1199,7 +1199,7 @@ class Instance(dbo):
 
         networks = []
         for iface_uuid in self.interfaces:
-            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
+            ni = interface.NetworkInterface.from_db(iface_uuid)
             n = network.Network.from_db(ni.network_uuid)
             networks.append(
                 {

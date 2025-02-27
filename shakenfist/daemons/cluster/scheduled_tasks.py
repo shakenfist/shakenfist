@@ -52,8 +52,6 @@ def _fill_per_blob_queue():
             continue
         BLOB_CHECKS_QUEUE.put(b)
 
-    LOG
-
 
 def _process_per_blob_queue(execution_limit=10):
     global BLOB_CHECKS_QUEUE

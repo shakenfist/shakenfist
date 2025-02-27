@@ -3,6 +3,7 @@ import time
 from collections import defaultdict
 from functools import partial
 from math import inf
+import re
 
 from etcd3gw.lock import Lock
 from oslo_concurrency import lockutils
@@ -139,6 +140,8 @@ class DatabaseBackedObject:
     HEALTHY_STATES = {STATE_INITIAL, STATE_CREATING, STATE_CREATED}
     INACTIVE_STATES = {}
 
+    VALID_OBJECT_TYPE_RE = re.compile(r'^[a-z_]+$')
+
     def __init__(self, object_uuid, version=None, in_memory_only=False):
         self.__uuid = object_uuid
         self.__version = version
@@ -148,6 +151,18 @@ class DatabaseBackedObject:
             self.__in_memory_values = {}
 
         self.log = LOG.with_fields({self.object_type: self.__uuid})
+
+        # Not very good schema rule enforcement for object naming...
+        m = self.VALID_OBJECT_TYPE_RE.match(self.object_type)
+        if not m:
+            self.log.with_fields({
+                'object_type': self.object_type
+            }).error('Object types must be all lower case with no hyphens!')
+
+        if self.object_type.endswith('s'):
+            self.log.with_fields({
+                'object_type': self.object_type
+            }).error('Object types must be singular!')
 
     def upgrade(self, static_values):
         if static_values.get('version', self.initial_version) != self.current_version:
@@ -387,7 +402,7 @@ class DatabaseBackedObject:
         if not global_scope:
             return lockutils.external_lock(
                 f'{self.object_type}-{self.uuid}',
-                lock_path='/tmp', lock_file_prefix='sflock-')
+                lock_path='/run/lock', lock_file_prefix='sflock-')
 
         return etcd.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
                              log_ctx=self.log, op=op, timeout=timeout)
@@ -400,7 +415,7 @@ class DatabaseBackedObject:
         if not global_scope:
             return lockutils.external_lock(
                 f'{self.object_type}-{self.uuid}-{name}',
-                lock_path='/tmp', lock_file_prefix='sflock-')
+                lock_path='/run/lock', lock_file_prefix='sflock-')
 
         return etcd.get_lock('attribute/%s' % self.object_type,
                              self.__uuid, name, op=op, ttl=ttl, timeout=timeout,

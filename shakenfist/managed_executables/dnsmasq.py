@@ -3,7 +3,7 @@ import signal
 import time
 
 from shakenfist import instance
-from shakenfist import networkinterface
+from shakenfist.network import interface
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
@@ -31,11 +31,7 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         self.__interface = None
         self.__network = None
 
-        self._read_template('config', 'dhcp.tmpl')
-        if self.provide_dhcp:
-            self._read_template('hosts', 'dhcphosts.tmpl')
-        if self.provide_dns:
-            self._read_template('dnshosts', 'dnshosts.tmpl')
+        self._templates_initialized = False
 
     @classmethod
     def _upgrade_step_1_to_2(cls, static_values):
@@ -116,12 +112,21 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         d.update(self.network.subst_dict())
         return d
 
+    def _read_templates(self):
+        if not self._templates_initialized:
+            self._read_template('config', 'dhcp.tmpl')
+            if self.provide_dhcp:
+                self._read_template('hosts', 'dhcphosts.tmpl')
+            if self.provide_dns:
+                self._read_template('dnshosts', 'dnshosts.tmpl')
+            self._templates_initialized = True
+
     def _enumerate_leases(self):
         instances = []
         allowed_leases = {}
 
         for ni_uuid in self.network.networkinterfaces:
-            ni = networkinterface.NetworkInterface.from_db(ni_uuid)
+            ni = interface.NetworkInterface.from_db(ni_uuid)
             if not ni:
                 continue
 
@@ -199,6 +204,7 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         _, allowed_leases = self._enumerate_leases()
         needs_start = False
 
+        self._read_templates()
         self._make_config()
 
         if self._remove_invalid_leases(allowed_leases):

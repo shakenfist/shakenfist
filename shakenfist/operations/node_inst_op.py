@@ -10,9 +10,9 @@ from shakenfist.etcd_schema.operations import node_inst_op as schema
 from shakenfist.instance import Instance
 from shakenfist.instance import Instances
 from shakenfist.instance import this_node_filter
-from shakenfist.network import Network
-from shakenfist.networkinterface import interfaces_for_instance
-from shakenfist.networkinterface import NetworkInterface
+from shakenfist.network.network import Network
+from shakenfist.network.interface import interfaces_for_instance
+from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import general as util_general
@@ -176,8 +176,7 @@ class NodeInstOp(BaseClusterOperation):
                 psutil.Process(pid)
             except (psutil.NoSuchProcess, FileNotFoundError):
                 inst.kvm_pid = None
-                inst.state = Instance.STATE_ERROR
-                inst.add_event(EVENT_TYPE_AUDIT, 'kvm process missing')
+                inst.enqueue_delete_due_error('kvm process missing')
 
     def _instance_delete(self, inst):
         with inst.get_lock(op='Instance delete', global_scope=False):

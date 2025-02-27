@@ -17,8 +17,8 @@ from shakenfist import eventlog
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import namespace
-from shakenfist import network
-from shakenfist import networkinterface
+from shakenfist.network import network
+from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
@@ -383,7 +383,7 @@ class Monitor(daemon.Daemon):
                     i.delete(global_only=True)
 
                     # Cleanup the instance's interfaces
-                    for ni in networkinterface.interfaces_for_instance(i):
+                    for ni in interface.interfaces_for_instance(i):
                         ni.delete()
 
                 # Cleanup any blob locations

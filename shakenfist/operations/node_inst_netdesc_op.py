@@ -9,8 +9,8 @@ from shakenfist.exceptions import ImagesCannotShrinkException
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import LowResourceException
 from shakenfist.instance import Instance
-from shakenfist.network import Network
-from shakenfist.networkinterface import NetworkInterface
+from shakenfist.network.network import Network
+from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.etcd_schema.operations.net_iface_op \
@@ -259,7 +259,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
 
                 # And now float any required interfaces
                 for ft in float_tasks:
-                    etcd.enqueue('networknode', ft)
+                    etcd.enqueue('networknode-clusteroperation-user_waiting', ft)
 
             except InvalidStateException as e:
                 # This instance is in an error or deleted state. Given the check

@@ -534,7 +534,7 @@ class Blob(dbo):
             try:
                 with lockutils.external_lock(
                         f'blob-{self.uuid}-transfer',
-                        lock_path='/tmp', lock_file_prefix='sflock-'):
+                        lock_path='/run/lock', lock_file_prefix='sflock-'):
                     # Check the blob didn't show up without us
                     if os.path.exists(blob_path):
                         self.observe()
