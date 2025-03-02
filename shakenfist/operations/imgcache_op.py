@@ -34,16 +34,6 @@ class NoSuchTask(ImageCacheOpException):
         super().__init__(op, f'no such task {task}')
 
 
-class NoSuchBlob(ImageCacheOpException):
-    def __init__(self, op, task):
-        super().__init__(op, 'blob missing for task {task}')
-
-
-class NoSuchCachedImage(ImageCacheOpException):
-    def __init__(self, op, task):
-        super().__init__(op, 'cached image missing for task {task}')
-
-
 class ImageCacheOp(BaseClusterOperation):
     object_type = schema.object_type.name.lower()
     initial_version = schema.initial_version
@@ -108,12 +98,15 @@ class ImageCacheOp(BaseClusterOperation):
 
         b = Blob.from_db(self.blob_uuid)
         if not b:
-            raise NoSuchBlob(self, task)
+            self.state = ImageCacheOp.STATE_ERROR
+            return
         if b.state.value != Blob.STATE_CREATED:
-            raise NoSuchBlob(self, task)
+            self.state = ImageCacheOp.STATE_ERROR
+            return
 
         if not os.path.exists(self.cache_path):
-            raise NoSuchCachedImage(self, task)
+            self.state = ImageCacheOp.STATE_ERROR
+            return
 
         try:
             self.__getattribute__(f'_{task.name}')(b)
