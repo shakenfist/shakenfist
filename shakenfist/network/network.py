@@ -199,7 +199,8 @@ class Network(dbo):
             'provide_nat': self.__provide_nat,
             'provide_dns': self.__provide_dns,
             'floating_gateway': self.floating_gateway,
-            'vxlan_id': self.__vxid
+            'vxlan_id': self.__vxid,
+            'last_cluster_operation': self.last_cluster_operation
         })
 
         for attrname in ['routing']:
@@ -262,15 +263,13 @@ class Network(dbo):
         return self._db_get_attribute('last_cluster_operation')
 
     def set_last_cluster_operation(self, op_type, op_uuid):
-        with self.get_lock_attr('last_cluster_operation',
-                                'Update last cluster op'):
-            self._db_set_attribute(
-                'last_cluster_operation',
-                {
-                    'op_type': op_type,
-                    'op_uuid': op_uuid
-                }
-            )
+        self._db_set_attribute(
+            'last_cluster_operation',
+            {
+                'op_type': op_type,
+                'op_uuid': op_uuid
+            }
+        )
 
     # Calculated values
     @property

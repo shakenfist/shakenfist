@@ -29,7 +29,7 @@ UPLOAD_URL = 'sf://upload/'
 
 class Artifact(dbo):
     object_type = 'artifact'
-    current_version = 6
+    current_version = 7
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -78,6 +78,10 @@ class Artifact(dbo):
     @classmethod
     def _upgrade_step_5_to_6(cls, static_values):
         static_values['name'] = static_values['source_url'].split('/')[-1]
+
+    @classmethod
+    def _upgrade_step_6_to_7(cls, static_values):
+        ...
 
     @classmethod
     def new(cls, artifact_type, source_url, name=None, max_versions=0,
@@ -197,6 +201,19 @@ class Artifact(dbo):
     def shared(self, value):
         self._db_set_attribute('shared', {'shared': value})
 
+    @property
+    def last_cluster_operation(self):
+        return self._db_get_attribute('last_cluster_operation')
+
+    def set_last_cluster_operation(self, op_type, op_uuid):
+        self._db_set_attribute(
+            'last_cluster_operation',
+            {
+                'op_type': op_type,
+                'op_uuid': op_uuid
+            }
+        )
+
     def external_view_without_index(self):
         out = self._external_view()
         out.update({
@@ -204,7 +221,8 @@ class Artifact(dbo):
             'source_url': self.source_url,
             'max_versions': self.max_versions,
             'namespace': self.namespace,
-            'shared': self.shared
+            'shared': self.shared,
+            'last_cluster_operation': self.last_cluster_operation
         })
         return out
 

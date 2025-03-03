@@ -129,6 +129,10 @@ artifact_get_example = """{
         }
     },
     "index": 101,
+    "last_cluster_operation": {
+        "op_type": "artifact_fetch_op",
+        "op_uuid": "f3a52d98-f06b-4e2c-968d-21262e4b104b"
+    },
     "max_versions": 3,
     "namespace": "system",
     "shared": true,
@@ -314,13 +318,16 @@ class ArtifactsEndpoint(sf_api.Resource):
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True
 
-        afo_create_and_enqueue(
-            namespace,
-            url,
-            None,
-            [afo_tasks.image_fetch],
-            PRIORITY.user_facing,
-            request_id=util_general.get_request_id())
+        with a.get_lock_attr('last_cluster_operation', 'add new operation'):
+            op_type, op_uuid = afo_create_and_enqueue(
+                namespace,
+                url,
+                None,
+                [afo_tasks.image_fetch],
+                PRIORITY.user_facing,
+                request_id=util_general.get_request_id(),
+                runs_after=[a.last_cluster_operation])
+            a.set_last_cluster_operation(op_type, op_uuid)
 
         return a.external_view()
 
