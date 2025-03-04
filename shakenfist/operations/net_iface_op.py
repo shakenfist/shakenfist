@@ -90,6 +90,15 @@ class NetIfaceOp(BaseClusterOperation):
     def tasks(self):
         return self.__tasks
 
+    # API
+    def external_view(self):
+        retval = super().external_view()
+        retval.update({
+            'network_uuid': self.network_uuid,
+            'interface_uuid': self.interface_uuid
+        })
+        return retval
+
     # Tasks
     def dispatch_task(self, task):
         if task not in schema.model_tasks:

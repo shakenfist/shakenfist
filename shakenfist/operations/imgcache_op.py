@@ -90,6 +90,17 @@ class ImageCacheOp(BaseClusterOperation):
     def tasks(self):
         return self.__tasks
 
+    # API
+    def external_view(self):
+        retval = super().external_view()
+        retval.update({
+            'node_uuid': self.node_uuid,
+            'blob_uuid': self.blob_uuid,
+            'cache_path': self.cache_path,
+            'transcode_description': self.transcode_description
+        })
+        return retval
+
     # Tasks
     def dispatch_task(self, task):
         if task not in schema.model_tasks:
