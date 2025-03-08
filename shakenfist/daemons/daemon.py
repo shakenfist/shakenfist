@@ -17,7 +17,6 @@ from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist import etcd
 from shakenfist.exceptions import InvalidStateException
-from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_user_facing_node_queues
 from shakenfist.operations.baseoperation import get_all_background_node_queues
@@ -84,34 +83,6 @@ def set_abort_path(abort_path, source):
 
 def check_abort_path(abort_path):
     return not os.path.exists(abort_path)
-
-
-def health_check_privexec():
-    try:
-        util_concurrency.execute(None, 'whoami')
-    except ProcessExecutionError as e:
-        LOG.with_fields({
-            'stdout': e.stdout,
-            'stderr': e.stderr,
-            'exit_code': e.exit_code
-        }).error('privsep daemon is unhealthy (execution error)!')
-        return False
-    except ConnectionResetError:
-        LOG.error('privsep daemon is unhealthy (connection reset)!')
-        return False
-
-    return True
-
-
-def health_check_nodelock():
-    try:
-        with util_concurrency.NodeLock('_health_check'):
-            ...
-    except ConnectionResetError:
-        LOG.error('nodelock daemon is unhealthy (connection reset)!')
-        return False
-
-    return True
 
 
 class Daemon:

@@ -2,6 +2,7 @@ import os
 import time
 
 import psutil
+import requests
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 
@@ -10,6 +11,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons.queues import startup_tasks
 from shakenfist.daemons.queues import workitem
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
@@ -18,7 +20,50 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 
 
+def health_check_privexec():
+    try:
+        util_concurrency.execute(None, 'whoami')
+    except ProcessExecutionError as e:
+        LOG.with_fields({
+            'stdout': e.stdout,
+            'stderr': e.stderr,
+            'exit_code': e.exit_code
+        }).error('privsep daemon is unhealthy (execution error)!')
+        return False
+    except ConnectionResetError:
+        LOG.error('privsep daemon is unhealthy (connection reset)!')
+        return False
+
+    return True
+
+
+def health_check_nodelock():
+    try:
+        with util_concurrency.NodeLock('_health_check'):
+            ...
+    except ConnectionResetError:
+        LOG.error('nodelock daemon is unhealthy (connection reset)!')
+        return False
+
+    return True
+
+
+def health_check_api():
+    try:
+        r = requests.get(
+            f'http:{config.NODE_MESH_IP}:13000/', timeout=2)
+        return r.status_code == 200
+    except requests.exceptions.RequestException:
+        return False
+
+
 def _check_other_daemon(n, daemon_name, override_daemon_name=None):
+    health_checks = {
+        'gunicorn': health_check_api,
+        'nodelock': health_check_nodelock,
+        'privexec': health_check_privexec
+    }
+
     recorded_daemon_name = daemon_name
     if override_daemon_name:
         recorded_daemon_name = override_daemon_name
@@ -26,22 +71,31 @@ def _check_other_daemon(n, daemon_name, override_daemon_name=None):
     if not os.path.exists(f'/run/sf/{daemon_name}.pid'):
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='pid file missing')
+        return
 
     try:
         with open(f'/run/sf/{daemon_name}.pid') as f:
             pid = int(f.read())
             psutil.Process(pid)
+            if not health_checks[daemon_name]():
+                n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
+                                   message='health check failed')
+                return
+
             n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_RUNNING)
             return
     except FileNotFoundError:
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='pid file missing on read')
+        return
     except ValueError:
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='pid file not parsable')
+        return
     except psutil.NoSuchProcess:
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='process absent')
+        return
 
     n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                        message='unknown issue')
@@ -49,20 +103,17 @@ def _check_other_daemon(n, daemon_name, override_daemon_name=None):
 
 def _health_checks():
     n = Node.from_db(config.NODE_NAME)
-    n.set_daemon_state('queues', Node.DAEMON_STATE_RUNNING)
     _check_other_daemon(n, 'privexec')
+    _check_other_daemon(n, 'nodelock')
     _check_other_daemon(n, 'gunicorn', override_daemon_name='api')
 
 
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
-        daemon.health_check_privexec()
-        daemon.health_check_nodelock()
+        _health_checks()
 
         warned_locks = {}
         last_third_party_health_check = 0
-
-        n = Node.from_db(config.NODE_NAME)
 
         while daemon.check_abort_path(self.abort_path):
             try:
@@ -71,9 +122,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 if time.time() - last_third_party_health_check > 30:
                     # We also check in on the privexec and api daemon heres because
                     # they cannot do this for themselves...
-                    _check_other_daemon(n, 'privexec')
-                    _check_other_daemon(
-                        n, 'gunicorn', override_daemon_name='api')
+                    _health_checks()
                     last_third_party_health_check = time.time()
 
                 # Check if we hold any locks for processes which don't exist any

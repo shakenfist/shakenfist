@@ -185,8 +185,6 @@ class Monitor(daemon.Daemon):
             util_general.ignore_exception('etcd compaction', e)
 
     def _run_inner(self):
-        daemon.health_check_privexec()
-        daemon.health_check_nodelock()
         last_defer_message = 0
 
         # Delay first compaction until system startup load has reduced
