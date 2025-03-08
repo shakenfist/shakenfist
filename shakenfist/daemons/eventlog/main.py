@@ -191,7 +191,16 @@ class Monitor(daemon.WorkerPoolDaemon):
             with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
                 pass
 
+        this_node = node.Node.from_db(config.NODE_NAME)
         while daemon.check_abort_path(self.abort_path):
+            s = this_node.get_daemon_state('nodelock')
+            while s.value != node.Node.DAEMON_STATE_RUNNING:
+                LOG.info(
+                    'Waiting for nodelock daemon to be running (currently '
+                    f'{s.value})')
+                time.sleep(1)
+                continue
+
             try:
                 did_work = False
 
@@ -290,7 +299,19 @@ def main():
     daemon.write_pid_file('eventlog')
     m = Monitor('eventlog')
 
-    # Start the grpc server very early
+    # Start the grpc server very early, but not before nodelock
+    n = node.Node.new(config.NODE_NAME, config.NODE_MESH_IP)
+    s = n.get_daemon_state('nodelock')
+    while not s:
+        LOG.info('Waiting for nodelock daemon to be registered')
+        time.sleep(1)
+        s = n.get_daemon_state('nodelock')
+    while s.value != node.Node.DAEMON_STATE_RUNNING:
+        LOG.info('Waiting for nodelock daemon to be running')
+        time.sleep(1)
+        s = n.get_daemon_state('nodelock')
+    LOG.info('nodelock daemon reports running')
+
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     event_pb2_grpc.add_EventServiceServicer_to_server(
         EventService(m), server)

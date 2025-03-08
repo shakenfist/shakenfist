@@ -6,7 +6,6 @@ from math import inf
 import re
 
 from etcd3gw.lock import Lock
-from oslo_concurrency import lockutils
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import cache
@@ -17,6 +16,7 @@ from shakenfist import exceptions
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 from shakenfist.util import json as util_json
 
@@ -400,9 +400,7 @@ class DatabaseBackedObject:
             return NoopLock()
 
         if not global_scope:
-            return lockutils.external_lock(
-                f'{self.object_type}-{self.uuid}',
-                lock_path='/run/lock', lock_file_prefix='sflock-')
+            return util_concurrency.NodeLock(f'{self.object_type}-{self.uuid}')
 
         return etcd.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
                              log_ctx=self.log, op=op, timeout=timeout)
@@ -413,9 +411,8 @@ class DatabaseBackedObject:
             return NoopLock()
 
         if not global_scope:
-            return lockutils.external_lock(
-                f'{self.object_type}-{self.uuid}-{name}',
-                lock_path='/run/lock', lock_file_prefix='sflock-')
+            return util_concurrency.NodeLock(
+                f'{self.object_type}-{self.uuid}-{name}')
 
         return etcd.get_lock('attribute/%s' % self.object_type,
                              self.__uuid, name, op=op, ttl=ttl, timeout=timeout,

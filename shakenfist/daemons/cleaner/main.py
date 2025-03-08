@@ -186,6 +186,7 @@ class Monitor(daemon.Daemon):
 
     def _run_inner(self):
         daemon.health_check_privexec()
+        daemon.health_check_nodelock()
         last_defer_message = 0
 
         # Delay first compaction until system startup load has reduced
@@ -212,7 +213,6 @@ class Monitor(daemon.Daemon):
                 self._maintain_blobs()
 
             scheduled_tasks.update_power_states()
-            scheduled_tasks.remove_stray_lock_files()
 
             if time.time() - last_missing_blob_check > 300:
                 with util_general.RecordedOperation('find missing blobs', n,

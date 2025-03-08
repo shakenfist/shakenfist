@@ -24,8 +24,11 @@ Description=Shaken Fist {{ item }} daemon
 After=multi-user.target
 {% elif item == "privexec" %}
 After=sf-sentinel-first.service
+{% elif item == "nodelock" %}
+After=sf-sentinel-first.service
 {% elif item != "sentinel-last" %}
 After=sf-privexec.service
+After=sf-nodelock.service
 Before=sf-sentinel-last.service
 {% endif%}
 PartOf=sf.target

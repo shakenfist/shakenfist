@@ -38,7 +38,8 @@ class Node(dbo):
     # deploy.yml.
     VALID_DAEMONS = ['eventlog', 'net', 'resources', 'sidechannel',
                      'queues', 'api', 'checksums', 'cleaner', 'cluster',
-                     'transfers', 'privexec', 'sentinel-first', 'sentinel-last']
+                     'transfers', 'privexec', 'nodelock', 'sentinel-first',
+                     'sentinel-last']
 
     DAEMON_STATE_RUNNING = 'daemon-running'
     DAEMON_STATE_STOPPING = 'daemon-stopping'

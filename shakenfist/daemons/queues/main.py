@@ -57,6 +57,7 @@ def _health_checks():
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
         daemon.health_check_privexec()
+        daemon.health_check_nodelock()
 
         warned_locks = {}
         last_third_party_health_check = 0

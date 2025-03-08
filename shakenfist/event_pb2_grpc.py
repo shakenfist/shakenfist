@@ -5,7 +5,7 @@ import warnings
 
 from shakenfist import event_pb2 as event__pb2
 
-GRPC_GENERATED_VERSION = '1.67.1'
+GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 

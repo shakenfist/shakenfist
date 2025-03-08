@@ -23,7 +23,7 @@ message ExecuteRequest {
     string execution_id = 7;
 }
 
-message Request {
+message PrivExecRequest {
     oneof request {
         ExecuteRequest execute_request = 1;
     }
@@ -38,7 +38,7 @@ message ExecuteReply {
     double execution_seconds = 6;
 }
 
-message Reply {
+message PrivExecReply {
     oneof reply {
         ExecuteReply execute_reply = 1;
     }

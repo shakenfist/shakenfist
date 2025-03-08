@@ -1,7 +1,5 @@
-from collections import defaultdict
 import json
 import os
-import re
 import shutil
 import signal
 import time
@@ -11,8 +9,6 @@ from shakenfist_utilities import logs                 # noreorder
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.constants import get_object_class
-from shakenfist.constants import NoSuchObject
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
 from shakenfist.util import concurrency as util_concurrency
@@ -21,58 +17,6 @@ from shakenfist.util import libvirt as util_libvirt
 
 
 LOG, _ = logs.setup(__name__)
-LOCKFILE_RE = re.compile(r'^sflock-([a-z]+)-([a-zA-Z0-9\-]{36}).*')
-
-
-def _remove_locks(paths):
-    for path in paths:
-        os.unlink(path)
-
-
-@util_general.recorded_method
-def remove_stray_lock_files():
-    lock_files = defaultdict(list)
-    if os.path.exists('/run/lock'):
-        # Lock files used to be in /tmp, they're now in /run/lock
-        for path in ['/tmp', '/run/lock']:
-            for lock_file in os.listdir(path):
-                full_path = os.path.join(path, lock_file)
-                handled = False
-
-                for special_case in ['api-requests', 'networkinterface']:
-                    if lock_file.startswith(f'sflock-{special_case}'):
-                        # This isn't a real object type, so we just use lock
-                        # modified time instead
-                        if os.stat(full_path).st_mtime > 600:
-                            os.unlink(full_path)
-                        handled = True
-                        continue
-
-                if not handled:
-                    m = LOCKFILE_RE.match(lock_file)
-                    if m:
-                        obj_type = m.group(1)
-                        obj_uuid = m.group(2)
-                        lock_files[(obj_type, obj_uuid)].append(full_path)
-
-    for obj_type, obj_uuid in lock_files:
-        try:
-            o = get_object_class(obj_type).from_db(
-                obj_uuid, suppress_failure_audit=True)
-            if not o:
-                _remove_locks(lock_files[(obj_type, obj_uuid)])
-                LOG.info(f'Remove stale local locks for {obj_type} {obj_uuid}')
-                continue
-
-            if o.state.value == dbo.STATE_DELETED:
-                _remove_locks(lock_files[(obj_type, obj_uuid)])
-                o.add_event(EVENT_TYPE_AUDIT, 'removed local locks')
-
-        except NoSuchObject:
-            LOG.with_fields({
-                obj_type: obj_uuid,
-                'files': lock_files[obj_type, obj_uuid]
-            }).error('Failed to process potentially stray lock')
 
 
 def _delete_instance_files(instance_uuid):

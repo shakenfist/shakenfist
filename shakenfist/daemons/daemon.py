@@ -88,7 +88,7 @@ def check_abort_path(abort_path):
 
 def health_check_privexec():
     try:
-        stdout, stderr = util_concurrency.execute(None, 'whoami')
+        util_concurrency.execute(None, 'whoami')
     except ProcessExecutionError as e:
         LOG.with_fields({
             'stdout': e.stdout,
@@ -98,6 +98,17 @@ def health_check_privexec():
         return False
     except ConnectionResetError:
         LOG.error('privsep daemon is unhealthy (connection reset)!')
+        return False
+
+    return True
+
+
+def health_check_nodelock():
+    try:
+        with util_concurrency.NodeLock('_health_check'):
+            ...
+    except ConnectionResetError:
+        LOG.error('nodelock daemon is unhealthy (connection reset)!')
         return False
 
     return True

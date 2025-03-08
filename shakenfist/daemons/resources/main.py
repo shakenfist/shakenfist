@@ -402,6 +402,7 @@ class Monitor(daemon.Daemon):
 
     def _run_inner(self):
         daemon.health_check_privexec()
+        daemon.health_check_nodelock()
         gauges = {
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
         }

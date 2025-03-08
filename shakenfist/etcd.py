@@ -172,7 +172,7 @@ class ActualLock(Lock):
 
         self.node = config.NODE_NAME
         self.pid = os.getpid()
-        caller = util_callstack.get_caller(offset=3)
+        caller = util_callstack.get_caller(offset=-3)
 
         # We also override the location of the lock so that we're in our own spot
         self.key = LOCK_PREFIX + self.path
