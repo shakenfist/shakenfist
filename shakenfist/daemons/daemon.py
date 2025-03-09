@@ -307,8 +307,14 @@ class WorkerPoolDaemon(Daemon):
         # busy. You can record more than 100% if there is more than one disk
         # in the system doing IO at the time.
         if time.time() - self.metrics_acquired_at > 30:
-            self.metrics = etcd.get('metrics', config.NODE_NAME, {})
-            self.metrics_acquired_at = time.time()
+            new_metrics = etcd.get('metrics', config.NODE_NAME, {})
+            if new_metrics:
+                self.metrics = new_metrics
+                self.metrics_acquired_at = time.time()
+            else:
+                # No metrics in etcd, let's try again next pass
+                self.metrics = {}
+                self.metrics_acquired_at = 0
 
         metrics_values = self.metrics.get('metrics', {})
         disk_busy = int(metrics_values.get(
