@@ -128,7 +128,6 @@ def _update_object_state_cache_attempt(
 
 def update_object_state_cache(object_type, object_uuid, old_state, new_state):
     attempts = 0
-    failures = []
     while attempts < 3:
         success, failures = _update_object_state_cache_attempt(
             object_type, object_uuid, old_state, new_state)
