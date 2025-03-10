@@ -107,6 +107,7 @@ class ConnectedVSockChannel():
         self.sock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
         self.sock.connect((self.cid, self.port))
         self.log.debug(f'Connected to vsock channel {self.channel}')
+        return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         self.log.debug(f'Disconnected from vsock channel {self.channel}')

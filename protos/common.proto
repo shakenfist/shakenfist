@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package shakenfist.protos;
+
+message EnvironmentVariable {
+    string name = 1;
+    string value = 2;
+}
+
+message ExecuteRequest {
+    enum IOPriority {
+        NORMAL = 0;
+        LOW = 1;
+        HIGH = 2;
+    }
+
+    string command = 1;
+    repeated EnvironmentVariable environment_variables = 2;
+    string network_namespace = 3;
+    IOPriority io_priority = 4;
+    string working_directory = 5;
+    string request_id = 6;
+    string execution_id = 7;
+}
+
+message ExecuteReply {
+    string stdout = 1;
+    string stderr = 2;
+    int32 exit_code = 3;
+    string request_id = 4;
+    string execution_id = 5;
+    double execution_seconds = 6;
+}

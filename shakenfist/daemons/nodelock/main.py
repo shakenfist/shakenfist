@@ -15,7 +15,7 @@ from google.protobuf.message import DecodeError
 import setproctitle
 from shakenfist_utilities import logs
 
-from shakenfist import nodelock_pb2
+from shakenfist.protos import nodelock_pb2
 
 
 LOG, _ = logs.setup(__name__)

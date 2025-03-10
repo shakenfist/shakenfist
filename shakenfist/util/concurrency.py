@@ -17,8 +17,9 @@ from shakenfist.exceptions import TruncatedNodeLockResponse
 from shakenfist.exceptions import TruncatedPrivExecResponse
 from shakenfist.exceptions import UnknownNodeLockReplyException
 from shakenfist.exceptions import UnknownPrivExecReplyException
-from shakenfist import nodelock_pb2
-from shakenfist import privexec_pb2
+from shakenfist.protos import common_pb2
+from shakenfist.protos import nodelock_pb2
+from shakenfist.protos import privexec_pb2
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 # To avoid circular imports, util modules should only import a limited
@@ -60,9 +61,9 @@ def _log_results(**kwargs):
         LOG.with_fields(kwargs).debug('Command output (truncated)')
 
 
-PRIORITY_NORMAL = privexec_pb2.ExecuteRequest.NORMAL
-PRIORITY_LOW = privexec_pb2.ExecuteRequest.LOW
-PRIORITY_HIGH = privexec_pb2.ExecuteRequest.HIGH
+PRIORITY_NORMAL = common_pb2.ExecuteRequest.NORMAL
+PRIORITY_LOW = common_pb2.ExecuteRequest.LOW
+PRIORITY_HIGH = common_pb2.ExecuteRequest.HIGH
 
 
 def execute(locks, command, check_exit_code=[0], env_variables=None,
@@ -75,7 +76,7 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
 
     execution_id = sf_random.random_id()
     request = privexec_pb2.PrivExecRequest(
-        execute_request=privexec_pb2.ExecuteRequest(
+        execute_request=common_pb2.ExecuteRequest(
             command=command,
             network_namespace=namespace,
             io_priority=iopriority,

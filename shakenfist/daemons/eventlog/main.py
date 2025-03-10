@@ -14,8 +14,6 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities.random import random_id  # noreorder
 
 from shakenfist import etcd
-from shakenfist import event_pb2
-from shakenfist import event_pb2_grpc
 from shakenfist import eventlog
 from shakenfist import node
 from shakenfist.config import config
@@ -23,6 +21,8 @@ from shakenfist.constants import API_REQUESTS
 from shakenfist.constants import EVENT_TYPE_HISTORIC
 from shakenfist.constants import EVENT_TYPES
 from shakenfist.daemons import daemon
+from shakenfist.protos import event_pb2
+from shakenfist.protos import event_pb2_grpc
 from shakenfist.util import general as util_general
 
 

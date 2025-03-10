@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package shakenfist.protos;
+
+message LockRequest {
+    string requester = 1;
+    string key = 2;
+}
+
+message UnlockRequest {
+    string requester = 1;
+    string key = 2;
+}
+
+message NodeLockRequest {
+    oneof request {
+        LockRequest lock_request = 1;
+        UnlockRequest unlock_request = 2;
+    }
+}
+
+message LockReply {
+    enum Outcome {
+        OK = 0;
+        ALREADY_HELD = 1;
+        DENIED = 2;
+    }
+
+    Outcome outcome = 1;
+}
+
+message UnlockReply {
+    enum Outcome {
+        OK = 0;
+        NOT_HELD = 2;
+    }
+
+    Outcome outcome = 1;
+}
+
+message NodeLockReply {
+    oneof reply {
+        LockReply lock_reply = 1;
+        UnlockReply unlock_reply = 2;
+    }
+}

@@ -13,10 +13,10 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import constants
 from shakenfist import etcd
-from shakenfist import event_pb2
-from shakenfist import event_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
+from shakenfist.protos import event_pb2
+from shakenfist.protos import event_pb2_grpc
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import json as util_json

@@ -40,12 +40,6 @@ class ExecuteRequest(_message.Message):
     execution_id: str
     def __init__(self, command: _Optional[str] = ..., environment_variables: _Optional[_Iterable[_Union[EnvironmentVariable, _Mapping]]] = ..., network_namespace: _Optional[str] = ..., io_priority: _Optional[_Union[ExecuteRequest.IOPriority, str]] = ..., working_directory: _Optional[str] = ..., request_id: _Optional[str] = ..., execution_id: _Optional[str] = ...) -> None: ...
 
-class PrivExecRequest(_message.Message):
-    __slots__ = ("execute_request",)
-    EXECUTE_REQUEST_FIELD_NUMBER: _ClassVar[int]
-    execute_request: ExecuteRequest
-    def __init__(self, execute_request: _Optional[_Union[ExecuteRequest, _Mapping]] = ...) -> None: ...
-
 class ExecuteReply(_message.Message):
     __slots__ = ("stdout", "stderr", "exit_code", "request_id", "execution_id", "execution_seconds")
     STDOUT_FIELD_NUMBER: _ClassVar[int]
@@ -61,9 +55,3 @@ class ExecuteReply(_message.Message):
     execution_id: str
     execution_seconds: float
     def __init__(self, stdout: _Optional[str] = ..., stderr: _Optional[str] = ..., exit_code: _Optional[int] = ..., request_id: _Optional[str] = ..., execution_id: _Optional[str] = ..., execution_seconds: _Optional[float] = ...) -> None: ...
-
-class PrivExecReply(_message.Message):
-    __slots__ = ("execute_reply",)
-    EXECUTE_REPLY_FIELD_NUMBER: _ClassVar[int]
-    execute_reply: ExecuteReply
-    def __init__(self, execute_reply: _Optional[_Union[ExecuteReply, _Mapping]] = ...) -> None: ...

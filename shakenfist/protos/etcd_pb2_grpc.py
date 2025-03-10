@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from shakenfist import etcd_pb2 as etcd__pb2
+from shakenfist.protos import etcd_pb2 as etcd__pb2
 
 GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__

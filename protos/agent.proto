@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package shakenfist.protos;
+import "common.proto";
+
+// Protocol level errors
+message CommandError {
+    string error = 1;
+}
+
+message UnknownCommand {
+    string command = 1;
+}
+
+// Agent state information sent to clients
+message HypervisorWelcome {
+    string version = 1;
+}
+
+message AgentWelcome {
+    string version = 1;
+    double boot_time = 2;
+}
+
+message HypervisorDeparture {
+}
+
+message AgentDeparture {
+}
+
+// Things clients can ask the agent to do
+message PingRequest {
+    string unique = 1;
+}
+
+message PingReply {
+    string unique = 1;
+}
+
+message IsSystemRunningRequest {
+
+}
+
+message IsSystemRunningReply {
+
+}
+
+
+message AgentRequest {
+    oneof request {
+        HypervisorWelcome hypervisor_welcome = 1;
+        HypervisorDeparture hypervisor_departure = 2;
+
+        CommandError command_error = 10;
+        UnknownCommand unknown_command = 11;
+
+        PingRequest ping_request = 20;
+
+        ExecuteRequest execute_request = 30;
+    }
+}
+
+message AgentReply {
+    oneof reply {
+        AgentWelcome agent_welcome = 1;
+        AgentDeparture agent_departure = 2;
+
+        CommandError command_error = 10;
+        UnknownCommand unknown_command = 11;
+
+        PingReply ping_reply = 20;
+
+        ExecuteReply execute_reply = 30;
+    }
+}
