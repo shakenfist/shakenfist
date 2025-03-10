@@ -35,6 +35,11 @@ class Monitor(daemon.WorkerPoolDaemon):
         }
 
         while daemon.check_abort_path(self.abort_path):
+            while not daemon.health_check_nodelock():
+                LOG.info('Waiting for nodelock daemon to be healthy')
+                time.sleep(1)
+                continue
+
             try:
                 self.reap_workers()
 
@@ -84,6 +89,11 @@ def main():
 
     n = Node.from_db(config.NODE_NAME)
     n.set_daemon_state('net', Node.DAEMON_STATE_RUNNING)
+
+    while not daemon.health_check_nodelock():
+        LOG.info('Waiting for nodelock daemon to be healthy')
+        time.sleep(1)
+    LOG.info('nodelock daemon reports healthy')
 
     # If I am the network node, I need some setup
     start_time = time.time()

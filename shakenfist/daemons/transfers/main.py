@@ -1,6 +1,7 @@
 import os
 import socket
 import threading
+import time
 
 from shakenfist_utilities import logs  # noreorder
 
@@ -89,6 +90,11 @@ class TransferJob(util_concurrency.Job):
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
         while daemon.check_abort_path(self.abort_path):
+            while not daemon.health_check_nodelock():
+                LOG.info('Waiting for nodelock daemon to be healthy')
+                time.sleep(1)
+                continue
+
             try:
                 self.reap_workers()
 
@@ -114,6 +120,12 @@ class Monitor(daemon.WorkerPoolDaemon):
 def main():
     daemon.write_pid_file('transfers')
     m = Monitor('transfers')
+
+    while not daemon.health_check_nodelock():
+        LOG.info('Waiting for nodelock daemon to be healthy')
+        time.sleep(1)
+    LOG.info('nodelock daemon reports healthy')
+
     m.run()
 
     # This is here because sometimes the grpc bits don't shut down cleanly

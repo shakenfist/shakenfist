@@ -636,6 +636,11 @@ class Monitor(daemon.Daemon):
 
         while daemon.check_abort_path(self.abort_path):
             try:
+                while not daemon.health_check_nodelock():
+                    LOG.info('Waiting for nodelock daemon to be healthy')
+                    time.sleep(1)
+                    continue
+
                 self.reap_single_instance_monitors()
 
                 if not os.path.exists(self.abort_path):
@@ -713,6 +718,12 @@ class Monitor(daemon.Daemon):
 def main():
     daemon.write_pid_file('sidechannel')
     m = Monitor('sidechannel')
+
+    while not daemon.health_check_nodelock():
+        LOG.info('Waiting for nodelock daemon to be healthy')
+        time.sleep(1)
+    LOG.info('nodelock daemon reports healthy')
+
     m.run()
 
     # This is here because sometimes the grpc bits don't shut down cleanly

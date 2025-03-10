@@ -195,6 +195,11 @@ class Monitor(daemon.Daemon):
 
         n = node.Node.from_db(config.NODE_NAME)
         while daemon.check_abort_path(self.abort_path):
+            while not daemon.health_check_nodelock():
+                LOG.info('Waiting for nodelock daemon to be healthy')
+                time.sleep(1)
+                continue
+
             if not self.cluster_stable():
                 if time.time() - last_defer_message > 10:
                     LOG.info('Cluster not yet stable, deferring maintenance')
@@ -245,6 +250,12 @@ class Monitor(daemon.Daemon):
 def main():
     daemon.write_pid_file('cleaner')
     m = Monitor('cleaner')
+
+    while not daemon.health_check_nodelock():
+        LOG.info('Waiting for nodelock daemon to be healthy')
+        time.sleep(1)
+    LOG.info('nodelock daemon reports healthy')
+
     m.run()
 
     # This is here because sometimes the grpc bits don't shut down cleanly
