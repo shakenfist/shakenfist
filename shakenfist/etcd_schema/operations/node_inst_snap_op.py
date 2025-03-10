@@ -4,8 +4,8 @@ from typing import Optional
 from uuid import uuid4
 
 from pydantic import BaseModel
-from pydantic import field_serializer
 from pydantic import Field
+from pydantic import field_serializer
 from pydantic import UUID4
 from pydantic import ValidationError
 from shakenfist_utilities import logs  # noreorder
@@ -44,12 +44,12 @@ class model(BaseModel):
     # This should be a UUID, but there's some history...
     node_uuid: str
     instance_uuid: UUID4
-    snapshots: List[snapshot]
+    snapshots: list[snapshot]
     priority: PRIORITY
     request_id: Optional[str]
-    tasks: List[model_tasks]
-    depends_on: Optional[List[dependency]]
-    runs_after: Optional[List[dependency]]
+    tasks: list[model_tasks]
+    depends_on: Optional[list[dependency]]
+    runs_after: Optional[list[dependency]]
     version: int = Field(ge=initial_version, le=current_version)
 
     @field_serializer('priority')
@@ -57,7 +57,7 @@ class model(BaseModel):
         return priority.name
 
     @field_serializer('tasks')
-    def serialize_tasks(self, tasks: List[model_tasks], _info):
+    def serialize_tasks(self, tasks: list[model_tasks], _info):
         return [t.name for t in tasks]
 
 
