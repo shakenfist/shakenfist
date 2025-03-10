@@ -107,7 +107,7 @@ instance_get_example = """{
     "power_state": "initial",
     "secure_boot": false,
     "side_channels": [
-        "sf-agent"
+        "sf-agent2"
     ],
     "ssh_key": null,
     "state": "preflight",
@@ -168,7 +168,7 @@ instance_get_example_deleted = """{
     "power_state": "off",
     "secure_boot": false,
     "side_channels": [
-        "sf-agent"
+        "sf-agent2"
     ],
     "ssh_key": null,
     "state": "deleted",
@@ -393,6 +393,9 @@ instances_get_example = """[
 ]"""
 
 
+VALID_SIDE_CHANNELS = ['sf-agent', 'sf-agent2']
+
+
 class InstancesEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get all instances visible to the currently '
@@ -470,7 +473,9 @@ class InstancesEndpoint(sf_api.Resource):
              'Either None, or an array of strings listing side channels to '
              'connect to the instance. The only currently supported side channel '
              'is sf-agent, which is required for the Shaken Fist in-guest agent '
-             'to function.', False)
+             'to function. None will result in you receiving the default set of '
+             'side channels (currently just sf-agent, whereas an empty list will'
+             'result in no side channels at all).', False)
           ],
         [
             (200, 'Information about a single instance.', instance_get_example),
@@ -698,7 +703,11 @@ class InstancesEndpoint(sf_api.Resource):
 
         # If no preference for side channels is expressed, then use the default
         if side_channels is None:
-            side_channels = ['sf-agent']
+            side_channels = ['sf-agent', 'sf-agent2']
+
+        for sc in side_channels:
+            if sc not in VALID_SIDE_CHANNELS:
+                return sf_api.error(400, f'{sc} is not a known side channel type')
 
         # Create instance object
         inst = instance.Instance.new(
