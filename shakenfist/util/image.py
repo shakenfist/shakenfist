@@ -2,7 +2,7 @@ import os
 import re
 import shutil
 
-import versions
+import semver
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import constants
@@ -19,7 +19,12 @@ LOG, _ = logs.setup(__name__)
 
 
 VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
-QEMU_REQUIRES_BACKING_FORMAT = versions.parse_version_set(">=6.0.0")
+QEMU_REQUIRES_BACKING_FORMAT = semver.Version(major=6, minor=0, patch=0)
+
+
+def _qemu_requires_backing_format(node_name):
+    qemu_version = Node.from_db(config.NODE_NAME).qemu_version
+    return qemu_version >= QEMU_REQUIRES_BACKING_FORMAT
 
 
 def convert_numeric_qemu_value(qemu_value):
@@ -99,7 +104,7 @@ def create_cow(locks, cache_file, disk_file, disk_size):
     qemu_command = ('qemu-img create -b %(cache_file)s '
                     '-o cluster_size=%(cluster_size)s -f qcow2 -F qcow2 '
                     '%(disk_file)s')
-    if Node.from_db(config.NODE_NAME).qemu_version.matches(QEMU_REQUIRES_BACKING_FORMAT):
+    if _qemu_requires_backing_format(config.NODE_NAME):
         qemu_command += ' -F qcow2'
 
     if disk_size:
@@ -177,7 +182,7 @@ def snapshot(locks, source, destination, thin=False):
                         '-B %(backing)s')
         if config.COMPRESS_SNAPSHOTS:
             qemu_command += ' -c'
-        if Node.from_db(config.NODE_NAME).qemu_version.matches(QEMU_REQUIRES_BACKING_FORMAT):
+        if _qemu_requires_backing_format(config.NODE_NAME):
             qemu_command += ' -F qcow2'
 
         cmd = qemu_command % {

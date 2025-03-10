@@ -12,7 +12,6 @@ import time
 import uuid
 
 import magic
-from oslo_concurrency import lockutils
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
@@ -532,9 +531,7 @@ class Blob(dbo):
         attempts = 0
         while True:
             try:
-                with lockutils.external_lock(
-                        f'blob-{self.uuid}-transfer',
-                        lock_path='/run/lock', lock_file_prefix='sflock-'):
+                with util_concurrency.NodeLock(f'blob-{self.uuid}-transfer'):
                     # Check the blob didn't show up without us
                     if os.path.exists(blob_path):
                         self.observe()

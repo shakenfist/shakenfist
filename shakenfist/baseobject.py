@@ -6,7 +6,6 @@ from math import inf
 import re
 
 from etcd3gw.lock import Lock
-from oslo_concurrency import lockutils
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import cache
@@ -17,6 +16,7 @@ from shakenfist import exceptions
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 from shakenfist.util import json as util_json
 
@@ -400,9 +400,7 @@ class DatabaseBackedObject:
             return NoopLock()
 
         if not global_scope:
-            return lockutils.external_lock(
-                f'{self.object_type}-{self.uuid}',
-                lock_path='/run/lock', lock_file_prefix='sflock-')
+            return util_concurrency.NodeLock(f'{self.object_type}-{self.uuid}')
 
         return etcd.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
                              log_ctx=self.log, op=op, timeout=timeout)
@@ -413,9 +411,8 @@ class DatabaseBackedObject:
             return NoopLock()
 
         if not global_scope:
-            return lockutils.external_lock(
-                f'{self.object_type}-{self.uuid}-{name}',
-                lock_path='/run/lock', lock_file_prefix='sflock-')
+            return util_concurrency.NodeLock(
+                f'{self.object_type}-{self.uuid}-{name}')
 
         return etcd.get_lock('attribute/%s' % self.object_type,
                              self.__uuid, name, op=op, ttl=ttl, timeout=timeout,
@@ -434,45 +431,50 @@ class DatabaseBackedObject:
 
     def _state_update(self, new_value, skip_transition_validation=False,
                       state_attribute_name='state', message=None):
-        orig = self._state_read(state_attribute_name=state_attribute_name)
+        # NOTE(mikal): I'm adding this lock back in, even though I don't want to,
+        # because until we can do this entire update (the state change and the
+        # cache update) in a single transaction its going to continue to cause
+        # me problems. This all needs a rethink.
+        with self.get_lock_attr(state_attribute_name, 'update'):
+            orig = self._state_read(state_attribute_name=state_attribute_name)
 
-        if orig.value == new_value:
-            return
+            if orig.value == new_value:
+                return
 
-        # Only standard states have validation right now
-        if state_attribute_name == 'state':
-            if orig.value == self.STATE_DELETED and self.object_type != 'node':
-                LOG.with_fields(
-                    {
-                        'uuid': self.uuid,
-                        'object_type': self.object_type,
-                        'original state': orig,
-                        'new state': new_value
-                    }).warn('Objects do not undelete')
-                raise exceptions.InvalidStateException(
-                    'Invalid state change from %s to %s for '
-                    'object=%s uuid=%s',
-                    orig.value, new_value, self.object_type, self.uuid)
-
-            # Ensure state change is valid
-            if not skip_transition_validation:
-                if not self.state_targets:
-                    raise exceptions.NoStateTransitionsDefined(
-                        self.object_type)
-
-                if new_value not in self.state_targets.get(orig.value, []):
+            # Only standard states have validation right now
+            if state_attribute_name == 'state':
+                if orig.value == self.STATE_DELETED and self.object_type != 'node':
+                    LOG.with_fields(
+                        {
+                            'uuid': self.uuid,
+                            'object_type': self.object_type,
+                            'original state': orig,
+                            'new state': new_value
+                        }).warn('Objects do not undelete')
                     raise exceptions.InvalidStateException(
                         'Invalid state change from %s to %s for '
                         'object=%s uuid=%s',
                         orig.value, new_value, self.object_type, self.uuid)
 
-        new_state = State(new_value, time.time(), message=message)
-        self._db_set_attribute(state_attribute_name, new_state)
+                # Ensure state change is valid
+                if not skip_transition_validation:
+                    if not self.state_targets:
+                        raise exceptions.NoStateTransitionsDefined(
+                            self.object_type)
 
-        # Only standard states are cached right now
-        if not self.__in_memory_only and state_attribute_name == 'state':
-            cache.update_object_state_cache(
-                self.object_type, self.uuid, orig.value, new_value)
+                    if new_value not in self.state_targets.get(orig.value, []):
+                        raise exceptions.InvalidStateException(
+                            'Invalid state change from %s to %s for '
+                            'object=%s uuid=%s',
+                            orig.value, new_value, self.object_type, self.uuid)
+
+            new_state = State(new_value, time.time(), message=message)
+            self._db_set_attribute(state_attribute_name, new_state)
+
+            # Only standard states are cached right now
+            if not self.__in_memory_only and state_attribute_name == 'state':
+                cache.update_object_state_cache(
+                    self.object_type, self.uuid, orig.value, new_value)
 
     @state.setter
     def state(self, new_value):

@@ -93,6 +93,10 @@ instance_get_example = """{
     "disks": [],
     "error_message": null,
     "interfaces": [],
+    "last_cluster_operation": {
+        "op_type": "node_inst_snap_op",
+        "op_uuid": "78d4c3dc-1c1d-4870-bac4-b397cfe79884"
+    },
     "machine_type": "pc",
     "memory": 1024,
     "metadata": {},
@@ -779,43 +783,45 @@ class InstancesEndpoint(sf_api.Resource):
         # Request the artifact fetches immediately
         instance_start_dependencies = []
 
-        for disk in inst.disk_spec:
-            disk_base = disk.get('base')
-            if disk.get('blob_uuid'):
-                url = f'{BLOB_URL}{disk["blob_uuid"]}'
-            elif not util_general.noneish(disk_base):
-                url = disk['base']
+        with inst.get_lock_attr('last_cluster_operation', 'add new operation'):
+            for disk in inst.disk_spec:
+                disk_base = disk.get('base')
+                if disk.get('blob_uuid'):
+                    url = f'{BLOB_URL}{disk["blob_uuid"]}'
+                elif not util_general.noneish(disk_base):
+                    url = disk['base']
 
-            # TODO(mikal): I would really like the target_node not to be set
-            # here so that any node in the cluster could start downloading
-            # this image ASAP. Unfortunately, image download is also comingled
-            # with populating the local image cache for instance start at the
-            # moment and I need to tease that apart first.
-            op_type, op_uuid = afo_create_and_enqueue(
-                namespace,
-                url,
+                # TODO(mikal): I would really like the target_node not to be set
+                # here so that any node in the cluster could start downloading
+                # this image ASAP. Unfortunately, image download is also comingled
+                # with populating the local image cache for instance start at the
+                # moment and I need to tease that apart first.
+                op_type, op_uuid = afo_create_and_enqueue(
+                    namespace,
+                    url,
+                    inst.uuid,
+                    [afo_tasks.image_fetch],
+                    PRIORITY.user_waiting,
+                    request_id=util_general.get_request_id(),
+                    target_node=placement)
+                instance_start_dependencies.append(
+                    dependency(op_type=op_type, op_uuid=op_uuid))
+
+            # Then request the instance start
+            if not instance_start_dependencies:
+                instance_start_dependencies = None
+
+            op_type, op_uuid = nino_create_and_enqueue(
+                placement,
                 inst.uuid,
-                [afo_tasks.image_fetch],
+                updated_networks,
+                [nino_tasks.instance_preflight,
+                 nino_tasks.instance_start],
                 PRIORITY.user_waiting,
                 request_id=util_general.get_request_id(),
-                target_node=placement)
-            instance_start_dependencies.append(
-                dependency(op_type=op_type, op_uuid=op_uuid))
-
-        # Then request the instance start
-        if not instance_start_dependencies:
-            instance_start_dependencies = None
-        op_type, op_uuid = nino_create_and_enqueue(
-            placement,
-            inst.uuid,
-            updated_networks,
-            [nino_tasks.instance_preflight,
-             nino_tasks.instance_start],
-            PRIORITY.user_waiting,
-            request_id=util_general.get_request_id(),
-            depends_on=instance_start_dependencies,
-            runs_after=[inst.last_cluster_operation])
-        inst.set_last_cluster_operation(op_type, op_uuid)
+                depends_on=instance_start_dependencies,
+                runs_after=[inst.last_cluster_operation])
+            inst.set_last_cluster_operation(op_type, op_uuid)
 
         return inst.external_view()
 
@@ -860,14 +866,15 @@ class InstancesEndpoint(sf_api.Resource):
             else:
                 node = db_placement['node']
 
-            op_type, op_uuid = nio_create_and_enqueue(
-                node,
-                inst.uuid,
-                [nio_tasks.instance_delete],
-                PRIORITY.user_facing,
-                runs_after=[inst.last_cluster_operation],
-                request_id=util_general.get_request_id())
-            inst.set_last_cluster_operation(op_type, op_uuid)
+            with inst.get_lock_attr('last_cluster_operation', 'add new operation'):
+                op_type, op_uuid = nio_create_and_enqueue(
+                    node,
+                    inst.uuid,
+                    [nio_tasks.instance_delete],
+                    PRIORITY.user_facing,
+                    runs_after=[inst.last_cluster_operation],
+                    request_id=util_general.get_request_id())
+                inst.set_last_cluster_operation(op_type, op_uuid)
 
             waiting_for.append(inst.uuid)
 

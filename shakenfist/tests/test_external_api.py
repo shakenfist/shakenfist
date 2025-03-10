@@ -7,6 +7,7 @@ from uuid import uuid4
 import bcrypt
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import NoopLock
 from shakenfist.baseobject import State
 from shakenfist.config import BaseSettings
 from shakenfist.config import config
@@ -76,6 +77,9 @@ class FakeInstance(BaseFakeObject):
 
     def set_last_cluster_operation(self, op_type, op_uuid):
         self.last_cluster_operation = (op_type, op_uuid)
+
+    def get_lock_attr(self, name, op, ttl=60, global_scope=True, timeout=10):
+        return NoopLock()
 
 
 class FakeNetwork(BaseFakeObject):

@@ -80,6 +80,15 @@ class NodeBlobOp(BaseClusterOperation):
     def tasks(self):
         return self.__tasks
 
+    # API
+    def external_view(self):
+        retval = super().external_view()
+        retval.update({
+            'node_uuid': self.node_uuid,
+            'blob_uuid': self.blob_uuid
+        })
+        return retval
+
     # Tasks
     def execute(self):
         try:

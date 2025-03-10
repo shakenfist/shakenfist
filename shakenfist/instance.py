@@ -322,6 +322,7 @@ class Instance(dbo):
             'agent_start_time': self.agent_start_time,
             'agent_system_boot_time': self.agent_system_boot_time,
             'error_message': self.error,
+            'last_cluster_operation': self.last_cluster_operation
         })
 
         if self.requested_placement:
@@ -585,15 +586,13 @@ class Instance(dbo):
         return self._db_get_attribute('last_cluster_operation')
 
     def set_last_cluster_operation(self, op_type, op_uuid):
-        with self.get_lock_attr('last_cluster_operation',
-                                'Update last cluster op'):
-            self._db_set_attribute(
-                'last_cluster_operation',
-                {
-                    'op_type': op_type,
-                    'op_uuid': op_uuid
-                }
-            )
+        self._db_set_attribute(
+            'last_cluster_operation',
+            {
+                'op_type': op_type,
+                'op_uuid': op_uuid
+            }
+        )
 
     # Implementation
     def _initialize_block_devices(self):

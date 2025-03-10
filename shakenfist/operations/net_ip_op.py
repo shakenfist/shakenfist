@@ -79,6 +79,15 @@ class NetIPOp(BaseClusterOperation):
     def tasks(self):
         return self.__tasks
 
+    # API
+    def external_view(self):
+        retval = super().external_view()
+        retval.update({
+            'network_uuid': self.network_uuid,
+            'ip': self.ip
+        })
+        return retval
+
     # Tasks
     def dispatch_task(self, task):
         if task not in schema.model_tasks:

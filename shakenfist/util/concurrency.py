@@ -1,27 +1,34 @@
 import flask
+import json
 import os
 import socket
 import threading
 import time
 
 from google.protobuf.message import DecodeError
-from shakenfist_utilities import logs        # noreorder
-from shakenfist_utilities import random      # noreorder
+from shakenfist_utilities import logs                     # noreorder
+from shakenfist_utilities import random as sf_random      # noreorder
 
 from shakenfist import etcd
+from shakenfist.exceptions import MissingNodeLockSocket
 from shakenfist.exceptions import MissingPrivExecSocket
 from shakenfist.exceptions import ProcessExecutionError
+from shakenfist.exceptions import TruncatedNodeLockResponse
 from shakenfist.exceptions import TruncatedPrivExecResponse
-from shakenfist.exceptions import UnknownReplyException
+from shakenfist.exceptions import UnknownNodeLockReplyException
+from shakenfist.exceptions import UnknownPrivExecReplyException
+from shakenfist import nodelock_pb2
 from shakenfist import privexec_pb2
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import general as util_general
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
 
 
 LOG, _ = logs.setup(__name__)
-SOCKET_PATH = '/srv/shakenfist/.privexec'
+PRIVEXEC_SOCKET_PATH = '/srv/shakenfist/.privexec'
+NODELOCK_SOCKET_PATH = '/srv/shakenfist/.nodelock'
 
 
 class Job:
@@ -66,8 +73,8 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
     except RuntimeError:
         request_id = None
 
-    execution_id = random.random_id()
-    request = privexec_pb2.Request(
+    execution_id = sf_random.random_id()
+    request = privexec_pb2.PrivExecRequest(
         execute_request=privexec_pb2.ExecuteRequest(
             command=command,
             network_namespace=namespace,
@@ -107,11 +114,11 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
         LOG.warning(
             f'Lock refreshers should not be used under gunicorn: {caller}')
 
-    if not os.path.exists(SOCKET_PATH):
+    if not os.path.exists(PRIVEXEC_SOCKET_PATH):
         raise MissingPrivExecSocket()
 
     client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    client.connect(SOCKET_PATH)
+    client.connect(PRIVEXEC_SOCKET_PATH)
 
     try:
         client.sendall(request.SerializeToString())
@@ -125,7 +132,7 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
             buffered += input
 
             try:
-                reply = privexec_pb2.Reply()
+                reply = privexec_pb2.PrivExecReply()
                 consumed = reply.ParseFromString(buffered)
                 if consumed == 0:
                     continue
@@ -149,7 +156,7 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
                             cmd=command
                         )
                 else:
-                    raise UnknownReplyException()
+                    raise UnknownPrivExecReplyException()
 
             except DecodeError:
                 ...
@@ -168,3 +175,92 @@ def set_thread_name(name):
         pyprctl.set_name(name)
     except (ImportError, AttributeError) as e:
         LOG.debug(f'Failed to change thread name to {name}: {e}')
+
+
+def _node_lock_request(request):
+    if not os.path.exists(NODELOCK_SOCKET_PATH):
+        raise MissingNodeLockSocket()
+
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    client.connect(NODELOCK_SOCKET_PATH)
+
+    try:
+        client.sendall(request.SerializeToString())
+
+        buffered = bytearray()
+        while True:
+            input = client.recv(102400)
+            if not input:
+                raise TruncatedNodeLockResponse()
+            buffered += input
+
+            try:
+                reply = nodelock_pb2.NodeLockReply()
+                consumed = reply.ParseFromString(buffered)
+                if consumed == 0:
+                    continue
+
+                if reply.HasField('lock_reply'):
+                    response = reply.lock_reply
+                    if response.outcome == response.OK:
+                        return True
+                    return False
+
+                elif reply.HasField('unlock_reply'):
+                    # This is a bit silly -- the responses here are either "ok"
+                    # (we unlocked the lock) or "not held" (we don't hold the
+                    # lock). Either way we no longer hold the lock.
+                    response = reply.unlock_reply
+                    return True
+
+                else:
+                    raise UnknownNodeLockReplyException()
+
+            except DecodeError:
+                ...
+
+    finally:
+        client.close()
+
+
+class NodeLock():
+    def __init__(self, name):
+        self.name = name
+        self.requester = json.dumps({
+            'caller': util_callstack.get_caller(offset=-3),
+            'lock_id': sf_random.random_id(),
+            'request_id': util_general.get_request_id()
+        }, indent=4, sort_keys=True)
+
+        self.log = LOG.with_fields(self.requester).with_fields({
+            'name': name
+        })
+
+    def __enter__(self):
+        start_time = time.time()
+        slow_warned = False
+
+        request = nodelock_pb2.NodeLockRequest(
+            lock_request=nodelock_pb2.LockRequest(
+                requester=self.requester,
+                key=self.name
+            )
+        )
+        while not _node_lock_request(request):
+            duration = round(time.time() - start_time, 2)
+            if duration > 5 and not slow_warned:
+                self.log.with_fields({
+                    'duration': duration
+                }).info('Waiting to acquire lock')
+
+            time.sleep(0.2)
+        return self
+
+    def __exit__(self, exc_type, exc_val, traceback):
+        request = nodelock_pb2.NodeLockRequest(
+            unlock_request=nodelock_pb2.UnlockRequest(
+                requester=self.requester,
+                key=self.name
+            )
+        )
+        _node_lock_request(request)

@@ -1184,6 +1184,7 @@
         - sentinel-first
         - sentinel-last
         - privexec
+        - nodelock
         - cleaner
         - cluster
         - net
@@ -1339,9 +1340,10 @@
         SHAKENFIST_NODE_NAME: "{{node_name}}"
         SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
 
-    - name: Register the eventlog daemon if this is an eventlog node
+    - name: Register the eventlog daemon and its dependencies if this is an eventlog node
       shell: |
-        /srv/shakenfist/venv/bin/sf-ctl register-daemon eventlog
+        /srv/shakenfist/venv/bin/sf-ctl register-daemon \
+            sentinel-first nodelock eventlog
       environment:
         SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
         SHAKENFIST_NODE_NAME: "{{node_name}}"
@@ -1350,14 +1352,16 @@
 
     # This must happen first to avoid gRPC event errors in the logs on single
     # machine installs.
-    - name: Restart the eventlog daemon if this node is the eventlog node
+    - name: Restart the eventlog daemon and its dependencies if this node is the eventlog node
       service:
         name: "sf-{{ item }}"
         enabled: yes
         state: restarted
         daemon_reload: no
-      vars:
-        item: eventlog
+      with_items:
+        - sentinel-first
+        - nodelock
+        - eventlog
       when: inventory_hostname in groups.get('eventlog_node', [])
 
 - hosts: hypervisors, network_node, etcd_master, storage, eventlog_node
@@ -1376,17 +1380,39 @@
         SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
         SHAKENFIST_NODE_NAME: "{{node_name}}"
         SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+      when: inventory_hostname not in groups.get('eventlog_node', [])
 
-    - name: Register the other SF daemons, one node at a time
+    - name: Register the other SF daemons, one node at a time (eventlog node)
       shell: |
-        /srv/shakenfist/venv/bin/sf-ctl register-daemon {{ item }}
+        /srv/shakenfist/venv/bin/sf-ctl register-daemon \
+            sentinel-last privexec net resources \
+            sidechannel queues api cleaner cluster transfers
       environment:
         SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
         SHAKENFIST_NODE_NAME: "{{node_name}}"
         SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+      when: inventory_hostname in groups.get('eventlog_node', [])
+
+    - name: Register the other SF daemons, one node at a time
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl register-daemon \
+            sentinel-first sentinel-last privexec nodelock net resources \
+            sidechannel queues api cleaner cluster transfers
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_NODE_NAME: "{{node_name}}"
+        SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+      when: inventory_hostname not in groups.get('eventlog_node', [])
+
+    # The ordering of units here is to match the order they must start in, not
+    # alphabetical order.
+    - name: Restart the other SF daemons, one node at a time (eventlog node)
+      service:
+        name: "sf-{{ item }}"
+        enabled: yes
+        state: restarted
+        daemon_reload: no
       with_items:
-        - sentinel-first
-        - sentinel-last
         - privexec
         - net
         - resources
@@ -1396,9 +1422,9 @@
         - cleaner
         - cluster
         - transfers
+        - sentinel-last
+      when: inventory_hostname in groups.get('eventlog_node', [])
 
-    # The ordering of units here is to match the order they must start in, not
-    # alphabetical order.
     - name: Restart the other SF daemons, one node at a time
       service:
         name: "sf-{{ item }}"
@@ -1408,6 +1434,7 @@
       with_items:
         - sentinel-first
         - privexec
+        - nodelock
         - net
         - resources
         - sidechannel
@@ -1417,6 +1444,7 @@
         - cluster
         - transfers
         - sentinel-last
+      when: inventory_hostname not in groups.get('eventlog_node', [])
 
     - name: Make sure sf.target unit is active
       vars:

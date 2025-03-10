@@ -85,6 +85,15 @@ class NodeInstOp(BaseClusterOperation):
     def tasks(self):
         return self.__tasks
 
+    # API
+    def external_view(self):
+        retval = super().external_view()
+        retval.update({
+            'node_uuid': self.node_uuid,
+            'instance_uuid': self.instance_uuid
+        })
+        return retval
+
     # Tasks
     def dispatch_task(self, task):
         if task not in schema.model_tasks:

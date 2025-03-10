@@ -76,6 +76,15 @@ class NodeAgentopOp(BaseClusterOperation):
     def tasks(self):
         return self.__tasks
 
+    # API
+    def external_view(self):
+        retval = super().external_view()
+        retval.update({
+            'node_uuid': self.node_uuid,
+            'agentoperation_uuid': self.agentoperation_uuid
+        })
+        return retval
+
     # Tasks
     def dispatch_task(self, task):
         if task not in schema.model_tasks:

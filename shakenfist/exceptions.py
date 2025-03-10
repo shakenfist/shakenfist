@@ -326,6 +326,18 @@ class CannotParseJWTIdentity(AuthException):
 
 
 # Utility exceptions
+class MissingNodeLockSocket(Exception):
+    ...
+
+
+class TruncatedNodeLockResponse(Exception):
+    ...
+
+
+class UnknownNodeLockReplyException(Exception):
+    ...
+
+
 class MissingPrivExecSocket(Exception):
     ...
 
@@ -334,7 +346,7 @@ class TruncatedPrivExecResponse(Exception):
     ...
 
 
-class UnknownReplyException(Exception):
+class UnknownPrivExecReplyException(Exception):
     ...
 
 

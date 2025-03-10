@@ -114,21 +114,23 @@ def initialise_node():
 
 
 @click.command()
-@click.argument('daemon')
+@click.argument('daemon', nargs=-1)
 def register_daemon(daemon):
-    click.echo(f'Registering {daemon} on node...')
     n = Node.from_db(config.NODE_NAME)
-    n.register_daemon(daemon)
+    for d in daemon:
+        click.echo(f'Registering {d} on node...')
+        n.register_daemon(d)
+        click.echo(f'Daemon is now in state {n.get_daemon_state(d).value}.')
     click.echo(f'Node is now in state {n.state.value}.')
-    click.echo(f'Daemon is now in state {n.get_daemon_state(daemon).value}.')
 
 
 @click.command()
-@click.argument('daemon')
+@click.argument('daemon', nargs=-1)
 def deregister_daemon(daemon):
-    click.echo(f'Deregistering {daemon} on node...')
     n = Node.from_db(config.NODE_NAME)
-    n.deregister_daemon(daemon)
+    for d in daemon:
+        click.echo(f'Deregistering {d} on node...')
+        n.deregister_daemon(d)
     click.echo(f'Node is now in state {n.state.value}.')
 
 

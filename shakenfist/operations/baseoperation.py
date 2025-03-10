@@ -146,6 +146,14 @@ class BaseClusterOperation(BaseOperation):
         self._queue_name = name
 
     # Methods
+    def external_view(self):
+        return {
+            'operation_type': self.object_type,
+            'uuid': self.uuid,
+            'state': self.state.value,
+            'tasks': self.__tasks
+        }
+
     def execute(self):
         self.state = BaseClusterOperation.STATE_EXECUTING
         for t in self.tasks:

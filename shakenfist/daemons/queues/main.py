@@ -19,6 +19,12 @@ LOG, _ = logs.setup(__name__)
 
 
 def _check_other_daemon(n, daemon_name, override_daemon_name=None):
+    health_checks = {
+        'gunicorn': daemon.health_check_api,
+        'nodelock': daemon.health_check_nodelock,
+        'privexec': daemon.health_check_privexec
+    }
+
     recorded_daemon_name = daemon_name
     if override_daemon_name:
         recorded_daemon_name = override_daemon_name
@@ -26,42 +32,61 @@ def _check_other_daemon(n, daemon_name, override_daemon_name=None):
     if not os.path.exists(f'/run/sf/{daemon_name}.pid'):
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='pid file missing')
+        return False
 
     try:
         with open(f'/run/sf/{daemon_name}.pid') as f:
             pid = int(f.read())
             psutil.Process(pid)
+            if not health_checks[daemon_name]():
+                n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
+                                   message='health check failed')
+                return False
+
             n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_RUNNING)
-            return
+            return True
     except FileNotFoundError:
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='pid file missing on read')
+        return False
     except ValueError:
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='pid file not parsable')
+        return False
     except psutil.NoSuchProcess:
         n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                            message='process absent')
+        return False
 
     n.set_daemon_state(recorded_daemon_name, Node.DAEMON_STATE_STOPPED,
                        message='unknown issue')
+    return False
 
 
 def _health_checks():
+    healthy = True
     n = Node.from_db(config.NODE_NAME)
-    n.set_daemon_state('queues', Node.DAEMON_STATE_RUNNING)
-    _check_other_daemon(n, 'privexec')
-    _check_other_daemon(n, 'gunicorn', override_daemon_name='api')
+    if not _check_other_daemon(n, 'privexec'):
+        healthy = False
+    if not _check_other_daemon(n, 'nodelock'):
+        healthy = False
+    if not _check_other_daemon(n, 'gunicorn', override_daemon_name='api'):
+        healthy = False
+    return healthy
+
+
+def _block_until_healthy():
+    while not _health_checks():
+        LOG.warning('Not processing queues as dependencies are unhealthy')
+        time.sleep(1)
 
 
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
-        daemon.health_check_privexec()
+        _block_until_healthy()
 
         warned_locks = {}
         last_third_party_health_check = 0
-
-        n = Node.from_db(config.NODE_NAME)
 
         while daemon.check_abort_path(self.abort_path):
             try:
@@ -70,9 +95,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 if time.time() - last_third_party_health_check > 30:
                     # We also check in on the privexec and api daemon heres because
                     # they cannot do this for themselves...
-                    _check_other_daemon(n, 'privexec')
-                    _check_other_daemon(
-                        n, 'gunicorn', override_daemon_name='api')
+                    _block_until_healthy()
                     last_third_party_health_check = time.time()
 
                 # Check if we hold any locks for processes which don't exist any
@@ -115,7 +138,6 @@ def main():
     name = f'{daemon.process_name("queues")} startup'
     setproctitle.setproctitle(name)
     util_concurrency.set_thread_name(name)
-    _health_checks()
 
     start_time = time.time()
     startup_tasks.startup_tasks()

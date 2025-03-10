@@ -36,6 +36,10 @@ interface_get_example = """{
     "floating": null,
     "instance_uuid": "d512e9f5-98d6-4c36-8520-33b6fc6de15f",
     "ipv4": "10.0.0.6",
+    "last_cluster_operation": {
+        "op_type": "net_iface_op",
+        "op_uuid": "48a40459-a813-491f-81d6-a68536122e07"
+    },
     "macaddr": "02:00:00:73:18:66",
     "metadata": {},
     "model": "virtio",
@@ -85,13 +89,14 @@ class InterfaceFloatEndpoint(sf_api.Resource):
             return sf_api.error(507, str(e), suppress_traceback=True)
 
         ni.add_event(EVENT_TYPE_AUDIT, 'float request from REST API')
-        op_type, op_uuid = ni_create_and_enqueue(
-            n.uuid,
-            interface_uuid,
-            [ni_tasks.interface_float],
-            priority=PRIORITY.user_waiting,
-            request_id=util_general.get_request_id())
-        n.set_last_cluster_operation(op_type, op_uuid)
+        with n.get_lock_attr('last_cluster_operation', 'add new operation'):
+            op_type, op_uuid = ni_create_and_enqueue(
+                n.uuid,
+                interface_uuid,
+                [ni_tasks.interface_float],
+                priority=PRIORITY.user_waiting,
+                request_id=util_general.get_request_id())
+            n.set_last_cluster_operation(op_type, op_uuid)
 
 
 class InterfaceDefloatEndpoint(sf_api.Resource):
@@ -111,14 +116,15 @@ class InterfaceDefloatEndpoint(sf_api.Resource):
         # Address is freed as part of the job, so code is "unbalanced" compared
         # to above for reasons.
         ni.add_event(EVENT_TYPE_AUDIT, 'defloat request from REST API')
-        op_type, op_uuid = nii_create_and_enqueue(
-            n.uuid,
-            interface_uuid,
-            ni.floating,
-            [nii_tasks.interface_defloat],
-            priority=PRIORITY.user_facing,
-            request_id=util_general.get_request_id())
-        n.set_last_cluster_operation(op_type, op_uuid)
+        with n.get_lock_attr('last_cluster_operation', 'add new operation'):
+            op_type, op_uuid = nii_create_and_enqueue(
+                n.uuid,
+                interface_uuid,
+                ni.floating,
+                [nii_tasks.interface_defloat],
+                priority=PRIORITY.user_facing,
+                request_id=util_general.get_request_id())
+            n.set_last_cluster_operation(op_type, op_uuid)
 
 
 class InterfaceMetadatasEndpoint(sf_api.Resource):

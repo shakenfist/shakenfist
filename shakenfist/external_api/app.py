@@ -32,6 +32,7 @@ from shakenfist.external_api import agentoperation as api_agentoperation
 from shakenfist.external_api import artifact as api_artifact
 from shakenfist.external_api import auth as api_auth
 from shakenfist.external_api import blob as api_blob
+from shakenfist.external_api import clusteroperation as api_clusteroperation
 from shakenfist.external_api import instance as api_instance
 from shakenfist.external_api import interface as api_interface
 from shakenfist.external_api import label as api_label
@@ -132,6 +133,7 @@ class Root(sf_api.Resource):
              '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
              'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events</li>'
+             '<li>cluster-operations: get</li>'
              '<li>events: events-by-type</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
              'instance-put-blob, instance-execute, instance-get, instance-screenshot, '
@@ -201,6 +203,9 @@ api.add_resource(api_blob.BlobEventsEndpoint, '/blobs/<blob_uuid>/events')
 api.add_resource(api_blob.BlobChecksumsEndpoint, '/blob_checksums/<algorithm>/<hash>')
 api.add_resource(api_blob.BlobMetadatasEndpoint, '/blobs/<blob_uuid>/metadata')
 api.add_resource(api_blob.BlobMetadataEndpoint, '/blobs/<blob_uuid>/metadata/<key>')
+
+api.add_resource(api_clusteroperation.ClusterOperationEndpoint,
+                 '/clusteroperations/<operation_type>/<operation_uuid>')
 
 api.add_resource(api_instance.InstancesEndpoint, '/instances')
 api.add_resource(api_instance.InstanceEndpoint, '/instances/<instance_ref>')

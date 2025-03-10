@@ -99,7 +99,7 @@ class PrivExecJob:
             'duration': duration
         }).debug('Executed command')
 
-        return privexec_pb2.Reply(
+        return privexec_pb2.PrivExecReply(
             execute_reply=privexec_pb2.ExecuteReply(
                 stdout=stdout,
                 stderr=stderr,
@@ -120,7 +120,7 @@ class PrivExecJob:
             buffered += input
 
             try:
-                request = privexec_pb2.Request()
+                request = privexec_pb2.PrivExecRequest()
                 consumed = request.ParseFromString(buffered)
                 if consumed == 0:
                     continue

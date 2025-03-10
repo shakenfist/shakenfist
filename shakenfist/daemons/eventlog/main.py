@@ -192,6 +192,11 @@ class Monitor(daemon.WorkerPoolDaemon):
                 pass
 
         while daemon.check_abort_path(self.abort_path):
+            while not daemon.health_check_nodelock():
+                LOG.info('Waiting for nodelock daemon to be healthy')
+                time.sleep(1)
+                continue
+
             try:
                 did_work = False
 
@@ -290,7 +295,14 @@ def main():
     daemon.write_pid_file('eventlog')
     m = Monitor('eventlog')
 
-    # Start the grpc server very early
+    # Start the grpc server very early, but not before nodelock. We cannot just
+    # lookup the state of the daemon from etcd, because eventlog starts before
+    # the queue daemon which actually writes that value
+    while not daemon.health_check_nodelock():
+        LOG.info('Waiting for nodelock daemon to be healthy')
+        time.sleep(1)
+    LOG.info('nodelock daemon reports healthy')
+
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     event_pb2_grpc.add_EventServiceServicer_to_server(
         EventService(m), server)

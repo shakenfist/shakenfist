@@ -63,16 +63,21 @@ def _delete_network(network_from_db, wait_interfaces=None):
     if wait_interfaces:
         n.state = network.Network.STATE_DELETE_WAIT
     else:
-        op_type, op_uuid = net_create_and_enqueue(
-            n.uuid,
-            [net_tasks.network_destroy],
-            PRIORITY.user_facing,
-            request_id=util_general.get_request_id())
-        n.set_last_cluster_operation(op_type, op_uuid)
+        with n.get_lock_attr('last_cluster_operation', 'add new operation'):
+            op_type, op_uuid = net_create_and_enqueue(
+                n.uuid,
+                [net_tasks.network_destroy],
+                PRIORITY.user_facing,
+                request_id=util_general.get_request_id())
+            n.set_last_cluster_operation(op_type, op_uuid)
 
 
 network_get_example = """{
     "floating_gateway": "192.168.10.16",
+    "last_cluster_operation": {
+        "op_type": "net_iface_op",
+        "op_uuid": "48a40459-a813-491f-81d6-a68536122e07"
+    },
     "metadata": {},
     "name": "example",
     "namespace": "system",
@@ -605,14 +610,15 @@ class NetworkRouteAddressEndpoint(sf_api.Resource):
             return sf_api.error(507, str(e), suppress_traceback=True)
 
         network_from_db.add_event(EVENT_TYPE_AUDIT, 'route request from REST API')
-        op_type, op_uuid = nip_create_and_enqueue(
-            network_from_db.uuid,
-            address,
-            [nip_tasks.route_address],
-            priority=PRIORITY.user_facing,
-            request_id=util_general.get_request_id()
-        )
-        network_from_db.set_last_cluster_operation(op_type, op_uuid)
+        with network_from_db.get_lock_attr('last_cluster_operation', 'add new operation'):
+            op_type, op_uuid = nip_create_and_enqueue(
+                network_from_db.uuid,
+                address,
+                [nip_tasks.route_address],
+                priority=PRIORITY.user_facing,
+                request_id=util_general.get_request_id()
+            )
+            network_from_db.set_last_cluster_operation(op_type, op_uuid)
         return address
 
 
@@ -641,14 +647,15 @@ class NetworkUnrouteAddressEndpoint(sf_api.Resource):
             return sf_api.error(403, 'address not routed by this network')
 
         network_from_db.add_event(EVENT_TYPE_AUDIT, 'unroute request from REST API')
-        op_type, op_uuid = nip_create_and_enqueue(
-            network_from_db.uuid,
-            address,
-            [nip_tasks.unroute_address],
-            priority=PRIORITY.user_facing,
-            request_id=util_general.get_request_id()
-        )
-        network_from_db.set_last_cluster_operation(op_type, op_uuid)
+        with network_from_db.get_lock_attr('last_cluster_operation', 'add new operation'):
+            op_type, op_uuid = nip_create_and_enqueue(
+                network_from_db.uuid,
+                address,
+                [nip_tasks.unroute_address],
+                priority=PRIORITY.user_facing,
+                request_id=util_general.get_request_id()
+            )
+            network_from_db.set_last_cluster_operation(op_type, op_uuid)
 
 
 class NetworkDNSAddressEndpoint(sf_api.Resource):

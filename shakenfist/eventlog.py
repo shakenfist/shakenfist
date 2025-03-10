@@ -9,7 +9,6 @@ import time
 
 import flask
 import grpc
-from oslo_concurrency import lockutils
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import constants
@@ -19,6 +18,7 @@ from shakenfist import event_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import json as util_json
 
 
@@ -534,9 +534,8 @@ class EventLogChunk:
         self.dbpath = os.path.join(self.dbdir, self.objuuid + '.' + self.chunk)
         self.bootstrapped = False
 
-        self.lock = lockutils.external_lock(
-            f'{self.objtype}-{self.objuuid}-events-{self.chunk}',
-            lock_path='/run/lock', lock_file_prefix='sflock-')
+        self.lock = util_concurrency.NodeLock(
+            f'{self.objtype}-{self.objuuid}-events-{self.chunk}')
 
     def _create_version_table(self, cur):
         # Check if we already have a version table with data
