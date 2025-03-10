@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import List
 from typing import Optional
 from uuid import uuid4
 
