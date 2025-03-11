@@ -60,10 +60,10 @@ def _sanitize_packet(in_packet):
 
 
 class SideChannelJob(util_concurrency.Job):
-    def __init__(self, instance_uuid):
+    def __init__(self, inst):
         super().__init__()
-        self.instance_uuid = instance_uuid
-        self.abort_path = f'/run/sf/sidechannel-{instance_uuid}.abort'
+        self.instance = inst
+        self.abort_path = f'/run/sf/sidechannel-{inst.uuid}.abort'
 
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
@@ -310,23 +310,15 @@ class SideChannelJob(util_concurrency.Job):
 
     def execute(self):
         etcd.reset_client()
-        util_concurrency.set_thread_name(self.instance_uuid)
+        util_concurrency.set_thread_name(self.inst.uuid)
         LOG.debug(
-            f'This sidechannel thread is handling instance {self.instance_uuid}')
-
-        self.instance = instance.Instance.from_db(self.instance_uuid)
-        if not self.instance:
-            return
-        if 'sf-agent' not in self.instance.side_channels:
-            return
-        if self.instance.state.value == instance.Instance.STATE_DELETED:
-            return
+            f'This sidechannel thread is handling instance {self.inst.uuid}')
 
         self.instance_ready = constants.AGENT_NEVER_TALKED
         self.instance.agent_state = constants.AGENT_NEVER_TALKED
         self.system_boot_time = 0
         self.last_data = time.time()
-        self.log = LOG.with_fields({'instance': self.instance_uuid})
+        self.log = LOG.with_fields({'instance': self.instance.uuid})
 
         # We use the existence of a console.log file in the instance directory
         # to indicate the instance has been created. This will be true even if
@@ -671,16 +663,19 @@ class Monitor(daemon.Daemon):
 
                     # Start missing monitors. We only support sf-agent for now.
                     for instance_uuid in missing_instances:
+                        inst = instance.Instance.from_db(instance_uuid)
+                        if not inst:
+                            continue
+
                         if instance_uuid not in instance_sidechannel_cache:
-                            inst = instance.Instance.from_db(instance_uuid)
-                            if not inst:
-                                continue
                             instance_sidechannel_cache[instance_uuid] = inst.side_channels
 
                         if 'sf-agent' not in instance_sidechannel_cache[instance_uuid]:
                             continue
+                        if inst.state.value == instance.Instance.STATE_DELETED:
+                            continue
 
-                        sc_obj = SideChannelJob(instance_uuid)
+                        sc_obj = SideChannelJob(inst)
                         sc_thread = threading.Thread(
                             target=sc_obj.run, daemon=True, name=instance_uuid)
                         sc_thread.start()
