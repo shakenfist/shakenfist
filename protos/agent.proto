@@ -38,38 +38,144 @@ message PingReply {
 }
 
 message IsSystemRunningRequest {
-
 }
 
 message IsSystemRunningReply {
-
+    bool result = 1;
+    string message = 2;
+    double boot_time = 3;
 }
 
+message Fact {
+    string name = 1;
+    string value = 2;
+}
+
+message MountPoint {
+    string device = 1;
+    string mount_point = 2;
+    string vfs_type = 3;
+}
+
+message GatherFactsRequest {
+}
+
+message GatherFactsReply {
+    repeated Fact distro_facts = 1;
+    repeated MountPoint mount_points = 2;
+    repeated Fact ssh_host_keys = 3;
+}
+
+message FileStat {
+    int32 st_mode = 1;
+    int32 st_size = 2;
+    int32 st_uid = 3;
+    int32 st_gid = 4;
+    double st_atime = 5;
+    double st_mtime = 6;
+    double st_ctime = 7;
+}
+
+message FileChunk {
+    enum Encoding {
+        BASE64 = 0;
+    }
+
+    string path = 1;
+    int64 offset = 2;
+    int64 length = 3;
+    Encoding encoding = 4;
+    string payload = 5;
+}
+
+message PutFileRequest {
+    string path = 1;
+    FileStat stat = 2;
+    FileChunk first_chunk = 3;
+}
+
+message FileChunkReply {
+    string path = 1;
+    int64 offset = 2;
+}
+
+message ChmodRequest {
+    string path = 1;
+    string mode = 2;
+}
+
+message ChmodReply {
+    string path = 1;
+}
+
+message ChownRequest {
+    string path = 1;
+    optional string user = 2;
+    optional string group = 3;
+}
+
+message ChownReply {
+    string path = 1;
+}
+
+message GetFileRequest {
+    string path = 1;
+}
+
+message WatchFileRequest {
+    string path = 1;
+}
+
+message AgentRequestCommand {
+    string command_id = 1;
+
+    oneof request {
+        HypervisorWelcome hypervisor_welcome = 10;
+        HypervisorDeparture hypervisor_departure = 11;
+
+        CommandError command_error = 20;
+        UnknownCommand unknown_command = 21;
+
+        PingRequest ping_request = 30;
+
+        shakenfist.protos.ExecuteRequest execute_request = 40;
+        IsSystemRunningRequest is_system_running_request = 41;
+        GatherFactsRequest gather_facts_request = 42;
+        PutFileRequest put_file_request = 43;
+        FileChunk file_chunk = 44;
+        ChmodRequest chmod_request = 45;
+        ChownRequest chown_request = 46;
+        GetFileRequest get_file_request = 47;
+        WatchFileRequest watch_file_request = 48;
+    }
+}
 
 message AgentRequest {
-    oneof request {
-        HypervisorWelcome hypervisor_welcome = 1;
-        HypervisorDeparture hypervisor_departure = 2;
+    repeated AgentRequestCommand commands = 1;
+}
 
-        CommandError command_error = 10;
-        UnknownCommand unknown_command = 11;
+message AgentReplyCommand {
+    string command_id = 1;
 
-        PingRequest ping_request = 20;
+    oneof reply {
+        AgentWelcome agent_welcome = 10;
+        AgentDeparture agent_departure = 11;
 
-        ExecuteRequest execute_request = 30;
+        CommandError command_error = 20;
+        UnknownCommand unknown_command = 21;
+
+        PingReply ping_reply = 30;
+
+        shakenfist.protos.ExecuteReply execute_reply = 40;
+        IsSystemRunningReply is_system_running_reply = 41;
+        GatherFactsReply gather_facts_reply = 42;
+        FileChunkReply file_chunk_reply = 43;
+        ChmodReply chmod_reply = 44;
+        ChownReply chown_reply = 45;
+        FileChunk file_chunk = 46;
     }
 }
 
 message AgentReply {
-    oneof reply {
-        AgentWelcome agent_welcome = 1;
-        AgentDeparture agent_departure = 2;
-
-        CommandError command_error = 10;
-        UnknownCommand unknown_command = 11;
-
-        PingReply ping_reply = 20;
-
-        ExecuteReply execute_reply = 30;
-    }
+    repeated AgentReplyCommand commands = 1;
 }
