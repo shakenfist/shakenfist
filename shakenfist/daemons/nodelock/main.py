@@ -80,18 +80,14 @@ def main():
 
                     if request.HasField('lock_request'):
                         lr = request.lock_request
-                        outcome_string = 'unknown'
 
                         if lr.key not in locks:
                             locks[lr.key] = lr.requester
                             outcome = nodelock_pb2.LockReply.OK
-                            outcome_string = 'ok'
                         elif locks[lr.key] == lr.requester:
                             outcome = nodelock_pb2.LockReply.ALREADY_HELD
-                            outcome_string = 'already held'
                         else:
                             outcome = nodelock_pb2.LockReply.DENIED
-                            outcome_string = 'denied'
 
                         reply = nodelock_pb2.NodeLockReply(
                             lock_reply=nodelock_pb2.LockReply(
@@ -100,22 +96,16 @@ def main():
                         )
 
                         req = json.loads(lr.requester)
-                        LOG.with_fields(req).info(
-                            f'attempted lock of {lr.key} '
-                            f'with outcome {outcome_string}')
                         conn.sendall(reply.SerializeToString())
 
                     elif request.HasField('unlock_request'):
                         lr = request.unlock_request
-                        outcome_string = 'unknown'
 
                         if lr.key in locks and locks[lr.key] == lr.requester:
                             del locks[lr.key]
                             outcome = nodelock_pb2.UnlockReply.OK
-                            outcome_string = 'ok'
                         else:
                             outcome = nodelock_pb2.UnlockReply.NOT_HELD
-                            outcome_string = 'not held'
 
                         reply = nodelock_pb2.NodeLockReply(
                             unlock_reply=nodelock_pb2.UnlockReply(
@@ -123,9 +113,6 @@ def main():
                             )
                         )
                         req = json.loads(lr.requester)
-                        LOG.with_fields(req).info(
-                            f'attempted unlock of {lr.key} '
-                            f'with outcome {outcome_string}')
                         conn.sendall(reply.SerializeToString())
 
                     else:
