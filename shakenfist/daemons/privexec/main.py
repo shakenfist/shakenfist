@@ -125,6 +125,7 @@ class PrivExecJob:
                 consumed = request.ParseFromString(buffered)
                 if consumed == 0:
                     continue
+                buffered = buffered[consumed:]
 
                 if request.HasField('execute_request'):
                     er = request.execute_request

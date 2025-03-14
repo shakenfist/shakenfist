@@ -1,24 +1,25 @@
 import base64
 import os
-import select
+import socket
 import threading
 import time
 import uuid
 
-import semver
-from shakenfist_agent import protocol
-from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities import random as sf_random        # noreorder
+from shakenfist_utilities import logs                       # noreorder
 
 from shakenfist import blob
 from shakenfist import constants
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist.exceptions import NoSuchChannel
 from shakenfist import instance
 from shakenfist.operations.agentoperation import AgentOperation
-from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist.daemons import daemon
+from shakenfist.protos import agent_pb2
+from shakenfist.protos import common_pb2
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import concurrency as util_concurrency
@@ -47,6 +48,13 @@ class SideChannelJob(util_concurrency.Job):
         self.abort_path = f'/run/sf/sidechannel-{inst.uuid}.abort'
         self.log = LOG.with_fields({'instance': self.instance.uuid})
 
+    def _record_system_boot_time(self, sbt):
+        if sbt != self.system_boot_time:
+            if self.system_boot_time != 0:
+                self.instance.add_event(EVENT_TYPE_AUDIT, 'reboot detected')
+            self.system_boot_time = sbt
+            self.instance.agent_system_boot_time = sbt
+
     def execute(self):
         etcd.reset_client()
         util_concurrency.set_thread_name(self.instance.uuid)
@@ -69,9 +77,59 @@ class SideChannelJob(util_concurrency.Job):
         # Attempt to connect to the agent
         try:
             with self.instance.socket_on_vsock_channel('sf-agent2') as vsock:
+                vsock.sock.settimeout(1)
                 self.instance.add_event(EVENT_TYPE_STATUS, 'connected to agent')
+
+                request = agent_pb2.AgentRequestCommand(
+                    command_id=sf_random.random_id(),
+                    hypervisor_welcome=agent_pb2.HypervisorWelcome(
+                        version=util_general.get_version()
+                    )
+                )
+                vsock.sock.sendall(request.SerializeToString())
+                last_traffic = time.time()
+
+                buffered = bytearray()
                 while daemon.check_abort_path(self.abort_path):
-                    time.sleep(2)
+                    if time.time() - last_traffic > 2:
+                        request = agent_pb2.AgentRequestCommand(
+                            command_id=sf_random.random_id(),
+                            ping_request=agent_pb2.PingRequest(
+                            )
+                        )
+                        vsock.sock.sendall(request.SerializeToString())
+                        last_traffic = time.time()
+                        self.log.debug('Ping request')
+
+                    try:
+                        input = vsock.sock.recv(102400)
+                        if not input:
+                            return
+
+                        last_traffic = time.time()
+                        buffered += input
+
+                        reply = agent_pb2.AgentReplyCommand()
+                        consumed = reply.ParseFromString(buffered)
+                        if consumed == 0:
+                            continue
+                        buffered = buffered[consumed:]
+
+                        if reply.HasField('agent_welcome'):
+                            response = reply.agent_welcome
+                            self.instance.add_event(
+                                EVENT_TYPE_STATUS, 'agent metrics',
+                                extra={
+                                    'version': response.version,
+                                    'boot_time': response.boot_time
+                                })
+                            self._record_system_boot_time(response.boot_time)
+
+                        elif reply.HasField('ping_reply'):
+                            self.log.debug('Ping reply')
+
+                    except socket.timeout:
+                        ...
 
         except NoSuchChannel:
             self.log.debug('No such channel')

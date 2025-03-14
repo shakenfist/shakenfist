@@ -77,6 +77,7 @@ def main():
                     consumed = request.ParseFromString(buffered)
                     if consumed == 0:
                         continue
+                    buffered = buffered[consumed:]
 
                     if request.HasField('lock_request'):
                         lr = request.lock_request

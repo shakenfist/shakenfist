@@ -30,11 +30,9 @@ message AgentDeparture {
 
 // Things clients can ask the agent to do
 message PingRequest {
-    string unique = 1;
 }
 
 message PingReply {
-    string unique = 1;
 }
 
 message IsSystemRunningRequest {

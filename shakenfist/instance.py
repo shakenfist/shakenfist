@@ -101,12 +101,17 @@ class ConnectedVSockChannel():
         self.channel = channel
         self.cid = cid
         self.port = port
-        self.log = log
+        self.log = log.with_fields({
+            'channel': channel,
+            'cid': cid,
+            'port': port
+        })
+        self.sock = None
 
     def __enter__(self):
         self.sock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
         self.sock.connect((self.cid, self.port))
-        self.log.debug(f'Connected to vsock channel {self.channel}')
+        self.log.debug(f'Connected to vsock with socket {self.sock}')
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):

@@ -137,6 +137,7 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
                 consumed = reply.ParseFromString(buffered)
                 if consumed == 0:
                     continue
+                buffered = buffered[consumed:]
 
                 if reply.HasField('execute_reply'):
                     response = reply.execute_reply
@@ -200,6 +201,7 @@ def _node_lock_request(request):
                 consumed = reply.ParseFromString(buffered)
                 if consumed == 0:
                     continue
+                buffered = buffered[consumed:]
 
                 if reply.HasField('lock_reply'):
                     response = reply.lock_reply

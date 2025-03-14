@@ -42,16 +42,12 @@ class AgentDeparture(_message.Message):
     def __init__(self) -> None: ...
 
 class PingRequest(_message.Message):
-    __slots__ = ("unique",)
-    UNIQUE_FIELD_NUMBER: _ClassVar[int]
-    unique: str
-    def __init__(self, unique: _Optional[str] = ...) -> None: ...
+    __slots__ = ()
+    def __init__(self) -> None: ...
 
 class PingReply(_message.Message):
-    __slots__ = ("unique",)
-    UNIQUE_FIELD_NUMBER: _ClassVar[int]
-    unique: str
-    def __init__(self, unique: _Optional[str] = ...) -> None: ...
+    __slots__ = ()
+    def __init__(self) -> None: ...
 
 class IsSystemRunningRequest(_message.Message):
     __slots__ = ()
