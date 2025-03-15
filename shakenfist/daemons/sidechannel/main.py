@@ -48,20 +48,28 @@ class SideChannelJob(util_concurrency.Job):
         self.abort_path = f'/run/sf/sidechannel-{inst.uuid}.abort'
         self.log = LOG.with_fields({'instance': self.instance.uuid})
 
+    def _send_commands(self, sock, commands):
+        out = agent_pb2.AgentRequest()
+        for cmd in commands:
+            out.commands.append(cmd)
+        sock.sendall(out.SerializeToString())
+
     def _send_ping(self, sock):
         if self.instance_ready in [constants.AGENT_READY,
                                    constants.AGENT_READY_DEGRADED]:
             request = agent_pb2.AgentRequestCommand(
                 command_id=sf_random.random_id(),
-                ping_request=agent_pb2.PingRequest(
-                )
+                ping_request=agent_pb2.PingRequest()
             )
             self.log.debug('...ping request')
         else:
-            request = agent_pb2.IsSystemRunningRequest()
+            request = agent_pb2.AgentRequestCommand(
+                command_id=sf_random.random_id(),
+                is_system_running_request=agent_pb2.IsSystemRunningRequest()
+            )
             self.log.debug('...is system running request')
 
-        sock.sendall(request.SerializeToString())
+        self._send_commands(sock, [request])
 
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
@@ -86,7 +94,7 @@ class SideChannelJob(util_concurrency.Job):
     def _handle_is_system_running(self, reply, sock):
         self.log.debug('...is system running reply')
         response = reply.is_system_running_reply
-        if response.ready:
+        if response.result:
             new_state = constants.AGENT_READY
         else:
             # Special case the degraded state here, as the
@@ -108,7 +116,7 @@ class SideChannelJob(util_concurrency.Job):
                 command_id=sf_random.random_id(),
                 gather_facts_request=agent_pb2.GatherFactsRequest()
             )
-            sock.sendall(request.SerializeToString())
+            self._send_commands(sock, [request])
             self.log.debug('...gather facts request')
 
     def execute(self):
@@ -142,7 +150,7 @@ class SideChannelJob(util_concurrency.Job):
                         version=util_general.get_version()
                     )
                 )
-                vsock.sock.sendall(request.SerializeToString())
+                self._send_commands(vsock.sock, [request])
                 last_traffic = time.time()
 
                 buffered = bytearray()
@@ -159,20 +167,22 @@ class SideChannelJob(util_concurrency.Job):
                         last_traffic = time.time()
                         buffered += input
 
-                        reply = agent_pb2.AgentReplyCommand()
-                        consumed = reply.ParseFromString(buffered)
+                        envelope = agent_pb2.AgentReply()
+                        consumed = envelope.ParseFromString(buffered)
                         if consumed == 0:
                             continue
                         buffered = buffered[consumed:]
 
-                        if reply.HasField('agent_welcome'):
-                            self._handle_agent_welcome(reply)
+                        for reply in envelope.commands:
+                            if reply.HasField('agent_welcome'):
+                                self._handle_agent_welcome(reply)
 
-                        elif reply.HasField('is_system_running_reply'):
-                            self._handle_is_system_running(reply)
+                            elif reply.HasField('is_system_running_reply'):
+                                self._handle_is_system_running(
+                                    reply, vsock.sock)
 
-                        elif reply.HasField('ping_reply'):
-                            self.log.debug('...ping reply')
+                            elif reply.HasField('ping_reply'):
+                                self.log.debug('...ping reply')
 
                     except socket.timeout:
                         ...
