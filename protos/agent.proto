@@ -9,7 +9,6 @@ message CommandError {
 }
 
 message UnknownCommand {
-    string command = 1;
 }
 
 // Agent state information sent to clients

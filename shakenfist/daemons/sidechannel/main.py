@@ -48,12 +48,68 @@ class SideChannelJob(util_concurrency.Job):
         self.abort_path = f'/run/sf/sidechannel-{inst.uuid}.abort'
         self.log = LOG.with_fields({'instance': self.instance.uuid})
 
+    def _send_ping(self, sock):
+        if self.instance_ready in [constants.AGENT_READY,
+                                   constants.AGENT_READY_DEGRADED]:
+            request = agent_pb2.AgentRequestCommand(
+                command_id=sf_random.random_id(),
+                ping_request=agent_pb2.PingRequest(
+                )
+            )
+            self.log.debug('...ping request')
+        else:
+            request = agent_pb2.IsSystemRunningRequest()
+            self.log.debug('...is system running request')
+
+        sock.sendall(request.SerializeToString())
+
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
             if self.system_boot_time != 0:
                 self.instance.add_event(EVENT_TYPE_AUDIT, 'reboot detected')
             self.system_boot_time = sbt
             self.instance.agent_system_boot_time = sbt
+
+    def _handle_agent_welcome(self, reply):
+        self.log.debug('...agent welcome')
+        response = reply.agent_welcome
+        self.instance.add_event(
+            EVENT_TYPE_STATUS, 'agent metrics',
+            extra={
+                'version': response.version,
+                'boot_time': response.boot_time
+            })
+        self.instance_ready = constants.AGENT_STARTED
+        self.instance.agent_state = constants.AGENT_STARTED
+        self._record_system_boot_time(response.boot_time)
+
+    def _handle_is_system_running(self, reply, sock):
+        self.log.debug('...is system running reply')
+        response = reply.is_system_running_reply
+        if response.ready:
+            new_state = constants.AGENT_READY
+        else:
+            # Special case the degraded state here, as the
+            # system is in fact as ready as it is ever going
+            # to be, but isn't entirely happy.
+            if response.message == 'degraded':
+                new_state = constants.AGENT_READY_DEGRADED
+            else:
+                new_state = constants.AGENT_DEGRADED % response.message
+
+        # We cache the agent state to reduce database load,
+        # and then trigger facts gathering when we transition
+        # into the constants.AGENT_READY state.
+        if self.instance_ready != new_state:
+            self.instance_ready = new_state
+            self.instance.agent_state = new_state
+
+            request = agent_pb2.AgentRequestCommand(
+                command_id=sf_random.random_id(),
+                gather_facts_request=agent_pb2.GatherFactsRequest()
+            )
+            sock.sendall(request.SerializeToString())
+            self.log.debug('...gather facts request')
 
     def execute(self):
         etcd.reset_client()
@@ -92,20 +148,7 @@ class SideChannelJob(util_concurrency.Job):
                 buffered = bytearray()
                 while daemon.check_abort_path(self.abort_path):
                     if time.time() - last_traffic > 2:
-                        if self.instance_ready in [
-                                constants.AGENT_READY,
-                                constants.AGENT_READY_DEGRADED]:
-                            request = agent_pb2.AgentRequestCommand(
-                                command_id=sf_random.random_id(),
-                                ping_request=agent_pb2.PingRequest(
-                                )
-                            )
-                            self.log.debug('...ping request')
-                        else:
-                            request = agent_pb2.IsSystemRunningRequest()
-                            self.log.debug('...is system running')
-
-                        vsock.sock.sendall(request.SerializeToString())
+                        self._send_ping(vsock.sock)
                         last_traffic = time.time()
 
                     try:
@@ -123,45 +166,10 @@ class SideChannelJob(util_concurrency.Job):
                         buffered = buffered[consumed:]
 
                         if reply.HasField('agent_welcome'):
-                            self.log.debug('...agent welcome')
-                            response = reply.agent_welcome
-                            self.instance.add_event(
-                                EVENT_TYPE_STATUS, 'agent metrics',
-                                extra={
-                                    'version': response.version,
-                                    'boot_time': response.boot_time
-                                })
-                            self.instance_ready = constants.AGENT_STARTED
-                            self.instance.agent_state = constants.AGENT_STARTED
-                            self._record_system_boot_time(response.boot_time)
+                            self._handle_agent_welcome(reply)
 
                         elif reply.HasField('is_system_running_reply'):
-                            response = reply.is_system_running_reply
-                            if response.ready:
-                                new_state = constants.AGENT_READY
-                            else:
-                                # Special case the degraded state here, as the
-                                # system is in fact as ready as it is ever going
-                                # to be, but isn't entirely happy.
-                                if response.message == 'degraded':
-                                    new_state = constants.AGENT_READY_DEGRADED
-                                else:
-                                    new_state = (
-                                        constants.AGENT_DEGRADED
-                                        % response.message)
-
-                            # We cache the agent state to reduce database load,
-                            # and then trigger facts gathering when we transition
-                            # into the constants.AGENT_READY state.
-                            if self.instance_ready != new_state:
-                                self.instance_ready = new_state
-                                self.instance.agent_state = new_state
-
-                                request = agent_pb2.AgentRequestCommand(
-                                    command_id=sf_random.random_id(),
-                                    gather_facts_request=agent_pb2.GatherFactsRequest()
-                                )
-                                vsock.sock.sendall(request.SerializeToString())
+                            self._handle_is_system_running(reply)
 
                         elif reply.HasField('ping_reply'):
                             self.log.debug('...ping reply')
