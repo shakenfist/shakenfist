@@ -13,5 +13,13 @@ version of the agent and the boot time of the instance in return.
 
 This initial connection is then held open for the life of the hypervisor's
 sidechannel process, with `PingRequest` messages being sent to periodically.
-These are responded to by `PingReply` messages, and indicate that the connection
-is still alive.
+These are responded to by `PingReply` messages, and indicate that the
+connection is still alive.
+
+The hypervisor also initially wants to determine the state of the instance. It
+does this by issuing `IsSystemRunningRequest` messages until the agent
+indicates via a `IsSystemRunningReply` that instance startup has hit a stable
+state. When the hypervisor receives a response to a `IsSystemRunningRequest`
+that indicates a change of state for the instance, it will attempt to gather
+facts about the instance by sending a `GatherFactsRequest` which should receive
+a `GatherFactsResponse`.
