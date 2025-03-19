@@ -84,8 +84,9 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
             op = self.test_client.get_agent_operation(op['uuid'])
 
         if op['state'] != 'complete':
-            self.fail('Agent execute operation %s did not complete in 120 seconds (%s)'
-                      % (op['uuid'], op['state']))
+            self.fail(
+                f'Agent execute operation {op["uuid"]} did not complete in '
+                f'120 seconds (op["state"])')
 
         # Wait for the operation to have results
         start_time = time.time()

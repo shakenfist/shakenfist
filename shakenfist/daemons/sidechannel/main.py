@@ -1,4 +1,6 @@
 import base64
+import copy
+import errno
 import os
 import socket
 import threading
@@ -15,6 +17,7 @@ from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
+from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import NoSuchChannel
 from shakenfist import instance
 from shakenfist.operations.agentoperation import AgentOperation
@@ -30,7 +33,7 @@ LOG, _ = logs.setup(__name__)
 
 # This is the minimum version of the in-guest agent that we support. This
 # generally gets bumped when the protocol changes.
-MINIMUM_AGENT_VERSION = '0.3.16'
+MINIMUM_AGENT_VERSION = '0.5.4'
 
 
 class ConnectionFailed(Exception):
@@ -45,14 +48,58 @@ class SideChannelJob(util_concurrency.Job):
     def __init__(self, inst):
         super().__init__()
         self.instance = inst
-        self.abort_path = f'/run/sf/sidechannel-{inst.uuid}.abort'
-        self.log = LOG.with_fields({'instance': self.instance.uuid})
+        self.thread_name = self.instance.uuid
+        self.abort_path = f'/run/sf/sidechannel-{self.thread_name}.abort'
 
     def _send_commands(self, sock, commands):
         out = agent_pb2.AgentRequest()
         for cmd in commands:
             out.commands.append(cmd)
         sock.sendall(out.SerializeToString())
+
+    def execute(self):
+        etcd.reset_client()
+        util_concurrency.set_thread_name(self.thread_name)
+        self.log.debug('Attempt channel connection')
+
+        self.instance_ready = constants.AGENT_NEVER_TALKED
+        self.last_data = time.time()
+
+        # We use the existence of a console.log file in the instance directory
+        # to indicate the instance has been created. This will be true even if
+        # the instance doesn't actually every write to the serial console.
+        console_path = os.path.join(self.instance.instance_path, 'console.log')
+        while not os.path.exists(console_path):
+            time.sleep(1)
+        self.log.debug('Detected console log')
+
+        # Attempt to connect to the agent
+        try:
+            with self.instance.socket_on_vsock_channel('sf-agent2') as vsock:
+                vsock.sock.settimeout(1)
+                self.instance.add_event(
+                    EVENT_TYPE_STATUS, 'connected to agent')
+                self._execute_inner(vsock)
+
+        except NoSuchChannel:
+            self.log.debug('No such channel')
+
+        except socket.error as e:
+            if e.errno != errno.ECONNRESET:
+                self.log.debug(f'socket.error: {e}')
+
+        except OSError as e:
+            self.log.debug(f'OSError: {e}')
+
+
+class SideChannelMonitorJob(SideChannelJob):
+    def __init__(self, inst):
+        super().__init__(inst)
+        self.abort_path = f'/run/sf/sidechannel-{inst.uuid}.abort'
+        self.log = LOG.with_fields({'instance': self.instance.uuid})
+
+        self.instance.agent_state = constants.AGENT_NEVER_TALKED
+        self.system_boot_time = 0
 
     def _send_ping(self, sock):
         if self.instance_ready in [constants.AGENT_READY,
@@ -119,108 +166,310 @@ class SideChannelJob(util_concurrency.Job):
             self._send_commands(sock, [request])
             self.log.debug('...gather facts request')
 
-    def execute(self):
-        etcd.reset_client()
-        util_concurrency.set_thread_name(self.instance.uuid)
-        self.log.debug('Attempt channel connection')
-
-        self.instance_ready = constants.AGENT_NEVER_TALKED
-        self.instance.agent_state = constants.AGENT_NEVER_TALKED
-        self.system_boot_time = 0
+    def _execute_inner(self, vsock):
+        request = agent_pb2.AgentRequestCommand(
+            command_id=sf_random.random_id(),
+            hypervisor_welcome=agent_pb2.HypervisorWelcome(
+                version=util_general.get_version()
+            )
+        )
+        self._send_commands(vsock.sock, [request])
         self.last_data = time.time()
 
+        buffered = bytearray()
+        while daemon.check_abort_path(self.abort_path):
+            if time.time() - self.last_data > 2:
+                self._send_ping(vsock.sock)
+                self.last_data = time.time()
 
-        # We use the existence of a console.log file in the instance directory
-        # to indicate the instance has been created. This will be true even if
-        # the instance doesn't actually every write to the serial console.
-        console_path = os.path.join(self.instance.instance_path, 'console.log')
-        while not os.path.exists(console_path):
-            time.sleep(1)
-        self.log.debug('Detected console log')
+            try:
+                input = vsock.sock.recv(102400)
+                if not input:
+                    return
 
-        # Attempt to connect to the agent
-        try:
-            with self.instance.socket_on_vsock_channel('sf-agent2') as vsock:
-                vsock.sock.settimeout(1)
-                self.instance.add_event(EVENT_TYPE_STATUS, 'connected to agent')
+                self.last_data = time.time()
+                buffered += input
 
-                request = agent_pb2.AgentRequestCommand(
-                    command_id=sf_random.random_id(),
-                    hypervisor_welcome=agent_pb2.HypervisorWelcome(
-                        version=util_general.get_version()
+                envelope = agent_pb2.AgentReply()
+                consumed = envelope.ParseFromString(buffered)
+                if consumed == 0:
+                    continue
+                buffered = buffered[consumed:]
+
+                for reply in envelope.commands:
+                    if reply.HasField('agent_welcome'):
+                        self._handle_agent_welcome(reply)
+
+                    elif reply.HasField('is_system_running_reply'):
+                        self._handle_is_system_running(
+                            reply, vsock.sock)
+
+                    elif reply.HasField('ping_reply'):
+                        self.log.debug('...ping reply')
+
+            except socket.timeout:
+                ...
+
+
+class SideChannelExecutorJob(SideChannelJob):
+    def __init__(self, inst, agentop):
+        super().__init__(inst)
+        self.agentop = agentop
+        self.affected_objects = [self.instance, self.agentop]
+        self.thread_name = f'{self.instance.uuid}-{self.agentop.uuid}'
+
+        self.commands = agentop.commands
+        self.command_count = 0
+        self.num_results = 0
+        self.command_cache = {}
+
+        self.ready = False
+        self.log = LOG.with_fields({
+            'instance': self.instance.uuid,
+            'agent_operation': self.agentop.uuid
+        })
+
+    def _send_ping(self, sock):
+        request = agent_pb2.AgentRequestCommand(
+            command_id=sf_random.random_id(),
+            ping_request=agent_pb2.PingRequest()
+        )
+        self.log.debug('...ping request')
+        self._send_commands(sock, [request])
+
+    def _handle_agent_welcome(self, reply):
+        self.log.debug('...agent welcome')
+        self.ready = True
+
+    def _handle_execute_reply(self, reply):
+        self.log.debug('...execute reply')
+        result = {
+            'command': 'execute-response',
+            'command-line': self.command_cache[reply.command_id],
+            'return-code': reply.execute_reply.exit_code
+        }
+
+        # Convert long stdouts and stderrs to blobs
+        stdout = reply.execute_reply.stdout
+        if len(stdout) > 10 * constants.KiB:
+            b = blob.from_memory(stdout.encode('utf-8'))
+            b.ref_count_inc(self.agentop)
+            result['stdout_blob'] = b.uuid
+        else:
+            result['stdout'] = stdout
+
+        stderr = reply.execute_reply.stderr
+        if len(stderr) > 10 * constants.KiB:
+            b = blob.from_memory(stderr.encode('utf-8'))
+            b.ref_count_inc(self.agentop)
+            result['stderr_blob'] = b.uuid
+        else:
+            result['stderr'] = stderr
+
+        self.agentop.add_result(self.command_count, result)
+        self.num_results += 1
+        self.command_count += 1
+
+        extra = {
+            'command': 'execute',
+            'command-line': self.command_cache[reply.command_id],
+            'return-code': reply.execute_reply.exit_code,
+            'command_id': reply.command_id
+        }
+        add_event_multi(
+            EVENT_TYPE_STATUS, self.affected_objects,
+            'got result for agent execute command', extra=extra)
+
+        self.ready = True
+
+    def _execute_inner(self, vsock):
+        request = agent_pb2.AgentRequestCommand(
+            command_id=sf_random.random_id(),
+            hypervisor_welcome=agent_pb2.HypervisorWelcome(
+                version=util_general.get_version()
+            )
+        )
+        self._send_commands(vsock.sock, [request])
+        self.last_data = time.time()
+
+        buffered = bytearray()
+        while daemon.check_abort_path(self.abort_path):
+            if time.time() - self.last_data > 2:
+                self._send_ping(vsock.sock)
+                self.last_data = time.time()
+
+            try:
+                input = vsock.sock.recv(102400)
+                if not input:
+                    return
+
+                self.last_data = time.time()
+                buffered += input
+
+                envelope = agent_pb2.AgentReply()
+                consumed = envelope.ParseFromString(buffered)
+                if consumed == 0:
+                    continue
+                buffered = buffered[consumed:]
+
+                for reply in envelope.commands:
+                    if reply.HasField('agent_welcome'):
+                        self._handle_agent_welcome(reply)
+
+                    elif reply.HasField('ping_reply'):
+                        self.log.debug('...ping reply')
+
+                    elif reply.HasField('execute_reply'):
+                        self._handle_execute_reply(reply)
+
+                if self.ready and not self.commands:
+                    # We've run out of things to execute, say goodbye and
+                    # disconnect.
+                    request = agent_pb2.AgentRequestCommand(
+                        command_id=sf_random.random_id(),
+                        hypervisor_departure=agent_pb2.HypervisorDeparture()
                     )
-                )
-                self._send_commands(vsock.sock, [request])
-                last_traffic = time.time()
+                    self._send_commands(vsock.sock, [request])
+                    self.agentop.add_event(
+                        EVENT_TYPE_STATUS, 'commands complete')
+                    self.agentop.state = AgentOperation.STATE_COMPLETE
+                    return
 
-                buffered = bytearray()
-                while daemon.check_abort_path(self.abort_path):
-                    if time.time() - last_traffic > 2:
-                        self._send_ping(vsock.sock)
-                        last_traffic = time.time()
+                if self.ready:
+                    self.agentop.state = AgentOperation.STATE_EXECUTING
+                    request = None
+                    cmd = self.commands.pop(0)
+                    command_id = sf_random.random_id()
 
-                    try:
-                        input = vsock.sock.recv(102400)
-                        if not input:
-                            return
+                    extra = copy.copy(cmd)
+                    extra['command_id'] = command_id
+                    add_event_multi(
+                        EVENT_TYPE_STATUS, self.affected_objects,
+                        'executing agent command', extra=extra)
 
-                        last_traffic = time.time()
-                        buffered += input
+                    if cmd['command'] == 'execute':
+                        request = agent_pb2.AgentRequestCommand(
+                            command_id=command_id,
+                            execute_request=common_pb2.ExecuteRequest(
+                                command=cmd['commandline'],
+                                io_priority=common_pb2.ExecuteRequest.NORMAL
+                            )
+                        )
+                        self.command_cache[command_id] = cmd['commandline']
 
-                        envelope = agent_pb2.AgentReply()
-                        consumed = envelope.ParseFromString(buffered)
-                        if consumed == 0:
-                            continue
-                        buffered = buffered[consumed:]
+                    if request:
+                        self._send_commands(vsock.sock, [request])
+                        self.ready = False
 
-                        for reply in envelope.commands:
-                            if reply.HasField('agent_welcome'):
-                                self._handle_agent_welcome(reply)
-
-                            elif reply.HasField('is_system_running_reply'):
-                                self._handle_is_system_running(
-                                    reply, vsock.sock)
-
-                            elif reply.HasField('ping_reply'):
-                                self.log.debug('...ping reply')
-
-                    except socket.timeout:
-                        ...
-
-        except NoSuchChannel:
-            self.log.debug('No such channel')
-
-        except OSError as e:
-            self.log.debug(f'OSError: {e}')
+            except socket.timeout:
+                ...
 
 
 class Monitor(daemon.Daemon):
     def __init__(self, name):
         super().__init__(name)
-        self.monitors = {}
 
-    def reap_single_instance_monitors(self):
+        self.instance_sidechannel_cache = {}
+        self.monitors = {}
+        self.monitor_attempts = {}
+        self.executors = {}
+
+    def start_instance_monitor(self, instance_uuid):
+        # Rate limit how often we try to connect
+        last_attempt = self.monitor_attempts.get(instance_uuid, 0)
+        if time.time() - last_attempt < 30:
+            return
+        self.monitor_attempts[instance_uuid] = time.time()
+
+        inst = instance.Instance.from_db(instance_uuid)
+        if not inst:
+            return
+
+        if instance_uuid not in self.instance_sidechannel_cache:
+            self.instance_sidechannel_cache[instance_uuid] = inst.side_channels
+
+        if 'sf-agent2' not in self.instance_sidechannel_cache[instance_uuid]:
+            return
+        if inst.state.value == instance.Instance.STATE_DELETED:
+            return
+        if not inst.vsock_cid('sf-agent2'):
+            return
+
+        sc_obj = SideChannelMonitorJob(inst)
+        sc_thread = threading.Thread(
+            target=sc_obj.run, daemon=True, name=instance_uuid)
+        sc_thread.start()
+
+        self.monitors[instance_uuid] = {
+            'object': sc_obj,
+            'thread': sc_thread,
+            'instance_uuid': instance_uuid
+        }
+
+    def reap_instance_monitors(self):
         all_monitors = list(self.monitors.keys())
         for instance_uuid in all_monitors:
-            t = self.monitors[instance_uuid]['thread']
-            if not t.is_alive():
-                t.join(1)
-                LOG.info(
-                    f'Reaped dead side channel monitor with ident {t.ident}')
-                eventlog.add_event(
-                    EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-                    'side channel monitor ended')
+            t = self.monitors[instance_uuid]
+            if not t['thread'].is_alive():
+                t['thread'].join(1)
                 del self.monitors[instance_uuid]
+
+    def start_instance_executor(self, instance_uuid, agentop):
+        inst = instance.Instance.from_db(instance_uuid)
+        if not inst:
+            return
+
+        if instance_uuid not in self.monitors:
+            return
+
+        sc_obj = SideChannelExecutorJob(inst, agentop)
+        sc_thread = threading.Thread(
+            target=sc_obj.run, daemon=True, name=instance_uuid)
+        sc_thread.start()
+
+        self.executors[instance_uuid] = {
+            'object': sc_obj,
+            'thread': sc_thread,
+            'instance_uuid': instance_uuid
+        }
+        eventlog.add_event(
+            EVENT_TYPE_AUDIT, 'instance', instance_uuid,
+            'side channel executor started',
+            extra={
+                'thread_ident': sc_thread.ident
+            })
+
+
+    def reap_instance_executors(self):
+        all_executors = list(self.executors.keys())
+        for executor_id in all_executors:
+            t = self.executors[executor_id]
+            if not t['thread'].is_alive():
+                t['thread'].join(1)
+                eventlog.add_event(
+                    EVENT_TYPE_AUDIT, 'instance', t['instance_uuid'],
+                    'side channel executor ended',
+                    extra={
+                        'thread_ident': t['thread'].ident
+                    })
+                del self.executors[executor_id]
 
     def _request_all_threads_exit(self):
         LOG.info('Requesting all threads exit')
+
         all_monitors = self.monitors.keys()
         for instance_uuid in all_monitors:
-            self._request_thread_exit(instance_uuid)
+            self._request_thread_exit(
+                instance_uuid, self.monitors[instance_uuid])
 
-    def _request_thread_exit(self, instance_uuid):
-        t = self.monitors[instance_uuid]
-        t['object'].exit.set()
+        all_executors = list(self.executors.keys())
+        for instance_uuid in all_executors:
+            self._request_thread_exit(
+                instance_uuid, self.executors[instance_uuid])
+
+    def _request_thread_exit(self, instance_uuid, t):
+        daemon.set_abort_path(
+            t['object'].abort_path, 'from _request_thread_exit')
         eventlog.add_event(
             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
             'side channel monitor instructed to exit')
@@ -228,13 +477,12 @@ class Monitor(daemon.Daemon):
 
         if not t['thread'].is_alive():
             del self.monitors[instance_uuid]
+            daemon.clear_abort_path(t['object'].abort_path)
             eventlog.add_event(
                 EVENT_TYPE_AUDIT, 'instance', instance_uuid,
                 'side channel monitor finished')
 
     def _run_inner(self):
-        instance_sidechannel_cache = {}
-
         while daemon.check_abort_path(self.abort_path):
             try:
                 while not daemon.health_check_nodelock():
@@ -242,7 +490,7 @@ class Monitor(daemon.Daemon):
                     time.sleep(1)
                     continue
 
-                self.reap_single_instance_monitors()
+                self.reap_instance_monitors()
 
                 if not os.path.exists(self.abort_path):
                     # Audit desired self.monitors
@@ -272,37 +520,36 @@ class Monitor(daemon.Daemon):
 
                     # Start missing monitors. We only support sf-agent2 for now.
                     for instance_uuid in missing_instances:
+                        self.start_instance_monitor(instance_uuid)
+
+                    # Cleanup extra monitors
+                    for instance_uuid in extra_instances:
+                        self._request_thread_exit(
+                            instance_uuid, self.monitors[instance_uuid])
+
+                    # Run jobs for healthy instances. For now we only support
+                    # running one job at once.
+                    for instance_uuid in list(self.monitors.keys()):
+                        if instance_uuid in self.executors:
+                            continue
+
                         inst = instance.Instance.from_db(instance_uuid)
                         if not inst:
                             continue
 
-                        if instance_uuid not in instance_sidechannel_cache:
-                            instance_sidechannel_cache[instance_uuid] = inst.side_channels
-
-                        if 'sf-agent2' not in instance_sidechannel_cache[instance_uuid]:
-                            continue
-                        if inst.state.value == instance.Instance.STATE_DELETED:
-                            continue
-                        if not inst.vsock_cid('sf-agent2'):
+                        ready = self.monitors[instance_uuid]['object'].instance_ready
+                        if ready not in [constants.AGENT_READY,
+                                         constants.AGENT_READY_DEGRADED]:
                             continue
 
-                        sc_obj = SideChannelJob(inst)
-                        sc_thread = threading.Thread(
-                            target=sc_obj.run, daemon=True, name=instance_uuid)
-                        sc_thread.start()
+                        agentop = inst.agent_operation_dequeue()
+                        if agentop:
+                            inst.add_event(
+                                EVENT_TYPE_AUDIT, 'dequeued agent operation',
+                                extra={'agentoperation': agentop.uuid})
 
-                        self.monitors[instance_uuid] = {
-                            'object': sc_obj,
-                            'thread': sc_thread,
-                            'instance_uuid': instance_uuid
-                        }
-                        eventlog.add_event(
-                            EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-                            'side channel monitor started')
-
-                    # Cleanup extra monitors
-                    for instance_uuid in extra_instances:
-                        self._request_thread_exit(instance_uuid)
+                            self.start_instance_executor(
+                                instance_uuid, agentop)
 
                     self.idle(1)
 
