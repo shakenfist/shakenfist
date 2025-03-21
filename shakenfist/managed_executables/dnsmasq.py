@@ -3,11 +3,11 @@ import signal
 import time
 
 from shakenfist import instance
-from shakenfist.network import interface
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.managed_executables import managedexecutable
+from shakenfist.network import interface
 from shakenfist.util import concurrency as util_concurrency
 
 
