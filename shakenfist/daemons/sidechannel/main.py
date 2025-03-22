@@ -1,6 +1,7 @@
 import base64
 import copy
 import errno
+import json
 import os
 import socket
 import threading
@@ -33,7 +34,7 @@ LOG, _ = logs.setup(__name__)
 
 # This is the minimum version of the in-guest agent that we support. This
 # generally gets bumped when the protocol changes.
-MINIMUM_AGENT_VERSION = '0.5.4'
+MINIMUM_AGENT_VERSION = '0.5.5'
 
 
 class ConnectionFailed(Exception):
@@ -48,6 +49,7 @@ class SideChannelJob(util_concurrency.Job):
     def __init__(self, inst):
         super().__init__()
         self.instance = inst
+        self.instance_ready = constants.AGENT_NEVER_TALKED
         self.thread_name = self.instance.uuid
         self.abort_path = f'/run/sf/sidechannel-{self.thread_name}.abort'
 
@@ -57,12 +59,20 @@ class SideChannelJob(util_concurrency.Job):
             out.commands.append(cmd)
         sock.sendall(out.SerializeToString())
 
+    def _handle_command_error(self, reply):
+        self.log.debug('...command error')
+        response = reply.command_error
+        self.instance.add_event(
+            EVENT_TYPE_STATUS, 'command error',
+            extra={
+                'error': response.error
+            })
+
     def execute(self):
         etcd.reset_client()
         util_concurrency.set_thread_name(self.thread_name)
         self.log.debug('Attempt channel connection')
 
-        self.instance_ready = constants.AGENT_NEVER_TALKED
         self.last_data = time.time()
 
         # We use the existence of a console.log file in the instance directory
@@ -166,6 +176,31 @@ class SideChannelMonitorJob(SideChannelJob):
             self._send_commands(sock, [request])
             self.log.debug('...gather facts request')
 
+    def _handle_gather_facts(self, reply):
+        self.log.debug('...gather facts reply')
+        response = reply.gather_facts_reply
+
+        facts = {
+            'distribution': {},
+            'mounts': [],
+            'ssh-host-keys': {}
+        }
+        for f in response.distro_facts:
+            facts['distribution'][f.name] = json.loads(f.value)
+        for mp in response.mount_points:
+            facts['mounts'].append(
+                {
+                    'device': mp.device,
+                    'mount_point': mp.mount_point,
+                    'vfs_type': mp.vfs_type
+                }
+            )
+        for hk in response.ssh_host_keys:
+            facts['ssh-host-keys'][hk.name] = hk.value
+
+        self.instance.add_event(EVENT_TYPE_AUDIT, 'received system facts')
+        self.instance.agent_facts = facts
+
     def _execute_inner(self, vsock):
         request = agent_pb2.AgentRequestCommand(
             command_id=sf_random.random_id(),
@@ -206,6 +241,12 @@ class SideChannelMonitorJob(SideChannelJob):
 
                     elif reply.HasField('ping_reply'):
                         self.log.debug('...ping reply')
+
+                    elif reply.HasField('gather_facts_reply'):
+                        self._handle_gather_facts(reply)
+
+                    elif reply.HasField('command_error'):
+                        self._handle_command_error(reply)
 
             except socket.timeout:
                 ...
@@ -321,6 +362,9 @@ class SideChannelExecutorJob(SideChannelJob):
 
                     elif reply.HasField('execute_reply'):
                         self._handle_execute_reply(reply)
+
+                    elif reply.HasField('command_error'):
+                        self._handle_command_error(reply)
 
                 if self.ready and not self.commands:
                     # We've run out of things to execute, say goodbye and
