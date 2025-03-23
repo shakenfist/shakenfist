@@ -1,4 +1,3 @@
-import base64
 import copy
 import errno
 import json
@@ -6,7 +5,6 @@ import os
 import socket
 import threading
 import time
-import uuid
 
 from shakenfist_utilities import random as sf_random        # noreorder
 from shakenfist_utilities import logs                       # noreorder
@@ -34,7 +32,7 @@ LOG, _ = logs.setup(__name__)
 
 # This is the minimum version of the in-guest agent that we support. This
 # generally gets bumped when the protocol changes.
-MINIMUM_AGENT_VERSION = '0.5.5'
+MINIMUM_AGENT_VERSION = '0.5.6'
 
 
 class ConnectionFailed(Exception):
@@ -366,6 +364,10 @@ class SideChannelExecutorJob(SideChannelJob):
                     elif reply.HasField('command_error'):
                         self._handle_command_error(reply)
 
+                self.log.with_fields({
+                    'ready': self.ready,
+                    'commands': self.commands
+                }).debug('Considering command execution')
                 if self.ready and not self.commands:
                     # We've run out of things to execute, say goodbye and
                     # disconnect.
@@ -374,13 +376,13 @@ class SideChannelExecutorJob(SideChannelJob):
                         hypervisor_departure=agent_pb2.HypervisorDeparture()
                     )
                     self._send_commands(vsock.sock, [request])
-                    self.agentop.add_event(
-                        EVENT_TYPE_STATUS, 'commands complete')
+                    add_event_multi(
+                        EVENT_TYPE_STATUS, self.affected_objects,
+                        'commands complete')
                     self.agentop.state = AgentOperation.STATE_COMPLETE
                     return
 
                 if self.ready:
-                    self.agentop.state = AgentOperation.STATE_EXECUTING
                     request = None
                     cmd = self.commands.pop(0)
                     command_id = sf_random.random_id()
@@ -390,6 +392,7 @@ class SideChannelExecutorJob(SideChannelJob):
                     add_event_multi(
                         EVENT_TYPE_STATUS, self.affected_objects,
                         'executing agent command', extra=extra)
+                    self.agentop.state = AgentOperation.STATE_EXECUTING
 
                     if cmd['command'] == 'execute':
                         request = agent_pb2.AgentRequestCommand(
@@ -535,6 +538,7 @@ class Monitor(daemon.Daemon):
                     continue
 
                 self.reap_instance_monitors()
+                self.reap_instance_executors()
 
                 if not os.path.exists(self.abort_path):
                     # Audit desired self.monitors

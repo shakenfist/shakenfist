@@ -88,7 +88,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None, side_channels=['sf-agent2'])
 
         self._await_instance_ready(inst['uuid'])
 

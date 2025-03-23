@@ -50,7 +50,7 @@ sudo echo 'banana' >  /tmp/output"""
             'BWeoicQzECQLMfnKuGpfoZsKbOTTeCzS0/q6guKLNgfXijpRf5uaZaTqQa18t'
             '8s= mikal@marvin"',
             str(base64.b64encode(ud.encode('utf-8')), 'utf-8'),
-            side_channels=['sf-agent'])
+            side_channels=['sf-agent2'])
 
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
