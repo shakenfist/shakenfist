@@ -6,6 +6,7 @@ import socket
 import threading
 import time
 
+from google.protobuf.message import DecodeError
 from shakenfist_utilities import random as sf_random        # noreorder
 from shakenfist_utilities import logs                       # noreorder
 
@@ -224,7 +225,12 @@ class SideChannelMonitorJob(SideChannelJob):
                 buffered += input
 
                 envelope = agent_pb2.AgentReply()
-                consumed = envelope.ParseFromString(buffered)
+                try:
+                    consumed = envelope.ParseFromString(buffered)
+                except DecodeError as e:
+                    self.log.debug(f'Decode error: {e}')
+                    consumed = 0
+
                 if consumed == 0:
                     continue
                 buffered = buffered[consumed:]
@@ -346,7 +352,12 @@ class SideChannelExecutorJob(SideChannelJob):
                 buffered += input
 
                 envelope = agent_pb2.AgentReply()
-                consumed = envelope.ParseFromString(buffered)
+                try:
+                    consumed = envelope.ParseFromString(buffered)
+                except DecodeError as e:
+                    self.log.debug(f'Decode error: {e}')
+                    consumed = 0
+
                 if consumed == 0:
                     continue
                 buffered = buffered[consumed:]
@@ -376,23 +387,17 @@ class SideChannelExecutorJob(SideChannelJob):
                         hypervisor_departure=agent_pb2.HypervisorDeparture()
                     )
                     self._send_commands(vsock.sock, [request])
-                    add_event_multi(
-                        EVENT_TYPE_STATUS, self.affected_objects,
-                        'commands complete')
-                    self.agentop.state = AgentOperation.STATE_COMPLETE
+                    if self.agentop.state.value == AgentOperation.STATE_EXECUTING:
+                        add_event_multi(
+                            EVENT_TYPE_STATUS, self.affected_objects,
+                            'commands complete')
+                        self.agentop.state = AgentOperation.STATE_COMPLETE
                     return
 
                 if self.ready:
                     request = None
                     cmd = self.commands.pop(0)
                     command_id = sf_random.random_id()
-
-                    extra = copy.copy(cmd)
-                    extra['command_id'] = command_id
-                    add_event_multi(
-                        EVENT_TYPE_STATUS, self.affected_objects,
-                        'executing agent command', extra=extra)
-                    self.agentop.state = AgentOperation.STATE_EXECUTING
 
                     if cmd['command'] == 'execute':
                         request = agent_pb2.AgentRequestCommand(
@@ -403,8 +408,21 @@ class SideChannelExecutorJob(SideChannelJob):
                             )
                         )
                         self.command_cache[command_id] = cmd['commandline']
+                    else:
+                        add_event_multi(
+                            EVENT_TYPE_STATUS, self.affected_objects,
+                            'unknown command', extra=cmd)
+                        self.agentop.state = AgentOperation.STATE_ERROR
+                        self.commands = []
 
                     if request:
+                        extra = copy.copy(cmd)
+                        extra['command_id'] = command_id
+                        add_event_multi(
+                            EVENT_TYPE_STATUS, self.affected_objects,
+                            'executing agent command', extra=extra)
+                        self.agentop.state = AgentOperation.STATE_EXECUTING
+
                         self._send_commands(vsock.sock, [request])
                         self.ready = False
 
