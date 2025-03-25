@@ -486,7 +486,6 @@ class Monitor(daemon.Daemon):
                 'thread_ident': sc_thread.ident
             })
 
-
     def reap_instance_executors(self):
         all_executors = list(self.executors.keys())
         for executor_id in all_executors:

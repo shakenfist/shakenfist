@@ -5,7 +5,6 @@
 # alernative would be to use etcd for distributed locks, but given these are
 # just for operations within a single node that would be expensive.
 
-import json
 import os
 import signal
 import socket
@@ -96,7 +95,6 @@ def main():
                             )
                         )
 
-                        req = json.loads(lr.requester)
                         conn.sendall(reply.SerializeToString())
 
                     elif request.HasField('unlock_request'):
@@ -113,7 +111,6 @@ def main():
                                 outcome=outcome
                             )
                         )
-                        req = json.loads(lr.requester)
                         conn.sendall(reply.SerializeToString())
 
                     else:
