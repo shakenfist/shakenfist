@@ -14,10 +14,8 @@ class CommandError(_message.Message):
     def __init__(self, error: _Optional[str] = ...) -> None: ...
 
 class UnknownCommand(_message.Message):
-    __slots__ = ("command",)
-    COMMAND_FIELD_NUMBER: _ClassVar[int]
-    command: str
-    def __init__(self, command: _Optional[str] = ...) -> None: ...
+    __slots__ = ()
+    def __init__(self) -> None: ...
 
 class HypervisorWelcome(_message.Message):
     __slots__ = ("version",)
@@ -95,51 +93,31 @@ class GatherFactsReply(_message.Message):
     ssh_host_keys: _containers.RepeatedCompositeFieldContainer[Fact]
     def __init__(self, distro_facts: _Optional[_Iterable[_Union[Fact, _Mapping]]] = ..., mount_points: _Optional[_Iterable[_Union[MountPoint, _Mapping]]] = ..., ssh_host_keys: _Optional[_Iterable[_Union[Fact, _Mapping]]] = ...) -> None: ...
 
-class FileStat(_message.Message):
-    __slots__ = ("st_mode", "st_size", "st_uid", "st_gid", "st_atime", "st_mtime", "st_ctime")
-    ST_MODE_FIELD_NUMBER: _ClassVar[int]
-    ST_SIZE_FIELD_NUMBER: _ClassVar[int]
-    ST_UID_FIELD_NUMBER: _ClassVar[int]
-    ST_GID_FIELD_NUMBER: _ClassVar[int]
-    ST_ATIME_FIELD_NUMBER: _ClassVar[int]
-    ST_MTIME_FIELD_NUMBER: _ClassVar[int]
-    ST_CTIME_FIELD_NUMBER: _ClassVar[int]
-    st_mode: int
-    st_size: int
-    st_uid: int
-    st_gid: int
-    st_atime: float
-    st_mtime: float
-    st_ctime: float
-    def __init__(self, st_mode: _Optional[int] = ..., st_size: _Optional[int] = ..., st_uid: _Optional[int] = ..., st_gid: _Optional[int] = ..., st_atime: _Optional[float] = ..., st_mtime: _Optional[float] = ..., st_ctime: _Optional[float] = ...) -> None: ...
-
 class FileChunk(_message.Message):
-    __slots__ = ("path", "offset", "length", "encoding", "payload")
+    __slots__ = ("offset", "encoding", "payload")
     class Encoding(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         BASE64: _ClassVar[FileChunk.Encoding]
     BASE64: FileChunk.Encoding
-    PATH_FIELD_NUMBER: _ClassVar[int]
     OFFSET_FIELD_NUMBER: _ClassVar[int]
-    LENGTH_FIELD_NUMBER: _ClassVar[int]
     ENCODING_FIELD_NUMBER: _ClassVar[int]
     PAYLOAD_FIELD_NUMBER: _ClassVar[int]
-    path: str
     offset: int
-    length: int
     encoding: FileChunk.Encoding
     payload: str
-    def __init__(self, path: _Optional[str] = ..., offset: _Optional[int] = ..., length: _Optional[int] = ..., encoding: _Optional[_Union[FileChunk.Encoding, str]] = ..., payload: _Optional[str] = ...) -> None: ...
+    def __init__(self, offset: _Optional[int] = ..., encoding: _Optional[_Union[FileChunk.Encoding, str]] = ..., payload: _Optional[str] = ...) -> None: ...
 
 class PutFileRequest(_message.Message):
-    __slots__ = ("path", "stat", "first_chunk")
+    __slots__ = ("path", "mode", "length", "first_chunk")
     PATH_FIELD_NUMBER: _ClassVar[int]
-    STAT_FIELD_NUMBER: _ClassVar[int]
+    MODE_FIELD_NUMBER: _ClassVar[int]
+    LENGTH_FIELD_NUMBER: _ClassVar[int]
     FIRST_CHUNK_FIELD_NUMBER: _ClassVar[int]
     path: str
-    stat: FileStat
+    mode: str
+    length: int
     first_chunk: FileChunk
-    def __init__(self, path: _Optional[str] = ..., stat: _Optional[_Union[FileStat, _Mapping]] = ..., first_chunk: _Optional[_Union[FileChunk, _Mapping]] = ...) -> None: ...
+    def __init__(self, path: _Optional[str] = ..., mode: _Optional[str] = ..., length: _Optional[int] = ..., first_chunk: _Optional[_Union[FileChunk, _Mapping]] = ...) -> None: ...
 
 class FileChunkReply(_message.Message):
     __slots__ = ("path", "offset")

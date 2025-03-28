@@ -63,32 +63,21 @@ message GatherFactsReply {
     repeated Fact ssh_host_keys = 3;
 }
 
-message FileStat {
-    int32 st_mode = 1;
-    int32 st_size = 2;
-    int32 st_uid = 3;
-    int32 st_gid = 4;
-    double st_atime = 5;
-    double st_mtime = 6;
-    double st_ctime = 7;
-}
-
 message FileChunk {
     enum Encoding {
         BASE64 = 0;
     }
 
-    string path = 1;
-    int64 offset = 2;
-    int64 length = 3;
-    Encoding encoding = 4;
-    string payload = 5;
+    int64 offset = 1;
+    Encoding encoding = 2;
+    string payload = 3;
 }
 
 message PutFileRequest {
     string path = 1;
-    FileStat stat = 2;
-    FileChunk first_chunk = 3;
+    string mode = 2;
+    int64 length = 3;
+    FileChunk first_chunk = 4;
 }
 
 message FileChunkReply {

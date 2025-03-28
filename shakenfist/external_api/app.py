@@ -129,7 +129,7 @@ class Root(sf_api.Resource):
              '<p>Machine searchable API capabilities:</p><ul>'
              '<li>admin: cluster-cacert, cluster-resources</li>'
              '<li>agent-operations: agentoperations-crud, instance-agentoperations, '
-             'instance-agentoperations-all</li>'
+             'instance-agentoperations-all, agentoperations-put-with-mode</li>'
              '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
              'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events</li>'
