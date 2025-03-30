@@ -34,7 +34,7 @@ LOG, _ = logs.setup(__name__)
 
 # This is the minimum version of the in-guest agent that we support. This
 # generally gets bumped when the protocol changes.
-MINIMUM_AGENT_VERSION = '0.5.8'
+MINIMUM_AGENT_VERSION = '0.5.9'
 
 
 # Parameters for blob transfers
@@ -72,6 +72,9 @@ class SideChannelJob(util_concurrency.Job):
             out.commands.append(cmd)
             if register_as_outstanding:
                 self.outstanding_message_count += 1
+                self.log.with_fields({
+                    'outstanding_messages': self.outstanding_message_count
+                }).debug('...increment outstanding commands')
         sock.sendall(out.SerializeToString())
 
     def _handle_command_error(self, reply):
@@ -223,6 +226,7 @@ class SideChannelMonitorJob(SideChannelJob):
                 version=util_general.get_version()
             )
         )
+        self.log.debug('...execute request')
         self._send_commands_single_envelope(vsock.sock, [request])
         self.last_data = time.time()
 
@@ -276,46 +280,6 @@ class SideChannelMonitorJob(SideChannelJob):
         }).debug('Abort path set, exiting')
 
 
-def _chunk_reader(command_id, cmd, path):
-    with open(path, 'rb') as f:
-        offset = 0
-        d = f.read(MAX_CHUNK_SIZE)
-        yield agent_pb2.AgentRequestCommand(
-            command_id=command_id,
-            put_file_request=agent_pb2.PutFileRequest(
-                path=cmd['path'],
-                mode=cmd.get('mode'),
-                length=os.stat(path).st_size,
-                first_chunk=agent_pb2.FileChunk(
-                    offset=offset,
-                    encoding=agent_pb2.FileChunk.BASE64,
-                    payload=base64.b64encode(d)
-                )
-            )
-        )
-        offset += len(d)
-
-        while d := f.read(MAX_CHUNK_SIZE):
-            yield agent_pb2.AgentRequestCommand(
-                command_id=command_id,
-                file_chunk=agent_pb2.FileChunk(
-                    offset=offset,
-                    encoding=agent_pb2.FileChunk.BASE64,
-                    payload=base64.b64encode(d)
-                )
-            )
-            offset += len(d)
-
-        yield agent_pb2.AgentRequestCommand(
-            command_id=command_id,
-            file_chunk=agent_pb2.FileChunk(
-                offset=offset,
-                encoding=agent_pb2.FileChunk.BASE64,
-                payload=None
-            )
-        )
-
-
 class SideChannelExecutorJob(SideChannelJob):
     def __init__(self, inst, agentop):
         super().__init__(inst)
@@ -340,11 +304,15 @@ class SideChannelExecutorJob(SideChannelJob):
             command_id=sf_random.random_id(),
             ping_request=agent_pb2.PingRequest()
         )
-        self.log.debug('...ping request')
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...ping request')
         self._send_commands_single_envelope(sock, [request])
 
     def _handle_agent_welcome(self, reply):
-        self.log.debug('...agent welcome')
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...agent welcome')
         self.ready = True
 
     def _dispatch_execute(self, command_id, cmd):
@@ -359,7 +327,9 @@ class SideChannelExecutorJob(SideChannelJob):
         return [request]
 
     def _handle_execute_reply(self, reply):
-        self.log.debug('...execute reply')
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...execute reply')
         result = {
             'command': 'execute-response',
             'command-line': self.command_cache[reply.command_id],
@@ -399,6 +369,55 @@ class SideChannelExecutorJob(SideChannelJob):
 
         self.ready = True
 
+    def _chunk_reader(self, command_id, cmd, path):
+        with open(path, 'rb') as f:
+            offset = 0
+            d = f.read(MAX_CHUNK_SIZE)
+            self.log.with_fields({
+                'outstanding_messages': self.outstanding_message_count
+            }).debug('...put file request (including file chunk)')
+
+            yield agent_pb2.AgentRequestCommand(
+                command_id=command_id,
+                put_file_request=agent_pb2.PutFileRequest(
+                    path=cmd['path'],
+                    mode=cmd.get('mode'),
+                    length=os.stat(path).st_size,
+                    first_chunk=agent_pb2.FileChunk(
+                        offset=offset,
+                        encoding=agent_pb2.FileChunk.BASE64,
+                        payload=base64.b64encode(d)
+                    )
+                )
+            )
+            offset += len(d)
+
+            while d := f.read(MAX_CHUNK_SIZE):
+                self.log.with_fields({
+                    'outstanding_messages': self.outstanding_message_count
+                }).debug('...file chunk')
+                yield agent_pb2.AgentRequestCommand(
+                    command_id=command_id,
+                    file_chunk=agent_pb2.FileChunk(
+                        offset=offset,
+                        encoding=agent_pb2.FileChunk.BASE64,
+                        payload=base64.b64encode(d)
+                    )
+                )
+                offset += len(d)
+
+            self.log.with_fields({
+                'outstanding_messages': self.outstanding_message_count
+            }).debug('...file chunk (termination)')
+            yield agent_pb2.AgentRequestCommand(
+                command_id=command_id,
+                file_chunk=agent_pb2.FileChunk(
+                    offset=offset,
+                    encoding=agent_pb2.FileChunk.BASE64,
+                    payload=None
+                )
+            )
+
     def _dispatch_put_blob(self, command_id, cmd):
         if 'blob_uuid' not in cmd:
             self.agentop.error = 'missing blob uuid'
@@ -411,7 +430,7 @@ class SideChannelExecutorJob(SideChannelJob):
 
         # This should already have been done by preflight, but hey
         b.ensure_local([])
-        self.chunk_iterator = _chunk_reader(
+        self.chunk_iterator = self._chunk_reader(
             command_id, cmd, blob.Blob.filepath(b.uuid))
 
         # Try to send MAX_OUTSTANDING chunks
@@ -425,10 +444,13 @@ class SideChannelExecutorJob(SideChannelJob):
         return out
 
     def _dispatch_chmod(self, command_id, cmd):
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...chmod request')
         return [
             agent_pb2.AgentRequestCommand(
                 command_id=command_id,
-                execute_request=agent_pb2.ChmodRequest(
+                chmod_request=agent_pb2.ChmodRequest(
                     path=cmd['path'],
                     mode=cmd['mode']
                 )
@@ -467,7 +489,9 @@ class SideChannelExecutorJob(SideChannelJob):
                 try:
                     consumed = envelope.ParseFromString(buffered)
                 except DecodeError as e:
-                    self.log.debug(f'Decode error: {e}')
+                    self.log.with_fields({
+                        'outstanding_messages': self.outstanding_message_count
+                    }).debug(f'Decode error: {e}')
                     consumed = 0
 
                 if consumed == 0:
@@ -482,24 +506,44 @@ class SideChannelExecutorJob(SideChannelJob):
                         self._handle_agent_welcome(reply)
 
                     elif reply.HasField('ping_reply'):
-                        self.log.debug('...ping reply')
+                        self.log.with_fields({
+                            'outstanding_messages': self.outstanding_message_count
+                        }).debug('...ping reply')
 
                     elif reply.HasField('execute_reply'):
                         self._handle_execute_reply(reply)
 
                     elif reply.HasField('file_chunk_reply'):
-                        self.log.debug('...file chunk reply')
+                        self.log.with_fields({
+                            'outstanding_messages': self.outstanding_message_count
+                        }).debug('...file chunk reply')
                         self.outstanding_message_count -= 1
+                        self.log.with_fields({
+                            'outstanding_messages': self.outstanding_message_count
+                        }).debug('...decrement outstanding commands')
+
+                        try:
+                            out = None
+                            if self.chunk_iterator:
+                                out = self.chunk_iterator.__next__()
+                            if out:
+                                self._send_commands_single_envelope(
+                                    vsock.sock, out, register_as_outstanding=True)
+
+                        except StopIteration:
+                            self.chunk_iterator = None
+
                         if self.outstanding_message_count == 0:
                             self.ready = True
                         elif self.outstanding_message_count < 0:
                             self.log.with_fields({
                                 'outstanding_messages': self.outstanding_message_count
                             }).error('Negative outstanding messages, aborting')
-                        return
 
                     elif reply.HasField('chmod_reply'):
-                        self.log.debug('...chmod reply')
+                        self.log.with_fields({
+                            'outstanding_messages': self.outstanding_message_count
+                        }).debug('...chmod reply')
                         self.ready = True
 
                     elif reply.HasField('command_error'):
@@ -507,7 +551,8 @@ class SideChannelExecutorJob(SideChannelJob):
 
                 self.log.with_fields({
                     'ready': self.ready,
-                    'commands': self.commands
+                    'commands': self.commands,
+                    'outstanding_messages': self.outstanding_message_count
                 }).debug('Considering command execution')
                 if self.ready and not self.commands:
                     # We've run out of things to execute, say goodbye and
@@ -530,6 +575,7 @@ class SideChannelExecutorJob(SideChannelJob):
 
                 if self.ready:
                     requests = []
+                    register_as_outstanding = False
                     cmd = self.commands.pop(0)
                     command_id = sf_random.random_id()
 
@@ -539,6 +585,7 @@ class SideChannelExecutorJob(SideChannelJob):
 
                         elif cmd['command'] == 'put-blob':
                             requests = self._dispatch_put_blob(command_id, cmd)
+                            register_as_outstanding = True
 
                         elif cmd['command'] == 'chmod':
                             requests = self._dispatch_chmod(command_id, cmd)
@@ -554,8 +601,13 @@ class SideChannelExecutorJob(SideChannelJob):
                                 'executing agent command', extra=extra)
                             self.agentop.state = AgentOperation.STATE_EXECUTING
 
+                            self.log.with_fields({
+                                'outstanding_messages': self.outstanding_message_count,
+                                'register_as_outstanding': register_as_outstanding
+                            }).debug(f'Sending {len(requests)} messages')
                             self._send_commands_single_envelope(
-                                vsock.sock, requests)
+                                vsock.sock, requests,
+                                register_as_outstanding=register_as_outstanding)
                             self.ready = False
 
                     finally:
@@ -570,7 +622,8 @@ class SideChannelExecutorJob(SideChannelJob):
                 ...
 
         self.log.with_fields({
-            'abort_path': self.abort_path
+            'abort_path': self.abort_path,
+            'outstanding_messages': self.outstanding_message_count
         }).debug('Abort path set, exiting')
 
 
@@ -665,7 +718,7 @@ class Monitor(daemon.Daemon):
     def _request_all_threads_exit(self):
         LOG.info('Requesting all threads exit')
 
-        all_monitors = self.monitors.keys()
+        all_monitors = list(self.monitors.keys())
         for instance_uuid in all_monitors:
             self._request_thread_exit(
                 instance_uuid, self.monitors[instance_uuid])
