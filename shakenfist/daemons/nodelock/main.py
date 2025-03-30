@@ -23,7 +23,6 @@ EXIT = threading.Event()
 
 
 def exit_gracefully(sig, _frame):
-    global EXIT
     if sig == signal.SIGTERM:
         LOG.info('Received SIGTERM')
         EXIT.set()
@@ -38,10 +37,6 @@ def write_pid_file():
 
 
 def main():
-    global LOG
-    global SOCKET_PATH
-    global EXIT
-
     write_pid_file()
     setproctitle.setproctitle('sf-nodelock')
 

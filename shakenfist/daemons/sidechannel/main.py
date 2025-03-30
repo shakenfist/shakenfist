@@ -34,7 +34,7 @@ LOG, _ = logs.setup(__name__)
 
 # This is the minimum version of the in-guest agent that we support. This
 # generally gets bumped when the protocol changes.
-MINIMUM_AGENT_VERSION = '0.5.7'
+MINIMUM_AGENT_VERSION = '0.5.8'
 
 
 # Parameters for blob transfers
@@ -424,6 +424,17 @@ class SideChannelExecutorJob(SideChannelJob):
 
         return out
 
+    def _dispatch_chmod(self, command_id, cmd):
+        return [
+            agent_pb2.AgentRequestCommand(
+                command_id=command_id,
+                execute_request=agent_pb2.ChmodRequest(
+                    path=cmd['path'],
+                    mode=cmd['mode']
+                )
+            )
+        ]
+
     def _execute_inner(self, vsock):
         self._send_commands_single_envelope(
             vsock.sock,
@@ -477,6 +488,7 @@ class SideChannelExecutorJob(SideChannelJob):
                         self._handle_execute_reply(reply)
 
                     elif reply.HasField('file_chunk_reply'):
+                        self.log.debug('...file chunk reply')
                         self.outstanding_message_count -= 1
                         if self.outstanding_message_count == 0:
                             self.ready = True
@@ -485,6 +497,10 @@ class SideChannelExecutorJob(SideChannelJob):
                                 'outstanding_messages': self.outstanding_message_count
                             }).error('Negative outstanding messages, aborting')
                         return
+
+                    elif reply.HasField('chmod_reply'):
+                        self.log.debug('...chmod reply')
+                        self.ready = True
 
                     elif reply.HasField('command_error'):
                         self._handle_command_error(reply)
@@ -523,6 +539,9 @@ class SideChannelExecutorJob(SideChannelJob):
 
                         elif cmd['command'] == 'put-blob':
                             requests = self._dispatch_put_blob(command_id, cmd)
+
+                        elif cmd['command'] == 'chmod':
+                            requests = self._dispatch_chmod(command_id, cmd)
 
                         else:
                             self.agentop.error = 'unknown command'

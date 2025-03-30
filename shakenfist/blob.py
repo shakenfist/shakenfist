@@ -166,6 +166,11 @@ class Blob(dbo):
         # If this is an external view, then mix back in attributes that users
         # expect
         out = self._external_view()
+
+        checksums = self.checksums
+        if 'nodes' in checksums:
+            del checksums['nodes']
+
         out.update({
             'size': self.size,
             'modified': self.modified,
@@ -173,8 +178,9 @@ class Blob(dbo):
             'depends_on': self.depends_on,
             'transcodes': self.transcoded,
             'reference_count': self.ref_count,
-            'sha512': self.checksums.get('sha512'),
-            'last_used': self.last_used
+            'sha512': checksums.get('sha512'),
+            'last_used': self.last_used,
+            'checksums': checksums
         })
 
         # Locations and their incomplete counterparts

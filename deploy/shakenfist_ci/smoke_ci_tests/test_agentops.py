@@ -137,3 +137,16 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self.assertTrue(
             '0' in aop['results'],
             f'Agent operation results lack expected result key "0": {aop}')
+
+        # Now ensure the data arrived correctly
+        aop = self.test_client.instance_execute(
+            inst1['uuid'], 'sha512sum /tmp/foo')
+        while aop['state'] != 'complete':
+            if time.time() - start_time > 30:
+                self.fail(f'Timeout for agentop: {aop}')
+            time.sleep(5)
+            aop = self.test_client.get_agent_operation(aop['uuid'])
+
+        remote_hash = aop['results']['0']['stdout'].rstrip()
+        b = self.test_client.get_blob(blob_uuid)
+        self.assertEqual(b['checksums']['sha512'], remote_hash)
