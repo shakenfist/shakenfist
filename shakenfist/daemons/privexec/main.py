@@ -26,7 +26,6 @@ EXIT = threading.Event()
 
 
 def exit_gracefully(sig, _frame):
-    global EXIT
     if sig == signal.SIGTERM:
         LOG.info('Received SIGTERM')
         EXIT.set()
@@ -51,8 +50,6 @@ class PrivExecJob:
         self.pid = None
 
     def _execute(self, request):
-        global IO_PRIORITIES
-
         command = request.command
         if request.network_namespace != '':
             command = f'ip netns exec {request.network_namespace} {command}'
@@ -148,10 +145,6 @@ def write_pid_file():
 
 
 def main():
-    global LOG
-    global SOCKET_PATH
-    global EXIT
-
     write_pid_file()
     setproctitle.setproctitle('sf-privexec')
 
