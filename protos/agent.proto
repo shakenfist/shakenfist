@@ -87,7 +87,7 @@ message FileChunkReply {
 
 message ChmodRequest {
     string path = 1;
-    int mode = 2;
+    int32 mode = 2;
 }
 
 message ChmodReply {

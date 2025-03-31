@@ -132,8 +132,8 @@ class ChmodRequest(_message.Message):
     PATH_FIELD_NUMBER: _ClassVar[int]
     MODE_FIELD_NUMBER: _ClassVar[int]
     path: str
-    mode: str
-    def __init__(self, path: _Optional[str] = ..., mode: _Optional[str] = ...) -> None: ...
+    mode: int
+    def __init__(self, path: _Optional[str] = ..., mode: _Optional[int] = ...) -> None: ...
 
 class ChmodReply(_message.Message):
     __slots__ = ("path",)

@@ -4,7 +4,6 @@
 # source: privexec.proto
 # Protobuf Python Version: 5.29.0
 """Generated protocol buffer code."""
-from shakenfist.protos import common_pb2 as common__pb2
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import runtime_version as _runtime_version
@@ -23,6 +22,7 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from shakenfist.protos import common_pb2 as common__pb2
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0eprivexec.proto\x12\x11shakenfist.protos\x1a\x0c\x63ommon.proto\"Z\n\x0fPrivExecRequest\x12<\n\x0f\x65xecute_request\x18\x01 \x01(\x0b\x32!.shakenfist.protos.ExecuteRequestH\x00\x42\t\n\x07request\"R\n\rPrivExecReply\x12\x38\n\rexecute_reply\x18\x01 \x01(\x0b\x32\x1f.shakenfist.protos.ExecuteReplyH\x00\x42\x07\n\x05replyb\x06proto3')

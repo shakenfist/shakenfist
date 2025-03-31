@@ -34,7 +34,7 @@ LOG, _ = logs.setup(__name__)
 
 # This is the minimum version of the in-guest agent that we support. This
 # generally gets bumped when the protocol changes.
-MINIMUM_AGENT_VERSION = '0.5.9'
+MINIMUM_AGENT_VERSION = '0.5.10'
 
 
 # Parameters for blob transfers
@@ -528,7 +528,7 @@ class SideChannelExecutorJob(SideChannelJob):
                                 out = self.chunk_iterator.__next__()
                             if out:
                                 self._send_commands_single_envelope(
-                                    vsock.sock, out, register_as_outstanding=True)
+                                    vsock.sock, [out], register_as_outstanding=True)
 
                         except StopIteration:
                             self.chunk_iterator = None
