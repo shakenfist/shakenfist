@@ -34,7 +34,7 @@ LOG, _ = logs.setup(__name__)
 
 # This is the minimum version of the in-guest agent that we support. This
 # generally gets bumped when the protocol changes.
-MINIMUM_AGENT_VERSION = '0.5.10'
+MINIMUM_AGENT_VERSION = '0.5.11'
 
 
 # Parameters for blob transfers
@@ -78,12 +78,15 @@ class SideChannelJob(util_concurrency.Job):
         sock.sendall(out.SerializeToString())
 
     def _handle_command_error(self, reply):
-        self.log.debug('...command error')
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).error('Received command error from agent')
         response = reply.command_error
         self.instance.add_event(
-            EVENT_TYPE_STATUS, 'command error',
+            EVENT_TYPE_STATUS, 'command error from agent',
             extra={
-                'error': response.error
+                'error': response.error,
+                'last_envelope': response.last_envelope.to_dict()
             })
 
     def execute(self):
@@ -452,7 +455,7 @@ class SideChannelExecutorJob(SideChannelJob):
                 command_id=command_id,
                 chmod_request=agent_pb2.ChmodRequest(
                     path=cmd['path'],
-                    mode=cmd['mode']
+                    mode=int(cmd['mode'])
                 )
             )
         ]

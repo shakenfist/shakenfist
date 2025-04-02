@@ -7,16 +7,6 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
-class CommandError(_message.Message):
-    __slots__ = ("error",)
-    ERROR_FIELD_NUMBER: _ClassVar[int]
-    error: str
-    def __init__(self, error: _Optional[str] = ...) -> None: ...
-
-class UnknownCommand(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
-
 class HypervisorWelcome(_message.Message):
     __slots__ = ("version",)
     VERSION_FIELD_NUMBER: _ClassVar[int]
@@ -168,6 +158,20 @@ class WatchFileRequest(_message.Message):
     PATH_FIELD_NUMBER: _ClassVar[int]
     path: str
     def __init__(self, path: _Optional[str] = ...) -> None: ...
+
+class CommandError(_message.Message):
+    __slots__ = ("error", "last_envelope")
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    LAST_ENVELOPE_FIELD_NUMBER: _ClassVar[int]
+    error: str
+    last_envelope: AgentRequestCommand
+    def __init__(self, error: _Optional[str] = ..., last_envelope: _Optional[_Union[AgentRequestCommand, _Mapping]] = ...) -> None: ...
+
+class UnknownCommand(_message.Message):
+    __slots__ = ("last_envelope",)
+    LAST_ENVELOPE_FIELD_NUMBER: _ClassVar[int]
+    last_envelope: AgentRequestCommand
+    def __init__(self, last_envelope: _Optional[_Union[AgentRequestCommand, _Mapping]] = ...) -> None: ...
 
 class AgentRequestCommand(_message.Message):
     __slots__ = ("command_id", "hypervisor_welcome", "hypervisor_departure", "command_error", "unknown_command", "ping_request", "execute_request", "is_system_running_request", "gather_facts_request", "put_file_request", "file_chunk", "chmod_request", "chown_request", "get_file_request", "watch_file_request")

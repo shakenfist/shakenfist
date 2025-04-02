@@ -3,14 +3,6 @@ syntax = "proto3";
 package shakenfist.protos;
 import "common.proto";
 
-// Protocol level errors
-message CommandError {
-    string error = 1;
-}
-
-message UnknownCommand {
-}
-
 // Agent state information sent to clients
 message HypervisorWelcome {
     string version = 1;
@@ -112,6 +104,17 @@ message WatchFileRequest {
     string path = 1;
 }
 
+// Protocol level errors
+message CommandError {
+    string error = 1;
+    AgentRequestCommand last_envelope = 2;
+}
+
+message UnknownCommand {
+    AgentRequestCommand last_envelope = 1;
+}
+
+// Envelopes
 message AgentRequestCommand {
     string command_id = 1;
 
