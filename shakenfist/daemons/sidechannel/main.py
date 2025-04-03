@@ -10,6 +10,7 @@ import time
 from google.protobuf.message import DecodeError
 from shakenfist_utilities import random as sf_random        # noreorder
 from shakenfist_utilities import logs                       # noreorder
+import symbolicmode
 
 from shakenfist import blob
 from shakenfist import constants
@@ -450,12 +451,39 @@ class SideChannelExecutorJob(SideChannelJob):
         self.log.with_fields({
             'outstanding_messages': self.outstanding_message_count
         }).debug('...chmod request')
+
+        mode = None
+        try:
+            mode = int(cmd['mode'])
+        except ValueError:
+            ...
+
+        if not mode:
+            try:
+                mode = symbolicmode.symbolic_to_numeric_permissions(
+                    cmd['mode'])
+            except Exception as e:
+                self.log.with_fields({
+                    'outstanding_messages': self.outstanding_message_count
+                }).debug(f'symbolic mode conversion failed: {e}')
+
+        if not mode:
+            add_event_multi(
+                EVENT_TYPE_AUDIT, self.affected_objects,
+                'failed to decode chmod mode argument',
+                extra=cmd)
+            self.log.with_fields({
+                'outstanding_messages': self.outstanding_message_count,
+                'command': cmd
+            }).error(f'Ignoring chmod command with undecoded mode argument')
+            return
+
         return [
             agent_pb2.AgentRequestCommand(
                 command_id=command_id,
                 chmod_request=agent_pb2.ChmodRequest(
                     path=cmd['path'],
-                    mode=int(cmd['mode'])
+                    mode=mode
                 )
             )
         ]
