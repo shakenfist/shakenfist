@@ -475,7 +475,7 @@ class SideChannelExecutorJob(SideChannelJob):
             self.log.with_fields({
                 'outstanding_messages': self.outstanding_message_count,
                 'command': cmd
-            }).error(f'Ignoring chmod command with undecoded mode argument')
+            }).error('Ignoring chmod command with undecoded mode argument')
             return
 
         return [

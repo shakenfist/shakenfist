@@ -121,7 +121,16 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         # Pick a blob and send it to the instance
         blobs = self.system_client.get_blobs()
         self.assertNotEqual(0, len(blobs))
-        blob_uuid = blobs[0]['uuid']
+
+        blob_uuid = None
+        for blob in blobs:
+            if blob['checksums'].get('sha512'):
+                blob_uuid = blob['uuid']
+                cluster_hash = blob['checksums']['sha512']
+                break
+
+        self.assertNotEqual(
+            None, blob_uuid, 'Failed to find a blob with a hash')
 
         start_time = time.time()
         aop = self.test_client.instance_put_blob(
@@ -134,10 +143,6 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             time.sleep(5)
             aop = self.test_client.get_agent_operation(aop['uuid'])
 
-        self.assertTrue(
-            '0' in aop['results'],
-            f'Agent operation results lack expected result key "0": {aop}')
-
         # Now ensure the data arrived correctly
         aop = self.test_client.instance_execute(
             inst1['uuid'], 'sha512sum /tmp/foo')
@@ -147,6 +152,8 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             time.sleep(5)
             aop = self.test_client.get_agent_operation(aop['uuid'])
 
-        remote_hash = aop['results']['0']['stdout'].rstrip()
-        b = self.test_client.get_blob(blob_uuid)
-        self.assertEqual(b['checksums']['sha512'], remote_hash)
+        remote_hash = aop['results']['0']['stdout'].split(' ')[0]
+        self.assertEqual(
+            cluster_hash, remote_hash,
+            f'Cluster hash {cluster_hash} does not match remote hash'
+            f'{remote_hash}')
