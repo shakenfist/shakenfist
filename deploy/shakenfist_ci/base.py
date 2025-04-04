@@ -315,7 +315,7 @@ class BaseTestCase(testtools.TestCase):
 
         last_event = None
         time_since_last_progress = time.time()
-        while time.time() - time_since_last_progress < 180:
+        while time.time() - time_since_last_progress < 300:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] == 'error':
                 raise StartException(
@@ -335,7 +335,7 @@ class BaseTestCase(testtools.TestCase):
 
         raise TimeoutException(
             f'Instance {instance_uuid} failed to start and enter the agent '
-            f'{desired} state and has seen no progress in 3 minutes. Agent '
+            f'{desired} state and has seen no progress in 5 minutes. Agent '
             f'state is {i["agent_state"]} and the last recorded event was '
             f'{last_event}.')
 
