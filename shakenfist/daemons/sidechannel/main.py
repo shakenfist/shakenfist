@@ -856,12 +856,12 @@ class Monitor(daemon.Daemon):
         LOG.info('Stopping')
 
         while self.monitors:
-            LOG.info('There are {len(self.monitors)} threads remaining')
+            LOG.info(f'There are {len(self.monitors)} threads remaining')
             self._request_all_threads_exit()
             if self.monitors:
                 time.sleep(5)
 
-        LOG.info('There are {len(self.monitors)} threads remaining')
+        LOG.info(f'There are {len(self.monitors)} threads remaining')
         LOG.info('Stopped')
 
 
