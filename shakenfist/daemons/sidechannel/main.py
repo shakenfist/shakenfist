@@ -424,11 +424,13 @@ class SideChannelExecutorJob(SideChannelJob):
 
     def _dispatch_put_blob(self, command_id, cmd):
         if 'blob_uuid' not in cmd:
+            self.agentop.state = AgentOperation.STATE_ERROR
             self.agentop.error = 'missing blob uuid'
             return []
 
         b = blob.Blob.from_db(cmd['blob_uuid'])
         if not b:
+            self.agentop.state = AgentOperation.STATE_ERROR
             self.agentop.error = 'missing blob'
             return []
 
@@ -622,6 +624,7 @@ class SideChannelExecutorJob(SideChannelJob):
                             requests = self._dispatch_chmod(command_id, cmd)
 
                         else:
+                            self.agentop.state = AgentOperation.STATE_ERROR
                             self.agentop.error = 'unknown command'
 
                         if requests:
@@ -646,6 +649,7 @@ class SideChannelExecutorJob(SideChannelJob):
                             add_event_multi(
                                 EVENT_TYPE_STATUS, self.affected_objects,
                                 'unknown command', extra=cmd)
+                            self.agentop.state = AgentOperation.STATE_ERROR
                             self.agentop.error = 'unknown command'
                             self.commands = []
 

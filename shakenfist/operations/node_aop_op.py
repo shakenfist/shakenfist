@@ -112,9 +112,9 @@ class NodeAgentopOp(BaseClusterOperation):
             if command['command'] == 'put-blob':
                 b = Blob.from_db(command['blob_uuid'])
                 if not b:
+                    self.state = NodeAgentopOp.STATE_ERROR
                     aop.error = ('preflight failure, blob missing: '
                                  f'{command["blob_uuid"]}')
-                    self.state = NodeAgentopOp.STATE_ERROR
                     return
                 b.ensure_local([])
 
