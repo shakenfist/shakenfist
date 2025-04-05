@@ -17,7 +17,6 @@ ABORT_PATH = '/run/sf/sentinel-last.abort'
 
 
 def exit_gracefully(sig, _frame):
-    global EXIT
     if sig == signal.SIGTERM:
         LOG.info('Received SIGTERM')
         daemon.set_abort_path(ABORT_PATH, 'from sentinel last exit_gracefully')
