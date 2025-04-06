@@ -1794,17 +1794,8 @@ class Instance(dbo):
         with util_libvirt.LibvirtConnection() as lc:
             lc.get_screenshot(self.uuid, dest_path + '.partial')
 
-        # We don't remove the partial file until we've finished registering the blob
-        # to avoid deletion races. Note that this _must_ be a hard link, which is why
-        # we don't use util_general.link().
-        st = os.stat(dest_path + '.partial')
-        os.link(dest_path + '.partial', dest_path)
         b = blob.Blob.new(blob_uuid, time.time(), time.time())
-        b.size = st.st_size
-        b.state = blob.Blob.STATE_CREATED
-        b.observe()
-        b.request_replication()
-        os.unlink(dest_path + '.partial')
+        b.register()
 
         self.add_event(EVENT_TYPE_AUDIT, 'acquired screenshot of instance console',
                        extra={'blob': blob_uuid})

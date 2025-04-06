@@ -751,6 +751,22 @@ class Blob(dbo):
                     self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
 
+    def register(self):
+        # We don't remove the partial file until we've finished registering the
+        # blob to avoid deletion races. Note that this _must_ be a hard link,
+        # which is why we don't use util_general.link().
+        dest_path = self.filepath(self.uuid)
+        os.link(dest_path + '.partial', dest_path)
+
+        if not self._db_get_attribute('size', None):
+            st = os.stat(dest_path + '.partial')
+            self.size = st.st_size
+
+        self.state = self.STATE_CREATED
+        self.observe()
+        self.request_replication()
+        os.unlink(dest_path + '.partial')
+
     @staticmethod
     def filedir(blob_uuid):
         path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid[0:2])
@@ -892,18 +908,10 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     # And make the associated blob. Note that we deliberately don't calculate the
     # snapshot checksum here, as this makes large snapshots even slower for users.
     # The checksum will "catch up" when the scheduled verification occurs.
-    # We don't remove the partial file until we've finished registering the blob
-    # to avoid deletion races. Note that this _must_ be a hard link, which is why
-    # we don't use util_general.link().
-    os.link(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, time.time(), time.time(), depends_on=depends_on)
-    b.size = st.st_size
-    b.state = Blob.STATE_CREATED
     if dep_blob:
         dep_blob.ref_count_inc(b)
-    b.observe()
-    b.request_replication()
-    os.unlink(dest_path + '.partial')
+    b.register()
     return b
 
 
@@ -963,12 +971,9 @@ def http_fetch(url, resp, b, locks, affected_objects):
         })
 
     # Import the newly fetched blob
-    os.rename(dest_path + '.partial', dest_path)
     b.size = fetched
-    b.state = Blob.STATE_CREATED
     b.verify_checksum(hash=sha512_hash.hexdigest())
-    b.observe()
-    b.request_replication()
+    b.register()
     return b
 
 

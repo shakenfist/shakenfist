@@ -6,6 +6,7 @@ import os
 import socket
 import threading
 import time
+from uuid import uuid4
 
 from google.protobuf.message import DecodeError
 from shakenfist_utilities import random as sf_random        # noreorder
@@ -48,6 +49,10 @@ class ConnectionFailed(Exception):
 
 
 class PutException(Exception):
+    ...
+
+
+class GetException(Exception):
     ...
 
 
@@ -490,6 +495,73 @@ class SideChannelExecutorJob(SideChannelJob):
             )
         ]
 
+    def _dispatch_get_file(self, command_id, cmd):
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...get file request')
+
+        self._agent_path_for_get = cmd['path']
+        self._blob_uuid = str(uuid4())
+        self._blob_partial_file = open(
+            blob.Blob.filepath(self._blob_uuid) + '.partial', 'wb')
+
+        return [
+            agent_pb2.AgentRequestCommand(
+                command_id=command_id,
+                chmod_request=agent_pb2.GetFileRequest(
+                    path=cmd['path']
+                )
+            )
+        ]
+
+    def _handle_file_chunk(self, command_id, path, reply):
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...file chunk')
+
+        if not self._blob_partial_file:
+            self.log.with_fields({
+                'outstanding_messages': self.outstanding_message_count
+            }).error('Unknown file transfer')
+            raise GetException('Unknown file transfer')
+
+        chunk = reply.file_chunk
+        if chunk.encoding != agent_pb2.FileChunk.BASE64:
+            self._send_commands_single_envelope(
+                [
+                    agent_pb2.AgentReplyCommand(
+                        command_id=reply.command_id,
+                        command_error=agent_pb2.CommandError(
+                            error='unknown payload encoding')
+                    )
+                ]
+            )
+            raise GetException('Unknown chunk encoding')
+
+        if chunk.payload:
+            d = base64.b64decode(chunk.payload)
+            self._blob_partial_file.write(d)
+        else:
+            b = blob.Blob.new(self._blob_uuid, time.time(), time.time())
+            b.register()
+
+            self._blob_partial_file.close()
+            self._blob_partial_file = None
+            self._blob_uuid = None
+            self._agent_path_for_get = None
+
+        self._send_commands_single_envelope(
+            [
+                agent_pb2.AgentReplyCommand(
+                    command_id=command_id,
+                    file_chunk_reply=agent_pb2.FileChunkReply(
+                        path=self._agent_path_for_get,
+                        offset=chunk.offset
+                    )
+                )
+            ]
+        )
+
     def _execute_inner(self, vsock):
         self._send_commands_single_envelope(
             vsock.sock,
@@ -579,6 +651,14 @@ class SideChannelExecutorJob(SideChannelJob):
                         }).debug('...chmod reply')
                         self.ready = True
 
+                    elif reply.HasField('file_chunk'):
+                        try:
+                            self._handle_file_chunk(envelope.command_id, reply)
+
+                        except GetException as e:
+                            self.agentop.state = AgentOperation.STATE_ERROR
+                            self.agentop.error = str(e)
+
                     elif reply.HasField('command_error'):
                         self._handle_command_error(reply)
 
@@ -623,7 +703,13 @@ class SideChannelExecutorJob(SideChannelJob):
                         elif cmd['command'] == 'chmod':
                             requests = self._dispatch_chmod(command_id, cmd)
 
+                        elif cmd['command'] == 'get-file':
+                            requests = self._dispatch_get_file(command_id, cmd)
+
                         else:
+                            add_event_multi(
+                                EVENT_TYPE_STATUS, self.affected_objects,
+                                'unknown command', extra=cmd)
                             self.agentop.state = AgentOperation.STATE_ERROR
                             self.agentop.error = 'unknown command'
 
@@ -646,11 +732,6 @@ class SideChannelExecutorJob(SideChannelJob):
 
                     finally:
                         if self.agentop.state.value == AgentOperation.STATE_ERROR:
-                            add_event_multi(
-                                EVENT_TYPE_STATUS, self.affected_objects,
-                                'unknown command', extra=cmd)
-                            self.agentop.state = AgentOperation.STATE_ERROR
-                            self.agentop.error = 'unknown command'
                             self.commands = []
 
             except socket.timeout:
