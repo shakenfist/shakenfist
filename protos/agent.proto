@@ -16,9 +16,6 @@ message AgentWelcome {
 message HypervisorDeparture {
 }
 
-message AgentDeparture {
-}
-
 // Things clients can ask the agent to do
 message PingRequest {
 }
@@ -67,7 +64,7 @@ message FileChunk {
 
 message PutFileRequest {
     string path = 1;
-    string mode = 2;
+    int32 mode = 2;
     int64 length = 3;
     FileChunk first_chunk = 4;
 }
@@ -100,18 +97,25 @@ message GetFileRequest {
     string path = 1;
 }
 
-message WatchFileRequest {
+message StatResult {
     string path = 1;
+    int64 mode = 2;
+    int64 size = 3;
+    int64 uid = 4;
+    int64 gid = 5;
+    double atime = 6;
+    double mtime = 7;
+    double ctime = 8;
 }
 
 // Protocol level errors
 message CommandError {
     string error = 1;
-    AgentRequestCommand last_envelope = 2;
+    AgentRequest last_envelope = 2;
 }
 
 message UnknownCommand {
-    AgentRequestCommand last_envelope = 1;
+    AgentRequest last_envelope = 1;
 }
 
 // Envelopes
@@ -135,7 +139,6 @@ message AgentRequestCommand {
         ChmodRequest chmod_request = 45;
         ChownRequest chown_request = 46;
         GetFileRequest get_file_request = 47;
-        WatchFileRequest watch_file_request = 48;
     }
 }
 
@@ -148,7 +151,6 @@ message AgentReplyCommand {
 
     oneof reply {
         AgentWelcome agent_welcome = 10;
-        AgentDeparture agent_departure = 11;
 
         CommandError command_error = 20;
         UnknownCommand unknown_command = 21;
@@ -162,6 +164,7 @@ message AgentReplyCommand {
         ChmodReply chmod_reply = 44;
         ChownReply chown_reply = 45;
         FileChunk file_chunk = 46;
+        StatResult stat_result = 47;
     }
 }
 

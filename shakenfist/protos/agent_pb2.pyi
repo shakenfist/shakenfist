@@ -25,10 +25,6 @@ class HypervisorDeparture(_message.Message):
     __slots__ = ()
     def __init__(self) -> None: ...
 
-class AgentDeparture(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
-
 class PingRequest(_message.Message):
     __slots__ = ()
     def __init__(self) -> None: ...
@@ -104,10 +100,10 @@ class PutFileRequest(_message.Message):
     LENGTH_FIELD_NUMBER: _ClassVar[int]
     FIRST_CHUNK_FIELD_NUMBER: _ClassVar[int]
     path: str
-    mode: str
+    mode: int
     length: int
     first_chunk: FileChunk
-    def __init__(self, path: _Optional[str] = ..., mode: _Optional[str] = ..., length: _Optional[int] = ..., first_chunk: _Optional[_Union[FileChunk, _Mapping]] = ...) -> None: ...
+    def __init__(self, path: _Optional[str] = ..., mode: _Optional[int] = ..., length: _Optional[int] = ..., first_chunk: _Optional[_Union[FileChunk, _Mapping]] = ...) -> None: ...
 
 class FileChunkReply(_message.Message):
     __slots__ = ("path", "offset")
@@ -153,28 +149,42 @@ class GetFileRequest(_message.Message):
     path: str
     def __init__(self, path: _Optional[str] = ...) -> None: ...
 
-class WatchFileRequest(_message.Message):
-    __slots__ = ("path",)
+class StatResult(_message.Message):
+    __slots__ = ("path", "mode", "size", "uid", "gid", "atime", "mtime", "ctime")
     PATH_FIELD_NUMBER: _ClassVar[int]
+    MODE_FIELD_NUMBER: _ClassVar[int]
+    SIZE_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
+    GID_FIELD_NUMBER: _ClassVar[int]
+    ATIME_FIELD_NUMBER: _ClassVar[int]
+    MTIME_FIELD_NUMBER: _ClassVar[int]
+    CTIME_FIELD_NUMBER: _ClassVar[int]
     path: str
-    def __init__(self, path: _Optional[str] = ...) -> None: ...
+    mode: int
+    size: int
+    uid: int
+    gid: int
+    atime: float
+    mtime: float
+    ctime: float
+    def __init__(self, path: _Optional[str] = ..., mode: _Optional[int] = ..., size: _Optional[int] = ..., uid: _Optional[int] = ..., gid: _Optional[int] = ..., atime: _Optional[float] = ..., mtime: _Optional[float] = ..., ctime: _Optional[float] = ...) -> None: ...
 
 class CommandError(_message.Message):
     __slots__ = ("error", "last_envelope")
     ERROR_FIELD_NUMBER: _ClassVar[int]
     LAST_ENVELOPE_FIELD_NUMBER: _ClassVar[int]
     error: str
-    last_envelope: AgentRequestCommand
-    def __init__(self, error: _Optional[str] = ..., last_envelope: _Optional[_Union[AgentRequestCommand, _Mapping]] = ...) -> None: ...
+    last_envelope: AgentRequest
+    def __init__(self, error: _Optional[str] = ..., last_envelope: _Optional[_Union[AgentRequest, _Mapping]] = ...) -> None: ...
 
 class UnknownCommand(_message.Message):
     __slots__ = ("last_envelope",)
     LAST_ENVELOPE_FIELD_NUMBER: _ClassVar[int]
-    last_envelope: AgentRequestCommand
-    def __init__(self, last_envelope: _Optional[_Union[AgentRequestCommand, _Mapping]] = ...) -> None: ...
+    last_envelope: AgentRequest
+    def __init__(self, last_envelope: _Optional[_Union[AgentRequest, _Mapping]] = ...) -> None: ...
 
 class AgentRequestCommand(_message.Message):
-    __slots__ = ("command_id", "hypervisor_welcome", "hypervisor_departure", "command_error", "unknown_command", "ping_request", "execute_request", "is_system_running_request", "gather_facts_request", "put_file_request", "file_chunk", "chmod_request", "chown_request", "get_file_request", "watch_file_request")
+    __slots__ = ("command_id", "hypervisor_welcome", "hypervisor_departure", "command_error", "unknown_command", "ping_request", "execute_request", "is_system_running_request", "gather_facts_request", "put_file_request", "file_chunk", "chmod_request", "chown_request", "get_file_request")
     COMMAND_ID_FIELD_NUMBER: _ClassVar[int]
     HYPERVISOR_WELCOME_FIELD_NUMBER: _ClassVar[int]
     HYPERVISOR_DEPARTURE_FIELD_NUMBER: _ClassVar[int]
@@ -189,7 +199,6 @@ class AgentRequestCommand(_message.Message):
     CHMOD_REQUEST_FIELD_NUMBER: _ClassVar[int]
     CHOWN_REQUEST_FIELD_NUMBER: _ClassVar[int]
     GET_FILE_REQUEST_FIELD_NUMBER: _ClassVar[int]
-    WATCH_FILE_REQUEST_FIELD_NUMBER: _ClassVar[int]
     command_id: str
     hypervisor_welcome: HypervisorWelcome
     hypervisor_departure: HypervisorDeparture
@@ -204,8 +213,7 @@ class AgentRequestCommand(_message.Message):
     chmod_request: ChmodRequest
     chown_request: ChownRequest
     get_file_request: GetFileRequest
-    watch_file_request: WatchFileRequest
-    def __init__(self, command_id: _Optional[str] = ..., hypervisor_welcome: _Optional[_Union[HypervisorWelcome, _Mapping]] = ..., hypervisor_departure: _Optional[_Union[HypervisorDeparture, _Mapping]] = ..., command_error: _Optional[_Union[CommandError, _Mapping]] = ..., unknown_command: _Optional[_Union[UnknownCommand, _Mapping]] = ..., ping_request: _Optional[_Union[PingRequest, _Mapping]] = ..., execute_request: _Optional[_Union[_common_pb2.ExecuteRequest, _Mapping]] = ..., is_system_running_request: _Optional[_Union[IsSystemRunningRequest, _Mapping]] = ..., gather_facts_request: _Optional[_Union[GatherFactsRequest, _Mapping]] = ..., put_file_request: _Optional[_Union[PutFileRequest, _Mapping]] = ..., file_chunk: _Optional[_Union[FileChunk, _Mapping]] = ..., chmod_request: _Optional[_Union[ChmodRequest, _Mapping]] = ..., chown_request: _Optional[_Union[ChownRequest, _Mapping]] = ..., get_file_request: _Optional[_Union[GetFileRequest, _Mapping]] = ..., watch_file_request: _Optional[_Union[WatchFileRequest, _Mapping]] = ...) -> None: ...
+    def __init__(self, command_id: _Optional[str] = ..., hypervisor_welcome: _Optional[_Union[HypervisorWelcome, _Mapping]] = ..., hypervisor_departure: _Optional[_Union[HypervisorDeparture, _Mapping]] = ..., command_error: _Optional[_Union[CommandError, _Mapping]] = ..., unknown_command: _Optional[_Union[UnknownCommand, _Mapping]] = ..., ping_request: _Optional[_Union[PingRequest, _Mapping]] = ..., execute_request: _Optional[_Union[_common_pb2.ExecuteRequest, _Mapping]] = ..., is_system_running_request: _Optional[_Union[IsSystemRunningRequest, _Mapping]] = ..., gather_facts_request: _Optional[_Union[GatherFactsRequest, _Mapping]] = ..., put_file_request: _Optional[_Union[PutFileRequest, _Mapping]] = ..., file_chunk: _Optional[_Union[FileChunk, _Mapping]] = ..., chmod_request: _Optional[_Union[ChmodRequest, _Mapping]] = ..., chown_request: _Optional[_Union[ChownRequest, _Mapping]] = ..., get_file_request: _Optional[_Union[GetFileRequest, _Mapping]] = ...) -> None: ...
 
 class AgentRequest(_message.Message):
     __slots__ = ("commands",)
@@ -214,10 +222,9 @@ class AgentRequest(_message.Message):
     def __init__(self, commands: _Optional[_Iterable[_Union[AgentRequestCommand, _Mapping]]] = ...) -> None: ...
 
 class AgentReplyCommand(_message.Message):
-    __slots__ = ("command_id", "agent_welcome", "agent_departure", "command_error", "unknown_command", "ping_reply", "execute_reply", "is_system_running_reply", "gather_facts_reply", "file_chunk_reply", "chmod_reply", "chown_reply", "file_chunk")
+    __slots__ = ("command_id", "agent_welcome", "command_error", "unknown_command", "ping_reply", "execute_reply", "is_system_running_reply", "gather_facts_reply", "file_chunk_reply", "chmod_reply", "chown_reply", "file_chunk", "stat_result")
     COMMAND_ID_FIELD_NUMBER: _ClassVar[int]
     AGENT_WELCOME_FIELD_NUMBER: _ClassVar[int]
-    AGENT_DEPARTURE_FIELD_NUMBER: _ClassVar[int]
     COMMAND_ERROR_FIELD_NUMBER: _ClassVar[int]
     UNKNOWN_COMMAND_FIELD_NUMBER: _ClassVar[int]
     PING_REPLY_FIELD_NUMBER: _ClassVar[int]
@@ -228,9 +235,9 @@ class AgentReplyCommand(_message.Message):
     CHMOD_REPLY_FIELD_NUMBER: _ClassVar[int]
     CHOWN_REPLY_FIELD_NUMBER: _ClassVar[int]
     FILE_CHUNK_FIELD_NUMBER: _ClassVar[int]
+    STAT_RESULT_FIELD_NUMBER: _ClassVar[int]
     command_id: str
     agent_welcome: AgentWelcome
-    agent_departure: AgentDeparture
     command_error: CommandError
     unknown_command: UnknownCommand
     ping_reply: PingReply
@@ -241,7 +248,8 @@ class AgentReplyCommand(_message.Message):
     chmod_reply: ChmodReply
     chown_reply: ChownReply
     file_chunk: FileChunk
-    def __init__(self, command_id: _Optional[str] = ..., agent_welcome: _Optional[_Union[AgentWelcome, _Mapping]] = ..., agent_departure: _Optional[_Union[AgentDeparture, _Mapping]] = ..., command_error: _Optional[_Union[CommandError, _Mapping]] = ..., unknown_command: _Optional[_Union[UnknownCommand, _Mapping]] = ..., ping_reply: _Optional[_Union[PingReply, _Mapping]] = ..., execute_reply: _Optional[_Union[_common_pb2.ExecuteReply, _Mapping]] = ..., is_system_running_reply: _Optional[_Union[IsSystemRunningReply, _Mapping]] = ..., gather_facts_reply: _Optional[_Union[GatherFactsReply, _Mapping]] = ..., file_chunk_reply: _Optional[_Union[FileChunkReply, _Mapping]] = ..., chmod_reply: _Optional[_Union[ChmodReply, _Mapping]] = ..., chown_reply: _Optional[_Union[ChownReply, _Mapping]] = ..., file_chunk: _Optional[_Union[FileChunk, _Mapping]] = ...) -> None: ...
+    stat_result: StatResult
+    def __init__(self, command_id: _Optional[str] = ..., agent_welcome: _Optional[_Union[AgentWelcome, _Mapping]] = ..., command_error: _Optional[_Union[CommandError, _Mapping]] = ..., unknown_command: _Optional[_Union[UnknownCommand, _Mapping]] = ..., ping_reply: _Optional[_Union[PingReply, _Mapping]] = ..., execute_reply: _Optional[_Union[_common_pb2.ExecuteReply, _Mapping]] = ..., is_system_running_reply: _Optional[_Union[IsSystemRunningReply, _Mapping]] = ..., gather_facts_reply: _Optional[_Union[GatherFactsReply, _Mapping]] = ..., file_chunk_reply: _Optional[_Union[FileChunkReply, _Mapping]] = ..., chmod_reply: _Optional[_Union[ChmodReply, _Mapping]] = ..., chown_reply: _Optional[_Union[ChownReply, _Mapping]] = ..., file_chunk: _Optional[_Union[FileChunk, _Mapping]] = ..., stat_result: _Optional[_Union[StatResult, _Mapping]] = ...) -> None: ...
 
 class AgentReply(_message.Message):
     __slots__ = ("commands",)

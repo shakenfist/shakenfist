@@ -894,7 +894,6 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     with util_general.RecordedOperation('snapshot %s' % disk['device'], related_object):
         depends_on = util_image.snapshot(
             None, disk['path'], dest_path + '.partial', thin=thin)
-        st = os.stat(dest_path + '.partial')
 
     # Check that the dependency (if any) actually exists. This test can fail when
     # the blob used to start an instance has been deleted already.

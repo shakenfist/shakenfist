@@ -4,6 +4,10 @@ v2 of the Shaken Fist agent protocol is serialized protobufs sent down
 virtio-vsock channels to the in-guest agent. This page documents the expected
 flow of messages between the hypervisor and this in-guest agent.
 
+There is some attempt to enforce these particular flows via unit testing in the
+agent code base at `shakenfist_agent.tests.daemom.DaemonAgentV2TestCase`, but
+the reality is there might be drift over time.
+
 ## Initial connection to the agent
 
 The sidechannel daemon process on the hypervisor wants to maintain an open

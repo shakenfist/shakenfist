@@ -83,6 +83,12 @@ class SideChannelJob(util_concurrency.Job):
                 }).debug('...increment outstanding commands')
         sock.sendall(out.SerializeToString())
 
+    def _send_replies_single_envelope(self, sock, replies):
+        out = agent_pb2.AgentReply()
+        for cmd in replies:
+            out.commands.append(cmd)
+        sock.sendall(out.SerializeToString())
+
     def _handle_command_error(self, reply):
         self.log.with_fields({
             'outstanding_messages': self.outstanding_message_count
@@ -504,17 +510,40 @@ class SideChannelExecutorJob(SideChannelJob):
         self._blob_uuid = str(uuid4())
         self._blob_partial_file = open(
             blob.Blob.filepath(self._blob_uuid) + '.partial', 'wb')
+        self._stat_result = None
 
         return [
             agent_pb2.AgentRequestCommand(
                 command_id=command_id,
-                chmod_request=agent_pb2.GetFileRequest(
+                get_file_request=agent_pb2.GetFileRequest(
                     path=cmd['path']
                 )
             )
         ]
 
-    def _handle_file_chunk(self, command_id, path, reply):
+    def _handle_stat_result(self, reply):
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...stat result')
+
+        if not self._blob_partial_file:
+            self.log.with_fields({
+                'outstanding_messages': self.outstanding_message_count
+            }).error('Unknown file transfer')
+            raise GetException('Unknown file transfer')
+
+        sr = reply.stat_result
+        self._stat_result = {
+            'mode': sr.mode,
+            'size': sr.size,
+            'uid': sr.uid,
+            'gid': sr.gid,
+            'atime': sr.atime,
+            'mtime': sr.mtime,
+            'ctime': sr.ctime
+        }
+
+    def _handle_file_chunk(self, sock, reply):
         self.log.with_fields({
             'outstanding_messages': self.outstanding_message_count
         }).debug('...file chunk')
@@ -527,7 +556,8 @@ class SideChannelExecutorJob(SideChannelJob):
 
         chunk = reply.file_chunk
         if chunk.encoding != agent_pb2.FileChunk.BASE64:
-            self._send_commands_single_envelope(
+            self._send_replies_single_envelope(
+                sock,
                 [
                     agent_pb2.AgentReplyCommand(
                         command_id=reply.command_id,
@@ -541,19 +571,49 @@ class SideChannelExecutorJob(SideChannelJob):
         if chunk.payload:
             d = base64.b64decode(chunk.payload)
             self._blob_partial_file.write(d)
+            self.log.debug(f'... wrote {len(d)} bytes to partial blob')
         else:
-            b = blob.Blob.new(self._blob_uuid, time.time(), time.time())
-            b.register()
-
             self._blob_partial_file.close()
+
+            if chunk.offset == 0:
+                os.unlink(blob.Blob.filepath(self._blob_uuid) + '.partial')
+                result = {
+                    'stat_result': self._stat_result
+                }
+
+            else:
+                b = blob.Blob.new(self._blob_uuid, time.time(), time.time())
+                ao = copy.copy(self.affected_objects)
+                ao.append(b)
+                eventlog.add_event_multi(
+                    EVENT_TYPE_STATUS, ao, 'fetched content from instance',
+                    extra={
+                        'remote_stat_result': self._stat_result,
+                        'transferred': chunk.offset,
+                        'content_blob': b.uuid,
+                        'instance_uuid': self.instance.uuid
+                    })
+                b.register()
+
+                result = {
+                    'stat_result': self._stat_result,
+                    'content_blob': b.uuid
+                }
+
+            self.agentop.add_result(self.command_count, result)
+            self.num_results += 1
+            self.command_count += 1
+
             self._blob_partial_file = None
             self._blob_uuid = None
+            self._stat_result = None
             self._agent_path_for_get = None
 
-        self._send_commands_single_envelope(
+        self._send_replies_single_envelope(
+            sock,
             [
                 agent_pb2.AgentReplyCommand(
-                    command_id=command_id,
+                    command_id=reply.command_id,
                     file_chunk_reply=agent_pb2.FileChunkReply(
                         path=self._agent_path_for_get,
                         offset=chunk.offset
@@ -651,9 +711,12 @@ class SideChannelExecutorJob(SideChannelJob):
                         }).debug('...chmod reply')
                         self.ready = True
 
+                    elif reply.HasField('stat_result'):
+                        self._handle_stat_result(reply)
+
                     elif reply.HasField('file_chunk'):
                         try:
-                            self._handle_file_chunk(envelope.command_id, reply)
+                            self._handle_file_chunk(vsock.sock, reply)
 
                         except GetException as e:
                             self.agentop.state = AgentOperation.STATE_ERROR

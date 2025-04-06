@@ -16,7 +16,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self._await_networks_ready([self.net_one['uuid']])
 
     def test_instance_execute_small(self):
-        inst1 = self.test_client.create_instance(
+        inst = self.test_client.create_instance(
             'test-instance-execute-small', 1, 1024,
             [
                 {
@@ -32,14 +32,16 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             ], None, None)
 
         # Wait for the instance agent to report in
-        self._await_instance_ready(inst1['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         # Execute a command
         start_time = time.time()
-        aop = self.test_client.instance_execute(inst1['uuid'], 'whoami')
+        aop = self.test_client.instance_execute(inst['uuid'], 'whoami')
         while aop['state'] != 'complete':
             if time.time() - start_time > 30:
-                self.fail(f'Timeout for agentop: {aop}')
+                console_data = self.test_client.get_console_data(inst['uuid'])
+                self.fail(
+                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
             time.sleep(5)
             aop = self.test_client.get_agent_operation(aop['uuid'])
 
@@ -55,7 +57,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             f'"root\\n": {aop}')
 
     def test_instance_execute_large(self):
-        inst1 = self.test_client.create_instance(
+        inst = self.test_client.create_instance(
             'test-instance-execute-large', 1, 1024,
             [
                 {
@@ -71,17 +73,19 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             ], None, None)
 
         # Wait for the instance agent to report in
-        self._await_instance_ready(inst1['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         # Execute a command
         start_time = time.time()
         aop = self.test_client.instance_execute(
-            inst1['uuid'], 'cat /var/log/syslog')
+            inst['uuid'], 'cat /var/log/syslog')
 
         # Wait for the operation to complete
         while aop['state'] != 'complete':
             if time.time() - start_time > 30:
-                self.fail(f'Timeout for agentop: {aop}')
+                console_data = self.test_client.get_console_data(inst['uuid'])
+                self.fail(
+                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
             time.sleep(5)
             aop = self.test_client.get_agent_operation(aop['uuid'])
 
@@ -99,8 +103,8 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         b = self.test_client.get_blob(aop['results']['0']['stdout_blob'])
         self.assertNotEqual(None, b)
 
-    def test_instance_put_blob(self):
-        inst1 = self.test_client.create_instance(
+    def test_instance_put_and_get_blob(self):
+        inst = self.test_client.create_instance(
             'test-instance-put-blob', 1, 1024,
             [
                 {
@@ -116,7 +120,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             ], None, None)
 
         # Wait for the instance agent to report in
-        self._await_instance_ready(inst1['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         # Pick a blob and send it to the instance
         blobs = self.system_client.get_blobs()
@@ -134,21 +138,25 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
 
         start_time = time.time()
         aop = self.test_client.instance_put_blob(
-            inst1['uuid'], blob_uuid, '/tmp/foo', 'ugo+r')
+            inst['uuid'], blob_uuid, '/tmp/foo', 'ugo+r')
 
         # Wait for the operation to complete
         while aop['state'] != 'complete':
             if time.time() - start_time > 30:
-                self.fail(f'Timeout for agentop: {aop}')
+                console_data = self.test_client.get_console_data(inst['uuid'])
+                self.fail(
+                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
             time.sleep(5)
             aop = self.test_client.get_agent_operation(aop['uuid'])
 
         # Now ensure the data arrived correctly
         aop = self.test_client.instance_execute(
-            inst1['uuid'], 'sha512sum /tmp/foo')
+            inst['uuid'], 'sha512sum /tmp/foo')
         while aop['state'] != 'complete':
             if time.time() - start_time > 30:
-                self.fail(f'Timeout for agentop: {aop}')
+                console_data = self.test_client.get_console_data(inst['uuid'])
+                self.fail(
+                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
             time.sleep(5)
             aop = self.test_client.get_agent_operation(aop['uuid'])
 
@@ -157,3 +165,29 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             cluster_hash, remote_hash,
             f'Cluster hash {cluster_hash} does not match remote hash'
             f'{remote_hash}')
+
+        # Now fetch the data back
+        aop = self.test_client.instance_get(inst['uuid'], '/tmp/foo')
+
+        # Wait for the operation to complete
+        while aop['state'] != 'complete':
+            if time.time() - start_time > 30:
+                console_data = self.test_client.get_console_data(inst['uuid'])
+                self.fail(
+                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
+            time.sleep(5)
+            aop = self.test_client.get_agent_operation(aop['uuid'])
+
+        self.assertTrue(
+            '0' in aop['results'],
+            f'Agent operation results lack expected result key "0": {aop}')
+        self.assertTrue(
+            'stat_result' in aop['results']['0'],
+            f'Agent operation results lacks stat results: {aop}')
+        self.assertTrue(
+            'content_blob' in aop['results']['0'],
+            f'Agent operation results lacks stat results: {aop}')
+
+        b = self.test_client.get_blob(aop['results']['0']['content_blob'])
+        self.assertNotEqual(None, b)
+        self.assertEqual(cluster_hash, b['checksums']['sha512'])
