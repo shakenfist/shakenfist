@@ -97,3 +97,4 @@ verboselogs==1.7
 zipp==3.21.0
 zope.event==5.0
 zope.interface==7.2
+wraps==0.15.0
