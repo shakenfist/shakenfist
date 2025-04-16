@@ -9,6 +9,7 @@ import time
 from uuid import uuid4
 
 from google.protobuf.message import DecodeError
+from google.protobuf.json_format import MessageToDict
 from shakenfist_utilities import random as sf_random        # noreorder
 from shakenfist_utilities import logs                       # noreorder
 import symbolicmode
@@ -36,7 +37,7 @@ LOG, _ = logs.setup(__name__)
 
 # This is the minimum version of the in-guest agent that we support. This
 # generally gets bumped when the protocol changes.
-MINIMUM_AGENT_VERSION = '0.5.11'
+MINIMUM_AGENT_VERSION = '0.5.13'
 
 
 # Parameters for blob transfers
@@ -98,7 +99,7 @@ class SideChannelJob(util_concurrency.Job):
             EVENT_TYPE_STATUS, 'command error from agent',
             extra={
                 'error': response.error,
-                'last_envelope': response.last_envelope.to_dict()
+                'last_envelope': MessageToDict(response.last_envelope)
             })
 
     def execute(self):
