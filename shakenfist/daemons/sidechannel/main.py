@@ -263,7 +263,7 @@ class SideChannelMonitorJob(SideChannelJob):
                 try:
                     consumed = envelope.ParseFromString(buffered)
                 except DecodeError as e:
-                    self.log.debug(f'Decode error: {e}')
+                    self.log.error(f'Protobuf decode error: {e}')
                     consumed = 0
 
                 if consumed == 0:
@@ -656,7 +656,7 @@ class SideChannelExecutorJob(SideChannelJob):
                 except DecodeError as e:
                     self.log.with_fields({
                         'outstanding_messages': self.outstanding_message_count
-                    }).debug(f'Decode error: {e}')
+                    }).error(f'Protobuf decode error: {e}')
                     consumed = 0
 
                 if consumed == 0:
