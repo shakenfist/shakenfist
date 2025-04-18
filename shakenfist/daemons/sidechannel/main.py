@@ -74,7 +74,7 @@ class SideChannelJob(util_concurrency.Job):
 
     def _send_commands_single_envelope(
             self, sock, commands, register_as_outstanding=False):
-        out = agent_pb2.AgentRequest()
+        out = agent_pb2.HypervisorToAgent()
         for cmd in commands:
             out.commands.append(cmd)
             if register_as_outstanding:
@@ -85,7 +85,7 @@ class SideChannelJob(util_concurrency.Job):
         sock.sendall(out.SerializeToString())
 
     def _send_replies_single_envelope(self, sock, replies):
-        out = agent_pb2.AgentReply()
+        out = agent_pb2.HypervisorToAgent()
         for cmd in replies:
             out.commands.append(cmd)
         sock.sendall(out.SerializeToString())
@@ -148,13 +148,13 @@ class SideChannelMonitorJob(SideChannelJob):
     def _send_ping(self, sock):
         if self.instance_ready in [constants.AGENT_READY,
                                    constants.AGENT_READY_DEGRADED]:
-            request = agent_pb2.AgentRequestCommand(
+            request = agent_pb2.HypervisorToAgentCommand(
                 command_id=sf_random.random_id(),
                 ping_request=agent_pb2.PingRequest()
             )
             self.log.debug('...ping request')
         else:
-            request = agent_pb2.AgentRequestCommand(
+            request = agent_pb2.HypervisorToAgentCommand(
                 command_id=sf_random.random_id(),
                 is_system_running_request=agent_pb2.IsSystemRunningRequest()
             )
@@ -203,7 +203,7 @@ class SideChannelMonitorJob(SideChannelJob):
             self.instance_ready = new_state
             self.instance.agent_state = new_state
 
-            request = agent_pb2.AgentRequestCommand(
+            request = agent_pb2.HypervisorToAgentCommand(
                 command_id=sf_random.random_id(),
                 gather_facts_request=agent_pb2.GatherFactsRequest()
             )
@@ -236,7 +236,7 @@ class SideChannelMonitorJob(SideChannelJob):
         self.instance.agent_facts = facts
 
     def _execute_inner(self, vsock):
-        request = agent_pb2.AgentRequestCommand(
+        request = agent_pb2.HypervisorToAgentCommand(
             command_id=sf_random.random_id(),
             hypervisor_welcome=agent_pb2.HypervisorWelcome(
                 version=util_general.get_version()
@@ -260,11 +260,10 @@ class SideChannelMonitorJob(SideChannelJob):
                 self.last_data = time.time()
                 buffered += input
 
-                envelope = agent_pb2.AgentReply()
+                envelope = agent_pb2.AgentToHypervisor()
                 try:
                     consumed = envelope.ParseFromString(buffered)
-                except DecodeError as e:
-                    self.log.error(f'Protobuf decode error: {e}')
+                except DecodeError:
                     consumed = 0
 
                 if consumed == 0:
@@ -316,7 +315,7 @@ class SideChannelExecutorJob(SideChannelJob):
         })
 
     def _send_ping(self, sock):
-        request = agent_pb2.AgentRequestCommand(
+        request = agent_pb2.HypervisorToAgentCommand(
             command_id=sf_random.random_id(),
             ping_request=agent_pb2.PingRequest()
         )
@@ -332,7 +331,7 @@ class SideChannelExecutorJob(SideChannelJob):
         self.ready = True
 
     def _dispatch_execute(self, command_id, cmd):
-        request = agent_pb2.AgentRequestCommand(
+        request = agent_pb2.HypervisorToAgentCommand(
             command_id=command_id,
             execute_request=common_pb2.ExecuteRequest(
                 command=cmd['commandline'],
@@ -393,7 +392,7 @@ class SideChannelExecutorJob(SideChannelJob):
                 'outstanding_messages': self.outstanding_message_count
             }).debug('...put file request (including file chunk)')
 
-            yield agent_pb2.AgentRequestCommand(
+            yield agent_pb2.HypervisorToAgentCommand(
                 command_id=command_id,
                 put_file_request=agent_pb2.PutFileRequest(
                     path=cmd['path'],
@@ -412,7 +411,7 @@ class SideChannelExecutorJob(SideChannelJob):
                 self.log.with_fields({
                     'outstanding_messages': self.outstanding_message_count
                 }).debug('...file chunk')
-                yield agent_pb2.AgentRequestCommand(
+                yield agent_pb2.HypervisorToAgentCommand(
                     command_id=command_id,
                     file_chunk=agent_pb2.FileChunk(
                         offset=offset,
@@ -425,7 +424,7 @@ class SideChannelExecutorJob(SideChannelJob):
             self.log.with_fields({
                 'outstanding_messages': self.outstanding_message_count
             }).debug('...file chunk (termination)')
-            yield agent_pb2.AgentRequestCommand(
+            yield agent_pb2.HypervisorToAgentCommand(
                 command_id=command_id,
                 file_chunk=agent_pb2.FileChunk(
                     offset=offset,
@@ -493,7 +492,7 @@ class SideChannelExecutorJob(SideChannelJob):
             return
 
         return [
-            agent_pb2.AgentRequestCommand(
+            agent_pb2.HypervisorToAgentCommand(
                 command_id=command_id,
                 chmod_request=agent_pb2.ChmodRequest(
                     path=cmd['path'],
@@ -514,7 +513,7 @@ class SideChannelExecutorJob(SideChannelJob):
         self._stat_result = None
 
         return [
-            agent_pb2.AgentRequestCommand(
+            agent_pb2.HypervisorToAgentCommand(
                 command_id=command_id,
                 get_file_request=agent_pb2.GetFileRequest(
                     path=cmd['path']
@@ -560,7 +559,7 @@ class SideChannelExecutorJob(SideChannelJob):
             self._send_replies_single_envelope(
                 sock,
                 [
-                    agent_pb2.AgentReplyCommand(
+                    agent_pb2.HypervisorToAgentCommand(
                         command_id=reply.command_id,
                         command_error=agent_pb2.CommandError(
                             error='unknown payload encoding')
@@ -609,11 +608,12 @@ class SideChannelExecutorJob(SideChannelJob):
             self._blob_uuid = None
             self._stat_result = None
             self._agent_path_for_get = None
+            self.ready = True
 
         self._send_replies_single_envelope(
             sock,
             [
-                agent_pb2.AgentReplyCommand(
+                agent_pb2.HypervisorToAgentCommand(
                     command_id=reply.command_id,
                     file_chunk_reply=agent_pb2.FileChunkReply(
                         path=self._agent_path_for_get,
@@ -627,7 +627,7 @@ class SideChannelExecutorJob(SideChannelJob):
         self._send_commands_single_envelope(
             vsock.sock,
             [
-                agent_pb2.AgentRequestCommand(
+                agent_pb2.HypervisorToAgentCommand(
                     command_id=sf_random.random_id(),
                     hypervisor_welcome=agent_pb2.HypervisorWelcome(
                         version=util_general.get_version()
@@ -651,13 +651,10 @@ class SideChannelExecutorJob(SideChannelJob):
                 self.last_data = time.time()
                 buffered += input
 
-                envelope = agent_pb2.AgentReply()
+                envelope = agent_pb2.AgentToHypervisor()
                 try:
                     consumed = envelope.ParseFromString(buffered)
-                except DecodeError as e:
-                    self.log.with_fields({
-                        'outstanding_messages': self.outstanding_message_count
-                    }).error(f'Protobuf decode error: {e}')
+                except DecodeError:
                     consumed = 0
 
                 if consumed == 0:
@@ -705,6 +702,7 @@ class SideChannelExecutorJob(SideChannelJob):
                             self.log.with_fields({
                                 'outstanding_messages': self.outstanding_message_count
                             }).error('Negative outstanding messages, aborting')
+                            return
 
                     elif reply.HasField('chmod_reply'):
                         self.log.with_fields({
@@ -737,7 +735,7 @@ class SideChannelExecutorJob(SideChannelJob):
                     self._send_commands_single_envelope(
                         vsock.sock,
                         [
-                            agent_pb2.AgentRequestCommand(
+                            agent_pb2.HypervisorToAgentCommand(
                                 command_id=sf_random.random_id(),
                                 hypervisor_departure=agent_pb2.HypervisorDeparture()
                             )

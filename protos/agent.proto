@@ -111,15 +111,15 @@ message StatResult {
 // Protocol level errors
 message CommandError {
     string error = 1;
-    AgentRequest last_envelope = 2;
+    HypervisorToAgent last_envelope = 2;
 }
 
 message UnknownCommand {
-    AgentRequest last_envelope = 1;
+    HypervisorToAgent last_envelope = 1;
 }
 
 // Envelopes
-message AgentRequestCommand {
+message HypervisorToAgentCommand {
     string command_id = 1;
 
     oneof request {
@@ -139,14 +139,15 @@ message AgentRequestCommand {
         ChmodRequest chmod_request = 45;
         ChownRequest chown_request = 46;
         GetFileRequest get_file_request = 47;
+        FileChunkReply file_chunk_reply = 48;
     }
 }
 
-message AgentRequest {
-    repeated AgentRequestCommand commands = 1;
+message HypervisorToAgent {
+    repeated HypervisorToAgentCommand commands = 1;
 }
 
-message AgentReplyCommand {
+message AgentToHypervisorCommand {
     string command_id = 1;
 
     oneof reply {
@@ -168,6 +169,6 @@ message AgentReplyCommand {
     }
 }
 
-message AgentReply {
-    repeated AgentReplyCommand commands = 1;
+message AgentToHypervisor {
+    repeated AgentToHypervisorCommand commands = 1;
 }
