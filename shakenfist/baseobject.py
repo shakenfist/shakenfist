@@ -431,16 +431,16 @@ class DatabaseBackedObject:
 
     def _state_update(self, new_value, skip_transition_validation=False,
                       state_attribute_name='state', message=None):
+        # Is this a change?
+        orig = self._state_read(state_attribute_name=state_attribute_name)
+        if orig.value == new_value:
+            return
+
         # NOTE(mikal): I'm adding this lock back in, even though I don't want to,
         # because until we can do this entire update (the state change and the
         # cache update) in a single transaction its going to continue to cause
         # me problems. This all needs a rethink.
         with self.get_lock_attr(state_attribute_name, 'update'):
-            orig = self._state_read(state_attribute_name=state_attribute_name)
-
-            if orig.value == new_value:
-                return
-
             # Only standard states have validation right now
             if state_attribute_name == 'state':
                 if orig.value == self.STATE_DELETED and self.object_type != 'node':
