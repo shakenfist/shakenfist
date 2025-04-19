@@ -751,7 +751,7 @@ class Blob(dbo):
                     self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
 
-    def register(self):
+    def register(self, request_checksums=True):
         # We don't remove the partial file until we've finished registering the
         # blob to avoid deletion races. Note that this _must_ be a hard link,
         # which is why we don't use util_general.link().
@@ -764,6 +764,15 @@ class Blob(dbo):
 
         self.state = self.STATE_CREATED
         self.observe()
+
+        # Request checksums be calculated
+        if request_checksums:
+            nbo_create_and_enqueue(
+                config.NODE_NAME,
+                self.uuid,
+                [nbo_tasks.verify_size_and_checksum],
+                PRIORITY.background_high_io)
+
         self.request_replication()
         os.unlink(dest_path + '.partial')
 
@@ -972,7 +981,7 @@ def http_fetch(url, resp, b, locks, affected_objects):
     # Import the newly fetched blob
     b.size = fetched
     b.verify_checksum(hash=sha512_hash.hexdigest())
-    b.register()
+    b.register(request_checksums=False)
     return b
 
 
