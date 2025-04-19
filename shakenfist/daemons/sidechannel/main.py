@@ -93,7 +93,7 @@ class SideChannelJob(util_concurrency.Job):
     def _handle_command_error(self, reply):
         self.log.with_fields({
             'outstanding_messages': self.outstanding_message_count
-        }).error('Received command error from agent')
+        }).info('Received command error from agent')
         response = reply.command_error
         self.instance.add_event(
             EVENT_TYPE_STATUS, 'command error from agent',
