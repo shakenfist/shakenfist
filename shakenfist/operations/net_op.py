@@ -107,7 +107,7 @@ class NetOp(BaseClusterOperation):
 
     def _network_destroy(self, n):
         if n.is_dead():
-            raise InvalidStateForTask()
+            raise InvalidStateForTask(self)
 
         if n.networkinterfaces:
             self.log.with_fields({
