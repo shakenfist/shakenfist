@@ -158,7 +158,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None, side_channels=['sf-agent2'])
 
         inst2 = self.test_client.create_instance(
             'test-networks-2', 1, 1024,
@@ -173,7 +173,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None, side_channels=['sf-agent2'])
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst2['uuid'])

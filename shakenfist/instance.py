@@ -96,9 +96,32 @@ def _safe_int_cast(i):
     return i
 
 
+class ConnectedVSockChannel():
+    def __init__(self, channel, cid, port, log):
+        self.channel = channel
+        self.cid = cid
+        self.port = port
+        self.log = log.with_fields({
+            'channel': channel,
+            'cid': cid,
+            'port': port
+        })
+        self.sock = None
+
+    def __enter__(self):
+        self.sock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
+        self.sock.connect((self.cid, self.port))
+        self.log.debug(f'Connected to vsock with socket {self.sock}')
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.log.debug(f'Disconnected from vsock channel {self.channel}')
+        self.sock.close()
+
+
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 15
+    current_version = 16
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -241,7 +264,7 @@ class Instance(dbo):
 
     @classmethod
     def _upgrade_step_12_to_13(cls, static_values):
-        pass
+        ...
 
     @classmethod
     def _upgrade_step_13_to_14(cls, static_values):
@@ -258,7 +281,11 @@ class Instance(dbo):
 
     @classmethod
     def _upgrade_step_14_to_15(cls, static_values):
-        pass
+        ...
+
+    @classmethod
+    def _upgrade_step_15_to_16(cls, static_values):
+        ...
 
     @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
@@ -593,6 +620,12 @@ class Instance(dbo):
                 'op_uuid': op_uuid
             }
         )
+
+    def vsock_cid(self, channel):
+        return self._db_get_attribute(f'vsock_cid:{channel}')
+
+    def set_vsock_cid(self, channel, cid):
+        self._db_set_attribute(f'vsock_cid:{channel}', cid)
 
     # Implementation
     def _initialize_block_devices(self):
@@ -1189,6 +1222,18 @@ class Instance(dbo):
         iso.write(disk_path)
         iso.close()
 
+    def _allocate_vsock_cid(self, channel_name):
+        reservation = {
+            'instance_uuid': self.uuid,
+            'channel_name': channel_name,
+            'when': time.time()
+            }
+
+        cid = random.randint(3, 4294967295)
+        while not etcd.create('cid', None, cid, reservation):
+            cid = random.randint(3, 4294967295)
+        return cid
+
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
 
@@ -1231,19 +1276,33 @@ class Instance(dbo):
                     blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))
                 nvram_template_attribute = ''
 
-        # Convert side channels into extra devices. Side channels are implemented
-        # as virtio-serial domain sockets on the hypervisor, and serial posts on
-        # the guest.
+        # Convert side channels into extra devices. There are now several types
+        # of side channel:
+        #     * sf-agent side channels are implemented as virtio-serial domain
+        #       sockets on the hypervisor, and serial posts on the guest.
+        #     * sf-agent2 side channels are implemented as virtio-vsocks, with
+        #       the guest being the server and the hypervisor being various
+        #       client connections.
+        #
+        # The API layer has already checked that only valid side channels are
+        # requested before we get here.
         extradevices = []
         side_channels = self.side_channels
         if side_channels:
             for channel in side_channels:
-                extradevices.append("<channel type='unix'>")
-                extradevices.append(
-                    f"  <source mode='bind' path='{self.instance_path}/sc-{channel}'/>")
-                extradevices.append(
-                    "  <target type='virtio' name='%s' state='connected'/>" % channel)
-                extradevices.append("</channel>")
+                if channel == 'sf-agent':
+                    extradevices.append("<channel type='unix'>")
+                    extradevices.append(
+                        f"  <source mode='bind' path='{self.instance_path}/sc-{channel}'/>")
+                    extradevices.append(
+                        "  <target type='virtio' name='%s' state='connected'/>" % channel)
+                    extradevices.append("</channel>")
+                elif channel == 'sf-agent2':
+                    cid = self._allocate_vsock_cid(channel)
+                    self.set_vsock_cid(channel, cid)
+                    extradevices.append("<vsock model='virtio'>")
+                    extradevices.append(f"    <cid auto='no' address='{cid}'/>")
+                    extradevices.append('</vsock>')
 
         # NOTE(mikal): the database stores memory allocations in MB, but the
         # domain XML takes them in KB. That wouldn't be worth a comment here if
@@ -1735,17 +1794,8 @@ class Instance(dbo):
         with util_libvirt.LibvirtConnection() as lc:
             lc.get_screenshot(self.uuid, dest_path + '.partial')
 
-        # We don't remove the partial file until we've finished registering the blob
-        # to avoid deletion races. Note that this _must_ be a hard link, which is why
-        # we don't use util_general.link().
-        st = os.stat(dest_path + '.partial')
-        os.link(dest_path + '.partial', dest_path)
         b = blob.Blob.new(blob_uuid, time.time(), time.time())
-        b.size = st.st_size
-        b.state = blob.Blob.STATE_CREATED
-        b.observe()
-        b.request_replication()
-        os.unlink(dest_path + '.partial')
+        b.register()
 
         self.add_event(EVENT_TYPE_AUDIT, 'acquired screenshot of instance console',
                        extra={'blob': blob_uuid})
@@ -1777,6 +1827,13 @@ class Instance(dbo):
             inst.attachDeviceFlags(device_xml, flags=flags)
             add_event_multi(
                 EVENT_TYPE_AUDIT, [self, n, ni], 'hot plugged interface')
+
+    def socket_on_vsock_channel(self, channel, port=1025):
+        cid = self.vsock_cid(channel)
+        if not cid:
+            raise exceptions.NoSuchChannel(f'No such channel {channel}')
+
+        return ConnectedVSockChannel(channel, cid, port, self.log)
 
 
 class Instances(dbo_iter):

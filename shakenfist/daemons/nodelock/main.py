@@ -5,7 +5,6 @@
 # alernative would be to use etcd for distributed locks, but given these are
 # just for operations within a single node that would be expensive.
 
-import json
 import os
 import signal
 import socket
@@ -15,7 +14,7 @@ from google.protobuf.message import DecodeError
 import setproctitle
 from shakenfist_utilities import logs
 
-from shakenfist import nodelock_pb2
+from shakenfist.protos import nodelock_pb2
 
 
 LOG, _ = logs.setup(__name__)
@@ -24,7 +23,6 @@ EXIT = threading.Event()
 
 
 def exit_gracefully(sig, _frame):
-    global EXIT
     if sig == signal.SIGTERM:
         LOG.info('Received SIGTERM')
         EXIT.set()
@@ -39,10 +37,6 @@ def write_pid_file():
 
 
 def main():
-    global LOG
-    global SOCKET_PATH
-    global EXIT
-
     write_pid_file()
     setproctitle.setproctitle('sf-nodelock')
 
@@ -77,21 +71,18 @@ def main():
                     consumed = request.ParseFromString(buffered)
                     if consumed == 0:
                         continue
+                    buffered = buffered[consumed:]
 
                     if request.HasField('lock_request'):
                         lr = request.lock_request
-                        outcome_string = 'unknown'
 
                         if lr.key not in locks:
                             locks[lr.key] = lr.requester
                             outcome = nodelock_pb2.LockReply.OK
-                            outcome_string = 'ok'
                         elif locks[lr.key] == lr.requester:
                             outcome = nodelock_pb2.LockReply.ALREADY_HELD
-                            outcome_string = 'already held'
                         else:
                             outcome = nodelock_pb2.LockReply.DENIED
-                            outcome_string = 'denied'
 
                         reply = nodelock_pb2.NodeLockReply(
                             lock_reply=nodelock_pb2.LockReply(
@@ -99,33 +90,22 @@ def main():
                             )
                         )
 
-                        req = json.loads(lr.requester)
-                        LOG.with_fields(req).info(
-                            f'attempted lock of {lr.key} '
-                            f'with outcome {outcome_string}')
                         conn.sendall(reply.SerializeToString())
 
                     elif request.HasField('unlock_request'):
                         lr = request.unlock_request
-                        outcome_string = 'unknown'
 
                         if lr.key in locks and locks[lr.key] == lr.requester:
                             del locks[lr.key]
                             outcome = nodelock_pb2.UnlockReply.OK
-                            outcome_string = 'ok'
                         else:
                             outcome = nodelock_pb2.UnlockReply.NOT_HELD
-                            outcome_string = 'not held'
 
                         reply = nodelock_pb2.NodeLockReply(
                             unlock_reply=nodelock_pb2.UnlockReply(
                                 outcome=outcome
                             )
                         )
-                        req = json.loads(lr.requester)
-                        LOG.with_fields(req).info(
-                            f'attempted unlock of {lr.key} '
-                            f'with outcome {outcome_string}')
                         conn.sendall(reply.SerializeToString())
 
                     else:

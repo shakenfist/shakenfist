@@ -76,9 +76,12 @@ def _health_checks():
 
 
 def _block_until_healthy():
+    start_time = time.time()
     while not _health_checks():
-        LOG.warning('Not processing queues as dependencies are unhealthy')
-        time.sleep(1)
+        if time.time() - start_time > 60:
+            LOG.warning('Not processing queues as dependencies are unhealthy')
+            start_time = time.time()
+        time.sleep(5)
 
 
 class Monitor(daemon.WorkerPoolDaemon):

@@ -17,7 +17,6 @@ ABORT_PATH = '/run/sf/sentinel-last.abort'
 
 
 def exit_gracefully(sig, _frame):
-    global EXIT
     if sig == signal.SIGTERM:
         LOG.info('Received SIGTERM')
         daemon.set_abort_path(ABORT_PATH, 'from sentinel last exit_gracefully')
@@ -28,9 +27,8 @@ signal.signal(signal.SIGTERM, exit_gracefully)
 
 def main():
     daemon.clear_abort_path(ABORT_PATH)
-
-    LOG.info('Started')
     setproctitle.setproctitle('sf-sentinel-last')
+    LOG.info('Started')
 
     n = Node.from_db(config.NODE_NAME)
     n.set_daemon_state('sentinel-last', Node.DAEMON_STATE_RUNNING)

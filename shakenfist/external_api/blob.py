@@ -88,6 +88,12 @@ def arg_is_blob_uuid(func):
 
 blob_get_example = """{
     "cluster_size": 2097152.0,
+    "checksums": {
+        "sha1": "40a4d...d601d",
+        "sha256": "e3a57...59afb",
+        "sha512": "db80b...93659",
+        "xxh128": "75584...92f29"
+    }
     "compat": 1.1,
     "compression type": "zlib",
     "depends_on": null,

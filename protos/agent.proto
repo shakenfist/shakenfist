@@ -1,0 +1,174 @@
+syntax = "proto3";
+
+package shakenfist.protos;
+import "common.proto";
+
+// Agent state information sent to clients
+message HypervisorWelcome {
+    string version = 1;
+}
+
+message AgentWelcome {
+    string version = 1;
+    double boot_time = 2;
+}
+
+message HypervisorDeparture {
+}
+
+// Things clients can ask the agent to do
+message PingRequest {
+}
+
+message PingReply {
+}
+
+message IsSystemRunningRequest {
+}
+
+message IsSystemRunningReply {
+    bool result = 1;
+    string message = 2;
+    double boot_time = 3;
+}
+
+message Fact {
+    string name = 1;
+    string value = 2;
+}
+
+message MountPoint {
+    string device = 1;
+    string mount_point = 2;
+    string vfs_type = 3;
+}
+
+message GatherFactsRequest {
+}
+
+message GatherFactsReply {
+    repeated Fact distro_facts = 1;
+    repeated MountPoint mount_points = 2;
+    repeated Fact ssh_host_keys = 3;
+}
+
+message FileChunk {
+    enum Encoding {
+        BASE64 = 0;
+    }
+
+    int64 offset = 1;
+    Encoding encoding = 2;
+    string payload = 3;
+}
+
+message PutFileRequest {
+    string path = 1;
+    int32 mode = 2;
+    int64 length = 3;
+    FileChunk first_chunk = 4;
+}
+
+message FileChunkReply {
+    string path = 1;
+    int64 offset = 2;
+}
+
+message ChmodRequest {
+    string path = 1;
+    int32 mode = 2;
+}
+
+message ChmodReply {
+    string path = 1;
+}
+
+message ChownRequest {
+    string path = 1;
+    optional string user = 2;
+    optional string group = 3;
+}
+
+message ChownReply {
+    string path = 1;
+}
+
+message GetFileRequest {
+    string path = 1;
+}
+
+message StatResult {
+    string path = 1;
+    int64 mode = 2;
+    int64 size = 3;
+    int64 uid = 4;
+    int64 gid = 5;
+    double atime = 6;
+    double mtime = 7;
+    double ctime = 8;
+}
+
+// Protocol level errors
+message CommandError {
+    string error = 1;
+    HypervisorToAgent last_envelope = 2;
+}
+
+message UnknownCommand {
+    HypervisorToAgent last_envelope = 1;
+}
+
+// Envelopes
+message HypervisorToAgentCommand {
+    string command_id = 1;
+
+    oneof request {
+        HypervisorWelcome hypervisor_welcome = 10;
+        HypervisorDeparture hypervisor_departure = 11;
+
+        CommandError command_error = 20;
+        UnknownCommand unknown_command = 21;
+
+        PingRequest ping_request = 30;
+
+        shakenfist.protos.ExecuteRequest execute_request = 40;
+        IsSystemRunningRequest is_system_running_request = 41;
+        GatherFactsRequest gather_facts_request = 42;
+        PutFileRequest put_file_request = 43;
+        FileChunk file_chunk = 44;
+        ChmodRequest chmod_request = 45;
+        ChownRequest chown_request = 46;
+        GetFileRequest get_file_request = 47;
+        FileChunkReply file_chunk_reply = 48;
+    }
+}
+
+message HypervisorToAgent {
+    repeated HypervisorToAgentCommand commands = 1;
+}
+
+message AgentToHypervisorCommand {
+    string command_id = 1;
+
+    oneof reply {
+        AgentWelcome agent_welcome = 10;
+
+        CommandError command_error = 20;
+        UnknownCommand unknown_command = 21;
+
+        PingReply ping_reply = 30;
+
+        shakenfist.protos.ExecuteReply execute_reply = 40;
+        IsSystemRunningReply is_system_running_reply = 41;
+        GatherFactsReply gather_facts_reply = 42;
+        FileChunkReply file_chunk_reply = 43;
+        ChmodReply chmod_reply = 44;
+        ChownReply chown_reply = 45;
+        FileChunk file_chunk = 46;
+        StatResult stat_result = 47;
+    }
+}
+
+message AgentToHypervisor {
+    repeated AgentToHypervisorCommand commands = 1;
+}

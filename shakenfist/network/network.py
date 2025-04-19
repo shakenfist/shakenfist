@@ -568,8 +568,8 @@ class Network(dbo):
                         'floating_netmask': fn.netmask
                     })
                 except CongestedNetwork:
-                    self.error = 'Unable to allocate floating gateway IP'
                     self.state = self.STATE_ERROR
+                    self.error = 'Unable to allocate floating gateway IP'
                     return
 
                 addresses = list(util_network.get_interface_addresses(

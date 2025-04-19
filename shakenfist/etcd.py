@@ -14,10 +14,10 @@ import requests
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as util_random  # noreorder
 
-from shakenfist import etcd_pb2
-from shakenfist import etcd_pb2_grpc
 from shakenfist import exceptions
 from shakenfist.config import config
+from shakenfist.protos import etcd_pb2
+from shakenfist.protos import etcd_pb2_grpc
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import json as util_json
 

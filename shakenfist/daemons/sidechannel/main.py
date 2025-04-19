@@ -1,23 +1,32 @@
 import base64
+import copy
+import errno
+import json
 import os
-import select
+import socket
 import threading
 import time
-import uuid
+from uuid import uuid4
 
-import semver
-from shakenfist_agent import protocol
-from shakenfist_utilities import logs  # noreorder
+from google.protobuf.message import DecodeError
+from google.protobuf.json_format import MessageToDict
+from shakenfist_utilities import random as sf_random        # noreorder
+from shakenfist_utilities import logs                       # noreorder
+import symbolicmode
 
 from shakenfist import blob
 from shakenfist import constants
-from shakenfist import etcd
-from shakenfist import eventlog
-from shakenfist import instance
-from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
+from shakenfist import etcd
+from shakenfist import eventlog
+from shakenfist.eventlog import add_event_multi
+from shakenfist.exceptions import NoSuchChannel
+from shakenfist import instance
+from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.protos import agent_pb2
+from shakenfist.protos import common_pb2
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import concurrency as util_concurrency
@@ -28,7 +37,12 @@ LOG, _ = logs.setup(__name__)
 
 # This is the minimum version of the in-guest agent that we support. This
 # generally gets bumped when the protocol changes.
-MINIMUM_AGENT_VERSION = '0.3.16'
+MINIMUM_AGENT_VERSION = '0.5.13'
+
+
+# Parameters for blob transfers
+MAX_CHUNK_SIZE = 102400
+MAX_OUTSTANDING = 5
 
 
 class ConnectionFailed(Exception):
@@ -39,31 +53,114 @@ class PutException(Exception):
     ...
 
 
-class SFSocketAgent(protocol.UnixDomainSocketAgent):
-    def __init__(self, inst, path, logger=None):
-        super().__init__(path, logger=logger)
-        self.log = LOG.with_fields({'instance': inst})
-        self.instance = inst
-
-    def poll(self):
-        raise NotImplementedError('Please don\'t call poll() in the sidechannel monitor')
-
-
-def _sanitize_packet(in_packet):
-    out_packet = {}
-    for key, value in in_packet.items():
-        if isinstance(value, (str, bytes, bytearray)):
-            out_packet[key] = value[:100]
-        else:
-            out_packet[key] = value
-    return out_packet
+class GetException(Exception):
+    ...
 
 
 class SideChannelJob(util_concurrency.Job):
-    def __init__(self, instance_uuid):
+    def __init__(self, inst):
         super().__init__()
-        self.instance_uuid = instance_uuid
-        self.abort_path = f'/run/sf/sidechannel-{instance_uuid}.abort'
+        self.instance = inst
+        self.instance_ready = constants.AGENT_NEVER_TALKED
+        self.thread_name = self.instance.uuid
+
+        self.abort_path = f'/run/sf/sidechannel-{self.thread_name}.abort'
+        daemon.clear_abort_path(self.abort_path)
+
+        # A count of the number of sent but not yet acknowledged command
+        # messages. Does not include lower level protocol messages like "ping".
+        # For now this is only used by SideChannelExecutorJob.
+        self.outstanding_message_count = 0
+
+    def _send_commands_single_envelope(
+            self, sock, commands, register_as_outstanding=False):
+        out = agent_pb2.HypervisorToAgent()
+        for cmd in commands:
+            out.commands.append(cmd)
+            if register_as_outstanding:
+                self.outstanding_message_count += 1
+                self.log.with_fields({
+                    'outstanding_messages': self.outstanding_message_count
+                }).debug('...increment outstanding commands')
+        sock.sendall(out.SerializeToString())
+
+    def _send_replies_single_envelope(self, sock, replies):
+        out = agent_pb2.HypervisorToAgent()
+        for cmd in replies:
+            out.commands.append(cmd)
+        sock.sendall(out.SerializeToString())
+
+    def _handle_command_error(self, reply):
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).error('Received command error from agent')
+        response = reply.command_error
+        self.instance.add_event(
+            EVENT_TYPE_STATUS, 'command error from agent',
+            extra={
+                'error': response.error,
+                'last_envelope': MessageToDict(response.last_envelope)
+            })
+
+    def execute(self):
+        etcd.reset_client()
+        util_concurrency.set_thread_name(self.thread_name)
+        self.log.debug('Attempt channel connection')
+
+        self.last_data = time.time()
+
+        # We use the existence of a console.log file in the instance directory
+        # to indicate the instance has been created. This will be true even if
+        # the instance doesn't actually every write to the serial console.
+        console_path = os.path.join(self.instance.instance_path, 'console.log')
+        while not os.path.exists(console_path):
+            time.sleep(1)
+        self.log.debug('Detected console log')
+
+        # Attempt to connect to the agent
+        try:
+            with self.instance.socket_on_vsock_channel('sf-agent2') as vsock:
+                vsock.sock.settimeout(1)
+                self.instance.add_event(
+                    EVENT_TYPE_STATUS, 'connected to agent')
+                self._execute_inner(vsock)
+
+        except NoSuchChannel:
+            self.log.debug('No such channel')
+
+        except socket.error as e:
+            if e.errno != errno.ECONNRESET:
+                self.log.debug(f'socket.error: {e}')
+
+        except OSError as e:
+            self.log.debug(f'OSError: {e}')
+
+
+class SideChannelMonitorJob(SideChannelJob):
+    def __init__(self, inst):
+        super().__init__(inst)
+        self.abort_path = f'/run/sf/sidechannel-{inst.uuid}.abort'
+        self.log = LOG.with_fields({'instance': self.instance.uuid})
+
+        self.instance.agent_state = constants.AGENT_NEVER_TALKED
+        self.system_boot_time = 0
+
+    def _send_ping(self, sock):
+        if self.instance_ready in [constants.AGENT_READY,
+                                   constants.AGENT_READY_DEGRADED]:
+            request = agent_pb2.HypervisorToAgentCommand(
+                command_id=sf_random.random_id(),
+                ping_request=agent_pb2.PingRequest()
+            )
+            self.log.debug('...ping request')
+        else:
+            request = agent_pb2.HypervisorToAgentCommand(
+                command_id=sf_random.random_id(),
+                is_system_running_request=agent_pb2.IsSystemRunningRequest()
+            )
+            self.log.debug('...is system running request')
+
+        self._send_commands_single_envelope(sock, [request])
 
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
@@ -72,568 +169,759 @@ class SideChannelJob(util_concurrency.Job):
             self.system_boot_time = sbt
             self.instance.agent_system_boot_time = sbt
 
-    def _handle_background_message(self, packet):
-        command = packet.get('command')
-        if command == 'agent-start':
-            self.instance.agent_start_time = time.time()
-            sbt = packet.get('system_boot_time', 0)
-            self._record_system_boot_time(sbt)
-
-            agent_version = packet.get('message')
-            if agent_version:
-                self.instance.add_event(
-                    EVENT_TYPE_AUDIT, 'detected agent version',
-                    extra={'version': agent_version})
-
-                agent_version_trimmed = agent_version.split(' ')[1]
-                agent_version_parsed = semver.Version.parse(
-                    agent_version_trimmed)
-                minimum_version_parsed = semver.Version.parse(
-                    MINIMUM_AGENT_VERSION)
-                if agent_version_parsed < minimum_version_parsed:
-                    self.instance_ready = constants.AGENT_TOO_OLD
-                    self.instance.agent_state = constants.AGENT_TOO_OLD
-                    return True
-
-            self.instance_ready = constants.AGENT_STARTED
-            self.instance.agent_state = constants.AGENT_STARTED
-            return True
-
-        elif command == 'agent-stop':
-            self.instance_ready = constants.AGENT_STOPPED
-            self.instance.agent_state = constants.AGENT_STOPPED
-            return True
-
-        elif command == 'is-system-running-response':
-            ready = packet.get('result', 'False')
-            sbt = packet.get('system_boot_time', 0)
-            self._record_system_boot_time(sbt)
-
-            if ready:
-                new_state = constants.AGENT_READY
-            else:
-                # Special case the degraded state here, as the system is in fact
-                # as ready as it is ever going to be, but isn't entirely happy.
-                if packet.get('message', 'none') == 'degraded':
-                    new_state = constants.AGENT_READY_DEGRADED
-                else:
-                    new_state = (
-                        constants.AGENT_DEGRADED % packet.get('message', 'none'))
-
-            # We cache the agent state to reduce database load, and then
-            # trigger facts gathering when we transition into the constants.AGENT_READY state.
-            if self.instance_ready != new_state:
-                self.instance_ready = new_state
-                self.instance.agent_state = new_state
-                if new_state in [constants.AGENT_READY, constants.AGENT_READY_DEGRADED]:
-                    self.sc_client.send_v1_packet({
-                        'command': 'gather-facts',
-                        'unique': str(time.time())
-                        })
-            return True
-
-        elif command == 'gather-facts-response':
-            self.instance.add_event(EVENT_TYPE_AUDIT, 'received system facts')
-            self.instance.agent_facts = packet.get('result', {})
-            return True
-
-        elif command == 'ping':
-            self.sc_client.send_v1_packet({
-                'command': 'pong',
-                'unique': packet['unique']
+    def _handle_agent_welcome(self, reply):
+        self.log.debug('...agent welcome')
+        response = reply.agent_welcome
+        self.instance.add_event(
+            EVENT_TYPE_STATUS, 'agent metrics',
+            extra={
+                'version': response.version,
+                'boot_time': response.boot_time
             })
-            return True
+        self.instance_ready = constants.AGENT_STARTED
+        self.instance.agent_state = constants.AGENT_STARTED
+        self._record_system_boot_time(response.boot_time)
 
-        elif command == 'pong':
-            return True
+    def _handle_is_system_running(self, reply, sock):
+        self.log.debug('...is system running reply')
+        response = reply.is_system_running_reply
+        if response.result:
+            new_state = constants.AGENT_READY
+        else:
+            # Special case the degraded state here, as the
+            # system is in fact as ready as it is ever going
+            # to be, but isn't entirely happy.
+            if response.message == 'degraded':
+                new_state = constants.AGENT_READY_DEGRADED
+            else:
+                new_state = constants.AGENT_DEGRADED % response.message
 
-        return False
+        # We cache the agent state to reduce database load,
+        # and then trigger facts gathering when we transition
+        # into the constants.AGENT_READY state.
+        if self.instance_ready != new_state:
+            self.instance_ready = new_state
+            self.instance.agent_state = new_state
 
-    def _await_client(self):
-        readable, _, exceptional = select.select(
-            [self.sc_client.input_fileno], [], [self.sc_client.input_fileno], 1)
+            request = agent_pb2.HypervisorToAgentCommand(
+                command_id=sf_random.random_id(),
+                gather_facts_request=agent_pb2.GatherFactsRequest()
+            )
+            self._send_commands_single_envelope(sock, [request])
+            self.log.debug('...gather facts request')
 
-        if readable:
-            self.last_data = time.time()
+    def _handle_gather_facts(self, reply):
+        self.log.debug('...gather facts reply')
+        response = reply.gather_facts_reply
+
+        facts = {
+            'distribution': {},
+            'mounts': [],
+            'ssh-host-keys': {}
+        }
+        for f in response.distro_facts:
+            facts['distribution'][f.name] = json.loads(f.value)
+        for mp in response.mount_points:
+            facts['mounts'].append(
+                {
+                    'device': mp.device,
+                    'mount_point': mp.mount_point,
+                    'vfs_type': mp.vfs_type
+                }
+            )
+        for hk in response.ssh_host_keys:
+            facts['ssh-host-keys'][hk.name] = hk.value
+
+        self.instance.add_event(EVENT_TYPE_AUDIT, 'received system facts')
+        self.instance.agent_facts = facts
+
+    def _execute_inner(self, vsock):
+        request = agent_pb2.HypervisorToAgentCommand(
+            command_id=sf_random.random_id(),
+            hypervisor_welcome=agent_pb2.HypervisorWelcome(
+                version=util_general.get_version()
+            )
+        )
+        self.log.debug('...execute request')
+        self._send_commands_single_envelope(vsock.sock, [request])
+        self.last_data = time.time()
+
+        buffered = bytearray()
+        while daemon.check_abort_path(self.abort_path):
+            if time.time() - self.last_data > 2:
+                self._send_ping(vsock.sock)
+                self.last_data = time.time()
+
             try:
-                for packet in self.sc_client.find_packets():
-                    self.log.with_fields(_sanitize_packet(packet)).debug(
-                        'Handling packet')
+                input = vsock.sock.recv(102400)
+                if not input:
+                    return
 
-                    if not self.agent_has_talked:
-                        self.instance.add_event(EVENT_TYPE_AUDIT, 'sidechannel connected')
-                        self.agent_has_talked = True
+                self.last_data = time.time()
+                buffered += input
 
-                    if not self._handle_background_message(packet):
-                        yield packet
+                envelope = agent_pb2.AgentToHypervisor()
+                try:
+                    consumed = envelope.ParseFromString(buffered)
+                except DecodeError:
+                    consumed = 0
 
-            except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
-                    FileNotFoundError, OSError):
-                raise ConnectionFailed()
+                if consumed == 0:
+                    continue
+                buffered = buffered[consumed:]
 
-        if exceptional:
-            raise ConnectionFailed()
+                for reply in envelope.commands:
+                    if reply.HasField('agent_welcome'):
+                        self._handle_agent_welcome(reply)
 
-    # Prototype new version of send_file(), playing here before doing yet another
-    # agent release.
-    def _send_file(self, command, source_path, destination_path, unique):
-        st = os.stat(source_path, follow_symlinks=True)
-        yield {
-            'command': command,
-            'path': destination_path,
-            'stat_result': {
-                'mode': st.st_mode,
-                'size': st.st_size,
-                'uid': st.st_uid,
-                'gid': st.st_gid,
-                'atime': st.st_atime,
-                'mtime': st.st_mtime,
-                'ctime': st.st_ctime
-            },
-            'unique': unique
+                    elif reply.HasField('is_system_running_reply'):
+                        self._handle_is_system_running(
+                            reply, vsock.sock)
+
+                    elif reply.HasField('ping_reply'):
+                        self.log.debug('...ping reply')
+
+                    elif reply.HasField('gather_facts_reply'):
+                        self._handle_gather_facts(reply)
+
+                    elif reply.HasField('command_error'):
+                        self._handle_command_error(reply)
+
+            except socket.timeout:
+                ...
+
+        self.log.with_fields({
+            'abort_path': self.abort_path
+        }).debug('Abort path set, exiting')
+
+
+class SideChannelExecutorJob(SideChannelJob):
+    def __init__(self, inst, agentop):
+        super().__init__(inst)
+        self.agentop = agentop
+        self.affected_objects = [self.instance, self.agentop]
+        self.thread_name = f'{self.instance.uuid}-{self.agentop.uuid}'
+
+        self.commands = agentop.commands
+        self.command_count = 0
+        self.num_results = 0
+        self.command_cache = {}
+        self.chunk_iterator = None
+
+        self.ready = False
+        self.log = LOG.with_fields({
+            'instance': self.instance.uuid,
+            'agent_operation': self.agentop.uuid
+        })
+
+    def _send_ping(self, sock):
+        request = agent_pb2.HypervisorToAgentCommand(
+            command_id=sf_random.random_id(),
+            ping_request=agent_pb2.PingRequest()
+        )
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...ping request')
+        self._send_commands_single_envelope(sock, [request])
+
+    def _handle_agent_welcome(self, reply):
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...agent welcome')
+        self.ready = True
+
+    def _dispatch_execute(self, command_id, cmd):
+        request = agent_pb2.HypervisorToAgentCommand(
+            command_id=command_id,
+            execute_request=common_pb2.ExecuteRequest(
+                command=cmd['commandline'],
+                io_priority=common_pb2.ExecuteRequest.NORMAL
+            )
+        )
+        self.command_cache[command_id] = cmd['commandline']
+        return [request]
+
+    def _handle_execute_reply(self, reply):
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...execute reply')
+        result = {
+            'command': 'execute-response',
+            'command-line': self.command_cache[reply.command_id],
+            'return-code': reply.execute_reply.exit_code
         }
 
-        offset = 0
-        with open(source_path, 'rb') as f:
-            while d := f.read(1024):
-                yield {
-                    'command': command,
-                    'path': destination_path,
-                    'offset': offset,
-                    'encoding': 'base64',
-                    'chunk': base64.b64encode(d).decode('utf-8'),
-                    'unique': unique
-                }
+        # Convert long stdouts and stderrs to blobs
+        stdout = reply.execute_reply.stdout
+        if len(stdout) > 10 * constants.KiB:
+            b = blob.from_memory(stdout.encode('utf-8'))
+            b.ref_count_inc(self.agentop)
+            result['stdout_blob'] = b.uuid
+        else:
+            result['stdout'] = stdout
+
+        stderr = reply.execute_reply.stderr
+        if len(stderr) > 10 * constants.KiB:
+            b = blob.from_memory(stderr.encode('utf-8'))
+            b.ref_count_inc(self.agentop)
+            result['stderr_blob'] = b.uuid
+        else:
+            result['stderr'] = stderr
+
+        self.agentop.add_result(self.command_count, result)
+        self.num_results += 1
+        self.command_count += 1
+
+        extra = {
+            'command': 'execute',
+            'command-line': self.command_cache[reply.command_id],
+            'return-code': reply.execute_reply.exit_code,
+            'command_id': reply.command_id
+        }
+        add_event_multi(
+            EVENT_TYPE_STATUS, self.affected_objects,
+            'got result for agent execute command', extra=extra)
+
+        self.ready = True
+
+    def _chunk_reader(self, command_id, cmd, path):
+        with open(path, 'rb') as f:
+            offset = 0
+            d = f.read(MAX_CHUNK_SIZE)
+            self.log.with_fields({
+                'outstanding_messages': self.outstanding_message_count
+            }).debug('...put file request (including file chunk)')
+
+            yield agent_pb2.HypervisorToAgentCommand(
+                command_id=command_id,
+                put_file_request=agent_pb2.PutFileRequest(
+                    path=cmd['path'],
+                    mode=cmd.get('mode'),
+                    length=os.stat(path).st_size,
+                    first_chunk=agent_pb2.FileChunk(
+                        offset=offset,
+                        encoding=agent_pb2.FileChunk.BASE64,
+                        payload=base64.b64encode(d)
+                    )
+                )
+            )
+            offset += len(d)
+
+            while d := f.read(MAX_CHUNK_SIZE):
+                self.log.with_fields({
+                    'outstanding_messages': self.outstanding_message_count
+                }).debug('...file chunk')
+                yield agent_pb2.HypervisorToAgentCommand(
+                    command_id=command_id,
+                    file_chunk=agent_pb2.FileChunk(
+                        offset=offset,
+                        encoding=agent_pb2.FileChunk.BASE64,
+                        payload=base64.b64encode(d)
+                    )
+                )
                 offset += len(d)
 
-            yield {
-                'command': command,
-                'path': destination_path,
-                'offset': offset,
-                'encoding': 'base64',
-                'chunk': None,
-                'unique': unique
-            }
+            self.log.with_fields({
+                'outstanding_messages': self.outstanding_message_count
+            }).debug('...file chunk (termination)')
+            yield agent_pb2.HypervisorToAgentCommand(
+                command_id=command_id,
+                file_chunk=agent_pb2.FileChunk(
+                    offset=offset,
+                    encoding=agent_pb2.FileChunk.BASE64,
+                    payload=None
+                )
+            )
 
-    def _handle_get_file(self, agentop, count, command):
-        unique = 'agentop:%s:%d' % (agentop.uuid, count)
-        self.sc_client.send_v1_packet({
-            'command': 'get-file',
-            'path': command['path'],
-            'unique': unique
-        })
-        get_done = False
-        get_successful = False
+    def _dispatch_put_blob(self, command_id, cmd):
+        if 'blob_uuid' not in cmd:
+            self.agentop.state = AgentOperation.STATE_ERROR
+            self.agentop.error = 'missing blob uuid'
+            return []
 
-        blob_uuid = str(uuid.uuid4())
-        b = blob.Blob.new(blob_uuid, time.time(), time.time())
-        blob_path = blob.Blob.filepath(blob_uuid)
-        stat_result = {}
-        total_length = 0
+        b = blob.Blob.from_db(cmd['blob_uuid'])
+        if not b:
+            self.agentop.state = AgentOperation.STATE_ERROR
+            self.agentop.error = 'missing blob'
+            return []
 
-        with open(blob_path + '.partial', 'wb') as f:
-            while not get_done:
-                for inpacket in self._await_client():
-                    if not inpacket.get('command') == 'get-file-response':
-                        self.log.with_fields({'packet': inpacket}).error(
-                            'Unexpected sidechannel client packet in '
-                            'response to get-file command '
-                            '(unexpected command type)')
-                        continue
+        # This should already have been done by preflight, but hey
+        b.ensure_local([])
+        self.chunk_iterator = self._chunk_reader(
+            command_id, cmd, blob.Blob.filepath(b.uuid))
 
-                    if not inpacket.get('unique') == unique:
-                        self.log.with_fields({'packet': inpacket}).error(
-                            'Unexpected sidechannel client packet in '
-                            'response to get-file command '
-                            '(unexpected transaction identifier)')
-                        continue
+        # Try to send MAX_OUTSTANDING chunks
+        out = []
+        try:
+            for _ in range(MAX_OUTSTANDING):
+                out.append(self.chunk_iterator.__next__())
+        except StopIteration:
+            self.chunk_iterator = None
 
-                    if 'result' in inpacket and not inpacket['result']:
-                        # Fetch failed!
-                        agentop.add_result(count, inpacket)
-                        agentop.state = AgentOperation.STATE_ERROR
-                        agentop.error = inpacket.get(
-                            'message', 'unknown error')
-                        get_done = True
-                        self.log.with_fields({'packet': inpacket}).info(
-                            'get-file command failed')
-                        continue
+        return out
 
-                    if 'stat_result' in inpacket:
-                        stat_result = inpacket['stat_result']
+    def _dispatch_chmod(self, command_id, cmd):
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...chmod request')
 
-                    if 'chunk' in inpacket:
-                        if not inpacket['chunk']:
-                            # An empty chunk indicates completion
-                            del inpacket['chunk']
-                            del inpacket['offset']
-                            del inpacket['encoding']
-                            inpacket['stat_result'] = stat_result
-                            inpacket['content_blob'] = blob_uuid
+        mode = None
+        try:
+            mode = int(cmd['mode'])
+        except ValueError:
+            ...
 
-                            agentop.add_result(count, inpacket)
-                            get_done = True
-                            get_successful = True
-                            self.log.with_fields({'packet': inpacket}).info(
-                                'get-file command succeeded')
-                        else:
-                            d = base64.b64decode(inpacket['chunk'])
-                            d_len = len(d)
-                            self.log.debug('Wrote %d bytes to %s.partial'
-                                           % (d_len, blob_path))
-                            total_length += d_len
-                            f.write(d)
-
-        if get_successful:
-            self.log.info('finalizing blob')
-
-            # This os.sync() is here because _sometimes_ we wouldn't see the
-            # data on disk when we immediately try to replicate it.
-            os.sync()
-
-            # We don't remove the partial file until we've finished
-            # registering the blob to avoid deletion races. Note that
-            # this _must_ be a hard link, which is why we don't use
-            # util_general.link().
-            os.link(blob_path + '.partial', blob_path)
-            st = os.stat(blob_path)
-            if st.st_size == 0 and total_length > 0:
-                self.log.error('Agent get-file blob is zero not %d bytes.'
-                               % total_length)
-
-            b.size = total_length
-            b.ref_count_inc(agentop)
-            b.observe()
-            b.request_replication()
-
-        os.unlink(blob_path + '.partial')
-
-    def execute(self):
-        etcd.reset_client()
-        util_concurrency.set_thread_name(self.instance_uuid)
-        LOG.debug(
-            f'This sidechannel thread is handling instance {self.instance_uuid}')
-
-        self.instance = instance.Instance.from_db(self.instance_uuid)
-        if not self.instance:
-            return
-        if 'sf-agent' not in self.instance.side_channels:
-            return
-        if self.instance.state.value == instance.Instance.STATE_DELETED:
-            return
-
-        self.instance_ready = constants.AGENT_NEVER_TALKED
-        self.instance.agent_state = constants.AGENT_NEVER_TALKED
-        self.system_boot_time = 0
-        self.last_data = time.time()
-        self.log = LOG.with_fields({'instance': self.instance_uuid})
-
-        # We use the existence of a console.log file in the instance directory
-        # to indicate the instance has been created. This will be true even if
-        # the instance doesn't actually every write to the serial console.
-        console_path = os.path.join(self.instance.instance_path, 'console.log')
-        while not os.path.exists(console_path):
-            time.sleep(1)
-        self.instance.add_event(EVENT_TYPE_STATUS, 'detected console log')
-
-        # Ensure side channel path exists.
-        sc_path = os.path.join(self.instance.instance_path, 'sc-sf-agent')
-        if not os.path.exists(sc_path):
-            self.log.info('sf-agent side channel file missing, aborting')
-            return
-
-        self.sc_client = None
-        self.agent_has_talked = False
-
-        # Setup a connection to the client
-        while not self.sc_client:
+        if not mode:
             try:
-                self.sc_client = SFSocketAgent(self.instance, sc_path, logger=self.log)
-                break
-            except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
-                    FileNotFoundError, OSError):
-                time.sleep(1)
+                mode = symbolicmode.symbolic_to_numeric_permissions(
+                    cmd['mode'])
+            except Exception as e:
+                self.log.with_fields({
+                    'outstanding_messages': self.outstanding_message_count
+                }).debug(f'symbolic mode conversion failed: {e}')
 
-        # We really want to see one of a small number of packets from the client
-        # as our initial conversation. Its possible if this is a restart of the
-        # monitor because of an error that we will receive unexpected packets.
-        # Just ignore them for now.
-        first_attempt = time.time()
-        last_attempt = time.time()
-        try:
-            self.sc_client.send_v1_packet({
-                'command': 'is-system-running',
-                'unique': str(time.time())
-                })
-
-            while daemon.check_abort_path(self.abort_path):
-                for packet in self._await_client():
-                    self.log.with_fields({'packet': packet}).error(
-                        'Unexpected sidechannel client packet during startup, ignoring')
-
-                if self.instance_ready in [constants.AGENT_READY,
-                                           constants.AGENT_READY_DEGRADED]:
-                    break
-
-                # Retry every now and then
-                if time.time() - last_attempt > 30:
-                    self.sc_client.send_v1_packet({
-                        'command': 'is-system-running',
-                        'unique': str(time.time())
-                        })
-                    last_attempt = time.time()
-
-                # If its been a long time and we've heard nothing, then we should
-                # exit so we can re-attempt.
-                if time.time() - first_attempt > 300 and not self.agent_has_talked:
-                    self.log.debug('We waited a long time but the agent never spoke, aborting')
-                    return
-
-        except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
-                FileNotFoundError, OSError, ConnectionFailed) as e:
-            self.log.with_fields({'error': str(e)}).debug(
-                'Unexpected sidechannel communication error during '
-                'connection setup, aborting')
+        if not mode:
+            add_event_multi(
+                EVENT_TYPE_AUDIT, self.affected_objects,
+                'failed to decode chmod mode argument',
+                extra=cmd)
+            self.log.with_fields({
+                'outstanding_messages': self.outstanding_message_count,
+                'command': cmd
+            }).error('Ignoring chmod command with undecoded mode argument')
             return
 
-        self.instance.add_event(EVENT_TYPE_AUDIT, 'instance agent has completed start up')
+        return [
+            agent_pb2.HypervisorToAgentCommand(
+                command_id=command_id,
+                chmod_request=agent_pb2.ChmodRequest(
+                    path=cmd['path'],
+                    mode=mode
+                )
+            )
+        ]
 
-        # If the agent is too old, then just sit here not doing the things we
-        # should be doing
-        if self.instance_ready == constants.AGENT_TOO_OLD:
-            self.instance.add_event(
-                EVENT_TYPE_AUDIT, 'instance agent is too old, not executing commands')
-            while daemon.check_abort_path(self.abort_path):
-                time.sleep(1)
+    def _dispatch_get_file(self, command_id, cmd):
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...get file request')
 
-        # Spin reading packets and responding until we see an error or are asked
-        # to exit.
-        try:
-            while daemon.check_abort_path(self.abort_path):
-                for packet in self._await_client():
-                    self.log.with_fields({'packet': packet}).error(
-                        'Unexpected sidechannel client packet')
+        self._agent_path_for_get = cmd['path']
+        self._blob_uuid = str(uuid4())
+        self._blob_partial_file = open(
+            blob.Blob.filepath(self._blob_uuid) + '.partial', 'wb')
+        self._stat_result = None
 
-                # If idle, try to do something
-                if self.instance_ready in [constants.AGENT_READY,
-                                           constants.AGENT_READY_DEGRADED]:
-                    agentop = self.instance.agent_operation_dequeue()
-                    if agentop:
-                        self.instance.add_event(
-                            EVENT_TYPE_AUDIT, 'dequeued agent operation',
-                            extra={'agentoperation': agentop.uuid})
+        return [
+            agent_pb2.HypervisorToAgentCommand(
+                command_id=command_id,
+                get_file_request=agent_pb2.GetFileRequest(
+                    path=cmd['path']
+                )
+            )
+        ]
 
-                        agentop.state = AgentOperation.STATE_EXECUTING
-                        count = 0
-                        num_results = 0
-                        commands = agentop.commands
+    def _handle_stat_result(self, reply):
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...stat result')
 
-                        for command in commands:
-                            if command['command'] == 'put-blob':
-                                b = blob.Blob.from_db(command['blob_uuid'])
-                                if not b:
-                                    agentop.state = AgentOperation.STATE_ERROR
-                                    agentop.error = 'blob missing: %s' % command['blob_uuid']
-                                    break
-                                blob_path = blob.Blob.filepath(b.uuid)
-                                if not os.path.exists(blob_path):
-                                    agentop.state = AgentOperation.STATE_ERROR
-                                    agentop.error = 'blob file missing: %s' % command['blob_uuid']
-                                    break
+        if not self._blob_partial_file:
+            self.log.with_fields({
+                'outstanding_messages': self.outstanding_message_count
+            }).error('Unknown file transfer')
+            raise GetException('Unknown file transfer')
 
-                                unique = 'agentop:%s:%d' % (agentop.uuid, count)
-                                inpacket = {}
-                                for outpacket in self._send_file(
-                                        'put-file', blob_path, command['path'], unique):
-                                    self.sc_client.send_v1_packet(outpacket)
+        sr = reply.stat_result
+        self._stat_result = {
+            'mode': sr.mode,
+            'size': sr.size,
+            'uid': sr.uid,
+            'gid': sr.gid,
+            'atime': sr.atime,
+            'mtime': sr.mtime,
+            'ctime': sr.ctime
+        }
 
-                                    # Wait for a matching ACK
-                                    for inpacket in self._await_client():
-                                        if (inpacket.get('command') == 'put-file-response'
-                                                and inpacket.get('unique') == unique):
-                                            break
-                                        else:
-                                            self.log.with_fields({'packet': inpacket}).error(
-                                                'Unexpected sidechannel client packet in '
-                                                'response to put-file command')
-                                agentop.add_result(count, inpacket)
-                                num_results += 1
+    def _handle_file_chunk(self, sock, reply):
+        self.log.with_fields({
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('...file chunk')
 
-                            elif command['command'] == 'get-file':
-                                self._handle_get_file(agentop, count, command)
-                                num_results += 1
+        if not self._blob_partial_file:
+            self.log.with_fields({
+                'outstanding_messages': self.outstanding_message_count
+            }).error('Unknown file transfer')
+            raise GetException('Unknown file transfer')
 
-                            elif command['command'] == 'chmod':
-                                unique = 'agentop:%s:%d' % (agentop.uuid, count)
-                                self.sc_client.send_v1_packet({
-                                    'command': 'chmod',
-                                    'path': command['path'],
-                                    'mode': command['mode'],
-                                    'unique': unique
-                                    })
-                                chmod_done = False
-                                while not chmod_done:
-                                    for inpacket in self._await_client():
-                                        if (inpacket.get('command') == 'chmod-response'
-                                                and inpacket.get('unique') == unique):
-                                            agentop.add_result(count, inpacket)
-                                            num_results += 1
-                                            chmod_done = True
-                                        else:
-                                            self.log.with_fields({'packet': inpacket}).error(
-                                                'Unexpected sidechannel client packet in '
-                                                'response to chmod command')
+        chunk = reply.file_chunk
+        if chunk.encoding != agent_pb2.FileChunk.BASE64:
+            self._send_replies_single_envelope(
+                sock,
+                [
+                    agent_pb2.HypervisorToAgentCommand(
+                        command_id=reply.command_id,
+                        command_error=agent_pb2.CommandError(
+                            error='unknown payload encoding')
+                    )
+                ]
+            )
+            raise GetException('Unknown chunk encoding')
 
-                            elif command['command'] == 'chown':
-                                unique = 'agentop:%s:%d' % (agentop.uuid, count)
-                                self.sc_client.send_v1_packet({
-                                    'command': 'chown',
-                                    'user': command['user'],
-                                    'group': command['group'],
-                                    'unique': unique
-                                    })
-                                chown_done = False
-                                while not chown_done:
-                                    for inpacket in self._await_client():
-                                        if (inpacket.get('command') == 'chown-response'
-                                                and inpacket.get('unique') == unique):
-                                            agentop.add_result(count, inpacket)
-                                            num_results += 1
-                                            chown_done = True
-                                        else:
-                                            self.log.with_fields({'packet': inpacket}).error(
-                                                'Unexpected sidechannel client packet in '
-                                                'response to chmod command')
+        if chunk.payload:
+            d = base64.b64decode(chunk.payload)
+            self._blob_partial_file.write(d)
+            self.log.debug(f'... wrote {len(d)} bytes to partial blob')
+        else:
+            self._blob_partial_file.close()
 
-                            elif command['command'] == 'execute':
-                                unique = 'agentop:%s:%d' % (agentop.uuid, count)
-                                self.sc_client.send_v1_packet({
-                                    'command': 'execute',
-                                    'command-line': command['commandline'],
-                                    'block-for-result': True,
-                                    'unique': unique
-                                    })
-                                execute_done = False
-                                while not execute_done:
-                                    for inpacket in self._await_client():
-                                        if (inpacket.get('command') == 'execute-response'
-                                                and inpacket.get('unique') == unique):
-                                            # Convert long stdouts and stderrs to blobs
-                                            if len(inpacket.get('stdout')) > 10 * constants.KiB:
-                                                b = blob.from_memory(
-                                                    inpacket['stdout'].encode('utf-8'))
-                                                b.ref_count_inc(agentop)
-                                                del inpacket['stdout']
-                                                inpacket['stdout_blob'] = b.uuid
-                                            if len(inpacket.get('stderr')) > 10 * constants.KiB:
-                                                b = blob.from_memory(
-                                                    inpacket['stderr'].encode('utf-8'))
-                                                b.ref_count_inc(agentop)
-                                                del inpacket['stderr']
-                                                inpacket['stderr_blob'] = b.uuid
+            if chunk.offset == 0:
+                os.unlink(blob.Blob.filepath(self._blob_uuid) + '.partial')
+                result = {
+                    'stat_result': self._stat_result
+                }
 
-                                            agentop.add_result(count, inpacket)
-                                            num_results += 1
-                                            execute_done = True
-                                        else:
-                                            self.log.with_fields({'packet': inpacket}).error(
-                                                'Unexpected sidechannel client packet in '
-                                                'response to execute command')
+            else:
+                b = blob.Blob.new(self._blob_uuid, time.time(), time.time())
+                ao = copy.copy(self.affected_objects)
+                ao.append(b)
+                eventlog.add_event_multi(
+                    EVENT_TYPE_STATUS, ao, 'fetched content from instance',
+                    extra={
+                        'remote_stat_result': self._stat_result,
+                        'transferred': chunk.offset,
+                        'content_blob': b.uuid,
+                        'instance_uuid': self.instance.uuid
+                    })
+                b.register()
 
-                            else:
-                                self.instance.add_event(
-                                    EVENT_TYPE_AUDIT,
-                                    'unknown agent operation command, aborting operation',
-                                    extra={
-                                        'agentoperation': agentop.uuid,
-                                        'command': command.get('command'),
-                                        'count': count
-                                        })
-                                break
+                result = {
+                    'stat_result': self._stat_result,
+                    'content_blob': b.uuid
+                }
 
-                            count += 1
+            self.agentop.add_result(self.command_count, result)
+            self.num_results += 1
+            self.command_count += 1
 
-                        if num_results == len(commands):
-                            agentop.add_event(EVENT_TYPE_STATUS, 'commands complete')
-                            if agentop.state.value != AgentOperation.STATE_ERROR:
-                                agentop.state = AgentOperation.STATE_COMPLETE
-                        else:
-                            agentop.add_event(
-                                EVENT_TYPE_STATUS, 'commands not yet complete',
-                                extra={'commands': commands, 'results': num_results})
+            self._blob_partial_file = None
+            self._blob_uuid = None
+            self._stat_result = None
+            self._agent_path_for_get = None
+            self.ready = True
 
-                # Ping if we've been idle for a small while
-                if time.time() - self.last_data > 5:
-                    self.sc_client.send_ping()
+        self._send_replies_single_envelope(
+            sock,
+            [
+                agent_pb2.HypervisorToAgentCommand(
+                    command_id=reply.command_id,
+                    file_chunk_reply=agent_pb2.FileChunkReply(
+                        path=self._agent_path_for_get,
+                        offset=chunk.offset
+                    )
+                )
+            ]
+        )
 
-                # If very idle, something has gone wrong
-                if time.time() - self.last_data > 15:
-                    if self.instance.agent_state.value != constants.AGENT_NEVER_TALKED:
-                        self.instance_ready = constants.AGENT_STOPPED_TALKING
-                        self.instance.agent_state = constants.AGENT_STOPPED_TALKING
-                    self.log.debug('Not receiving traffic, aborting.')
-                    if self.system_boot_time != 0:
-                        self.instance.add_event(
-                            EVENT_TYPE_STATUS, 'agent has gone silent, restarting channel')
+    def _execute_inner(self, vsock):
+        self._send_commands_single_envelope(
+            vsock.sock,
+            [
+                agent_pb2.HypervisorToAgentCommand(
+                    command_id=sf_random.random_id(),
+                    hypervisor_welcome=agent_pb2.HypervisorWelcome(
+                        version=util_general.get_version()
+                    )
+                )
+            ]
+        )
+        self.last_data = time.time()
 
-                    # Attempt to close, but the OS might already think its closed
+        buffered = bytearray()
+        while daemon.check_abort_path(self.abort_path):
+            if time.time() - self.last_data > 2:
+                self._send_ping(vsock.sock)
+                self.last_data = time.time()
+
+            try:
+                input = vsock.sock.recv(102400)
+                if not input:
+                    return
+
+                self.last_data = time.time()
+                buffered += input
+
+                envelope = agent_pb2.AgentToHypervisor()
+                try:
+                    consumed = envelope.ParseFromString(buffered)
+                except DecodeError:
+                    consumed = 0
+
+                if consumed == 0:
+                    continue
+                buffered = buffered[consumed:]
+                self.log.with_fields({
+                    'outstanding_messages': self.outstanding_message_count
+                }).debug('Received message')
+
+                for reply in envelope.commands:
+                    if reply.HasField('agent_welcome'):
+                        self._handle_agent_welcome(reply)
+
+                    elif reply.HasField('ping_reply'):
+                        self.log.with_fields({
+                            'outstanding_messages': self.outstanding_message_count
+                        }).debug('...ping reply')
+
+                    elif reply.HasField('execute_reply'):
+                        self._handle_execute_reply(reply)
+
+                    elif reply.HasField('file_chunk_reply'):
+                        self.log.with_fields({
+                            'outstanding_messages': self.outstanding_message_count
+                        }).debug('...file chunk reply')
+                        self.outstanding_message_count -= 1
+                        self.log.with_fields({
+                            'outstanding_messages': self.outstanding_message_count
+                        }).debug('...decrement outstanding commands')
+
+                        try:
+                            out = None
+                            if self.chunk_iterator:
+                                out = self.chunk_iterator.__next__()
+                            if out:
+                                self._send_commands_single_envelope(
+                                    vsock.sock, [out], register_as_outstanding=True)
+
+                        except StopIteration:
+                            self.chunk_iterator = None
+
+                        if self.outstanding_message_count == 0:
+                            self.ready = True
+                        elif self.outstanding_message_count < 0:
+                            self.log.with_fields({
+                                'outstanding_messages': self.outstanding_message_count
+                            }).error('Negative outstanding messages, aborting')
+                            return
+
+                    elif reply.HasField('chmod_reply'):
+                        self.log.with_fields({
+                            'outstanding_messages': self.outstanding_message_count
+                        }).debug('...chmod reply')
+                        self.ready = True
+
+                    elif reply.HasField('stat_result'):
+                        self._handle_stat_result(reply)
+
+                    elif reply.HasField('file_chunk'):
+                        try:
+                            self._handle_file_chunk(vsock.sock, reply)
+
+                        except GetException as e:
+                            self.agentop.state = AgentOperation.STATE_ERROR
+                            self.agentop.error = str(e)
+
+                    elif reply.HasField('command_error'):
+                        self._handle_command_error(reply)
+
+                self.log.with_fields({
+                    'ready': self.ready,
+                    'commands': self.commands,
+                    'outstanding_messages': self.outstanding_message_count
+                }).debug('Considering command execution')
+                if self.ready and not self.commands:
+                    # We've run out of things to execute, say goodbye and
+                    # disconnect.
+                    self._send_commands_single_envelope(
+                        vsock.sock,
+                        [
+                            agent_pb2.HypervisorToAgentCommand(
+                                command_id=sf_random.random_id(),
+                                hypervisor_departure=agent_pb2.HypervisorDeparture()
+                            )
+                        ]
+                    )
+                    if self.agentop.state.value == AgentOperation.STATE_EXECUTING:
+                        add_event_multi(
+                            EVENT_TYPE_STATUS, self.affected_objects,
+                            'commands complete')
+                        self.agentop.state = AgentOperation.STATE_COMPLETE
+                    return
+
+                if self.ready:
+                    requests = []
+                    register_as_outstanding = False
+                    cmd = self.commands.pop(0)
+                    command_id = sf_random.random_id()
+
                     try:
-                        self.sc_client.close()
-                    except OSError:
-                        pass
+                        if cmd['command'] == 'execute':
+                            requests = self._dispatch_execute(command_id, cmd)
 
-                    return
+                        elif cmd['command'] == 'put-blob':
+                            requests = self._dispatch_put_blob(command_id, cmd)
+                            register_as_outstanding = True
 
-        except (BrokenPipeError, ConnectionRefusedError, ConnectionResetError,
-                FileNotFoundError, OSError, ConnectionFailed) as e:
-            self.instance.add_event(
-                EVENT_TYPE_STATUS,
-                ('unexpected sidechannel communication error post '
-                 'connection setup, restarting channel'), extra={'error': str(e)})
-            return
+                        elif cmd['command'] == 'chmod':
+                            requests = self._dispatch_chmod(command_id, cmd)
+
+                        elif cmd['command'] == 'get-file':
+                            requests = self._dispatch_get_file(command_id, cmd)
+
+                        else:
+                            add_event_multi(
+                                EVENT_TYPE_STATUS, self.affected_objects,
+                                'unknown command', extra=cmd)
+                            self.agentop.state = AgentOperation.STATE_ERROR
+                            self.agentop.error = 'unknown command'
+
+                        if requests:
+                            extra = copy.copy(cmd)
+                            extra['command_id'] = command_id
+                            add_event_multi(
+                                EVENT_TYPE_STATUS, self.affected_objects,
+                                'executing agent command', extra=extra)
+                            self.agentop.state = AgentOperation.STATE_EXECUTING
+
+                            self.log.with_fields({
+                                'outstanding_messages': self.outstanding_message_count,
+                                'register_as_outstanding': register_as_outstanding
+                            }).debug(f'Sending {len(requests)} messages')
+                            self._send_commands_single_envelope(
+                                vsock.sock, requests,
+                                register_as_outstanding=register_as_outstanding)
+                            self.ready = False
+
+                    finally:
+                        if self.agentop.state.value == AgentOperation.STATE_ERROR:
+                            self.commands = []
+
+            except socket.timeout:
+                ...
+
+        self.log.with_fields({
+            'abort_path': self.abort_path,
+            'outstanding_messages': self.outstanding_message_count
+        }).debug('Abort path set, exiting')
 
 
 class Monitor(daemon.Daemon):
     def __init__(self, name):
         super().__init__(name)
-        self.monitors = {}
 
-    def reap_single_instance_monitors(self):
+        self.instance_sidechannel_cache = {}
+        self.monitors = {}
+        self.monitor_attempts = {}
+        self.executors = {}
+
+    def start_instance_monitor(self, instance_uuid):
+        # Rate limit how often we try to connect
+        last_attempt = self.monitor_attempts.get(instance_uuid, 0)
+        if time.time() - last_attempt < 30:
+            return
+        self.monitor_attempts[instance_uuid] = time.time()
+
+        inst = instance.Instance.from_db(instance_uuid)
+        if not inst:
+            return
+
+        if instance_uuid not in self.instance_sidechannel_cache:
+            self.instance_sidechannel_cache[instance_uuid] = inst.side_channels
+
+        if 'sf-agent2' not in self.instance_sidechannel_cache[instance_uuid]:
+            return
+        if inst.state.value == instance.Instance.STATE_DELETED:
+            return
+        if not inst.vsock_cid('sf-agent2'):
+            return
+
+        sc_obj = SideChannelMonitorJob(inst)
+        sc_thread = threading.Thread(
+            target=sc_obj.run, daemon=True, name=instance_uuid)
+        sc_thread.start()
+
+        self.monitors[instance_uuid] = {
+            'object': sc_obj,
+            'thread': sc_thread,
+            'instance_uuid': instance_uuid
+        }
+
+    def reap_instance_monitors(self):
         all_monitors = list(self.monitors.keys())
         for instance_uuid in all_monitors:
-            t = self.monitors[instance_uuid]['thread']
-            if not t.is_alive():
-                t.join(1)
-                LOG.info(
-                    f'Reaped dead sidechannel monitor with ident {t.ident}')
-                eventlog.add_event(
-                    EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-                    'sidechannel monitor ended')
+            t = self.monitors[instance_uuid]
+            if not t['thread'].is_alive():
+                t['thread'].join(1)
                 del self.monitors[instance_uuid]
+
+    def start_instance_executor(self, instance_uuid, agentop):
+        inst = instance.Instance.from_db(instance_uuid)
+        if not inst:
+            return
+
+        if instance_uuid not in self.monitors:
+            return
+
+        sc_obj = SideChannelExecutorJob(inst, agentop)
+        sc_thread = threading.Thread(
+            target=sc_obj.run, daemon=True, name=instance_uuid)
+        sc_thread.start()
+
+        self.executors[instance_uuid] = {
+            'object': sc_obj,
+            'thread': sc_thread,
+            'instance_uuid': instance_uuid
+        }
+        eventlog.add_event(
+            EVENT_TYPE_AUDIT, 'instance', instance_uuid,
+            'side channel executor started',
+            extra={
+                'thread_ident': sc_thread.ident
+            })
+
+    def reap_instance_executors(self):
+        all_executors = list(self.executors.keys())
+        for executor_id in all_executors:
+            t = self.executors[executor_id]
+            if not t['thread'].is_alive():
+                t['thread'].join(1)
+                eventlog.add_event(
+                    EVENT_TYPE_AUDIT, 'instance', t['instance_uuid'],
+                    'side channel executor ended',
+                    extra={
+                        'thread_ident': t['thread'].ident
+                    })
+                del self.executors[executor_id]
 
     def _request_all_threads_exit(self):
         LOG.info('Requesting all threads exit')
-        all_monitors = self.monitors.keys()
-        for instance_uuid in all_monitors:
-            self._request_thread_exit(instance_uuid)
 
-    def _request_thread_exit(self, instance_uuid):
-        t = self.monitors[instance_uuid]
-        t['object'].exit.set()
+        all_monitors = list(self.monitors.keys())
+        for instance_uuid in all_monitors:
+            self._request_thread_exit(
+                instance_uuid, self.monitors[instance_uuid])
+
+        all_executors = list(self.executors.keys())
+        for instance_uuid in all_executors:
+            self._request_thread_exit(
+                instance_uuid, self.executors[instance_uuid])
+
+    def _request_thread_exit(self, instance_uuid, t):
+        daemon.set_abort_path(
+            t['object'].abort_path, 'from _request_thread_exit')
         eventlog.add_event(
             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-            'sidechannel monitor instructed to exit')
+            'side channel monitor instructed to exit')
         self.monitors[instance_uuid]['thread'].join(0.5)
 
         if not t['thread'].is_alive():
             del self.monitors[instance_uuid]
+            daemon.clear_abort_path(t['object'].abort_path)
             eventlog.add_event(
                 EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-                'sidechannel monitor finished')
+                'side channel monitor finished')
 
     def _run_inner(self):
-        instance_sidechannel_cache = {}
-
         while daemon.check_abort_path(self.abort_path):
             try:
                 while not daemon.health_check_nodelock():
@@ -641,7 +929,8 @@ class Monitor(daemon.Daemon):
                     time.sleep(1)
                     continue
 
-                self.reap_single_instance_monitors()
+                self.reap_instance_monitors()
+                self.reap_instance_executors()
 
                 if not os.path.exists(self.abort_path):
                     # Audit desired self.monitors
@@ -669,49 +958,53 @@ class Monitor(daemon.Daemon):
                             if instance_uuid not in self.monitors:
                                 missing_instances.append(instance_uuid)
 
-                    # Start missing monitors. We only support sf-agent for now.
+                    # Start missing monitors. We only support sf-agent2 for now.
                     for instance_uuid in missing_instances:
-                        if instance_uuid not in instance_sidechannel_cache:
-                            inst = instance.Instance.from_db(instance_uuid)
-                            if not inst:
-                                continue
-                            instance_sidechannel_cache[instance_uuid] = inst.side_channels
-
-                        if 'sf-agent' not in instance_sidechannel_cache[instance_uuid]:
-                            continue
-
-                        sc_obj = SideChannelJob(instance_uuid)
-                        sc_thread = threading.Thread(
-                            target=sc_obj.run, daemon=True, name=instance_uuid)
-                        sc_thread.start()
-
-                        self.monitors[instance_uuid] = {
-                            'object': sc_obj,
-                            'thread': sc_thread,
-                            'instance_uuid': instance_uuid
-                        }
-                        eventlog.add_event(
-                            EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-                            'sidechannel monitor started')
+                        self.start_instance_monitor(instance_uuid)
 
                     # Cleanup extra monitors
                     for instance_uuid in extra_instances:
-                        self._request_thread_exit(instance_uuid)
+                        self._request_thread_exit(
+                            instance_uuid, self.monitors[instance_uuid])
+
+                    # Run jobs for healthy instances. For now we only support
+                    # running one job at once.
+                    for instance_uuid in list(self.monitors.keys()):
+                        if instance_uuid in self.executors:
+                            continue
+
+                        inst = instance.Instance.from_db(instance_uuid)
+                        if not inst:
+                            continue
+
+                        ready = self.monitors[instance_uuid]['object'].instance_ready
+                        if ready not in [constants.AGENT_READY,
+                                         constants.AGENT_READY_DEGRADED]:
+                            continue
+
+                        agentop = inst.agent_operation_dequeue()
+                        if agentop:
+                            inst.add_event(
+                                EVENT_TYPE_AUDIT, 'dequeued agent operation',
+                                extra={'agentoperation': agentop.uuid})
+
+                            self.start_instance_executor(
+                                instance_uuid, agentop)
 
                     self.idle(1)
 
             except Exception as e:
-                util_general.ignore_exception('sidechannel monitor', e)
+                util_general.ignore_exception('side channel monitor', e)
 
         LOG.info('Stopping')
 
         while self.monitors:
-            LOG.info('There are {len(self.monitors)} threads remaining')
+            LOG.info(f'There are {len(self.monitors)} threads remaining')
             self._request_all_threads_exit()
-            if self(self.monitors):
+            if self.monitors:
                 time.sleep(5)
 
-        LOG.info('There are {len(self.monitors)} threads remaining')
+        LOG.info(f'There are {len(self.monitors)} threads remaining')
         LOG.info('Stopped')
 
 

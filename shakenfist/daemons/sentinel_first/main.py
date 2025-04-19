@@ -28,9 +28,9 @@ signal.signal(signal.SIGTERM, exit_gracefully)
 
 def main():
     daemon.clear_abort_path(ABORT_PATH)
-
-    LOG.info('Started')
     setproctitle.setproctitle('sf-sentinel-first')
+    LOG.info('Started')
+
     refresh_object_state_caches()
 
     n = Node.from_db(config.NODE_NAME)

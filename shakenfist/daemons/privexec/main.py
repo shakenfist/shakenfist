@@ -16,7 +16,8 @@ import setproctitle
 from shakenfist_utilities import random      # noreorder
 from shakenfist_utilities import logs
 
-from shakenfist import privexec_pb2
+from shakenfist.protos import common_pb2
+from shakenfist.protos import privexec_pb2
 
 
 LOG, _ = logs.setup(__name__)
@@ -25,7 +26,6 @@ EXIT = threading.Event()
 
 
 def exit_gracefully(sig, _frame):
-    global EXIT
     if sig == signal.SIGTERM:
         LOG.info('Received SIGTERM')
         EXIT.set()
@@ -36,9 +36,9 @@ signal.signal(signal.SIGTERM, exit_gracefully)
 
 # Mid-range best effort, equivalent to not specifying a value
 IO_PRIORITIES = {
-    privexec_pb2.ExecuteRequest.NORMAL: (2, 4),
-    privexec_pb2.ExecuteRequest.LOW: (2, 7),
-    privexec_pb2.ExecuteRequest.HIGH: (2, 0)
+    common_pb2.ExecuteRequest.NORMAL: (2, 4),
+    common_pb2.ExecuteRequest.LOW: (2, 7),
+    common_pb2.ExecuteRequest.HIGH: (2, 0)
 }
 
 
@@ -50,8 +50,6 @@ class PrivExecJob:
         self.pid = None
 
     def _execute(self, request):
-        global IO_PRIORITIES
-
         command = request.command
         if request.network_namespace != '':
             command = f'ip netns exec {request.network_namespace} {command}'
@@ -65,7 +63,7 @@ class PrivExecJob:
         ioclass, iovalue = list(psutil.Process().ionice())
         current_iopriority = (int(ioclass), int(iovalue))
         requested_iopriority = IO_PRIORITIES.get(
-            request.io_priority, IO_PRIORITIES[privexec_pb2.ExecuteRequest.NORMAL])
+            request.io_priority, IO_PRIORITIES[common_pb2.ExecuteRequest.NORMAL])
 
         if current_iopriority != requested_iopriority:
             command = (f'ionice -c {requested_iopriority[0]} '
@@ -100,7 +98,7 @@ class PrivExecJob:
         }).debug('Executed command')
 
         return privexec_pb2.PrivExecReply(
-            execute_reply=privexec_pb2.ExecuteReply(
+            execute_reply=common_pb2.ExecuteReply(
                 stdout=stdout,
                 stderr=stderr,
                 exit_code=exit_code,
@@ -124,6 +122,7 @@ class PrivExecJob:
                 consumed = request.ParseFromString(buffered)
                 if consumed == 0:
                     continue
+                buffered = buffered[consumed:]
 
                 if request.HasField('execute_request'):
                     er = request.execute_request
@@ -146,10 +145,6 @@ def write_pid_file():
 
 
 def main():
-    global LOG
-    global SOCKET_PATH
-    global EXIT
-
     write_pid_file()
     setproctitle.setproctitle('sf-privexec')
 

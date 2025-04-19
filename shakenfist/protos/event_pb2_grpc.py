@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from shakenfist import event_pb2 as event__pb2
+from shakenfist.protos import event_pb2 as event__pb2
 
 GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__

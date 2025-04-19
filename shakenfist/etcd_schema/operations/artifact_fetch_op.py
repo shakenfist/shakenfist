@@ -3,8 +3,8 @@ from typing import Optional
 from uuid import uuid4
 
 from pydantic import BaseModel
-from pydantic import field_serializer
 from pydantic import Field
+from pydantic import field_serializer
 from pydantic import UUID4
 from pydantic import ValidationError
 from shakenfist_utilities import logs  # noreorder

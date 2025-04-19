@@ -57,6 +57,10 @@ class InvalidLifecycleState(InstanceException):
     ...
 
 
+class NoSuchChannel(InstanceException):
+    ...
+
+
 # Scheduler
 class SchedulerException(Exception):
     ...
