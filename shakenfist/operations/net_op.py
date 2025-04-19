@@ -100,15 +100,12 @@ class NetOp(BaseClusterOperation):
 
     def _network_deploy(self, n):
         if n.is_dead():
-            raise InvalidStateForTask()
+            raise InvalidStateForTask(self)
 
         n.create_on_network_node()
         n.ensure_mesh()
 
     def _network_destroy(self, n):
-        if n.is_dead():
-            raise InvalidStateForTask(self)
-
         if n.networkinterfaces:
             self.log.with_fields({
                 'networkinterfaces': n.networkinterfaces
