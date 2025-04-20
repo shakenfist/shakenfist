@@ -390,6 +390,22 @@ class BaseTestCase(testtools.TestCase):
             'After time {}, instance {} had no event "{}:{}"'.format(
                 after, instance_uuid, operation, message))
 
+    def _await_instance_operations_complete(self, instance_uuid):
+        start_time = time.time()
+        while time.time() - start_time < 5 * 60:
+            i = self.system_client.get_instance(instance_uuid)
+            lco = i['last_cluster_operation']
+
+            if not lco:
+                return
+
+            lco_details = self.system_client.get_cluster_operation(
+                lco['op_type'], lco['op_uuid'])
+            if lco_details['state'] in ['complete', 'deleted', 'abort']:
+                return
+
+            time.sleep(10)
+
     def _await_image_download_success(self, image_uuid, after=None):
         return self._await_image_event(image_uuid, 'fetch', 'success', after)
 
