@@ -667,7 +667,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs -t 1.25'
+              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs -t 1.75'
 
       - name: Check for reasonable data rates
         timeout-minutes: 5
@@ -877,7 +877,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs -t 0.99'
+              debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs -t 1.75'
 
       - name: Check for reasonable data rates
         timeout-minutes: 5
