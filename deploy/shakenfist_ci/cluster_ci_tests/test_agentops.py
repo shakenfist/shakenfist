@@ -192,13 +192,14 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self.assertNotEqual(None, b)
 
         start_time = time.time()
-        while not b['checksums'].get('sha512'):
+        fetched_hash = self.test_client.get_blob_hash(b['uuid'], 'sha512')
+        while not fetched_hash:
             if time.time() - start_time > 60:
                 self.fail(
                     f'Checksum for blob {b["uuid"]} not available after 60 '
                     'seconds')
 
             time.sleep(5)
-            b = self.test_client.get_blob(aop['results']['0']['content_blob'])
+            fetched_hash = self.test_client.get_blob_hash(b['uuid'], 'sha512')
 
-        self.assertEqual(cluster_hash, b['checksums'].get('sha512'))
+        self.assertEqual(cluster_hash, fetched_hash)
