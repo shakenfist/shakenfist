@@ -133,8 +133,8 @@ class Root(sf_api.Resource):
              '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
              'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events, '
-             'blob-checksums</li>'
-             '<li>cluster-operations: get</li>'
+             'blob-checksums, blob-single-checksum</li>'
+             '<li>cluster-operations: get-cluster-operations</li>'
              '<li>events: events-by-type</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
              'instance-put-blob, instance-execute, instance-get, instance-screenshot, '
@@ -201,6 +201,8 @@ api.add_resource(api_blob.BlobsEndpoint, '/blobs')
 api.add_resource(api_blob.BlobEndpoint, '/blobs/<blob_uuid>')
 api.add_resource(api_blob.BlobDataEndpoint, '/blobs/<blob_uuid>/data')
 api.add_resource(api_blob.BlobEventsEndpoint, '/blobs/<blob_uuid>/events')
+api.add_resource(api_blob.BlobChecksumEndpoint,
+                 '/blobs/<blob_uuid>/checksum/<algorithm>')
 api.add_resource(api_blob.BlobChecksumsEndpoint, '/blob_checksums/<algorithm>/<hash>')
 api.add_resource(api_blob.BlobMetadatasEndpoint, '/blobs/<blob_uuid>/metadata')
 api.add_resource(api_blob.BlobMetadataEndpoint, '/blobs/<blob_uuid>/metadata/<key>')

@@ -14,7 +14,7 @@ click==8.1.8                       # bsd
 werkzeug==3.1.3                    # bsd
 prometheus-client==0.21.1          # apache2
 etcd3gw==2.4.2                     # apache2
-bcrypt==4.2.1                      # apache2
+bcrypt==4.3.0                      # apache2
 python-magic==0.4.27               # mit
 webargs==8.6.0                     # mit
 py-cpuinfo==9.0.0                  # mit
@@ -84,7 +84,7 @@ mixed-methods==1.1.1
 named==1.4.2
 orderings==1.6.0
 property-manager==3.0
-psutil==6.1.0
+psutil==6.1.1
 PyJWT==2.10.1
 python-dotenv==1.0.1
 pytz==2024.2
@@ -96,3 +96,4 @@ verboselogs==1.7
 zipp==3.21.0
 zope.event==5.0
 zope.interface==7.2
+wraps==0.15.0

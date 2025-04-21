@@ -170,7 +170,9 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
             'macaddress': '02:00:00:ea:3a:28'
         }
         self.test_client.add_instance_interface(inst['uuid'], netdesc)
-        time.sleep(10)
+
+        # Wait for operations to complete
+        self._await_instance_operations_complete(inst['uuid'])
 
         # List interfaces
         _, data = self.test_client.await_agent_command(

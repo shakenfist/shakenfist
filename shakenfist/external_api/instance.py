@@ -24,6 +24,10 @@ from shakenfist.etcd_schema.operations.artifact_fetch_op \
     import create_and_enqueue as afo_create_and_enqueue
 from shakenfist.etcd_schema.operations.artifact_fetch_op \
     import model_tasks as afo_tasks
+from shakenfist.etcd_schema.operations.net_op \
+    import create_and_enqueue as net_create_and_enqueue
+from shakenfist.etcd_schema.operations.net_op \
+    import model_tasks as net_tasks
 from shakenfist.etcd_schema.operations.node_aop_op \
     import create_and_enqueue as na_create_and_enqueue
 from shakenfist.etcd_schema.operations.node_aop_op \
@@ -987,6 +991,14 @@ class InstanceInterfacesEndpoint(sf_api.Resource):
         if err:
             return err
 
+        # We ensure the new interface is in the DHCP service for the network
+        # before we plug the interface into the instance.
+        dnsmasq_op_type, dnsmasq_op_uuid = net_create_and_enqueue(
+            netdesc['network_uuid'],
+            [net_tasks.network_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io
+        )
+
         op_type, op_uuid = niio_create_and_enqueue(
             instance_from_db.placement['node'],
             instance_from_db.uuid,
@@ -995,7 +1007,9 @@ class InstanceInterfacesEndpoint(sf_api.Resource):
             [niio_tasks.hot_plug_instance_interface],
             PRIORITY.user_waiting,
             request_id=util_general.get_request_id(),
-            depends_on=None,
+            depends_on=[
+                dependency(op_type=dnsmasq_op_type, op_uuid=dnsmasq_op_uuid)
+            ],
             runs_after=[instance_from_db.last_cluster_operation])
         instance_from_db.set_last_cluster_operation(op_type, op_uuid)
         instance_from_db.interfaces_append(netdesc['iface_uuid'])

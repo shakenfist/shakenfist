@@ -105,7 +105,7 @@ class NodeAgentopOp(BaseClusterOperation):
             aop.state = Instance.STATE_ERROR
 
     def _preflight(self, aop):
-        if not aop.state.value == AgentOperation.STATE_PREFLIGHT:
+        if aop.state.value != AgentOperation.STATE_PREFLIGHT:
             return
 
         for command in aop.commands:
@@ -117,5 +117,10 @@ class NodeAgentopOp(BaseClusterOperation):
                                  f'{command["blob_uuid"]}')
                     return
                 b.ensure_local([])
+
+                # This agent operation could have been deleted while we copied
+                # this blob?
+                if aop.state.value != AgentOperation.STATE_PREFLIGHT:
+                    return
 
         aop.state = AgentOperation.STATE_QUEUED
