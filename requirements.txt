@@ -72,7 +72,7 @@ entrypoint==2.1.0
 exceptiongroup==1.2.2
 executor==23.2
 funcs==0.11.0
-futurist==3.0.0
+futurist==3.1.1
 humanfriendly==10.0
 importlib-metadata==8.5.0
 itsdangerous==2.2.0
