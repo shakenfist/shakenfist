@@ -6,7 +6,7 @@ psutil>=5.9.0                      # bsd
 shakenfist-utilities==0.7.3        # apache2
 clingwrap==1.6.9                   # apache2
 
-fixtures==4.1.0                    # apache2
+fixtures==4.2.5                    # apache2
 PyYAML==6.0.2                      # mit
 Jinja2==3.1.6                      # bsd
 setproctitle==1.3.4                # bsd
