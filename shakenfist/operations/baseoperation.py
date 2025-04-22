@@ -1,4 +1,5 @@
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist import etcd
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
@@ -107,7 +108,7 @@ class BaseClusterOperation(BaseOperation):
         dbo.STATE_DELETED: None,
     }
 
-    def __init__(self, static_values):
+    def __init__(self, static_values, schema):
         super().__init__(static_values['uuid'], static_values.get('version'))
         self.__priority = PRIORITY[static_values['priority']]
         self.__request_id = static_values.get('request_id')
@@ -116,6 +117,17 @@ class BaseClusterOperation(BaseOperation):
 
         # We only know this if we have been dequeued
         self._queue_name = None
+
+        # Convert tasks names back into enum entries
+        self.__tasks = []
+        for task_name in static_values['tasks']:
+            try:
+                self.__tasks.append(schema.model_tasks[task_name])
+            except KeyError as e:
+                self.state = self.STATE_ERROR
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'unknown task {task_name}: {e}')
+                raise e
 
     @property
     def priority(self):
@@ -145,13 +157,21 @@ class BaseClusterOperation(BaseOperation):
     def queue_name(self, name):
         self._queue_name = name
 
+    @property
+    def tasks(self):
+        return self.__tasks
+
     # Methods
     def external_view(self):
+        tasks = []
+        for t in self.__tasks:
+            tasks.append(t.name)
+
         return {
             'operation_type': self.object_type,
             'uuid': self.uuid,
             'state': self.state.value,
-            'tasks': self.__tasks
+            'tasks': tasks
         }
 
     def execute(self):

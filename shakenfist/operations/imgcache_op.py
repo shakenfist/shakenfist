@@ -41,23 +41,12 @@ class ImageCacheOp(BaseClusterOperation):
 
     def __init__(self, static_values):
         self.upgrade(static_values)
-        super().__init__(static_values)
+        super().__init__(static_values, schema)
 
         self.__node_uuid = static_values['node_uuid']
         self.__blob_uuid = static_values['blob_uuid']
         self.__cache_path = static_values['cache_path']
         self.__transcode_description = static_values['transcode_description']
-
-        # Convert tasks names back into enum entries
-        self.__tasks = []
-        for task_name in static_values['tasks']:
-            try:
-                self.__tasks.append(schema.model_tasks[task_name])
-            except KeyError as e:
-                self.state = self.STATE_ERROR
-                self.add_event(
-                    EVENT_TYPE_AUDIT, 'unknown task {task_name}: {e}')
-                raise e
 
         self.log = LOG.with_fields({
             'operation_type': self.object_type,
@@ -85,10 +74,6 @@ class ImageCacheOp(BaseClusterOperation):
     @property
     def transcode_description(self):
         return self.__transcode_description
-
-    @property
-    def tasks(self):
-        return self.__tasks
 
     # API
     def external_view(self):
