@@ -48,6 +48,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
 from shakenfist.util import general as util_general
@@ -723,6 +724,16 @@ class Instance(dbo):
 
         return block_devices
 
+    def _record_domain_xml(self):
+        with util_libvirt.LibvirtConnection() as lc:
+            inst = lc.get_domain_from_sf_uuid(self.uuid)
+            xml_desc = inst.XMLDesc(0)
+            self.add_event(
+                EVENT_TYPE_MUTATE, 'libvirt domain XML',
+                extra={
+                    'xml': xml_desc
+                })
+
     def place_instance(self, location):
         with self.get_lock_attr('placement', 'Instance placement'):
             # We don't write unchanged things to the database
@@ -783,6 +794,8 @@ class Instance(dbo):
         self._configure_block_devices(lock)
 
         self.power_on()
+        self._record_domain_xml()
+
         if self.is_powered_on():
             self.state = self.STATE_CREATED
         else:
@@ -1336,8 +1349,11 @@ class Instance(dbo):
         # Libvirt re-writes the domain XML once loaded, so we store the XML
         # as generated as well so that we can debug. Note that this is _not_
         # the XML actually used by libvirt.
-        with open(self.domain_xml_path, 'w') as f:
-            f.write(x)
+        self.add_event(
+            EVENT_TYPE_MUTATE, 'libvirt domain XML',
+            extra={
+                'xml': x
+            })
 
         return x
 
@@ -1826,6 +1842,7 @@ class Instance(dbo):
             inst.attachDeviceFlags(device_xml, flags=flags)
             add_event_multi(
                 EVENT_TYPE_AUDIT, [self, n, ni], 'hot plugged interface')
+            self._record_domain_xml()
 
     def socket_on_vsock_channel(self, channel, port=1025):
         cid = self.vsock_cid(channel)
