@@ -319,9 +319,17 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             'macaddress': '02:00:00:ea:3a:28'
         }
         self.test_client.add_instance_interface(inst['uuid'], netdesc)
-
-        # Wait for operations to complete
         self._await_instance_operations_complete(inst['uuid'])
+
+        # Wait a bit longer for the kernel to do its thing
+        time.sleep(10)
+
+        # Check lshw
+        _, data = self.test_client.await_agent_command(
+            inst['uuid'], 'sudo lshw -class network')
+        self.assertNotEqual(
+            -1, data.find('02:00:00:ea:3a:28'),
+            'Interface not found in `sudo lshw -class network` output:\n%s' % data)
 
         # List interfaces
         _, data = self.test_client.await_agent_command(
@@ -375,7 +383,17 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             'macaddress': '02:00:00:ea:3a:28'
         }
         self.test_client.add_instance_interface(inst['uuid'], netdesc)
+        self._await_instance_operations_complete(inst['uuid'])
+
+        # Wait a bit longer for the kernel to do its thing
         time.sleep(10)
+
+        # Check lshw
+        _, data = self.test_client.await_agent_command(
+            inst['uuid'], 'sudo lshw -class network')
+        self.assertNotEqual(
+            -1, data.find('02:00:00:ea:3a:28'),
+            'Interface not found in `sudo lshw -class network` output:\n%s' % data)
 
         # List interfaces
         _, data = self.test_client.await_agent_command(

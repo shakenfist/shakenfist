@@ -324,12 +324,12 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         # Wait a bit longer for the kernel to do its thing
         time.sleep(10)
 
-        # Check dmesg
+        # Check lshw
         _, data = self.test_client.await_agent_command(
-            inst['uuid'], 'dmesg')
+            inst['uuid'], 'sudo lshw -class network')
         self.assertNotEqual(
             -1, data.find('02:00:00:ea:3a:28'),
-            'Interface not found in `dmesg` output:\n%s' % data)
+            'Interface not found in `sudo lshw -class network` output:\n%s' % data)
 
         # List interfaces
         _, data = self.test_client.await_agent_command(
@@ -388,12 +388,19 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         # Wait a bit longer for the kernel to do its thing
         time.sleep(10)
 
-        # Check dmesg
+        # Check lshw
         _, data = self.test_client.await_agent_command(
-            inst['uuid'], 'dmesg')
+            inst['uuid'], 'sudo lshw -class network')
         self.assertNotEqual(
             -1, data.find('02:00:00:ea:3a:28'),
-            'Interface not found in `dmesg` output:\n%s' % data)
+            'Interface not found in `sudo lshw -class network` output:\n%s' % data)
+
+        # List interfaces
+        _, data = self.test_client.await_agent_command(
+            inst['uuid'], 'ip -json link')
+        self.assertNotEqual(
+            -1, data.find('02:00:00:ea:3a:28'),
+            'Interface not found in `ip -json link` output:\n%s' % data)
 
         # Determine which interface the new one was added as
         d = json.loads(data)
