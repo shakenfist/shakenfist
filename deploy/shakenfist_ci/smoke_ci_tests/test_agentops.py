@@ -321,6 +321,9 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self.test_client.add_instance_interface(inst['uuid'], netdesc)
         self._await_instance_operations_complete(inst['uuid'])
 
+        # Wait a bit longer for the kernel to do its thing
+        time.sleep(10)
+
         # Check dmesg
         _, data = self.test_client.await_agent_command(
             inst['uuid'], 'dmesg')
@@ -381,6 +384,9 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         }
         self.test_client.add_instance_interface(inst['uuid'], netdesc)
         self._await_instance_operations_complete(inst['uuid'])
+
+        # Wait a bit longer for the kernel to do its thing
+        time.sleep(10)
 
         # Check dmesg
         _, data = self.test_client.await_agent_command(
