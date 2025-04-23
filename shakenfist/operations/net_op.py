@@ -3,6 +3,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.etcd_schema.operations import net_op as schema
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.network.network import Network
+from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import general as util_general
@@ -91,10 +92,12 @@ class NetOp(BaseClusterOperation):
 
     def _network_destroy(self, n):
         if n.networkinterfaces:
-            self.log.with_fields({
-                'networkinterfaces': n.networkinterfaces
-            }).info('Cannot destroy network with interfaces, deferring.')
-            self.defer()
+            wo = []
+            for ni_uuid in n.networkinterfaces:
+                ni = NetworkInterface.from_db(ni_uuid)
+                if ni:
+                    wo.append(ni)
+            self.defer(waiting_on=wo)
             return
 
         try:

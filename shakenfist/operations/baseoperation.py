@@ -185,14 +185,23 @@ class BaseClusterOperation(BaseOperation):
                 return
         self.state = BaseClusterOperation.STATE_COMPLETE
 
-    def defer(self, delay=15):
+    def defer(self, waiting_on=None, delay=15):
         if not self.queue_name:
             raise CannotDeferUnqueued(
                 'You cannot defer a cluster operation which has not been queued')
 
         # Re-enqueue this operation for a retry after delay seconds
+        wo = None
+        if waiting_on:
+            wo = []
+            for wobj in waiting_on:
+                wo.append(wobj.unique_label())
+
         self.add_event(
-            EVENT_TYPE_STATUS, f'Execution deferred for {delay} seconds')
+            EVENT_TYPE_STATUS, f'Execution deferred for {delay} seconds',
+            extra={
+                'waiting_on': wo
+            })
         work_item = {
             'operation_type': self.object_type,
             'operation_uuid': self.uuid
