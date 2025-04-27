@@ -1,6 +1,5 @@
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.etcd_schema.operations import node_net_op as schema
 from shakenfist.network.network import Network
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -37,21 +36,10 @@ class NodeNetOp(BaseClusterOperation):
 
     def __init__(self, static_values):
         self.upgrade(static_values)
-        super().__init__(static_values)
+        super().__init__(static_values, schema)
 
         self.__node_uuid = static_values['node_uuid']
         self.__network_uuid = static_values['network_uuid']
-
-        # Convert tasks names back into enum entries
-        self.__tasks = []
-        for task_name in static_values['tasks']:
-            try:
-                self.__tasks.append(schema.model_tasks[task_name])
-            except KeyError as e:
-                self.state = self.STATE_ERROR
-                self.add_event(
-                    EVENT_TYPE_AUDIT, 'unknown task {task_name}: {e}')
-                raise e
 
         self.log = LOG.with_fields({
             'operation_type': self.object_type,
@@ -69,10 +57,6 @@ class NodeNetOp(BaseClusterOperation):
     @property
     def network_uuid(self):
         return self.__network_uuid
-
-    @property
-    def tasks(self):
-        return self.__tasks
 
     # API
     def external_view(self):

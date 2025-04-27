@@ -996,7 +996,7 @@ class InstanceInterfacesEndpoint(sf_api.Resource):
         dnsmasq_op_type, dnsmasq_op_uuid = net_create_and_enqueue(
             netdesc['network_uuid'],
             [net_tasks.network_update_dnsmasq],
-            priority=PRIORITY.user_facing_high_io
+            priority=PRIORITY.user_waiting
         )
 
         op_type, op_uuid = niio_create_and_enqueue(

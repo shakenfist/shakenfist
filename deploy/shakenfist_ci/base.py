@@ -333,11 +333,13 @@ class BaseTestCase(testtools.TestCase):
 
             time.sleep(5)
 
+        cd = self.system_client.get_console_data(instance_uuid)
+        cd = '\n'.join(cd.split('\n')[-10:])
         raise TimeoutException(
             f'Instance {instance_uuid} failed to start and enter the agent '
             f'{desired} state and has seen no progress in 5 minutes. Agent '
             f'state is {i["agent_state"]} and the last recorded event was '
-            f'{last_event}.')
+            f'{last_event}. Last console lines were:\n\n{cd}\n...END...')
 
     def _await_instance_create(self, instance_uuid):
         # Wait for the instance to be created

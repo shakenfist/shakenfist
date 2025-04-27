@@ -40,22 +40,11 @@ class ArtifactFetchOp(BaseClusterOperation):
 
     def __init__(self, static_values):
         self.upgrade(static_values)
-        super().__init__(static_values)
+        super().__init__(static_values, schema)
 
         self.__namespace = static_values['namespace']
         self.__url = static_values['url']
         self.__instance_uuid = static_values['instance_uuid']
-
-        # Convert tasks names back into enum entries
-        self.__tasks = []
-        for task_name in static_values['tasks']:
-            try:
-                self.__tasks.append(schema.model_tasks[task_name])
-            except KeyError as e:
-                self.state = self.STATE_ERROR
-                self.add_event(
-                    EVENT_TYPE_AUDIT, 'unknown task {task_name}: {e}')
-                raise e
 
         self.log = LOG.with_fields({
             'operation_type': self.object_type,
@@ -78,10 +67,6 @@ class ArtifactFetchOp(BaseClusterOperation):
     @property
     def namespace(self):
         return self.__namespace
-
-    @property
-    def tasks(self):
-        return self.__tasks
 
     # API
     def external_view(self):

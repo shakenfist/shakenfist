@@ -100,7 +100,7 @@ class Job(util_concurrency.Job):
                                 BaseClusterOperation.STATE_PREFLIGHT,
                                 BaseClusterOperation.STATE_EXECUTING]:
                 # Dependency not yet ready, we should defer
-                op.defer()
+                op.defer(waiting_on=[dep_op])
                 return
 
         # Ensure that we are running after any runs_after requirements.
@@ -126,7 +126,7 @@ class Job(util_concurrency.Job):
                                 BaseClusterOperation.STATE_PREFLIGHT,
                                 BaseClusterOperation.STATE_EXECUTING]:
                 # Dependency not yet ready, we should defer
-                op.defer()
+                op.defer(waiting_on=[dep_op])
                 return
 
         # We're good to go!
