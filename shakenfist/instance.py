@@ -727,12 +727,16 @@ class Instance(dbo):
     def _record_domain_xml(self):
         with util_libvirt.LibvirtConnection() as lc:
             inst = lc.get_domain_from_sf_uuid(self.uuid)
-            xml_desc = inst.XMLDesc(0)
-            self.add_event(
-                EVENT_TYPE_MUTATE, 'libvirt domain XML',
-                extra={
-                    'xml': xml_desc
-                })
+            if inst:
+                xml_desc = inst.XMLDesc(0)
+                self.add_event(
+                    EVENT_TYPE_MUTATE, 'libvirt domain XML',
+                    extra={
+                        'xml': xml_desc
+                    })
+            else:
+                self.add_event(
+                    EVENT_TYPE_STATUS, 'libvirt reports domain undefined')
 
     def place_instance(self, location):
         with self.get_lock_attr('placement', 'Instance placement'):
