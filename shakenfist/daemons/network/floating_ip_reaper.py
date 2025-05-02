@@ -4,7 +4,7 @@ import itertools
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
+from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist import ipam
 from shakenfist.network import network
@@ -66,7 +66,7 @@ class Job(util_concurrency.Job):
                             fg, n.unique_label(), ipam.RESERVATION_TYPE_FLOATING,
                             'Rescued from incorrect registration')
                         LOG.with_fields({
-                            'networkinterface': ni.uuid,
+                            'interface': ni.uuid,
                             'address': fa
                         }).error('Floating address not reserved correctly')
             LOG.info('Found floating addresses: %s' % floating_addresses)
@@ -123,9 +123,8 @@ class Job(util_concurrency.Job):
                     # was using this address might still be in process.
                     res = floating_network.ipam.get_reservation(ip)
                     if res and res.get('user'):
-                        object_type, object_uuid = res['user']
-                        o = OBJECT_NAMES_TO_CLASSES[object_type].from_db(
-                            object_uuid)
+                        obj_type, obj_uuid = res['user']
+                        o = get_object_class(obj_type).from_db(obj_uuid)
                         if o:
                             obj_state = o.state
                             if (

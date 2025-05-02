@@ -45,7 +45,7 @@ class Job(util_concurrency.Job):
                         if not inst:
                             ni.delete()
                             LOG.with_fields({
-                                'networkinterface': ni,
+                                'interface': ni,
                                 'instance': ni.instance_uuid}).info(
                                 'Deleted stray network interface for missing instance')
                         else:
@@ -54,7 +54,7 @@ class Job(util_concurrency.Job):
                                     s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
                                 ni.delete()
                                 LOG.with_fields({
-                                    'networkinterface': ni,
+                                    'interface': ni,
                                     'instance': ni.instance_uuid}).info(
                                     'Deleted stray network interface')
 

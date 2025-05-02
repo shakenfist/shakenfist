@@ -78,10 +78,15 @@ class IPAM(dbo):
     def _upgrade_step_3_to_4(cls, static_values):
         ipm = ipmanager.IPManager.from_db(static_values['uuid'])
         for address in ipm.in_use:
+            # Handle the rename of networkinterface to interface
+            obj_type, obj_uuid = ipm.in_use[address]['user']
+            if obj_type == 'networkinterface':
+                obj_type = 'interface'
+
             etcd.put_raw((IPAM_RESERVATIONS_PATH % static_values['uuid']) + address,
                          {
                              'address': address,
-                             'user': ipm.in_use[address]['user'],
+                             'user': (obj_type, obj_uuid),
                              'when': ipm.in_use[address]['when'],
                              'type': RESERVATION_TYPE_UNKNOWN,
                              'comment': ''
@@ -367,7 +372,13 @@ class IPAM(dbo):
                 f'{address} is not a valid address')
 
         if self.version == 3:
-            return self.cached_ipmanager_object.in_use.get(address)
+            res = self.cached_ipmanager_object.in_use.get(address)
+
+            # Handle the rename of networkinterface to interface
+            obj_type, obj_uuid = res['user']
+            if obj_type == 'networkinterface':
+                res['user'] = ('interface', obj_uuid)
+            return res
 
         return etcd.get_raw(self.reservations_path + address)
 

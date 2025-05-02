@@ -386,7 +386,7 @@ class Instance(dbo):
         for iface_uuid in self.interfaces:
             ni = interface.NetworkInterface.from_db(iface_uuid)
             if not ni:
-                self.log.with_fields({'networkinterface': ni}).error(
+                self.log.with_fields({'interface': ni}).error(
                     'Network interface missing')
             else:
                 i['interfaces'].append(ni.external_view())

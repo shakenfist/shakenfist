@@ -81,8 +81,8 @@ class Job(util_concurrency.Job):
                         if not ni:
                             LOG.with_fields({
                                 'instance': inst,
-                                'networkinterface': iface_uuid}).error(
-                                    'Network interface does not exist')
+                                'interface': iface_uuid
+                            }).error('Network interface does not exist')
                         elif ni.network_uuid not in host_networks:
                             host_networks.append(ni.network_uuid)
             else:
