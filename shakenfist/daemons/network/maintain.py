@@ -77,7 +77,7 @@ class Job(util_concurrency.Job):
 
                     for iface_uuid in ifaces:
                         ni = interface.NetworkInterface.from_db(
-                            iface_uuid)
+                            iface_uuid, suppress_failure_audit=True)
                         if not ni:
                             LOG.with_fields({
                                 'instance': inst,
@@ -142,7 +142,7 @@ class Job(util_concurrency.Job):
                             # that network.
                             for ni_uuid in n.networkinterfaces:
                                 ni = interface.NetworkInterface.from_db(
-                                    ni_uuid)
+                                    ni_uuid, suppress_failure_audit=True)
                                 if not ni:
                                     continue
 
@@ -181,7 +181,6 @@ class Job(util_concurrency.Job):
 
             # We keep a global cache of extra vxlans we've seen before, so that
             # we only warn about them when they've been stray for five minutes.
-            global EXTRA_VLANS_HISTORY
             for vxid in EXTRA_VLANS_HISTORY.copy():
                 if vxid not in extra_vxids:
                     del EXTRA_VLANS_HISTORY[vxid]
