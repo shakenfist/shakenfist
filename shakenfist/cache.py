@@ -134,6 +134,14 @@ def update_object_state_cache(object_type, object_uuid, old_state, new_state):
         if success:
             return
 
+        # Is it possible someone else did this update for us?
+        if (
+            not etcd.get_raw(
+                f'/sf/cache/{object_type}/{old_state}/{object_uuid}')
+            and etcd.get_raw(f'/sf/cache/{object_type}/{new_state}/{object_uuid}')
+        ):
+            return
+
         time.sleep(0.2)
         attempts += 1
 
