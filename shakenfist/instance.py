@@ -1889,7 +1889,7 @@ def instances_in_namespace(namespace):
 
 def all_instances():
     for object_uuid in cache.read_object_state_cache_all(Instance.object_type):
-        i = Instance.from_db(object_uuid)
+        i = Instance.from_db(object_uuid, suppress_failure_audit=True)
         if i:
             yield i
 
