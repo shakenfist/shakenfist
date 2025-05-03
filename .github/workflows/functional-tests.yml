@@ -108,12 +108,6 @@ jobs:
                     short: true
                     value: "Failure in sanity tests"
 
-      # We do this instead of "fast-fail: true" because we want to cancel jobs
-      # outside of the matrix as well.
-      # - uses: andymckay/cancel-action@0.5
-      #   if: failure()
-      #   name: Cancel entire workflow on failure
-
   functional_matrix_pr:
     if: always() && github.event_name != 'merge_group'
     runs-on: [self-hosted, vm]
@@ -403,12 +397,6 @@ jobs:
               Failures are:
 
               ${{ steps.failures.outputs.failures }}
-
-      # We do this instead of "fast-fail: true" because we want to cancel jobs
-      # outside of the matrix as well.
-      # - uses: andymckay/cancel-action@0.5
-      #   if: failure()
-      #   name: Cancel entire workflow on failure
 
   functional_matrix_merge:
     if: github.event_name == 'merge_group'

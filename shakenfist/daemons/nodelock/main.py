@@ -120,5 +120,4 @@ def main():
 
     # This is here because sometimes the grpc bits don't shut down cleanly
     # by themselves.
-    LOG.info('Terminating ourselves')
     raise SystemExit(0)

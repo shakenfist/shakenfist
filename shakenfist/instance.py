@@ -386,7 +386,7 @@ class Instance(dbo):
         for iface_uuid in self.interfaces:
             ni = interface.NetworkInterface.from_db(iface_uuid)
             if not ni:
-                self.log.with_fields({'networkinterface': ni}).error(
+                self.log.with_fields({'interface': ni}).error(
                     'Network interface missing')
             else:
                 i['interfaces'].append(ni.external_view())
@@ -727,12 +727,16 @@ class Instance(dbo):
     def _record_domain_xml(self):
         with util_libvirt.LibvirtConnection() as lc:
             inst = lc.get_domain_from_sf_uuid(self.uuid)
-            xml_desc = inst.XMLDesc(0)
-            self.add_event(
-                EVENT_TYPE_MUTATE, 'libvirt domain XML',
-                extra={
-                    'xml': xml_desc
-                })
+            if inst:
+                xml_desc = inst.XMLDesc(0)
+                self.add_event(
+                    EVENT_TYPE_MUTATE, 'libvirt domain XML',
+                    extra={
+                        'xml': xml_desc
+                    })
+            else:
+                self.add_event(
+                    EVENT_TYPE_STATUS, 'libvirt reports domain undefined')
 
     def place_instance(self, location):
         with self.get_lock_attr('placement', 'Instance placement'):
@@ -1885,7 +1889,7 @@ def instances_in_namespace(namespace):
 
 def all_instances():
     for object_uuid in cache.read_object_state_cache_all(Instance.object_type):
-        i = Instance.from_db(object_uuid)
+        i = Instance.from_db(object_uuid, suppress_failure_audit=True)
         if i:
             yield i
 

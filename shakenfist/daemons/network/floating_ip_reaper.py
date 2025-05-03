@@ -3,6 +3,8 @@ import itertools
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist import ipam
 from shakenfist.network import network
@@ -64,7 +66,7 @@ class Job(util_concurrency.Job):
                             fg, n.unique_label(), ipam.RESERVATION_TYPE_FLOATING,
                             'Rescued from incorrect registration')
                         LOG.with_fields({
-                            'networkinterface': ni.uuid,
+                            'interface': ni.uuid,
                             'address': fa
                         }).error('Floating address not reserved correctly')
             LOG.info('Found floating addresses: %s' % floating_addresses)
@@ -114,9 +116,26 @@ class Job(util_concurrency.Job):
                                              floating_halo):
                     # This IP needs to have been allocated more than 300 seconds
                     # ago to ensure that the network setup isn't still queued.
-                    if time.time() - floating_network.ipam.get_allocation_age(ip) > 300:
-                        LOG.error('Floating IP %s has leaked.' % ip)
-                        leaks.append(ip)
+                    if time.time() - floating_network.ipam.get_allocation_age(ip) < 300:
+                        continue
+
+                    # However, the inverse is also true -- the deletion of whatever
+                    # was using this address might still be in process.
+                    res = floating_network.ipam.get_reservation(ip)
+                    if res and res.get('user'):
+                        obj_type, obj_uuid = res['user']
+                        o = get_object_class(obj_type).from_db(obj_uuid)
+                        if o:
+                            obj_state = o.state
+                            if (
+                                obj_state.value == dbo.STATE_DELETED and
+                                time.time() - obj_state.update_time < 300
+                            ):
+                                continue
+
+                    # A leak!
+                    LOG.error(f'Floating IP {ip} has leaked.')
+                    leaks.append(ip)
 
             for ip in leaks:
                 LOG.error('Leaked floating IP %s has been released.' % ip)

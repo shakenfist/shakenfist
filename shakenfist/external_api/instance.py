@@ -350,7 +350,7 @@ def _netdesc_allocate_address(inst, netdesc, order):
 
     iface_uuid = str(uuid.uuid4())
     LOG.with_fields({
-        'networkinterface': iface_uuid,
+        'interface': iface_uuid,
         'instance': inst,
         'network': n
     }).with_fields(netdesc).info('Interface allocated')

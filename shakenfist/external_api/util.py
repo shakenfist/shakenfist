@@ -33,8 +33,10 @@ def safe_get_network_interface(interface_uuid):
     if not ni:
         return None, None, sf_api.error(404, 'interface not found')
 
-    log = LOG.with_fields({'network': ni.network_uuid,
-                           'networkinterface': ni.uuid})
+    log = LOG.with_fields({
+        'network': ni.network_uuid,
+        'networkinterface': ni.uuid
+    })
 
     n = network.Network.from_db(ni.network_uuid)
     if not n:
