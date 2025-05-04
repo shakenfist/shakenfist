@@ -125,6 +125,6 @@ class NodeBlobOp(BaseClusterOperation):
             return
 
         try:
-            b.ensure_local([], wait_for_other_transfers=False)
+            b.ensure_local(wait_for_other_transfers=False)
         except BlobAlreadyBeingTransferred:
             self.defer()

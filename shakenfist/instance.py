@@ -786,7 +786,7 @@ class Instance(dbo):
     # creation. It is assumed that the image sits in local cache already, and
     # has been transcoded to the right format. This has been done to facilitate
     # moving to a queue and task based creation mechanism.
-    def create(self, iface_uuids, lock=None):
+    def create(self, iface_uuids):
         self.state = self.STATE_CREATING
         self.interfaces = iface_uuids
 
@@ -795,7 +795,7 @@ class Instance(dbo):
 
         # Configure block devices, not including config drive creation which is
         # done in power_on().
-        self._configure_block_devices(lock)
+        self._configure_block_devices()
 
         self.power_on()
         self._record_domain_xml()
@@ -929,14 +929,9 @@ class Instance(dbo):
         self._free_console_port(ports.get('vdi_tls_port'))
         self._db_delete_attribute('ports')
 
-    def _configure_block_devices(self, lock):
+    def _configure_block_devices(self):
         with self.get_lock_attr(
-                'block_devices', 'Initialize block devices', ttl=600) as bd_lock:
-            # Locks to refresh
-            locks = [bd_lock]
-            if lock:
-                locks.append(lock)
-
+                'block_devices', 'Initialize block devices'):
             # Create block devices if required
             block_devices = self.block_devices
             if not block_devices:
@@ -1014,13 +1009,13 @@ class Instance(dbo):
                             # disk. This is because we don't have a libvirt <disk/> element for
                             # them and therefore can't specify their backing store. Instead we
                             # produce a flat layer here.
-                            util_image.create_qcow2(locks, cached_image_path,
-                                                    disk['path'], disk_size=disk['size'])
+                            util_image.create_qcow2(
+                                cached_image_path, disk['path'], disk_size=disk['size'])
 
                         else:
                             with util_general.RecordedOperation('create copy on write layer', self):
                                 util_image.create_cow(
-                                    locks, cached_image_path, disk['path'], disk['size'])
+                                    cached_image_path, disk['path'], disk['size'])
                             self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
                                 'COW layer %s created' % disk['path'])
 
@@ -1067,7 +1062,7 @@ class Instance(dbo):
                             disk['backing'] = disk['backing'].lstrip()
 
                     elif not os.path.exists(disk['path']):
-                        util_image.create_blank(locks, disk['path'], disk['size'])
+                        util_image.create_blank(disk['path'], disk['size'])
 
                     shutil.chown(disk['path'], 'libvirt-qemu', 'libvirt-qemu')
                     modified_disks.append(disk)
@@ -1286,7 +1281,7 @@ class Instance(dbo):
                 if not b:
                     raise exceptions.NVRAMTemplateMissing(
                         'Blob %s does not exist' % self.nvram_template)
-                b.ensure_local([], instance_object=self)
+                b.ensure_local(instance_object=self)
                 b.add_event(EVENT_TYPE_AUDIT, 'instance is using blob',
                             extra={'instance_uuid': self.uuid})
                 shutil.copyfile(

@@ -100,7 +100,7 @@ class NodeAgentopOp(BaseClusterOperation):
                     aop.error = ('preflight failure, blob missing: '
                                  f'{command["blob_uuid"]}')
                     return
-                b.ensure_local([])
+                b.ensure_local()
 
                 # This agent operation could have been deleted while we copied
                 # this blob?

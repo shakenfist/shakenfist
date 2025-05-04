@@ -19,7 +19,6 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import constants
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.etcd_schema.operations.artifact_fetch_op \
     import create_and_enqueue as afo_create_and_enqueue
@@ -272,11 +271,11 @@ class ArtifactsEndpoint(sf_api.Resource):
                     b = Blob.from_db(idx['blob_uuid'])
                     if b and node in b.locations:
                         ev = a.external_view()
-                        ev['instances']: instance_usage_for_blob_uuid(b.uuid)
+                        ev['instances'] = instance_usage_for_blob_uuid(b.uuid)
                         retval.append(ev)
             else:
                 ev = a.external_view()
-                ev['instances']: instance_usage_for_blob_uuid(b.uuid)
+                ev['instances'] = instance_usage_for_blob_uuid(b.uuid)
                 retval.append(ev)
         return retval
 
@@ -465,8 +464,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True
 
-        with a.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
-                        timeout=config.MAX_IMAGE_TRANSFER_SECONDS):
+        with a.get_lock(timeout=config.MAX_IMAGE_TRANSFER_SECONDS):
             if not blob_uuid:
                 # Convert upload to a blob
                 blob_uuid = str(uuid.uuid4())

@@ -161,8 +161,8 @@ def update_object_state_cache(object_type, object_uuid, old_state, new_state):
 # Blob hash caches live in etcd under /sf/blob_by_hash/...algorithm.../...hash...
 def update_blob_hash_cache(blob_uuid, hashes):
     for alg in hashes:
-        with etcd.get_lock('blob_by_hash', alg, hashes[alg],
-                           op='Blob hash cache update'):
+        with etcd.ClusterLock(
+                'blob_by_hash', alg, hashes[alg], op='Blob hash cache update'):
             c = etcd.get('blob_by_hash', alg, hashes[alg])
             if not c:
                 c = {}

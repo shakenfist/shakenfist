@@ -9,7 +9,6 @@ from google.protobuf.message import DecodeError
 from shakenfist_utilities import logs                     # noreorder
 from shakenfist_utilities import random as sf_random      # noreorder
 
-from shakenfist import etcd
 from shakenfist.exceptions import MissingNodeLockSocket
 from shakenfist.exceptions import MissingPrivExecSocket
 from shakenfist.exceptions import ProcessExecutionError
@@ -66,7 +65,7 @@ PRIORITY_LOW = common_pb2.ExecuteRequest.LOW
 PRIORITY_HIGH = common_pb2.ExecuteRequest.HIGH
 
 
-def execute(locks, command, check_exit_code=[0], env_variables=None,
+def execute(command, check_exit_code=[0], env_variables=None,
             namespace=None, iopriority=None, cwd=None,
             suppress_command_logging=False):
     try:
@@ -110,11 +109,6 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
             'execution_id': execution_id
         }).info('Executing command')
 
-    if _is_gunicorn() and locks:
-        caller = util_callstack.generate_traceback()
-        LOG.warning(
-            f'Lock refreshers should not be used under gunicorn: {caller}')
-
     if not os.path.exists(PRIVEXEC_SOCKET_PATH):
         raise MissingPrivExecSocket()
 
@@ -125,7 +119,6 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
         client.sendall(request.SerializeToString())
 
         buffered = bytearray()
-        last_refresh = 0
         while True:
             input = client.recv(102400)
             if not input:
@@ -162,10 +155,6 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
 
             except DecodeError:
                 ...
-
-            if locks and time.time() - last_refresh > 9:
-                etcd.refresh_locks(locks)
-                last_refresh = time.time()
 
     finally:
         client.close()

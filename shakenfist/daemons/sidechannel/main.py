@@ -446,7 +446,7 @@ class SideChannelExecutorJob(SideChannelJob):
             return []
 
         # This should already have been done by preflight, but hey
-        b.ensure_local([])
+        b.ensure_local()
         self.chunk_iterator = self._chunk_reader(
             command_id, cmd, blob.Blob.filepath(b.uuid))
 

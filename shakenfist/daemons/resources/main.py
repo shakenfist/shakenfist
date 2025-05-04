@@ -358,7 +358,6 @@ class Monitor(daemon.Daemon):
                 # are added.
                 try:
                     vers_out, _ = util_concurrency.execute(
-                        None,
                         ('dpkg-query --show --showformat=\'${Package}==${Version}\\n\' '
                          '--no-pager'),
                         suppress_command_logging=True)

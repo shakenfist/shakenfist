@@ -63,7 +63,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.create')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
                 return_value={'value': None, 'update_time': 0})
-    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.ClusterLock')
     @mock.patch('time.time', return_value=1234)
     def test_instance_new(self, mock_time, mock_get_lock, mock_get_attribute,
                           mock_create, mock_put, mock_get, mock_cache_update):

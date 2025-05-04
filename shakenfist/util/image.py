@@ -55,7 +55,7 @@ def identify(path):
         return {}
 
     out, _ = util_concurrency.execute(
-        None, 'qemu-img info --force-share %s' % path, suppress_command_logging=True)
+        'qemu-img info --force-share %s' % path, suppress_command_logging=True)
 
     data = {}
     for line in out.split('\n'):
@@ -79,7 +79,7 @@ def identify(path):
     return data
 
 
-def create_cow(locks, cache_file, disk_file, disk_size):
+def create_cow(cache_file, disk_file, disk_size):
     """Create a COW layer on top of the image cache.
 
     disk_size is specified in GiBs.
@@ -110,7 +110,7 @@ def create_cow(locks, cache_file, disk_file, disk_size):
     if disk_size:
         qemu_command += ' %(disk_size)dG'
         util_concurrency.execute(
-            locks, qemu_command % {
+            qemu_command % {
                 'cache_file': cache_file,
                 'cluster_size': constants.QCOW2_CLUSTER_SIZE,
                 'disk_file': disk_file,
@@ -119,7 +119,7 @@ def create_cow(locks, cache_file, disk_file, disk_size):
             iopriority=util_concurrency.PRIORITY_LOW)
     else:
         util_concurrency.execute(
-            locks, qemu_command % {
+            qemu_command % {
                 'cache_file': cache_file,
                 'cluster_size': constants.QCOW2_CLUSTER_SIZE,
                 'disk_file': disk_file
@@ -127,36 +127,35 @@ def create_cow(locks, cache_file, disk_file, disk_size):
             iopriority=util_concurrency.PRIORITY_LOW)
 
 
-def create_qcow2(locks, cache_file, disk_file, disk_size=None):
+def create_qcow2(cache_file, disk_file, disk_size=None):
     """Make a qcow2 copy of the disk from the image cache."""
 
     if os.path.exists(disk_file):
         return
 
     util_concurrency.execute(
-        locks,
         'qemu-img convert -t none -o cluster_size=%s -O qcow2 %s %s -c'
         % (constants.QCOW2_CLUSTER_SIZE, cache_file, disk_file),
         iopriority=util_concurrency.PRIORITY_LOW)
     if disk_size:
         util_concurrency.execute(
-            locks, 'qemu-img resize %s %dG' % (disk_file, int(disk_size)),
+            'qemu-img resize %s %dG' % (disk_file, int(disk_size)),
             iopriority=util_concurrency.PRIORITY_LOW)
 
 
-def create_blank(locks, disk_file, disk_size):
+def create_blank(disk_file, disk_size):
     """Make an empty image."""
 
     if os.path.exists(disk_file):
         return
 
     util_concurrency.execute(
-        locks, 'qemu-img create -o cluster_size=%s -f qcow2 %s %sG'
+        'qemu-img create -o cluster_size=%s -f qcow2 %s %sG'
         % (constants.QCOW2_CLUSTER_SIZE, disk_file, disk_size),
         iopriority=util_concurrency.PRIORITY_LOW)
 
 
-def snapshot(locks, source, destination, thin=False):
+def snapshot(source, destination, thin=False):
     """Convert a possibly COW layered disk file into a snapshot."""
     backing_file = identify(source).get('backing file')
     LOG.with_fields({
@@ -191,7 +190,7 @@ def snapshot(locks, source, destination, thin=False):
         }
 
         util_concurrency.execute(
-            locks, ' '.join([cmd, source, temporary_location]),
+            ' '.join([cmd, source, temporary_location]),
             iopriority=util_concurrency.PRIORITY_LOW, cwd=backing_path)
 
         # TODO(mikal): its likely this move should be done with a low IO priority?
@@ -210,6 +209,6 @@ def snapshot(locks, source, destination, thin=False):
     }
 
     util_concurrency.execute(
-        locks, ' '.join([cmd, source, destination]),
+        ' '.join([cmd, source, destination]),
         iopriority=util_concurrency.PRIORITY_LOW)
     return None

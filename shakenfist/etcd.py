@@ -5,7 +5,6 @@ import time
 
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
-from etcd3gw.lock import Lock
 from google.rpc import error_details_pb2
 import grpc
 from grpc_status import rpc_status
@@ -23,7 +22,6 @@ from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
-LOCK_PREFIX = '/sflocks'
 
 
 class WrappedEtcdClient(Etcd3Client):
@@ -157,15 +155,15 @@ def retry_etcd_forever(func):
     return wrapper
 
 
-class ActualLock(Lock):
-    def __init__(self, objecttype, subtype, name, ttl=120,
-                 client=None, timeout=120, log_ctx=LOG,
-                 op=None):
-        self.path = _construct_key(objecttype, subtype, name)
-        super().__init__(self.path, ttl=ttl, client=client)
+class ClusterLock:
+    def __init__(self, objecttype, subtype, name,
+                 timeout=120, log_ctx=LOG, op=None):
+        self.path = _construct_key(objecttype, subtype, name, prefix='sflocks')
 
         self.objecttype = objecttype
         self.objectname = name
+        self.name = name
+
         self.timeout = timeout
         self.operation = op
         self.lockid = util_random.random_id()
@@ -174,95 +172,46 @@ class ActualLock(Lock):
         self.pid = os.getpid()
         caller = util_callstack.get_caller(offset=-3)
 
-        # We also override the location of the lock so that we're in our own spot
-        self.key = LOCK_PREFIX + self.path
+        self.lock_data = {
+            'node': self.node,
+            'pid': self.pid,
+            'thread': threading.get_ident(),
+            'line': caller,
+            'operation': self.operation,
+            'id': self.lockid
+        }
+        self.log_ctx = log_ctx.with_fields(self.lock_data)
 
-        self.log_ctx = log_ctx.with_fields(
-            {
-                'lock': self.path,
-                'key': self.key,
-                'node': self.node,
-                'pid': self.pid,
-                'thread': threading.get_ident(),
-                'line': caller,
-                'operation': self.operation,
-                'id': self.lockid
-            })
-
-        # We override the UUID of the lock with something more helpful to debugging
-        self._uuid = json.dumps(
-            {
-                'node': self.node,
-                'pid': self.pid,
-                'thread': threading.get_ident(),
-                'line': caller,
-                'operation': self.operation,
-                'id': self.lockid
-            },
-            indent=4, sort_keys=True)
-
-    @retry_etcd_forever
     def get_holder(self, key_prefix=''):
-        value = get_etcd_client().get(self.key)
-        if value is None or len(value) == 0:
+        value = get_raw(self.path)
+        if value is None or value == {}:
             return {'holder': None}
 
-        if not value[0][0]:
-            return {'holder': None}
-
-        holder = json.loads(value[0])
         if key_prefix:
             new_holder = {}
-            for key in holder:
-                new_holder[f'{key_prefix}-{key}'] = holder[key]
+            for key in value:
+                new_holder[f'{key_prefix}-{key}'] = value[key]
             return new_holder
 
-        return holder
+        return value
 
-    def get_lease(self):
-        return self.lease
+    def acquire(self):
+        return create_raw(self.path, self.lock_data)
 
-    def refresh(self):
-        super().refresh()
-        self.log_ctx.info('Refreshed lock')
+    def is_acquired(self):
+        holder = self.get_holder()
+        for field in self.lock_data.keys():
+            if holder.get(field) != self.lock_data[field]:
+                return False
+        return True
 
     def __enter__(self):
         start_time = time.time()
-        slow_warned = False
-        threshold = self.timeout / 2
-
         while time.time() - start_time < self.timeout:
             res = self.acquire()
-            self.log_ctx = self.log_ctx.with_fields({
-                'leased_keys': self.get_lease().keys()
-            })
-
-            duration = round(time.time() - start_time, 2)
             if res:
-                current = self.get_holder()
-                current_id = current.get('id')
-                if current_id != self.lockid:
-                    self.log_ctx.with_fields({
-                        'current_id': current_id,
-                        'duration': duration
-                        }).error('We should hold lock, but do not!')
-                elif duration > threshold:
-                    self.log_ctx.with_fields({
-                        'duration': duration}).info('Acquired lock, but it was slow')
-                    return self
-                else:
-                    self.log_ctx.info('Acquired lock')
-                    return self
-
-            if (duration > threshold and not slow_warned):
-                current = self.get_holder(key_prefix='current')
-                self.log_ctx.with_fields(current).with_fields({
-                    'duration': duration,
-                    'threshold': threshold
-                    }).info('Waiting to acquire lock')
-                slow_warned = True
-
-            time.sleep(1)
+                return self
+            time.sleep(0.5)
 
         current = self.get_holder(key_prefix='current')
         self.log_ctx.with_fields(current).with_fields({
@@ -273,71 +222,21 @@ class ActualLock(Lock):
             'Cannot acquire lock %s, timed out after %.02f seconds'
             % (self.name, self.timeout))
 
-    def __exit__(self, _exception_type, _exception_value, _traceback):
-        attempts = 0
-        while attempts < 4:
-            if self.release():
-                self.log_ctx.info('Released lock')
-                return
-            else:
-                attempts += 1
-                locks = list(get_all(LOCK_PREFIX, None))
-                self.log_ctx.with_fields({
-                    'locks': locks,
-                    'path': self.path,
-                    'name': self.name,
-                    'key': self.key,
-                    'attempt': attempts,
-                    'leased_keys': self.get_lease().keys()
-                    }).error('Failed to release lock')
-            time.sleep(0.5)
+    def release(self):
+        return transactional_delete_raw(self.path, self.lock_data)
 
-        raise exceptions.LockException('Cannot release lock: %s' % self.name)
+    def __exit__(self, _exception_type, _exception_value, _traceback):
+        if self.release():
+            return
+
+        current = self.get_holder(key_prefix='current')
+        self.log_ctx.with_fields(current).error(
+            'Attempt to release a lock we were not holding')
 
     def __str__(self):
-        return ('ActualLock(%s %s, op %s, with timeout %s)'
-                % (self.objecttype, self.objectname, self.timeout, self.operation))
-
-
-def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
-             op=None):
-    """Retrieves an etcd lock object. It is not locked, to lock use acquire().
-
-    The returned lock can be used as a context manager, with the lock being
-    acquired on entry and released on exit. Note that the lock acquire process
-    will have no timeout.
-    """
-    return ActualLock(objecttype, subtype, name, ttl=ttl,
-                      client=get_etcd_client(),
-                      log_ctx=log_ctx, timeout=timeout, op=op)
-
-
-def refresh_lock(lock, log_ctx=LOG):
-    log = log_ctx.with_fields({
-        'lock': lock.name,
-        'path': lock.path,
-        'pid': lock.pid
-    })
-
-    try:
-        psutil.Process(lock.pid)
-        if not lock.is_acquired():
-            log.error('Attempt to refresh an expired lock')
-            raise exceptions.LockException(
-                f'The lock on {lock.path} has expired.')
-    except (psutil.NoSuchProcess, FileNotFoundError):
-        log.error('Attempt to refresh lock whose process has disappeared')
-        raise exceptions.LockException(
-            f'The process (pid {lock.pid}) holding lock {lock.path} has disappeared.')
-
-    lock.refresh()
-
-
-def refresh_locks(locks):
-    if locks:
-        for lock in locks:
-            if lock:
-                refresh_lock(lock)
+        return (f'ClusterLock({self.objecttype} {self.objectname}, '
+                f'lock name "{self.name}", operation {self.operation}, '
+                f'with timeout {self.timeout})')
 
 
 @retry_etcd_forever
@@ -345,8 +244,8 @@ def clear_stale_locks():
     # Remove all locks held by former processes on this node. This is required
     # after an unclean restart, otherwise we need to wait for these locks to
     # timeout and that can take a long time.
-    for key, holder in get_prefix_raw(LOCK_PREFIX + '/'):
-        lockname = key.replace(LOCK_PREFIX + '/', '')
+    for key, holder in get_prefix_raw('/sflocks/'):
+        lockname = key.replace('/sflocks/', '')
         node = holder['node']
         pid = int(holder['pid'])
 
@@ -361,19 +260,19 @@ def clear_stale_locks():
 @retry_etcd_forever
 def get_existing_locks():
     key_val = {}
-    for key, holder in get_prefix_raw(LOCK_PREFIX + '/'):
+    for key, holder in get_prefix_raw('/sflocks/'):
         key_val[key] = holder
     return key_val
 
 
-def _construct_key(objecttype, subtype, name):
+def _construct_key(objecttype, subtype, name, prefix='sf'):
     if subtype and name:
-        return f'/sf/{objecttype}/{subtype}/{name}'
+        return f'/{prefix}/{objecttype}/{subtype}/{name}'
     if name:
-        return f'/sf/{objecttype}/{name}'
+        return f'/{prefix}/{objecttype}/{name}'
     if subtype:
-        return f'/sf/{objecttype}/{subtype}/'
-    return f'/sf/{objecttype}/'
+        return f'/{prefix}/{objecttype}/{subtype}/'
+    return f'/{prefix}/{objecttype}/'
 
 
 def put(objecttype, subtype, name, data):

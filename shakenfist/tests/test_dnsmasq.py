@@ -717,7 +717,7 @@ class DnsMasqTestCase(testtools.TestCase):
             d.restart()
             mock_signal.assert_called_with(signal.SIGHUP)
             mock_execute.assert_called_with(
-                None, 'dnsmasq --conf-file=%s/config' % dir,
+                'dnsmasq --conf-file=%s/config' % dir,
                 namespace=network_uuid)
 
     @mock.patch('os.path.exists', return_value=True)
@@ -757,7 +757,7 @@ class DnsMasqTestCase(testtools.TestCase):
 
             mock_signal.assert_called_with(signal.SIGKILL)
             mock_execute.assert_called_with(
-                None, 'dnsmasq --conf-file=%s/config' % dir,
+                'dnsmasq --conf-file=%s/config' % dir,
                 namespace=network_uuid)
 
             with open(os.path.join(dir, 'leases')) as f:
