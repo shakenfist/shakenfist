@@ -265,18 +265,20 @@ class ArtifactsEndpoint(sf_api.Resource):
         for a in Artifacts(filters=[
                 partial(namespace_or_shared_filter, parse_jwt_identity()[0])],
                 prefilter='active'):
-            if node:
-                idx = a.most_recent_index
-                if 'blob_uuid' in idx:
-                    b = Blob.from_db(idx['blob_uuid'])
-                    if b and node in b.locations:
-                        ev = a.external_view()
+            idx = a.most_recent_index
+            ev = a.external_view()
+
+            if 'blob_uuid' in idx:
+                b = Blob.from_db(idx['blob_uuid'])
+                if b:
+                    if not node:
                         ev['instances'] = instance_usage_for_blob_uuid(b.uuid)
-                        retval.append(ev)
-            else:
-                ev = a.external_view()
-                ev['instances'] = instance_usage_for_blob_uuid(b.uuid)
-                retval.append(ev)
+
+                    if node and node in b.locations:
+                        ev['instances'] = instance_usage_for_blob_uuid(b.uuid)
+
+            retval.append(ev)
+
         return retval
 
     @swag_from(api_base.swagger_helper(
