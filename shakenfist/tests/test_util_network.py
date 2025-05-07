@@ -22,7 +22,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         found = util_network.check_for_interface('banana0')
         self.assertEqual(False, found)
         mock_execute.assert_called_with(
-            None, 'ip -pretty -json link show banana0',
+            'ip -pretty -json link show banana0',
             check_exit_code=[0, 1], namespace=None, suppress_command_logging=True)
 
     @mock.patch(
@@ -40,7 +40,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         found = util_network.check_for_interface('eth0')
         self.assertEqual(True, found)
         mock_execute.assert_called_with(
-            None, 'ip -pretty -json link show eth0',
+            'ip -pretty -json link show eth0',
             check_exit_code=[0, 1], namespace=None, suppress_command_logging=True)
 
     @mock.patch(
@@ -50,7 +50,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         found = list(util_network.get_interface_addresses('eth0'))
         self.assertEqual([], found)
         mock_execute.assert_called_with(
-            None, 'ip -pretty -json addr show eth0',
+            'ip -pretty -json addr show eth0',
             check_exit_code=[0, 1], namespace=None)
 
     @mock.patch(
@@ -85,7 +85,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         found = list(util_network.get_interface_addresses('eth0'))
         self.assertEqual(['192.168.1.28'], found)
         mock_execute.assert_called_with(
-            None, 'ip -pretty -json addr show eth0',
+            'ip -pretty -json addr show eth0',
             check_exit_code=[0, 1], namespace=None)
 
     @mock.patch(
@@ -121,7 +121,7 @@ class UtilTestCase(base.ShakenFistTestCase):
             'eth0', namespace='bananarama'))
         self.assertEqual(['192.168.1.28'], found)
         mock_execute.assert_called_with(
-            None, 'ip -pretty -json addr show eth0',
+            'ip -pretty -json addr show eth0',
             check_exit_code=[0, 1], namespace='bananarama')
 
     @mock.patch(
@@ -133,27 +133,26 @@ class UtilTestCase(base.ShakenFistTestCase):
         found = util_network.get_default_routes('mynamespace')
         self.assertEqual(['192.168.1.247'], found)
         mock_execute.assert_called_with(
-            None, 'ip route list default', namespace='mynamespace')
+            'ip route list default', namespace='mynamespace')
 
     @mock.patch('shakenfist.util.concurrency.execute')
     def test_create_interface_bridge(self, mock_execute):
         util_network.create_interface('eth0', 'bridge', '')
         mock_execute.assert_called_with(
-            None, 'ip link add eth0 mtu 7950 type bridge ')
+            'ip link add eth0 mtu 7950 type bridge ')
 
     @mock.patch('shakenfist.util.concurrency.execute')
     def test_create_interface_bridge_truncates(self, mock_execute):
         util_network.create_interface(
             'eth0rjkghjkfshgjksfhdjkghfdsjkg', 'bridge', '')
         mock_execute.assert_called_with(
-            None, 'ip link add eth0rjkghjkfshg mtu 7950 type bridge ')
+            'ip link add eth0rjkghjkfshg mtu 7950 type bridge ')
 
     @mock.patch('shakenfist.util.concurrency.execute')
     def test_create_interface_vxlan(self, mock_execute):
         util_network.create_interface(
             'vxlan1', 'vxlan', 'id 123 dev eth0 dstport 0')
         mock_execute.assert_called_with(
-            None,
             'ip link add vxlan1 mtu 7950 type vxlan id 123 dev eth0 dstport 0')
 
     @mock.patch('shakenfist.util.concurrency.execute')
@@ -161,7 +160,6 @@ class UtilTestCase(base.ShakenFistTestCase):
         util_network.create_interface(
             'veth-foo-o', 'veth', 'peer name veth-foo-i')
         mock_execute.assert_called_with(
-            None,
             'ip link add veth-foo-o mtu 7950 type veth peer name veth-foo-i')
 
     @mock.patch(

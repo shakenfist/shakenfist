@@ -445,24 +445,24 @@ class Network(dbo):
                 'id %(vx_id)s dev %(mesh_interface)s dstport 0'
                 % subst)
             util_concurrency.execute(
-                None, 'sysctl -w net.ipv4.conf.%(vx_interface)s.arp_notify=1' % subst)
+                'sysctl -w net.ipv4.conf.%(vx_interface)s.arp_notify=1' % subst)
 
         if not util_network.check_for_interface(subst['vx_bridge']):
             util_network.create_interface(subst['vx_bridge'], 'bridge', '')
             util_concurrency.execute(
-                None, 'ip link set %(vx_interface)s master %(vx_bridge)s' % subst)
+                'ip link set %(vx_interface)s master %(vx_bridge)s' % subst)
             util_concurrency.execute(
-                None, 'ip link set %(vx_interface)s up' % subst)
+                'ip link set %(vx_interface)s up' % subst)
             util_concurrency.execute(
-                None, 'ip link set %(vx_bridge)s up' % subst)
+                'ip link set %(vx_bridge)s up' % subst)
             util_concurrency.execute(
-                None, 'sysctl -w net.ipv4.conf.%(vx_bridge)s.arp_notify=1' % subst)
+                'sysctl -w net.ipv4.conf.%(vx_bridge)s.arp_notify=1' % subst)
             util_concurrency.execute(
-                None, 'brctl setfd %(vx_bridge)s 0' % subst)
+                'brctl setfd %(vx_bridge)s 0' % subst)
             util_concurrency.execute(
-                None, 'brctl stp %(vx_bridge)s off' % subst)
+                'brctl stp %(vx_bridge)s off' % subst)
             util_concurrency.execute(
-                None, 'brctl setageing %(vx_bridge)s 0' % subst)
+                'brctl setageing %(vx_bridge)s 0' % subst)
 
     def create_on_hypervisor(self):
         # The floating network does not have a vxlan mesh
@@ -496,8 +496,7 @@ class Network(dbo):
             subst = self.subst_dict()
             if not os.path.exists('/var/run/netns/%s' % self.uuid):
                 try:
-                    util_concurrency.execute(
-                        None, 'ip netns add %s' % self.uuid)
+                    util_concurrency.execute('ip netns add %s' % self.uuid)
                 except ProcessExecutionError as e:
                     r = re.compile(
                         r'Cannot create namespace file ".*": File exists\n')
@@ -510,7 +509,7 @@ class Network(dbo):
                     subst['vx_veth_outer'], 'veth',
                     'peer name %(vx_veth_inner)s' % subst)
                 util_concurrency.execute(
-                    None, 'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
+                    'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
 
                 # Refer to bug 952 for more details here, but it turns out
                 # that adding an interface to a bridge overwrites the MTU of
@@ -519,14 +518,13 @@ class Network(dbo):
                 subst['vx_bridge_mtu'] = util_network.get_interface_mtu(
                     subst['vx_bridge'])
                 util_concurrency.execute(
-                    None,
                     'ip link set %(vx_veth_outer)s master %(vx_bridge)s '
                     'mtu %(vx_bridge_mtu)s' % subst)
 
                 util_concurrency.execute(
-                    None, 'ip link set %(vx_veth_outer)s up' % subst)
+                    'ip link set %(vx_veth_outer)s up' % subst)
                 util_concurrency.execute(
-                    None, 'ip link set %(vx_veth_inner)s up' % subst,
+                    'ip link set %(vx_veth_inner)s up' % subst,
                     namespace=self.uuid)
                 util_network.add_address_to_interface(
                     self.uuid, subst['router'], subst['netmask'],
@@ -544,14 +542,13 @@ class Network(dbo):
                 subst['egress_bridge_mtu'] = util_network.get_interface_mtu(
                     subst['egress_bridge'])
                 util_concurrency.execute(
-                    None,
                     'ip link set %(egress_veth_outer)s master %(egress_bridge)s '
                     'mtu %(egress_bridge_mtu)s' % subst)
 
                 util_concurrency.execute(
-                    None, 'ip link set %(egress_veth_outer)s up' % subst)
+                    'ip link set %(egress_veth_outer)s up' % subst)
                 util_concurrency.execute(
-                    None, 'ip link set %(egress_veth_inner)s netns %(netns)s' % subst)
+                    'ip link set %(egress_veth_inner)s netns %(netns)s' % subst)
 
             if self.provide_nat:
                 # We don't always need this lock, but acquiring it here means
@@ -614,11 +611,11 @@ class Network(dbo):
 
             if util_network.check_for_interface(subst['vx_bridge']):
                 util_concurrency.execute(
-                    None, 'ip link delete %(vx_bridge)s' % subst)
+                    'ip link delete %(vx_bridge)s' % subst)
 
             if util_network.check_for_interface(subst['vx_interface']):
                 util_concurrency.execute(
-                    None, 'ip link delete %(vx_interface)s' % subst)
+                    'ip link delete %(vx_interface)s' % subst)
 
     # This method should only ever be called when you already know you're on
     # the network node. Specifically it is called by a queue task that the
@@ -629,14 +626,14 @@ class Network(dbo):
 
             if util_network.check_for_interface(subst['vx_veth_outer']):
                 util_concurrency.execute(
-                    None, 'ip link delete %(vx_veth_outer)s' % subst)
+                    'ip link delete %(vx_veth_outer)s' % subst)
 
             if util_network.check_for_interface(subst['egress_veth_outer']):
                 util_concurrency.execute(
-                    None, 'ip link delete %(egress_veth_outer)s' % subst)
+                    'ip link delete %(egress_veth_outer)s' % subst)
 
             if os.path.exists('/var/run/netns/%s' % self.uuid):
-                util_concurrency.execute(None, 'ip netns del %s' % self.uuid)
+                util_concurrency.execute('ip netns del %s' % self.uuid)
 
             self.ipam.state = self.ipam.STATE_DELETED
             self.state = self.STATE_DELETED
@@ -721,19 +718,16 @@ class Network(dbo):
         subst = self.subst_dict()
         if not util_network.nat_rules_for_ipblock(self.network_address):
             util_concurrency.execute(
-                None, 'echo 1 > /proc/sys/net/ipv4/ip_forward')
+                'echo 1 > /proc/sys/net/ipv4/ip_forward')
             util_concurrency.execute(
-                None,
                 'iptables -w 10 -A FORWARD -o %(egress_veth_inner)s '
                 '-i %(vx_veth_inner)s -j ACCEPT' % subst,
                 namespace=self.uuid)
             util_concurrency.execute(
-                None,
                 'iptables -w 10 -A FORWARD -i %(egress_veth_inner)s '
                 '-o %(vx_veth_inner)s -j ACCEPT' % subst,
                 namespace=self.uuid)
             util_concurrency.execute(
-                None,
                 'iptables -w 10 -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
                 '-o %(egress_veth_inner)s -j MASQUERADE' % subst,
                 namespace=self.uuid)
@@ -800,7 +794,6 @@ class Network(dbo):
 
         try:
             stdout, _ = util_concurrency.execute(
-                None,
                 'bridge fdb show brport %(vx_interface)s' % self.subst_dict(),
                 suppress_command_logging=True)
 
@@ -884,7 +877,6 @@ class Network(dbo):
 
         try:
             util_concurrency.execute(
-                None,
                 'bridge fdb append to 00:00:00:00:00:00 '
                 'dst %(node)s dev %(vx_interface)s' % subst)
             self.add_event(EVENT_TYPE_MUTATE, 'added new mesh element', extra={'ip': n})
@@ -899,7 +891,6 @@ class Network(dbo):
 
         try:
             util_concurrency.execute(
-                None,
                 'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
                 'dev %(vx_interface)s' % subst)
             self.add_event(EVENT_TYPE_MUTATE, 'removed excess mesh element',
@@ -930,11 +921,10 @@ class Network(dbo):
             'flt-%(floating_address_as_hex)s-o' % subst, 'veth',
             'peer name flt-%(floating_address_as_hex)s-i' % subst)
         util_concurrency.execute(
-            None,  'ip link set flt-%(floating_address_as_hex)s-i netns %(netns)s' % subst)
+            'ip link set flt-%(floating_address_as_hex)s-i netns %(netns)s' % subst)
         util_network.add_address_to_interface(
             self.uuid, floating_address, '32', 'flt-%(floating_address_as_hex)s-i' % subst)
         util_concurrency.execute(
-            None,
             'iptables -w 10 -t nat -A PREROUTING -d %(floating_address)s -j DNAT '
             '--to-destination %(inner_address)s' % subst,
             namespace=self.uuid)
@@ -958,7 +948,6 @@ class Network(dbo):
 
         if util_network.check_for_interface('flt-%(floating_address_as_hex)s-o' % subst):
             util_concurrency.execute(
-                None,
                 'ip link del flt-%(floating_address_as_hex)s-o' % subst)
 
     # NOTE(mikal): this call only works on the network node, the API
@@ -970,7 +959,7 @@ class Network(dbo):
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         util_concurrency.execute(
-            None, 'ip route add %(floating_address)s/32 dev %(vx_bridge)s' % subst)
+            'ip route add %(floating_address)s/32 dev %(vx_bridge)s' % subst)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
@@ -981,7 +970,7 @@ class Network(dbo):
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         util_concurrency.execute(
-            None, 'ip route del %(floating_address)s/32 dev %(vx_bridge)s' % subst)
+            'ip route del %(floating_address)s/32 dev %(vx_bridge)s' % subst)
 
 
 class Networks(dbo_iter):

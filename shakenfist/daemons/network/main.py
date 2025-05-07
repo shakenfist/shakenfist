@@ -129,20 +129,18 @@ def main():
                 subst['egress_bridge'], 'bridge', '', mtu=mtu)
 
             util_concurrency.execute(
-                None, 'ip link set %(egress_bridge)s up' % subst)
+                'ip link set %(egress_bridge)s up' % subst)
             util_network.add_address_to_interface(
-                None, subst['master_float'], subst['netmask'], subst['egress_bridge'])
+                None, subst['master_float'], subst['netmask'],
+                subst['egress_bridge'])
 
             util_concurrency.execute(
-                None,
                 'iptables -w 10 -A FORWARD -o %(egress_nic)s '
                 '-i %(egress_bridge)s -j ACCEPT' % subst)
             util_concurrency.execute(
-                None,
                 'iptables -w 10 -A FORWARD -i %(egress_nic)s '
                 '-o %(egress_bridge)s -j ACCEPT' % subst)
             util_concurrency.execute(
-                None,
                 'iptables -w 10 -t nat -A POSTROUTING '
                 '-o %(egress_nic)s -j MASQUERADE' % subst)
 

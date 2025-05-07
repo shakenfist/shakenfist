@@ -39,9 +39,9 @@ def _delete_with_virsh(instance_uuid, inst):
     try:
         log_ctx.warning('Destroying instance using virsh')
         util_concurrency.execute(
-            None, 'virsh destroy "sf:%s"' % instance_uuid)
+            'virsh destroy "sf:%s"' % instance_uuid)
         util_concurrency.execute(
-            None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
+            'virsh undefine --nvram "sf:%s"' % instance_uuid)
         _delete_instance_files(instance_uuid)
         log_ctx.warning('Destroying instance using virsh succeeded')
         if inst:
@@ -61,7 +61,7 @@ def _delete_with_kill(instance_uuid, inst):
     log_ctx = LOG.with_fields({'instance': instance_uuid})
     try:
         log_ctx.warning('Destroying instance using SIGKILL')
-        stdout, _ = util_concurrency.execute(None, 'aa-status --json')
+        stdout, _ = util_concurrency.execute('aa-status --json')
         status = json.loads(stdout)
         profile = 'libvirt-%s' % instance_uuid
         for proc in status['processes']['/usr/bin/qemu-system-x86_64']:
@@ -70,7 +70,7 @@ def _delete_with_kill(instance_uuid, inst):
 
         try:
             util_concurrency.execute(
-                None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
+                'virsh undefine --nvram "sf:%s"' % instance_uuid)
         except ProcessExecutionError:
             pass
 
@@ -140,7 +140,7 @@ def update_power_states():
                 if state == 'crashed':
                     if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
                         util_concurrency.execute(
-                            None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
+                            'virsh undefine --nvram "sf:%s"' % instance_uuid)
                         inst.state.value = dbo.STATE_DELETED
                     else:
                         inst.state = inst.state.value + '-error'
@@ -176,7 +176,7 @@ def update_power_states():
                             domain.undefine()
                         except lc.libvirt.libvirtError:
                             util_concurrency.execute(
-                                None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
+                                'virsh undefine --nvram "sf:%s"' % instance_uuid)
                         continue
 
                     db_state = inst.state
@@ -194,7 +194,7 @@ def update_power_states():
                             domain.undefine()
                         except lc.libvirt.libvirtError:
                             util_concurrency.execute(
-                                None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
+                                'virsh undefine --nvram "sf:%s"' % instance_uuid)
 
                         inst.add_event(EVENT_TYPE_AUDIT,
                                        'deleted stray instance')

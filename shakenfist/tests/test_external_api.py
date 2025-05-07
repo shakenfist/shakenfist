@@ -78,7 +78,7 @@ class FakeInstance(BaseFakeObject):
     def set_last_cluster_operation(self, op_type, op_uuid):
         self.last_cluster_operation = (op_type, op_uuid)
 
-    def get_lock_attr(self, name, op, ttl=60, global_scope=True, timeout=10):
+    def get_lock_attr(self, name, op, global_scope=True, timeout=10):
         return NoopLock()
 
 
@@ -524,7 +524,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                         uuid='847b0327-9b17-4148-b4ed-be72b6722c17',
                         state=[dbo.STATE_CREATED])])
     @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.ClusterLock')
     def test_delete_all_instances(
             self, mock_db_get_lock, mock_etcd_put,
             mock_get_instances, mock_enqueue):

@@ -32,7 +32,6 @@ from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import GiB
-from shakenfist.constants import LOCK_REFRESH_SECONDS
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
 from shakenfist.exceptions import BlobDeleted
@@ -473,8 +472,7 @@ class Blob(dbo):
             if dep_blob:
                 dep_blob.ref_count_dec(self)
 
-    def ensure_local(self, locks, instance_object=None,
-                     wait_for_other_transfers=True):
+    def ensure_local(self, instance_object=None, wait_for_other_transfers=True):
         affected_objects = [self]
         if instance_object:
             affected_objects.append(instance_object)
@@ -490,7 +488,7 @@ class Blob(dbo):
             dep_blob = Blob.from_db(self.depends_on)
             if not dep_blob:
                 raise BlobDependencyMissing(self.depends_on)
-            dep_blob.ensure_local(locks, instance_object=instance_object)
+            dep_blob.ensure_local(instance_object=instance_object)
 
         # If the blob exists already, we're done
         blob_path = Blob.filepath(self.uuid)
@@ -545,7 +543,7 @@ class Blob(dbo):
 
                     # Attempt a transfer
                     self._attempt_transfer(
-                        locks, affected_objects, partial_path, blob_path)
+                        affected_objects, partial_path, blob_path)
                     return
             except (ConnectionRefusedError, BlobTransferSetupFailed,
                     BlobFetchFailed) as e:
@@ -558,8 +556,7 @@ class Blob(dbo):
     # This method assumes the caller is holding the 'blob-{self.uuid}-transfer'
     # external lock. Luckily the only caller right now is the one directly
     # above here.
-    def _attempt_transfer(self, locks, affected_objects, partial_path,
-                          blob_path):
+    def _attempt_transfer(self, affected_objects, partial_path, blob_path):
         add_event_multi(
             EVENT_TYPE_AUDIT, affected_objects, 'attempting transfer')
         with open(partial_path, 'wb') as f:
@@ -620,7 +617,6 @@ class Blob(dbo):
             client.send(token.encode('utf-8'))
 
             total_bytes_received = 0
-            last_refresh = 0
             next_percentage = 10
 
             last_event = time.time()
@@ -633,10 +629,6 @@ class Blob(dbo):
                     f.write(d)
                     sha512_hash.update(d)
                     total_bytes_received += len(d)
-
-                    if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
-                        etcd.refresh_locks(locks)
-                        last_refresh = time.time()
 
                     percentage = total_bytes_received / int(self.size) * 100.0
                     if ((next_percentage - percentage) < 0 or
@@ -818,7 +810,6 @@ class Blob(dbo):
 
     def _get_hash(self, hashtype='sha512', locks=None):
         hash_out, _ = util_concurrency.execute(
-            locks,
             f'{hashtype}sum {Blob.filepath(self.uuid)}',
             iopriority=util_concurrency.PRIORITY_LOW)
         return hash_out.split(' ')[0]
@@ -902,7 +893,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     depends_on = None
     with util_general.RecordedOperation('snapshot %s' % disk['device'], related_object):
         depends_on = util_image.snapshot(
-            None, disk['path'], dest_path + '.partial', thin=thin)
+            disk['path'], dest_path + '.partial', thin=thin)
 
     # Check that the dependency (if any) actually exists. This test can fail when
     # the blob used to start an instance has been deleted already.
@@ -923,7 +914,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     return b
 
 
-def http_fetch(url, resp, b, locks, affected_objects):
+def http_fetch(url, resp, b, affected_objects):
     fetched = 0
 
     if resp.headers.get('Content-Length'):
@@ -931,7 +922,6 @@ def http_fetch(url, resp, b, locks, affected_objects):
     else:
         total_size = None
 
-    last_refresh = 0
     dest_path = Blob.filepath(b.uuid)
 
     md5_hash = hashlib.md5()
@@ -964,10 +954,6 @@ def http_fetch(url, resp, b, locks, affected_objects):
                 if (next_percentage - percentage) < 0:
                     next_percentage += 10
                 last_event = time.time()
-
-            if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
-                etcd.refresh_locks(locks)
-                last_refresh = time.time()
 
     b.remove_incomplete_location()
     add_event_multi(

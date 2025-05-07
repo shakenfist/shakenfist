@@ -146,7 +146,7 @@ def restore_instances():
 
     for inst in instances:
         try:
-            with inst.get_lock(ttl=120, timeout=120, op='Instance restore',
+            with inst.get_lock(timeout=120, op='Instance restore',
                                global_scope=False):
                 started = ['on', 'transition-to-on',
                            instance.Instance.STATE_INITIAL, 'unknown']

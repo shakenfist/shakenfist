@@ -89,7 +89,7 @@ def check_abort_path(abort_path):
 
 def health_check_privexec():
     try:
-        util_concurrency.execute(None, 'whoami')
+        util_concurrency.execute('whoami')
     except ProcessExecutionError as e:
         LOG.with_fields({
             'stdout': e.stdout,

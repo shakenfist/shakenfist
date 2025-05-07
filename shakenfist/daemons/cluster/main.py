@@ -56,8 +56,8 @@ class Monitor(daemon.Daemon):
         # release the lock, it gets cleared on a crash. This is so that only
         # one node at a time is performing cluster maintenance.
         while daemon.check_abort_path(self.abort_path):
-            self.lock = etcd.get_lock('cluster', None, None, ttl=300, timeout=10,
-                                      op='Cluster maintenance')
+            self.lock = etcd.ClusterLock(
+                'cluster', None, None, timeout=10, op='Cluster maintenance')
             result = self.lock.acquire()
             if result:
                 self.is_elected = True
@@ -83,7 +83,6 @@ class Monitor(daemon.Daemon):
 
             for node in Nodes([]):
                 node.blobs = per_node.get(node.uuid, [])
-            self.lock.refresh()
 
         # Cleanup soft deleted objects
         for objtype in OBJECT_NAMES_TO_CLASSES:
@@ -92,7 +91,6 @@ class Monitor(daemon.Daemon):
                 obj = get_object_class(objtype).from_db(obj_uuid)
                 if time.time() - obj.state.update_time > config.CLEANER_DELAY:
                     obj.hard_delete()
-        self.lock.refresh()
 
         # Cleanup vxids which specify a missing network. We ignore allocations
         # less than five minutes old to let the network setup complete.
@@ -116,7 +114,6 @@ class Monitor(daemon.Daemon):
                         'network': network_uuid,
                         'vxid record': k
                     }).warning('Cleaning up leaked vxlan')
-        self.lock.refresh()
 
         # Cleanup ipmanagers whose network is absent
         # TODO(mikal): remove in v0.9
@@ -137,7 +134,6 @@ class Monitor(daemon.Daemon):
                     LOG.with_fields({
                         'ipmanager': network_uuid
                     }).warning('Cleaning up leaked ipmanager')
-        self.lock.refresh()
 
         # Cleanup IPAMs whose network is absent
         for ipm in ipam.IPAMs([], prefilter='active'):
@@ -153,7 +149,6 @@ class Monitor(daemon.Daemon):
                      'IPAM as leaked because the associated network is '
                      'missing'))
                 ipm.state = dbo.STATE_DELETED
-        self.lock.refresh()
 
         # Cleanup floating IP reservations which refer to deleted objects
         fn = network.floating_network()
@@ -192,7 +187,6 @@ class Monitor(daemon.Daemon):
                     'upload': upload.uuid
                 }).warning('Cleaning up stale upload')
                 upload.hard_delete()
-        self.lock.refresh()
 
         # Cleanup orphan artifacts, delete old versions, and record blobs used
         # by artifacts
@@ -215,7 +209,6 @@ class Monitor(daemon.Daemon):
                 b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
                 if b:
                     in_use_blobs[b.uuid] += 1
-        self.lock.refresh()
 
         # Inspect current state of blobs, the actual changes are done below outside
         # the read only cache. We define being low on disk has having less than three
@@ -300,14 +293,12 @@ class Monitor(daemon.Daemon):
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 b.record_usage()
-        self.lock.refresh()
 
         # Find expired blobs
         for b in Blobs([], prefilter='active'):
             if b.expires_at > 0 and b.expires_at < time.time():
                 b.add_event(EVENT_TYPE_AUDIT, 'blob has expired')
                 b.state = dbo.STATE_DELETED
-        self.lock.refresh()
 
         # Prune over replicated blobs
         for blob_uuid in overreplicated:
@@ -319,7 +310,6 @@ class Monitor(daemon.Daemon):
                         'node': node
                     }).info('Blob over replicated, removing from node with no users')
                     b.drop_node_location(node)
-        self.lock.refresh()
 
         # Replicate under replicated blobs, but only if we don't have heaps of
         # queued replications already
@@ -330,7 +320,6 @@ class Monitor(daemon.Daemon):
                     'blob': b
                 }).info('Blob under replicated, attempting to correct')
                 b.request_replication(allow_excess=excess)
-        self.lock.refresh()
 
         # Find transcodes of not recently used blobs and reap them
         for b in Blobs([], prefilter='active'):
@@ -343,7 +332,6 @@ class Monitor(daemon.Daemon):
                 for transcode in transcoded:
                     tb = Blob.from_db(transcoded[transcode])
                     tb.ref_count_dec(b)
-        self.lock.refresh()
 
         # Node management
         for n in Nodes([]):
@@ -431,7 +419,7 @@ class Monitor(daemon.Daemon):
 
         # Remove old entries from the hard-deleted state caches
         for object_type in OBJECT_NAMES_TO_CLASSES:
-            with etcd.get_lock('cache', None, object_type, op='Hard deleted prune'):
+            with etcd.ClusterLock('cache', None, object_type, op='Hard deleted prune'):
                 hd = etcd.get('cache', object_type, 'hard-deleted')
                 if hd:
                     for obj in list(hd.keys()):
@@ -470,16 +458,12 @@ class Monitor(daemon.Daemon):
 
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):
-                self.lock.refresh()
-
                 try:
                     with util_general.RecordedOperation(
                             'scheduled cluster operations', None, threshold=10):
                         schedule.run_pending()
                 except Exception as e:
                     util_general.ignore_exception('cluster', e)
-
-                self.lock.refresh()
 
                 try:
                     with util_general.RecordedOperation(
@@ -489,7 +473,6 @@ class Monitor(daemon.Daemon):
                     util_general.ignore_exception('cluster', e)
 
                 last_loop_run = time.time()
-                self.lock.refresh()
 
                 self.idle(60)
 

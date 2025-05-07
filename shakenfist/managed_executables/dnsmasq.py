@@ -189,7 +189,7 @@ class DnsMasq(managedexecutable.ManagedExecutable):
             'macaddr': macaddr
         })
         util_concurrency.execute(
-            None, 'dhcp_release %(interface)s %(ipv4)s %(macaddr)s' % subst,
+            'dhcp_release %(interface)s %(ipv4)s %(macaddr)s' % subst,
             namespace=self.network.uuid)
         self.add_event(EVENT_TYPE_AUDIT, 'released a DHCP lease',
                        extra={
@@ -222,6 +222,6 @@ class DnsMasq(managedexecutable.ManagedExecutable):
 
         if needs_start:
             util_concurrency.execute(
-                None, 'dnsmasq --conf-file=%s/config' % self.config_directory,
+                'dnsmasq --conf-file=%s/config' % self.config_directory,
                 namespace=self.network.uuid)
             self.add_event(EVENT_TYPE_AUDIT, 'started')

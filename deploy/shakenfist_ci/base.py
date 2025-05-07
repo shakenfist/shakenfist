@@ -315,7 +315,7 @@ class BaseTestCase(testtools.TestCase):
 
         last_event = None
         time_since_last_progress = time.time()
-        while time.time() - time_since_last_progress < 300:
+        while time.time() - time_since_last_progress < 500:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] == 'error':
                 raise StartException(

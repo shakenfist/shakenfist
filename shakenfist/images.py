@@ -16,7 +16,6 @@ from shakenfist.artifact import BLOB_URL
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist.constants import LOCK_REFRESH_SECONDS
 from shakenfist.constants import QCOW2_CLUSTER_SIZE
 from shakenfist.constants import TRANSCODE_DESCRIPTION
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
@@ -120,15 +119,14 @@ class ImageFetchHelper:
 
     def get_image(self):
         fetched_blobs = []
-        with self.artifact.get_lock(ttl=(12 * LOCK_REFRESH_SECONDS),
-                                    timeout=config.MAX_IMAGE_TRANSFER_SECONDS,
-                                    op='get image') as lock:
+        with self.artifact.get_lock(timeout=config.MAX_IMAGE_TRANSFER_SECONDS,
+                                    op='get image'):
             # Transfer the requested image, in its original format, from either
             # within the cluster (if we have it cached), or from the source. This
             # means that even if we have a cached post transcode version of the image
             # we insist on having the original locally. This was mostly done because
             # I am lazy, but it also serves as a partial access check.
-            fetched_blobs.append(self.transfer_image(lock))
+            fetched_blobs.append(self.transfer_image())
 
             # If the image depends on another image, we must fetch that too.
             while depends_on := fetched_blobs[-1].depends_on:
@@ -139,7 +137,7 @@ class ImageFetchHelper:
                         'child_blob_uuid': depends_on
                         })
                 fetched_blobs.append(
-                    self._blob_get(lock, 'sf://blob/%s' % depends_on))
+                    self._blob_get('sf://blob/%s' % depends_on))
 
             # We might already have a transcoded version of the image cached. If so
             # we use that. Otherwise, we might have a transcoded version within the
@@ -149,12 +147,9 @@ class ImageFetchHelper:
             # transcode version of the image, and we don't completely trust the
             # transcode process to be deterministic.
             for b in fetched_blobs:
-                self.transcode_image(lock, b)
+                self.transcode_image(b)
 
-    def transfer_image(self, lock):
-        # NOTE(mikal): it is assumed the caller holds a lock on the artifact, and passes
-        # it in.
-
+    def transfer_image(self):
         url = _resolve_image(self.artifact.source_url)
 
         # If this is a request for a URL, do we have the most recent version
@@ -228,19 +223,16 @@ class ImageFetchHelper:
             add_event_multi(
                 EVENT_TYPE_STATUS, self.objects,
                 'fetching image from within the cluster')
-            b = self._blob_get(lock, url)
+            b = self._blob_get(url)
         else:
             add_event_multi(
                 EVENT_TYPE_STATUS, self.objects,
                 'fetching image from the internet')
-            b = self._http_get_inner(lock, url)
+            b = self._http_get_inner(url)
 
         return b
 
-    def transcode_image(self, lock, b):
-        # NOTE(mikal): it is assumed the caller holds a lock on the artifact, and passes
-        # it in lock.
-
+    def transcode_image(self, b):
         # If this blob uuid is not the most recent index for the artifact, set that
         if self.artifact.most_recent_index.get('blob_uuid') != b.uuid:
             self.artifact.add_index(b.uuid)
@@ -280,7 +272,7 @@ class ImageFetchHelper:
             remote_blob = blob.Blob.from_db(cached_remotely)
             if not remote_blob:
                 raise exceptions.BlobMissing(cached_remotely)
-            remote_blob.ensure_local([lock], instance_object=self.instance)
+            remote_blob.ensure_local(instance_object=self.instance)
 
             cache_path = os.path.join(
                 config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
@@ -296,7 +288,7 @@ class ImageFetchHelper:
                     config.STORAGE_PATH, 'image_cache', b.uuid)
                 with util_general.RecordedOperation('decompress image', self.instance):
                     util_concurrency.execute(
-                        [lock], f'gunzip -k -q -c {blob_path} > {cache_path}')
+                        f'gunzip -k -q -c {blob_path} > {cache_path}')
                 blob_path = cache_path
 
             cache_path = os.path.join(
@@ -318,7 +310,7 @@ class ImageFetchHelper:
                 with util_general.RecordedOperation('transcode image', self.instance):
                     add_event_multi(
                         EVENT_TYPE_STATUS, objects_with_blob, 'transcoding blob')
-                    util_image.create_qcow2([lock], blob_path, cache_path)
+                    util_image.create_qcow2(blob_path, cache_path)
 
                 # We will cache this transcode, but we do it later as part of a
                 # task so the instance isn't waiting for it.
@@ -339,19 +331,18 @@ class ImageFetchHelper:
         if self.artifact.state.value == Artifact.STATE_INITIAL:
             self.artifact.state = Artifact.STATE_CREATED
 
-    def _blob_get(self, lock, url):
+    def _blob_get(self, url):
         """Fetch a blob from the cluster."""
 
         blob_uuid = url[len(BLOB_URL):]
-
         b = blob.Blob.from_db(blob_uuid)
         if not b:
             raise exceptions.BlobMissing(blob_uuid)
 
-        b.ensure_local([lock], instance_object=self.instance)
+        b.ensure_local(instance_object=self.instance)
         return b
 
-    def _http_get_inner(self, lock, url):
+    def _http_get_inner(self, url):
         """Fetch image if not downloaded and return image path."""
 
         with util_general.RecordedOperation('fetch image', self.instance):
@@ -367,7 +358,7 @@ class ImageFetchHelper:
                 'commencing HTTP fetch to blob', extra={'url': url})
 
             try:
-                blob.http_fetch(url, resp, b, [lock], objects_including_blob)
+                blob.http_fetch(url, resp, b, objects_including_blob)
             except exceptions.BadCheckSum as e:
                 add_event_multi(
                     EVENT_TYPE_AUDIT, objects_including_blob,

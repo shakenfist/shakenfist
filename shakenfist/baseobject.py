@@ -393,7 +393,7 @@ class DatabaseBackedObject:
                     'initialized': True
                 })
 
-    def get_lock(self, subtype=None, ttl=60, op=None, global_scope=True,
+    def get_lock(self, subtype=None, op=None, global_scope=True,
                  timeout=constants.ETCD_ATTEMPT_TIMEOUT):
         # There is no point locking in-memory objects
         if self.in_memory_only:
@@ -402,10 +402,11 @@ class DatabaseBackedObject:
         if not global_scope:
             return util_concurrency.NodeLock(f'{self.object_type}-{self.uuid}')
 
-        return etcd.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
-                             log_ctx=self.log, op=op, timeout=timeout)
+        return etcd.ClusterLock(
+            self.object_type, subtype, self.uuid, log_ctx=self.log, op=op,
+            timeout=timeout)
 
-    def get_lock_attr(self, name, op, ttl=60, global_scope=True, timeout=10):
+    def get_lock_attr(self, name, op, global_scope=True, timeout=10):
         # There is no point locking in-memory objects
         if self.in_memory_only:
             return NoopLock()
@@ -414,9 +415,9 @@ class DatabaseBackedObject:
             return util_concurrency.NodeLock(
                 f'{self.object_type}-{self.uuid}-{name}')
 
-        return etcd.get_lock('attribute/%s' % self.object_type,
-                             self.__uuid, name, op=op, ttl=ttl, timeout=timeout,
-                             log_ctx=self.log)
+        return etcd.ClusterLock(
+            'attribute/%s' % self.object_type, self.__uuid, name, op=op,
+            timeout=timeout, log_ctx=self.log)
 
     # Properties common to all objects which are routed to attributes
     @property

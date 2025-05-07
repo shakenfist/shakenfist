@@ -97,10 +97,6 @@ class MockEtcd():
         self.etcd_replace_many_raw.start()
         self.test_obj.addCleanup(self.etcd_replace_many_raw.stop)
 
-        self.etcd_get_lock = mock.patch('shakenfist.etcd.get_lock')
-        self.etcd_get_lock.start()
-        self.test_obj.addCleanup(self.etcd_get_lock.stop)
-
         # Setup basic DB data
         for n in self.nodes:
             Node.new(n[0], n[1])

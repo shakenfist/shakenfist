@@ -191,7 +191,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
                 'you cannot start an instance in a terminal state')
             raise AbortInstanceStart(self, 'Instance in terminal state')
 
-        with inst.get_lock(ttl=900, op='Instance start', global_scope=False):
+        with inst.get_lock(op='Instance start', global_scope=False):
             try:
                 # Ensure networks are connected to this node
                 iface_uuids = []

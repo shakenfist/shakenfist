@@ -142,7 +142,7 @@ def link_or_copy(source, destination):
     try:
         os.link(source, destination)
     except OSError:
-        util_concurrency.execute([], f'cp {source} {destination}')
+        util_concurrency.execute(f'cp {source} {destination}')
 
     pathlib.Path(destination).touch(exist_ok=True)
 

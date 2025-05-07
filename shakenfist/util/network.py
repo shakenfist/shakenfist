@@ -70,7 +70,7 @@ def check_for_interface(name, namespace=None, up=False):
             return False
 
     stdout, stderr = concurrency.execute(
-        None, 'ip -pretty -json link show %s' % name,
+        'ip -pretty -json link show %s' % name,
         check_exit_code=[0, 1], namespace=namespace,
         suppress_command_logging=True)
 
@@ -89,7 +89,7 @@ def check_for_interface(name, namespace=None, up=False):
 
 def get_interface_addresses(name, namespace=None):
     stdout, _ = concurrency.execute(
-        None, 'ip -pretty -json addr show %s' % name,
+        'ip -pretty -json addr show %s' % name,
         check_exit_code=[0, 1], namespace=namespace)
 
     addresses = []
@@ -101,7 +101,7 @@ def get_interface_addresses(name, namespace=None):
 
 def get_interface_statistics(name, namespace=None):
     stdout, stderr = concurrency.execute(
-        None, 'ip -s -pretty -json link show %s' % name,
+        'ip -s -pretty -json link show %s' % name,
         check_exit_code=[0, 1], namespace=namespace,
         suppress_command_logging=True)
 
@@ -121,7 +121,7 @@ def get_interface_statistics(name, namespace=None):
 
 def get_interface_mtus(namespace=None):
     stdout, _ = concurrency.execute(
-        None, 'ip -pretty -json link show',
+        'ip -pretty -json link show',
         check_exit_code=[0, 1], namespace=namespace,
         suppress_command_logging=True)
 
@@ -131,7 +131,7 @@ def get_interface_mtus(namespace=None):
 
 def get_interface_mtu(interface, namespace=None):
     stdout, _ = concurrency.execute(
-        None, 'ip -pretty -json link show %s' % interface,
+        'ip -pretty -json link show %s' % interface,
         check_exit_code=[0, 1], namespace=namespace,
         suppress_command_logging=True)
 
@@ -141,7 +141,7 @@ def get_interface_mtu(interface, namespace=None):
 
 def get_default_routes(namespace):
     stdout, _ = concurrency.execute(
-        None,  'ip route list default', namespace=namespace)
+        'ip route list default', namespace=namespace)
 
     if not stdout:
         return []
@@ -157,7 +157,7 @@ def get_default_routes(namespace):
 def add_default_route(namespace, router):
     try:
         concurrency.execute(
-            None, f'route add default gw {router}', namespace=namespace)
+            f'route add default gw {router}', namespace=namespace)
     except ProcessExecutionError as e:
         if e.stderr != 'SIOCADDRT: File exists\n':
             raise e
@@ -165,7 +165,7 @@ def add_default_route(namespace, router):
 
 def delete_default_route(namespace, router):
     concurrency.execute(
-        None, f'route del default gw {router}', namespace=namespace)
+        f'route del default gw {router}', namespace=namespace)
 
 
 def get_safe_interface_name(interface):
@@ -177,7 +177,6 @@ def get_safe_interface_name(interface):
 def _create_interface_inner(interface, interface_type, extra, mtu):
     try:
         concurrency.execute(
-            None,
             'ip link add %(interface)s mtu %(mtu)s '
             'type %(interface_type)s %(extra)s' % {
                 'interface': interface,
@@ -212,7 +211,7 @@ def create_interface(interface, interface_type, extra, mtu=None):
 
 def nat_rules_for_ipblock(ipblock):
     out, _ = concurrency.execute(
-        None, 'iptables -w 10 -t nat -L POSTROUTING -n -v')
+        'iptables -w 10 -t nat -L POSTROUTING -n -v')
     # Output looks like this:
     # Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)
     # pkts bytes target     prot opt in     out     source               destination
@@ -238,7 +237,7 @@ def discover_interfaces():
     link_ether = None
     link_ether_re = re.compile('^    link/ether (.*) brd .*')
 
-    stdout, _ = concurrency.execute(None, 'ip addr list')
+    stdout, _ = concurrency.execute('ip addr list')
     for line in stdout.split('\n'):
         line = line.rstrip()
 
@@ -284,15 +283,14 @@ def add_address_to_interface(namespace, address, netmask, device):
 
         try:
             concurrency.execute(
-                None,
                 'ip addr add {address}/{netmask} dev {device}'.format(
                     address=address,
                     netmask=netmask,
                     device=device
                 ),
                 namespace=namespace)
-            concurrency.execute(None, 'ip link set %s up' %
-                                device, namespace=namespace)
+            concurrency.execute(
+                'ip link set %s up' % device, namespace=namespace)
 
         except ProcessExecutionError as e:
             if e.stderr.rstrip() != 'RTNETLINK answers: File exists':
