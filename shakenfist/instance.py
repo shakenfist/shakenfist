@@ -24,6 +24,7 @@ from shakenfist import baseobject
 from shakenfist import blob
 from shakenfist import cache
 from shakenfist import constants
+from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.etcd_schema.operations.node_inst_op \
@@ -51,6 +52,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
+from shakenfist.operations.baseoperation import BaseClusterOperation as bco
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import libvirt as util_libvirt
@@ -95,6 +97,30 @@ def _safe_int_cast(i):
     if i:
         return int(i)
     return i
+
+
+def traverse_cluster_operations_tree(op, only_incomplete=True):
+    # Walk the tree of ops from a starting point and yield all ops.
+    if not op:
+        return
+
+    if only_incomplete and op.state.value not in [
+        bco.STATE_QUEUED,
+        bco.STATE_EXECUTING
+    ]:
+        return
+
+    for dep in op.depends_on:
+        dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
+        for thing in traverse_cluster_operations_tree(dep_op):
+            yield thing
+
+    for dep in op.runs_after:
+        dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
+        for thing in traverse_cluster_operations_tree(dep_op):
+            yield thing
+
+    yield op
 
 
 class ConnectedVSockChannel():
@@ -1590,7 +1616,36 @@ class Instance(dbo):
         os.truncate(console_path, 0)
         self.add_event(EVENT_TYPE_AUDIT, 'console log cleared')
 
-    def enqueue_delete_remote(self, node):
+    def enqueue_delete(self):
+        # If this instance is not on a node, just enqueue on this node
+        placement = self.placement
+        if not placement.get('node'):
+            node = config.NODE_NAME
+        else:
+            node = placement['node']
+
+        # Determine which outstanding cluster operations should be cancelled
+        # for this instance. I don't love this approach, but I cannot think
+        # of something which isn't terrible in some other way right now either.
+        ops = []
+
+        lco = self.last_cluster_operation
+        if lco:
+            lco_op = get_object_class(lco['op_type']).from_db(lco['op_uuid'])
+            ops = traverse_cluster_operations_tree(lco_op)
+
+        for op in ops:
+            has_protected_task = False
+            for task in op.tasks:
+                if task in [niso_tasks.instance_snapshot]:
+                    has_protected_task = True
+
+            if not has_protected_task:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, [self, op],
+                    'task aborted due to enqueued delete request')
+                op.state = bco.STATE_ABORT
+
         op_type, op_uuid = nio_create_and_enqueue(
             node,
             self.uuid,
@@ -1613,7 +1668,7 @@ class Instance(dbo):
             self.state = self.STATE_ERROR
 
         self.error = error_msg
-        self.enqueue_delete_remote(config.NODE_NAME)
+        self.enqueue_delete()
 
     def snapshot(self, all=False, device=None, max_versions=None, thin=False):
         disks = self.block_devices['devices']

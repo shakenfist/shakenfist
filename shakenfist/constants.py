@@ -115,6 +115,7 @@ OBJECT_NAMES_TO_CLASSES = {
     'instance': 'instance.Instance',
     'ipam': 'ipam.IPAM',
     'namespace': 'namespace.Namespace',
+    'net_iface_ip_op': 'operations.net_iface_ip_op.NetIfaceIPOp',
     'net_iface_op': 'operations.net_iface_op.NetIfaceOp',
     'net_ip_op': 'operations.net_ip_op.NetIPOp',
     'net_macaddr_ip_op': 'operations.net_macaddr_ip_op.NetMacaddrIPOp',
@@ -130,6 +131,24 @@ OBJECT_NAMES_TO_CLASSES = {
     'node_inst_snap_op': 'operations.node_inst_snap_op.NodeInstSnapOp',
     'node_net_op': 'operations.node_net_op.NodeNetOp',
     'upload': 'upload.Upload'
+}
+
+
+OPERATION_NAMES_TO_CLASSES = {
+    'artifact_fetch_op': 'operations.artifact_fetch_op.ArtifactFetchOp',
+    'imgcache_op': 'operations.imgcache_op.ImageCacheOp',
+    'net_iface_ip_op': 'operations.net_iface_ip_op.NetIfaceIPOp',
+    'net_iface_op': 'operations.net_iface_op.NetIfaceOp',
+    'net_ip_op': 'operations.net_ip_op.NetIPOp',
+    'net_macaddr_ip_op': 'operations.net_macaddr_ip_op.NetMacaddrIPOp',
+    'net_op': 'operations.net_op.NetOp',
+    'node_aop_op': 'operations.node_aop_op.NodeAgentopOp',
+    'node_blob_op': 'operations.node_blob_op.NodeBlobOp',
+    'node_inst_net_iface_op': 'operations.node_inst_net_iface_op.NodeInstNetIfaceOp',
+    'node_inst_netdesc_op': 'operations.node_inst_netdesc_op.NodeInstNetdescOp',
+    'node_inst_op': 'operations.node_inst_op.NodeInstOp',
+    'node_inst_snap_op': 'operations.node_inst_snap_op.NodeInstSnapOp',
+    'node_net_op': 'operations.node_net_op.NodeNetOp'
 }
 
 

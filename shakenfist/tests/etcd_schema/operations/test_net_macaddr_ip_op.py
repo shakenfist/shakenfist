@@ -3,6 +3,8 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
+from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
 from shakenfist.etcd_schema.operations.net_macaddr_ip_op import create_and_enqueue
 from shakenfist.etcd_schema.operations.net_macaddr_ip_op import current_version
 from shakenfist.etcd_schema.operations.net_macaddr_ip_op import model
@@ -11,8 +13,6 @@ from shakenfist.etcd_schema.operations.baseclusteroperation \
     import CLUSTER_OPERATIONS
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.net_macaddr_ip_op import NetMacaddrIPOp
-from shakenfist.operations.clusteroperationmapping \
-    import OPERATION_NAMES_TO_CLASSES
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -180,3 +180,5 @@ class NetMacaddrIPOpTestCase(base.ShakenFistTestCase):
     def test_object_mapping(self):
         self.assertTrue(
             NetMacaddrIPOp.object_type in OPERATION_NAMES_TO_CLASSES)
+        self.assertTrue(
+            NetMacaddrIPOp.object_type in OBJECT_NAMES_TO_CLASSES)

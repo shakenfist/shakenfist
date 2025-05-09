@@ -7,6 +7,7 @@ from shakenfist.cache import read_object_state_cache
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.blob import Blob
+from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist.etcd_schema.operations import baseclusteroperation as bco_schema
 from shakenfist.etcd_schema.operations import node_blob_op as nbo_schema
@@ -16,7 +17,6 @@ from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_general_background_node_queues
 from shakenfist.operations.baseoperation import get_general_user_facing_node_queues
-from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
 from shakenfist.util import general as util_general
 
 
@@ -27,8 +27,6 @@ INSTANCE_CHECKS_QUEUE = queue.Queue()
 
 @util_general.recorded_method
 def per_blob_checks():
-    global BLOB_CHECKS_QUEUE
-
     start_time = time.time()
     if BLOB_CHECKS_QUEUE.empty():
         _fill_per_blob_queue()
@@ -44,8 +42,6 @@ def per_blob_checks():
 
 
 def _fill_per_blob_queue():
-    global BLOB_CHECKS_QUEUE
-
     for blob_uuid in read_object_state_cache(Blob.object_type, Blob.STATE_CREATED):
         b = Blob.from_db(blob_uuid)
         if not b:
@@ -54,8 +50,6 @@ def _fill_per_blob_queue():
 
 
 def _process_per_blob_queue(execution_limit=10):
-    global BLOB_CHECKS_QUEUE
-
     processed = 0
     start_time = time.time()
     while True:
@@ -89,7 +83,7 @@ def _process_per_blob_queue(execution_limit=10):
 
             request_checksum = True
             for op_type, op_uuid in requests:
-                op = OPERATION_NAMES_TO_CLASSES[op_type].from_db(op_uuid)
+                op = get_object_class(op_type).from_db(op_uuid)
                 if op and op.state.value == BaseClusterOperation.STATE_QUEUED:
                     request_checksum = False
                     break
@@ -104,8 +98,6 @@ def _process_per_blob_queue(execution_limit=10):
 
 @util_general.recorded_method
 def per_instance_checks_and_usage():
-    global INSTANCE_CHECKS_QUEUE
-
     start_time = time.time()
     if INSTANCE_CHECKS_QUEUE.empty():
         _fill_per_instance_queue()
@@ -123,8 +115,6 @@ def per_instance_checks_and_usage():
 
 
 def _fill_per_instance_queue():
-    global INSTANCE_CHECKS_QUEUE
-
     for instance_uuid in read_object_state_cache(
             Instance.object_type, Instance.STATE_CREATED):
         inst = Instance.from_db(instance_uuid)
@@ -135,8 +125,6 @@ def _fill_per_instance_queue():
 
 
 def _process_per_instance_queue(execution_limit=10):
-    global INSTANCE_CHECKS_QUEUE
-
     processed = 0
     start_time = time.time()
     while True:

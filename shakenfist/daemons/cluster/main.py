@@ -34,8 +34,6 @@ from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_all_node_queues
-from shakenfist.operations.clusteroperationmapping \
-    import OPERATION_NAMES_TO_CLASSES
 from shakenfist.upload import Uploads
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
@@ -403,8 +401,7 @@ class Monitor(daemon.Daemon):
                         if queue_name.find('-clusteroperation-') != -1:
                             op_type = workitem.get('operation_type')
                             op_uuid = workitem.get('operation_uuid')
-                            op = OPERATION_NAMES_TO_CLASSES[op_type].from_db(
-                                op_uuid)
+                            op = get_object_class(op_type).from_db(op_uuid)
                             op.state = BaseClusterOperation.STATE_ABORT
                             eventlog.add_event_multi(
                                 EVENT_TYPE_AUDIT,

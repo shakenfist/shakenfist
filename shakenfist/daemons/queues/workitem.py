@@ -1,10 +1,10 @@
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist.operations.baseoperation import BaseClusterOperation
-from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -41,7 +41,7 @@ class Job(util_concurrency.Job):
     def _cluster_operation_execute(self):
         op_type = self.workitem.get('operation_type')
         op_uuid = self.workitem.get('operation_uuid')
-        op = OPERATION_NAMES_TO_CLASSES[op_type].from_db(op_uuid)
+        op = get_object_class(op_type).from_db(op_uuid)
 
         if not op:
             self.log.error('Operation not found')
@@ -51,8 +51,7 @@ class Job(util_concurrency.Job):
 
         # Ensure our dependencies are met.
         for dep in op.depends_on:
-            dep_op = OPERATION_NAMES_TO_CLASSES[dep['op_type']].from_db(
-                dep['op_uuid'])
+            dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
             if not dep_op:
                 op.add_event(
                     EVENT_TYPE_AUDIT,
@@ -89,8 +88,7 @@ class Job(util_concurrency.Job):
 
         # Ensure that we are running after any runs_after requirements.
         for dep in op.runs_after:
-            dep_op = OPERATION_NAMES_TO_CLASSES[dep['op_type']].from_db(
-                dep['op_uuid'])
+            dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
             if not dep_op:
                 # Not fatal because otherwise a missing cluster operation
                 # could cause the entire cluster to stop being able to manage
