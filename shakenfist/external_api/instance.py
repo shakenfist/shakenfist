@@ -55,7 +55,6 @@ from shakenfist.artifact import SNAPSHOT_URL
 from shakenfist.artifact import UPLOAD_URL
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
-from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import agentoperation as api_agentoperation
@@ -1430,7 +1429,7 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
         if p.get('vdi_tls_port'):
             tls_port = '\ntls-port=%s' % p['vdi_tls_port']
 
-        config = VIRTVIEWER_TEMPLATE % {
+        vvconfig = VIRTVIEWER_TEMPLATE % {
             'vdi_type': instance_from_db.video['vdi'],
             'node': instance_from_db.placement.get('node'),
             'vdi_port': p.get('vdi_port'),
@@ -1441,7 +1440,7 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'vdiconsole request from REST API')
         resp = flask.Response(
-            config, mimetype='application/x-virt-viewer')
+            vvconfig, mimetype='application/x-virt-viewer')
         resp.status_code = 200
         return resp
 
