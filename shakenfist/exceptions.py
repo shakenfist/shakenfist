@@ -354,6 +354,10 @@ class UnknownPrivExecReplyException(Exception):
     ...
 
 
+class HashFailed(Exception):
+    ...
+
+
 class ProcessExecutionError(Exception):
     def __init__(self, stdout=None, stderr=None, exit_code=None, cmd=None):
         super().__init__(stdout, stderr, exit_code, cmd)

@@ -25,15 +25,23 @@ _sym_db = _symbol_database.Default()
 from shakenfist.protos import common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0eprivexec.proto\x12\x11shakenfist.protos\x1a\x0c\x63ommon.proto\"Z\n\x0fPrivExecRequest\x12<\n\x0f\x65xecute_request\x18\x01 \x01(\x0b\x32!.shakenfist.protos.ExecuteRequestH\x00\x42\t\n\x07request\"R\n\rPrivExecReply\x12\x38\n\rexecute_reply\x18\x01 \x01(\x0b\x32\x1f.shakenfist.protos.ExecuteReplyH\x00\x42\x07\n\x05replyb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0eprivexec.proto\x12\x11shakenfist.protos\x1a\x0c\x63ommon.proto\"T\n\x0fHashFileRequest\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x33\n\talgorithm\x18\x02 \x01(\x0e\x32 .shakenfist.protos.HashAlgorithm\"\x98\x02\n\rHashFileReply\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x33\n\talgorithm\x18\x02 \x01(\x0e\x32 .shakenfist.protos.HashAlgorithm\x12\x0c\n\x04hash\x18\x03 \x01(\t\x12\x36\n\x05\x65rror\x18\x04 \x01(\x0e\x32\'.shakenfist.protos.HashFileReply.Errors\x12\x12\n\nerror_text\x18\x05 \x01(\t\"j\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x12\n\x0e\x46ILE_NOT_FOUND\x10\x01\x12\x15\n\x11UNKNOWN_ALGORITHM\x10\x02\x12\x17\n\x13\x41LGORITHM_NOT_FOUND\x10\x03\x12\x14\n\x10\x41LGORITHM_FAILED\x10\x04\"\x9b\x01\n\x0fPrivExecRequest\x12<\n\x0f\x65xecute_request\x18\x01 \x01(\x0b\x32!.shakenfist.protos.ExecuteRequestH\x00\x12?\n\x11hash_file_request\x18\n \x01(\x0b\x32\".shakenfist.protos.HashFileRequestH\x00\x42\t\n\x07request\"\x8f\x01\n\rPrivExecReply\x12\x38\n\rexecute_reply\x18\x01 \x01(\x0b\x32\x1f.shakenfist.protos.ExecuteReplyH\x00\x12;\n\x0fhash_file_reply\x18\n \x01(\x0b\x32 .shakenfist.protos.HashFileReplyH\x00\x42\x07\n\x05reply*=\n\rHashAlgorithm\x12\x08\n\x04SHA1\x10\x00\x12\n\n\x06SHA256\x10\x01\x12\n\n\x06SHA512\x10\x02\x12\n\n\x06XXH128\x10\x03\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'privexec_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_PRIVEXECREQUEST']._serialized_start=51
-  _globals['_PRIVEXECREQUEST']._serialized_end=141
-  _globals['_PRIVEXECREPLY']._serialized_start=143
-  _globals['_PRIVEXECREPLY']._serialized_end=225
+  _globals['_HASHALGORITHM']._serialized_start=724
+  _globals['_HASHALGORITHM']._serialized_end=785
+  _globals['_HASHFILEREQUEST']._serialized_start=51
+  _globals['_HASHFILEREQUEST']._serialized_end=135
+  _globals['_HASHFILEREPLY']._serialized_start=138
+  _globals['_HASHFILEREPLY']._serialized_end=418
+  _globals['_HASHFILEREPLY_ERRORS']._serialized_start=312
+  _globals['_HASHFILEREPLY_ERRORS']._serialized_end=418
+  _globals['_PRIVEXECREQUEST']._serialized_start=421
+  _globals['_PRIVEXECREQUEST']._serialized_end=576
+  _globals['_PRIVEXECREPLY']._serialized_start=579
+  _globals['_PRIVEXECREPLY']._serialized_end=722
 # @@protoc_insertion_point(module_scope)

@@ -3,14 +3,46 @@ syntax = "proto3";
 package shakenfist.protos;
 import "common.proto";
 
+enum HashAlgorithm {
+    SHA1 = 0;
+    SHA256 = 1;
+    SHA512 = 2;
+    XXH128 = 3;
+}
+
+message HashFileRequest {
+    string path = 1;
+    HashAlgorithm algorithm = 2;
+}
+
+message HashFileReply {
+    enum Errors {
+        OK = 0;
+        FILE_NOT_FOUND = 1;
+        UNKNOWN_ALGORITHM = 2;
+        ALGORITHM_NOT_FOUND = 3;
+        ALGORITHM_FAILED = 4;
+    }
+
+    string path = 1;
+    HashAlgorithm algorithm = 2;
+    string hash = 3;
+    Errors error = 4;
+    string error_text = 5;
+}
+
 message PrivExecRequest {
     oneof request {
         shakenfist.protos.ExecuteRequest execute_request = 1;
+
+        HashFileRequest hash_file_request = 10;
     }
 }
 
 message PrivExecReply {
     oneof reply {
         shakenfist.protos.ExecuteReply execute_reply = 1;
+
+        HashFileReply hash_file_reply = 10;
     }
 }

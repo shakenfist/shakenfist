@@ -4,9 +4,11 @@
 # protobufs.
 
 import os
+import shutil
 import signal
 import socket
 import subprocess
+import sys
 import threading
 import time
 
@@ -43,9 +45,11 @@ IO_PRIORITIES = {
 
 
 class PrivExecJob:
-    def __init__(self, conn):
+    def __init__(self, conn, ionice):
         super().__init__()
         self.conn = conn
+        self.ionice = ionice
+
         self.task_details = None
         self.pid = None
 
@@ -66,7 +70,7 @@ class PrivExecJob:
             request.io_priority, IO_PRIORITIES[common_pb2.ExecuteRequest.NORMAL])
 
         if current_iopriority != requested_iopriority:
-            command = (f'ionice -c {requested_iopriority[0]} '
+            command = (f'{self.ionice} -c {requested_iopriority[0]} '
                        f'-n {requested_iopriority[1]} {command}')
 
         working_directory = None
@@ -108,6 +112,89 @@ class PrivExecJob:
             )
         )
 
+    def _hash_file(self, req):
+        log = LOG.with_fields({
+            'path': req.path,
+            'algorithm': req.algorithm
+        })
+
+        hash_commands = {
+            privexec_pb2.HashAlgorithm.SHA1: 'sha1sum',
+            privexec_pb2.HashAlgorithm.SHA256: 'sha256sum',
+            privexec_pb2.HashAlgorithm.SHA512: 'sha512sum',
+            privexec_pb2.HashAlgorithm.XXH128: 'xxh128sum'
+        }
+
+        if req.algorithm not in hash_commands:
+            log.error('Failed to hash file, no hasher found')
+            return privexec_pb2.PrivExecReply(
+                hash_file_reply=privexec_pb2.HashFileReply(
+                    path=req.path,
+                    algorithm=req.algorithm,
+                    error=privexec_pb2.HashFileReply.UNKNOWN_ALGORITHM
+                )
+            )
+
+        hasher = shutil.which(hash_commands[req.algorithm])
+        if not hasher:
+            log.error('Failed to hash file, could not resolve hasher')
+            return privexec_pb2.PrivExecReply(
+                hash_file_reply=privexec_pb2.HashFileReply(
+                    path=req.path,
+                    algorithm=req.algorithm,
+                    error=privexec_pb2.HashFileReply.ALGORITHM_NOT_FOUND
+                )
+            )
+
+        command = [self.ionice, '-c', '2', '-n', '7', hasher, req.path]
+        log = log.with_fields({
+            'hasher': hasher,
+            'command': command
+        })
+
+        start_time = time.time()
+        pipe = subprocess.PIPE
+        obj = subprocess.Popen(
+            command, stdin=pipe, stdout=pipe, stderr=pipe, close_fds=True)
+        self.pid = obj.pid
+
+        stdout, stderr = obj.communicate(None, timeout=None)
+        obj.stdin.close()
+        exit_code = obj.returncode
+
+        duration = round(time.time() - start_time, 2)
+        hash_out = stdout.decode().split(' ')[0]
+        log = log.with_fields({
+            'duration': duration,
+            'exit_code': exit_code,
+            'stdout': stdout,
+            'stderr': stderr,
+            'hash': hash_out
+        })
+
+        if exit_code != 0 or len(hash_out) == 0:
+            log.error(
+                'Failed to hash file, bad exit code or no output from hasher')
+            return privexec_pb2.PrivExecReply(
+                hash_file_reply=privexec_pb2.HashFileReply(
+                    path=req.path,
+                    algorithm=req.algorithm,
+                    hash=hash_out,
+                    error=privexec_pb2.HashFileReply.ALGORITHM_FAILED,
+                    error_text=stderr
+                )
+            )
+
+        log.debug('Hashed file')
+        return privexec_pb2.PrivExecReply(
+            hash_file_reply=privexec_pb2.HashFileReply(
+                path=req.path,
+                algorithm=req.algorithm,
+                hash=hash_out,
+                error=privexec_pb2.HashFileReply.OK
+            )
+        )
+
     def run(self):
         buffered = bytearray()
 
@@ -129,6 +216,12 @@ class PrivExecJob:
                     self.task_details = f'execute: {er.command}'
                     reply = self._execute(er)
                     self.conn.sendall(reply.SerializeToString())
+
+                elif request.HasField('hash_file_request'):
+                    req = request.hash_file_request
+                    reply = self._hash_file(req)
+                    self.conn.sendall(reply.SerializeToString())
+
                 else:
                     LOG.error('Unknown execute request type')
                 break
@@ -148,6 +241,11 @@ def main():
     write_pid_file()
     setproctitle.setproctitle('sf-privexec')
 
+    ionice = shutil.which('ionice')
+    if not ionice:
+        LOG.error('Cannot find ionice command')
+        sys.exit(1)
+
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
 
@@ -166,7 +264,7 @@ def main():
 
         if conn:
             thread_name = random.random_id()
-            worker_object = PrivExecJob(conn)
+            worker_object = PrivExecJob(conn, ionice)
             worker_thread = threading.Thread(
                 target=worker_object.run, daemon=True, name=thread_name)
             workers[thread_name] = {

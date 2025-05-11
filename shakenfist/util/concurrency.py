@@ -9,6 +9,7 @@ from google.protobuf.message import DecodeError
 from shakenfist_utilities import logs                     # noreorder
 from shakenfist_utilities import random as sf_random      # noreorder
 
+from shakenfist.exceptions import HashFailed
 from shakenfist.exceptions import MissingNodeLockSocket
 from shakenfist.exceptions import MissingPrivExecSocket
 from shakenfist.exceptions import ProcessExecutionError
@@ -39,10 +40,6 @@ class Job:
         LOG.debug('Starting job execution')
         self.execute()
         LOG.debug('Finished job execution')
-
-
-def _is_gunicorn():
-    return 'gunicorn' in os.environ.get('SERVER_SOFTWARE', '')
 
 
 def _log_results(**kwargs):
@@ -150,6 +147,59 @@ def execute(command, check_exit_code=[0], env_variables=None,
                             stderr=response.stderr,
                             cmd=command
                         )
+                else:
+                    raise UnknownPrivExecReplyException()
+
+            except DecodeError:
+                ...
+
+    finally:
+        client.close()
+
+
+def hash_file(path, algorithm_str):
+    if not os.path.exists(PRIVEXEC_SOCKET_PATH):
+        raise MissingPrivExecSocket()
+
+    hash_algorithms = {
+        'sha1': privexec_pb2.HashAlgorithm.SHA1,
+        'sha256': privexec_pb2.HashAlgorithm.SHA256,
+        'sha512': privexec_pb2.HashAlgorithm.SHA512,
+        'xxh128': privexec_pb2.HashAlgorithm.XXH128
+    }
+
+    request = privexec_pb2.PrivExecRequest(
+        hash_file_request=privexec_pb2.HashFileRequest(
+            path=path,
+            algorithm=hash_algorithms[algorithm_str]
+        )
+    )
+
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    client.connect(PRIVEXEC_SOCKET_PATH)
+
+    try:
+        client.sendall(request.SerializeToString())
+
+        buffered = bytearray()
+        while True:
+            input = client.recv(102400)
+            if not input:
+                raise TruncatedPrivExecResponse()
+            buffered += input
+
+            try:
+                reply = privexec_pb2.PrivExecReply()
+                consumed = reply.ParseFromString(buffered)
+                if consumed == 0:
+                    continue
+                buffered = buffered[consumed:]
+
+                if reply.HasField('hash_file_reply'):
+                    response = reply.hash_file_reply
+                    if response.error != privexec_pb2.HashFileReply.OK:
+                        raise HashFailed()
+                    return response.hash
                 else:
                     raise UnknownPrivExecReplyException()
 

@@ -808,22 +808,18 @@ class Blob(dbo):
             return False
         return True
 
-    def _get_hash(self, hashtype='sha512', locks=None):
-        hash_out, _ = util_concurrency.execute(
-            f'{hashtype}sum {Blob.filepath(self.uuid)}',
-            iopriority=util_concurrency.PRIORITY_LOW)
-        return hash_out.split(' ')[0]
-
-    def verify_checksum(self, hash=None, locks=None, urgent=True):
+    def verify_checksum(self, hash=None, urgent=True):
         # This method is focussed on sha512 hashes at the moment, but I also
         # want it to be able to do other hash types later -- for example OVA
         # support needs sha1 or sha256, and xxhash is a lot faster. So for now
         # we always make sure there is a sha512, but if we're not in a hurry
         # we'll calculate a few others just once as well.
+        file_path = self.filepath(self.uuid)
+
         if hash:
             sha512_hash = hash
         if not hash:
-            sha512_hash = self._get_hash(hashtype='sha512', locks=locks)
+            sha512_hash = util_concurrency.hash_file(file_path, 'sha512')
 
         # If we're not in a hurry, calculate missing extra hashes
         extra_hashes = {}
@@ -832,8 +828,8 @@ class Blob(dbo):
         for alg in BLOB_HASH_ALGORITHMS:
             if alg not in c:
                 if not urgent:
-                    extra_hashes[alg] = self._get_hash(
-                        hashtype=alg, locks=locks)
+                    extra_hashes[alg] = \
+                        util_concurrency.hash_file(file_path, alg)
                 else:
                     needs_rehashing = True
 
