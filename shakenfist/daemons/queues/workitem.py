@@ -111,5 +111,9 @@ class Job(util_concurrency.Job):
                 op.defer(waiting_on=[dep_op])
                 return
 
+        # Ensure we haven't been aborted or something
+        if op.state.value != BaseClusterOperation.STATE_QUEUED:
+            return
+
         # We're good to go!
         op.execute()
