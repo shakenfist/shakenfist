@@ -714,23 +714,8 @@ class Network(dbo):
     def enable_nat(self):
         if not config.NODE_IS_NETWORK_NODE:
             return
-
-        subst = self.subst_dict()
-        if not util_network.nat_rules_for_ipblock(self.network_address):
-            util_concurrency.execute(
-                'echo 1 > /proc/sys/net/ipv4/ip_forward')
-            util_concurrency.execute(
-                'iptables -w 10 -A FORWARD -o %(egress_veth_inner)s '
-                '-i %(vx_veth_inner)s -j ACCEPT' % subst,
-                namespace=self.uuid)
-            util_concurrency.execute(
-                'iptables -w 10 -A FORWARD -i %(egress_veth_inner)s '
-                '-o %(vx_veth_inner)s -j ACCEPT' % subst,
-                namespace=self.uuid)
-            util_concurrency.execute(
-                'iptables -w 10 -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
-                '-o %(egress_veth_inner)s -j MASQUERADE' % subst,
-                namespace=self.uuid)
+        util_concurrency.enable_nat(
+            self.uuid, self.network_address, self.netmask, self.vxid)
 
     def remove_nat(self):
         if config.NODE_IS_NETWORK_NODE:

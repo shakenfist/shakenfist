@@ -354,6 +354,10 @@ class UnknownPrivExecReplyException(Exception):
     ...
 
 
+class EnableNATFailed(Exception):
+    ...
+
+
 class HashFailed(Exception):
     ...
 

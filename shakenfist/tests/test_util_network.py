@@ -162,19 +162,5 @@ class UtilTestCase(base.ShakenFistTestCase):
         mock_execute.assert_called_with(
             'ip link add veth-foo-o mtu 7950 type veth peer name veth-foo-i')
 
-    @mock.patch(
-        'shakenfist.util.concurrency.execute',
-        return_value=(
-            'Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)\n'
-            ' pkts bytes target     prot opt in     out     source               destination\n'
-            '   23  1736 MASQUERADE  all  --  *     ens4    192.168.242.0/24     0.0.0.0/0\n',
-            ''))
-    def test_nat_rules_for_ipblock(self, mock_execute):
-        found = util_network.nat_rules_for_ipblock('192.168.242.0')
-        self.assertEqual(True, found)
-
-        found = util_network.nat_rules_for_ipblock('10.0.0.0')
-        self.assertEqual(False, found)
-
     def test_random_macaddr(self):
         self.assertTrue(util_network.random_macaddr().startswith('02:00:00'))

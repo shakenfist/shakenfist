@@ -45,10 +45,10 @@ IO_PRIORITIES = {
 
 
 class PrivExecJob:
-    def __init__(self, conn, ionice):
+    def __init__(self, conn, cached_executables):
         super().__init__()
         self.conn = conn
-        self.ionice = ionice
+        self.cached_executables = cached_executables
 
         self.task_details = None
         self.pid = None
@@ -70,7 +70,8 @@ class PrivExecJob:
             request.io_priority, IO_PRIORITIES[common_pb2.ExecuteRequest.NORMAL])
 
         if current_iopriority != requested_iopriority:
-            command = (f'{self.ionice} -c {requested_iopriority[0]} '
+            command = (f'{self.cached_executables["ionice"]} -c '
+                       f'{requested_iopriority[0]} '
                        f'-n {requested_iopriority[1]} {command}')
 
         working_directory = None
@@ -78,9 +79,9 @@ class PrivExecJob:
             working_directory = request.working_directory
 
         start_time = time.time()
-        pipe = subprocess.PIPE
         obj = subprocess.Popen(
-            command, stdin=pipe, stdout=pipe, stderr=pipe, close_fds=True,
+            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, close_fds=True,
             shell=True, cwd=working_directory, env=env_variables)
         self.pid = obj.pid
 
@@ -111,6 +112,22 @@ class PrivExecJob:
                 execution_seconds=duration
             )
         )
+
+    def _command_helper(self, *command):
+        obj = subprocess.Popen(
+            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, close_fds=True)
+        self.pid = obj.pid
+
+        stdout, stderr = obj.communicate(None, timeout=None)
+        if obj.returncode != 0:
+            LOG.with_fields({
+                'command': command,
+                'stdout': stdout,
+                'stderr': stderr,
+                'exit_code': obj.returncode
+            }).error('Command failed')
+        return stdout, stderr, obj.returncode
 
     def _hash_file(self, req):
         log = LOG.with_fields({
@@ -146,52 +163,124 @@ class PrivExecJob:
                 )
             )
 
-        command = [self.ionice, '-c', '2', '-n', '7', hasher, req.path]
-        log = log.with_fields({
-            'hasher': hasher,
-            'command': command
-        })
-
-        start_time = time.time()
-        pipe = subprocess.PIPE
-        obj = subprocess.Popen(
-            command, stdin=pipe, stdout=pipe, stderr=pipe, close_fds=True)
-        self.pid = obj.pid
-
-        stdout, stderr = obj.communicate(None, timeout=None)
-        obj.stdin.close()
-        exit_code = obj.returncode
-
-        duration = round(time.time() - start_time, 2)
-        hash_out = stdout.decode().split(' ')[0]
-        log = log.with_fields({
-            'duration': duration,
-            'exit_code': exit_code,
-            'stdout': stdout,
-            'stderr': stderr,
-            'hash': hash_out
-        })
-
-        if exit_code != 0 or len(hash_out) == 0:
+        stdout, stderr, returncode = self._command_helper(
+            self.cached_executables['ionice'], '-c', '2', '-n', '7',
+            hasher, req.path
+        )
+        if returncode != 0 or len(stdout) == 0:
             log.error(
                 'Failed to hash file, bad exit code or no output from hasher')
             return privexec_pb2.PrivExecReply(
                 hash_file_reply=privexec_pb2.HashFileReply(
                     path=req.path,
                     algorithm=req.algorithm,
-                    hash=hash_out,
+                    hash=stdout,
                     error=privexec_pb2.HashFileReply.ALGORITHM_FAILED,
                     error_text=stderr
                 )
             )
 
-        log.debug('Hashed file')
         return privexec_pb2.PrivExecReply(
             hash_file_reply=privexec_pb2.HashFileReply(
                 path=req.path,
                 algorithm=req.algorithm,
-                hash=hash_out,
+                hash=stdout.decode().split(' ')[0],
                 error=privexec_pb2.HashFileReply.OK
+            )
+        )
+
+    def _enable_nat(self, req):
+        # Determine if we have NAT already
+        stdout, stderr, returncode = self._command_helper(
+            self.cached_executables['iptables'], '-w', '10', '-t', 'nat',
+            '-L', 'POSTROUTING', '-n', '-v'
+        )
+        if returncode != 0:
+            return privexec_pb2.PrivExecReply(
+                enable_nat_reply=privexec_pb2.EnableNATReply(
+                    network_uuid=req.network_uuid,
+                    network_address=req.network_address,
+                    network_mask=req.network_mask,
+                    vxid=req.vxid,
+                    error=privexec_pb2.EnableNATReply.IPTABLES_FAILED,
+                    error_text=stderr
+                )
+            )
+
+        # Output looks like this:
+        # Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)
+        # pkts bytes target     prot opt in     out     source               destination
+        #   23  1736 MASQUERADE  all  --  *      ens4    192.168.242.0/24     0.0.0.0/0
+        for line in stdout.decode().split('\n'):
+            if line.find(str(req.network_address)) != -1:
+                return privexec_pb2.PrivExecReply(
+                    enable_nat_reply=privexec_pb2.EnableNATReply(
+                        network_uuid=req.network_uuid,
+                        network_address=req.network_address,
+                        network_mask=req.network_mask,
+                        vxid=req.vxid,
+                        error=privexec_pb2.EnableNATReply.RULES_ALREADY_PRESENT
+                    )
+                )
+
+        # Ensure IP forwarding is enabled
+        with open('/proc/sys/net/ipv4/ip_forward') as f:
+            forwarding_enabled = f.read().rstrip() == '1'
+
+        if not forwarding_enabled:
+            with open('/proc/sys/net/ipv4/ip_forward', 'w') as f:
+                f.write('1\n')
+
+        # Create iptables rules
+        iptables_failed_error = privexec_pb2.PrivExecReply(
+            enable_nat_reply=privexec_pb2.EnableNATReply(
+                network_uuid=req.network_uuid,
+                network_address=req.network_address,
+                network_mask=req.network_mask,
+                vxid=req.vxid,
+                error=privexec_pb2.EnableNATReply.IPTABLES_FAILED,
+                error_text=stderr
+            )
+        )
+
+        egress_veth_inner = f'egr-{req.vxid:06x}-i'
+        vx_veth_inner = f'veth-{req.vxid:06x}-i'
+
+        _, stderr, returncode = self._command_helper(
+            self.cached_executables['ip'], 'netns', 'exec', req.network_uuid,
+            self.cached_executables['iptables'], '-w', '10',
+            '-A', 'FORWARD', '-o', egress_veth_inner, '-i', vx_veth_inner,
+            '-j', 'ACCEPT'
+        )
+        if returncode != 0:
+            return iptables_failed_error
+
+        _, stderr, returncode = self._command_helper(
+            self.cached_executables['ip'], 'netns', 'exec', req.network_uuid,
+            self.cached_executables['iptables'], '-w', '10',
+            '-A', 'FORWARD', '-i', egress_veth_inner,
+            '-o', 'vx_veth_inner', '-j', 'ACCEPT'
+        )
+        if returncode != 0:
+            return iptables_failed_error
+
+        _, stderr, returncode = self._command_helper(
+            self.cached_executables['ip'], 'netns', 'exec', req.network_uuid,
+            self.cached_executables['iptables'], '-w', '10',
+            '-t', 'nat', '-A', 'POSTROUTING', '-s',
+            f'{req.network_address}/{req.network_mask}',
+            '-o', egress_veth_inner, '-j', 'MASQUERADE'
+        )
+        if returncode != 0:
+            return iptables_failed_error
+
+        return privexec_pb2.PrivExecReply(
+            enable_nat_reply=privexec_pb2.EnableNATReply(
+                network_uuid=req.network_uuid,
+                network_address=req.network_address,
+                network_mask=req.network_mask,
+                vxid=req.vxid,
+                error=privexec_pb2.EnableNATReply.OK
             )
         )
 
@@ -222,6 +311,11 @@ class PrivExecJob:
                     reply = self._hash_file(req)
                     self.conn.sendall(reply.SerializeToString())
 
+                elif request.HasField('enable_nat_request'):
+                    req = request.enable_nat_request
+                    reply = self._enable_nat(req)
+                    self.conn.sendall(reply.SerializeToString())
+
                 else:
                     LOG.error('Unknown execute request type')
                 break
@@ -241,10 +335,13 @@ def main():
     write_pid_file()
     setproctitle.setproctitle('sf-privexec')
 
-    ionice = shutil.which('ionice')
-    if not ionice:
-        LOG.error('Cannot find ionice command')
-        sys.exit(1)
+    cached_executables = {}
+    for command in ['ionice', 'iptables', 'ip']:
+        command_path = shutil.which(command)
+        if not command_path:
+            LOG.error(f'Cannot find {command} command in path')
+            sys.exit(1)
+        cached_executables[command] = command_path
 
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
@@ -264,7 +361,7 @@ def main():
 
         if conn:
             thread_name = random.random_id()
-            worker_object = PrivExecJob(conn, ionice)
+            worker_object = PrivExecJob(conn, cached_executables)
             worker_thread = threading.Thread(
                 target=worker_object.run, daemon=True, name=thread_name)
             workers[thread_name] = {

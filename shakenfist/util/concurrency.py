@@ -9,6 +9,7 @@ from google.protobuf.message import DecodeError
 from shakenfist_utilities import logs                     # noreorder
 from shakenfist_utilities import random as sf_random      # noreorder
 
+from shakenfist.exceptions import EnableNATFailed
 from shakenfist.exceptions import HashFailed
 from shakenfist.exceptions import MissingNodeLockSocket
 from shakenfist.exceptions import MissingPrivExecSocket
@@ -200,6 +201,54 @@ def hash_file(path, algorithm_str):
                     if response.error != privexec_pb2.HashFileReply.OK:
                         raise HashFailed()
                     return response.hash
+                else:
+                    raise UnknownPrivExecReplyException()
+
+            except DecodeError:
+                ...
+
+    finally:
+        client.close()
+
+
+def enable_nat(network_uuid, network_address, network_mask, vxid):
+    if not os.path.exists(PRIVEXEC_SOCKET_PATH):
+        raise MissingPrivExecSocket()
+
+    request = privexec_pb2.PrivExecRequest(
+        enable_nat_request=privexec_pb2.EnableNATRequest(
+            network_uuid=network_uuid,
+            network_address=network_address,
+            network_mask=network_mask,
+            vxid=vxid
+        )
+    )
+
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    client.connect(PRIVEXEC_SOCKET_PATH)
+
+    try:
+        client.sendall(request.SerializeToString())
+
+        buffered = bytearray()
+        while True:
+            input = client.recv(102400)
+            if not input:
+                raise TruncatedPrivExecResponse()
+            buffered += input
+
+            try:
+                reply = privexec_pb2.PrivExecReply()
+                consumed = reply.ParseFromString(buffered)
+                if consumed == 0:
+                    continue
+                buffered = buffered[consumed:]
+
+                if reply.HasField('enable_nat_reply'):
+                    response = reply.enable_nat_reply
+                    if response.error != privexec_pb2.EnableNATReply.OK:
+                        raise EnableNATFailed()
+                    return
                 else:
                     raise UnknownPrivExecReplyException()
 

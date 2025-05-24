@@ -209,21 +209,6 @@ def create_interface(interface, interface_type, extra, mtu=None):
         attempts += 1
 
 
-def nat_rules_for_ipblock(ipblock):
-    out, _ = concurrency.execute(
-        'iptables -w 10 -t nat -L POSTROUTING -n -v')
-    # Output looks like this:
-    # Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)
-    # pkts bytes target     prot opt in     out     source               destination
-    #   23  1736 MASQUERADE  all  --  *      ens4    192.168.242.0/24     0.0.0.0/0
-
-    for line in out.split('\n'):
-        if line.find(str(ipblock)) != -1:
-            return True
-
-    return False
-
-
 def discover_interfaces():
     mac_to_iface = {
         '00:00:00:00:00:00': 'broadcast'
