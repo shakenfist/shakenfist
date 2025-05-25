@@ -4,6 +4,7 @@
 # protobufs.
 
 import os
+import re
 import shutil
 import signal
 import socket
@@ -42,6 +43,14 @@ IO_PRIORITIES = {
     common_pb2.ExecuteRequest.LOW: (2, 7),
     common_pb2.ExecuteRequest.HIGH: (2, 0)
 }
+
+
+# vxlan mesh discovery
+MESH_RE = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
+
+
+class VXLANMeshDiscoveryFailure(Exception):
+    ...
 
 
 class PrivExecJob:
@@ -190,22 +199,23 @@ class PrivExecJob:
         )
 
     def _enable_nat(self, req):
+        iptables_failed_error = privexec_pb2.PrivExecReply(
+            enable_nat_reply=privexec_pb2.EnableNATReply(
+                network_uuid=req.network_uuid,
+                network_address=req.network_address,
+                network_mask=req.network_mask,
+                vxid=req.vxid,
+                error=privexec_pb2.EnableNATReply.IPTABLES_FAILED
+            )
+        )
+
         # Determine if we have NAT already
-        stdout, stderr, returncode = self._command_helper(
+        stdout, _, returncode = self._command_helper(
             self.cached_executables['iptables'], '-w', '10', '-t', 'nat',
             '-L', 'POSTROUTING', '-n', '-v'
         )
         if returncode != 0:
-            return privexec_pb2.PrivExecReply(
-                enable_nat_reply=privexec_pb2.EnableNATReply(
-                    network_uuid=req.network_uuid,
-                    network_address=req.network_address,
-                    network_mask=req.network_mask,
-                    vxid=req.vxid,
-                    error=privexec_pb2.EnableNATReply.IPTABLES_FAILED,
-                    error_text=stderr
-                )
-            )
+            return iptables_failed_error
 
         # Output looks like this:
         # Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)
@@ -232,21 +242,10 @@ class PrivExecJob:
                 f.write('1\n')
 
         # Create iptables rules
-        iptables_failed_error = privexec_pb2.PrivExecReply(
-            enable_nat_reply=privexec_pb2.EnableNATReply(
-                network_uuid=req.network_uuid,
-                network_address=req.network_address,
-                network_mask=req.network_mask,
-                vxid=req.vxid,
-                error=privexec_pb2.EnableNATReply.IPTABLES_FAILED,
-                error_text=stderr
-            )
-        )
-
         egress_veth_inner = f'egr-{req.vxid:06x}-i'
         vx_veth_inner = f'veth-{req.vxid:06x}-i'
 
-        _, stderr, returncode = self._command_helper(
+        _, _, returncode = self._command_helper(
             self.cached_executables['ip'], 'netns', 'exec', req.network_uuid,
             self.cached_executables['iptables'], '-w', '10',
             '-A', 'FORWARD', '-o', egress_veth_inner, '-i', vx_veth_inner,
@@ -255,7 +254,7 @@ class PrivExecJob:
         if returncode != 0:
             return iptables_failed_error
 
-        _, stderr, returncode = self._command_helper(
+        _, _, returncode = self._command_helper(
             self.cached_executables['ip'], 'netns', 'exec', req.network_uuid,
             self.cached_executables['iptables'], '-w', '10',
             '-A', 'FORWARD', '-i', egress_veth_inner,
@@ -264,7 +263,7 @@ class PrivExecJob:
         if returncode != 0:
             return iptables_failed_error
 
-        _, stderr, returncode = self._command_helper(
+        _, _, returncode = self._command_helper(
             self.cached_executables['ip'], 'netns', 'exec', req.network_uuid,
             self.cached_executables['iptables'], '-w', '10',
             '-t', 'nat', '-A', 'POSTROUTING', '-s',
@@ -281,6 +280,70 @@ class PrivExecJob:
                 network_mask=req.network_mask,
                 vxid=req.vxid,
                 error=privexec_pb2.EnableNATReply.OK
+            )
+        )
+
+    def _discover_mesh(self, vx_interface):
+        stdout, _, returncode = self._command_helper(
+            self.cached_executables['bridge'], 'fdb', 'show', 'brport',
+            vx_interface
+        )
+        if returncode != 0:
+            raise VXLANMeshDiscoveryFailure()
+
+        for line in stdout.decode().split('\n'):
+            m = MESH_RE.match(line)
+            if m:
+                yield m.group(1)
+
+    def _ensure_mesh(self, req):
+        removed = []
+        added = []
+        node_ips = list(req.node_ips)
+
+        vx_interface = f'vxlan-{req.vxid:06x}'
+
+        vxlan_failed_error = privexec_pb2.PrivExecReply(
+            ensure_vxlan_mesh_reply=privexec_pb2.EnsureVXLANMeshReply(
+                network_uuid=req.network_uuid,
+                vxid=req.vxid,
+                error=privexec_pb2.EnsureVXLANMeshReply.FAILURE
+            )
+        )
+
+        try:
+            discovered = list(self._discover_mesh(vx_interface))
+        except VXLANMeshDiscoveryFailure:
+            return vxlan_failed_error
+
+        for n in discovered:
+            if n in node_ips:
+                node_ips.remove(n)
+            else:
+                _, _, returncode = self._command_helper(
+                    self.cached_executables['bridge'], 'fdb', 'del', 'to',
+                    '00:00:00:00:00:00', 'dst', n, 'dev', vx_interface
+                )
+                if returncode != 0:
+                    return vxlan_failed_error
+                removed.append(n)
+
+        for n in node_ips:
+            _, _, returncode = self._command_helper(
+                self.cached_executables['bridge'], 'fdb', 'append', 'to',
+                '00:00:00:00:00:00', 'dst', n, 'dev', vx_interface
+            )
+            if returncode != 0:
+                return vxlan_failed_error
+            added.append(n)
+
+        return privexec_pb2.PrivExecReply(
+            ensure_vxlan_mesh_reply=privexec_pb2.EnsureVXLANMeshReply(
+                network_uuid=req.network_uuid,
+                vxid=req.vxid,
+                error=privexec_pb2.EnsureVXLANMeshReply.OK,
+                added_addresses=added,
+                removed_addresses=removed
             )
         )
 
@@ -336,7 +399,7 @@ def main():
     setproctitle.setproctitle('sf-privexec')
 
     cached_executables = {}
-    for command in ['ionice', 'iptables', 'ip']:
+    for command in ['ionice', 'iptables', 'ip', 'bridge']:
         command_path = shutil.which(command)
         if not command_path:
             LOG.error(f'Cannot find {command} command in path')

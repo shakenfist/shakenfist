@@ -10,6 +10,7 @@ from shakenfist_utilities import logs                     # noreorder
 from shakenfist_utilities import random as sf_random      # noreorder
 
 from shakenfist.exceptions import EnableNATFailed
+from shakenfist.exceptions import EnsureMeshFailed
 from shakenfist.exceptions import HashFailed
 from shakenfist.exceptions import MissingNodeLockSocket
 from shakenfist.exceptions import MissingPrivExecSocket
@@ -63,6 +64,42 @@ PRIORITY_LOW = common_pb2.ExecuteRequest.LOW
 PRIORITY_HIGH = common_pb2.ExecuteRequest.HIGH
 
 
+def _marshal_privexec_request(request, expected_field):
+    if not os.path.exists(PRIVEXEC_SOCKET_PATH):
+        raise MissingPrivExecSocket()
+
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    client.connect(PRIVEXEC_SOCKET_PATH)
+
+    try:
+        client.sendall(request.SerializeToString())
+
+        buffered = bytearray()
+        while True:
+            input = client.recv(102400)
+            if not input:
+                raise TruncatedPrivExecResponse()
+            buffered += input
+
+            try:
+                reply = privexec_pb2.PrivExecReply()
+                consumed = reply.ParseFromString(buffered)
+                if consumed == 0:
+                    continue
+                buffered = buffered[consumed:]
+
+                if reply.HasField(expected_field):
+                    return reply
+                else:
+                    raise UnknownPrivExecReplyException()
+
+            except DecodeError:
+                ...
+
+    finally:
+        client.close()
+
+
 def execute(command, check_exit_code=[0], env_variables=None,
             namespace=None, iopriority=None, cwd=None,
             suppress_command_logging=False):
@@ -107,61 +144,27 @@ def execute(command, check_exit_code=[0], env_variables=None,
             'execution_id': execution_id
         }).info('Executing command')
 
-    if not os.path.exists(PRIVEXEC_SOCKET_PATH):
-        raise MissingPrivExecSocket()
+    reply = _marshal_privexec_request(request, 'execute_reply')
+    response = reply.execute_reply
+    _log_results(
+        request_id=response.request_id,
+        execution_id=response.execution_id,
+        stdout=response.stdout,
+        stderr=response.stderr,
+        exit_code=response.exit_code,
+        duration=response.execution_seconds)
+    if response.exit_code in check_exit_code:
+        return response.stdout, response.stderr
 
-    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    client.connect(PRIVEXEC_SOCKET_PATH)
-
-    try:
-        client.sendall(request.SerializeToString())
-
-        buffered = bytearray()
-        while True:
-            input = client.recv(102400)
-            if not input:
-                raise TruncatedPrivExecResponse()
-            buffered += input
-
-            try:
-                reply = privexec_pb2.PrivExecReply()
-                consumed = reply.ParseFromString(buffered)
-                if consumed == 0:
-                    continue
-                buffered = buffered[consumed:]
-
-                if reply.HasField('execute_reply'):
-                    response = reply.execute_reply
-                    _log_results(
-                        request_id=response.request_id,
-                        execution_id=response.execution_id,
-                        stdout=response.stdout,
-                        stderr=response.stderr,
-                        exit_code=response.exit_code,
-                        duration=response.execution_seconds)
-                    if response.exit_code in check_exit_code:
-                        return response.stdout, response.stderr
-                    else:
-                        raise ProcessExecutionError(
-                            exit_code=response.exit_code,
-                            stdout=response.stdout,
-                            stderr=response.stderr,
-                            cmd=command
-                        )
-                else:
-                    raise UnknownPrivExecReplyException()
-
-            except DecodeError:
-                ...
-
-    finally:
-        client.close()
+    raise ProcessExecutionError(
+        exit_code=response.exit_code,
+        stdout=response.stdout,
+        stderr=response.stderr,
+        cmd=command
+    )
 
 
 def hash_file(path, algorithm_str):
-    if not os.path.exists(PRIVEXEC_SOCKET_PATH):
-        raise MissingPrivExecSocket()
-
     hash_algorithms = {
         'sha1': privexec_pb2.HashAlgorithm.SHA1,
         'sha256': privexec_pb2.HashAlgorithm.SHA256,
@@ -176,45 +179,14 @@ def hash_file(path, algorithm_str):
         )
     )
 
-    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    client.connect(PRIVEXEC_SOCKET_PATH)
-
-    try:
-        client.sendall(request.SerializeToString())
-
-        buffered = bytearray()
-        while True:
-            input = client.recv(102400)
-            if not input:
-                raise TruncatedPrivExecResponse()
-            buffered += input
-
-            try:
-                reply = privexec_pb2.PrivExecReply()
-                consumed = reply.ParseFromString(buffered)
-                if consumed == 0:
-                    continue
-                buffered = buffered[consumed:]
-
-                if reply.HasField('hash_file_reply'):
-                    response = reply.hash_file_reply
-                    if response.error != privexec_pb2.HashFileReply.OK:
-                        raise HashFailed()
-                    return response.hash
-                else:
-                    raise UnknownPrivExecReplyException()
-
-            except DecodeError:
-                ...
-
-    finally:
-        client.close()
+    reply = _marshal_privexec_request(request, 'hash_file_reply')
+    response = reply.hash_file_reply
+    if response.error != privexec_pb2.HashFileReply.OK:
+        raise HashFailed()
+    return response.hash
 
 
 def enable_nat(network_uuid, network_address, network_mask, vxid):
-    if not os.path.exists(PRIVEXEC_SOCKET_PATH):
-        raise MissingPrivExecSocket()
-
     request = privexec_pb2.PrivExecRequest(
         enable_nat_request=privexec_pb2.EnableNATRequest(
             network_uuid=network_uuid,
@@ -223,40 +195,25 @@ def enable_nat(network_uuid, network_address, network_mask, vxid):
             vxid=vxid
         )
     )
+    reply = _marshal_privexec_request(request, 'enable_nat_reply')
+    response = reply.enable_nat_reply
+    if response.error != privexec_pb2.EnableNATReply.OK:
+        raise EnableNATFailed()
 
-    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    client.connect(PRIVEXEC_SOCKET_PATH)
 
-    try:
-        client.sendall(request.SerializeToString())
-
-        buffered = bytearray()
-        while True:
-            input = client.recv(102400)
-            if not input:
-                raise TruncatedPrivExecResponse()
-            buffered += input
-
-            try:
-                reply = privexec_pb2.PrivExecReply()
-                consumed = reply.ParseFromString(buffered)
-                if consumed == 0:
-                    continue
-                buffered = buffered[consumed:]
-
-                if reply.HasField('enable_nat_reply'):
-                    response = reply.enable_nat_reply
-                    if response.error != privexec_pb2.EnableNATReply.OK:
-                        raise EnableNATFailed()
-                    return
-                else:
-                    raise UnknownPrivExecReplyException()
-
-            except DecodeError:
-                ...
-
-    finally:
-        client.close()
+def ensure_vxlan_mesh(network_uuid, vxid, node_ips):
+    request = privexec_pb2.PrivExecRequest(
+        ensure_vxlan_mesh_request=privexec_pb2.EnsureVXLANMeshRequest(
+            network_uuid=network_uuid,
+            vxid=vxid,
+            node_ips=node_ips
+        )
+    )
+    reply = _marshal_privexec_request(request, 'ensure_vxlan_mesh_reply')
+    response = reply.ensure_vxlan_mesh_reply
+    if response.error != privexec_pb2.EnsureVXLANMeshReply.OK:
+        raise EnsureMeshFailed()
+    return list(response.added_addresses), list(response.removed_addresses)
 
 
 def set_thread_name(name):

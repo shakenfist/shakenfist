@@ -358,6 +358,10 @@ class EnableNATFailed(Exception):
     ...
 
 
+class EnsureMeshFailed(Exception):
+    ...
+
+
 class HashFailed(Exception):
     ...
 

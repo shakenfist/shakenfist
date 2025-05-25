@@ -770,120 +770,53 @@ class Network(dbo):
                 priority=PRIORITY.user_facing_high_io
             )
 
-    def discover_mesh(self):
-        # The floating network does not have a vxlan mesh
-        if self.uuid == 'floating':
-            return
-
-        mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
-
-        try:
-            stdout, _ = util_concurrency.execute(
-                'bridge fdb show brport %(vx_interface)s' % self.subst_dict(),
-                suppress_command_logging=True)
-
-            for line in stdout.split('\n'):
-                m = mesh_re.match(line)
-                if m:
-                    yield m.group(1)
-
-        except ProcessExecutionError as e:
-            if time.time() - self.state.update_time > 10:
-                self.log.warning('Mesh discovery failure: %s' % e)
-
     def ensure_mesh(self):
         # The floating network does not have a vxlan mesh
         if self.uuid == 'floating':
             return
 
-        with self.get_lock(op='Network ensure mesh', global_scope=False):
-            # Ensure network was not deleted whilst waiting for the lock.
-            if self.is_dead():
-                raise DeadNetwork('network=%s' % self)
+        # Determine which IPs should be on this mesh and where
+        instances = []
+        for ni_uuid in self.networkinterfaces:
+            ni = interface.NetworkInterface.from_db(ni_uuid)
+            if ni.instance_uuid not in instances:
+                instances.append(ni.instance_uuid)
 
-            removed = []
-            added = []
+        node_fqdns = []
+        for inst_uuid in instances:
+            inst = instance.Instance.from_db(inst_uuid)
+            placement = inst.placement
+            if not placement:
+                continue
+            if not placement.get('node'):
+                continue
 
-            instances = []
-            for ni_uuid in self.networkinterfaces:
-                ni = interface.NetworkInterface.from_db(ni_uuid)
-                if ni.instance_uuid not in instances:
-                    instances.append(ni.instance_uuid)
+            if not placement.get('node') in node_fqdns:
+                node_fqdns.append(placement.get('node'))
 
-            node_fqdns = []
-            for inst_uuid in instances:
-                inst = instance.Instance.from_db(inst_uuid)
-                placement = inst.placement
-                if not placement:
-                    continue
-                if not placement.get('node'):
-                    continue
+        # NOTE(mikal): why not use DNS here? Well, DNS might be outside
+        # the control of the deployer if we're running in a public cloud
+        # as an overlay cloud... Also, we don't include ourselves in the
+        # mesh as that would cause duplicate packets to reflect back to us.
+        # (see bug #859).
+        node_ips = set()
+        if config.NETWORK_NODE_IP != config.NODE_MESH_IP:
+            # Always add Network node if it is not this node
+            node_ips.add(config.NETWORK_NODE_IP)
 
-                if not placement.get('node') in node_fqdns:
-                    node_fqdns.append(placement.get('node'))
+        for fqdn in node_fqdns:
+            n = Node.from_db(fqdn)
+            if n and n.ip != config.NODE_MESH_IP:
+                node_ips.add(n.ip)
 
-            # NOTE(mikal): why not use DNS here? Well, DNS might be outside
-            # the control of the deployer if we're running in a public cloud
-            # as an overlay cloud... Also, we don't include ourselves in the
-            # mesh as that would cause duplicate packets to reflect back to us.
-            # (see bug #859).
-            node_ips = set()
-            if config.NETWORK_NODE_IP != config.NODE_MESH_IP:
-                # Always add Network node if it is not this node
-                node_ips.add(config.NETWORK_NODE_IP)
-
-            for fqdn in node_fqdns:
-                n = Node.from_db(fqdn)
-                if n and n.ip != config.NODE_MESH_IP:
-                    node_ips.add(n.ip)
-
-            discovered = list(self.discover_mesh())
-            for n in discovered:
-                if n in node_ips:
-                    node_ips.remove(n)
-                else:
-                    self._remove_mesh_element(n)
-                    removed.append(n)
-
-            for n in node_ips:
-                self._add_mesh_element(n)
-                added.append(n)
-
-            if removed:
-                self.add_event(EVENT_TYPE_MUTATE, 'remove mesh elements',
-                               extra={'removed': removed})
-            if added:
-                self.add_event(EVENT_TYPE_MUTATE, 'add mesh elements',
-                               extra={'added': added})
-
-    def _add_mesh_element(self, n):
-        subst = self.subst_dict()
-        subst['node'] = n
-
-        try:
-            util_concurrency.execute(
-                'bridge fdb append to 00:00:00:00:00:00 '
-                'dst %(node)s dev %(vx_interface)s' % subst)
-            self.add_event(EVENT_TYPE_MUTATE, 'added new mesh element', extra={'ip': n})
-        except ProcessExecutionError as e:
-            self.log.with_fields({
-                'node': n,
-                'error': e}).info('Failed to add mesh element')
-
-    def _remove_mesh_element(self, n):
-        subst = self.subst_dict()
-        subst['node'] = n
-
-        try:
-            util_concurrency.execute(
-                'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
-                'dev %(vx_interface)s' % subst)
-            self.add_event(EVENT_TYPE_MUTATE, 'removed excess mesh element',
-                           extra={'ip': n})
-        except ProcessExecutionError as e:
-            self.log.with_fields({
-                'node': n,
-                'error': e}).info('Failed to remove mesh element')
+        added, removed = util_concurrency.ensure_vxlan_mesh(
+            self.uuid, self.vxid, node_ips)
+        if removed:
+            self.add_event(EVENT_TYPE_MUTATE, 'remove mesh elements',
+                           extra={'removed': removed})
+        if added:
+            self.add_event(EVENT_TYPE_MUTATE, 'add mesh elements',
+                           extra={'added': added})
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.

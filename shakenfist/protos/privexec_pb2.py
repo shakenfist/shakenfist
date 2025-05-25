@@ -25,15 +25,15 @@ _sym_db = _symbol_database.Default()
 from shakenfist.protos import common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0eprivexec.proto\x12\x11shakenfist.protos\x1a\x0c\x63ommon.proto\"T\n\x0fHashFileRequest\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x33\n\talgorithm\x18\x02 \x01(\x0e\x32 .shakenfist.protos.HashAlgorithm\"\x98\x02\n\rHashFileReply\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x33\n\talgorithm\x18\x02 \x01(\x0e\x32 .shakenfist.protos.HashAlgorithm\x12\x0c\n\x04hash\x18\x03 \x01(\t\x12\x36\n\x05\x65rror\x18\x14 \x01(\x0e\x32\'.shakenfist.protos.HashFileReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"j\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x12\n\x0e\x46ILE_NOT_FOUND\x10\x01\x12\x15\n\x11UNKNOWN_ALGORITHM\x10\x02\x12\x17\n\x13\x41LGORITHM_NOT_FOUND\x10\x03\x12\x14\n\x10\x41LGORITHM_FAILED\x10\x04\"e\n\x10\x45nableNATRequest\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x17\n\x0fnetwork_address\x18\x02 \x01(\t\x12\x14\n\x0cnetwork_mask\x18\x03 \x01(\t\x12\x0c\n\x04vxid\x18\x04 \x01(\x03\"\xf2\x01\n\x0e\x45nableNATReply\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x17\n\x0fnetwork_address\x18\x02 \x01(\t\x12\x14\n\x0cnetwork_mask\x18\x03 \x01(\t\x12\x0c\n\x04vxid\x18\x04 \x01(\x03\x12\x37\n\x05\x65rror\x18\x14 \x01(\x0e\x32(.shakenfist.protos.EnableNATReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"@\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x13\n\x0fIPTABLES_FAILED\x10\x01\x12\x19\n\x15RULES_ALREADY_PRESENT\x10\x02\"\xde\x01\n\x0fPrivExecRequest\x12<\n\x0f\x65xecute_request\x18\x01 \x01(\x0b\x32!.shakenfist.protos.ExecuteRequestH\x00\x12?\n\x11hash_file_request\x18\n \x01(\x0b\x32\".shakenfist.protos.HashFileRequestH\x00\x12\x41\n\x12\x65nable_nat_request\x18\x0b \x01(\x0b\x32#.shakenfist.protos.EnableNATRequestH\x00\x42\t\n\x07request\"\xce\x01\n\rPrivExecReply\x12\x38\n\rexecute_reply\x18\x01 \x01(\x0b\x32\x1f.shakenfist.protos.ExecuteReplyH\x00\x12;\n\x0fhash_file_reply\x18\n \x01(\x0b\x32 .shakenfist.protos.HashFileReplyH\x00\x12=\n\x10\x65nable_nat_reply\x18\x0b \x01(\x0b\x32!.shakenfist.protos.EnableNATReplyH\x00\x42\x07\n\x05reply*=\n\rHashAlgorithm\x12\x08\n\x04SHA1\x10\x00\x12\n\n\x06SHA256\x10\x01\x12\n\n\x06SHA512\x10\x02\x12\n\n\x06XXH128\x10\x03\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0eprivexec.proto\x12\x11shakenfist.protos\x1a\x0c\x63ommon.proto\"T\n\x0fHashFileRequest\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x33\n\talgorithm\x18\x02 \x01(\x0e\x32 .shakenfist.protos.HashAlgorithm\"\x98\x02\n\rHashFileReply\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x33\n\talgorithm\x18\x02 \x01(\x0e\x32 .shakenfist.protos.HashAlgorithm\x12\x0c\n\x04hash\x18\x03 \x01(\t\x12\x36\n\x05\x65rror\x18\x14 \x01(\x0e\x32\'.shakenfist.protos.HashFileReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"j\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x12\n\x0e\x46ILE_NOT_FOUND\x10\x01\x12\x15\n\x11UNKNOWN_ALGORITHM\x10\x02\x12\x17\n\x13\x41LGORITHM_NOT_FOUND\x10\x03\x12\x14\n\x10\x41LGORITHM_FAILED\x10\x04\"e\n\x10\x45nableNATRequest\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x17\n\x0fnetwork_address\x18\x02 \x01(\t\x12\x14\n\x0cnetwork_mask\x18\x03 \x01(\t\x12\x0c\n\x04vxid\x18\x04 \x01(\x03\"\xf2\x01\n\x0e\x45nableNATReply\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x17\n\x0fnetwork_address\x18\x02 \x01(\t\x12\x14\n\x0cnetwork_mask\x18\x03 \x01(\t\x12\x0c\n\x04vxid\x18\x04 \x01(\x03\x12\x37\n\x05\x65rror\x18\x14 \x01(\x0e\x32(.shakenfist.protos.EnableNATReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"@\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x13\n\x0fIPTABLES_FAILED\x10\x01\x12\x19\n\x15RULES_ALREADY_PRESENT\x10\x02\"N\n\x16\x45nsureVXLANMeshRequest\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x0c\n\x04vxid\x18\x02 \x01(\x03\x12\x10\n\x08node_ips\x18\x03 \x03(\t\"\xe0\x01\n\x14\x45nsureVXLANMeshReply\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x0c\n\x04vxid\x18\x02 \x01(\x03\x12\x17\n\x0f\x61\x64\x64\x65\x64_addresses\x18\x03 \x03(\t\x12\x19\n\x11removed_addresses\x18\x04 \x03(\t\x12=\n\x05\x65rror\x18\x14 \x01(\x0e\x32..shakenfist.protos.EnsureVXLANMeshReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"\x1d\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x0b\n\x07\x46\x41ILURE\x10\x01\"\xae\x02\n\x0fPrivExecRequest\x12<\n\x0f\x65xecute_request\x18\x01 \x01(\x0b\x32!.shakenfist.protos.ExecuteRequestH\x00\x12?\n\x11hash_file_request\x18\n \x01(\x0b\x32\".shakenfist.protos.HashFileRequestH\x00\x12\x41\n\x12\x65nable_nat_request\x18\x0b \x01(\x0b\x32#.shakenfist.protos.EnableNATRequestH\x00\x12N\n\x19\x65nsure_vxlan_mesh_request\x18\x0c \x01(\x0b\x32).shakenfist.protos.EnsureVXLANMeshRequestH\x00\x42\t\n\x07request\"\x9a\x02\n\rPrivExecReply\x12\x38\n\rexecute_reply\x18\x01 \x01(\x0b\x32\x1f.shakenfist.protos.ExecuteReplyH\x00\x12;\n\x0fhash_file_reply\x18\n \x01(\x0b\x32 .shakenfist.protos.HashFileReplyH\x00\x12=\n\x10\x65nable_nat_reply\x18\x0b \x01(\x0b\x32!.shakenfist.protos.EnableNATReplyH\x00\x12J\n\x17\x65nsure_vxlan_mesh_reply\x18\x0c \x01(\x0b\x32\'.shakenfist.protos.EnsureVXLANMeshReplyH\x00\x42\x07\n\x05reply*=\n\rHashAlgorithm\x12\x08\n\x04SHA1\x10\x00\x12\n\n\x06SHA256\x10\x01\x12\n\n\x06SHA512\x10\x02\x12\n\n\x06XXH128\x10\x03\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'privexec_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_HASHALGORITHM']._serialized_start=1202
-  _globals['_HASHALGORITHM']._serialized_end=1263
+  _globals['_HASHALGORITHM']._serialized_start=1665
+  _globals['_HASHALGORITHM']._serialized_end=1726
   _globals['_HASHFILEREQUEST']._serialized_start=51
   _globals['_HASHFILEREQUEST']._serialized_end=135
   _globals['_HASHFILEREPLY']._serialized_start=138
@@ -46,8 +46,14 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_ENABLENATREPLY']._serialized_end=766
   _globals['_ENABLENATREPLY_ERRORS']._serialized_start=702
   _globals['_ENABLENATREPLY_ERRORS']._serialized_end=766
-  _globals['_PRIVEXECREQUEST']._serialized_start=769
-  _globals['_PRIVEXECREQUEST']._serialized_end=991
-  _globals['_PRIVEXECREPLY']._serialized_start=994
-  _globals['_PRIVEXECREPLY']._serialized_end=1200
+  _globals['_ENSUREVXLANMESHREQUEST']._serialized_start=768
+  _globals['_ENSUREVXLANMESHREQUEST']._serialized_end=846
+  _globals['_ENSUREVXLANMESHREPLY']._serialized_start=849
+  _globals['_ENSUREVXLANMESHREPLY']._serialized_end=1073
+  _globals['_ENSUREVXLANMESHREPLY_ERRORS']._serialized_start=1044
+  _globals['_ENSUREVXLANMESHREPLY_ERRORS']._serialized_end=1073
+  _globals['_PRIVEXECREQUEST']._serialized_start=1076
+  _globals['_PRIVEXECREQUEST']._serialized_end=1378
+  _globals['_PRIVEXECREPLY']._serialized_start=1381
+  _globals['_PRIVEXECREPLY']._serialized_end=1663
 # @@protoc_insertion_point(module_scope)
