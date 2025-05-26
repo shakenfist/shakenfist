@@ -349,8 +349,10 @@ class PrivExecJob:
 
     def run(self):
         buffered = bytearray()
+        command_found = False
+        error = False
 
-        while True:
+        while not error:
             input = self.conn.recv(102400)
             if not input:
                 break
@@ -363,25 +365,23 @@ class PrivExecJob:
                     continue
                 buffered = buffered[consumed:]
 
-                if request.HasField('execute_request'):
-                    er = request.execute_request
-                    self.task_details = f'execute: {er.command}'
-                    reply = self._execute(er)
-                    self.conn.sendall(reply.SerializeToString())
+                request_map = {
+                    'execute_request': self._execute,
+                    'hash_file_request': self._hash_file,
+                    'enable_nat_request': self._enable_nat,
+                    'ensure_vxlan_mesh_request': self._ensure_mesh
+                }
 
-                elif request.HasField('hash_file_request'):
-                    req = request.hash_file_request
-                    reply = self._hash_file(req)
-                    self.conn.sendall(reply.SerializeToString())
+                for request_field in request_map:
+                    if request.HasField(request_field):
+                        req = getattr(request, request_field)
+                        reply = request_map[request_field](req)
+                        self.conn.sendall(reply.SerializeToString())
+                        command_found = True
+                        break
 
-                elif request.HasField('enable_nat_request'):
-                    req = request.enable_nat_request
-                    reply = self._enable_nat(req)
-                    self.conn.sendall(reply.SerializeToString())
-
-                else:
-                    LOG.error('Unknown execute request type')
-                break
+                if not command_found:
+                    error = True
 
             except DecodeError:
                 ...
