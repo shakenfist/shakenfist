@@ -9,6 +9,7 @@ from google.protobuf.message import DecodeError
 from shakenfist_utilities import logs                     # noreorder
 from shakenfist_utilities import random as sf_random      # noreorder
 
+from shakenfist.exceptions import AddFloatingIPFailed
 from shakenfist.exceptions import EnableNATFailed
 from shakenfist.exceptions import EnsureMeshFailed
 from shakenfist.exceptions import HashFailed
@@ -214,6 +215,20 @@ def ensure_vxlan_mesh(network_uuid, vxid, node_ips):
     if response.error != privexec_pb2.EnsureVXLANMeshReply.OK:
         raise EnsureMeshFailed()
     return list(response.added_addresses), list(response.removed_addresses)
+
+
+def add_floating_ip(network_uuid, floating_address, inner_address):
+    request = privexec_pb2.PrivExecRequest(
+        add_floating_ip_request=privexec_pb2.AddFloatingIPRequest(
+            network_uuid=network_uuid,
+            floating_address=floating_address,
+            inner_address=inner_address
+        )
+    )
+    reply = _marshal_privexec_request(request, 'add_floating_ip_reply')
+    response = reply.add_floating_ip_reply
+    if response.error != privexec_pb2.AddFloatingIPReply.OK:
+        raise AddFloatingIPFailed()
 
 
 def set_thread_name(name):

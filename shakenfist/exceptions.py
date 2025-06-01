@@ -362,7 +362,15 @@ class EnsureMeshFailed(Exception):
     ...
 
 
+class AddFloatingIPFailed(Exception):
+    ...
+
+
 class HashFailed(Exception):
+    ...
+
+
+class ListingInterfaceAddressesFailed(Exception):
     ...
 
 

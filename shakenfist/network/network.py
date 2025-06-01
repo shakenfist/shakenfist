@@ -829,23 +829,8 @@ class Network(dbo):
                 'floating': floating_address,
                 'inner': inner_address
             })
-        subst = self.subst_dict()
-        subst['floating_address'] = floating_address
-        subst['floating_address_as_hex'] = '%08x' % int(
-            ipaddress.IPv4Address(floating_address))
-        subst['inner_address'] = inner_address
-
-        util_network.create_interface(
-            'flt-%(floating_address_as_hex)s-o' % subst, 'veth',
-            'peer name flt-%(floating_address_as_hex)s-i' % subst)
-        util_concurrency.execute(
-            'ip link set flt-%(floating_address_as_hex)s-i netns %(netns)s' % subst)
-        util_network.add_address_to_interface(
-            self.uuid, floating_address, '32', 'flt-%(floating_address_as_hex)s-i' % subst)
-        util_concurrency.execute(
-            'iptables -w 10 -t nat -A PREROUTING -d %(floating_address)s -j DNAT '
-            '--to-destination %(inner_address)s' % subst,
-            namespace=self.uuid)
+        util_concurrency.add_floating_ip(
+            self.uuid, floating_address, inner_address)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.

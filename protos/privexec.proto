@@ -76,6 +76,24 @@ message EnsureVXLANMeshReply {
     string error_text = 21;
 }
 
+message AddFloatingIPRequest {
+    string network_uuid = 1;
+    string floating_address = 2;
+    string inner_address = 3;
+}
+
+message AddFloatingIPReply {
+    enum Errors {
+        OK = 0;
+        CREATE_INTERFACE_FAILED = 1;
+        ADD_ADDRESS_FAILED = 2;
+        IPTABLES_FAILED = 3;
+    }
+
+    string network_uuid = 1;
+    string floating_address = 2;
+}
+
 message PrivExecRequest {
     oneof request {
         shakenfist.protos.ExecuteRequest execute_request = 1;
@@ -83,6 +101,7 @@ message PrivExecRequest {
         HashFileRequest hash_file_request = 10;
         EnableNATRequest enable_nat_request = 11;
         EnsureVXLANMeshRequest ensure_vxlan_mesh_request = 12;
+        AddFloatingIPRequest add_floating_ip_request = 13;
     }
 }
 
@@ -93,5 +112,6 @@ message PrivExecReply {
         HashFileReply hash_file_reply = 10;
         EnableNATReply enable_nat_reply = 11;
         EnsureVXLANMeshReply ensure_vxlan_mesh_reply = 12;
+        AddFloatingIPReply add_floating_ip_reply = 13;
     }
 }

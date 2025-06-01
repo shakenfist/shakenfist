@@ -3,13 +3,12 @@
 # on a single node. The protocol on the unix domain socket is binary serialized
 # protobufs.
 
+import ipaddress
 import os
 import re
-import shutil
 import signal
 import socket
 import subprocess
-import sys
 import threading
 import time
 
@@ -17,8 +16,9 @@ from google.protobuf.message import DecodeError
 import psutil
 import setproctitle
 from shakenfist_utilities import random      # noreorder
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs        # noreorder
 
+from shakenfist.daemons.privexec import util as privexec_util
 from shakenfist.protos import common_pb2
 from shakenfist.protos import privexec_pb2
 
@@ -54,13 +54,10 @@ class VXLANMeshDiscoveryFailure(Exception):
 
 
 class PrivExecJob:
-    def __init__(self, conn, cached_executables):
+    def __init__(self, conn):
         super().__init__()
         self.conn = conn
-        self.cached_executables = cached_executables
-
         self.task_details = None
-        self.pid = None
 
     def _execute(self, request):
         command = request.command
@@ -79,7 +76,7 @@ class PrivExecJob:
             request.io_priority, IO_PRIORITIES[common_pb2.ExecuteRequest.NORMAL])
 
         if current_iopriority != requested_iopriority:
-            command = (f'{self.cached_executables["ionice"]} -c '
+            command = (f'{privexec_util.locate_command("ionice")} -c '
                        f'{requested_iopriority[0]} '
                        f'-n {requested_iopriority[1]} {command}')
 
@@ -92,7 +89,6 @@ class PrivExecJob:
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, close_fds=True,
             shell=True, cwd=working_directory, env=env_variables)
-        self.pid = obj.pid
 
         stdout, stderr = obj.communicate(None, timeout=None)
         obj.stdin.close()
@@ -122,22 +118,6 @@ class PrivExecJob:
             )
         )
 
-    def _command_helper(self, *command):
-        obj = subprocess.Popen(
-            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, close_fds=True)
-        self.pid = obj.pid
-
-        stdout, stderr = obj.communicate(None, timeout=None)
-        if obj.returncode != 0:
-            LOG.with_fields({
-                'command': command,
-                'stdout': stdout,
-                'stderr': stderr,
-                'exit_code': obj.returncode
-            }).error('Command failed')
-        return stdout, stderr, obj.returncode
-
     def _hash_file(self, req):
         log = LOG.with_fields({
             'path': req.path,
@@ -161,7 +141,7 @@ class PrivExecJob:
                 )
             )
 
-        hasher = shutil.which(hash_commands[req.algorithm])
+        hasher = privexec_util.locate_command(hash_commands[req.algorithm])
         if not hasher:
             log.error('Failed to hash file, could not resolve hasher')
             return privexec_pb2.PrivExecReply(
@@ -172,8 +152,8 @@ class PrivExecJob:
                 )
             )
 
-        stdout, stderr, returncode = self._command_helper(
-            self.cached_executables['ionice'], '-c', '2', '-n', '7',
+        stdout, stderr, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ionice'), '-c', '2', '-n', '7',
             hasher, req.path
         )
         if returncode != 0 or len(stdout) == 0:
@@ -210,8 +190,8 @@ class PrivExecJob:
         )
 
         # Determine if we have NAT already
-        stdout, _, returncode = self._command_helper(
-            self.cached_executables['iptables'], '-w', '10', '-t', 'nat',
+        stdout, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('iptables'), '-w', '10', '-t', 'nat',
             '-L', 'POSTROUTING', '-n', '-v'
         )
         if returncode != 0:
@@ -245,28 +225,28 @@ class PrivExecJob:
         egress_veth_inner = f'egr-{req.vxid:06x}-i'
         vx_veth_inner = f'veth-{req.vxid:06x}-i'
 
-        _, _, returncode = self._command_helper(
-            self.cached_executables['ip'], 'netns', 'exec', req.network_uuid,
-            self.cached_executables['iptables'], '-w', '10',
-            '-A', 'FORWARD', '-o', egress_veth_inner, '-i', vx_veth_inner,
-            '-j', 'ACCEPT'
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, privexec_util.locate_command('iptables'),
+            '-w', '10', '-A', 'FORWARD', '-o', egress_veth_inner,
+            '-i', vx_veth_inner, '-j', 'ACCEPT'
         )
         if returncode != 0:
             return iptables_failed_error
 
-        _, _, returncode = self._command_helper(
-            self.cached_executables['ip'], 'netns', 'exec', req.network_uuid,
-            self.cached_executables['iptables'], '-w', '10',
-            '-A', 'FORWARD', '-i', egress_veth_inner,
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, privexec_util.locate_command('iptables'),
+            '-w', '10', '-A', 'FORWARD', '-i', egress_veth_inner,
             '-o', 'vx_veth_inner', '-j', 'ACCEPT'
         )
         if returncode != 0:
             return iptables_failed_error
 
-        _, _, returncode = self._command_helper(
-            self.cached_executables['ip'], 'netns', 'exec', req.network_uuid,
-            self.cached_executables['iptables'], '-w', '10',
-            '-t', 'nat', '-A', 'POSTROUTING', '-s',
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, privexec_util.locate_command('iptables'),
+            '-w', '10', '-t', 'nat', '-A', 'POSTROUTING', '-s',
             f'{req.network_address}/{req.network_mask}',
             '-o', egress_veth_inner, '-j', 'MASQUERADE'
         )
@@ -284,8 +264,8 @@ class PrivExecJob:
         )
 
     def _discover_mesh(self, vx_interface):
-        stdout, _, returncode = self._command_helper(
-            self.cached_executables['bridge'], 'fdb', 'show', 'brport',
+        stdout, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('bridge'), 'fdb', 'show', 'brport',
             vx_interface
         )
         if returncode != 0:
@@ -320,8 +300,8 @@ class PrivExecJob:
             if n in node_ips:
                 node_ips.remove(n)
             else:
-                _, _, returncode = self._command_helper(
-                    self.cached_executables['bridge'], 'fdb', 'del', 'to',
+                _, _, returncode = privexec_util.command_helper(
+                    privexec_util.locate_command('bridge'), 'fdb', 'del', 'to',
                     '00:00:00:00:00:00', 'dst', n, 'dev', vx_interface
                 )
                 if returncode != 0:
@@ -329,8 +309,8 @@ class PrivExecJob:
                 removed.append(n)
 
         for n in node_ips:
-            _, _, returncode = self._command_helper(
-                self.cached_executables['bridge'], 'fdb', 'append', 'to',
+            _, _, returncode = privexec_util.command_helper(
+                privexec_util.locate_command('bridge'), 'fdb', 'append', 'to',
                 '00:00:00:00:00:00', 'dst', n, 'dev', vx_interface
             )
             if returncode != 0:
@@ -344,6 +324,76 @@ class PrivExecJob:
                 error=privexec_pb2.EnsureVXLANMeshReply.OK,
                 added_addresses=added,
                 removed_addresses=removed
+            )
+        )
+
+    def _add_floating_ip(self, req):
+        floating_interface = \
+            f'flt-{int(ipaddress.IPv4Address(req.floating_address)):08x}'
+        inner_floating_interface = f'{floating_interface}-i'
+
+        success = privexec_util.create_interface(
+            floating_interface, 'veth',
+            ['peer', 'name', inner_floating_interface],
+            inner_namespace=req.network_uuid
+        )
+        if not success:
+            return privexec_pb2.PrivExecReply(
+                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                    network_uuid=req.network_uuid,
+                    floating_address=req.floating_address,
+                    inner_address=req.inner_address,
+                    error=privexec_pb2.AddFloatingIPReply.CREATE_INTERFACE_FAILED
+                )
+            )
+
+        if req.floating_address in privexec_util.get_interface_addresses(
+            floating_interface
+        ):
+            return privexec_pb2.PrivExecReply(
+                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                    network_uuid=req.network_uuid,
+                    floating_address=req.floating_address,
+                    inner_address=req.inner_address,
+                    error=privexec_pb2.AddFloatingIPReply.OK
+                )
+            )
+
+        success = privexec_util.add_address_to_interface(
+            req.network_uuid, req.floating_address, '32',
+            inner_floating_interface)
+        if not success:
+            return privexec_pb2.PrivExecReply(
+                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                    network_uuid=req.network_uuid,
+                    floating_address=req.floating_address,
+                    inner_address=req.inner_address,
+                    error=privexec_pb2.AddFloatingIPReply.ADD_ADDRESS_FAILED
+                )
+            )
+
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, privexec_util.locate_command('iptables'),
+            '-w', '10', '-t', 'nat', '-A', 'PREROUTING',
+            '-d', req.floating_address, '-j', 'DNAT',
+            '--to-destination', req.inner_address)
+        if returncode != 0:
+            return privexec_pb2.PrivExecReply(
+                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                    network_uuid=req.network_uuid,
+                    floating_address=req.floating_address,
+                    inner_address=req.inner_address,
+                    error=privexec_pb2.AddFloatingIPReply.IPTABLES_FAILED
+                )
+            )
+
+        return privexec_pb2.PrivExecReply(
+            add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                network_uuid=req.network_uuid,
+                floating_address=req.floating_address,
+                inner_address=req.inner_address,
+                error=privexec_pb2.AddFloatingIPReply.OK
             )
         )
 
@@ -369,7 +419,8 @@ class PrivExecJob:
                     'execute_request': self._execute,
                     'hash_file_request': self._hash_file,
                     'enable_nat_request': self._enable_nat,
-                    'ensure_vxlan_mesh_request': self._ensure_mesh
+                    'ensure_vxlan_mesh_request': self._ensure_mesh,
+                    'add_floating_ip_request': self._add_floating_ip
                 }
 
                 for request_field in request_map:
@@ -398,14 +449,6 @@ def main():
     write_pid_file()
     setproctitle.setproctitle('sf-privexec')
 
-    cached_executables = {}
-    for command in ['ionice', 'iptables', 'ip', 'bridge']:
-        command_path = shutil.which(command)
-        if not command_path:
-            LOG.error(f'Cannot find {command} command in path')
-            sys.exit(1)
-        cached_executables[command] = command_path
-
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
 
@@ -424,7 +467,7 @@ def main():
 
         if conn:
             thread_name = random.random_id()
-            worker_object = PrivExecJob(conn, cached_executables)
+            worker_object = PrivExecJob(conn)
             worker_thread = threading.Thread(
                 target=worker_object.run, daemon=True, name=thread_name)
             workers[thread_name] = {
