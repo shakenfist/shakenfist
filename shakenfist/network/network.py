@@ -1,6 +1,5 @@
 # Copyright 2020 Michael Still
 import copy
-import ipaddress
 import os
 import random
 import re
@@ -843,15 +842,7 @@ class Network(dbo):
                 'floating': floating_address,
                 'inner': inner_address
             })
-        subst = self.subst_dict()
-        subst['floating_address'] = floating_address
-        subst['floating_address_as_hex'] = '%08x' % int(
-            ipaddress.IPv4Address(floating_address))
-        subst['inner_address'] = inner_address
-
-        if util_network.check_for_interface('flt-%(floating_address_as_hex)s-o' % subst):
-            util_concurrency.execute(
-                'ip link del flt-%(floating_address_as_hex)s-o' % subst)
+        util_concurrency.remove_floating_ip(self.uuid, floating_address)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.

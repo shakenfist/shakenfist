@@ -366,6 +366,10 @@ class AddFloatingIPFailed(Exception):
     ...
 
 
+class RemoveFloatingIPFailed(Exception):
+    ...
+
+
 class HashFailed(Exception):
     ...
 

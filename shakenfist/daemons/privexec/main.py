@@ -397,6 +397,32 @@ class PrivExecJob:
             )
         )
 
+    def _remove_floating_ip(self, req):
+        floating_interface = \
+            f'flt-{int(ipaddress.IPv4Address(req.floating_address)):08x}'
+        outer_floating_interface = f'{floating_interface}-o'
+
+        if privexec_util.check_for_interface(outer_floating_interface):
+            _, _, returncode = privexec_util.execute(
+                privexec_util.locate_command('ip'), 'link', 'del',
+                outer_floating_interface)
+            if returncode != 0:
+                return privexec_pb2.PrivExecReply(
+                    remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
+                        network_uuid=req.network_uuid,
+                        floating_address=req.floating_address,
+                        error=privexec_pb2.RemoveFloatingIPReply.FAILED
+                    )
+                )
+
+        return privexec_pb2.PrivExecReply(
+            remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
+                network_uuid=req.network_uuid,
+                floating_address=req.floating_address,
+                error=privexec_pb2.RemoveFloatingIPReply.OK
+            )
+        )
+
     def run(self):
         buffered = bytearray()
         command_found = False
@@ -420,7 +446,8 @@ class PrivExecJob:
                     'hash_file_request': self._hash_file,
                     'enable_nat_request': self._enable_nat,
                     'ensure_vxlan_mesh_request': self._ensure_mesh,
-                    'add_floating_ip_request': self._add_floating_ip
+                    'add_floating_ip_request': self._add_floating_ip,
+                    'remove_floating_ip_request': self._remove_floating_ip
                 }
 
                 for request_field in request_map:

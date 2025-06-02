@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+import json
+>>>>>>> 3b896f2c (Push removing floating IPs down to privexec.)
 import os
 import shutil
 import subprocess
@@ -200,7 +204,7 @@ def add_address_to_interface(namespace, address, netmask, device):
         _, stderr, returncode = command_helper(*command)
         if returncode == 0:
             return True
-        if stderr.find('RTNETLINK answers: File exists') != -1:
+        if stderr.decode().find('RTNETLINK answers: File exists') != -1:
             return True
         if attempts > 5:
             return False

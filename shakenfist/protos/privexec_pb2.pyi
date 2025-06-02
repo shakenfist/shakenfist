@@ -148,30 +148,56 @@ class AddFloatingIPReply(_message.Message):
     floating_address: str
     def __init__(self, network_uuid: _Optional[str] = ..., floating_address: _Optional[str] = ...) -> None: ...
 
+class RemoveFloatingIPRequest(_message.Message):
+    __slots__ = ("network_uuid", "floating_address")
+    NETWORK_UUID_FIELD_NUMBER: _ClassVar[int]
+    FLOATING_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    network_uuid: str
+    floating_address: str
+    def __init__(self, network_uuid: _Optional[str] = ..., floating_address: _Optional[str] = ...) -> None: ...
+
+class RemoveFloatingIPReply(_message.Message):
+    __slots__ = ("network_uuid", "floating_address")
+    class Errors(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        OK: _ClassVar[RemoveFloatingIPReply.Errors]
+        FAILED: _ClassVar[RemoveFloatingIPReply.Errors]
+    OK: RemoveFloatingIPReply.Errors
+    FAILED: RemoveFloatingIPReply.Errors
+    NETWORK_UUID_FIELD_NUMBER: _ClassVar[int]
+    FLOATING_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    network_uuid: str
+    floating_address: str
+    def __init__(self, network_uuid: _Optional[str] = ..., floating_address: _Optional[str] = ...) -> None: ...
+
 class PrivExecRequest(_message.Message):
-    __slots__ = ("execute_request", "hash_file_request", "enable_nat_request", "ensure_vxlan_mesh_request", "add_floating_ip_request")
+    __slots__ = ("execute_request", "hash_file_request", "enable_nat_request", "ensure_vxlan_mesh_request", "add_floating_ip_request", "remove_floating_ip_request")
     EXECUTE_REQUEST_FIELD_NUMBER: _ClassVar[int]
     HASH_FILE_REQUEST_FIELD_NUMBER: _ClassVar[int]
     ENABLE_NAT_REQUEST_FIELD_NUMBER: _ClassVar[int]
     ENSURE_VXLAN_MESH_REQUEST_FIELD_NUMBER: _ClassVar[int]
     ADD_FLOATING_IP_REQUEST_FIELD_NUMBER: _ClassVar[int]
+    REMOVE_FLOATING_IP_REQUEST_FIELD_NUMBER: _ClassVar[int]
     execute_request: _common_pb2.ExecuteRequest
     hash_file_request: HashFileRequest
     enable_nat_request: EnableNATRequest
     ensure_vxlan_mesh_request: EnsureVXLANMeshRequest
     add_floating_ip_request: AddFloatingIPRequest
-    def __init__(self, execute_request: _Optional[_Union[_common_pb2.ExecuteRequest, _Mapping]] = ..., hash_file_request: _Optional[_Union[HashFileRequest, _Mapping]] = ..., enable_nat_request: _Optional[_Union[EnableNATRequest, _Mapping]] = ..., ensure_vxlan_mesh_request: _Optional[_Union[EnsureVXLANMeshRequest, _Mapping]] = ..., add_floating_ip_request: _Optional[_Union[AddFloatingIPRequest, _Mapping]] = ...) -> None: ...
+    remove_floating_ip_request: RemoveFloatingIPRequest
+    def __init__(self, execute_request: _Optional[_Union[_common_pb2.ExecuteRequest, _Mapping]] = ..., hash_file_request: _Optional[_Union[HashFileRequest, _Mapping]] = ..., enable_nat_request: _Optional[_Union[EnableNATRequest, _Mapping]] = ..., ensure_vxlan_mesh_request: _Optional[_Union[EnsureVXLANMeshRequest, _Mapping]] = ..., add_floating_ip_request: _Optional[_Union[AddFloatingIPRequest, _Mapping]] = ..., remove_floating_ip_request: _Optional[_Union[RemoveFloatingIPRequest, _Mapping]] = ...) -> None: ...
 
 class PrivExecReply(_message.Message):
-    __slots__ = ("execute_reply", "hash_file_reply", "enable_nat_reply", "ensure_vxlan_mesh_reply", "add_floating_ip_reply")
+    __slots__ = ("execute_reply", "hash_file_reply", "enable_nat_reply", "ensure_vxlan_mesh_reply", "add_floating_ip_reply", "remove_floating_ip_reply")
     EXECUTE_REPLY_FIELD_NUMBER: _ClassVar[int]
     HASH_FILE_REPLY_FIELD_NUMBER: _ClassVar[int]
     ENABLE_NAT_REPLY_FIELD_NUMBER: _ClassVar[int]
     ENSURE_VXLAN_MESH_REPLY_FIELD_NUMBER: _ClassVar[int]
     ADD_FLOATING_IP_REPLY_FIELD_NUMBER: _ClassVar[int]
+    REMOVE_FLOATING_IP_REPLY_FIELD_NUMBER: _ClassVar[int]
     execute_reply: _common_pb2.ExecuteReply
     hash_file_reply: HashFileReply
     enable_nat_reply: EnableNATReply
     ensure_vxlan_mesh_reply: EnsureVXLANMeshReply
     add_floating_ip_reply: AddFloatingIPReply
-    def __init__(self, execute_reply: _Optional[_Union[_common_pb2.ExecuteReply, _Mapping]] = ..., hash_file_reply: _Optional[_Union[HashFileReply, _Mapping]] = ..., enable_nat_reply: _Optional[_Union[EnableNATReply, _Mapping]] = ..., ensure_vxlan_mesh_reply: _Optional[_Union[EnsureVXLANMeshReply, _Mapping]] = ..., add_floating_ip_reply: _Optional[_Union[AddFloatingIPReply, _Mapping]] = ...) -> None: ...
+    remove_floating_ip_reply: RemoveFloatingIPReply
+    def __init__(self, execute_reply: _Optional[_Union[_common_pb2.ExecuteReply, _Mapping]] = ..., hash_file_reply: _Optional[_Union[HashFileReply, _Mapping]] = ..., enable_nat_reply: _Optional[_Union[EnableNATReply, _Mapping]] = ..., ensure_vxlan_mesh_reply: _Optional[_Union[EnsureVXLANMeshReply, _Mapping]] = ..., add_floating_ip_reply: _Optional[_Union[AddFloatingIPReply, _Mapping]] = ..., remove_floating_ip_reply: _Optional[_Union[RemoveFloatingIPReply, _Mapping]] = ...) -> None: ...

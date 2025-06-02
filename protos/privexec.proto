@@ -94,6 +94,21 @@ message AddFloatingIPReply {
     string floating_address = 2;
 }
 
+message RemoveFloatingIPRequest {
+    string network_uuid = 1;
+    string floating_address = 2;
+}
+
+message RemoveFloatingIPReply {
+    enum Errors {
+        OK = 0;
+        FAILED = 1;
+    }
+
+    string network_uuid = 1;
+    string floating_address = 2;
+}
+
 message PrivExecRequest {
     oneof request {
         shakenfist.protos.ExecuteRequest execute_request = 1;
@@ -102,6 +117,7 @@ message PrivExecRequest {
         EnableNATRequest enable_nat_request = 11;
         EnsureVXLANMeshRequest ensure_vxlan_mesh_request = 12;
         AddFloatingIPRequest add_floating_ip_request = 13;
+        RemoveFloatingIPRequest remove_floating_ip_request = 14;
     }
 }
 
@@ -113,5 +129,6 @@ message PrivExecReply {
         EnableNATReply enable_nat_reply = 11;
         EnsureVXLANMeshReply ensure_vxlan_mesh_reply = 12;
         AddFloatingIPReply add_floating_ip_reply = 13;
+        RemoveFloatingIPReply remove_floating_ip_reply = 14;
     }
 }

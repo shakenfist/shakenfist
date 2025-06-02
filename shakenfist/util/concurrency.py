@@ -16,6 +16,7 @@ from shakenfist.exceptions import HashFailed
 from shakenfist.exceptions import MissingNodeLockSocket
 from shakenfist.exceptions import MissingPrivExecSocket
 from shakenfist.exceptions import ProcessExecutionError
+from shakenfist.exceptions import RemoveFloatingIPFailed
 from shakenfist.exceptions import TruncatedNodeLockResponse
 from shakenfist.exceptions import TruncatedPrivExecResponse
 from shakenfist.exceptions import UnknownNodeLockReplyException
@@ -229,6 +230,19 @@ def add_floating_ip(network_uuid, floating_address, inner_address):
     response = reply.add_floating_ip_reply
     if response.error != privexec_pb2.AddFloatingIPReply.OK:
         raise AddFloatingIPFailed()
+
+
+def remove_floating_ip(network_uuid, floating_address):
+    request = privexec_pb2.PrivExecRequest(
+        remove_floating_ip_request=privexec_pb2.RemoveFloatingIPRequest(
+            network_uuid=network_uuid,
+            floating_address=floating_address
+        )
+    )
+    reply = _marshal_privexec_request(request, 'remove_floating_ip_reply')
+    response = reply.remove_floating_ip_reply
+    if response.error != privexec_pb2.RemoveFloatingIPReply.OK:
+        raise RemoveFloatingIPFailed()
 
 
 def set_thread_name(name):
