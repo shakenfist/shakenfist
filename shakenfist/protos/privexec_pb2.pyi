@@ -131,7 +131,7 @@ class AddFloatingIPRequest(_message.Message):
     def __init__(self, network_uuid: _Optional[str] = ..., floating_address: _Optional[str] = ..., inner_address: _Optional[str] = ...) -> None: ...
 
 class AddFloatingIPReply(_message.Message):
-    __slots__ = ("network_uuid", "floating_address")
+    __slots__ = ("network_uuid", "floating_address", "inner_address", "error", "error_text")
     class Errors(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         OK: _ClassVar[AddFloatingIPReply.Errors]
@@ -144,9 +144,15 @@ class AddFloatingIPReply(_message.Message):
     IPTABLES_FAILED: AddFloatingIPReply.Errors
     NETWORK_UUID_FIELD_NUMBER: _ClassVar[int]
     FLOATING_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    INNER_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    ERROR_TEXT_FIELD_NUMBER: _ClassVar[int]
     network_uuid: str
     floating_address: str
-    def __init__(self, network_uuid: _Optional[str] = ..., floating_address: _Optional[str] = ...) -> None: ...
+    inner_address: str
+    error: AddFloatingIPReply.Errors
+    error_text: str
+    def __init__(self, network_uuid: _Optional[str] = ..., floating_address: _Optional[str] = ..., inner_address: _Optional[str] = ..., error: _Optional[_Union[AddFloatingIPReply.Errors, str]] = ..., error_text: _Optional[str] = ...) -> None: ...
 
 class RemoveFloatingIPRequest(_message.Message):
     __slots__ = ("network_uuid", "floating_address")
@@ -157,7 +163,7 @@ class RemoveFloatingIPRequest(_message.Message):
     def __init__(self, network_uuid: _Optional[str] = ..., floating_address: _Optional[str] = ...) -> None: ...
 
 class RemoveFloatingIPReply(_message.Message):
-    __slots__ = ("network_uuid", "floating_address")
+    __slots__ = ("network_uuid", "floating_address", "error", "error_text")
     class Errors(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         OK: _ClassVar[RemoveFloatingIPReply.Errors]
@@ -166,9 +172,13 @@ class RemoveFloatingIPReply(_message.Message):
     FAILED: RemoveFloatingIPReply.Errors
     NETWORK_UUID_FIELD_NUMBER: _ClassVar[int]
     FLOATING_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    ERROR_TEXT_FIELD_NUMBER: _ClassVar[int]
     network_uuid: str
     floating_address: str
-    def __init__(self, network_uuid: _Optional[str] = ..., floating_address: _Optional[str] = ...) -> None: ...
+    error: RemoveFloatingIPReply.Errors
+    error_text: str
+    def __init__(self, network_uuid: _Optional[str] = ..., floating_address: _Optional[str] = ..., error: _Optional[_Union[RemoveFloatingIPReply.Errors, str]] = ..., error_text: _Optional[str] = ...) -> None: ...
 
 class PrivExecRequest(_message.Message):
     __slots__ = ("execute_request", "hash_file_request", "enable_nat_request", "ensure_vxlan_mesh_request", "add_floating_ip_request", "remove_floating_ip_request")

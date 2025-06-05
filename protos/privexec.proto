@@ -92,6 +92,10 @@ message AddFloatingIPReply {
 
     string network_uuid = 1;
     string floating_address = 2;
+    string inner_address = 3;
+
+    Errors error = 20;
+    string error_text = 21;
 }
 
 message RemoveFloatingIPRequest {
@@ -107,6 +111,9 @@ message RemoveFloatingIPReply {
 
     string network_uuid = 1;
     string floating_address = 2;
+
+    Errors error = 20;
+    string error_text = 21;
 }
 
 message PrivExecRequest {
