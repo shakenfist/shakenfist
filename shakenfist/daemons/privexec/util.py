@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 import json
->>>>>>> 3b896f2c (Push removing floating IPs down to privexec.)
 import os
 import shutil
 import subprocess
