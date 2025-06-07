@@ -51,6 +51,13 @@ jobs:
                 'outputlabel': 'ci-images/ubuntu-2204',
                 'scheduled': True
             },
+            {
+                'name': 'ubuntu-2404',
+                'baseimage': 'ubuntu:24.04',
+                'baseuser': 'ubuntu',
+                'outputlabel': 'ci-images/ubuntu-2404',
+                'scheduled': True
+            },
         ]
     runs-on: [self-hosted, vm]
     concurrency:
