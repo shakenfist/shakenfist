@@ -5,9 +5,10 @@ import subprocess
 import sys
 import time
 
-from shakenfist_utilities import logs        # noreorder
+from shakenfist_utilities import logs                    # noreorder
 
 from shakenfist.config import config
+from shakenfist.daemons.privexec import eventlog as privexec_eventlog
 from shakenfist.exceptions import ListingInterfaceAddressesFailed
 
 
@@ -86,14 +87,12 @@ def _clean_ip_json(data):
 
 
 def check_for_interface(name, namespace=None, up=False):
-    log = LOG.with_fields({
-        'name': name,
-        'namespace': namespace
-    })
-
     if namespace:
         if not os.path.exists('/var/run/netns/%s' % namespace):
-            log.info('Interface is down, namespace missing')
+            privexec_eventlog.EVENT_DB.write_event(
+                'linux interface', name,
+                f'namespace {namespace} missing, interface missing'
+            )
             return False
 
         command = [locate_command('ip'), 'netns', 'exec', namespace]
@@ -107,18 +106,28 @@ def check_for_interface(name, namespace=None, up=False):
     stdout, stderr, returncode = command_helper(
         *command, failure_is_error=False)
     if returncode != 0:
+        privexec_eventlog.EVENT_DB.write_event(
+            'linux interface', name, 'unexpected error, interface missing'
+        )
         return False
 
     if stderr.rstrip('\n').endswith(' does not exist.'):
-        log.info('Interface is down, interface missing')
+        privexec_eventlog.EVENT_DB.write_event(
+            'linux interface', name, 'interface does not exist'
+        )
         return False
 
     if up:
         j = _clean_ip_json(stdout)
         if 'UP' not in j[0]['flags']:
-            log.info('Interface is down, UP flag is missing')
+            privexec_eventlog.EVENT_DB.write_event(
+                'linux interface', name, 'interface exists, but is not up'
+            )
             return False
 
+    privexec_eventlog.EVENT_DB.write_event(
+        'linux interface', name, 'interface exists'
+    )
     return True
 
 
