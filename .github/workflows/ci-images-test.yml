@@ -32,6 +32,13 @@ jobs:
                 'scheduled': False
             },
             {
+                'name': 'rocky-9-test',
+                'baseimage': 'rocky:9',
+                'baseuser': 'cloud-user',
+                'outputlabel': 'ci-images/rocky-9-test',
+                'scheduled': False
+            },
+            {
                 'name': 'ubuntu-2004-test',
                 'baseimage': 'ubuntu:20.04',
                 'baseuser': 'ubuntu',
@@ -46,10 +53,10 @@ jobs:
                 'scheduled': False
             },
             {
-                'name': 'rocky-9-test',
-                'baseimage': 'rocky:9',
-                'baseuser': 'cloud-user',
-                'outputlabel': 'ci-images/rocky-9-test',
+                'name': 'ubuntu-2404-test',
+                'baseimage': 'ubuntu:24.04',
+                'baseuser': 'ubuntu',
+                'outputlabel': 'ci-images/ubuntu-2404-test',
                 'scheduled': False
             },
         ]
