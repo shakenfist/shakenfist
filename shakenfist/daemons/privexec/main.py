@@ -362,8 +362,8 @@ class PrivExecJob:
             )
 
         success = privexec_util.add_address_to_interface(
-            req.network_uuid, req.floating_address, '32',
-            inner_floating_interface)
+            inner_floating_interface, req.network_uuid,
+            req.floating_address, '32',)
         if not success:
             return privexec_pb2.PrivExecReply(
                 add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(

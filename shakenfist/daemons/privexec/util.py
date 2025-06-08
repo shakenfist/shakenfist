@@ -1,3 +1,4 @@
+from functools import partial
 import json
 import os
 import shutil
@@ -86,13 +87,13 @@ def _clean_ip_json(data):
     return [x for x in j if x]
 
 
-def check_for_interface(name, namespace=None, up=False):
+def check_for_interface(interface, namespace=None, up=False):
+    evt = partial(privexec_eventlog.EVENT_DB.write_event,
+                  'linux interface', interface)
+
     if namespace:
         if not os.path.exists('/var/run/netns/%s' % namespace):
-            privexec_eventlog.EVENT_DB.write_event(
-                'linux interface', name,
-                f'namespace {namespace} missing, interface missing'
-            )
+            evt(f'namespace {namespace} missing, interface missing')
             return False
 
         command = [locate_command('ip'), 'netns', 'exec', namespace]
@@ -100,34 +101,26 @@ def check_for_interface(name, namespace=None, up=False):
         command = []
 
     command.extend([
-        locate_command('ip'), '-pretty', '-json', 'link', 'show', name
+        locate_command('ip'), '-pretty', '-json', 'link', 'show', interface
     ])
 
     stdout, stderr, returncode = command_helper(
         *command, failure_is_error=False)
     if returncode != 0:
-        privexec_eventlog.EVENT_DB.write_event(
-            'linux interface', name, 'unexpected error, interface missing'
-        )
+        evt('unexpected error, interface missing')
         return False
 
     if stderr.rstrip('\n').endswith(' does not exist.'):
-        privexec_eventlog.EVENT_DB.write_event(
-            'linux interface', name, 'interface does not exist'
-        )
+        evt('interface does not exist')
         return False
 
     if up:
         j = _clean_ip_json(stdout)
         if 'UP' not in j[0]['flags']:
-            privexec_eventlog.EVENT_DB.write_event(
-                'linux interface', name, 'interface exists, but is not up'
-            )
+            evt('interface exists, but is not up')
             return False
 
-    privexec_eventlog.EVENT_DB.write_event(
-        'linux interface', name, 'interface exists'
-    )
+    evt('interface exists')
     return True
 
 
@@ -137,8 +130,13 @@ def _get_safe_interface_name(interface):
 
 def create_interface(interface, interface_type, extra, mtu=None,
                      inner_namespace=None):
+    evt = partial(privexec_eventlog.EVENT_DB.write_event,
+                  'linux interface', interface)
+
     interface = _get_safe_interface_name(interface)
+    evt(f'safe interface name is {interface}')
     if check_for_interface(interface):
+        evt('skipping creation as it already exists')
         return True
 
     if not mtu:
@@ -157,8 +155,11 @@ def create_interface(interface, interface_type, extra, mtu=None,
         _, _, returncode = command_helper(
             *command, failure_is_error=last_attempt)
         if returncode == 0:
+            evt('interface creation success')
             break
+        evt('interface creation failure')
         if last_attempt:
+            evt('giving up after repeated failures')
             return False
 
         time.sleep(0.2)
@@ -169,19 +170,25 @@ def create_interface(interface, interface_type, extra, mtu=None,
             locate_command('ip'), 'link', 'set', interface,
             'netns', inner_namespace)
         if returncode != 0:
+            evt('failed to move interface to namesapce')
             return False
+        evt('interface moved to namespace')
 
+    evt('interface created')
     return True
 
 
-def get_interface_addresses(name, namespace=None):
+def get_interface_addresses(interface, namespace=None):
+    evt = partial(privexec_eventlog.EVENT_DB.write_event,
+                  'linux interface', interface)
+
     if namespace:
         command = [locate_command('ip'), 'netns', 'exec', namespace]
     else:
         command = []
 
     command.extend([
-        locate_command('ip'), '-pretty', '-json', 'addr', 'show', name
+        locate_command('ip'), '-pretty', '-json', 'addr', 'show', interface
     ])
     stdout, stderr, returncode = command_helper(*command)
     if returncode not in [0, 1]:
@@ -191,10 +198,16 @@ def get_interface_addresses(name, namespace=None):
     for elem in _clean_ip_json(stdout):
         for addr_info in elem.get('addr_info', []):
             addresses.append(addr_info['local'])
+
+    evt('interface addresses',
+        extra=json.dumps(addresses, indent=4, sort_keys=True))
     return addresses
 
 
-def add_address_to_interface(namespace, address, netmask, device):
+def add_address_to_interface(interface, namespace, address, netmask):
+    evt = partial(privexec_eventlog.EVENT_DB.write_event,
+                  'linux interface', interface)
+
     if namespace:
         command = [locate_command('ip'), 'netns', 'exec', namespace]
     else:
@@ -202,17 +215,22 @@ def add_address_to_interface(namespace, address, netmask, device):
 
     command.extend([
         locate_command('ip'), 'addr', 'add', f'{address}/{netmask}',
-        'dev', device
+        'dev', interface
     ])
 
     attempts = 0
     while True:
         _, stderr, returncode = command_helper(*command)
         if returncode == 0:
+            evt('added address success')
             return True
         if stderr.decode().find('RTNETLINK answers: File exists') != -1:
+            evt('address already existed')
             return True
+        evt('add address failure')
+
         if attempts > 5:
+            evt('giving up after repeated failures')
             return False
 
         time.sleep(0.5)

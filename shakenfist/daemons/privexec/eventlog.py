@@ -77,7 +77,7 @@ class LocalEvents:
             'primary_object_uuid, message, extra, request_id, correlation_id) '
             'VALUES (CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)',
             (
-                primary_object_type, primary_object_uuid, message, extra,
+                primary_object_type, str(primary_object_uuid), message, extra,
                 request_id(), correlation_id
             )
         )
