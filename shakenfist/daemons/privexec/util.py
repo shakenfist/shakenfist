@@ -104,6 +104,7 @@ def check_for_interface(interface, namespace=None, up=False):
         locate_command('ip'), '-pretty', '-json', 'link', 'show', interface
     ])
 
+    evt('executing command', extra=command)
     stdout, stderr, returncode = command_helper(
         *command, failure_is_error=False)
 
@@ -153,6 +154,8 @@ def create_interface(interface, interface_type, extra, mtu=None,
     attempts = 0
     while True:
         last_attempt = attempts == 3
+
+        evt('executing command', extra=command)
         _, _, returncode = command_helper(
             *command, failure_is_error=last_attempt)
         if returncode == 0:
@@ -167,9 +170,12 @@ def create_interface(interface, interface_type, extra, mtu=None,
         attempts += 1
 
     if inner_namespace:
-        _, _, returncode = command_helper(
+        command = [
             locate_command('ip'), 'link', 'set', interface,
-            'netns', inner_namespace)
+            'netns', inner_namespace
+        ]
+        evt('executing command', extra=command)
+        _, _, returncode = command_helper(*command)
         if returncode != 0:
             evt('failed to move interface to namespace')
             return False
@@ -191,6 +197,7 @@ def get_interface_addresses(interface, namespace=None):
     command.extend([
         locate_command('ip'), '-pretty', '-json', 'addr', 'show', interface
     ])
+    evt('executing command', extra=command)
     stdout, stderr, returncode = command_helper(*command)
     if returncode not in [0, 1]:
         raise ListingInterfaceAddressesFailed(stderr)
@@ -200,8 +207,7 @@ def get_interface_addresses(interface, namespace=None):
         for addr_info in elem.get('addr_info', []):
             addresses.append(addr_info['local'])
 
-    evt('interface addresses',
-        extra=json.dumps(addresses, indent=4, sort_keys=True))
+    evt('interface addresses', extra=addresses)
     return addresses
 
 
@@ -221,6 +227,7 @@ def add_address_to_interface(interface, namespace, address, netmask):
 
     attempts = 0
     while True:
+        evt('executing command', extra=command)
         _, stderr, returncode = command_helper(*command)
         if returncode == 0:
             evt('added address success')
