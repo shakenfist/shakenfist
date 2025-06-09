@@ -1,3 +1,4 @@
+from collections import defaultdict
 import queue
 import time
 
@@ -71,8 +72,13 @@ def _process_per_blob_queue(execution_limit=10):
         # config.CHECKSUM_VERIFICATION_FREQUENCY seconds.
         checksums = b.checksums
         node_uuids = b.locations
-        requests = checksums.get('requests_by_node', {}).get(
-            config.NODE_NAME, [])
+
+        requests_by_node = defaultdict(list)
+        for _, value in etcd.get_prefix_raw(f'/sf/clusteroperations-by-blob/'):
+            op_type = value.get('operation_type')
+            op_uuid = value.get('operation_uuid')
+            op = get_object_class(op_type).from_db(op_uuid)
+            requests_by_node[op.node_uuid].append((op_type, op_uuid))
 
         for node_uuid in node_uuids:
             last_checksum = checksums.get(config.NODE_NAME, 0)
@@ -81,14 +87,7 @@ def _process_per_blob_queue(execution_limit=10):
             if age < config.CHECKSUM_VERIFICATION_FREQUENCY:
                 continue
 
-            request_checksum = True
-            for op_type, op_uuid in requests:
-                op = get_object_class(op_type).from_db(op_uuid)
-                if op and op.state.value == BaseClusterOperation.STATE_QUEUED:
-                    request_checksum = False
-                    break
-
-            if request_checksum:
+            if not requests_by_node[node_uuid]:
                 nbo_schema.create_and_enqueue(
                     node_uuid,
                     b.uuid,

@@ -80,7 +80,7 @@ class NodeBlobOp(BaseClusterOperation):
             super().execute()
         finally:
             etcd.delete_raw(
-                f'/sf/clusteroperations-by-blob/{self.blob_uuid}/{self.node_uuid}')
+                f'/sf/clusteroperations-by-blob/{self.blob_uuid}/{self.uuid}')
 
     def dispatch_task(self, task):
         if task not in schema.model_tasks:
