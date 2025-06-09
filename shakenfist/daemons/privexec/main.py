@@ -531,6 +531,7 @@ def main():
     LOG.info('Stopping')
 
     start_time = time.time()
+    last_event_prune = time.time()
     while workers:
         LOG.info(f'There are {len(workers)} remaining workers')
 
@@ -561,6 +562,9 @@ def main():
         workers = remaining_workers
         if workers:
             time.sleep(5)
+
+        if time.time() - last_event_prune > 300:
+            privexec_eventlog.EVENT_DB.prune_old_events()
 
     LOG.info(f'There are {len(workers)} remaining workers')
     LOG.info('Stopped')

@@ -86,5 +86,11 @@ class LocalEvents:
         )
         con.commit()
 
+    def prune_old_events(self):
+        con = self._make_connection()
+        con.execute(
+            'DELETE FROM localevents WHERE timestamp < '
+            'datetime("now", "-1 hout");')
+
 
 EVENT_DB = None
