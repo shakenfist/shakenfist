@@ -63,6 +63,8 @@ def refresh_object_state_caches():
                     }
                 })
 
+            LOG.info(f'Cache update for {object_type} {state} has '
+                     f'{len(mutations)} mutations')
             etcd.replace_many_raw(mutations)
 
         for state in previous_states:
