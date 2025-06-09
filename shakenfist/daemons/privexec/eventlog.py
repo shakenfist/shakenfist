@@ -72,8 +72,9 @@ class LocalEvents:
 
     def write_event(self, primary_object_type, primary_object_uuid,
                     message, correlation_id=None, extra=None):
-        if extra:
+        if extra is not None:
             extra = json.dumps(extra, indent=4, sort_keys=True)
+
         con = self._make_connection()
         con.execute(
             'INSERT INTO localevents(timestamp, primary_object_type,'
