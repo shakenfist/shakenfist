@@ -45,7 +45,7 @@ def command_helper(*command, failure_is_error=True):
         log.error('Command failed')
     else:
         log.debug('Command executed')
-    return stdout, stderr, obj.returncode
+    return stdout.decode(), stderr.decode(), obj.returncode
 
 
 def _clean_ip_json(data):
@@ -225,7 +225,7 @@ def add_address_to_interface(interface, namespace, address, netmask):
         if returncode == 0:
             evt('added address success')
             return True
-        if stderr.decode().find('RTNETLINK answers: File exists') != -1:
+        if stderr.find('RTNETLINK answers: File exists') != -1:
             evt('address already existed')
             return True
         evt('add address failure')

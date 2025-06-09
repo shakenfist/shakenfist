@@ -175,7 +175,7 @@ class PrivExecJob:
             hash_file_reply=privexec_pb2.HashFileReply(
                 path=req.path,
                 algorithm=req.algorithm,
-                hash=stdout.decode().split(' ')[0],
+                hash=stdout.split(' ')[0],
                 error=privexec_pb2.HashFileReply.OK
             )
         )
@@ -203,7 +203,7 @@ class PrivExecJob:
         # Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)
         # pkts bytes target     prot opt in     out     source               destination
         #   23  1736 MASQUERADE  all  --  *      ens4    192.168.242.0/24     0.0.0.0/0
-        for line in stdout.decode().split('\n'):
+        for line in stdout.split('\n'):
             if line.find(str(req.network_address)) != -1:
                 return privexec_pb2.PrivExecReply(
                     enable_nat_reply=privexec_pb2.EnableNATReply(
@@ -273,7 +273,7 @@ class PrivExecJob:
         if returncode != 0:
             raise VXLANMeshDiscoveryFailure()
 
-        for line in stdout.decode().split('\n'):
+        for line in stdout.split('\n'):
             m = MESH_RE.match(line)
             if m:
                 yield m.group(1)
