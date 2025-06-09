@@ -63,9 +63,12 @@ def refresh_object_state_caches():
                     }
                 })
 
-            LOG.info(f'Cache update for {object_type} {state} has '
-                     f'{len(mutations)} mutations')
-            etcd.replace_many_raw(mutations)
+            while mutations:
+                batch = mutations[:50]
+                LOG.info(f'Cache update for {object_type} {state} has '
+                         f'{len(mutations)} mutations, sending {len(batch)}')
+                etcd.replace_many_raw(batch)
+                mutations = mutations[50:]
 
         for state in previous_states:
             etcd.delete_prefix(f'/sf/cache/{object_type}/{state}')
