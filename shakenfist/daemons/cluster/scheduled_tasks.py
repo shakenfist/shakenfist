@@ -15,7 +15,6 @@ from shakenfist.etcd_schema.operations import node_blob_op as nbo_schema
 from shakenfist.etcd_schema.operations import node_inst_op as nio_schema
 from shakenfist.instance import Instance
 from shakenfist.node import Node
-from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_general_background_node_queues
 from shakenfist.operations.baseoperation import get_general_user_facing_node_queues
 from shakenfist.util import general as util_general
@@ -74,7 +73,7 @@ def _process_per_blob_queue(execution_limit=10):
         node_uuids = b.locations
 
         requests_by_node = defaultdict(list)
-        for _, value in etcd.get_prefix_raw(f'/sf/clusteroperations-by-blob/'):
+        for _, value in etcd.get_prefix_raw('/sf/clusteroperations-by-blob/'):
             op_type = value.get('operation_type')
             op_uuid = value.get('operation_uuid')
             op = get_object_class(op_type).from_db(op_uuid)
