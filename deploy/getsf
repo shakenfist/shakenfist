@@ -110,6 +110,7 @@ elif [ ${GETSF_RELEASE} == "pre-release" ]; then
     GETSF_AGENT_PACKAGE="shakenfist-agent"
 elif [ ${GETSF_RELEASE} == "local" ]; then
     status "We will use local packages."
+    PIP_EXTRA="--force-reinstall"
 
     question_start
     echo "Do you want to build packages from a local git repository"
