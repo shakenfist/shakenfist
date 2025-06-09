@@ -25,7 +25,7 @@ def refresh_object_state_caches():
         for key, _ in etcd.get_prefix_raw(f'/sf/{object_type}'):
             obj_uuid = key.split('/')[-1]
             obj = constants.get_object_class(object_type).from_db(
-                obj_uuid)
+                obj_uuid, suppress_failure_audit=True)
             if obj:
                 if obj.state.value not in by_state:
                     LOG.with_fields({
