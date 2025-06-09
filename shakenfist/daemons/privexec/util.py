@@ -106,12 +106,13 @@ def check_for_interface(interface, namespace=None, up=False):
 
     stdout, stderr, returncode = command_helper(
         *command, failure_is_error=False)
-    if returncode != 0:
-        evt('unexpected error, interface missing')
-        return False
 
     if stderr.rstrip('\n').endswith(' does not exist.'):
         evt('interface does not exist')
+        return False
+
+    if returncode != 0:
+        evt('unexpected error, interface missing')
         return False
 
     if up:
@@ -170,7 +171,7 @@ def create_interface(interface, interface_type, extra, mtu=None,
             locate_command('ip'), 'link', 'set', interface,
             'netns', inner_namespace)
         if returncode != 0:
-            evt('failed to move interface to namesapce')
+            evt('failed to move interface to namespace')
             return False
         evt('interface moved to namespace')
 
