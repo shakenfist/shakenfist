@@ -255,9 +255,18 @@ jobs:
 
           script="cd shakenfist/deploy/;"
           script="${script} . /etc/sf/sfrc;"
-          script="${script} sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt;"
+
+          script="${script} python3 -mvenv /tmp/functests;"
+          script="${script} /tmp/functests/bin/pip3 install -U -r ../requirements.txt -r ../test-requirements.txt;"
+          script="${script} echo -e '\n\nvenv pip after packages:\n';"
+          script="${script} /tmp/functests/bin/pip3 list;"
+          script="${script} echo -e '\n---\n';"
+
+          script="${script} /tmp/functests/bin/pip3 install -e ${GITHUB_WORKSPACE}/../client-python/;"
+
           script="${script} set -e;"
-          script="${script} stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
+          script="${script} /tmp/functests/bin/stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
+
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} "${script}"
 
@@ -603,9 +612,18 @@ jobs:
 
           script="cd shakenfist/deploy/;"
           script="${script} . /etc/sf/sfrc;"
-          script="${script} sudo PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r requirements.txt;"
+
+          script="${script} python3 -mvenv /tmp/functests;"
+          script="${script} /tmp/functests/bin/pip3 install -U -r ../requirements.txt -r ../test-requirements.txt;"
+          script="${script} echo -e '\n\nvenv pip after packages:\n';"
+          script="${script} /tmp/functests/bin/pip3 list;"
+          script="${script} echo -e '\n---\n';"
+
+          script="${script} /tmp/functests/bin/pip3 install -e ${GITHUB_WORKSPACE}/../client-python/;"
+
           script="${script} set -e;"
-          script="${script} stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
+          script="${script} /tmp/functests/bin/stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
+
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} "${script}"
 
