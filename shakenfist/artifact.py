@@ -278,7 +278,9 @@ class Artifact(dbo):
             if 'blob_uuid' in mri:
                 old_blob = blob.Blob.from_db(mri['blob_uuid'])
                 if not old_blob:
-                    raise exceptions.BlobMissing()
+                    raise exceptions.BlobMissing(
+                        'Failed to retrieve previous artifact version: '
+                        f'{mri["blob_uuid"]}')
                 old_checksums = old_blob.checksums
                 old_blob_uuid = old_blob.uuid
             else:
@@ -291,7 +293,8 @@ class Artifact(dbo):
 
             new_blob = blob.Blob.from_db(blob_uuid)
             if not new_blob:
-                raise exceptions.BlobMissing()
+                raise exceptions.BlobMissing(
+                    f'Failed to retrieve new artifact version: {blob_uuid}')
             new_checksums = new_blob.checksums
 
             if old_checksums.get('sha512') and new_checksums.get('sha512'):

@@ -271,7 +271,8 @@ class ImageFetchHelper:
         elif cached_remotely:
             remote_blob = blob.Blob.from_db(cached_remotely)
             if not remote_blob:
-                raise exceptions.BlobMissing(cached_remotely)
+                raise exceptions.BlobMissing(
+                    f'Failed to lookup blob {cached_remotely}')
             remote_blob.ensure_local(instance_object=self.instance)
 
             cache_path = os.path.join(
@@ -337,7 +338,8 @@ class ImageFetchHelper:
         blob_uuid = url[len(BLOB_URL):]
         b = blob.Blob.from_db(blob_uuid)
         if not b:
-            raise exceptions.BlobMissing(blob_uuid)
+            raise exceptions.BlobMissing(
+                f'Failed to lookup blob {blob_uuid}')
 
         b.ensure_local(instance_object=self.instance)
         return b

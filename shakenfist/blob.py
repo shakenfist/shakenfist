@@ -572,7 +572,8 @@ class Blob(dbo):
                 add_event_multi(
                     EVENT_TYPE_AUDIT, affected_objects,
                     'there are no online sources for this blob')
-                raise BlobMissing('There are no online sources for this blob')
+                raise BlobMissing(
+                    f'There are no online sources for blob {self.uuid}')
 
             random.shuffle(locations)
             name = sf_random.random_id()

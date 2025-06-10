@@ -1061,7 +1061,7 @@ class Instance(dbo):
                                 backing_blob = blob.Blob.from_db(backing_uuid)
                                 if not backing_blob:
                                     raise exceptions.BlobMissing(
-                                        'backing blob %s is missing' % backing_uuid)
+                                        'Backing blob %s is missing' % backing_uuid)
                                 backing_uuid = backing_blob.depends_on
 
                             indent = '      '
