@@ -18,16 +18,12 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
 
-    # NOTE(mikal): git repos are checked out to /srv/github/_work/{org}/{repo}
-    # which is available as GITHUB_WORKSPACE. You can find other environment
-    # variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
-
     steps:
       - name: Set environment variables
         run: |
           echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
 
-      - name: Checkout shakenfist
+      - name: Checkout the shakenfist repository
         uses: actions/checkout@v4
         with:
           path: shakenfist
@@ -57,15 +53,15 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
             install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
 
-          python3 -m venv  --system-site-packages ${RUNNER_TEMP}/venv
+          python3 -m venv  --system-site-packages /srv/ci/venv
           cd ${GITHUB_WORKSPACE}/shakenfist
-          ${RUNNER_TEMP}/venv/bin/pip install -r requirements.txt
-          ${RUNNER_TEMP}/venv/bin/pip install pyupgrade reorder-python-imports
+          /srv/ci/venv/bin/pip install -r requirements.txt
+          /srv/ci/venv/bin/pip install pyupgrade reorder-python-imports
 
       - name: Scan for obsolete syntax
         env:
           GITHUB_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN }}
         run: |
           cd ${GITHUB_WORKSPACE}/shakenfist
-          . ${RUNNER_TEMP}/venv/bin/activate
+          . /srv/ci/venv/bin/activate
           ${GITHUB_WORKSPACE}/actions/tools/ci_code_formatting.sh 39

@@ -1,10 +1,5 @@
 name: Functional tests
 
-# NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
-# which is available as GITHUB_WORKSPACE. You can find other environment
-# variables at:
-# https://docs.github.com/en/actions/learn-github-actions/environment-variables
-#
 # The can_enqueue / can_merge scheme is as described at:
 # https://boinkor.net/2023/11/neat-github-actions-patterns-for-github-merge-queues/
 
@@ -56,15 +51,15 @@ jobs:
         id: failures
         run: |
           echo "Gathering list of failed tests..."
-          touch ${GITHUB_WORKSPACE}/failed
-          /usr/bin/tox -efailing || true > ${GITHUB_WORKSPACE}/failed
+          touch /srv/ci/failed
+          /usr/bin/tox -efailing || true > /srv/ci/failed
           echo
 
-          failed=$(cat ${GITHUB_WORKSPACE}/failed | egrep "^FAIL: " | \
+          failed=$(cat /srv/ci/failed | egrep "^FAIL: " | \
               sed -z 's/FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
 
           echo "Failed tests:"
-          cat ${GITHUB_WORKSPACE}/failed
+          cat /srv/ci/failed
           echo
 
           echo "failures<<EOF" >> ${GITHUB_OUTPUT}
@@ -147,7 +142,7 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
-              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
               base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
               ansible/ci-topology-${{ matrix.os.topology }}.yml
 
@@ -250,8 +245,12 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              ${source_path}/shakenfist \
+              ${GITHUB_WORKSPACE}/shakenfist \
               ${{ matrix.os.base_image_user }}@${primary}:shakenfist
+          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/client-python \
+              ${{ matrix.os.base_image_user }}@${primary}:client-python
 
           script="cd shakenfist/deploy/;"
           script="${script} . /etc/sf/sfrc;"
@@ -262,8 +261,11 @@ jobs:
           script="${script} /tmp/functests/bin/pip3 list;"
           script="${script} echo -e '\n---\n';"
 
-          script="${script} /tmp/functests/bin/pip3 install -e ${GITHUB_WORKSPACE}/../client-python/;"
+          script="${script} echo -e '\n\nInstall client-python:\n';"
+          script="${script} cd ~/client-python;"
+          script="${script} /tmp/functests/bin/pip3 install -e .;"
 
+          script="${script} cd ~/shakenfist/deploy/;"
           script="${script} set -e;"
           script="${script} /tmp/functests/bin/stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
 
@@ -285,17 +287,17 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
           echo "Gathering list of failed tests..."
-          touch ${GITHUB_WORKSPACE}/failed
+          touch /srv/ci/failed
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} \
-              "cd shakenfist/deploy; stestr failing || true" > ${GITHUB_WORKSPACE}/failed
+              "cd shakenfist/deploy; stestr failing || true" > /srv/ci/failed
           echo
 
-          failed=$(cat ${GITHUB_WORKSPACE}/failed | egrep "^FAIL: " | \
+          failed=$(cat /srv/ci/failed | egrep "^FAIL: " | \
               sed -z 's/FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
 
           echo "Failed tests:"
-          cat ${GITHUB_WORKSPACE}/failed
+          cat /srv/ci/failed
           echo
 
           echo "failures<<EOF" >> ${GITHUB_OUTPUT}
@@ -473,7 +475,7 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
-              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
               base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
               ansible/ci-topology-${{ matrix.os.topology }}.yml
 
@@ -607,8 +609,12 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              ${source_path}/shakenfist \
+              ${GITHUB_WORKSPACE}/shakenfist \
               ${{ matrix.os.base_image_user }}@${primary}:shakenfist
+          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/client-python \
+              ${{ matrix.os.base_image_user }}@${primary}:client-python
 
           script="cd shakenfist/deploy/;"
           script="${script} . /etc/sf/sfrc;"
@@ -619,8 +625,11 @@ jobs:
           script="${script} /tmp/functests/bin/pip3 list;"
           script="${script} echo -e '\n---\n';"
 
-          script="${script} /tmp/functests/bin/pip3 install -e ${GITHUB_WORKSPACE}/../client-python/;"
+          script="${script} echo -e '\n\nInstall client-python:\n';"
+          script="${script} cd ~/client-python;"
+          script="${script} /tmp/functests/bin/pip3 install -e .;"
 
+          script="${script} cd ~/shakenfist/deploy/;"
           script="${script} set -e;"
           script="${script} /tmp/functests/bin/stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
 
@@ -642,17 +651,17 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
           echo "Gathering list of failed tests..."
-          touch ${GITHUB_WORKSPACE}/failed
+          touch /srv/ci/failed
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} \
-              "cd shakenfist/deploy; stestr failing || true" > ${GITHUB_WORKSPACE}/failed
+              "cd shakenfist/deploy; stestr failing || true" > /srv/ci/failed
           echo
 
-          failed=$(cat ${GITHUB_WORKSPACE}/failed | egrep "^FAIL: " | \
+          failed=$(cat /srv/ci/failed | egrep "^FAIL: " | \
               sed -z 's/^FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
 
           echo "Failed tests:"
-          cat ${GITHUB_WORKSPACE}/failed
+          cat /srv/ci/failed
           echo
 
           echo "failures<<EOF" >> ${GITHUB_OUTPUT}
@@ -783,7 +792,7 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
-              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
               ansible/ci-topology-slim-primary.yml
 
@@ -866,7 +875,7 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              $source_path/shakenfist \
+              ${GITHUB_WORKSPACE}/shakenfist \
               debian@$primary:shakenfist
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; bash ansiblemoduletests.sh"
@@ -971,7 +980,7 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
-              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
               ansible/ci-topology-slim-primary.yml
 
@@ -1053,7 +1062,7 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              $source_path/shakenfist \
+              ${GITHUB_WORKSPACE}/shakenfist \
               debian@$primary:shakenfist
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; bash nodelifecycletests.sh"
@@ -1161,7 +1170,7 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
-              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
               base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
               ansible/ci-topology-localhost-upgrade.yml
 
@@ -1271,7 +1280,7 @@ jobs:
 
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+              /srv/ci/git/actions/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()
