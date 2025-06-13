@@ -171,7 +171,7 @@ def create_interface(interface, interface_type, extra, mtu=None,
 
     if inner_namespace:
         command = [
-            locate_command('ip'), 'link', 'set', interface,
+            locate_command('ip'), 'link', 'set', f'{interface}-i',
             'netns', inner_namespace
         ]
         evt('executing command', extra=command)

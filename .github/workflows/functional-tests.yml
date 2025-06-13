@@ -1280,7 +1280,7 @@ jobs:
 
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              /srv/ci/git/actions/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - uses: actions/upload-artifact@v4
         if: always()
