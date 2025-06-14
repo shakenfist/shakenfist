@@ -1934,6 +1934,10 @@
 <li>Power on now implies creation of a config drive is one is specified for the
   instance. That is, you can force re-creation of the config drive by powering
   an instance off and then on again.</li>
+<li>Deletion of an instance will now cause most outstanding cluster operations for
+  that instance to be cancelled. This is so these operations do not block the
+  delete operation. The one exception at this time is snapshots, which will
+  complete before the deletion occurs.</li>
 </ul>
 <h3 id="artifacts">Artifacts</h3>
 <ul>
