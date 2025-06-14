@@ -370,6 +370,10 @@ class RemoveFloatingIPFailed(Exception):
     ...
 
 
+class CreateVXLANInterfaceFailed(Exception):
+    ...
+
+
 class HashFailed(Exception):
     ...
 

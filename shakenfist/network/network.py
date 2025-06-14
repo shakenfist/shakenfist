@@ -367,7 +367,6 @@ class Network(dbo):
             'egress_bridge': 'egr-br-%s' % config.NODE_EGRESS_NIC,
             'egress_veth_outer': 'egr-%06x-o' % self.vxid,
             'egress_veth_inner': 'egr-%06x-i' % self.vxid,
-            'mesh_interface': self.mesh_nic,
 
             'netns': self.uuid,
 
@@ -431,49 +430,16 @@ class Network(dbo):
                                     self.STATE_DELETE_WAIT,
                                     self.STATE_ERROR)
 
-    def _create_common(self):
-        # The floating network does not have a vxlan mesh
-        if self.uuid == 'floating':
-            return
-
-        subst = self.subst_dict()
-
-        if not util_network.check_for_interface(subst['vx_interface']):
-            util_network.create_interface(
-                subst['vx_interface'], 'vxlan',
-                'id %(vx_id)s dev %(mesh_interface)s dstport 0'
-                % subst)
-            util_concurrency.execute(
-                'sysctl -w net.ipv4.conf.%(vx_interface)s.arp_notify=1' % subst)
-
-        if not util_network.check_for_interface(subst['vx_bridge']):
-            util_network.create_interface(subst['vx_bridge'], 'bridge', '')
-            util_concurrency.execute(
-                'ip link set %(vx_interface)s master %(vx_bridge)s' % subst)
-            util_concurrency.execute(
-                'ip link set %(vx_interface)s up' % subst)
-            util_concurrency.execute(
-                'ip link set %(vx_bridge)s up' % subst)
-            util_concurrency.execute(
-                'sysctl -w net.ipv4.conf.%(vx_bridge)s.arp_notify=1' % subst)
-            util_concurrency.execute(
-                'brctl setfd %(vx_bridge)s 0' % subst)
-            util_concurrency.execute(
-                'brctl stp %(vx_bridge)s off' % subst)
-            util_concurrency.execute(
-                'brctl setageing %(vx_bridge)s 0' % subst)
-
     def create_on_hypervisor(self):
         # The floating network does not have a vxlan mesh
         if self.uuid == 'floating':
             return
 
         self.add_event(EVENT_TYPE_AUDIT, 'creating network on hypervisor')
-
         with self.get_lock(op='create_on_hypervisor', global_scope=False):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
-            self._create_common()
+            util_concurrency.create_vxlan_interface(self.vxid, self.mesh_nic)
 
     def create_on_network_node(self):
         # The floating network does not have a vxlan mesh
@@ -490,7 +456,7 @@ class Network(dbo):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
 
-            self._create_common()
+            util_concurrency.create_vxlan_interface(self.vxid, self.mesh_nic)
 
             subst = self.subst_dict()
             if not os.path.exists('/var/run/netns/%s' % self.uuid):

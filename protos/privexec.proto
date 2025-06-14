@@ -116,6 +116,24 @@ message RemoveFloatingIPReply {
     string error_text = 21;
 }
 
+message CreateVXLANInterfaceRequest {
+    int64 vx_id = 1;
+    string mesh_interface = 2;
+}
+
+message CreateVXLANInterfaceReply {
+    enum Errors {
+        OK = 0;
+        FAILED = 1;
+    }
+
+    int64 vx_id = 1;
+    string mesh_interface = 2;
+
+    Errors error = 20;
+    string error_text = 21;
+}
+
 message PrivExecRequest {
     oneof request {
         shakenfist.protos.ExecuteRequest execute_request = 1;
@@ -125,6 +143,7 @@ message PrivExecRequest {
         EnsureVXLANMeshRequest ensure_vxlan_mesh_request = 12;
         AddFloatingIPRequest add_floating_ip_request = 13;
         RemoveFloatingIPRequest remove_floating_ip_request = 14;
+        CreateVXLANInterfaceRequest create_vxlan_interface_request = 15;
     }
 }
 
@@ -137,5 +156,6 @@ message PrivExecReply {
         EnsureVXLANMeshReply ensure_vxlan_mesh_reply = 12;
         AddFloatingIPReply add_floating_ip_reply = 13;
         RemoveFloatingIPReply remove_floating_ip_reply = 14;
+        CreateVXLANInterfaceReply create_vxlan_interface_reply = 15;
     }
 }

@@ -185,6 +185,83 @@ def create_interface(interface, interface_type, extra, mtu=None,
     return True
 
 
+def create_vx_interface(vx_interface, vx_id, vx_bridge, mesh_interface):
+    evt = partial(privexec_eventlog.EVENT_DB.write_event,
+                  'vxlan interface', vx_interface)
+
+    if not check_for_interface(vx_interface):
+        evt('creating vxlan interface')
+        create_interface(
+            vx_interface, 'vxlan',
+            ['id', str(vx_id), 'dev', str(mesh_interface), 'dstport', '0']
+        )
+
+        command = ['sysctl', '-w',
+                   f'net.ipv4.conf.{vx_interface}.arp_notify=1']
+        evt('executing command', extra=command)
+        _, _, returncode = command_helper(*command)
+        if returncode != 0:
+            evt('failed to enable arp_notify for vxlan interface')
+            return False
+
+    if not check_for_interface(vx_bridge):
+        evt('creating vxlan bridge')
+        create_interface(vx_bridge, 'bridge', [])
+
+        command = [
+            'ip', 'link', 'set', str(vx_interface), 'master', str(vx_bridge)
+        ]
+        evt('executing command', extra=command)
+        _, _, returncode = command_helper(*command)
+        if returncode != 0:
+            evt('failed to set vxlan bridge as master for vxlan interface')
+            return False
+
+        command = ['ip', 'link', 'set', str(vx_interface), 'up']
+        evt('executing command', extra=command)
+        _, _, returncode = command_helper(*command)
+        if returncode != 0:
+            evt('failed to bring vxlan interface up')
+            return False
+
+        command = ['ip', 'link', 'set', str(vx_bridge), 'up']
+        evt('executing command', extra=command)
+        _, _, returncode = command_helper(*command)
+        if returncode != 0:
+            evt('failed to bring vxlan bridge up')
+            return False
+
+        command = ['sysctl', '-w', f'net.ipv4.conf.{vx_bridge}.arp_notify=1']
+        evt('executing command', extra=command)
+        _, _, returncode = command_helper(*command)
+        if returncode != 0:
+            evt('failed to enable arp_notify for vxlan bridge')
+            return False
+
+        command = ['brctl', 'setfd', str(vx_bridge), '0']
+        evt('executing command', extra=command)
+        _, _, returncode = command_helper(*command)
+        if returncode != 0:
+            evt('failed to set vxlan bridge forward delay')
+            return False
+
+        command = ['brctl', 'stp', str(vx_bridge), 'off']
+        evt('executing command', extra=command)
+        _, _, returncode = command_helper(*command)
+        if returncode != 0:
+            evt('failed to disable STP on vxlan bridge')
+            return False
+
+        command = ['brctl', 'setageing', str(vx_bridge), '0']
+        evt('executing command', extra=command)
+        _, _, returncode = command_helper(*command)
+        if returncode != 0:
+            evt('failed to set vxlan bridge aging')
+            return False
+
+    return True
+
+
 def get_interface_addresses(interface, namespace=None):
     evt = partial(privexec_eventlog.EVENT_DB.write_event,
                   'linux interface', interface)

@@ -425,6 +425,29 @@ class PrivExecJob:
             )
         )
 
+    def _create_vx_interface(self, req):
+        vx_interface = f'vxlan-{req.vx_id:06x}'
+        vx_bridge = f'br-vxlan-{req.vx_id:06x}'
+
+        if not privexec_util.create_vx_interface(
+            vx_interface, req.vx_id, vx_bridge, req.mesh_interface
+        ):
+            return privexec_pb2.PrivExecReply(
+                create_vxlan_interface_reply=privexec_pb2.CreateVXLANInterfaceReply(
+                    vx_id=req.vx_id,
+                    mesh_interface=req.mesh_interface,
+                    error=privexec_pb2.CreateVXLANInterfaceReply.FAILED
+                )
+            )
+
+        return privexec_pb2.PrivExecReply(
+            create_vxlan_interface_reply=privexec_pb2.CreateVXLANInterfaceReply(
+                vx_id=req.vx_id,
+                mesh_interface=req.mesh_interface,
+                error=privexec_pb2.CreateVXLANInterfaceReply.OK
+            )
+        )
+
     def run(self):
         buffered = bytearray()
         command_found = False
@@ -449,7 +472,8 @@ class PrivExecJob:
                     'enable_nat_request': self._enable_nat,
                     'ensure_vxlan_mesh_request': self._ensure_mesh,
                     'add_floating_ip_request': self._add_floating_ip,
-                    'remove_floating_ip_request': self._remove_floating_ip
+                    'remove_floating_ip_request': self._remove_floating_ip,
+                    'create_vxlan_interface_request': self._create_vx_interface
                 }
 
                 for request_field in request_map:
