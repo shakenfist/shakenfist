@@ -28,9 +28,9 @@ schedule==1.2.2                    # mit
 semver==3.0.4                      # bsd
 
 greenlet==3.2.1                    # mit
-gunicorn==21.2.0                   # mit
+gunicorn==23.0.0                   # mit
 gevent==24.11.1                    # mit
-gunicorn[gevent]==21.2.0           # mit
+gunicorn[gevent]==23.0.0           # mit
 
 flask==3.1.1                       # bsd
 Flask-RESTful==0.3.10              # bsd
