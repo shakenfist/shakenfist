@@ -32,7 +32,7 @@ gunicorn==21.2.0                   # mit
 gevent==24.11.1                    # mit
 gunicorn[gevent]==21.2.0           # mit
 
-flask==3.1.0                       # bsd
+flask==3.1.1                       # bsd
 Flask-RESTful==0.3.10              # bsd
 flasgger==0.9.7.1                  # mit
 Flask-JWT-Extended==4.7.1          # mit
