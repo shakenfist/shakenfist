@@ -3,14 +3,139 @@ syntax = "proto3";
 package shakenfist.protos;
 import "common.proto";
 
+enum HashAlgorithm {
+    SHA1 = 0;
+    SHA256 = 1;
+    SHA512 = 2;
+    XXH128 = 3;
+}
+
+message HashFileRequest {
+    string path = 1;
+    HashAlgorithm algorithm = 2;
+}
+
+message HashFileReply {
+    enum Errors {
+        OK = 0;
+        FILE_NOT_FOUND = 1;
+        UNKNOWN_ALGORITHM = 2;
+        ALGORITHM_NOT_FOUND = 3;
+        ALGORITHM_FAILED = 4;
+    }
+
+    string path = 1;
+    HashAlgorithm algorithm = 2;
+    string hash = 3;
+
+    Errors error = 20;
+    string error_text = 21;
+}
+
+message EnableNATRequest {
+    string network_uuid = 1;
+    string network_address = 2;
+    string network_mask = 3;
+    int64 vxid = 4;
+}
+
+message EnableNATReply {
+    enum Errors {
+        OK = 0;
+        IPTABLES_FAILED = 1;
+        RULES_ALREADY_PRESENT = 2;
+    }
+
+    string network_uuid = 1;
+    string network_address = 2;
+    string network_mask = 3;
+    int64 vxid = 4;
+
+    Errors error = 20;
+    string error_text = 21;
+}
+
+message EnsureVXLANMeshRequest {
+    string network_uuid = 1;
+    int64 vxid = 2;
+    repeated string node_ips = 3;
+}
+
+message EnsureVXLANMeshReply {
+    enum Errors {
+        OK = 0;
+        FAILURE = 1;
+    }
+
+    string network_uuid = 1;
+    int64 vxid = 2;
+    repeated string added_addresses = 3;
+    repeated string removed_addresses = 4;
+
+    Errors error = 20;
+    string error_text = 21;
+}
+
+message AddFloatingIPRequest {
+    string network_uuid = 1;
+    string floating_address = 2;
+    string inner_address = 3;
+}
+
+message AddFloatingIPReply {
+    enum Errors {
+        OK = 0;
+        CREATE_INTERFACE_FAILED = 1;
+        ADD_ADDRESS_FAILED = 2;
+        IPTABLES_FAILED = 3;
+    }
+
+    string network_uuid = 1;
+    string floating_address = 2;
+    string inner_address = 3;
+
+    Errors error = 20;
+    string error_text = 21;
+}
+
+message RemoveFloatingIPRequest {
+    string network_uuid = 1;
+    string floating_address = 2;
+}
+
+message RemoveFloatingIPReply {
+    enum Errors {
+        OK = 0;
+        FAILED = 1;
+    }
+
+    string network_uuid = 1;
+    string floating_address = 2;
+
+    Errors error = 20;
+    string error_text = 21;
+}
+
 message PrivExecRequest {
     oneof request {
         shakenfist.protos.ExecuteRequest execute_request = 1;
+
+        HashFileRequest hash_file_request = 10;
+        EnableNATRequest enable_nat_request = 11;
+        EnsureVXLANMeshRequest ensure_vxlan_mesh_request = 12;
+        AddFloatingIPRequest add_floating_ip_request = 13;
+        RemoveFloatingIPRequest remove_floating_ip_request = 14;
     }
 }
 
 message PrivExecReply {
     oneof reply {
         shakenfist.protos.ExecuteReply execute_reply = 1;
+
+        HashFileReply hash_file_reply = 10;
+        EnableNATReply enable_nat_reply = 11;
+        EnsureVXLANMeshReply ensure_vxlan_mesh_reply = 12;
+        AddFloatingIPReply add_floating_ip_reply = 13;
+        RemoveFloatingIPReply remove_floating_ip_reply = 14;
     }
 }

@@ -110,6 +110,7 @@ elif [ ${GETSF_RELEASE} == "pre-release" ]; then
     GETSF_AGENT_PACKAGE="shakenfist-agent"
 elif [ ${GETSF_RELEASE} == "local" ]; then
     status "We will use local packages."
+    PIP_EXTRA="--force-reinstall"
 
     question_start
     echo "Do you want to build packages from a local git repository"
@@ -554,7 +555,7 @@ if [ -z "${GETSF_EXTRA_CONFIG}" ]; then
     if [ -z "${GETSF_EXTRA_CONFIG}" ]; then
         GETSF_EXTRA_CONFIG="[]"
     fi
-    record_answer GETSF_NODE_HYPERVISOR "${GETSF_EXTRA_CONFIG}"
+    record_answer GETSF_EXTRA_CONFIG "${GETSF_EXTRA_CONFIG}"
 else
     echo "(a JSON list of configuration dictionaries) >> ${GETSF_EXTRA_CONFIG}"
 fi
@@ -593,6 +594,8 @@ question_end
 echo
 
 # Build local wheels if required
+mkdir -p /srv/shakenfist/packages
+
 if [ ! -z ${GETSF_SERVER_REPO} ]; then
     echo
     status "Installing package build dependencies"
@@ -615,9 +618,9 @@ if [ ! -z ${GETSF_SERVER_REPO} ]; then
     tar czf docs.tgz docs
     python3 setup.py sdist bdist_wheel
     twine check dist/*
-    cp dist/*.whl /tmp/
+    cp dist/*.whl /srv/shakenfist/packages/
 
-    GETSF_SERVER_PACKAGE=$(pwd)"/"$(ls dist/*.whl)
+    GETSF_SERVER_PACKAGE="/srv/shakenfist/packages/"$(ls dist/*.whl | sed 's/dist\///')
 
     echo
     status "Server package is ${GETSF_SERVER_PACKAGE}"
@@ -636,9 +639,9 @@ if [ ! -z ${GETSF_CLIENT_REPO} ]; then
     fi
     python3 setup.py sdist bdist_wheel
     twine check dist/*
-    cp dist/*.whl /tmp/
+    cp dist/*.whl /srv/shakenfist/packages/
 
-    GETSF_CLIENT_PACKAGE=$(pwd)"/"$(ls dist/*.whl)
+    GETSF_CLIENT_PACKAGE="/srv/shakenfist/packages/"$(ls dist/*.whl | sed 's/dist\///')
 
     echo
     status "Client package is ${GETSF_CLIENT_PACKAGE}"
@@ -657,9 +660,9 @@ if [ ! -z ${GETSF_AGENT_REPO} ]; then
     fi
     python3 setup.py sdist bdist_wheel
     twine check dist/*
-    cp dist/*.whl /tmp/
+    cp dist/*.whl /srv/shakenfist/packages
 
-    GETSF_AGENT_PACKAGE=$(pwd)"/"$(ls dist/*.whl)
+    GETSF_AGENT_PACKAGE="/srv/shakenfist/packages/"$(ls dist/*.whl | sed 's/dist\///')
 
     echo
     status "Agent package is ${GETSF_AGENT_PACKAGE}"

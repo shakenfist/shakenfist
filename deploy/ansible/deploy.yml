@@ -804,7 +804,8 @@
         state: restarted
       when: hostvars[groups['primary_node'][0]]['node_mesh_ip'] != node_mesh_ip
 
-# Install etcd
+# Install etcd.
+#    ETCD_MAX_REQUEST_BYTES is from https://github.com/etcd-io/etcd/issues/9043
 - hosts: etcd
   tags: etcd
   roles:
@@ -817,6 +818,8 @@
         etcd_iface_public: "{{node_mesh_nic}}"
         etcd_iface_cluster: "{{node_mesh_nic}}"
         etcd_address_cluster: "{{node_mesh_ip}}"
+        etcd_additional_envvars:
+          ETCD_MAX_REQUEST_BYTES: 100000000
 
 - hosts: allsf
   any_errors_fatal: true

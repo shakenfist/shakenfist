@@ -25,7 +25,7 @@ def refresh_object_state_caches():
         for key, _ in etcd.get_prefix_raw(f'/sf/{object_type}'):
             obj_uuid = key.split('/')[-1]
             obj = constants.get_object_class(object_type).from_db(
-                obj_uuid)
+                obj_uuid, suppress_failure_audit=True)
             if obj:
                 if obj.state.value not in by_state:
                     LOG.with_fields({
@@ -63,7 +63,12 @@ def refresh_object_state_caches():
                     }
                 })
 
-            etcd.replace_many_raw(mutations)
+            while mutations:
+                batch = mutations[:50]
+                LOG.info(f'Cache update for {object_type} {state} has '
+                         f'{len(mutations)} mutations, sending {len(batch)}')
+                etcd.replace_many_raw(batch)
+                mutations = mutations[50:]
 
         for state in previous_states:
             etcd.delete_prefix(f'/sf/cache/{object_type}/{state}')

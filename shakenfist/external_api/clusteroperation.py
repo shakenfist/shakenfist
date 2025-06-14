@@ -10,7 +10,8 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
+from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
+from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 
@@ -37,7 +38,7 @@ class ClusterOperationEndpoint(sf_api.Resource):
     def get(self, operation_type=None, operation_uuid=None):
         if operation_type not in OPERATION_NAMES_TO_CLASSES:
             return sf_api.error(404, 'operation type not found')
-        op = OPERATION_NAMES_TO_CLASSES[operation_type].from_db(operation_uuid)
+        op = get_object_class(operation_type).from_db(operation_uuid)
         if not op:
             return sf_api.error(404, 'operation not found')
         return op.external_view()

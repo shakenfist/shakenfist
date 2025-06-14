@@ -226,7 +226,7 @@ class Daemon:
             set_abort_path(self.abort_path, 'from exit_gracefully')
 
     def check_daemon_state(self):
-        n = Node.from_db(config.NODE_NAME)
+        n = Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
         daemon_state = n.get_daemon_state(self.daemon_name).value
         if daemon_state in [Node.DAEMON_STATE_STOPPED,
                             Node.DAEMON_STATE_STOPPING]:

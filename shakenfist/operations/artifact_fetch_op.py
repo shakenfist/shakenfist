@@ -113,9 +113,6 @@ class ArtifactFetchOp(BaseClusterOperation):
              f'{a.uuid}.'))
 
         try:
-            # TODO(andy): Wait up to 15 mins for another queue process to download
-            # the required image. This will be changed to queue on a
-            # "waiting_image_fetch" queue but this works now.
             images.ImageFetchHelper(inst, a).get_image()
             a.add_event(EVENT_TYPE_AUDIT, 'artifact fetch complete')
 
@@ -140,7 +137,12 @@ class ArtifactFetchOp(BaseClusterOperation):
                 if inst:
                     inst.enqueue_delete_due_error(
                         f'failed to fetch image: {msg}')
-                self.state = ArtifactFetchOp.STATE_ERROR
+
+                # The op might not be in executing if it has been aborted
+                # because the instance start request which created it has been
+                # aborted.
+                if self.state.value == ArtifactFetchOp.STATE_EXECUTING:
+                    self.state = ArtifactFetchOp.STATE_ERROR
 
             else:
                 a.add_event(

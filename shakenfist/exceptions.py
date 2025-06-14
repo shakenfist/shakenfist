@@ -354,6 +354,30 @@ class UnknownPrivExecReplyException(Exception):
     ...
 
 
+class EnableNATFailed(Exception):
+    ...
+
+
+class EnsureMeshFailed(Exception):
+    ...
+
+
+class AddFloatingIPFailed(Exception):
+    ...
+
+
+class RemoveFloatingIPFailed(Exception):
+    ...
+
+
+class HashFailed(Exception):
+    ...
+
+
+class ListingInterfaceAddressesFailed(Exception):
+    ...
+
+
 class ProcessExecutionError(Exception):
     def __init__(self, stdout=None, stderr=None, exit_code=None, cmd=None):
         super().__init__(stdout, stderr, exit_code, cmd)

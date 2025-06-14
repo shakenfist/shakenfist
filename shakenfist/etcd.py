@@ -114,6 +114,8 @@ def get_etcd_native_client():
                 ('keepalive_timeout_ms', 200),
                 ('grpc.http2.max_pings_without_data', 0),
                 ('grpc.keepalive_permit_without_calls', 1),
+                ('grpc.max_send_message_length', 100000000),
+                ('grpc.max_receive_message_length', 100000000),
             ]
         )
         c = local.sf_etcd_native_client

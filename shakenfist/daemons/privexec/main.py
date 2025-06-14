@@ -3,19 +3,24 @@
 # on a single node. The protocol on the unix domain socket is binary serialized
 # protobufs.
 
+import ipaddress
 import os
+import re
 import signal
 import socket
 import subprocess
 import threading
 import time
 
+from google.protobuf.json_format import MessageToJson
 from google.protobuf.message import DecodeError
 import psutil
 import setproctitle
 from shakenfist_utilities import random      # noreorder
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs        # noreorder
 
+from shakenfist.daemons.privexec import eventlog as privexec_eventlog
+from shakenfist.daemons.privexec import util as privexec_util
 from shakenfist.protos import common_pb2
 from shakenfist.protos import privexec_pb2
 
@@ -42,12 +47,19 @@ IO_PRIORITIES = {
 }
 
 
+# vxlan mesh discovery
+MESH_RE = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
+
+
+class VXLANMeshDiscoveryFailure(Exception):
+    ...
+
+
 class PrivExecJob:
     def __init__(self, conn):
         super().__init__()
         self.conn = conn
         self.task_details = None
-        self.pid = None
 
     def _execute(self, request):
         command = request.command
@@ -66,7 +78,8 @@ class PrivExecJob:
             request.io_priority, IO_PRIORITIES[common_pb2.ExecuteRequest.NORMAL])
 
         if current_iopriority != requested_iopriority:
-            command = (f'ionice -c {requested_iopriority[0]} '
+            command = (f'{privexec_util.locate_command("ionice")} -c '
+                       f'{requested_iopriority[0]} '
                        f'-n {requested_iopriority[1]} {command}')
 
         working_directory = None
@@ -74,11 +87,10 @@ class PrivExecJob:
             working_directory = request.working_directory
 
         start_time = time.time()
-        pipe = subprocess.PIPE
         obj = subprocess.Popen(
-            command, stdin=pipe, stdout=pipe, stderr=pipe, close_fds=True,
+            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, close_fds=True,
             shell=True, cwd=working_directory, env=env_variables)
-        self.pid = obj.pid
 
         stdout, stderr = obj.communicate(None, timeout=None)
         obj.stdin.close()
@@ -108,10 +120,317 @@ class PrivExecJob:
             )
         )
 
+    def _hash_file(self, req):
+        log = LOG.with_fields({
+            'path': req.path,
+            'algorithm': req.algorithm
+        })
+
+        hash_commands = {
+            privexec_pb2.HashAlgorithm.SHA1: 'sha1sum',
+            privexec_pb2.HashAlgorithm.SHA256: 'sha256sum',
+            privexec_pb2.HashAlgorithm.SHA512: 'sha512sum',
+            privexec_pb2.HashAlgorithm.XXH128: 'xxh128sum'
+        }
+
+        if req.algorithm not in hash_commands:
+            log.error('Failed to hash file, no hasher found')
+            return privexec_pb2.PrivExecReply(
+                hash_file_reply=privexec_pb2.HashFileReply(
+                    path=req.path,
+                    algorithm=req.algorithm,
+                    error=privexec_pb2.HashFileReply.UNKNOWN_ALGORITHM
+                )
+            )
+
+        hasher = privexec_util.locate_command(hash_commands[req.algorithm])
+        if not hasher:
+            log.error('Failed to hash file, could not resolve hasher')
+            return privexec_pb2.PrivExecReply(
+                hash_file_reply=privexec_pb2.HashFileReply(
+                    path=req.path,
+                    algorithm=req.algorithm,
+                    error=privexec_pb2.HashFileReply.ALGORITHM_NOT_FOUND
+                )
+            )
+
+        stdout, stderr, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ionice'), '-c', '2', '-n', '7',
+            hasher, req.path
+        )
+        if returncode != 0 or len(stdout) == 0:
+            log.error(
+                'Failed to hash file, bad exit code or no output from hasher')
+            return privexec_pb2.PrivExecReply(
+                hash_file_reply=privexec_pb2.HashFileReply(
+                    path=req.path,
+                    algorithm=req.algorithm,
+                    hash=stdout,
+                    error=privexec_pb2.HashFileReply.ALGORITHM_FAILED,
+                    error_text=stderr
+                )
+            )
+
+        return privexec_pb2.PrivExecReply(
+            hash_file_reply=privexec_pb2.HashFileReply(
+                path=req.path,
+                algorithm=req.algorithm,
+                hash=stdout.split(' ')[0],
+                error=privexec_pb2.HashFileReply.OK
+            )
+        )
+
+    def _enable_nat(self, req):
+        iptables_failed_error = privexec_pb2.PrivExecReply(
+            enable_nat_reply=privexec_pb2.EnableNATReply(
+                network_uuid=req.network_uuid,
+                network_address=req.network_address,
+                network_mask=req.network_mask,
+                vxid=req.vxid,
+                error=privexec_pb2.EnableNATReply.IPTABLES_FAILED
+            )
+        )
+
+        # Determine if we have NAT already
+        stdout, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('iptables'), '-w', '10', '-t', 'nat',
+            '-L', 'POSTROUTING', '-n', '-v'
+        )
+        if returncode != 0:
+            return iptables_failed_error
+
+        # Output looks like this:
+        # Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)
+        # pkts bytes target     prot opt in     out     source               destination
+        #   23  1736 MASQUERADE  all  --  *      ens4    192.168.242.0/24     0.0.0.0/0
+        for line in stdout.split('\n'):
+            if line.find(str(req.network_address)) != -1:
+                return privexec_pb2.PrivExecReply(
+                    enable_nat_reply=privexec_pb2.EnableNATReply(
+                        network_uuid=req.network_uuid,
+                        network_address=req.network_address,
+                        network_mask=req.network_mask,
+                        vxid=req.vxid,
+                        error=privexec_pb2.EnableNATReply.RULES_ALREADY_PRESENT
+                    )
+                )
+
+        # Ensure IP forwarding is enabled
+        with open('/proc/sys/net/ipv4/ip_forward') as f:
+            forwarding_enabled = f.read().rstrip() == '1'
+
+        if not forwarding_enabled:
+            with open('/proc/sys/net/ipv4/ip_forward', 'w') as f:
+                f.write('1\n')
+
+        # Create iptables rules
+        egress_veth_inner = f'egr-{req.vxid:06x}-i'
+        vx_veth_inner = f'veth-{req.vxid:06x}-i'
+
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, privexec_util.locate_command('iptables'),
+            '-w', '10', '-A', 'FORWARD', '-o', egress_veth_inner,
+            '-i', vx_veth_inner, '-j', 'ACCEPT'
+        )
+        if returncode != 0:
+            return iptables_failed_error
+
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, privexec_util.locate_command('iptables'),
+            '-w', '10', '-A', 'FORWARD', '-i', egress_veth_inner,
+            '-o', 'vx_veth_inner', '-j', 'ACCEPT'
+        )
+        if returncode != 0:
+            return iptables_failed_error
+
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, privexec_util.locate_command('iptables'),
+            '-w', '10', '-t', 'nat', '-A', 'POSTROUTING', '-s',
+            f'{req.network_address}/{req.network_mask}',
+            '-o', egress_veth_inner, '-j', 'MASQUERADE'
+        )
+        if returncode != 0:
+            return iptables_failed_error
+
+        return privexec_pb2.PrivExecReply(
+            enable_nat_reply=privexec_pb2.EnableNATReply(
+                network_uuid=req.network_uuid,
+                network_address=req.network_address,
+                network_mask=req.network_mask,
+                vxid=req.vxid,
+                error=privexec_pb2.EnableNATReply.OK
+            )
+        )
+
+    def _discover_mesh(self, vx_interface):
+        stdout, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('bridge'), 'fdb', 'show', 'brport',
+            vx_interface
+        )
+        if returncode != 0:
+            raise VXLANMeshDiscoveryFailure()
+
+        for line in stdout.split('\n'):
+            m = MESH_RE.match(line)
+            if m:
+                yield m.group(1)
+
+    def _ensure_mesh(self, req):
+        removed = []
+        added = []
+        node_ips = list(req.node_ips)
+
+        vx_interface = f'vxlan-{req.vxid:06x}'
+
+        vxlan_failed_error = privexec_pb2.PrivExecReply(
+            ensure_vxlan_mesh_reply=privexec_pb2.EnsureVXLANMeshReply(
+                network_uuid=req.network_uuid,
+                vxid=req.vxid,
+                error=privexec_pb2.EnsureVXLANMeshReply.FAILURE
+            )
+        )
+
+        try:
+            discovered = list(self._discover_mesh(vx_interface))
+        except VXLANMeshDiscoveryFailure:
+            return vxlan_failed_error
+
+        for n in discovered:
+            if n in node_ips:
+                node_ips.remove(n)
+            else:
+                _, _, returncode = privexec_util.command_helper(
+                    privexec_util.locate_command('bridge'), 'fdb', 'del', 'to',
+                    '00:00:00:00:00:00', 'dst', n, 'dev', vx_interface
+                )
+                if returncode != 0:
+                    return vxlan_failed_error
+                removed.append(n)
+
+        for n in node_ips:
+            _, _, returncode = privexec_util.command_helper(
+                privexec_util.locate_command('bridge'), 'fdb', 'append', 'to',
+                '00:00:00:00:00:00', 'dst', n, 'dev', vx_interface
+            )
+            if returncode != 0:
+                return vxlan_failed_error
+            added.append(n)
+
+        return privexec_pb2.PrivExecReply(
+            ensure_vxlan_mesh_reply=privexec_pb2.EnsureVXLANMeshReply(
+                network_uuid=req.network_uuid,
+                vxid=req.vxid,
+                error=privexec_pb2.EnsureVXLANMeshReply.OK,
+                added_addresses=added,
+                removed_addresses=removed
+            )
+        )
+
+    def _add_floating_ip(self, req):
+        floating_interface = \
+            f'flt-{int(ipaddress.IPv4Address(req.floating_address)):08x}'
+        inner_floating_interface = f'{floating_interface}-i'
+
+        success = privexec_util.create_interface(
+            floating_interface, 'veth',
+            ['peer', 'name', inner_floating_interface],
+            inner_namespace=req.network_uuid
+        )
+        if not success:
+            return privexec_pb2.PrivExecReply(
+                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                    network_uuid=req.network_uuid,
+                    floating_address=req.floating_address,
+                    inner_address=req.inner_address,
+                    error=privexec_pb2.AddFloatingIPReply.CREATE_INTERFACE_FAILED
+                )
+            )
+
+        if req.floating_address in privexec_util.get_interface_addresses(
+            floating_interface
+        ):
+            return privexec_pb2.PrivExecReply(
+                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                    network_uuid=req.network_uuid,
+                    floating_address=req.floating_address,
+                    inner_address=req.inner_address,
+                    error=privexec_pb2.AddFloatingIPReply.OK
+                )
+            )
+
+        success = privexec_util.add_address_to_interface(
+            inner_floating_interface, req.network_uuid,
+            req.floating_address, '32')
+        if not success:
+            return privexec_pb2.PrivExecReply(
+                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                    network_uuid=req.network_uuid,
+                    floating_address=req.floating_address,
+                    inner_address=req.inner_address,
+                    error=privexec_pb2.AddFloatingIPReply.ADD_ADDRESS_FAILED
+                )
+            )
+
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, privexec_util.locate_command('iptables'),
+            '-w', '10', '-t', 'nat', '-A', 'PREROUTING',
+            '-d', req.floating_address, '-j', 'DNAT',
+            '--to-destination', req.inner_address)
+        if returncode != 0:
+            return privexec_pb2.PrivExecReply(
+                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                    network_uuid=req.network_uuid,
+                    floating_address=req.floating_address,
+                    inner_address=req.inner_address,
+                    error=privexec_pb2.AddFloatingIPReply.IPTABLES_FAILED
+                )
+            )
+
+        return privexec_pb2.PrivExecReply(
+            add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                network_uuid=req.network_uuid,
+                floating_address=req.floating_address,
+                inner_address=req.inner_address,
+                error=privexec_pb2.AddFloatingIPReply.OK
+            )
+        )
+
+    def _remove_floating_ip(self, req):
+        floating_interface = \
+            f'flt-{int(ipaddress.IPv4Address(req.floating_address)):08x}'
+        outer_floating_interface = f'{floating_interface}-o'
+
+        if privexec_util.check_for_interface(outer_floating_interface):
+            _, _, returncode = privexec_util.execute(
+                privexec_util.locate_command('ip'), 'link', 'del',
+                outer_floating_interface)
+            if returncode != 0:
+                return privexec_pb2.PrivExecReply(
+                    remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
+                        network_uuid=req.network_uuid,
+                        floating_address=req.floating_address,
+                        error=privexec_pb2.RemoveFloatingIPReply.FAILED
+                    )
+                )
+
+        return privexec_pb2.PrivExecReply(
+            remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
+                network_uuid=req.network_uuid,
+                floating_address=req.floating_address,
+                error=privexec_pb2.RemoveFloatingIPReply.OK
+            )
+        )
+
     def run(self):
         buffered = bytearray()
+        command_found = False
+        error = False
 
-        while True:
+        while not error:
             input = self.conn.recv(102400)
             if not input:
                 break
@@ -124,14 +443,35 @@ class PrivExecJob:
                     continue
                 buffered = buffered[consumed:]
 
-                if request.HasField('execute_request'):
-                    er = request.execute_request
-                    self.task_details = f'execute: {er.command}'
-                    reply = self._execute(er)
-                    self.conn.sendall(reply.SerializeToString())
-                else:
-                    LOG.error('Unknown execute request type')
-                break
+                request_map = {
+                    'execute_request': self._execute,
+                    'hash_file_request': self._hash_file,
+                    'enable_nat_request': self._enable_nat,
+                    'ensure_vxlan_mesh_request': self._ensure_mesh,
+                    'add_floating_ip_request': self._add_floating_ip,
+                    'remove_floating_ip_request': self._remove_floating_ip
+                }
+
+                for request_field in request_map:
+                    if request.HasField(request_field):
+                        req = getattr(request, request_field)
+                        privexec_eventlog.EVENT_DB.write_event(
+                            'request', request_field, 'received request',
+                            extra=MessageToJson(req)
+                        )
+
+                        reply = request_map[request_field](req)
+                        privexec_eventlog.EVENT_DB.write_event(
+                            'request', request_field, 'replied',
+                            extra=MessageToJson(reply)
+                        )
+
+                        self.conn.sendall(reply.SerializeToString())
+                        command_found = True
+                        break
+
+                if not command_found:
+                    error = True
 
             except DecodeError:
                 ...
@@ -147,6 +487,10 @@ def write_pid_file():
 def main():
     write_pid_file()
     setproctitle.setproctitle('sf-privexec')
+
+    if os.path.exists(privexec_eventlog.DBPATH):
+        os.unlink(privexec_eventlog.DBPATH)
+    privexec_eventlog.EVENT_DB = privexec_eventlog.LocalEvents()
 
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
@@ -187,6 +531,7 @@ def main():
     LOG.info('Stopping')
 
     start_time = time.time()
+    last_event_prune = time.time()
     while workers:
         LOG.info(f'There are {len(workers)} remaining workers')
 
@@ -217,6 +562,9 @@ def main():
         workers = remaining_workers
         if workers:
             time.sleep(5)
+
+        if time.time() - last_event_prune > 300:
+            privexec_eventlog.EVENT_DB.prune_old_events()
 
     LOG.info(f'There are {len(workers)} remaining workers')
     LOG.info('Stopped')

@@ -81,6 +81,9 @@ class FakeInstance(BaseFakeObject):
     def get_lock_attr(self, name, op, global_scope=True, timeout=10):
         return NoopLock()
 
+    def enqueue_delete(self):
+        ...
+
 
 class FakeNetwork(BaseFakeObject):
     object_type = 'network'

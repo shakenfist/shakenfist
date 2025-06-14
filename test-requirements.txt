@@ -1,9 +1,8 @@
-coverage            # apache2
-testtools           # mit
-mock                # bsd
-stestr              # apache2
-flake8              # mit
-tox>3.17            # mit
-testtools           # mit
-mkdocs              # bsd
-mkdocs-material     # mit
+coverage==7.8.2          # apache2
+testtools==2.7.2         # mit
+mock==5.2.0              # bsd
+stestr==4.1.0            # apache2
+flake8==7.2.0            # mit
+tox==4.26.0              # mit
+mkdocs==1.6.1            # bsd
+mkdocs-material==9.6.14  # mit

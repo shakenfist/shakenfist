@@ -122,7 +122,7 @@ class ImageCacheOp(BaseClusterOperation):
             transcode_blob.size = st.st_size
             transcode_blob.state = Blob.STATE_CREATED
             transcode_blob.observe()
-            transcode_blob.verify_checksum(locks=[])
+            transcode_blob.verify_checksum()
 
             if b.add_transcode(self.transcode_description, transcode_blob_uuid):
                 transcode_blob.request_replication()

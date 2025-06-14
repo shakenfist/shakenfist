@@ -1,9 +1,5 @@
 name: Rebuild CI images
 
-# NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
-# which is available as GITHUB_WORKSPACE. You can find other environment
-# variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
-
 on:
   workflow_dispatch:
   schedule:
@@ -80,7 +76,7 @@ jobs:
           run: |
             cd ${GITHUB_WORKSPACE}/actions
             ansible-playbook -i /home/debian/ansible-hosts \
-              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
                 base_image=${{ matrix.os.baseimage }} base_image_user=${{ matrix.os.baseuser }} label=${{ matrix.os.outputlabel }}" \
               ansible/ci-image.yml
 

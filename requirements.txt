@@ -4,12 +4,12 @@ psutil>=5.9.0                      # bsd
 # Our requirements -- we specify exact versions here and let renovate update
 # them for the develop branch as required. Releases never update requirements.
 shakenfist-utilities==0.7.3        # apache2
-clingwrap==1.7.0                   # apache2
+clingwrap==1.9.0                   # apache2
 
 fixtures==4.2.5                    # apache2
 PyYAML==6.0.2                      # mit
 Jinja2==3.1.6                      # bsd
-setproctitle==1.3.5                # bsd
+setproctitle==1.3.6                # bsd
 click==8.1.8                       # bsd
 werkzeug==3.1.3                    # bsd
 prometheus-client==0.21.1          # apache2
@@ -20,7 +20,6 @@ webargs==8.6.0                     # mit
 py-cpuinfo==9.0.0                  # mit
 distro==1.9.0                      # apache2
 pbr==6.1.1                         # apache2
-setuptools==75.9.1                 # mit
 symbolicmode==2.0.1                # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
 pycdlib==1.14.0                    # lgpl
 validators==0.34.0                 # mit
@@ -43,7 +42,7 @@ protobuf==5.29.3                   # bsd
 grpcio==1.70.0                     # apache2
 grpcio-status==1.70.0              # apache2
 grpcio-tools==1.70.0               # apache2
-googleapis-common-protos==1.66.0   # apache2
+googleapis-common-protos==1.70.0   # apache2
 
 requests==2.32.3                   # apache2
 requests-toolbelt==1.0.0           # apache2
@@ -74,7 +73,6 @@ executor==23.2
 funcs==0.11.0
 futurist==3.1.1
 humanfriendly==10.0
-importlib-metadata==8.7.0
 itsdangerous==2.2.0
 linux-utils==0.7
 MarkupSafe==3.0.2

@@ -32,10 +32,6 @@ from shakenfist.etcd_schema.operations.node_aop_op \
     import create_and_enqueue as na_create_and_enqueue
 from shakenfist.etcd_schema.operations.node_aop_op \
     import model_tasks as na_tasks
-from shakenfist.etcd_schema.operations.node_inst_op \
-    import create_and_enqueue as nio_create_and_enqueue
-from shakenfist.etcd_schema.operations.node_inst_op \
-    import model_tasks as nio_tasks
 from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
     import create_and_enqueue as niio_create_and_enqueue
 from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
@@ -59,7 +55,6 @@ from shakenfist.artifact import SNAPSHOT_URL
 from shakenfist.artifact import UPLOAD_URL
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
-from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import agentoperation as api_agentoperation
@@ -230,16 +225,9 @@ class InstanceEndpoint(sf_api.Resource):
             if instance_from_db.namespace != namespace:
                 return sf_api.error(404, 'instance not in namespace')
 
-        # If this instance is not on a node, just do the DB cleanup locally
-        placement = instance_from_db.placement
-        if not placement.get('node'):
-            node = config.NODE_NAME
-        else:
-            node = placement['node']
-
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'delete request from REST API')
-        instance_from_db.enqueue_delete_remote(node)
+        instance_from_db.enqueue_delete()
 
         # Return UUID in case API call was made using object name
         return instance_from_db.external_view()
@@ -871,24 +859,7 @@ class InstancesEndpoint(sf_api.Resource):
         for inst in instance.Instances([partial(baseobject.namespace_filter, namespace)]):
             inst.add_event(
                 EVENT_TYPE_AUDIT, 'delete request via delete all from REST API')
-
-            # If this instance is not on a node, just do the DB cleanup locally
-            db_placement = inst.placement
-            if not db_placement.get('node'):
-                node = config.NODE_NAME
-            else:
-                node = db_placement['node']
-
-            with inst.get_lock_attr('last_cluster_operation', 'add new operation'):
-                op_type, op_uuid = nio_create_and_enqueue(
-                    node,
-                    inst.uuid,
-                    [nio_tasks.instance_delete],
-                    PRIORITY.user_facing,
-                    runs_after=[inst.last_cluster_operation],
-                    request_id=util_general.get_request_id())
-                inst.set_last_cluster_operation(op_type, op_uuid)
-
+            inst.enqueue_delete()
             waiting_for.append(inst.uuid)
 
         return waiting_for
@@ -1458,7 +1429,7 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
         if p.get('vdi_tls_port'):
             tls_port = '\ntls-port=%s' % p['vdi_tls_port']
 
-        config = VIRTVIEWER_TEMPLATE % {
+        vvconfig = VIRTVIEWER_TEMPLATE % {
             'vdi_type': instance_from_db.video['vdi'],
             'node': instance_from_db.placement.get('node'),
             'vdi_port': p.get('vdi_port'),
@@ -1469,7 +1440,7 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'vdiconsole request from REST API')
         resp = flask.Response(
-            config, mimetype='application/x-virt-viewer')
+            vvconfig, mimetype='application/x-virt-viewer')
         resp.status_code = 200
         return resp
 

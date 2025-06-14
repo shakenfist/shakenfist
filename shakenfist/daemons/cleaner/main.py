@@ -41,10 +41,10 @@ class Monitor(daemon.Daemon):
 
         all_node_blobs = n.blobs
 
-        p = pathlib.Path(blob_path)
-        for entpath in p.glob('**/*'):
-            entpath = str(entpath)
-            try:
+        try:
+            p = pathlib.Path(blob_path)
+            for entpath in p.glob('**/*'):
+                entpath = str(entpath)
                 if entpath.endswith('/_version'):
                     continue
 
@@ -74,9 +74,14 @@ class Monitor(daemon.Daemon):
                                 ['iso', 'qcow2'])
                             if cached:
                                 os.unlink(cached)
-            except FileNotFoundError:
-                LOG.debug('File %s disappeared while maintaining blobs'
-                          % entpath)
+
+                        entdir = os.path.dirname(entpath)
+                        if len(os.listdir(entdir)) == 0:
+                            LOG.with_fields({'path': entpath}).debug(
+                                'Removing now empty directory')
+                            os.rmdir(entdir)
+        except FileNotFoundError:
+            ...
 
         # Find transcoded blobs in the image cache which are no longer in use
         for ent in os.listdir(cache_path):
