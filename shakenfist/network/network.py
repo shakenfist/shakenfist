@@ -430,22 +430,25 @@ class Network(dbo):
                                     self.STATE_DELETE_WAIT,
                                     self.STATE_ERROR)
 
-    def create_on_hypervisor(self):
-        # The floating network does not have a vxlan mesh
-        if self.uuid == 'floating':
-            return
+    def _not_on_floating_network(func):
+        # Some calls don't make sense on the floating network and are ignored
+        def wrapper(*args, **kwargs):
+            # The first argument is "self"
+            if args[0].uuid == 'floating':
+                return
+            return func(*args, **kwargs)
+        return wrapper
 
+    @_not_on_floating_network
+    def create_on_hypervisor(self):
         self.add_event(EVENT_TYPE_AUDIT, 'creating network on hypervisor')
         with self.get_lock(op='create_on_hypervisor', global_scope=False):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
             util_concurrency.create_vxlan_interface(self.vxid, self.mesh_nic)
 
+    @_not_on_floating_network
     def create_on_network_node(self):
-        # The floating network does not have a vxlan mesh
-        if self.uuid == 'floating':
-            return
-
         if self.state.value == dbo.STATE_DELETED:
             self.add_event(
                 EVENT_TYPE_AUDIT, 'refusing to create deleted network on network node')
@@ -735,11 +738,8 @@ class Network(dbo):
                 priority=PRIORITY.user_facing_high_io
             )
 
+    @_not_on_floating_network
     def ensure_mesh(self):
-        # The floating network does not have a vxlan mesh
-        if self.uuid == 'floating':
-            return
-
         # Determine which IPs should be on this mesh and where
         instances = []
         for ni_uuid in self.networkinterfaces:
