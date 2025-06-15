@@ -448,6 +448,22 @@ class PrivExecJob:
             )
         )
 
+    def _create_network_namespace(self, req):
+        if not privexec_util.create_network_namespace(req.namespace):
+            return privexec_pb2.PrivExecReply(
+                create_network_namespace_reply=privexec_pb2.CreateNetworkNamespaceReply(
+                    namespace=req.namespace,
+                    error=privexec_pb2.CreateVXLANInterfaceReply.FAILED
+                )
+            )
+
+        return privexec_pb2.PrivExecReply(
+            create_network_namespace_reply=privexec_pb2.CreateNetworkNamespaceReply(
+                namespace=req.namespace,
+                error=privexec_pb2.CreateVXLANInterfaceReply.OK
+            )
+        )
+
     def run(self):
         buffered = bytearray()
         command_found = False
@@ -473,7 +489,12 @@ class PrivExecJob:
                     'ensure_vxlan_mesh_request': self._ensure_mesh,
                     'add_floating_ip_request': self._add_floating_ip,
                     'remove_floating_ip_request': self._remove_floating_ip,
-                    'create_vxlan_interface_request': self._create_vx_interface
+                    'create_vxlan_interface_request': (
+                        self._create_vx_interface
+                    ),
+                    'create_network_namespace_request': (
+                        self._create_network_namespace
+                    )
                 }
 
                 for request_field in request_map:

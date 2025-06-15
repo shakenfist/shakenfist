@@ -2,7 +2,6 @@
 import copy
 import os
 import random
-import re
 import time
 from functools import partial
 from uuid import uuid4
@@ -38,7 +37,6 @@ from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import IPManagerMissing
-from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
@@ -460,17 +458,9 @@ class Network(dbo):
                 raise DeadNetwork('network=%s' % self)
 
             util_concurrency.create_vxlan_interface(self.vxid, self.mesh_nic)
+            util_concurrency.create_network_namespace(self.uuid)
 
             subst = self.subst_dict()
-            if not os.path.exists('/var/run/netns/%s' % self.uuid):
-                try:
-                    util_concurrency.execute('ip netns add %s' % self.uuid)
-                except ProcessExecutionError as e:
-                    r = re.compile(
-                        r'Cannot create namespace file ".*": File exists\n')
-                    m = r.match(e.stderr)
-                    if not m:
-                        raise e
 
             if not util_network.check_for_interface(subst['vx_veth_outer']):
                 util_network.create_interface(

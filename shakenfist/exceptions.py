@@ -374,6 +374,10 @@ class CreateVXLANInterfaceFailed(Exception):
     ...
 
 
+class CreateNetworkNamespaceFailed(Exception):
+    ...
+
+
 class HashFailed(Exception):
     ...
 

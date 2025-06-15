@@ -1,6 +1,7 @@
 from functools import partial
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -320,3 +321,22 @@ def add_address_to_interface(interface, namespace, address, netmask):
 
         time.sleep(0.5)
         attempts += 1
+
+
+def create_network_namespace(namespace):
+    evt = partial(privexec_eventlog.EVENT_DB.write_event,
+                  'network namespace', namespace)
+
+    if not os.path.exists('/var/run/netns/%s' % namespace):
+        command = ['ip', 'netns', 'add', namespace]
+        evt('executing command', extra=command)
+        _, stderr, returncode = command_helper(*command)
+        if returncode != 0:
+            r = re.compile(
+                r'Cannot create namespace file ".*": File exists\n')
+            m = r.match(stderr)
+            if not m:
+                evt('failed to set vxlan bridge forward delay')
+                return False
+
+    return True

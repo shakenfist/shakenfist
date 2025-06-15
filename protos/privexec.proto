@@ -134,6 +134,22 @@ message CreateVXLANInterfaceReply {
     string error_text = 21;
 }
 
+message CreateNetworkNamespaceRequest {
+    string namespace = 1;
+}
+
+message CreateNetworkNamespaceReply {
+    enum Errors {
+        OK = 0;
+        FAILED = 1;
+    }
+
+    string namespace = 1;
+
+    Errors error = 20;
+    string error_text = 21;
+}
+
 message PrivExecRequest {
     oneof request {
         shakenfist.protos.ExecuteRequest execute_request = 1;
@@ -144,6 +160,7 @@ message PrivExecRequest {
         AddFloatingIPRequest add_floating_ip_request = 13;
         RemoveFloatingIPRequest remove_floating_ip_request = 14;
         CreateVXLANInterfaceRequest create_vxlan_interface_request = 15;
+        CreateNetworkNamespaceRequest create_network_namespace_request = 16;
     }
 }
 
@@ -157,5 +174,6 @@ message PrivExecReply {
         AddFloatingIPReply add_floating_ip_reply = 13;
         RemoveFloatingIPReply remove_floating_ip_reply = 14;
         CreateVXLANInterfaceReply create_vxlan_interface_reply = 15;
+        CreateNetworkNamespaceReply create_network_namespace_reply = 16;
     }
 }
