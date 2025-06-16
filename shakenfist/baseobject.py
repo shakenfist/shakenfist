@@ -529,6 +529,21 @@ class DatabaseBackedObject:
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
 
 
+class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
+    @property
+    def last_cluster_operation(self):
+        return self._db_get_attribute('last_cluster_operation')
+
+    def set_last_cluster_operation(self, op_type, op_uuid):
+        self._db_set_attribute(
+            'last_cluster_operation',
+            {
+                'op_type': op_type,
+                'op_uuid': op_uuid
+            }
+        )
+
+
 class DatabaseBackedObjectIterator:
     def __init__(self, filters, prefilter=None, suppress_failure_audit=False):
         self.filters = filters

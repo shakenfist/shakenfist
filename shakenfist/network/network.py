@@ -14,6 +14,7 @@ from shakenfist import instance
 from shakenfist import ipam
 from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectWithOperations as dbowo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -48,7 +49,7 @@ from shakenfist.util import concurrency as util_concurrency
 LOG, _ = logs.setup(__name__)
 
 
-class Network(dbo):
+class Network(dbowo):
     object_type = 'network'
     initial_version = 2
     current_version = 7
@@ -252,21 +253,6 @@ class Network(dbo):
     @property
     def vxid(self):
         return self.__vxid
-
-    # NOTE(mikal): these are only used to sequence operations on the network
-    # node, not network operations on a single hypervisor.
-    @property
-    def last_cluster_operation(self):
-        return self._db_get_attribute('last_cluster_operation')
-
-    def set_last_cluster_operation(self, op_type, op_uuid):
-        self._db_set_attribute(
-            'last_cluster_operation',
-            {
-                'op_type': op_type,
-                'op_uuid': op_uuid
-            }
-        )
 
     # Calculated values
     @property
