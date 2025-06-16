@@ -6,6 +6,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist import etcd
+from shakenfist.exceptions import InvalidStateException
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_all_network_queues
 from shakenfist.util import concurrency as util_concurrency
@@ -91,7 +92,11 @@ class Job(util_concurrency.Job):
                         'dep_object_uuid': dep_op.uuid,
                         'dep_object_state': dep_op_state
                     })
-                op.state = BaseClusterOperation.STATE_ABORT
+
+                try:
+                    op.state = BaseClusterOperation.STATE_ABORT
+                except InvalidStateException:
+                    op.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
                 return
 
             if dep_op_state in [BaseClusterOperation.STATE_INITIAL,

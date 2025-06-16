@@ -1644,7 +1644,10 @@ class Instance(dbo):
                 add_event_multi(
                     EVENT_TYPE_AUDIT, [self, op],
                     'task aborted due to enqueued delete request')
-                op.state = bco.STATE_ABORT
+                try:
+                    op.state = bco.STATE_ABORT
+                except exceptions.InvalidStateException:
+                    op.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
 
         op_type, op_uuid = nio_create_and_enqueue(
             node,
