@@ -18,6 +18,8 @@ import requests
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
+from webargs import fields
+from webargs.flaskparser import use_kwargs
 
 from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.etcd_schema.operations.artifact_fetch_op \
@@ -793,3 +795,50 @@ class ArtifactMetadataEndpoint(sf_api.Resource):
             EVENT_TYPE_AUDIT, 'delete metadata key request from REST API',
             extra={'key': key})
         artifact_from_db.remove_metadata_key(key)
+
+
+artifact_outstanding_operations_example = """[
+    [
+        {
+            "instance_uuid": "d657c162-65c2-4abd-b81f-5908632e6c3f",
+            "namespace": "system",
+            "operation_type": "artifact_fetch_op",
+            "state": "complete",
+            "tasks": [
+                "image_fetch"
+            ],
+            "url": "debian:12",
+            "uuid": "2f9cd517-0aab-443c-aaed-7fad23a0115d"
+        }
+    ]
+]"""
+
+
+class ArtifactOutstandingOperationsEndpoint(sf_api.Resource):
+    # NOTE(mikal): note that arguments from URL routes (object uuid for example),
+    # are not included in the webargs schema because webargs doesn't appear to
+    # know how to find them.
+    get_args = {
+        'all': fields.Boolean(missing=False)
+    }
+
+    @swag_from(api_base.swagger_helper(
+        'artifacts', 'Get the outstanding cluster operations for an artifact.',
+        [('artifact_ref', 'query', 'uuidorname',
+          'The UUID or name of the artifact.', True)],
+        [(
+            200,
+            'A list of the cluster operations not yet executed for this artifact.',
+            artifact_outstanding_operations_example),
+         (404, 'Artifact not found.', None)]))
+    @api_base.verify_token
+    @use_kwargs(get_args, location='query')
+    @arg_is_artifact_ref
+    @requires_artifact_access
+    def get(self, artifact_ref=None, all=False, artifact_from_db=None):
+        retval = []
+        for op in artifact_from_db.get_cluster_operations(
+            outstanding_only=(not all)
+        ):
+            retval.append(op.external_view())
+        return retval

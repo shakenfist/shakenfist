@@ -16,6 +16,8 @@ import validators
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
+from webargs import fields
+from webargs.flaskparser import use_kwargs
 
 from shakenfist import baseobject
 from shakenfist.etcd_schema.operations.baseclusteroperation import dependency
@@ -1613,3 +1615,72 @@ class InstanceScreenshotEndpoint(sf_api.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'screenshot request from REST API')
         return instance_from_db.get_screenshot()
+
+
+instance_outstanding_operations_example = """[
+    [
+        {
+            "instance_uuid": "5d6810b9-cef5-4c88-9406-b4c11e830de1",
+            "net_desc": [
+                {
+                    "address": "10.0.13.109",
+                    "float": true,
+                    "iface_uuid": "2e5fa696-2cee-40b1-9f6b-61c45e5a9027",
+                    "macaddress": "02:00:00:9a:4d:5e",
+                    "model": "virtio",
+                    "network_uuid": "7c822e61-a5cc-45ed-9ffa-086568aa7ade"
+                }
+            ],
+            "node_uuid": "localhost",
+            "operation_type": "node_inst_netdesc_op",
+            "state": "complete",
+            "tasks": [
+                "instance_preflight",
+                "instance_start"
+            ],
+            "uuid": "5dd7a116-37e3-474e-aeaa-fb003e5f5c60"
+        },
+        {
+            "instance_uuid": "5d6810b9-cef5-4c88-9406-b4c11e830de1",
+            "namespace": "system",
+            "operation_type": "artifact_fetch_op",
+            "state": "complete",
+            "tasks": [
+                "image_fetch"
+            ],
+            "url": "debian:12",
+            "uuid": "c3615ff7-228b-44e5-ab32-0fe668389528"
+        }
+    ]
+]"""
+
+
+class InstanceOutstandingOperationsEndpoint(sf_api.Resource):
+    # NOTE(mikal): note that arguments from URL routes (object uuid for example),
+    # are not included in the webargs schema because webargs doesn't appear to
+    # know how to find them.
+    get_args = {
+        'all': fields.Boolean(missing=False)
+    }
+
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Get the outstanding cluster operations for an instance.',
+        [('instance_ref', 'query', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(
+            200,
+            'A list of the cluster operations not yet executed for this instance.',
+            instance_outstanding_operations_example),
+         (404, 'Instance not found.', None)]))
+    @api_base.verify_token
+    @use_kwargs(get_args, location='query')
+    @api_base.arg_is_instance_ref
+    @api_base.requires_instance_ownership
+    @api_base.log_token_use
+    def get(self, instance_ref=None, all=False, instance_from_db=None):
+        retval = []
+        for op in instance_from_db.get_cluster_operations(
+            outstanding_only=(not all)
+        ):
+            retval.append(op.external_view())
+        return retval

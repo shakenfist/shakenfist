@@ -127,10 +127,12 @@ class Root(sf_api.Resource):
              '<body><h1>Shaken Fist REST API service</h1>'
              '<p>You might be interested in the <a href="/apidocs">apidocs</a>.</p>'
              '<p>Machine searchable API capabilities:</p><ul>'
+
              '<li>admin: cluster-cacert, cluster-resources</li>'
              '<li>agent-operations: agentoperations-crud, instance-agentoperations, '
              'instance-agentoperations-all, agentoperations-put-with-mode</li>'
-             '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
+             '<li>artifacts: artifact-metadata, artifact-upload-types, '
+             'artifact-clusteroperations</li>'
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
              'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events, '
              'blob-checksums, blob-single-checksum</li>'
@@ -139,9 +141,9 @@ class Root(sf_api.Resource):
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
              'instance-put-blob, instance-execute, instance-get, instance-screenshot, '
              'get-instance-namespace, hot-plug-interface, '
-             'include-queued-agent-operations</li>'
+             'include-queued-agent-operations, instance-clusteroperations</li>'
              '<li>networks: list-addresses, route-addresses, get-network-namespace, '
-             'provide-dns, extra-dns-entries'
+             'provide-dns, extra-dns-entries, network-clusteroperations'
              '<li>networkinterfaces: interface-metadata</li>'
              '<li>nodes: node-get, node-metadata, node-process-metrics</li>'
              '</ul></p></body></html>'),
@@ -176,6 +178,8 @@ api.add_resource(api_artifact.ArtifactVersionsEndpoint,
                  '/artifacts/<artifact_ref>/versions')
 api.add_resource(api_artifact.ArtifactVersionEndpoint,
                  '/artifacts/<artifact_ref>/versions/<version_id>')
+api.add_resource(api_artifact.ArtifactOutstandingOperationsEndpoint,
+                 '/artifacts/<artifact_ref>/clusteroperations')
 
 api.add_resource(api_agentoperation.AgentOperationEndpoint,
                  '/agentoperations/<operation_uuid>')
@@ -248,6 +252,8 @@ api.add_resource(api_instance.InstanceAgentExecuteEndpoint,
                  '/instances/<instance_ref>/agent/execute')
 api.add_resource(api_instance.InstanceScreenshotEndpoint,
                  '/instances/<instance_ref>/screenshot')
+api.add_resource(api_instance.InstanceOutstandingOperationsEndpoint,
+                 '/instances/<instance_ref>/clusteroperations')
 
 api.add_resource(api_interface.InterfaceEndpoint,
                  '/interfaces/<interface_uuid>')
@@ -282,6 +288,8 @@ api.add_resource(api_network.NetworkUnrouteAddressEndpoint,
                  '/networks/<network_ref>/route/<address>')
 api.add_resource(api_network.NetworkDNSAddressEndpoint,
                  '/networks/<network_ref>/dns')
+api.add_resource(api_network.NetworkOutstandingOperationsEndpoint,
+                 '/networks/<network_ref>/clusteroperations')
 
 api.add_resource(api_node.NodesEndpoint, '/nodes')
 api.add_resource(api_node.NodeEndpoint, '/nodes/<node>')

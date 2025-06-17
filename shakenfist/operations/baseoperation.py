@@ -208,3 +208,11 @@ class BaseClusterOperation(BaseOperation):
         }
         etcd.enqueue(self.queue_name, work_item, delay=delay)
         self.state = self.STATE_QUEUED
+
+    def is_outstanding(self):
+        if self.state.value in [BaseClusterOperation.STATE_ERROR,
+                                BaseClusterOperation.STATE_DELETED,
+                                BaseClusterOperation.STATE_ABORT,
+                                BaseClusterOperation.STATE_COMPLETE]:
+            return False
+        return True

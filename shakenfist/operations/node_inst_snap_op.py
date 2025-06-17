@@ -151,6 +151,7 @@ class NodeInstSnapOp(BaseClusterOperation):
                 self.log.warning(f'Artifact {s["artifact_uuid"]} is deleted')
                 raise NoSuchArtifact(self)
             self.accumulated_artifacts.append(a)
+            a.set_last_cluster_operation(self.object_type, self.uuid)
 
             # The blob UUID has been allocated, but the blob object has not yet
             # been created.

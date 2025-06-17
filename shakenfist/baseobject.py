@@ -10,6 +10,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import cache
 from shakenfist import constants
+from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
@@ -542,6 +543,40 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
                 'op_uuid': op_uuid
             }
         )
+
+    def get_cluster_operations(self, outstanding_only=True):
+        last_op = self.last_cluster_operation
+        if not last_op:
+            return []
+        if not last_op.get('op_type'):
+            return []
+
+        op = get_object_class(last_op.get('op_type')).from_db(
+            last_op.get('op_uuid'))
+        if not op:
+            return []
+        if outstanding_only and not op.is_outstanding():
+            return []
+
+        outstanding = [op]
+
+        for dep in op.depends_on:
+            dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
+            if not dep_op:
+                continue
+            if outstanding_only and not dep_op.is_outstanding():
+                continue
+            outstanding.append(dep_op)
+
+        for dep in op.runs_after:
+            dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
+            if not dep_op:
+                continue
+            if outstanding_only and not dep_op.is_outstanding():
+                continue
+            outstanding.append(dep_op)
+
+        return outstanding
 
 
 class DatabaseBackedObjectIterator:

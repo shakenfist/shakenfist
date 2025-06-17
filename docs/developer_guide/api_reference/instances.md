@@ -911,3 +911,37 @@ is available [in the user guide](/user_guide/metadata/).
     sf_client = apiclient.Client()
     sf_client.delete_instance_metadata_item(instance_uuid, 'foo')
     ```
+
+## Cluster operations
+
+Since v0.8, [cluster operations](/developer_guide/api_reference/clusteroperations)
+for a given instance have been exposed. This lists the various pieces of queued
+work that Shaken Fist has executed on a given object, with the limitation that
+completed cluster operations are hard deleted after CLEANER_DELAY seconds
+(which defaults to one hour).
+
+???+ tip "REST API calls"
+
+    * [GET ​/instances/{instance_ref}​/clusteroperations](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__clusteroperations): Get cluster operations for an instance.
+
+??? example "Python API client: get queued cluster operations for an instance"
+
+    ```python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    md = sf_client.get_instance_queued_cluster_operations(img_uuid)
+    print(json.dumps(md, indent=4, sort_keys=True))
+    ```
+
+??? example "Python API client: get all cluster operations for an instance"
+
+    ```python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    md = sf_client.get_instance_queued_cluster_operations(img_uuid, all=True)
+    print(json.dumps(md, indent=4, sort_keys=True))
+    ```

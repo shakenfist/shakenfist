@@ -437,3 +437,37 @@ is available [in the user guide](/user_guide/metadata/).
     sf_client = apiclient.Client()
     sf_client.delete_artifact_metadata_item(img_uuid, 'foo')
     ```
+
+## Cluster operations
+
+Since v0.8, [cluster operations](/developer_guide/api_reference/clusteroperations)
+for a given artifact have been exposed. This lists the various pieces of queued
+work that Shaken Fist has executed on a given object, with the limitation that
+completed cluster operations are hard deleted after CLEANER_DELAY seconds
+(which defaults to one hour).
+
+???+ tip "REST API calls"
+
+    * [GET ​/artifacts​/{artifact_ref}​/clusteroperations](https://openapi.shakenfist.com/#/artifacts/get_artifacts__artifact_ref__clusteroperations): Get cluster operations for an artifact.
+
+??? example "Python API client: get queued cluster operations for an artifact"
+
+    ```python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    md = sf_client.get_artifact_queued_cluster_operations(img_uuid)
+    print(json.dumps(md, indent=4, sort_keys=True))
+    ```
+
+??? example "Python API client: get all cluster operations for an artifact"
+
+    ```python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    md = sf_client.get_artifact_queued_cluster_operations(img_uuid, all=True)
+    print(json.dumps(md, indent=4, sort_keys=True))
+    ```
