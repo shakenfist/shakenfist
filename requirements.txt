@@ -47,7 +47,7 @@ googleapis-common-protos==1.70.0   # apache2
 requests==2.32.3                   # apache2
 requests-toolbelt==1.0.0           # apache2
 chardet==5.2.0                     # lgpl
-urllib3==2.2.3                     # mit
+urllib3==2.5.0                     # mit
 
 # These must move as a set
 pydantic==2.10.6                   # mit
