@@ -12,14 +12,12 @@ import subprocess
 import threading
 import time
 
-from google.protobuf.json_format import MessageToJson
 from google.protobuf.message import DecodeError
 import psutil
 import setproctitle
 from shakenfist_utilities import random      # noreorder
 from shakenfist_utilities import logs        # noreorder
 
-from shakenfist.daemons.privexec import eventlog as privexec_eventlog
 from shakenfist.daemons.privexec import util as privexec_util
 from shakenfist.protos import common_pb2
 from shakenfist.protos import privexec_pb2
@@ -500,17 +498,7 @@ class PrivExecJob:
                 for request_field in request_map:
                     if request.HasField(request_field):
                         req = getattr(request, request_field)
-                        privexec_eventlog.EVENT_DB.write_event(
-                            'request', request_field, 'received request',
-                            extra=MessageToJson(req)
-                        )
-
                         reply = request_map[request_field](req)
-                        privexec_eventlog.EVENT_DB.write_event(
-                            'request', request_field, 'replied',
-                            extra=MessageToJson(reply)
-                        )
-
                         self.conn.sendall(reply.SerializeToString())
                         command_found = True
                         break
@@ -532,10 +520,6 @@ def write_pid_file():
 def main():
     write_pid_file()
     setproctitle.setproctitle('sf-privexec')
-
-    if os.path.exists(privexec_eventlog.DBPATH):
-        os.unlink(privexec_eventlog.DBPATH)
-    privexec_eventlog.EVENT_DB = privexec_eventlog.LocalEvents()
 
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
@@ -576,7 +560,6 @@ def main():
     LOG.info('Stopping')
 
     start_time = time.time()
-    last_event_prune = time.time()
     while workers:
         LOG.info(f'There are {len(workers)} remaining workers')
 
@@ -607,9 +590,6 @@ def main():
         workers = remaining_workers
         if workers:
             time.sleep(5)
-
-        if time.time() - last_event_prune > 300:
-            privexec_eventlog.EVENT_DB.prune_old_events()
 
     LOG.info(f'There are {len(workers)} remaining workers')
     LOG.info('Stopped')
