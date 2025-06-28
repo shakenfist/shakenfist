@@ -10,6 +10,7 @@ from collections import defaultdict
 from itertools import count
 from unittest import mock
 
+from shakenfist.constants import get_object_class
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
 from shakenfist.network.network import Network
@@ -186,7 +187,7 @@ class MockEtcd():
                     )
                 elif mutation['new_data']:
                     updates[path] = nde
-                else:
+                elif path in updates:
                     del updates[path]
             else:
                 if path not in self.db:
@@ -341,6 +342,14 @@ class MockEtcd():
         # We just smash the requested state into the object, we don't attempt
         # to find a valid path to that state.
         network._state_update(set_state, skip_transition_validation=True)
+
+        # Ignore cluster operations because we don't do them in unit tests.
+        last_op = network.last_cluster_operation
+        if last_op and last_op.get('op_type'):
+            op = get_object_class(last_op.get('op_type')).from_db(
+                last_op.get('op_uuid'))
+            op.state = op.STATE_EXECUTING
+            op.state = op.STATE_COMPLETE
 
         return network
 

@@ -9,6 +9,7 @@ from uuid import uuid4
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
+from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import ipam
@@ -373,9 +374,20 @@ class Network(dbowo):
 
     def is_okay(self):
         """Check if network is created and running."""
-        # TODO(andy):This will be built upon with further code re-design
+        last_op = self.last_cluster_operation
+        if last_op and last_op.get('op_type'):
+            op = get_object_class(last_op.get('op_type')).from_db(
+                last_op.get('op_uuid'))
+            if op and op.state.value not in [op.STATE_COMPLETE,
+                                             op.STATE_ABORT,
+                                             op.STATE_ERROR,
+                                             op.STATE_DELETED]:
+                # There is an incomplete operation so we assume this network
+                # is ok for now.
+                return True
 
         if not self.is_created():
+            self.add_event(EVENT_TYPE_STATUS, 'network not ok, is not created')
             return False
 
         if not config.NODE_IS_NETWORK_NODE:
@@ -383,6 +395,8 @@ class Network(dbowo):
 
         if self.provide_dhcp or self.provide_dns:
             if not self.is_dnsmasq_running():
+                self.add_event(
+                    EVENT_TYPE_STATUS, 'network not ok, dnsmasq not running')
                 return False
 
         return True
@@ -608,7 +622,10 @@ class Network(dbowo):
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""
         d = self._get_dnsmasq_object()
-        return d.is_running()
+        is_running = d.is_running()
+        if not is_running:
+            self.add_event(EVENT_TYPE_STATUS, 'dnsmasq is not running')
+        return is_running
 
     def remove_dhcp_lease(self, ipv4, macaddr):
         if not self.provide_dhcp and not self.provide_dns:
