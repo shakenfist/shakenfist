@@ -165,3 +165,11 @@ def get_object_class(object_type):
     cls_name = cls.split('.')[-1]
     lib = importlib.import_module(f'shakenfist.{lib_name}')
     return getattr(lib, cls_name)
+
+
+# A list of object states subject to "hard deletion"
+FINAL_OBJECT_STATES = [
+    'deleted',
+    'complete',
+    'abort'
+]
