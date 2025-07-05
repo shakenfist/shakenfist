@@ -13,6 +13,8 @@ import validators
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
+from webargs import fields
+from webargs.flaskparser import use_kwargs
 
 from shakenfist import baseobject
 from shakenfist import eventlog
@@ -716,3 +718,49 @@ class NetworkDNSAddressEndpoint(sf_api.Resource):
             return sf_api.error(406, 'invalid DNS name')
 
         network_from_db.remove_dns_entry(name)
+
+
+network_outstanding_operations_example = """[
+    [
+        {
+            "network_uuid": "7c822e61-a5cc-45ed-9ffa-086568aa7ade",
+            "operation_type": "net_op",
+            "state": "complete",
+            "tasks": [
+                "network_deploy"
+            ],
+            "uuid": "22b757ae-41d1-456b-84a4-edca694ceb6d"
+        }
+    ]
+]"""
+
+
+class NetworkOutstandingOperationsEndpoint(sf_api.Resource):
+    # NOTE(mikal): note that arguments from URL routes (object uuid for example),
+    # are not included in the webargs schema because webargs doesn't appear to
+    # know how to find them.
+    get_args = {
+        'all': fields.Boolean(missing=False)
+    }
+
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Get the outstanding cluster operations for a network.',
+        [('network_ref', 'query', 'uuidorname',
+          'The UUID or name of the network.', True)],
+        [(
+            200,
+            'A list of the cluster operations not yet executed for this network.',
+            network_outstanding_operations_example),
+         (404, 'Network not found.', None)]))
+    @api_base.verify_token
+    @use_kwargs(get_args, location='query')
+    @api_base.arg_is_network_ref
+    @api_base.requires_network_ownership
+    @api_base.log_token_use
+    def get(self, network_ref=None, all=False, network_from_db=None):
+        retval = []
+        for op in network_from_db.get_cluster_operations(
+            outstanding_only=(not all)
+        ):
+            retval.append(op.external_view())
+        return retval

@@ -116,13 +116,22 @@ class NodeInstSnapOp(BaseClusterOperation):
 
         try:
             self.__getattribute__(f'_{task.name}')(inst)
+
         except AbortSnapshot:
-            self.state = NodeInstSnapOp.STATE_ABORT
-            self.add_event(EVENT_TYPE_AUDIT, 'Snapshot aborted')
+            try:
+                self.state = NodeInstSnapOp.STATE_ABORT
+                self.add_event(EVENT_TYPE_AUDIT, 'snapshot aborted')
+            except InvalidStateException:
+                self.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
+
         except BlobDependencyMissing:
-            self.state = NodeInstSnapOp.STATE_ABORT
-            self.add_event(
-                EVENT_TYPE_AUDIT, 'Aborted as blob dependency is missing')
+            try:
+                self.state = NodeInstSnapOp.STATE_ABORT
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'aborted as blob dependency is missing')
+            except InvalidStateException:
+                self.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
+
         except Exception as e:
             util_general.ignore_exception('node_inst_snap_op', e)
             self.state = NodeInstSnapOp.STATE_ERROR
@@ -142,6 +151,7 @@ class NodeInstSnapOp(BaseClusterOperation):
                 self.log.warning(f'Artifact {s["artifact_uuid"]} is deleted')
                 raise NoSuchArtifact(self)
             self.accumulated_artifacts.append(a)
+            a.set_last_cluster_operation(self.object_type, self.uuid)
 
             # The blob UUID has been allocated, but the blob object has not yet
             # been created.

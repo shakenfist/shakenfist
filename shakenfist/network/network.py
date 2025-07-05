@@ -2,7 +2,6 @@
 import copy
 import os
 import random
-import re
 import time
 from functools import partial
 from uuid import uuid4
@@ -10,11 +9,13 @@ from uuid import uuid4
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
+from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectWithOperations as dbowo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -38,7 +39,6 @@ from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import IPManagerMissing
-from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
@@ -50,7 +50,7 @@ from shakenfist.util import concurrency as util_concurrency
 LOG, _ = logs.setup(__name__)
 
 
-class Network(dbo):
+class Network(dbowo):
     object_type = 'network'
     initial_version = 2
     current_version = 7
@@ -255,21 +255,6 @@ class Network(dbo):
     def vxid(self):
         return self.__vxid
 
-    # NOTE(mikal): these are only used to sequence operations on the network
-    # node, not network operations on a single hypervisor.
-    @property
-    def last_cluster_operation(self):
-        return self._db_get_attribute('last_cluster_operation')
-
-    def set_last_cluster_operation(self, op_type, op_uuid):
-        self._db_set_attribute(
-            'last_cluster_operation',
-            {
-                'op_type': op_type,
-                'op_uuid': op_uuid
-            }
-        )
-
     # Calculated values
     @property
     def ipblock(self):
@@ -367,7 +352,6 @@ class Network(dbo):
             'egress_bridge': 'egr-br-%s' % config.NODE_EGRESS_NIC,
             'egress_veth_outer': 'egr-%06x-o' % self.vxid,
             'egress_veth_inner': 'egr-%06x-i' % self.vxid,
-            'mesh_interface': self.mesh_nic,
 
             'netns': self.uuid,
 
@@ -390,9 +374,20 @@ class Network(dbo):
 
     def is_okay(self):
         """Check if network is created and running."""
-        # TODO(andy):This will be built upon with further code re-design
+        last_op = self.last_cluster_operation
+        if last_op and last_op.get('op_type'):
+            op = get_object_class(last_op.get('op_type')).from_db(
+                last_op.get('op_uuid'))
+            if op and op.state.value not in [op.STATE_COMPLETE,
+                                             op.STATE_ABORT,
+                                             op.STATE_ERROR,
+                                             op.STATE_DELETED]:
+                # There is an incomplete operation so we assume this network
+                # is ok for now.
+                return True
 
         if not self.is_created():
+            self.add_event(EVENT_TYPE_STATUS, 'network not ok, is not created')
             return False
 
         if not config.NODE_IS_NETWORK_NODE:
@@ -400,6 +395,8 @@ class Network(dbo):
 
         if self.provide_dhcp or self.provide_dns:
             if not self.is_dnsmasq_running():
+                self.add_event(
+                    EVENT_TYPE_STATUS, 'network not ok, dnsmasq not running')
                 return False
 
         return True
@@ -431,55 +428,25 @@ class Network(dbo):
                                     self.STATE_DELETE_WAIT,
                                     self.STATE_ERROR)
 
-    def _create_common(self):
-        # The floating network does not have a vxlan mesh
-        if self.uuid == 'floating':
-            return
+    def _not_on_floating_network(func):
+        # Some calls don't make sense on the floating network and are ignored
+        def wrapper(*args, **kwargs):
+            # The first argument is "self"
+            if args[0].uuid == 'floating':
+                return
+            return func(*args, **kwargs)
+        return wrapper
 
-        subst = self.subst_dict()
-
-        if not util_network.check_for_interface(subst['vx_interface']):
-            util_network.create_interface(
-                subst['vx_interface'], 'vxlan',
-                'id %(vx_id)s dev %(mesh_interface)s dstport 0'
-                % subst)
-            util_concurrency.execute(
-                'sysctl -w net.ipv4.conf.%(vx_interface)s.arp_notify=1' % subst)
-
-        if not util_network.check_for_interface(subst['vx_bridge']):
-            util_network.create_interface(subst['vx_bridge'], 'bridge', '')
-            util_concurrency.execute(
-                'ip link set %(vx_interface)s master %(vx_bridge)s' % subst)
-            util_concurrency.execute(
-                'ip link set %(vx_interface)s up' % subst)
-            util_concurrency.execute(
-                'ip link set %(vx_bridge)s up' % subst)
-            util_concurrency.execute(
-                'sysctl -w net.ipv4.conf.%(vx_bridge)s.arp_notify=1' % subst)
-            util_concurrency.execute(
-                'brctl setfd %(vx_bridge)s 0' % subst)
-            util_concurrency.execute(
-                'brctl stp %(vx_bridge)s off' % subst)
-            util_concurrency.execute(
-                'brctl setageing %(vx_bridge)s 0' % subst)
-
+    @_not_on_floating_network
     def create_on_hypervisor(self):
-        # The floating network does not have a vxlan mesh
-        if self.uuid == 'floating':
-            return
-
         self.add_event(EVENT_TYPE_AUDIT, 'creating network on hypervisor')
-
         with self.get_lock(op='create_on_hypervisor', global_scope=False):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
-            self._create_common()
+            util_concurrency.create_vxlan_interface(self.vxid, self.mesh_nic)
 
+    @_not_on_floating_network
     def create_on_network_node(self):
-        # The floating network does not have a vxlan mesh
-        if self.uuid == 'floating':
-            return
-
         if self.state.value == dbo.STATE_DELETED:
             self.add_event(
                 EVENT_TYPE_AUDIT, 'refusing to create deleted network on network node')
@@ -490,18 +457,10 @@ class Network(dbo):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
 
-            self._create_common()
+            util_concurrency.create_vxlan_interface(self.vxid, self.mesh_nic)
+            util_concurrency.create_network_namespace(self.uuid)
 
             subst = self.subst_dict()
-            if not os.path.exists('/var/run/netns/%s' % self.uuid):
-                try:
-                    util_concurrency.execute('ip netns add %s' % self.uuid)
-                except ProcessExecutionError as e:
-                    r = re.compile(
-                        r'Cannot create namespace file ".*": File exists\n')
-                    m = r.match(e.stderr)
-                    if not m:
-                        raise e
 
             if not util_network.check_for_interface(subst['vx_veth_outer']):
                 util_network.create_interface(
@@ -663,7 +622,10 @@ class Network(dbo):
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""
         d = self._get_dnsmasq_object()
-        return d.is_running()
+        is_running = d.is_running()
+        if not is_running:
+            self.add_event(EVENT_TYPE_STATUS, 'dnsmasq is not running')
+        return is_running
 
     def remove_dhcp_lease(self, ipv4, macaddr):
         if not self.provide_dhcp and not self.provide_dns:
@@ -769,11 +731,8 @@ class Network(dbo):
                 priority=PRIORITY.user_facing_high_io
             )
 
+    @_not_on_floating_network
     def ensure_mesh(self):
-        # The floating network does not have a vxlan mesh
-        if self.uuid == 'floating':
-            return
-
         # Determine which IPs should be on this mesh and where
         instances = []
         for ni_uuid in self.networkinterfaces:

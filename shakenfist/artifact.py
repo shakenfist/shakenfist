@@ -9,6 +9,7 @@ from shakenfist import blob
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectWithOperations as dbowo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -27,7 +28,7 @@ SNAPSHOT_URL = 'sf://snapshot/'
 UPLOAD_URL = 'sf://upload/'
 
 
-class Artifact(dbo):
+class Artifact(dbowo):
     object_type = 'artifact'
     current_version = 7
 
@@ -200,19 +201,6 @@ class Artifact(dbo):
     @shared.setter
     def shared(self, value):
         self._db_set_attribute('shared', {'shared': value})
-
-    @property
-    def last_cluster_operation(self):
-        return self._db_get_attribute('last_cluster_operation')
-
-    def set_last_cluster_operation(self, op_type, op_uuid):
-        self._db_set_attribute(
-            'last_cluster_operation',
-            {
-                'op_type': op_type,
-                'op_uuid': op_uuid
-            }
-        )
 
     def external_view_without_index(self):
         out = self._external_view()

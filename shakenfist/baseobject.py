@@ -10,6 +10,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import cache
 from shakenfist import constants
+from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
@@ -527,6 +528,55 @@ class DatabaseBackedObject:
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
+
+
+class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
+    @property
+    def last_cluster_operation(self):
+        return self._db_get_attribute('last_cluster_operation')
+
+    def set_last_cluster_operation(self, op_type, op_uuid):
+        self._db_set_attribute(
+            'last_cluster_operation',
+            {
+                'op_type': op_type,
+                'op_uuid': op_uuid
+            }
+        )
+
+    def get_cluster_operations(self, outstanding_only=True):
+        last_op = self.last_cluster_operation
+        if not last_op:
+            return []
+        if not last_op.get('op_type'):
+            return []
+
+        op = get_object_class(last_op.get('op_type')).from_db(
+            last_op.get('op_uuid'))
+        if not op:
+            return []
+        if outstanding_only and not op.is_outstanding():
+            return []
+
+        outstanding = [op]
+
+        for dep in op.depends_on:
+            dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
+            if not dep_op:
+                continue
+            if outstanding_only and not dep_op.is_outstanding():
+                continue
+            outstanding.append(dep_op)
+
+        for dep in op.runs_after:
+            dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
+            if not dep_op:
+                continue
+            if outstanding_only and not dep_op.is_outstanding():
+                continue
+            outstanding.append(dep_op)
+
+        return outstanding
 
 
 class DatabaseBackedObjectIterator:

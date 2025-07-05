@@ -46,6 +46,7 @@ from shakenfist.operations.agentoperation import AgentOperations
 from shakenfist.operations.agentoperation \
     import instance_filter as agent_instance_filter
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import DatabaseBackedObjectWithOperations as dbowo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -146,7 +147,7 @@ class ConnectedVSockChannel():
         self.sock.close()
 
 
-class Instance(dbo):
+class Instance(dbowo):
     object_type = 'instance'
     current_version = 16
 
@@ -634,19 +635,6 @@ class Instance(dbo):
         if self.kvm_pid == pid:
             return
         self._db_set_attribute('kvm_pid', {'pid': pid})
-
-    @property
-    def last_cluster_operation(self):
-        return self._db_get_attribute('last_cluster_operation')
-
-    def set_last_cluster_operation(self, op_type, op_uuid):
-        self._db_set_attribute(
-            'last_cluster_operation',
-            {
-                'op_type': op_type,
-                'op_uuid': op_uuid
-            }
-        )
 
     def vsock_cid(self, channel):
         return self._db_get_attribute(f'vsock_cid:{channel}')
@@ -1644,7 +1632,10 @@ class Instance(dbo):
                 add_event_multi(
                     EVENT_TYPE_AUDIT, [self, op],
                     'task aborted due to enqueued delete request')
-                op.state = bco.STATE_ABORT
+                try:
+                    op.state = bco.STATE_ABORT
+                except exceptions.InvalidStateException:
+                    op.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
 
         op_type, op_uuid = nio_create_and_enqueue(
             node,

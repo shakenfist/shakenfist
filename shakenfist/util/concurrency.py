@@ -10,6 +10,8 @@ from shakenfist_utilities import logs                     # noreorder
 from shakenfist_utilities import random as sf_random      # noreorder
 
 from shakenfist.exceptions import AddFloatingIPFailed
+from shakenfist.exceptions import CreateNetworkNamespaceFailed
+from shakenfist.exceptions import CreateVXLANInterfaceFailed
 from shakenfist.exceptions import EnableNATFailed
 from shakenfist.exceptions import EnsureMeshFailed
 from shakenfist.exceptions import HashFailed
@@ -243,6 +245,32 @@ def remove_floating_ip(network_uuid, floating_address):
     response = reply.remove_floating_ip_reply
     if response.error != privexec_pb2.RemoveFloatingIPReply.OK:
         raise RemoveFloatingIPFailed()
+
+
+def create_vxlan_interface(vx_id, mesh_interface):
+    request = privexec_pb2.PrivExecRequest(
+        create_vxlan_interface_request=privexec_pb2.CreateVXLANInterfaceRequest(
+            vx_id=vx_id,
+            mesh_interface=mesh_interface
+        )
+    )
+    reply = _marshal_privexec_request(request, 'create_vxlan_interface_reply')
+    response = reply.create_vxlan_interface_reply
+    if response.error != privexec_pb2.CreateVXLANInterfaceReply.OK:
+        raise CreateVXLANInterfaceFailed()
+
+
+def create_network_namespace(namespace):
+    request = privexec_pb2.PrivExecRequest(
+        create_network_namespace_request=privexec_pb2.CreateNetworkNamespaceRequest(
+            namespace=namespace
+        )
+    )
+    reply = _marshal_privexec_request(
+        request, 'create_network_namespace_reply')
+    response = reply.create_network_namespace_reply
+    if response.error != privexec_pb2.CreateNetworkNamespaceReply.OK:
+        raise CreateNetworkNamespaceFailed()
 
 
 def set_thread_name(name):

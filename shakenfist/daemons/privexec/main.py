@@ -12,14 +12,12 @@ import subprocess
 import threading
 import time
 
-from google.protobuf.json_format import MessageToJson
 from google.protobuf.message import DecodeError
 import psutil
 import setproctitle
 from shakenfist_utilities import random      # noreorder
 from shakenfist_utilities import logs        # noreorder
 
-from shakenfist.daemons.privexec import eventlog as privexec_eventlog
 from shakenfist.daemons.privexec import util as privexec_util
 from shakenfist.protos import common_pb2
 from shakenfist.protos import privexec_pb2
@@ -425,6 +423,45 @@ class PrivExecJob:
             )
         )
 
+    def _create_vx_interface(self, req):
+        vx_interface = f'vxlan-{req.vx_id:06x}'
+        vx_bridge = f'br-vxlan-{req.vx_id:06x}'
+
+        if not privexec_util.create_vx_interface(
+            vx_interface, req.vx_id, vx_bridge, req.mesh_interface
+        ):
+            return privexec_pb2.PrivExecReply(
+                create_vxlan_interface_reply=privexec_pb2.CreateVXLANInterfaceReply(
+                    vx_id=req.vx_id,
+                    mesh_interface=req.mesh_interface,
+                    error=privexec_pb2.CreateVXLANInterfaceReply.FAILED
+                )
+            )
+
+        return privexec_pb2.PrivExecReply(
+            create_vxlan_interface_reply=privexec_pb2.CreateVXLANInterfaceReply(
+                vx_id=req.vx_id,
+                mesh_interface=req.mesh_interface,
+                error=privexec_pb2.CreateVXLANInterfaceReply.OK
+            )
+        )
+
+    def _create_network_namespace(self, req):
+        if not privexec_util.create_network_namespace(req.namespace):
+            return privexec_pb2.PrivExecReply(
+                create_network_namespace_reply=privexec_pb2.CreateNetworkNamespaceReply(
+                    namespace=req.namespace,
+                    error=privexec_pb2.CreateVXLANInterfaceReply.FAILED
+                )
+            )
+
+        return privexec_pb2.PrivExecReply(
+            create_network_namespace_reply=privexec_pb2.CreateNetworkNamespaceReply(
+                namespace=req.namespace,
+                error=privexec_pb2.CreateVXLANInterfaceReply.OK
+            )
+        )
+
     def run(self):
         buffered = bytearray()
         command_found = False
@@ -449,23 +486,19 @@ class PrivExecJob:
                     'enable_nat_request': self._enable_nat,
                     'ensure_vxlan_mesh_request': self._ensure_mesh,
                     'add_floating_ip_request': self._add_floating_ip,
-                    'remove_floating_ip_request': self._remove_floating_ip
+                    'remove_floating_ip_request': self._remove_floating_ip,
+                    'create_vxlan_interface_request': (
+                        self._create_vx_interface
+                    ),
+                    'create_network_namespace_request': (
+                        self._create_network_namespace
+                    )
                 }
 
                 for request_field in request_map:
                     if request.HasField(request_field):
                         req = getattr(request, request_field)
-                        privexec_eventlog.EVENT_DB.write_event(
-                            'request', request_field, 'received request',
-                            extra=MessageToJson(req)
-                        )
-
                         reply = request_map[request_field](req)
-                        privexec_eventlog.EVENT_DB.write_event(
-                            'request', request_field, 'replied',
-                            extra=MessageToJson(reply)
-                        )
-
                         self.conn.sendall(reply.SerializeToString())
                         command_found = True
                         break
@@ -487,10 +520,6 @@ def write_pid_file():
 def main():
     write_pid_file()
     setproctitle.setproctitle('sf-privexec')
-
-    if os.path.exists(privexec_eventlog.DBPATH):
-        os.unlink(privexec_eventlog.DBPATH)
-    privexec_eventlog.EVENT_DB = privexec_eventlog.LocalEvents()
 
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
@@ -531,7 +560,6 @@ def main():
     LOG.info('Stopping')
 
     start_time = time.time()
-    last_event_prune = time.time()
     while workers:
         LOG.info(f'There are {len(workers)} remaining workers')
 
@@ -562,9 +590,6 @@ def main():
         workers = remaining_workers
         if workers:
             time.sleep(5)
-
-        if time.time() - last_event_prune > 300:
-            privexec_eventlog.EVENT_DB.prune_old_events()
 
     LOG.info(f'There are {len(workers)} remaining workers')
     LOG.info('Stopped')

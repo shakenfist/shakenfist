@@ -118,7 +118,11 @@ class NodeInstNetdescOp(BaseClusterOperation):
             self.__getattribute__(f'_{task.name}')(inst)
         except AbortInstanceStart as e:
             inst.enqueue_delete_due_error(e.message)
-            self.state = NodeInstNetdescOp.STATE_ABORT
+
+            try:
+                self.state = NodeInstNetdescOp.STATE_ABORT
+            except InvalidStateException:
+                self.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
         except Exception as e:
             util_general.ignore_exception('node_inst_netdesc_op', e)
             inst.enqueue_delete_due_error(f'Unhandled error: {e}')
@@ -169,7 +173,11 @@ class NodeInstNetdescOp(BaseClusterOperation):
                 candidates[0], self.instance_uuid, self.net_desc,
                 self.tasks, self.priority, self.request_id)
             redirected.enqueue()
-            self.state = NodeInstNetdescOp.STATE_ABORT
+
+            try:
+                self.state = NodeInstNetdescOp.STATE_ABORT
+            except InvalidStateException:
+                self.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
 
         except LowResourceException as e:
             add_event_multi(

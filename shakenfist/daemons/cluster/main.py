@@ -11,7 +11,6 @@ import schedule
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
-from shakenfist import cache
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import instance
@@ -29,6 +28,7 @@ from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.daemons.cluster import scheduled_tasks
+from shakenfist.exceptions import InvalidStateException
 from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
@@ -81,14 +81,6 @@ class Monitor(daemon.Daemon):
 
             for node in Nodes([]):
                 node.blobs = per_node.get(node.uuid, [])
-
-        # Cleanup soft deleted objects
-        for objtype in OBJECT_NAMES_TO_CLASSES:
-            for obj_uuid in cache.read_object_state_cache(
-                    objtype, dbo.STATE_DELETED):
-                obj = get_object_class(objtype).from_db(obj_uuid)
-                if time.time() - obj.state.update_time > config.CLEANER_DELAY:
-                    obj.hard_delete()
 
         # Cleanup vxids which specify a missing network. We ignore allocations
         # less than five minutes old to let the network setup complete.
@@ -402,15 +394,24 @@ class Monitor(daemon.Daemon):
                             op_type = workitem.get('operation_type')
                             op_uuid = workitem.get('operation_uuid')
                             op = get_object_class(op_type).from_db(op_uuid)
-                            op.state = BaseClusterOperation.STATE_ABORT
-                            eventlog.add_event_multi(
-                                EVENT_TYPE_AUDIT,
-                                [n, op],
-                                'aborted operation for deleted node',
-                                extra={
-                                    'jobname': jobname,
-                                    'queue': queue_name
-                                })
+
+                            try:
+                                op.state = BaseClusterOperation.STATE_ABORT
+                                eventlog.add_event_multi(
+                                    EVENT_TYPE_AUDIT,
+                                    [n, op],
+                                    'aborted operation for deleted node',
+                                    extra={
+                                        'jobname': jobname,
+                                        'queue': queue_name
+                                    })
+
+                            except InvalidStateException:
+                                eventlog.add_event_multi(
+                                    EVENT_TYPE_AUDIT,
+                                    [n, op],
+                                    'failed to abort operation'
+                                )
 
                         etcd.resolve(queue_name, jobname)
 
@@ -452,6 +453,8 @@ class Monitor(daemon.Daemon):
                 scheduled_tasks.per_blob_checks)
             schedule.every(5).minutes.do(
                 scheduled_tasks.per_instance_checks_and_usage)
+            schedule.every(15).minutes.do(
+                scheduled_tasks.per_deleted_object_checks)
 
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):

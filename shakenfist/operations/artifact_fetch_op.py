@@ -111,6 +111,7 @@ class ArtifactFetchOp(BaseClusterOperation):
             [self, a],
             (f'URL {self.url} in namespace {self.namespace} maps to artifact '
              f'{a.uuid}.'))
+        a.set_last_cluster_operation(self.object_type, self.uuid)
 
         try:
             images.ImageFetchHelper(inst, a).get_image()

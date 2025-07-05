@@ -7,8 +7,10 @@ from shakenfist_utilities import logs                 # noreorder
 from shakenfist.cache import read_object_state_cache
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.blob import Blob
+from shakenfist.constants import FINAL_OBJECT_STATES
 from shakenfist.constants import get_object_class
+from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
+from shakenfist.blob import Blob
 from shakenfist import etcd
 from shakenfist.etcd_schema.operations import baseclusteroperation as bco_schema
 from shakenfist.etcd_schema.operations import node_blob_op as nbo_schema
@@ -23,6 +25,7 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 BLOB_CHECKS_QUEUE = queue.Queue()
 INSTANCE_CHECKS_QUEUE = queue.Queue()
+DELETED_OBJECTS_QUEUE = queue.Queue()
 
 
 @util_general.recorded_method
@@ -180,3 +183,50 @@ def log_cluster_queue_lengths():
 
     for queuename in get_general_background_node_queues():
         _log_and_update_metrics_for_queue(queuename, 'Cluster background')
+
+
+@util_general.recorded_method
+def per_deleted_object_checks():
+    start_time = time.time()
+    if DELETED_OBJECTS_QUEUE.empty():
+        _fill_per_deleted_object_queue()
+        LOG.info(
+            'Refreshed per-deleted-boject queue with '
+            f'{DELETED_OBJECTS_QUEUE.qsize()} items')
+
+    queue_fill_cost = time.time() - start_time
+    if queue_fill_cost > 10:
+        return
+
+    processed = _process_per_deleted_object_queue(
+        execution_limit=(10 - queue_fill_cost))
+    LOG.info(f'Processed {processed} items from per-deleted-object queue')
+
+
+def _fill_per_deleted_object_queue():
+    for objtype in OBJECT_NAMES_TO_CLASSES:
+        for state in FINAL_OBJECT_STATES:
+            for obj_uuid in read_object_state_cache(objtype, state):
+                obj = get_object_class(objtype).from_db(obj_uuid)
+                if not obj:
+                    continue
+                DELETED_OBJECTS_QUEUE.put(obj)
+
+
+def _process_per_deleted_object_queue(execution_limit=10):
+    processed = 0
+    start_time = time.time()
+    while True:
+        # Limit how long we spend in this loop
+        if time.time() - start_time > execution_limit:
+            return processed
+
+        try:
+            obj = DELETED_OBJECTS_QUEUE.get(block=False)
+        except queue.Empty:
+            return processed
+
+        processed += 1
+
+        if time.time() - obj.state.update_time > config.CLEANER_DELAY:
+            obj.hard_delete()
