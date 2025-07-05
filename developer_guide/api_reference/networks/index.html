@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
     
     
       
@@ -975,6 +975,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../clusteroperations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Cluster Operations
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../instances/" class="md-nav__link">
         
   
@@ -1110,6 +1133,15 @@
   <a href="#metadata" class="md-nav__link">
     <span class="md-ellipsis">
       Metadata
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cluster-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cluster operations
     </span>
   </a>
   
@@ -1715,6 +1747,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#cluster-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cluster operations
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2091,6 +2132,38 @@ is available <a href="/user_guide/metadata/">in the user guide</a>.</p>
 <span class="n">sf_client</span><span class="o">.</span><span class="n">delete_network_metadata_item</span><span class="p">(</span><span class="n">net_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">)</span>
 </code></pre></div>
 </details>
+<h2 id="cluster-operations">Cluster operations</h2>
+<p>Since v0.8, <a href="/developer_guide/api_reference/clusteroperations">cluster operations</a>
+for a given network have been exposed. This lists the various pieces of queued
+work that Shaken Fist has executed on a given object, with the limitation that
+completed cluster operations are hard deleted after CLEANER_DELAY seconds
+(which defaults to one hour).</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/networks/get_networks__network_ref__clusteroperations">GET ​/networks/{network_ref}​/clusteroperations</a>: Get cluster operations for an network.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: get queued cluster operations for an network</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_network_queued_cluster_operations</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: get all cluster operations for an network</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_network_queued_cluster_operations</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="nb">all</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
 
 
 
@@ -2142,7 +2215,7 @@ is available <a href="/user_guide/metadata/">in the user guide</a>.</p>
       <script id="__config" type="application/json">{"base": "../../..", "features": [], "search": "../../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.56ea9cef.min.js"></script>
       
     
   </body>
