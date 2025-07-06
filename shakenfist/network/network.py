@@ -73,10 +73,7 @@ class Network(dbowo):
         self.__ipam = ipam.IPAM.from_db(
             static_values['uuid'], suppress_failure_audit=True)
         if not self.__ipam:
-            in_memory_only = False
-            if self.state.value == dbo.STATE_DELETED:
-                in_memory_only = True
-
+            in_memory_only = self.state.value == dbo.STATE_DELETED
             self.__ipam = ipam.IPAM.new(
                 static_values['uuid'], static_values['namespace'],
                 static_values['uuid'], static_values.get('netblock'),
