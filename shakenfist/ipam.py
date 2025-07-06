@@ -56,12 +56,13 @@ class IPAM(dbo):
         except KeyError:
             cluster_minimum = 3
 
-        if cluster_minimum > 3:
+        self._in_memory_only = static_values.get('in_memory_only', False)
+        if cluster_minimum > 3 and not self._in_memory_only:
             self.upgrade(static_values)
 
         super().__init__(static_values['uuid'],
                          static_values.get('version'),
-                         static_values.get('in_memory_only', False))
+                         self._in_memory_only)
 
         self.__namespace = static_values['namespace']
         self.__network_uuid = static_values['network_uuid']
@@ -70,6 +71,9 @@ class IPAM(dbo):
         self.cached_ipblock_object = None
         self.cached_ipmanager_object = None
         self.reservations_path = IPAM_RESERVATIONS_PATH % self.uuid
+
+        if self._in_memory_only:
+            self.__in_memory_store = {}
 
         if self.version == 3:
             self.cached_ipmanager_object = ipmanager.IPManager.from_db(self.uuid)
@@ -161,7 +165,6 @@ class IPAM(dbo):
             static_values['in_memory_only'] = True
             o = IPAM(static_values)
             o.log.with_fields(static_values).info('IPAM is in-memory only')
-
         else:
             IPAM._db_create(ipam_uuid, static_values)
             o = IPAM.from_db(ipam_uuid)
@@ -209,6 +212,9 @@ class IPAM(dbo):
     def in_use(self):
         if self.version == 3:
             return self.cached_ipmanager_object.in_use.keys()
+
+        if self._in_memory_only:
+            return self.__in_memory_store.keys()
 
         reservations = []
         for _, data in etcd.get_prefix_raw(self.reservations_path):
@@ -258,6 +264,12 @@ class IPAM(dbo):
 
         self.release_haloed(config.IP_DELETION_HALO_DURATION)
 
+        if self._in_memory_only:
+            if address in self.__in_memory_store:
+                return False
+            self.__in_memory_store[address] = reservation
+            return True
+
         if not etcd.create_raw(self.reservations_path + address, reservation):
             return False
         self.add_event(EVENT_TYPE_AUDIT, 'reserved address', extra=reservation)
@@ -274,6 +286,12 @@ class IPAM(dbo):
                 self.cached_ipmanager_object.persist()
             self.log.with_fields({'address': address}).info('Released address via ipmanager')
             return success
+
+        if self._in_memory_only:
+            if address not in self.__in_memory_store:
+                return False
+            del self.__in_memory_store[address]
+            return True
 
         original_reservation = self.get_reservation(address)
         if not original_reservation:
@@ -297,22 +315,44 @@ class IPAM(dbo):
             extra=original_reservation)
         return True
 
+    @staticmethod
+    def _should_free(data, duration):
+        if (data['type'] == RESERVATION_TYPE_DELETION_HALO and
+                time.time() - data['when'] > duration):
+            return True
+        return False
+
     def release_haloed(self, duration):
         if self.version == 3:
             return
 
+        freed = 0
+
+        if self._in_memory_only:
+            for address in list(self.__in_memory_store.keys()):
+                data = self.__in_memory_store[address]
+                if self._should_free(data, duration):
+                    del self.__in_memory_store[address]
+                    freed += 1
+            return freed
+
         # Handle the possible allocation race here where something's halo is
         # removed and its immediately allocated, but at the same time we
         # remove its halo by using a transactional_delete_raw.
-        freed = 0
         for key, data in etcd.get_prefix_raw(self.reservations_path):
-            if (data['type'] == RESERVATION_TYPE_DELETION_HALO and
-                    time.time() - data['when'] > duration):
+            if self._should_free(data, duration):
                 if etcd.transactional_delete_raw(key, data):
                     freed += 1
         return freed
 
     def get_haloed_addresses(self):
+        if self._in_memory_only:
+            for address in self.__in_memory_store:
+                if self.__in_memory_store[address]['type'] == \
+                        RESERVATION_TYPE_DELETION_HALO:
+                    yield address
+            return
+
         for _, data in etcd.get_prefix_raw(self.reservations_path):
             if data['type'] == RESERVATION_TYPE_DELETION_HALO:
                 yield data['address']
@@ -380,6 +420,9 @@ class IPAM(dbo):
                 res['user'] = ('interface', obj_uuid)
             return res
 
+        if self._in_memory_only:
+            return self.__in_memory_store.get(address)
+
         return etcd.get_raw(self.reservations_path + address)
 
     def get_allocation_age(self, address):
@@ -398,6 +441,9 @@ class IPAM(dbo):
     def hard_delete(self):
         if self.version == 3:
             self.cached_ipmanager_object.delete()
+
+        if self._in_memory_only:
+            return
 
         etcd.delete('ipmanager', None, self.uuid)
         etcd.delete_prefix(self.reservations_path)

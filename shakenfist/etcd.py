@@ -630,11 +630,18 @@ def delete_raw(path):
 
 
 def create_raw(path, new_data):
-    return replace_many_raw([{
-        'path': path,
-        'original_data': None,
-        'new_data': new_data
-    }])[0]
+    # Failure audit is suppressed here because we expect to fail if the key is
+    # already in use.
+    return replace_many_raw(
+        [
+            {
+                'path': path,
+                'original_data': None,
+                'new_data': new_data
+            }
+        ],
+        suppress_failure_audit=True
+    )[0]
 
 
 def replace_raw(path, original_data, new_data):
@@ -656,7 +663,7 @@ def transactional_delete_raw(path, original_data):
 # NOTE(mikal): note that mutations are expected to use strings in their
 # descriptions, not bytes.
 @_retry_etcd_native_client
-def replace_many_raw(mutations):
+def replace_many_raw(mutations, suppress_failure_audit=False):
     original_values_by_path = {}
     new_values_by_path = {}
 
@@ -763,5 +770,6 @@ def replace_many_raw(mutations):
             }
         )
 
-    LOG.with_fields({'failed': failures}).info('Transaction failure')
+    if not suppress_failure_audit:
+        LOG.with_fields({'failed': failures}).info('Transaction failure')
     return False, failures
