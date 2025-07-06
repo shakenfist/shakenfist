@@ -377,7 +377,7 @@ class Network(dbowo):
         last_op = self.last_cluster_operation
         if last_op and last_op.get('op_type'):
             op = get_object_class(last_op.get('op_type')).from_db(
-                last_op.get('op_uuid'))
+                last_op.get('op_uuid'), suppress_failure_audit=True)
             if op and op.state.value not in [op.STATE_COMPLETE,
                                              op.STATE_ABORT,
                                              op.STATE_ERROR,
