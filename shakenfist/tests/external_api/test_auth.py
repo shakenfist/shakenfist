@@ -567,10 +567,8 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.network.network.Network._db_get_attribute',
                 return_value={'value': dbo.STATE_CREATED, 'update_time': 2})
     @mock.patch('shakenfist.etcd.ClusterLock')
-    @mock.patch('shakenfist.ipmanager.IPManager.from_db')
     def test_post_instance_only_system_specifies_namespaces(
-            self, mock_ipmanager, mock_lock, mock_net_attribute,
-            mock_get_artifact):
+            self, mock_lock, mock_net_attribute, mock_get_artifact):
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'key': 'cheese'}))
         self.assertEqual(200, resp.status_code)

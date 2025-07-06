@@ -38,7 +38,6 @@ from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
-from shakenfist.exceptions import IPManagerMissing
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
@@ -831,16 +830,13 @@ class Networks(dbo_iter):
             if n['uuid'] == 'floating':
                 continue
 
-            try:
-                n = Network(n)
-                if not n:
-                    continue
+            n = Network(n)
+            if not n:
+                continue
 
-                out = self.apply_filters(n)
-                if out:
-                    yield out
-            except IPManagerMissing:
-                pass
+            out = self.apply_filters(n)
+            if out:
+                yield out
 
 
 # Convenience helpers

@@ -180,10 +180,6 @@ class NetworkMissing(NetworkException):
     ...
 
 
-class IPManagerMissing(NetworkException):
-    ...
-
-
 class InvalidAddress(NetworkException):
     ...
 

@@ -5,23 +5,16 @@ import time
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
-from shakenfist import eventlog
 from shakenfist import exceptions
-from shakenfist import ipmanager
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
-from shakenfist.baseobject import get_minimum_object_version as gmov
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.util import callstack as util_callstack
 
 
 # Please note: IPAMs are a "foundational" baseobject type, which means they
 # should not rely on any other baseobjects for their implementation. This is
 # done to help minimize circular import problems.
-
-# Also note that version 3 is just a proxy to the old ipmanager, which should be
-# removed with fire in v0.9.
 
 LOG, _ = logs.setup(__name__)
 
@@ -37,9 +30,11 @@ RESERVATION_TYPE_UNKNOWN = 'unknown'
 
 
 class IPAM(dbo):
+    # There were older versions of ipam, but we don't admit to them because
+    # the upgrade is painful.
     object_type = 'ipam'
-    initial_version = 3
-    current_version = 6
+    initial_version = 7
+    current_version = 7
 
     state_targets = {
         None: (dbo.STATE_CREATED),
@@ -48,17 +43,7 @@ class IPAM(dbo):
     }
 
     def __init__(self, static_values):
-        # NOTE(mikal): this is unusual, but we can't do an online upgrade from
-        # v3 to v4 until everyone knows about v4 due to how we're transitioning
-        # from ipmanager to ipam.
-        try:
-            cluster_minimum = gmov(self.object_type)
-        except KeyError:
-            cluster_minimum = 3
-
         self._in_memory_only = static_values.get('in_memory_only', False)
-        if cluster_minimum > 3 and not self._in_memory_only:
-            self.upgrade(static_values)
 
         super().__init__(static_values['uuid'],
                          static_values.get('version'),
@@ -69,87 +54,15 @@ class IPAM(dbo):
         self.__ipblock = static_values['ipblock']
 
         self.cached_ipblock_object = None
-        self.cached_ipmanager_object = None
         self.reservations_path = IPAM_RESERVATIONS_PATH % self.uuid
 
         if self._in_memory_only:
             self.__in_memory_store = {}
 
-        if self.version == 3:
-            self.cached_ipmanager_object = ipmanager.IPManager.from_db(self.uuid)
-
-    @classmethod
-    def _upgrade_step_3_to_4(cls, static_values):
-        ipm = ipmanager.IPManager.from_db(static_values['uuid'])
-        for address in ipm.in_use:
-            # Handle the rename of networkinterface to interface
-            obj_type, obj_uuid = ipm.in_use[address]['user']
-            if obj_type == 'networkinterface':
-                obj_type = 'interface'
-
-            etcd.put_raw((IPAM_RESERVATIONS_PATH % static_values['uuid']) + address,
-                         {
-                             'address': address,
-                             'user': (obj_type, obj_uuid),
-                             'when': ipm.in_use[address]['when'],
-                             'type': RESERVATION_TYPE_UNKNOWN,
-                             'comment': ''
-                         })
-
-    @classmethod
-    def _upgrade_step_4_to_5(cls, static_values):
-        try:
-            ipm = ipmanager.IPManager.from_db(static_values['uuid'])
-            if ipm:
-                LOG.with_fields({'ipam': static_values['uuid']}).info(
-                    'Removed obsolete ipmanager post IPAM upgrade')
-                ipm.delete()
-        except exceptions.IPManagerMissing:
-            pass
-
-    @classmethod
-    def _upgrade_step_5_to_6(cls, static_values):
-        etcd.delete('attribute/ipam', static_values['uuid'], 'deletion-halo')
-
     def _ensure_ipblock_object(self):
         if not self.cached_ipblock_object:
             self.cached_ipblock_object = ipaddress.ip_network(self.__ipblock, strict=False)
         return self.cached_ipblock_object
-
-    @classmethod
-    def from_db(cls, ipam_uuid, suppress_failure_audit=False):
-        # This is required to handle the ipmanager to IPAM upgrade case and can
-        # be removed in v0.9.
-        if not ipam_uuid:
-            return None
-
-        static_values = cls._db_get(ipam_uuid)
-        if static_values:
-            return cls(static_values)
-
-        try:
-            ipm = ipmanager.IPManager.from_db(ipam_uuid)
-            if not ipm:
-                LOG.with_fields({'ipam': ipam_uuid}).debug(
-                    'Failed to find both an IPAM and an ipmanager')
-                if not suppress_failure_audit:
-                    eventlog.add_event(
-                            EVENT_TYPE_AUDIT, cls.object_type, ipam_uuid,
-                            'attempt to lookup non-existent object',
-                            extra={'caller': util_callstack.get_caller(offset=-3)},
-                            log_as_error=True)
-                return None
-        except exceptions.IPManagerMissing:
-            return None
-
-        LOG.with_fields({'ipam': ipam_uuid}).warning('Falling back to ipmanager for IPAM')
-        return cls({
-            'uuid': ipam_uuid,
-            'version': 3,
-            'namespace': None,
-            'network_uuid': ipam_uuid,
-            'ipblock': ipm.ipblock
-        })
 
     @classmethod
     def new(cls, ipam_uuid, namespace, network_uuid, ipblock, in_memory_only=False):
@@ -178,14 +91,10 @@ class IPAM(dbo):
     # Static values
     @property
     def namespace(self):
-        if self.version == 3:
-            return None
         return self.__namespace
 
     @property
     def network_uuid(self):
-        if self.version == 3:
-            return self.uuid
         return self.__network_uuid
 
     @property
@@ -210,9 +119,6 @@ class IPAM(dbo):
 
     @property
     def in_use(self):
-        if self.version == 3:
-            return self.cached_ipmanager_object.in_use.keys()
-
         if self._in_memory_only:
             return self.__in_memory_store.keys()
 
@@ -247,13 +153,6 @@ class IPAM(dbo):
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
 
-        if self.version == 3:
-            success = self.cached_ipmanager_object.reserve(address, user)
-            if success:
-                self.cached_ipmanager_object.persist()
-            self.log.with_fields({'address': address}).info('Reserved address via ipmanager')
-            return success
-
         reservation = {
             'address': address,
             'user': user,
@@ -279,13 +178,6 @@ class IPAM(dbo):
         if not address:
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
-
-        if self.version == 3:
-            success = self.cached_ipmanager_object.release(address)
-            if success:
-                self.cached_ipmanager_object.persist()
-            self.log.with_fields({'address': address}).info('Released address via ipmanager')
-            return success
 
         if self._in_memory_only:
             if address not in self.__in_memory_store:
@@ -323,9 +215,6 @@ class IPAM(dbo):
         return False
 
     def release_haloed(self, duration):
-        if self.version == 3:
-            return
-
         freed = 0
 
         if self._in_memory_only:
@@ -411,15 +300,6 @@ class IPAM(dbo):
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
 
-        if self.version == 3:
-            res = self.cached_ipmanager_object.in_use.get(address)
-
-            # Handle the rename of networkinterface to interface
-            obj_type, obj_uuid = res['user']
-            if obj_type == 'networkinterface':
-                res['user'] = ('interface', obj_uuid)
-            return res
-
         if self._in_memory_only:
             return self.__in_memory_store.get(address)
 
@@ -430,22 +310,15 @@ class IPAM(dbo):
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
 
-        if self.version == 3:
-            return self.cached_ipmanager_object.in_use.get(address, {}).get('when')
-
         r = self.get_reservation(address)
         if not r:
             return None
         return r.get('when', time.time())
 
     def hard_delete(self):
-        if self.version == 3:
-            self.cached_ipmanager_object.delete()
-
         if self._in_memory_only:
             return
 
-        etcd.delete('ipmanager', None, self.uuid)
         etcd.delete_prefix(self.reservations_path)
         super().hard_delete()
 
