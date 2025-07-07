@@ -67,6 +67,12 @@ def _process_per_blob_queue(execution_limit=10):
 
         processed += 1
 
+        if b.ref_count == 0:
+            b.add_event(
+                EVENT_TYPE_AUDIT, 'deleting blob with reference count of 0')
+            b.state = Blob.STATE_DELETED
+            continue
+
         if b.state.value != Blob.STATE_CREATED:
             continue
 

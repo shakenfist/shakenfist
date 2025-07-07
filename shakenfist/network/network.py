@@ -38,7 +38,6 @@ from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
-from shakenfist.exceptions import IPManagerMissing
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
@@ -73,10 +72,7 @@ class Network(dbowo):
         self.__ipam = ipam.IPAM.from_db(
             static_values['uuid'], suppress_failure_audit=True)
         if not self.__ipam:
-            in_memory_only = False
-            if self.state.value == dbo.STATE_DELETED:
-                in_memory_only = True
-
+            in_memory_only = self.state.value == dbo.STATE_DELETED
             self.__ipam = ipam.IPAM.new(
                 static_values['uuid'], static_values['namespace'],
                 static_values['uuid'], static_values.get('netblock'),
@@ -377,7 +373,7 @@ class Network(dbowo):
         last_op = self.last_cluster_operation
         if last_op and last_op.get('op_type'):
             op = get_object_class(last_op.get('op_type')).from_db(
-                last_op.get('op_uuid'))
+                last_op.get('op_uuid'), suppress_failure_audit=True)
             if op and op.state.value not in [op.STATE_COMPLETE,
                                              op.STATE_ABORT,
                                              op.STATE_ERROR,
@@ -834,16 +830,13 @@ class Networks(dbo_iter):
             if n['uuid'] == 'floating':
                 continue
 
-            try:
-                n = Network(n)
-                if not n:
-                    continue
+            n = Network(n)
+            if not n:
+                continue
 
-                out = self.apply_filters(n)
-                if out:
-                    yield out
-            except IPManagerMissing:
-                pass
+            out = self.apply_filters(n)
+            if out:
+                yield out
 
 
 # Convenience helpers

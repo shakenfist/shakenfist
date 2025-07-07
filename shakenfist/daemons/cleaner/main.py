@@ -109,12 +109,6 @@ class Monitor(daemon.Daemon):
                     os.unlink(entpath)
                     continue
 
-                if b.ref_count == 0:
-                    LOG.with_fields({
-                        'blob': ent}).warning('Deleting globally unused image cache entry')
-                    os.unlink(entpath)
-                    continue
-
                 this_node = len(instance.instance_usage_for_blob_uuid(
                     b.uuid, node=config.NODE_NAME))
                 LOG.with_fields(
