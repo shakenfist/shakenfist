@@ -34,6 +34,13 @@ jobs:
                 'scheduled': True
             },
             {
+                'name': 'rocky-10',
+                'baseimage': 'rocky:10',
+                'baseuser': 'cloud-user',
+                'outputlabel': 'ci-images/rocky-10',
+                'scheduled': True
+            },
+            {
                 'name': 'ubuntu-2004',
                 'baseimage': 'ubuntu:20.04',
                 'baseuser': 'ubuntu',
