@@ -82,6 +82,42 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
         self.test_client.delete_instance_metadata_item(inst['uuid'], 'foo')
         self.assertEqual({}, self.test_client.get_instance_metadata(inst['uuid']))
 
+    def test_set_during_create(self):
+        inst = self.test_client.create_instance(
+            'test-set-during-create', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': base.CLUSTER_CI_IMAGE,
+                    'type': 'disk'
+                }
+            ],
+            None,
+            None,
+            metadata={
+                'affinity': {
+                    'foo': -50
+                },
+                'tags': ['foo', 'bar']
+            }
+        )
+
+        self.assertIsNotNone(inst['uuid'])
+
+        self.assertEqual(
+            {
+                'affinity': {
+                    'foo': -50
+                },
+                'tags': ['foo', 'bar']
+            },
+            self.test_client.get_instance_metadata(inst['uuid']))
+
 
 class TestInterfaceMetadata(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
