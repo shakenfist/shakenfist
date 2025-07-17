@@ -732,7 +732,8 @@ class InstancesEndpoint(sf_api.Resource):
 
         # Initialise metadata
         if metadata:
-            inst._db_set_attribute('metadata', metadata)
+            for k, v in metadata.items():
+                inst.add_metadata_key(k, v)
 
         # Allocate IP addresses
         order = 0

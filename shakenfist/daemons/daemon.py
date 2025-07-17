@@ -67,6 +67,7 @@ def set_log_level(log, name):
 
 
 def write_pid_file(daemon_name):
+    os.makedirs('/run/sf/', exist_ok=True)
     with open(f'/run/sf/{daemon_name}.pid', 'w') as f:
         f.write(f'{os.getpid()}')
 
@@ -79,6 +80,7 @@ def clear_abort_path(abort_path):
 
 def set_abort_path(abort_path, source):
     LOG.info(f'Setting abort file: {abort_path} ({source})')
+    os.makedirs(os.path.basename(abort_path), exist_ok=True)
     with open(abort_path, 'w') as f:
         f.write('1')
 
