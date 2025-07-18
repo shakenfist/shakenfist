@@ -1,4 +1,5 @@
 # Copyright 2020 Michael Still
+import datetime
 import importlib
 import json
 import logging
@@ -36,6 +37,12 @@ config = sf_config.config
 
 # These imports _must_ occur after the extra config setup has run.
 from shakenfist.cache import refresh_object_state_caches   # noqa
+from shakenfist.daemons.cluster.scheduled_tasks \
+    import _fill_per_deleted_object_queue                  # noqa
+from shakenfist.daemons.cluster.scheduled_tasks \
+    import _process_per_deleted_object_queue               # noqa
+from shakenfist.daemons.cluster.scheduled_tasks \
+    import DELETED_OBJECTS_QUEUE                           # noqa
 from shakenfist import etcd                                # noqa
 from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
@@ -150,8 +157,19 @@ def stop(daemon):
 
 @click.command()
 def rebuild_etcd_caches():
+    click.echo(f'{datetime.datetime.now()} Hard deleting objects...')
+    _fill_per_deleted_object_queue()
+    click.echo(f'{datetime.datetime.now()}     '
+               f'Built list of {DELETED_OBJECTS_QUEUE.qsize()} objects')
+    while DELETED_OBJECTS_QUEUE.qsize() > 0:
+        processed = _process_per_deleted_object_queue(10)
+        click.echo(f'{datetime.datetime.now()}     '
+                   f'Processed {processed} objects, '
+                   f'{DELETED_OBJECTS_QUEUE.qsize()} objects remaining')
+
+    click.echo(f'{datetime.datetime.now()} Rebuilding caches...')
     refresh_object_state_caches()
-    click.echo('etcd caches rebuilt.')
+    click.echo(f'{datetime.datetime.now()} etcd caches rebuilt.')
 
 
 cli.add_command(bootstrap_system_key)
