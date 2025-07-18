@@ -92,7 +92,8 @@ class Job(util_concurrency.Job):
 
         # Ensure that we are running after any runs_after requirements.
         for dep in op.runs_after:
-            dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
+            dep_op = get_object_class(dep['op_type']).from_db(
+                dep['op_uuid'], suppress_failure_audit=True)
             if not dep_op:
                 # Not fatal because otherwise a missing cluster operation
                 # could cause the entire cluster to stop being able to manage
