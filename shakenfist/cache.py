@@ -119,14 +119,15 @@ def _update_object_state_cache_attempt(
             'new_data': None
         })
 
-    path = f'/sf/cache/{object_type}/{new_state}/{object_uuid}'
-    mutations.append({
-        'path': path,
-        'original_data': None,
-        'new_data': {
-            'timestamp': time.time()
-        }
-    })
+    if new_state != 'hard-deleted':
+        path = f'/sf/cache/{object_type}/{new_state}/{object_uuid}'
+        mutations.append({
+            'path': path,
+            'original_data': None,
+            'new_data': {
+                'timestamp': time.time()
+            }
+        })
 
     return etcd.replace_many_raw(mutations)
 
