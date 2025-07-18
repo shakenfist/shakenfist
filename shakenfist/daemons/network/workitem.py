@@ -74,8 +74,8 @@ class Job(util_concurrency.Job):
                     EVENT_TYPE_AUDIT,
                     'cancelling operation, as dependency does not exist',
                     extra={
-                        'dep_object_type': dep_op.object_type,
-                        'dep_object_uuid': dep_op.uuid
+                        'dep_object_type': dep['op_type'],
+                        'dep_object_uuid': dep['op_uuid']
                     })
                 op.state = BaseClusterOperation.STATE_ERROR
                 return
@@ -118,8 +118,8 @@ class Job(util_concurrency.Job):
                     EVENT_TYPE_AUDIT,
                     'warning, runs_after dependency is missing',
                     extra={
-                        'dep_object_type': dep_op.object_type,
-                        'dep_object_uuid': dep_op.uuid
+                        'dep_object_type': dep['op_type'],
+                        'dep_object_uuid': dep['op_uuid']
                     })
                 continue
 
