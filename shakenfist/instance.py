@@ -1619,8 +1619,10 @@ class Instance(dbowo):
 
         lco = self.last_cluster_operation
         if lco:
-            lco_op = get_object_class(lco['op_type']).from_db(lco['op_uuid'])
-            ops = traverse_cluster_operations_tree(lco_op)
+            lco_op = get_object_class(lco['op_type']).from_db(
+                lco['op_uuid'], suppress_failure_audit=True)
+            if lco_op:
+                ops = traverse_cluster_operations_tree(lco_op)
 
         for op in ops:
             has_protected_task = False

@@ -233,6 +233,9 @@ def _process_per_deleted_object_queue(execution_limit=10):
             return processed
 
         processed += 1
+        delay = config.CLEANER_DELAY
+        if obj.object_type.endswith('_op'):
+            delay = 30
 
-        if time.time() - obj.state.update_time > config.CLEANER_DELAY:
+        if time.time() - obj.state.update_time > delay:
             obj.hard_delete()
