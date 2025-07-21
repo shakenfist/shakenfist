@@ -82,7 +82,7 @@ jobs:
           path: cover.zip
 
       # Failures get announced here before we cancel stuff
-      - uses: slackapi/slack-github-action@v2.0.0
+      - uses: slackapi/slack-github-action@v2.1.1
         if: failure()
         with:
           method: chat.update
@@ -375,7 +375,7 @@ jobs:
           path: /srv/github/artifacts/bundle.zip
 
       # Failures get announced here before we cancel stuff
-      - uses: slackapi/slack-github-action@v2.0.0
+      - uses: slackapi/slack-github-action@v2.1.1
         if: failure()
         with:
           method: chat.update
@@ -396,7 +396,7 @@ jobs:
                     short: true
                     value: "Failure in functional matrix tests"
 
-      - uses: slackapi/slack-github-action@v2.0.0
+      - uses: slackapi/slack-github-action@v2.1.1
         if: failure()
         with:
           method: chat.postMessage
@@ -736,7 +736,7 @@ jobs:
           path: /srv/github/artifacts/bundle.zip
 
       # Failures get announced here before we cancel stuff
-      - uses: slackapi/slack-github-action@v2.0.0
+      - uses: slackapi/slack-github-action@v2.1.1
         if: failure()
         with:
           method: chat.update
@@ -757,7 +757,7 @@ jobs:
                     short: true
                     value: "Failure in functional matrix tests"
 
-      - uses: slackapi/slack-github-action@v2.0.0
+      - uses: slackapi/slack-github-action@v2.1.1
         if: failure()
         with:
           method: chat.postMessage
@@ -937,7 +937,7 @@ jobs:
           path: /srv/github/artifacts/bundle.zip
 
       # Failures get announced here before we cancel stuff
-      - uses: slackapi/slack-github-action@v2.0.0
+      - uses: slackapi/slack-github-action@v2.1.1
         if: failure()
         with:
           method: chat.update
@@ -1127,7 +1127,7 @@ jobs:
           path: /srv/github/artifacts/bundle.zip
 
       # Failures get announced here before we cancel stuff
-      - uses: slackapi/slack-github-action@v2.0.0
+      - uses: slackapi/slack-github-action@v2.1.1
         if: failure()
         with:
           method: chat.update
@@ -1291,7 +1291,7 @@ jobs:
           path: /srv/github/artifacts/bundle.zip
 
       # Failures get announced here before we cancel stuff
-      - uses: slackapi/slack-github-action@v2.0.0
+      - uses: slackapi/slack-github-action@v2.1.1
         if: failure()
         with:
           method: chat.update
@@ -1335,7 +1335,7 @@ jobs:
 
       - name: Tell people a PR test attempt is running
         id: slack
-        uses: slackapi/slack-github-action@v2.0.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           method: chat.postMessage
           token: "${{ secrets.SLACK_BOT_TOKEN }}"
@@ -1390,7 +1390,7 @@ jobs:
 
       - name: Tell people a merge attempt is running
         id: slack
-        uses: slackapi/slack-github-action@v2.0.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           method: chat.postMessage
           token: "${{ secrets.SLACK_BOT_TOKEN }}"
@@ -1432,7 +1432,7 @@ jobs:
           echo "ALL_SUCCESS=$(echo "$NEEDS_JSON" | jq '. | to_entries | map([.value.result == "success", .value.result == "skipped"] | any) | all')" >>$GITHUB_ENV
       - name: Check outcomes
         run: "[ $ALL_SUCCESS == true ]"
-      - uses: slackapi/slack-github-action@v2.0.0
+      - uses: slackapi/slack-github-action@v2.1.1
         if: success()
         with:
           method: chat.update
@@ -1472,7 +1472,7 @@ jobs:
           echo "ALL_SUCCESS=$(echo "$NEEDS_JSON" | jq '. | to_entries | map([.value.result == "success", .value.result == "skipped"] | any) | all')" >>$GITHUB_ENV
       - name: Check outcomes
         run: "[ $ALL_SUCCESS == true ]"
-      - uses: slackapi/slack-github-action@v2.0.0
+      - uses: slackapi/slack-github-action@v2.1.1
         if: success()
         with:
           method: chat.update
