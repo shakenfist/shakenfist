@@ -83,7 +83,7 @@ def get_all_network_queues():
     return [
         'networknode-clusteroperation-user_waiting',
         'networknode-clusteroperation-user_facing',
-        'networknode-clusteroperation-user_facing_high_io'
+        'networknode-clusteroperation-user_facing_high_io',
         'networknode-clusteroperation-background',
         'networknode-clusteroperation-background_high_io'
     ]
