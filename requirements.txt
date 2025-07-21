@@ -60,7 +60,7 @@ pydantic-extra-types==2.10.2       # (indirect dependency)
 #libvirt-python      # lgpl
 
 # Indirect dependencies. We do not track license for these.
-aniso8601==9.0.1
+aniso8601==10.0.1
 annotated-types==0.7.0
 anyio==4.9.0
 async-extensions==4.0.0
