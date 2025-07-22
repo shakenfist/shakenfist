@@ -283,9 +283,9 @@ class Monitor(daemon.Daemon):
                     network_deferred += deferred
 
                 retval.update({
-                    'queue_network_processing': network_processing,
-                    'queue_network_waiting': network_waiting,
-                    'queue_network_deferred': network_deferred
+                    'network_queue_processing': network_processing,
+                    'network_queue_waiting': network_waiting,
+                    'network_queue_deferred': network_deferred
                 })
 
             if config.NODE_IS_EVENTLOG_NODE:
