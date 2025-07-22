@@ -3,6 +3,7 @@ import time
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -133,4 +134,10 @@ class Job(util_concurrency.Job):
                 return
 
         # We're good to go!
+        start_time = time.time()
         op.execute()
+        op.add_event(
+            EVENT_TYPE_USAGE, 'execution duration',
+            extra={
+                'seconds': time.time() - start_time
+            })
