@@ -60,15 +60,15 @@ pydantic-extra-types==2.10.2       # (indirect dependency)
 #libvirt-python      # lgpl
 
 # Indirect dependencies. We do not track license for these.
-aniso8601==9.0.1
+aniso8601==10.0.1
 annotated-types==0.7.0
 anyio==4.9.0
 async-extensions==4.0.0
-attrs==24.3.0
+attrs==25.3.0
 blinker==1.9.0
 coloredlogs==15.0.1
 entrypoint==2.1.0
-exceptiongroup==1.2.2
+exceptiongroup==1.3.0
 executor==23.2
 funcs==0.11.0
 futurist==3.1.1
@@ -92,6 +92,6 @@ typing-aliases==1.10.1
 typing-extensions==4.14.1
 verboselogs==1.7
 zipp==3.21.0
-zope.event==5.0
+zope.event==5.1
 zope.interface==7.2
 wraps==0.15.0
