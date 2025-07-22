@@ -240,7 +240,7 @@ class Monitor(daemon.Daemon):
 
             for queue in get_node_user_facing_node_queues(config.NODE_NAME):
                 processing, queued, deferred = _log_and_update_metrics_for_queue(
-                    queue, 'Node specific user facing')
+                    queue, 'User facing')
 
                 node_queue_processing += processing
                 node_queue_waiting += queued
@@ -248,7 +248,7 @@ class Monitor(daemon.Daemon):
 
             for queue in get_all_background_node_queues(config.NODE_NAME):
                 processing, queued, deferred = _log_and_update_metrics_for_queue(
-                    queue, 'Node specific background')
+                    queue, 'Background')
 
                 node_background_queue_processing += processing
                 node_background_queue_waiting += queued
@@ -275,7 +275,9 @@ class Monitor(daemon.Daemon):
                 network_deferred = 0
 
                 for queue in get_all_network_queues():
-                    processing, queued, deferred = etcd.get_queue_length(queue)
+                    processing, queued, deferred = _log_and_update_metrics_for_queue(
+                        queue, 'Network node')
+
                     network_waiting += queued
                     network_processing += processing
                     network_deferred += deferred
