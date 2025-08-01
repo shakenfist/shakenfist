@@ -155,8 +155,8 @@ class BlobDataEndpoint(sf_api.Resource):
     # are not included in the webargs schema because webargs doesn't appear to
     # know how to find them.
     get_args = {
-        'offset': fields.Int(missing=0),
-        'limit': fields.Int(missing=0)
+        'offset': fields.Int(load_default=0),
+        'limit': fields.Int(load_default=0)
     }
 
     @swag_from(api_base.swagger_helper(

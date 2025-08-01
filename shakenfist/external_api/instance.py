@@ -1662,7 +1662,7 @@ class InstanceOutstandingOperationsEndpoint(sf_api.Resource):
     # are not included in the webargs schema because webargs doesn't appear to
     # know how to find them.
     get_args = {
-        'all': fields.Boolean(missing=False)
+        'all': fields.Boolean(load_default=False)
     }
 
     @swag_from(api_base.swagger_helper(
