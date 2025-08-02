@@ -169,7 +169,9 @@ class NodeInstOp(BaseClusterOperation):
                 psutil.Process(pid)
             except (psutil.NoSuchProcess, FileNotFoundError):
                 inst.kvm_pid = None
-                inst.enqueue_delete_due_error('kvm process missing')
+
+                if inst.power_state == 'on':
+                    inst.enqueue_delete_due_error('kvm process missing')
 
     def _instance_delete(self, inst):
         with inst.get_lock(op='Instance delete', global_scope=False):

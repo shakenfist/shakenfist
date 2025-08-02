@@ -2,6 +2,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.etcd_schema.operations import net_op as schema
 from shakenfist.exceptions import DeadNetwork
+from shakenfist.exceptions import EnsureMeshFailed
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -79,6 +80,14 @@ class NetOp(BaseClusterOperation):
 
         try:
             self.__getattribute__(f'_{task.name}')(n)
+
+        except EnsureMeshFailed as e:
+            if n.state.value in n.ACTIVE_STATES:
+                # This should not happen with an active network
+                util_general.ignore_exception('net_op', e)
+
+            self.state = NetOp.STATE_ERROR
+
         except Exception as e:
             util_general.ignore_exception('net_op', e)
             self.state = NetOp.STATE_ERROR
