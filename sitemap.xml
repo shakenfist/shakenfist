@@ -1,199 +1,199 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://shakenfist.com/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/index.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/community/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/community.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/features/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/features.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/manifesto/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/manifesto.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/kerbside/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/components/kerbside.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/overview/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/components/overview.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/kerbside/config/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/components/kerbside/config.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/kerbside/console-sources/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/components/kerbside/console-sources.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/agent_protocol/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/agent_protocol.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/authentication/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/authentication.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/ci_api_coverage/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/ci_api_coverage.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/io_performance_tuning/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/io_performance_tuning.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/release_process/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/release_process.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/standards/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/standards.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/state_machine/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/state_machine.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/updating_docs/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/updating_docs.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/workflow/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/workflow.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/admin/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/admin.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/agentoperations/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/agentoperations.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/artifacts/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/artifacts.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/authentication/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/authentication.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/blob_checksums/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/blob_checksums.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/blobs/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/blobs.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/clusteroperations/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/clusteroperations.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/instances/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/instances.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/interfaces/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/interfaces.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/label/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/label.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/networks/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/networks.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/nodes/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/nodes.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/api_reference/upload/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/developer_guide/api_reference/upload.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/operator_guide/artifacts/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/operator_guide/artifacts.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/operator_guide/authentication/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/operator_guide/authentication.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/operator_guide/installation/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/operator_guide/installation.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/operator_guide/locks/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/operator_guide/locks.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/operator_guide/power_states/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/operator_guide/power_states.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/operator_guide/python_versions/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/operator_guide/python_versions.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/operator_guide/threads/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/operator_guide/threads.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/operator_guide/upgrades/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/operator_guide/upgrades.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/operator_guide/networking/overview/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/operator_guide/networking/overview.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/release_notes/v07-v08/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/release_notes/v07-v08.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/user_guide/affinity/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/user_guide/affinity.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/user_guide/ansible/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/user_guide/ansible.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/user_guide/artifacts/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/user_guide/artifacts.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/user_guide/authentication/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/user_guide/authentication.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/user_guide/consoles/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/user_guide/consoles.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/user_guide/events/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/user_guide/events.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/user_guide/metadata/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/user_guide/metadata.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/user_guide/objects/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/user_guide/objects.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/user_guide/usage/</loc>
-         <lastmod>2025-07-22</lastmod>
+         <loc>https://shakenfist.com/user_guide/usage.html</loc>
+         <lastmod>2025-08-02</lastmod>
     </url>
 </urlset>

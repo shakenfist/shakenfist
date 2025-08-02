@@ -10,26 +10,28 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/index.html">
+        <link rel="canonical" href="https://shakenfist.com/developer_guide/api_reference/nodes.html">
       
       
+        <link rel="prev" href="interfaces.html">
       
-        <link rel="next" href="manifesto.html">
+      
+        <link rel="next" href="upload.html">
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.16">
     
     
       
-        <title>Shaken Fist</title>
+        <title>Nodes (/nodes/) - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,7 +50,7 @@
       
     
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#introduction" class="md-skip">
+        <a href="#nodes-nodes" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +92,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../index.html" title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -110,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Introduction
+              Nodes (/nodes/)
             
           </span>
         </div>
@@ -226,7 +228,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../index.html" title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -253,32 +255,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    Introduction
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../index.html" class="md-nav__link">
         
   
   
@@ -289,80 +269,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments" class="md-nav__link">
-    <span class="md-ellipsis">
-      Shaken Fist, an open cloud aimed at small and edge deployments
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-underlying-idea" class="md-nav__link">
-    <span class="md-ellipsis">
-      The underlying idea
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-choices" class="md-nav__link">
-    <span class="md-ellipsis">
-      Development choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#deployment-choices" class="md-nav__link">
-    <span class="md-ellipsis">
-      Deployment choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#id-like-to-subscribe-to-your-newsletter" class="md-nav__link">
-    <span class="md-ellipsis">
-      "I'd like to subscribe to your newsletter"
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-shaken-fist-can-i-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      What is Shaken Fist? Can I help?
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -374,7 +280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="manifesto.html" class="md-nav__link">
+      <a href="../../manifesto.html" class="md-nav__link">
         
   
   
@@ -434,7 +340,7 @@
   
   
     <li class="md-nav__item">
-      <a href="components/overview.html" class="md-nav__link">
+      <a href="../../components/overview.html" class="md-nav__link">
         
   
   
@@ -457,7 +363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="components/kerbside.html" class="md-nav__link">
+      <a href="../../components/kerbside.html" class="md-nav__link">
         
   
   
@@ -487,7 +393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="features.html" class="md-nav__link">
+      <a href="../../features.html" class="md-nav__link">
         
   
   
@@ -547,7 +453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="release_notes/v07-v08.html" class="md-nav__link">
+      <a href="../../release_notes/v07-v08.html" class="md-nav__link">
         
   
   
@@ -577,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="community.html" class="md-nav__link">
+      <a href="../../community.html" class="md-nav__link">
         
   
   
@@ -637,7 +543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/usage.html" class="md-nav__link">
+      <a href="../../user_guide/usage.html" class="md-nav__link">
         
   
   
@@ -660,7 +566,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/authentication.html" class="md-nav__link">
+      <a href="../../user_guide/authentication.html" class="md-nav__link">
         
   
   
@@ -683,7 +589,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/ansible.html" class="md-nav__link">
+      <a href="../../user_guide/ansible.html" class="md-nav__link">
         
   
   
@@ -706,7 +612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/artifacts.html" class="md-nav__link">
+      <a href="../../user_guide/artifacts.html" class="md-nav__link">
         
   
   
@@ -729,7 +635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/affinity.html" class="md-nav__link">
+      <a href="../../user_guide/affinity.html" class="md-nav__link">
         
   
   
@@ -752,7 +658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/consoles.html" class="md-nav__link">
+      <a href="../../user_guide/consoles.html" class="md-nav__link">
         
   
   
@@ -775,7 +681,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/events.html" class="md-nav__link">
+      <a href="../../user_guide/events.html" class="md-nav__link">
         
   
   
@@ -798,7 +704,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/objects.html" class="md-nav__link">
+      <a href="../../user_guide/objects.html" class="md-nav__link">
         
   
   
@@ -821,7 +727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/metadata.html" class="md-nav__link">
+      <a href="../../user_guide/metadata.html" class="md-nav__link">
         
   
   
@@ -848,18 +754,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -875,7 +783,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Developer Guide
@@ -886,18 +794,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" checked>
         
           
           <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
@@ -913,7 +823,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8_1">
             <span class="md-nav__icon md-icon"></span>
             API reference
@@ -927,7 +837,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/admin.html" class="md-nav__link">
+      <a href="admin.html" class="md-nav__link">
         
   
   
@@ -950,7 +860,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/agentoperations.html" class="md-nav__link">
+      <a href="agentoperations.html" class="md-nav__link">
         
   
   
@@ -973,7 +883,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/artifacts.html" class="md-nav__link">
+      <a href="artifacts.html" class="md-nav__link">
         
   
   
@@ -996,7 +906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/authentication.html" class="md-nav__link">
+      <a href="authentication.html" class="md-nav__link">
         
   
   
@@ -1019,7 +929,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/blob_checksums.html" class="md-nav__link">
+      <a href="blob_checksums.html" class="md-nav__link">
         
   
   
@@ -1042,7 +952,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/blobs.html" class="md-nav__link">
+      <a href="blobs.html" class="md-nav__link">
         
   
   
@@ -1065,7 +975,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/clusteroperations.html" class="md-nav__link">
+      <a href="clusteroperations.html" class="md-nav__link">
         
   
   
@@ -1088,7 +998,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/instances.html" class="md-nav__link">
+      <a href="instances.html" class="md-nav__link">
         
   
   
@@ -1111,7 +1021,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/label.html" class="md-nav__link">
+      <a href="label.html" class="md-nav__link">
         
   
   
@@ -1134,7 +1044,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/networks.html" class="md-nav__link">
+      <a href="networks.html" class="md-nav__link">
         
   
   
@@ -1157,7 +1067,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/interfaces.html" class="md-nav__link">
+      <a href="interfaces.html" class="md-nav__link">
         
   
   
@@ -1177,10 +1087,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="developer_guide/api_reference/nodes.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Nodes (/nodes/)
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="nodes.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1191,6 +1123,53 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#node-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      Node lifecycle
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other-network-information" class="md-nav__link">
+    <span class="md-ellipsis">
+      Other network information
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      Metadata
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1203,7 +1182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/upload.html" class="md-nav__link">
+      <a href="upload.html" class="md-nav__link">
         
   
   
@@ -1234,7 +1213,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/agent_protocol.html" class="md-nav__link">
+      <a href="../agent_protocol.html" class="md-nav__link">
         
   
   
@@ -1257,7 +1236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/authentication.html" class="md-nav__link">
+      <a href="../authentication.html" class="md-nav__link">
         
   
   
@@ -1280,7 +1259,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/ci_api_coverage.html" class="md-nav__link">
+      <a href="../ci_api_coverage.html" class="md-nav__link">
         
   
   
@@ -1303,7 +1282,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/release_process.html" class="md-nav__link">
+      <a href="../release_process.html" class="md-nav__link">
         
   
   
@@ -1326,7 +1305,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/standards.html" class="md-nav__link">
+      <a href="../standards.html" class="md-nav__link">
         
   
   
@@ -1349,7 +1328,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/state_machine.html" class="md-nav__link">
+      <a href="../state_machine.html" class="md-nav__link">
         
   
   
@@ -1372,7 +1351,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/updating_docs.html" class="md-nav__link">
+      <a href="../updating_docs.html" class="md-nav__link">
         
   
   
@@ -1395,7 +1374,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/workflow.html" class="md-nav__link">
+      <a href="../workflow.html" class="md-nav__link">
         
   
   
@@ -1463,7 +1442,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/installation.html" class="md-nav__link">
+      <a href="../../operator_guide/installation.html" class="md-nav__link">
         
   
   
@@ -1486,7 +1465,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/artifacts.html" class="md-nav__link">
+      <a href="../../operator_guide/artifacts.html" class="md-nav__link">
         
   
   
@@ -1509,7 +1488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/authentication.html" class="md-nav__link">
+      <a href="../../operator_guide/authentication.html" class="md-nav__link">
         
   
   
@@ -1532,7 +1511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/locks.html" class="md-nav__link">
+      <a href="../../operator_guide/locks.html" class="md-nav__link">
         
   
   
@@ -1555,7 +1534,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/networking/overview.html" class="md-nav__link">
+      <a href="../../operator_guide/networking/overview.html" class="md-nav__link">
         
   
   
@@ -1578,7 +1557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/power_states.html" class="md-nav__link">
+      <a href="../../operator_guide/power_states.html" class="md-nav__link">
         
   
   
@@ -1601,7 +1580,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/python_versions.html" class="md-nav__link">
+      <a href="../../operator_guide/python_versions.html" class="md-nav__link">
         
   
   
@@ -1624,7 +1603,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/threads.html" class="md-nav__link">
+      <a href="../../operator_guide/threads.html" class="md-nav__link">
         
   
   
@@ -1647,7 +1626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/upgrades.html" class="md-nav__link">
+      <a href="../../operator_guide/upgrades.html" class="md-nav__link">
         
   
   
@@ -1697,54 +1676,27 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments" class="md-nav__link">
+  <a href="#node-lifecycle" class="md-nav__link">
     <span class="md-ellipsis">
-      Shaken Fist, an open cloud aimed at small and edge deployments
+      Node lifecycle
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-underlying-idea" class="md-nav__link">
+  <a href="#other-network-information" class="md-nav__link">
     <span class="md-ellipsis">
-      The underlying idea
+      Other network information
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#development-choices" class="md-nav__link">
+  <a href="#metadata" class="md-nav__link">
     <span class="md-ellipsis">
-      Development choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#deployment-choices" class="md-nav__link">
-    <span class="md-ellipsis">
-      Deployment choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#id-like-to-subscribe-to-your-newsletter" class="md-nav__link">
-    <span class="md-ellipsis">
-      "I'd like to subscribe to your newsletter"
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-shaken-fist-can-i-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      What is Shaken Fist? Can I help?
+      Metadata
     </span>
   </a>
   
@@ -1769,56 +1721,139 @@
   
 
 
-<h1 id="introduction">Introduction</h1>
-<h2 id="shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments">Shaken Fist, an open cloud aimed at small and edge deployments</h2>
-<p>Shaken Fist is a deliberately opinionated cloud intended for small deployments. We
-spend a lot of time trying to do the simplest possible thing well, and keep our
-resource usage on idle deployments as low as possible. Shaken Fist has progressed
-from being a proof of concept to being a functional cloud, although the release
-numbers being below zero indicates that we are still stabilizing the REST API
-and that breaking changes might occur. 1.0 will be released when we are relatively
-sure of stability going forwards.</p>
-<p>Shaken Fist started a personal research project, but has grown into something
-which is starting to see wider contributions and some small commercial deployments.</p>
-<h2 id="the-underlying-idea">The underlying idea</h2>
-<p>Originally Shaken Fist came about as a reaction to the increasing complexity of
-OpenStack, as well as a desire to experiment with alternative approaches to
-solving the problems that OpenStack Compute addresses. What I really wanted was
-a simple API to orchestrate virtual machines, but it needed to run with minimal
-resource overhead and be simple to deploy. I also wanted it to always work in a
-predictable way.</p>
-<p>One of the reasons OpenStack is so complicated and its behaviour varies is because
-it has many options to configure. The solution seemed obvious to me -- a cloud
-that is super opinionated. For each different functional requirement there is
-one option, and the simplest option is chosen where possible. Read on for some
-examples.</p>
-<h2 id="development-choices">Development choices</h2>
-<p>If there is an existing library which does a thing, we use it. OpenStack suffered
-from being old (and having issues with re-writes being hard), as well as licensing
-constraints. We just use the code that others have provided to the community. Always.</p>
-<h2 id="deployment-choices">Deployment choices</h2>
-<p>libvirt is the only supported hypervisor. Instances are specified to libvirt with
-simple templated XML. If your local requirements are different to what's in the
-template, you're welcome to change the template to meet your needs. If your
-template changes break things, you're also welcome to debug what went wrong for
-yourself.</p>
-<h2 id="id-like-to-subscribe-to-your-newsletter">"I'd like to subscribe to your newsletter"</h2>
-<p>First off, we don't have a newsletter. That said, updates will be announced here
-as they happen. What we do have is useful links:</p>
+<h1 id="nodes-nodes">Nodes (/nodes/)</h1>
+<p>Nodes are how Shaken Fist models the hypervisors that actually run your virtual
+machines. They're a little unusual, as we use the host name to track the object
+instead of an assigned UUID. Nodes are an administrative-only object, not
+available to other users of Shaken Fist.</p>
+<details class="note" open="open">
+<summary>Note</summary>
+<p>For a detailed reference on the state machine for nodes, see the
+<a href="/developer_guide/state_machine/#nodes">developer documentation on object states</a>.</p>
+</details>
+<h2 id="node-lifecycle">Node lifecycle</h2>
+<p>Nodes cannot be created via the API, instead nodes are created by installing
+Shaken Fist on a machine and having that machine join a Shaken Fist cluster.
+However, you can delete a node via API and that will cause the machine to delete
+all the instances running and stop accepting new work.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
 <ul>
-<li>
-<p><a href="http://github.com/shakenfist/shakenfist">The Shaken Fist repository</a> is where
-  the code for the server is, including the deployer. Its a good place to start.</p>
-</li>
-<li>
-<p>There is also <a href="http://github.com/shakenfist/client-python">the python client repository</a>
-  contains the python API client, as well as the command line client that users
-  and shell scripts use to interact with Shaken Fist.</p>
-</li>
+<li><a href="https://openapi.shakenfist.com/#/nodes/get_nodes">GET /nodes</a>: List all nodes in the cluster, including deleted nodes.</li>
+<li><a href="https://openapi.shakenfist.com/#/nodes/delete_nodes__node_">DELETE /nodes/{node}</a>: Delete a node.</li>
+<li><a href="https://openapi.shakenfist.com/#/nodes/get_nodes__node_">GET /nodes/{node}</a>: Get information about a single node.</li>
 </ul>
-<h2 id="what-is-shaken-fist-can-i-help">What is Shaken Fist? Can I help?</h2>
-<p>The <a href="/manifesto/">Shaken Fist Manifesto</a> is our general conceptual starting
-point, but apart from that just reach out and have a chat.</p>
+</details>
+<details class="example">
+<summary>Python API client: get details for a node</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="s1">&#39;sf-1&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: list all nodes</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_nodes</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<h2 id="other-network-information">Other network information</h2>
+<p>We can also request other information for a network. For example, we can list the
+nodes's network interfaces, or the events for the network. See the
+<a href="/user_guide/events/">user guide</a> for a general introduction to the Shaken Fist
+event system.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/nodes/get_nodes__node__events">GET /nodes/{node}/events</a>: Fetch events for a node.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: list events for a node</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_node_events</span><span class="p">(</span><span class="s1">&#39;sf-1&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<p>Note that events are returned in reverse chronological order and are limited
+to the 100 most recent events.</p>
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;extra&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;cpu_available&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_load_1&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_load_15&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.85</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_load_5&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.87</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_max_per_instance&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_total_instance_cpu_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">235110000000</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;cpu_total_instance_vcpus&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;disk_free&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">376334815232</span><span class="p">,</span>
+<span class="w">            </span><span class="err">...</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;fqdn&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sf-1&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;updated node resources and package versions&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1685475323.252612</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;resources&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="p">]</span>
+</code></pre></div>
+</details>
+<h2 id="metadata">Metadata</h2>
+<p>All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all,
+with the exception of the <a href="/user_guide/affinity/">instance affinity metadata values</a>.
+The metadata store is in the form of a key value store, and a general introduction
+is available <a href="/user_guide/metadata/">in the user guide</a>.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/nodes/get_nodes__node__metadata">GET ​/nodes/{node}​/metadata</a>: Get metadata for a node.</li>
+<li><a href="https://openapi.shakenfist.com/#/nodes/post_nodes__node__metadata">POST /nodes/{node}/metadata</a>: Create a new metadata key for a node.</li>
+<li><a href="https://openapi.shakenfist.com/#/nodes/delete_nodes__node__metadata__key_">DELETE /nodes/{node}/metadata/{key}</a>: Delete a specific metadata key for a node.</li>
+<li><a href="https://openapi.shakenfist.com/#/nodes/put_nodes__node__metadata__key_">PUT /nodes/{node}/metadata/{key}</a>: Update an existing metadata key for a node.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: set metadata on a node</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">set_node_metadata_item</span><span class="p">(</span><span class="n">net_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: get metadata for a node</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_node_metadata</span><span class="p">(</span><span class="n">net_uuid</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: delete metadata for a node</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">delete_node_metadata_item</span><span class="p">(</span><span class="n">net_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
 
 
 
@@ -1867,10 +1902,10 @@ point, but apart from that just reach out and have a chat.</p>
     
     
       
-      <script id="__config" type="application/json">{"base": ".", "features": [], "search": "assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.50899def.min.js"></script>
+      <script src="../../assets/javascripts/bundle.50899def.min.js"></script>
       
     
   </body>

@@ -10,26 +10,28 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/index.html">
+        <link rel="canonical" href="https://shakenfist.com/developer_guide/state_machine.html">
       
       
+        <link rel="prev" href="standards.html">
       
-        <link rel="next" href="manifesto.html">
+      
+        <link rel="next" href="updating_docs.html">
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.16">
     
     
       
-        <title>Shaken Fist</title>
+        <title>State machine - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,7 +50,7 @@
       
     
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#introduction" class="md-skip">
+        <a href="#shaken-fists-state-machine" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +92,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../index.html" title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -110,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Introduction
+              State machine
             
           </span>
         </div>
@@ -226,7 +228,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../index.html" title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -253,32 +255,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    Introduction
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
         
   
   
@@ -289,80 +269,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments" class="md-nav__link">
-    <span class="md-ellipsis">
-      Shaken Fist, an open cloud aimed at small and edge deployments
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-underlying-idea" class="md-nav__link">
-    <span class="md-ellipsis">
-      The underlying idea
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-choices" class="md-nav__link">
-    <span class="md-ellipsis">
-      Development choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#deployment-choices" class="md-nav__link">
-    <span class="md-ellipsis">
-      Deployment choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#id-like-to-subscribe-to-your-newsletter" class="md-nav__link">
-    <span class="md-ellipsis">
-      "I'd like to subscribe to your newsletter"
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-shaken-fist-can-i-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      What is Shaken Fist? Can I help?
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -374,7 +280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="manifesto.html" class="md-nav__link">
+      <a href="../manifesto.html" class="md-nav__link">
         
   
   
@@ -434,7 +340,7 @@
   
   
     <li class="md-nav__item">
-      <a href="components/overview.html" class="md-nav__link">
+      <a href="../components/overview.html" class="md-nav__link">
         
   
   
@@ -457,7 +363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="components/kerbside.html" class="md-nav__link">
+      <a href="../components/kerbside.html" class="md-nav__link">
         
   
   
@@ -487,7 +393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="features.html" class="md-nav__link">
+      <a href="../features.html" class="md-nav__link">
         
   
   
@@ -547,7 +453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="release_notes/v07-v08.html" class="md-nav__link">
+      <a href="../release_notes/v07-v08.html" class="md-nav__link">
         
   
   
@@ -577,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="community.html" class="md-nav__link">
+      <a href="../community.html" class="md-nav__link">
         
   
   
@@ -637,7 +543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/usage.html" class="md-nav__link">
+      <a href="../user_guide/usage.html" class="md-nav__link">
         
   
   
@@ -660,7 +566,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/authentication.html" class="md-nav__link">
+      <a href="../user_guide/authentication.html" class="md-nav__link">
         
   
   
@@ -683,7 +589,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/ansible.html" class="md-nav__link">
+      <a href="../user_guide/ansible.html" class="md-nav__link">
         
   
   
@@ -706,7 +612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/artifacts.html" class="md-nav__link">
+      <a href="../user_guide/artifacts.html" class="md-nav__link">
         
   
   
@@ -729,7 +635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/affinity.html" class="md-nav__link">
+      <a href="../user_guide/affinity.html" class="md-nav__link">
         
   
   
@@ -752,7 +658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/consoles.html" class="md-nav__link">
+      <a href="../user_guide/consoles.html" class="md-nav__link">
         
   
   
@@ -775,7 +681,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/events.html" class="md-nav__link">
+      <a href="../user_guide/events.html" class="md-nav__link">
         
   
   
@@ -798,7 +704,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/objects.html" class="md-nav__link">
+      <a href="../user_guide/objects.html" class="md-nav__link">
         
   
   
@@ -821,7 +727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/metadata.html" class="md-nav__link">
+      <a href="../user_guide/metadata.html" class="md-nav__link">
         
   
   
@@ -848,18 +754,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -875,7 +783,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Developer Guide
@@ -927,7 +835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/admin.html" class="md-nav__link">
+      <a href="api_reference/admin.html" class="md-nav__link">
         
   
   
@@ -950,7 +858,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/agentoperations.html" class="md-nav__link">
+      <a href="api_reference/agentoperations.html" class="md-nav__link">
         
   
   
@@ -973,7 +881,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/artifacts.html" class="md-nav__link">
+      <a href="api_reference/artifacts.html" class="md-nav__link">
         
   
   
@@ -996,7 +904,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/authentication.html" class="md-nav__link">
+      <a href="api_reference/authentication.html" class="md-nav__link">
         
   
   
@@ -1019,7 +927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/blob_checksums.html" class="md-nav__link">
+      <a href="api_reference/blob_checksums.html" class="md-nav__link">
         
   
   
@@ -1042,7 +950,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/blobs.html" class="md-nav__link">
+      <a href="api_reference/blobs.html" class="md-nav__link">
         
   
   
@@ -1065,7 +973,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/clusteroperations.html" class="md-nav__link">
+      <a href="api_reference/clusteroperations.html" class="md-nav__link">
         
   
   
@@ -1088,7 +996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/instances.html" class="md-nav__link">
+      <a href="api_reference/instances.html" class="md-nav__link">
         
   
   
@@ -1111,7 +1019,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/label.html" class="md-nav__link">
+      <a href="api_reference/label.html" class="md-nav__link">
         
   
   
@@ -1134,7 +1042,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/networks.html" class="md-nav__link">
+      <a href="api_reference/networks.html" class="md-nav__link">
         
   
   
@@ -1157,7 +1065,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/interfaces.html" class="md-nav__link">
+      <a href="api_reference/interfaces.html" class="md-nav__link">
         
   
   
@@ -1180,7 +1088,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/nodes.html" class="md-nav__link">
+      <a href="api_reference/nodes.html" class="md-nav__link">
         
   
   
@@ -1203,7 +1111,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/upload.html" class="md-nav__link">
+      <a href="api_reference/upload.html" class="md-nav__link">
         
   
   
@@ -1234,7 +1142,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/agent_protocol.html" class="md-nav__link">
+      <a href="agent_protocol.html" class="md-nav__link">
         
   
   
@@ -1257,7 +1165,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/authentication.html" class="md-nav__link">
+      <a href="authentication.html" class="md-nav__link">
         
   
   
@@ -1280,7 +1188,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/ci_api_coverage.html" class="md-nav__link">
+      <a href="ci_api_coverage.html" class="md-nav__link">
         
   
   
@@ -1303,7 +1211,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/release_process.html" class="md-nav__link">
+      <a href="release_process.html" class="md-nav__link">
         
   
   
@@ -1326,7 +1234,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/standards.html" class="md-nav__link">
+      <a href="standards.html" class="md-nav__link">
         
   
   
@@ -1346,10 +1254,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="developer_guide/state_machine.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    State machine
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="state_machine.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1360,6 +1290,107 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#agent-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Agent Operations
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      Artifacts
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#blobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Blobs
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#instances" class="md-nav__link">
+    <span class="md-ellipsis">
+      Instances
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#namespaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Namespaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Networks
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Network Interfaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upload" class="md-nav__link">
+    <span class="md-ellipsis">
+      Upload
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1372,7 +1403,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/updating_docs.html" class="md-nav__link">
+      <a href="updating_docs.html" class="md-nav__link">
         
   
   
@@ -1395,7 +1426,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/workflow.html" class="md-nav__link">
+      <a href="workflow.html" class="md-nav__link">
         
   
   
@@ -1463,7 +1494,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/installation.html" class="md-nav__link">
+      <a href="../operator_guide/installation.html" class="md-nav__link">
         
   
   
@@ -1486,7 +1517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/artifacts.html" class="md-nav__link">
+      <a href="../operator_guide/artifacts.html" class="md-nav__link">
         
   
   
@@ -1509,7 +1540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/authentication.html" class="md-nav__link">
+      <a href="../operator_guide/authentication.html" class="md-nav__link">
         
   
   
@@ -1532,7 +1563,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/locks.html" class="md-nav__link">
+      <a href="../operator_guide/locks.html" class="md-nav__link">
         
   
   
@@ -1555,7 +1586,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/networking/overview.html" class="md-nav__link">
+      <a href="../operator_guide/networking/overview.html" class="md-nav__link">
         
   
   
@@ -1578,7 +1609,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/power_states.html" class="md-nav__link">
+      <a href="../operator_guide/power_states.html" class="md-nav__link">
         
   
   
@@ -1601,7 +1632,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/python_versions.html" class="md-nav__link">
+      <a href="../operator_guide/python_versions.html" class="md-nav__link">
         
   
   
@@ -1624,7 +1655,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/threads.html" class="md-nav__link">
+      <a href="../operator_guide/threads.html" class="md-nav__link">
         
   
   
@@ -1647,7 +1678,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/upgrades.html" class="md-nav__link">
+      <a href="../operator_guide/upgrades.html" class="md-nav__link">
         
   
   
@@ -1697,54 +1728,81 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments" class="md-nav__link">
+  <a href="#agent-operations" class="md-nav__link">
     <span class="md-ellipsis">
-      Shaken Fist, an open cloud aimed at small and edge deployments
+      Agent Operations
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-underlying-idea" class="md-nav__link">
+  <a href="#artifacts" class="md-nav__link">
     <span class="md-ellipsis">
-      The underlying idea
+      Artifacts
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#development-choices" class="md-nav__link">
+  <a href="#blobs" class="md-nav__link">
     <span class="md-ellipsis">
-      Development choices
+      Blobs
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#deployment-choices" class="md-nav__link">
+  <a href="#instances" class="md-nav__link">
     <span class="md-ellipsis">
-      Deployment choices
+      Instances
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#id-like-to-subscribe-to-your-newsletter" class="md-nav__link">
+  <a href="#namespaces" class="md-nav__link">
     <span class="md-ellipsis">
-      "I'd like to subscribe to your newsletter"
+      Namespaces
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-is-shaken-fist-can-i-help" class="md-nav__link">
+  <a href="#networks" class="md-nav__link">
     <span class="md-ellipsis">
-      What is Shaken Fist? Can I help?
+      Networks
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Network Interfaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upload" class="md-nav__link">
+    <span class="md-ellipsis">
+      Upload
     </span>
   </a>
   
@@ -1769,56 +1827,279 @@
   
 
 
-<h1 id="introduction">Introduction</h1>
-<h2 id="shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments">Shaken Fist, an open cloud aimed at small and edge deployments</h2>
-<p>Shaken Fist is a deliberately opinionated cloud intended for small deployments. We
-spend a lot of time trying to do the simplest possible thing well, and keep our
-resource usage on idle deployments as low as possible. Shaken Fist has progressed
-from being a proof of concept to being a functional cloud, although the release
-numbers being below zero indicates that we are still stabilizing the REST API
-and that breaking changes might occur. 1.0 will be released when we are relatively
-sure of stability going forwards.</p>
-<p>Shaken Fist started a personal research project, but has grown into something
-which is starting to see wider contributions and some small commercial deployments.</p>
-<h2 id="the-underlying-idea">The underlying idea</h2>
-<p>Originally Shaken Fist came about as a reaction to the increasing complexity of
-OpenStack, as well as a desire to experiment with alternative approaches to
-solving the problems that OpenStack Compute addresses. What I really wanted was
-a simple API to orchestrate virtual machines, but it needed to run with minimal
-resource overhead and be simple to deploy. I also wanted it to always work in a
-predictable way.</p>
-<p>One of the reasons OpenStack is so complicated and its behaviour varies is because
-it has many options to configure. The solution seemed obvious to me -- a cloud
-that is super opinionated. For each different functional requirement there is
-one option, and the simplest option is chosen where possible. Read on for some
-examples.</p>
-<h2 id="development-choices">Development choices</h2>
-<p>If there is an existing library which does a thing, we use it. OpenStack suffered
-from being old (and having issues with re-writes being hard), as well as licensing
-constraints. We just use the code that others have provided to the community. Always.</p>
-<h2 id="deployment-choices">Deployment choices</h2>
-<p>libvirt is the only supported hypervisor. Instances are specified to libvirt with
-simple templated XML. If your local requirements are different to what's in the
-template, you're welcome to change the template to meet your needs. If your
-template changes break things, you're also welcome to debug what went wrong for
-yourself.</p>
-<h2 id="id-like-to-subscribe-to-your-newsletter">"I'd like to subscribe to your newsletter"</h2>
-<p>First off, we don't have a newsletter. That said, updates will be announced here
-as they happen. What we do have is useful links:</p>
+<h1 id="shaken-fists-state-machine">Shaken Fist's State Machine</h1>
+<p>Shaken Fist implements a state machine for each object type. This page documents
+the possible states for each object, and which transitions between states are
+valid.</p>
+<p>Shaken Fist rigidly enforces the state model defined for each object, and will
+raise an exception if an unexpected transition occurs. The state model for a
+given object is defined in the <code>state_targets</code> map in the object class for those
+keen on reading code.</p>
+<p>Objects marked as <code>deleted</code> are removed from etcd after sitting deleted for
+some period of time. This is called a "hard deletion" and the period of time is
+configured with the CLEANER_DELAY configuration option. Once an object is hard
+deleted it will no longer appear in any API request, as it no longer exists in
+the database. The exception is that it will still appear in relevant events that
+have not yet aged out.</p>
+<h2 id="agent-operations">Agent Operations</h2>
 <ul>
-<li>
-<p><a href="http://github.com/shakenfist/shakenfist">The Shaken Fist repository</a> is where
-  the code for the server is, including the deployer. Its a good place to start.</p>
-</li>
-<li>
-<p>There is also <a href="http://github.com/shakenfist/client-python">the python client repository</a>
-  contains the python API client, as well as the command line client that users
-  and shell scripts use to interact with Shaken Fist.</p>
-</li>
+<li><code>initial</code>: the first state for an agent operation. A UUID has been allocated,
+  and a placeholder database entry created.</li>
+<li><code>preflight</code>: some agent operations require additional queued steps such as
+  fetching <code>blob</code>s to the correct <code>node</code>. These operations will be in <code>preflight</code>
+  during this background work.</li>
+<li><code>queued</code>: awaiting execution on the <code>instance</code>.</li>
+<li><code>executing</code>: means the Agent Operation is now executing on the <code>instance</code>.</li>
+<li><code>complete</code>: the Agent Operation has finished executing on the <code>instance</code>.
+  Specifically, this means we have received a result from the agent for each
+  command. If the agent crashes or a command never returns, this means the Agent
+  Operation will never be marked as complete.</li>
+<li><code>deleted</code>: the Agent Operation has been deleted.</li>
+<li><code>error</code>: an error occurred while processing the Agent Operation.</li>
 </ul>
-<h2 id="what-is-shaken-fist-can-i-help">What is Shaken Fist? Can I help?</h2>
-<p>The <a href="/manifesto/">Shaken Fist Manifesto</a> is our general conceptual starting
-point, but apart from that just reach out and have a chat.</p>
+<p>The following transitions are possible:</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; initial
+  [*] --&gt; error
+
+  initial --&gt; preflight
+  initial --&gt; queued
+  initial --&gt; deleted
+  initial --&gt; error
+
+  preflight --&gt; queued
+  preflight --&gt; deleted
+  preflight --&gt; error
+
+  queued --&gt; executing
+  queued --&gt; deleted
+  queued --&gt; error
+
+  executing --&gt; complete
+  executing --&gt; deleted
+  executing --&gt; error
+
+  complete --&gt; deleted
+
+  error --&gt; deleted
+
+  deleted --&gt; [*]</code></pre>
+<h2 id="artifacts">Artifacts</h2>
+<ul>
+<li><code>initial</code>: the first state for an artifact. A UUID has been allocated,
+  and a placeholder database entry created.</li>
+<li><code>created</code>: the artifact has at least one version.</li>
+<li><code>deleted</code>: the artifact has been deleted.</li>
+<li><code>error</code>: the artifact is in an error state.</li>
+</ul>
+<p>The following transitions are possible:</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; initial
+
+  initial --&gt; created
+  initial --&gt; deleted
+  initial --&gt; error
+
+  created --&gt; deleted
+  created --&gt; error
+
+  error --&gt; deleted
+
+  deleted --&gt; [*]</code></pre>
+<h2 id="blobs">Blobs</h2>
+<ul>
+<li><code>initial</code>: the first state for an blob. A UUID has been allocated,
+  and a placeholder database entry created.</li>
+<li><code>created</code>: the blob has data associated with it.</li>
+<li><code>deleted</code>: the blob has been deleted.</li>
+<li><code>error</code>: the blob is in an error state.</li>
+</ul>
+<p>The following transitions are possible:</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; initial
+
+  initial --&gt; created
+  initial --&gt; deleted
+  initial --&gt; error
+
+  created --&gt; deleted
+  created --&gt; error
+
+  error --&gt; deleted
+
+  deleted --&gt; [*]</code></pre>
+<h2 id="instances">Instances</h2>
+<ul>
+<li><code>initial</code>: this is the first state for an instance. A UUID has been allocated,
+  a placeholder database entry created, and a request to create the instance has
+  been queued.</li>
+<li><code>preflight</code>: the instance creation request has been dequeued and is being
+  validated against the current state of the cluster by the scheduler. At this
+  point any required resources (transfers of blobs inside the cluster and
+  fetching of images from outside the cluster) also occurs.</li>
+<li><code>creating</code>: the instance is being created on the <code>node</code>.</li>
+<li><code>created</code>: the instance is now running.</li>
+<li><code>deleted</code>: the instance is now deleted.</li>
+<li><code>error</code>: the instance is unable to be used.</li>
+</ul>
+<p>Any instance may enter the <code>error</code> state, which happens when something bad has
+happened. That process involves the instance being moved to a transition state
+named for the instance's previous state, so for example an instance which was
+<code>created</code> that went into Error would transition through <code>created-error</code>. This is
+done because the <code>error</code> transition is a queue job and happens sometime later.
+Instances in the <code>error</code> state are not removed like those in the <code>deleted</code> state,
+as we assume a caller must acknowledge an error occurred. To remove them, delete
+the instance in <code>error</code> state.</p>
+<p>The following transitions are possible (note that hyphens have been replaced with
+underscores in some state names due to limitations in the diagram renderer):</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; initial
+  [*] --&gt; error
+
+  initial --&gt; preflight
+  initial --&gt; delete_wait
+  initial --&gt; deleted
+  initial --&gt; initial_error
+
+  preflight --&gt; creating
+  preflight --&gt; delete_wait
+  preflight --&gt; deleted
+  preflight --&gt; preflight_error
+
+  creating --&gt; created
+  creating --&gt; delete_wait
+  creating --&gt; deleted
+  creating --&gt; creating_error
+
+  created --&gt; delete_wait
+  created --&gt; deleted
+  created --&gt; created_error
+
+  initial_error --&gt; error
+  preflight_error --&gt; error
+  creating_error --&gt; error
+  created_error --&gt; error
+  delete_wait_error --&gt; error
+
+  error --&gt; delete_wait
+  error --&gt; deleted
+
+  delete_wait --&gt; deleted
+  delete_wait --&gt; delete_wait_error
+
+  deleted --&gt; [*]</code></pre>
+<h2 id="namespaces">Namespaces</h2>
+<ul>
+<li><code>created</code>: the namespace exists.</li>
+<li><code>deleted</code>: the namespace has been deleted.</li>
+</ul>
+<p>The following transitions are possible:</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; created
+  created --&gt; deleted
+  deleted --&gt; [*]</code></pre>
+<h2 id="networks">Networks</h2>
+<ul>
+<li><code>initial</code>: first state for a network. A UUID has been allocated, database entry
+  created, and a request to create the network on the <code>networknode</code> has been queued.</li>
+<li><code>created</code>: the network has been created on the <code>networknode</code>.</li>
+<li><code>delete-wait</code>: the network has been scheduled for deletion. Waiting for
+  instances on the network to be deleted.</li>
+<li><code>deleted</code>: the network is now deleted.</li>
+<li><code>error</code>: the network has encountered an error and cannot be used.</li>
+</ul>
+<p>A network is regarded as "dead" when it is in state <code>deleted</code>, <code>delete-wait</code> or
+<code>error</code>.</p>
+<p>The following transitions are possible (note that hyphens have been replaced with
+underscores in some state names due to limitations in the diagram renderer):</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; initial
+
+  initial --&gt; created
+  initial --&gt; deleted
+  initial --&gt; error
+
+  created --&gt; deleted
+  created --&gt; delete_wait
+  created --&gt; error
+
+  delete_wait --&gt; deleted
+  delete_wait --&gt; error
+
+  error --&gt; deleted
+
+  deleted --&gt; [*]</code></pre>
+<h2 id="network-interfaces">Network Interfaces</h2>
+<ul>
+<li><code>initial</code>: the first state for a network interface. A UUID has been allocated,
+  and a placeholder database entry created.</li>
+<li><code>created</code>: the network interface has data associated with it.</li>
+<li><code>deleted</code>: the network interface has been deleted.</li>
+<li><code>error</code>: the network interface is in an error state.</li>
+</ul>
+<p>The following transitions are possible:</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; initial
+
+  initial --&gt; created
+  initial --&gt; deleted
+  initial --&gt; error
+
+  created --&gt; deleted
+  created --&gt; error
+
+  error --&gt; deleted
+
+  deleted --&gt; [*]</code></pre>
+<h2 id="nodes">Nodes</h2>
+<ul>
+<li><code>created</code>: on first check in, a node is created in the "created" state.</li>
+<li><code>stopping</code>: the node is gracefully shutting down.</li>
+<li><code>stopped</code>: the node has gracefully shut down.</li>
+<li><code>deleted</code>: the node was manually evacuated and removed. Note that the <code>node</code>
+  object is the only object type to never hard delete, although a <code>node</code> cannot
+  be undeleted.</li>
+<li><code>missing</code>: the node has not checked in within the NODE_CHECKIN_MAXIMUM deadline.</li>
+<li><code>error</code>: the node has not check in for ten times NODE_CHECKIN_MAXIMUM, and all
+  instances on this node have been declared to be in an error state. The <code>node</code>
+  object is the only object which can return from an <code>error</code> state to other states.</li>
+</ul>
+<p>The following transitions are possible:</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; created
+  [*] --&gt; error
+  [*] --&gt; missing
+
+  created --&gt; deleted
+  created --&gt; error
+  created --&gt; missing
+  created --&gt; stopping
+
+  stopping --&gt; stopped
+  stopping --&gt; deleted
+  stopping --&gt; error
+  stopping --&gt; created
+
+  stopped --&gt; created
+  stopped --&gt; deleted
+  stopped --&gt; error
+
+  error --&gt; created
+  error --&gt; deleted
+
+  missing --&gt; created
+  missing --&gt; deleted
+  missing --&gt; error</code></pre>
+<h2 id="upload">Upload</h2>
+<ul>
+<li><code>created</code>: the upload has data associated with it.</li>
+<li><code>deleted</code>: the network interface has been deleted.</li>
+</ul>
+<p>The following transitions are possible:</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; created
+  created --&gt; deleted
+  deleted --&gt; [*]</code></pre>
 
 
 
@@ -1867,10 +2148,10 @@ point, but apart from that just reach out and have a chat.</p>
     
     
       
-      <script id="__config" type="application/json">{"base": ".", "features": [], "search": "assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.50899def.min.js"></script>
+      <script src="../assets/javascripts/bundle.50899def.min.js"></script>
       
     
   </body>

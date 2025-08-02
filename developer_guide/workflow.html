@@ -10,26 +10,28 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/index.html">
+        <link rel="canonical" href="https://shakenfist.com/developer_guide/workflow.html">
       
       
+        <link rel="prev" href="updating_docs.html">
       
-        <link rel="next" href="manifesto.html">
+      
+        <link rel="next" href="../operator_guide/installation.html">
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.16">
     
     
       
-        <title>Shaken Fist</title>
+        <title>Workflow - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,7 +50,7 @@
       
     
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#introduction" class="md-skip">
+        <a href="#development-workflow" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +92,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../index.html" title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -110,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Introduction
+              Workflow
             
           </span>
         </div>
@@ -226,7 +228,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../index.html" title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -253,32 +255,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    Introduction
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
         
   
   
@@ -289,80 +269,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments" class="md-nav__link">
-    <span class="md-ellipsis">
-      Shaken Fist, an open cloud aimed at small and edge deployments
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-underlying-idea" class="md-nav__link">
-    <span class="md-ellipsis">
-      The underlying idea
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-choices" class="md-nav__link">
-    <span class="md-ellipsis">
-      Development choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#deployment-choices" class="md-nav__link">
-    <span class="md-ellipsis">
-      Deployment choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#id-like-to-subscribe-to-your-newsletter" class="md-nav__link">
-    <span class="md-ellipsis">
-      "I'd like to subscribe to your newsletter"
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-shaken-fist-can-i-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      What is Shaken Fist? Can I help?
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -374,7 +280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="manifesto.html" class="md-nav__link">
+      <a href="../manifesto.html" class="md-nav__link">
         
   
   
@@ -434,7 +340,7 @@
   
   
     <li class="md-nav__item">
-      <a href="components/overview.html" class="md-nav__link">
+      <a href="../components/overview.html" class="md-nav__link">
         
   
   
@@ -457,7 +363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="components/kerbside.html" class="md-nav__link">
+      <a href="../components/kerbside.html" class="md-nav__link">
         
   
   
@@ -487,7 +393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="features.html" class="md-nav__link">
+      <a href="../features.html" class="md-nav__link">
         
   
   
@@ -547,7 +453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="release_notes/v07-v08.html" class="md-nav__link">
+      <a href="../release_notes/v07-v08.html" class="md-nav__link">
         
   
   
@@ -577,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="community.html" class="md-nav__link">
+      <a href="../community.html" class="md-nav__link">
         
   
   
@@ -637,7 +543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/usage.html" class="md-nav__link">
+      <a href="../user_guide/usage.html" class="md-nav__link">
         
   
   
@@ -660,7 +566,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/authentication.html" class="md-nav__link">
+      <a href="../user_guide/authentication.html" class="md-nav__link">
         
   
   
@@ -683,7 +589,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/ansible.html" class="md-nav__link">
+      <a href="../user_guide/ansible.html" class="md-nav__link">
         
   
   
@@ -706,7 +612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/artifacts.html" class="md-nav__link">
+      <a href="../user_guide/artifacts.html" class="md-nav__link">
         
   
   
@@ -729,7 +635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/affinity.html" class="md-nav__link">
+      <a href="../user_guide/affinity.html" class="md-nav__link">
         
   
   
@@ -752,7 +658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/consoles.html" class="md-nav__link">
+      <a href="../user_guide/consoles.html" class="md-nav__link">
         
   
   
@@ -775,7 +681,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/events.html" class="md-nav__link">
+      <a href="../user_guide/events.html" class="md-nav__link">
         
   
   
@@ -798,7 +704,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/objects.html" class="md-nav__link">
+      <a href="../user_guide/objects.html" class="md-nav__link">
         
   
   
@@ -821,7 +727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/metadata.html" class="md-nav__link">
+      <a href="../user_guide/metadata.html" class="md-nav__link">
         
   
   
@@ -848,18 +754,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -875,7 +783,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Developer Guide
@@ -927,7 +835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/admin.html" class="md-nav__link">
+      <a href="api_reference/admin.html" class="md-nav__link">
         
   
   
@@ -950,7 +858,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/agentoperations.html" class="md-nav__link">
+      <a href="api_reference/agentoperations.html" class="md-nav__link">
         
   
   
@@ -973,7 +881,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/artifacts.html" class="md-nav__link">
+      <a href="api_reference/artifacts.html" class="md-nav__link">
         
   
   
@@ -996,7 +904,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/authentication.html" class="md-nav__link">
+      <a href="api_reference/authentication.html" class="md-nav__link">
         
   
   
@@ -1019,7 +927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/blob_checksums.html" class="md-nav__link">
+      <a href="api_reference/blob_checksums.html" class="md-nav__link">
         
   
   
@@ -1042,7 +950,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/blobs.html" class="md-nav__link">
+      <a href="api_reference/blobs.html" class="md-nav__link">
         
   
   
@@ -1065,7 +973,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/clusteroperations.html" class="md-nav__link">
+      <a href="api_reference/clusteroperations.html" class="md-nav__link">
         
   
   
@@ -1088,7 +996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/instances.html" class="md-nav__link">
+      <a href="api_reference/instances.html" class="md-nav__link">
         
   
   
@@ -1111,7 +1019,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/label.html" class="md-nav__link">
+      <a href="api_reference/label.html" class="md-nav__link">
         
   
   
@@ -1134,7 +1042,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/networks.html" class="md-nav__link">
+      <a href="api_reference/networks.html" class="md-nav__link">
         
   
   
@@ -1157,7 +1065,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/interfaces.html" class="md-nav__link">
+      <a href="api_reference/interfaces.html" class="md-nav__link">
         
   
   
@@ -1180,7 +1088,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/nodes.html" class="md-nav__link">
+      <a href="api_reference/nodes.html" class="md-nav__link">
         
   
   
@@ -1203,7 +1111,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/upload.html" class="md-nav__link">
+      <a href="api_reference/upload.html" class="md-nav__link">
         
   
   
@@ -1234,7 +1142,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/agent_protocol.html" class="md-nav__link">
+      <a href="agent_protocol.html" class="md-nav__link">
         
   
   
@@ -1257,7 +1165,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/authentication.html" class="md-nav__link">
+      <a href="authentication.html" class="md-nav__link">
         
   
   
@@ -1280,7 +1188,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/ci_api_coverage.html" class="md-nav__link">
+      <a href="ci_api_coverage.html" class="md-nav__link">
         
   
   
@@ -1303,7 +1211,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/release_process.html" class="md-nav__link">
+      <a href="release_process.html" class="md-nav__link">
         
   
   
@@ -1326,7 +1234,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/standards.html" class="md-nav__link">
+      <a href="standards.html" class="md-nav__link">
         
   
   
@@ -1349,7 +1257,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/state_machine.html" class="md-nav__link">
+      <a href="state_machine.html" class="md-nav__link">
         
   
   
@@ -1372,7 +1280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/updating_docs.html" class="md-nav__link">
+      <a href="updating_docs.html" class="md-nav__link">
         
   
   
@@ -1392,10 +1300,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="developer_guide/workflow.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Workflow
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="workflow.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1406,6 +1336,104 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#short-lesson" class="md-nav__link">
+    <span class="md-ellipsis">
+      Short Lesson
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git-development-the-shaken-fist-way" class="md-nav__link">
+    <span class="md-ellipsis">
+      Git Development - the Shaken Fist Way
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#branch-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Branch Types
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#process" class="md-nav__link">
+    <span class="md-ellipsis">
+      Process
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fix-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bug fix branches
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      Feature branches
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#merging" class="md-nav__link">
+    <span class="md-ellipsis">
+      Merging
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minimal-backports" class="md-nav__link">
+    <span class="md-ellipsis">
+      Minimal backports
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1463,7 +1491,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/installation.html" class="md-nav__link">
+      <a href="../operator_guide/installation.html" class="md-nav__link">
         
   
   
@@ -1486,7 +1514,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/artifacts.html" class="md-nav__link">
+      <a href="../operator_guide/artifacts.html" class="md-nav__link">
         
   
   
@@ -1509,7 +1537,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/authentication.html" class="md-nav__link">
+      <a href="../operator_guide/authentication.html" class="md-nav__link">
         
   
   
@@ -1532,7 +1560,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/locks.html" class="md-nav__link">
+      <a href="../operator_guide/locks.html" class="md-nav__link">
         
   
   
@@ -1555,7 +1583,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/networking/overview.html" class="md-nav__link">
+      <a href="../operator_guide/networking/overview.html" class="md-nav__link">
         
   
   
@@ -1578,7 +1606,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/power_states.html" class="md-nav__link">
+      <a href="../operator_guide/power_states.html" class="md-nav__link">
         
   
   
@@ -1601,7 +1629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/python_versions.html" class="md-nav__link">
+      <a href="../operator_guide/python_versions.html" class="md-nav__link">
         
   
   
@@ -1624,7 +1652,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/threads.html" class="md-nav__link">
+      <a href="../operator_guide/threads.html" class="md-nav__link">
         
   
   
@@ -1647,7 +1675,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/upgrades.html" class="md-nav__link">
+      <a href="../operator_guide/upgrades.html" class="md-nav__link">
         
   
   
@@ -1697,56 +1725,80 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments" class="md-nav__link">
+  <a href="#short-lesson" class="md-nav__link">
     <span class="md-ellipsis">
-      Shaken Fist, an open cloud aimed at small and edge deployments
+      Short Lesson
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-underlying-idea" class="md-nav__link">
+  <a href="#git-development-the-shaken-fist-way" class="md-nav__link">
     <span class="md-ellipsis">
-      The underlying idea
+      Git Development - the Shaken Fist Way
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#development-choices" class="md-nav__link">
+  <a href="#branch-types" class="md-nav__link">
     <span class="md-ellipsis">
-      Development choices
+      Branch Types
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#deployment-choices" class="md-nav__link">
+  <a href="#process" class="md-nav__link">
     <span class="md-ellipsis">
-      Deployment choices
+      Process
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fix-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bug fix branches
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#id-like-to-subscribe-to-your-newsletter" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#feature-branches" class="md-nav__link">
     <span class="md-ellipsis">
-      "I'd like to subscribe to your newsletter"
+      Feature branches
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-shaken-fist-can-i-help" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#merging" class="md-nav__link">
     <span class="md-ellipsis">
-      What is Shaken Fist? Can I help?
+      Merging
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minimal-backports" class="md-nav__link">
+    <span class="md-ellipsis">
+      Minimal backports
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1769,56 +1821,70 @@
   
 
 
-<h1 id="introduction">Introduction</h1>
-<h2 id="shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments">Shaken Fist, an open cloud aimed at small and edge deployments</h2>
-<p>Shaken Fist is a deliberately opinionated cloud intended for small deployments. We
-spend a lot of time trying to do the simplest possible thing well, and keep our
-resource usage on idle deployments as low as possible. Shaken Fist has progressed
-from being a proof of concept to being a functional cloud, although the release
-numbers being below zero indicates that we are still stabilizing the REST API
-and that breaking changes might occur. 1.0 will be released when we are relatively
-sure of stability going forwards.</p>
-<p>Shaken Fist started a personal research project, but has grown into something
-which is starting to see wider contributions and some small commercial deployments.</p>
-<h2 id="the-underlying-idea">The underlying idea</h2>
-<p>Originally Shaken Fist came about as a reaction to the increasing complexity of
-OpenStack, as well as a desire to experiment with alternative approaches to
-solving the problems that OpenStack Compute addresses. What I really wanted was
-a simple API to orchestrate virtual machines, but it needed to run with minimal
-resource overhead and be simple to deploy. I also wanted it to always work in a
-predictable way.</p>
-<p>One of the reasons OpenStack is so complicated and its behaviour varies is because
-it has many options to configure. The solution seemed obvious to me -- a cloud
-that is super opinionated. For each different functional requirement there is
-one option, and the simplest option is chosen where possible. Read on for some
-examples.</p>
-<h2 id="development-choices">Development choices</h2>
-<p>If there is an existing library which does a thing, we use it. OpenStack suffered
-from being old (and having issues with re-writes being hard), as well as licensing
-constraints. We just use the code that others have provided to the community. Always.</p>
-<h2 id="deployment-choices">Deployment choices</h2>
-<p>libvirt is the only supported hypervisor. Instances are specified to libvirt with
-simple templated XML. If your local requirements are different to what's in the
-template, you're welcome to change the template to meet your needs. If your
-template changes break things, you're also welcome to debug what went wrong for
-yourself.</p>
-<h2 id="id-like-to-subscribe-to-your-newsletter">"I'd like to subscribe to your newsletter"</h2>
-<p>First off, we don't have a newsletter. That said, updates will be announced here
-as they happen. What we do have is useful links:</p>
+<h1 id="development-workflow">Development Workflow</h1>
+<h3 id="short-lesson">Short Lesson</h3>
+<p>The majority of teams using git have a work flow that looks similar to the four
+well known work flows:</p>
 <ul>
-<li>
-<p><a href="http://github.com/shakenfist/shakenfist">The Shaken Fist repository</a> is where
-  the code for the server is, including the deployer. Its a good place to start.</p>
-</li>
-<li>
-<p>There is also <a href="http://github.com/shakenfist/client-python">the python client repository</a>
-  contains the python API client, as well as the command line client that users
-  and shell scripts use to interact with Shaken Fist.</p>
-</li>
+<li><a href="https://datasift.github.io/gitflow/IntroducingGitFlow.html">Git Flow</a></li>
+<li><a href="https://guides.github.com/introduction/flow/">GitHub Flow</a></li>
+<li><a href="https://about.gitlab.com/blog/2014/09/29/gitlab-flow/">GitLab Flow</a></li>
+<li><a href="https://trunkbaseddevelopment.com/">Trunk Based Development</a></li>
 </ul>
-<h2 id="what-is-shaken-fist-can-i-help">What is Shaken Fist? Can I help?</h2>
-<p>The <a href="/manifesto/">Shaken Fist Manifesto</a> is our general conceptual starting
-point, but apart from that just reach out and have a chat.</p>
+<h2 id="git-development-the-shaken-fist-way">Git Development - the Shaken Fist Way</h2>
+<p>The Shaken Fist developers have chosen <strong>Trunk Based Development</strong> with some
+minor tweaks.</p>
+<h2 id="branch-types">Branch Types</h2>
+<ol>
+<li>
+<p>Branch <code>develop</code></p>
+<ul>
+<li>This is the development trunk and has largely replaced <code>master</code> in most of our respositories.</li>
+<li>All <code>feature</code> branches are branched from <code>develop</code> and merged to <code>develop</code>.</li>
+<li>New releases are cut from the <code>develop</code> branch when we decide its time to bump the major release number.</li>
+<li>The <code>develop</code> branch has automated nightly CI tests, and failures create GitHub issues which must be regularly triaged. That is, CI failures on <code>develop</code> are exceptional and should not be accepted as flakey tests or "situation normal". CI failures are labelled as <code>ci-failure</code> in GitHub issues.</li>
+</ul>
+</li>
+<li>
+<p>Feature branches</p>
+<ul>
+<li>Short-lived, generally a few days although sometimes much longer for complicated things.</li>
+<li>Normally only one developer.</li>
+<li>When presented to the team, it is expected to pass the linter, unit tests, and CI tests.</li>
+<li>It is normal that other team members suggest changes / improvements before merging.</li>
+</ul>
+</li>
+<li>
+<p>Branches <code>vX.X-release</code></p>
+<ul>
+<li>Created from <code>develop</code> when a new major release is first cut. Patches and minor releases for that major version are then cut from this branch.</li>
+<li>Commits to this branch are cherry-picks from <code>develop</code> except in exceptional circumstances (for example the code to be changed no longer existing on <code>develop</code>).</li>
+<li>It is not expected that many commits are made to this branch.</li>
+<li>If many commits are required to a release branch then this indicates the need for another release.</li>
+<li>"Recent" release branches has automated nightly CI tests, and failures create GitHub issues which must be regularly triaged. That is, CI failures on recent releases are exceptional and should not be accepted as flakey tests or "situation normal". CI failures are labelled as <code>ci-failure</code> in GitHub issues. For now, this is treated as all releases from v0.6 onwards, although that will likely change at some point.</li>
+</ul>
+</li>
+</ol>
+<h2 id="process">Process</h2>
+<h3 id="bug-fix-branches">Bug fix branches</h3>
+<ul>
+<li>Bug fix branches have a prefix consisting of the GitHub issue number and the word "bug", for example "bug-XXX".</li>
+<li>You commit should include the text <code>Fixes #XXX</code> where XXX is the GitHub issue number for the bug. It is possible to fix more than one GitHub issue in a single commit.</li>
+</ul>
+<h3 id="feature-branches">Feature branches</h3>
+<ul>
+<li>Feature branches should be named "feature-branch-XXX" where XXX is a short description of the feature.</li>
+<li>The feature branch developers should squash commits to remove WIP commits before creating a Pull Request, but it is acceptable to have a series of incremental changes building up to a complete feature in the feature branch at merge time.</li>
+<li>It is preferable that each remaining commit passes unit testing and CI, but the final state that is merged <em>must</em> pass unit tests and CI.</li>
+</ul>
+<h3 id="merging">Merging</h3>
+<ul>
+<li>Commits are <strong>not</strong> squashed when merged to <code>develop</code>.</li>
+<li>Not squashing commits maintains history of multiple issues being solved.</li>
+<li>Pull Request related commits remain grouped and can be understood as a single merge</li>
+</ul>
+<h3 id="minimal-backports">Minimal backports</h3>
+<p>Only <strong>necessary</strong> bug fixes are cherry-picked from <code>master</code> to an existing release branch.</p>
 
 
 
@@ -1867,10 +1933,10 @@ point, but apart from that just reach out and have a chat.</p>
     
     
       
-      <script id="__config" type="application/json">{"base": ".", "features": [], "search": "assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.50899def.min.js"></script>
+      <script src="../assets/javascripts/bundle.50899def.min.js"></script>
       
     
   </body>

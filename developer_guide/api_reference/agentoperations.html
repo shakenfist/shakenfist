@@ -10,26 +10,28 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/index.html">
+        <link rel="canonical" href="https://shakenfist.com/developer_guide/api_reference/agentoperations.html">
       
       
+        <link rel="prev" href="admin.html">
       
-        <link rel="next" href="manifesto.html">
+      
+        <link rel="next" href="artifacts.html">
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.16">
     
     
       
-        <title>Shaken Fist</title>
+        <title>Agent Operations (/agentoperations/) - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,7 +50,7 @@
       
     
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#introduction" class="md-skip">
+        <a href="#agent-operations-agentoperations" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +92,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../index.html" title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -110,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Introduction
+              Agent Operations (/agentoperations/)
             
           </span>
         </div>
@@ -226,7 +228,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../index.html" title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -253,32 +255,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    Introduction
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../index.html" class="md-nav__link">
         
   
   
@@ -289,80 +269,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments" class="md-nav__link">
-    <span class="md-ellipsis">
-      Shaken Fist, an open cloud aimed at small and edge deployments
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-underlying-idea" class="md-nav__link">
-    <span class="md-ellipsis">
-      The underlying idea
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-choices" class="md-nav__link">
-    <span class="md-ellipsis">
-      Development choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#deployment-choices" class="md-nav__link">
-    <span class="md-ellipsis">
-      Deployment choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#id-like-to-subscribe-to-your-newsletter" class="md-nav__link">
-    <span class="md-ellipsis">
-      "I'd like to subscribe to your newsletter"
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-shaken-fist-can-i-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      What is Shaken Fist? Can I help?
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -374,7 +280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="manifesto.html" class="md-nav__link">
+      <a href="../../manifesto.html" class="md-nav__link">
         
   
   
@@ -434,7 +340,7 @@
   
   
     <li class="md-nav__item">
-      <a href="components/overview.html" class="md-nav__link">
+      <a href="../../components/overview.html" class="md-nav__link">
         
   
   
@@ -457,7 +363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="components/kerbside.html" class="md-nav__link">
+      <a href="../../components/kerbside.html" class="md-nav__link">
         
   
   
@@ -487,7 +393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="features.html" class="md-nav__link">
+      <a href="../../features.html" class="md-nav__link">
         
   
   
@@ -547,7 +453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="release_notes/v07-v08.html" class="md-nav__link">
+      <a href="../../release_notes/v07-v08.html" class="md-nav__link">
         
   
   
@@ -577,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="community.html" class="md-nav__link">
+      <a href="../../community.html" class="md-nav__link">
         
   
   
@@ -637,7 +543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/usage.html" class="md-nav__link">
+      <a href="../../user_guide/usage.html" class="md-nav__link">
         
   
   
@@ -660,7 +566,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/authentication.html" class="md-nav__link">
+      <a href="../../user_guide/authentication.html" class="md-nav__link">
         
   
   
@@ -683,7 +589,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/ansible.html" class="md-nav__link">
+      <a href="../../user_guide/ansible.html" class="md-nav__link">
         
   
   
@@ -706,7 +612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/artifacts.html" class="md-nav__link">
+      <a href="../../user_guide/artifacts.html" class="md-nav__link">
         
   
   
@@ -729,7 +635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/affinity.html" class="md-nav__link">
+      <a href="../../user_guide/affinity.html" class="md-nav__link">
         
   
   
@@ -752,7 +658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/consoles.html" class="md-nav__link">
+      <a href="../../user_guide/consoles.html" class="md-nav__link">
         
   
   
@@ -775,7 +681,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/events.html" class="md-nav__link">
+      <a href="../../user_guide/events.html" class="md-nav__link">
         
   
   
@@ -798,7 +704,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/objects.html" class="md-nav__link">
+      <a href="../../user_guide/objects.html" class="md-nav__link">
         
   
   
@@ -821,7 +727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/metadata.html" class="md-nav__link">
+      <a href="../../user_guide/metadata.html" class="md-nav__link">
         
   
   
@@ -848,18 +754,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -875,7 +783,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Developer Guide
@@ -886,18 +794,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" checked>
         
           
           <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
@@ -913,7 +823,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8_1">
             <span class="md-nav__icon md-icon"></span>
             API reference
@@ -927,7 +837,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/admin.html" class="md-nav__link">
+      <a href="admin.html" class="md-nav__link">
         
   
   
@@ -947,10 +857,19 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="developer_guide/api_reference/agentoperations.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="agentoperations.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -961,6 +880,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -973,7 +893,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/artifacts.html" class="md-nav__link">
+      <a href="artifacts.html" class="md-nav__link">
         
   
   
@@ -996,7 +916,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/authentication.html" class="md-nav__link">
+      <a href="authentication.html" class="md-nav__link">
         
   
   
@@ -1019,7 +939,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/blob_checksums.html" class="md-nav__link">
+      <a href="blob_checksums.html" class="md-nav__link">
         
   
   
@@ -1042,7 +962,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/blobs.html" class="md-nav__link">
+      <a href="blobs.html" class="md-nav__link">
         
   
   
@@ -1065,7 +985,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/clusteroperations.html" class="md-nav__link">
+      <a href="clusteroperations.html" class="md-nav__link">
         
   
   
@@ -1088,7 +1008,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/instances.html" class="md-nav__link">
+      <a href="instances.html" class="md-nav__link">
         
   
   
@@ -1111,7 +1031,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/label.html" class="md-nav__link">
+      <a href="label.html" class="md-nav__link">
         
   
   
@@ -1134,7 +1054,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/networks.html" class="md-nav__link">
+      <a href="networks.html" class="md-nav__link">
         
   
   
@@ -1157,7 +1077,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/interfaces.html" class="md-nav__link">
+      <a href="interfaces.html" class="md-nav__link">
         
   
   
@@ -1180,7 +1100,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/nodes.html" class="md-nav__link">
+      <a href="nodes.html" class="md-nav__link">
         
   
   
@@ -1203,7 +1123,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/api_reference/upload.html" class="md-nav__link">
+      <a href="upload.html" class="md-nav__link">
         
   
   
@@ -1234,7 +1154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/agent_protocol.html" class="md-nav__link">
+      <a href="../agent_protocol.html" class="md-nav__link">
         
   
   
@@ -1257,7 +1177,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/authentication.html" class="md-nav__link">
+      <a href="../authentication.html" class="md-nav__link">
         
   
   
@@ -1280,7 +1200,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/ci_api_coverage.html" class="md-nav__link">
+      <a href="../ci_api_coverage.html" class="md-nav__link">
         
   
   
@@ -1303,7 +1223,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/release_process.html" class="md-nav__link">
+      <a href="../release_process.html" class="md-nav__link">
         
   
   
@@ -1326,7 +1246,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/standards.html" class="md-nav__link">
+      <a href="../standards.html" class="md-nav__link">
         
   
   
@@ -1349,7 +1269,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/state_machine.html" class="md-nav__link">
+      <a href="../state_machine.html" class="md-nav__link">
         
   
   
@@ -1372,7 +1292,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/updating_docs.html" class="md-nav__link">
+      <a href="../updating_docs.html" class="md-nav__link">
         
   
   
@@ -1395,7 +1315,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer_guide/workflow.html" class="md-nav__link">
+      <a href="../workflow.html" class="md-nav__link">
         
   
   
@@ -1463,7 +1383,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/installation.html" class="md-nav__link">
+      <a href="../../operator_guide/installation.html" class="md-nav__link">
         
   
   
@@ -1486,7 +1406,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/artifacts.html" class="md-nav__link">
+      <a href="../../operator_guide/artifacts.html" class="md-nav__link">
         
   
   
@@ -1509,7 +1429,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/authentication.html" class="md-nav__link">
+      <a href="../../operator_guide/authentication.html" class="md-nav__link">
         
   
   
@@ -1532,7 +1452,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/locks.html" class="md-nav__link">
+      <a href="../../operator_guide/locks.html" class="md-nav__link">
         
   
   
@@ -1555,7 +1475,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/networking/overview.html" class="md-nav__link">
+      <a href="../../operator_guide/networking/overview.html" class="md-nav__link">
         
   
   
@@ -1578,7 +1498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/power_states.html" class="md-nav__link">
+      <a href="../../operator_guide/power_states.html" class="md-nav__link">
         
   
   
@@ -1601,7 +1521,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/python_versions.html" class="md-nav__link">
+      <a href="../../operator_guide/python_versions.html" class="md-nav__link">
         
   
   
@@ -1624,7 +1544,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/threads.html" class="md-nav__link">
+      <a href="../../operator_guide/threads.html" class="md-nav__link">
         
   
   
@@ -1647,7 +1567,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operator_guide/upgrades.html" class="md-nav__link">
+      <a href="../../operator_guide/upgrades.html" class="md-nav__link">
         
   
   
@@ -1690,68 +1610,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments" class="md-nav__link">
-    <span class="md-ellipsis">
-      Shaken Fist, an open cloud aimed at small and edge deployments
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-underlying-idea" class="md-nav__link">
-    <span class="md-ellipsis">
-      The underlying idea
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-choices" class="md-nav__link">
-    <span class="md-ellipsis">
-      Development choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#deployment-choices" class="md-nav__link">
-    <span class="md-ellipsis">
-      Deployment choices
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#id-like-to-subscribe-to-your-newsletter" class="md-nav__link">
-    <span class="md-ellipsis">
-      "I'd like to subscribe to your newsletter"
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-shaken-fist-can-i-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      What is Shaken Fist? Can I help?
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -1769,56 +1627,69 @@
   
 
 
-<h1 id="introduction">Introduction</h1>
-<h2 id="shaken-fist-an-open-cloud-aimed-at-small-and-edge-deployments">Shaken Fist, an open cloud aimed at small and edge deployments</h2>
-<p>Shaken Fist is a deliberately opinionated cloud intended for small deployments. We
-spend a lot of time trying to do the simplest possible thing well, and keep our
-resource usage on idle deployments as low as possible. Shaken Fist has progressed
-from being a proof of concept to being a functional cloud, although the release
-numbers being below zero indicates that we are still stabilizing the REST API
-and that breaking changes might occur. 1.0 will be released when we are relatively
-sure of stability going forwards.</p>
-<p>Shaken Fist started a personal research project, but has grown into something
-which is starting to see wider contributions and some small commercial deployments.</p>
-<h2 id="the-underlying-idea">The underlying idea</h2>
-<p>Originally Shaken Fist came about as a reaction to the increasing complexity of
-OpenStack, as well as a desire to experiment with alternative approaches to
-solving the problems that OpenStack Compute addresses. What I really wanted was
-a simple API to orchestrate virtual machines, but it needed to run with minimal
-resource overhead and be simple to deploy. I also wanted it to always work in a
-predictable way.</p>
-<p>One of the reasons OpenStack is so complicated and its behaviour varies is because
-it has many options to configure. The solution seemed obvious to me -- a cloud
-that is super opinionated. For each different functional requirement there is
-one option, and the simplest option is chosen where possible. Read on for some
-examples.</p>
-<h2 id="development-choices">Development choices</h2>
-<p>If there is an existing library which does a thing, we use it. OpenStack suffered
-from being old (and having issues with re-writes being hard), as well as licensing
-constraints. We just use the code that others have provided to the community. Always.</p>
-<h2 id="deployment-choices">Deployment choices</h2>
-<p>libvirt is the only supported hypervisor. Instances are specified to libvirt with
-simple templated XML. If your local requirements are different to what's in the
-template, you're welcome to change the template to meet your needs. If your
-template changes break things, you're also welcome to debug what went wrong for
-yourself.</p>
-<h2 id="id-like-to-subscribe-to-your-newsletter">"I'd like to subscribe to your newsletter"</h2>
-<p>First off, we don't have a newsletter. That said, updates will be announced here
-as they happen. What we do have is useful links:</p>
+<h1 id="agent-operations-agentoperations">Agent Operations (/agentoperations/)</h1>
+<p>Since v0.7, when an instance is running the Shaken Fist agent, you can queue agent
+operations to run on that instance. These operations consist of a series of commands
+which are executed in return, with results for each being gathered as they execute.
+In general the API for agent operations is instance-centric -- you lookup the
+agent operations an instance has seen, and then can request further information
+about the agent operation directly. There is currently no way to search for an
+agent operation outside the context of its parent instance.</p>
+<p>For information on how to create an agent operation for an instance, refer to
+the <a href="/developer_guide/api_reference/instances/#executing-commands-within-an-instance">instances API documentation on creating agent operations</a>. For information on how to list the
+agent operations for a given instance, refer to the <a href="/developer_guide/api_reference/instances/#fetching-information-about-an-instances-agent-operations">instances API documentation on listing agent operations</a>.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
 <ul>
-<li>
-<p><a href="http://github.com/shakenfist/shakenfist">The Shaken Fist repository</a> is where
-  the code for the server is, including the deployer. Its a good place to start.</p>
-</li>
-<li>
-<p>There is also <a href="http://github.com/shakenfist/client-python">the python client repository</a>
-  contains the python API client, as well as the command line client that users
-  and shell scripts use to interact with Shaken Fist.</p>
-</li>
+<li><a href="https://openapi.shakenfist.com/#/agentoperations/get_agentoperations__operation_uuid_">GET /agentoperations/{operation_uuid}</a>: Lookup a specific agent operation.</li>
+<li><a href="https://openapi.shakenfist.com/#/agentoperations/delete_agentoperations__operation_uuid_">DELETE /agentoperations/{operation_uuid}</a>: Delete a specific agent operation.</li>
 </ul>
-<h2 id="what-is-shaken-fist-can-i-help">What is Shaken Fist? Can I help?</h2>
-<p>The <a href="/manifesto/">Shaken Fist Manifesto</a> is our general conceptual starting
-point, but apart from that just reach out and have a chat.</p>
+</details>
+<details class="example">
+<summary>Python API client: lookup an agent operation by uuid</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">agentop</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_agent_operation</span><span class="p">(</span><span class="s1">&#39;5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">agentop</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<p>Which returns something like:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;commands&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;block-for-result&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;command&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;execute&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;commandline&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cat /tmp/README.md&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;instance_uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;a771fb13-aaad-4cb6-a86b-7ee51e7bacc6&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">    </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vdi&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;0&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;command-line&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cat /tmp/README.md&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;result&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;return-code&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;stderr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;stdout&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;complete&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="p">}</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: delete an agent operation by uuid</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">agentop</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">delete_agent_operation</span><span class="p">(</span><span class="s1">&#39;5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
 
 
 
@@ -1867,10 +1738,10 @@ point, but apart from that just reach out and have a chat.</p>
     
     
       
-      <script id="__config" type="application/json">{"base": ".", "features": [], "search": "assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.50899def.min.js"></script>
+      <script src="../../assets/javascripts/bundle.50899def.min.js"></script>
       
     
   </body>
