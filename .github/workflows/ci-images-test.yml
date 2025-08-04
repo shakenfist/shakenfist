@@ -14,49 +14,63 @@ jobs:
       matrix:
         os: [
             {
-                'name': 'debian-11-test',
+                'name': 'debian-11',
                 'baseimage': 'debian:11',
                 'baseuser': 'debian',
-                'outputlabel': 'ci-images/debian-11-test',
-                'scheduled': False
+                'outputlabel': 'ci-images/debian-11',
+                'scheduled': True,
+                'runs_on': 'debian-11'
             },
             {
-                'name': 'debian-12-test',
+                'name': 'debian-12',
                 'baseimage': 'debian:12',
                 'baseuser': 'debian',
-                'outputlabel': 'ci-images/debian-12-test',
-                'scheduled': False
+                'outputlabel': 'ci-images/debian-12',
+                'scheduled': True,
+                'runs_on': 'debian-11'
             },
             {
-                'name': 'rocky-9-test',
+                'name': 'rocky-9',
                 'baseimage': 'rocky:9',
                 'baseuser': 'cloud-user',
-                'outputlabel': 'ci-images/rocky-9-test',
-                'scheduled': False
+                'outputlabel': 'ci-images/rocky-9',
+                'scheduled': True,
+                'runs_on': 'debian-11'
             },
             {
-                'name': 'ubuntu-2004-test',
+                'name': 'rocky-10',
+                'baseimage': 'rocky:10',
+                'baseuser': 'cloud-user',
+                'outputlabel': 'ci-images/rocky-10',
+                'scheduled': True,
+                'runs_on': 'debian-12'
+            },
+            {
+                'name': 'ubuntu-2004',
                 'baseimage': 'ubuntu:20.04',
                 'baseuser': 'ubuntu',
-                'outputlabel': 'ci-images/ubuntu-2004-test',
-                'scheduled': False
+                'outputlabel': 'ci-images/ubuntu-2004',
+                'scheduled': True,
+                'runs_on': 'debian-11'
             },
             {
-                'name': 'ubuntu-2204-test',
+                'name': 'ubuntu-2204',
                 'baseimage': 'ubuntu:22.04',
                 'baseuser': 'ubuntu',
-                'outputlabel': 'ci-images/ubuntu-2204-test',
-                'scheduled': False
+                'outputlabel': 'ci-images/ubuntu-2204',
+                'scheduled': True,
+                'runs_on': 'debian-11'
             },
             {
-                'name': 'ubuntu-2404-test',
+                'name': 'ubuntu-2404',
                 'baseimage': 'ubuntu:24.04',
                 'baseuser': 'ubuntu',
-                'outputlabel': 'ci-images/ubuntu-2404-test',
-                'scheduled': False
+                'outputlabel': 'ci-images/ubuntu-2404',
+                'scheduled': True,
+                'runs_on': 'debian-11'
             },
         ]
-    runs-on: [self-hosted, vm]
+    runs-on: [self-hosted, vm, '${{ matrix.os.runs_on }}']
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os.name }}
       cancel-in-progress: true
