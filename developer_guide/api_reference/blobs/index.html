@@ -10,22 +10,28 @@
       
       
       
+        <link rel="canonical" href="https://shakenfist.com/developer_guide/api_reference/blobs/">
       
       
+        <link rel="prev" href="../blob_checksums/">
       
-      <link rel="icon" href="/assets/images/favicon.png">
+      
+        <link rel="next" href="../clusteroperations/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.16">
     
     
       
-        <title>Shaken Fist</title>
+        <title>Blobs (/blobs/) - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="/assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="/assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -44,7 +50,7 @@
       
     
     
-    <script>__md_scope=new URL("/",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -69,6 +75,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#blobs-blobs" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -81,7 +92,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -101,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              Blobs (/blobs/)
             
           </span>
         </div>
@@ -217,7 +228,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -247,7 +258,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/." class="md-nav__link">
+      <a href="../../.." class="md-nav__link">
         
   
   
@@ -269,7 +280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/manifesto/" class="md-nav__link">
+      <a href="../../../manifesto/" class="md-nav__link">
         
   
   
@@ -329,7 +340,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/components/overview/" class="md-nav__link">
+      <a href="../../../components/overview/" class="md-nav__link">
         
   
   
@@ -352,7 +363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/components/kerbside/" class="md-nav__link">
+      <a href="../../../components/kerbside/" class="md-nav__link">
         
   
   
@@ -382,7 +393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/features/" class="md-nav__link">
+      <a href="../../../features/" class="md-nav__link">
         
   
   
@@ -442,7 +453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/release_notes/v07-v08/" class="md-nav__link">
+      <a href="../../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -472,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/community/" class="md-nav__link">
+      <a href="../../../community/" class="md-nav__link">
         
   
   
@@ -532,7 +543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/usage/" class="md-nav__link">
+      <a href="../../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -555,7 +566,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/authentication/" class="md-nav__link">
+      <a href="../../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -578,7 +589,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/ansible/" class="md-nav__link">
+      <a href="../../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -601,7 +612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/artifacts/" class="md-nav__link">
+      <a href="../../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -624,7 +635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/affinity/" class="md-nav__link">
+      <a href="../../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -647,7 +658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/consoles/" class="md-nav__link">
+      <a href="../../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -670,7 +681,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/events/" class="md-nav__link">
+      <a href="../../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -693,7 +704,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/objects/" class="md-nav__link">
+      <a href="../../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -716,7 +727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/metadata/" class="md-nav__link">
+      <a href="../../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -743,18 +754,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -770,7 +783,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Developer Guide
@@ -781,18 +794,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" checked>
         
           
           <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
@@ -808,7 +823,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8_1">
             <span class="md-nav__icon md-icon"></span>
             API reference
@@ -822,7 +837,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/admin/" class="md-nav__link">
+      <a href="../admin/" class="md-nav__link">
         
   
   
@@ -845,7 +860,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/agentoperations/" class="md-nav__link">
+      <a href="../agentoperations/" class="md-nav__link">
         
   
   
@@ -868,7 +883,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/artifacts/" class="md-nav__link">
+      <a href="../artifacts/" class="md-nav__link">
         
   
   
@@ -891,7 +906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/authentication/" class="md-nav__link">
+      <a href="../authentication/" class="md-nav__link">
         
   
   
@@ -914,7 +929,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+      <a href="../blob_checksums/" class="md-nav__link">
         
   
   
@@ -934,10 +949,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/blobs/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Blobs (/blobs/)
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -948,6 +985,44 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fetching-information-about-a-blob" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fetching information about a blob
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      Metadata
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -960,7 +1035,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+      <a href="../clusteroperations/" class="md-nav__link">
         
   
   
@@ -983,7 +1058,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/instances/" class="md-nav__link">
+      <a href="../instances/" class="md-nav__link">
         
   
   
@@ -1006,7 +1081,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/label/" class="md-nav__link">
+      <a href="../label/" class="md-nav__link">
         
   
   
@@ -1029,7 +1104,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/networks/" class="md-nav__link">
+      <a href="../networks/" class="md-nav__link">
         
   
   
@@ -1052,7 +1127,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/interfaces/" class="md-nav__link">
+      <a href="../interfaces/" class="md-nav__link">
         
   
   
@@ -1075,7 +1150,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/nodes/" class="md-nav__link">
+      <a href="../nodes/" class="md-nav__link">
         
   
   
@@ -1098,7 +1173,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/upload/" class="md-nav__link">
+      <a href="../upload/" class="md-nav__link">
         
   
   
@@ -1129,7 +1204,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/agent_protocol/" class="md-nav__link">
+      <a href="../../agent_protocol/" class="md-nav__link">
         
   
   
@@ -1152,7 +1227,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/authentication/" class="md-nav__link">
+      <a href="../../authentication/" class="md-nav__link">
         
   
   
@@ -1175,7 +1250,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/ci_api_coverage/" class="md-nav__link">
+      <a href="../../ci_api_coverage/" class="md-nav__link">
         
   
   
@@ -1198,7 +1273,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/release_process/" class="md-nav__link">
+      <a href="../../release_process/" class="md-nav__link">
         
   
   
@@ -1221,7 +1296,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/standards/" class="md-nav__link">
+      <a href="../../standards/" class="md-nav__link">
         
   
   
@@ -1244,7 +1319,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/state_machine/" class="md-nav__link">
+      <a href="../../state_machine/" class="md-nav__link">
         
   
   
@@ -1267,7 +1342,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/updating_docs/" class="md-nav__link">
+      <a href="../../updating_docs/" class="md-nav__link">
         
   
   
@@ -1290,7 +1365,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/workflow/" class="md-nav__link">
+      <a href="../../workflow/" class="md-nav__link">
         
   
   
@@ -1358,7 +1433,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/installation/" class="md-nav__link">
+      <a href="../../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -1381,7 +1456,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/artifacts/" class="md-nav__link">
+      <a href="../../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -1404,7 +1479,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/authentication/" class="md-nav__link">
+      <a href="../../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -1427,7 +1502,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/locks/" class="md-nav__link">
+      <a href="../../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -1450,7 +1525,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/networking/overview/" class="md-nav__link">
+      <a href="../../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -1473,7 +1548,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/power_states/" class="md-nav__link">
+      <a href="../../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -1496,7 +1571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/python_versions/" class="md-nav__link">
+      <a href="../../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -1519,7 +1594,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/threads/" class="md-nav__link">
+      <a href="../../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -1542,7 +1617,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/upgrades/" class="md-nav__link">
+      <a href="../../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -1582,6 +1657,34 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fetching-information-about-a-blob" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fetching information about a blob
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      Metadata
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1593,8 +1696,177 @@
             <div class="md-content" data-md-component="content">
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+  
+
+
+<h1 id="blobs-blobs">Blobs (/blobs/)</h1>
+<p>In general you interact with blobs as attributes of other objects -- blobs
+being the most obvious example. However, there is limited support in the REST API
+for interacting directly with blobs as well. Blobs are also considered a special
+case in that they are not namespaced like most other objects. That is, possession
+of the UUID of a blob is considered evidence that you should have access to it.
+This is because blobs can be shared between objects if the data for those
+objects is currently the identical. This is also why only administrators can list
+all blobs in a given Shaken Fist cluster.</p>
+<details class="note" open="open">
+<summary>Note</summary>
+<p>For a detailed reference on the state machine for blobs, see the
+<a href="/developer_guide/state_machine/#blobs">developer documentation on object states</a>.</p>
+</details>
+<h2 id="fetching-information-about-a-blob">Fetching information about a blob</h2>
+<p>If you know the UUID of a blob, then you can GET information about that blob from
+the REST API, as well as fetching the actual data the blob is storing as well.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/blobs/get_blobs">GET /blobs</a>: List all blobs in a cluster. You must be an administrator to make this call.</li>
+<li><a href="https://openapi.shakenfist.com/#/blobs/get_blobs__blob_uuid_">GET /blobs/{blob_uuid}</a>: Get information about a specific blob.</li>
+<li><a href="https://openapi.shakenfist.com/#/blobs/get_blobs__blob_uuid__data">GET /blobs/{blob_uuid}/data</a>: Get the stored data for a specific blob.</li>
+<li><a href="https://openapi.shakenfist.com/#/blobs/get_blob_checksums_sha512__hash_">GET /blob_checksums/sha512/{hash}</a>: Find a blob with this hash.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: get a specific blob</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_blob</span><span class="p">(</span><span class="s1">&#39;578da8b6-eb98-4e10-bb36-e4d4d763d312&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: download the data for a specific blob</summary>
+<p>This example requires retry logic to handle the HTTP connection dropping
+while transferring large files.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">http</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">urllib3</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+
+<span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">connection_failures</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">done</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;output&#39;</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="k">while</span> <span class="ow">not</span> <span class="n">done</span><span class="p">:</span>
+        <span class="n">bytes_in_attempt</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_blob_data</span><span class="p">(</span>
+                    <span class="s1">&#39;578da8b6-eb98-4e10-bb36-e4d4d763d312&#39;</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="n">total</span><span class="p">):</span>
+                <span class="n">received</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+                <span class="n">bytes_in_attempt</span> <span class="o">+=</span> <span class="n">received</span>
+                <span class="n">total</span> <span class="o">+=</span> <span class="n">received</span>
+
+            <span class="n">done</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">except</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NewConnectionError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">connection_failures</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">connection_failures</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;HTTP connection repeatedly failed: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ConnectionResetError</span><span class="p">,</span> <span class="n">http</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">IncompleteRead</span><span class="p">,</span>
+                <span class="n">urllib3</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ProtocolError</span><span class="p">,</span>
+                <span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ChunkedEncodingError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># An API error (or timeout) occurred. Retry unless we got nothing.</span>
+            <span class="k">if</span> <span class="n">bytes_in_attempt</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;HTTP connection dropped without transferring data: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: search for a blob by sha512 hash</summary>
+<p>Note that this call is not supported by older versions of the Shaken Fist
+REST API.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">check_capability</span><span class="p">(</span><span class="s1">&#39;blob-search-by-hash&#39;</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Searching by hash is not supported&#39;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">sha512_hash</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha512</span><span class="p">()</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;input&#39;</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">4096</span><span class="p">)</span>
+        <span class="k">while</span> <span class="n">d</span><span class="p">:</span>
+            <span class="n">sha512_hash</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">4096</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Searching for a pre-existing blob with this hash...&#39;</span><span class="p">)</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_blob_by_sha512</span><span class="p">(</span><span class="n">sha512_hash</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">())</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">b</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;No matching blob found&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Blob </span><span class="si">%s</span><span class="s1"> is a match&#39;</span> <span class="o">%</span> <span class="n">b</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+</code></pre></div>
+</details>
+<h2 id="metadata">Metadata</h2>
+<p>All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all,
+with the exception of the <a href="/user_guide/affinity/">instance affinity metadata values</a>.
+The metadata store is in the form of a key value store, and a general introduction
+is available <a href="/user_guide/metadata/">in the user guide</a>.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/blobs/get_blobs__blob_uuid__metadata">GET ​/blobs​/{blob_uuid}​/metadata</a>: Get metadata for a blob.</li>
+<li><a href="https://openapi.shakenfist.com/#/blobs/post_blobs__blob_uuid__metadata">POST /blobs/{blob_uuid}/metadata</a>: Create a new metadata key for a blob.</li>
+<li><a href="https://openapi.shakenfist.com/#/blobs/delete_blobs__blob_uuid__metadata__key_">DELETE /blobs/{blob_uuid}/metadata/{key}</a>: Delete a specific metadata key for a blob.</li>
+<li><a href="https://openapi.shakenfist.com/#/blobs/put_blobs__blob_uuid__metadata__key_">PUT /blobs/{blob_uuid}/metadata/{key}</a>: Update an existing metadata key for a blob.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: set metadata on a blob</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">set_blob_metadata_item</span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: get metadata for a blob</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_blob_metadata</span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: delete metadata for a blob</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">delete_blob_metadata_item</span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -1630,10 +1902,10 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "/", "features": [], "search": "/assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "../../..", "features": [], "search": "../../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="/assets/javascripts/bundle.50899def.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.50899def.min.js"></script>
       
     
   </body>

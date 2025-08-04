@@ -10,22 +10,28 @@
       
       
       
+        <link rel="canonical" href="https://shakenfist.com/developer_guide/authentication/">
       
       
+        <link rel="prev" href="../agent_protocol/">
       
-      <link rel="icon" href="/assets/images/favicon.png">
+      
+        <link rel="next" href="../ci_api_coverage/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.16">
     
     
       
-        <title>Shaken Fist</title>
+        <title>Authentication - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="/assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="/assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -44,7 +50,7 @@
       
     
     
-    <script>__md_scope=new URL("/",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -69,6 +75,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#authentication-and-namespaces" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -81,7 +92,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -101,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              Authentication
             
           </span>
         </div>
@@ -217,7 +228,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -247,7 +258,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -269,7 +280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/manifesto/" class="md-nav__link">
+      <a href="../../manifesto/" class="md-nav__link">
         
   
   
@@ -329,7 +340,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/components/overview/" class="md-nav__link">
+      <a href="../../components/overview/" class="md-nav__link">
         
   
   
@@ -352,7 +363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/components/kerbside/" class="md-nav__link">
+      <a href="../../components/kerbside/" class="md-nav__link">
         
   
   
@@ -382,7 +393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/features/" class="md-nav__link">
+      <a href="../../features/" class="md-nav__link">
         
   
   
@@ -442,7 +453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/release_notes/v07-v08/" class="md-nav__link">
+      <a href="../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -472,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/community/" class="md-nav__link">
+      <a href="../../community/" class="md-nav__link">
         
   
   
@@ -532,7 +543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/usage/" class="md-nav__link">
+      <a href="../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -555,7 +566,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/authentication/" class="md-nav__link">
+      <a href="../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -578,7 +589,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/ansible/" class="md-nav__link">
+      <a href="../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -601,7 +612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/artifacts/" class="md-nav__link">
+      <a href="../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -624,7 +635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/affinity/" class="md-nav__link">
+      <a href="../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -647,7 +658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/consoles/" class="md-nav__link">
+      <a href="../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -670,7 +681,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/events/" class="md-nav__link">
+      <a href="../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -693,7 +704,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/objects/" class="md-nav__link">
+      <a href="../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -716,7 +727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user_guide/metadata/" class="md-nav__link">
+      <a href="../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -743,18 +754,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -770,7 +783,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Developer Guide
@@ -822,7 +835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/admin/" class="md-nav__link">
+      <a href="../api_reference/admin/" class="md-nav__link">
         
   
   
@@ -845,7 +858,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/agentoperations/" class="md-nav__link">
+      <a href="../api_reference/agentoperations/" class="md-nav__link">
         
   
   
@@ -868,7 +881,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/artifacts/" class="md-nav__link">
+      <a href="../api_reference/artifacts/" class="md-nav__link">
         
   
   
@@ -891,7 +904,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/authentication/" class="md-nav__link">
+      <a href="../api_reference/authentication/" class="md-nav__link">
         
   
   
@@ -914,7 +927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+      <a href="../api_reference/blob_checksums/" class="md-nav__link">
         
   
   
@@ -937,7 +950,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/blobs/" class="md-nav__link">
+      <a href="../api_reference/blobs/" class="md-nav__link">
         
   
   
@@ -960,7 +973,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+      <a href="../api_reference/clusteroperations/" class="md-nav__link">
         
   
   
@@ -983,7 +996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/instances/" class="md-nav__link">
+      <a href="../api_reference/instances/" class="md-nav__link">
         
   
   
@@ -1006,7 +1019,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/label/" class="md-nav__link">
+      <a href="../api_reference/label/" class="md-nav__link">
         
   
   
@@ -1029,7 +1042,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/networks/" class="md-nav__link">
+      <a href="../api_reference/networks/" class="md-nav__link">
         
   
   
@@ -1052,7 +1065,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/interfaces/" class="md-nav__link">
+      <a href="../api_reference/interfaces/" class="md-nav__link">
         
   
   
@@ -1075,7 +1088,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/nodes/" class="md-nav__link">
+      <a href="../api_reference/nodes/" class="md-nav__link">
         
   
   
@@ -1098,7 +1111,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/api_reference/upload/" class="md-nav__link">
+      <a href="../api_reference/upload/" class="md-nav__link">
         
   
   
@@ -1129,7 +1142,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/agent_protocol/" class="md-nav__link">
+      <a href="../agent_protocol/" class="md-nav__link">
         
   
   
@@ -1149,10 +1162,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/developer_guide/authentication/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Authentication
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1163,6 +1198,98 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#namespaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Namespaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Authentication
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-namespaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating namespaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key management
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authenticating-directly-to-the-rest-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      Authenticating directly to the REST API
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contents-of-the-jwt-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contents of the JWT tokens
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inter-node-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inter-node Authentication
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Storage
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1175,7 +1302,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/ci_api_coverage/" class="md-nav__link">
+      <a href="../ci_api_coverage/" class="md-nav__link">
         
   
   
@@ -1198,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/release_process/" class="md-nav__link">
+      <a href="../release_process/" class="md-nav__link">
         
   
   
@@ -1221,7 +1348,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/standards/" class="md-nav__link">
+      <a href="../standards/" class="md-nav__link">
         
   
   
@@ -1244,7 +1371,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/state_machine/" class="md-nav__link">
+      <a href="../state_machine/" class="md-nav__link">
         
   
   
@@ -1267,7 +1394,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/updating_docs/" class="md-nav__link">
+      <a href="../updating_docs/" class="md-nav__link">
         
   
   
@@ -1290,7 +1417,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer_guide/workflow/" class="md-nav__link">
+      <a href="../workflow/" class="md-nav__link">
         
   
   
@@ -1358,7 +1485,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/installation/" class="md-nav__link">
+      <a href="../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -1381,7 +1508,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/artifacts/" class="md-nav__link">
+      <a href="../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -1404,7 +1531,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/authentication/" class="md-nav__link">
+      <a href="../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -1427,7 +1554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/locks/" class="md-nav__link">
+      <a href="../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -1450,7 +1577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/networking/overview/" class="md-nav__link">
+      <a href="../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -1473,7 +1600,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/power_states/" class="md-nav__link">
+      <a href="../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -1496,7 +1623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/python_versions/" class="md-nav__link">
+      <a href="../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -1519,7 +1646,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/threads/" class="md-nav__link">
+      <a href="../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -1542,7 +1669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/operator_guide/upgrades/" class="md-nav__link">
+      <a href="../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -1582,6 +1709,88 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#namespaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Namespaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Authentication
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-namespaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating namespaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key management
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authenticating-directly-to-the-rest-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      Authenticating directly to the REST API
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contents-of-the-jwt-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contents of the JWT tokens
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inter-node-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inter-node Authentication
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Storage
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1593,8 +1802,230 @@
             <div class="md-content" data-md-component="content">
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+  
+
+
+<h1 id="authentication-and-namespaces">Authentication and Namespaces</h1>
+<p>Shaken Fist uses JWT tokens for authentication and access control. These tokens
+are created with a request to the REST API and then passed as part of subsequent
+calls in the form of a HTTP header on the request. The tokens can expire, in
+which case a caller needs to re-authenticate and then retry their request. The
+process to create and use a token is discussed further in the
+<em>Authentication</em> section below.</p>
+<p>Shaken Fist logically divides objects into "namespaces". These namespaces can be
+thought of as tenants, although there might be other reasons to divide resources
+into their own buckets -- for example the Shaken Fist CI system uses a namespace
+to store an archive of the images used for CI runs, and that namespace is referred
+to by the namespaces actually running tests. The process to create a namespace is
+discussed in the <em>Creating namespaces</em> section below.</p>
+<h2 id="namespaces">Namespaces</h2>
+<p>All resources (instances, networks, network interfaces, and artifacts) are
+assigned to a namespace. Notably, blobs are not within namespaces and more than
+one artifact can refer to a given blob even if those artifacts are in different
+namespaces. It is assumed that knowing the UUID of a given blob implies that
+you can access it.</p>
+<p>All requests to Shaken Fist have a namespace context. The namespace "system" is
+reserved and is used for administrative actions. Please note that the
+authentication configuration created by the <code>getsf</code> installer is for the system
+namespace, and if used directly will result in instances and other objects
+being created in that namespace. While this is supported and will function as
+expected, it is probably undesirable for anything other than a single user
+installation.</p>
+<p>By default only requests in the system namespace are able to access resources
+in other (foreign) namespaces. Before Shaken Fist v0.7 this behavior was hard
+coded and not configurable. As of Shaken Fist v0.7, this is implemented in
+the form of "trusts", where every namespace is configured to "trust" the system
+namespace. This makes the resources visible to the system namespace. You cannot
+remove the trust of the system namespace from your namespaces. However, you can
+choose to trust additional namespaces, and this is done via the
+<code>sf-client namespace trust ...</code> series of commands and associated API calls.</p>
+<h2 id="authentication">Authentication</h2>
+<p>When the <code>getsf</code> installer ran, it created two authentication artifacts on the
+primary node which are useful to get started with Shaken Fist. First off, there
+is <code>/etc/sf/sfrc</code>, which is a file you can source in your shell to provide
+authentication environment variables. These environment variables can be used
+by Shaken Fist command line clients, Ansible modules, and the Python API client
+implementation itself. An example <code>sfrc</code> looks like this:</p>
+<div class="highlight"><pre><span></span><code># Command line hinting
+eval &quot;$(_SF_CLIENT_COMPLETE=bash_source sf-client)&quot;
+
+# Use the v3 etcd API
+export ETCDCTL_API=3
+
+# Client auth
+export SHAKENFIST_NAMESPACE=&quot;system&quot;
+export SHAKENFIST_KEY=&quot;oisoSe7T&quot;
+export SHAKENFIST_API_URL=&quot;https://shakenfist/api&quot;
+</code></pre></div>
+<p>The first two lines of the file enable tab completion for <code>sf-client</code> in a bash
+shell. The middle section defaults <code>etcd</code> to use the v3 API and can be ignored
+for now. The last three lines are the important authentication details:</p>
+<ul>
+<li>the namespace we want to use is called "system".</li>
+<li>our access key is "oisoSe7T".</li>
+<li>the URL the API exists at is "<a href="https://shakenfist/api">https://shakenfist/api</a>"</li>
+</ul>
+<p><code>sfrc</code> is only useful to users of Unix-like shells, so there is also a JSON form
+of this configuration information, which is written by <code>getsf</code> at
+<code>/etc/sf/shakenfist.json</code>. Here's an example:</p>
+<div class="highlight"><pre><span></span><code>{
+    &quot;namespace&quot;: &quot;system&quot;,
+    &quot;key&quot;: &quot;oisoSe7T&quot;,
+    &quot;apiurl&quot;: &quot;https://shakenfist/api&quot;
+}
+</code></pre></div>
+<p>The Shaken Fist command line clients, Ansible modules, and the Python API client
+will look for configuration in the following locations:</p>
+<ul>
+<li>environment variables.</li>
+<li><code>.shakenfist</code> in your home directory, that is <code>~/.shakenfist</code>.</li>
+<li><code>/etc/sf/shakenfist.json</code>.</li>
+</ul>
+<h2 id="creating-namespaces">Creating namespaces</h2>
+<p>You can create your first namespace like this, assuming you are authenticated
+as the system namespace:</p>
+<div class="highlight"><pre><span></span><code>sf-client namespace create new-namespace
+</code></pre></div>
+<p>By default a new namespace has no access keys or trusts configured, and therefore
+is only accessible to users of the system namespace.</p>
+<h2 id="key-management">Key management</h2>
+<p>Namespaces are accessed by providing a valid "key" for the namespace. While
+keys have names, they do not have to be usernames and passwords -- my mental
+model is more like API access tokens in something like GitHub than usernames and
+passwords. I tend to create a new key for each program which is interacting with
+the namespace, and then give it a descriptive name.</p>
+<p>You can create a new key like this:</p>
+<div class="highlight"><pre><span></span><code>sf-client namespace add-key namespace-name keyname key
+</code></pre></div>
+<p>There can be more than one key for a namespace. The key name is not used as part
+of the authentication process, and is largely used for key management (deleting
+the key) and logging which access token was used in the event logs.</p>
+<details class="info" open="open">
+<summary>Info</summary>
+<p>Please note the key prefix "_service_key" is reserved for internal use within
+Shaken Fist. This usage is discussed in the <em>Inter-node Authentication</em> section
+below.</p>
+</details>
+<h2 id="authenticating-directly-to-the-rest-api">Authenticating directly to the REST API</h2>
+<p>The authentication endpoint <code>/auth</code> is used to obtain a token to authenticate
+future API requests. For example, I can obtain an authentication token from the
+REST API using <code>curl</code> like this:</p>
+<div class="highlight"><pre><span></span><code>curl -X POST https://shakenfist/api/auth -d &#39;{&quot;namespace&quot;: &quot;system&quot;, &quot;key&quot;: &quot;oisoSe7T&quot;}&#39;
+{
+    &quot;access_token&quot;: &quot;eyJhbG...IkpXVCJ9.eyJmc...wwQ&quot;,
+    &quot;token_type&quot;: &quot;Bearer&quot;,
+    &quot;expires_in&quot;: 900
+}
+</code></pre></div>
+<p>That is, a HTTP POST request to the <code>/auth</code> endpoint for the REST API (in our
+case hosted at <code>https://shakenfist/api</code>) with a JSON body containing a dictionary
+of the namespace name and the key to use.</p>
+<p>In the response the <code>access_token</code> value of  <code>eyJhbG...IkpXVCJ9.eyJmc...wwQ</code> is
+our JWT token and has been truncated in this example for readability. Authentication
+tokens expire after a fixed period of time (nominally 15 minutes), but you will
+be informed that the token as expired by receiving a 401 Unauthorized response.
+If that occurs, simply create a new token as above and retry your request.</p>
+<p>Subsequent requests to the REST API pass the token via an <code>Authorization</code> HTTP
+header, and should request a <code>Content-Type</code> of <code>application/json</code>. For example,
+to list the namespaces in our deployment we would make a <code>curl</code> request like this:</p>
+<div class="highlight"><pre><span></span><code>curl -X GET https://shakenfist/api/auth/namespaces \
+    -H &#39;Authorization: Bearer eyJhbG...IkpXVCJ9.eyJmc...wwQ&#39; \
+    -H &#39;Content-Type: application/json&#39;
+[
+    {
+        &quot;name&quot;: &quot;adhoc&quot;,
+        &quot;state&quot;: &quot;created&quot;,
+        &quot;trust&quot;: {&quot;full&quot;: [&quot;system&quot;]}
+    }, {
+        &quot;name&quot;: &quot;ci&quot;,
+        &quot;state&quot;: &quot;created&quot;,
+        &quot;trust&quot;: {&quot;full&quot;: [&quot;system&quot;]}
+    }, {
+        &quot;name&quot;: &quot;system&quot;,
+        &quot;state&quot;: &quot;created&quot;,
+        &quot;trust&quot;: {&quot;full&quot;: [&quot;system&quot;]}
+    }
+]
+</code></pre></div>
+<p>The JSON response here has been formatted for readability.</p>
+<details class="info" open="open">
+<summary>Info</summary>
+<p>Note the word "Bearer" before the access token in the Authorization header.</p>
+</details>
+<h2 id="contents-of-the-jwt-tokens">Contents of the JWT tokens</h2>
+<p>JWT authentication tokens are base64 encoded parts separated by the <code>.</code> character.
+They are therefore trivial to decode. A decoded example (generated by the online
+decoder at <a href="https://jwt.io/">https://jwt.io/</a>) is:</p>
+<div class="highlight"><pre><span></span><code>{
+    &quot;alg&quot;: &quot;HS256&quot;,
+    &quot;typ&quot;: &quot;JWT&quot;
+}
+.
+{
+    &quot;fresh&quot;: false,
+    &quot;iat&quot;: 1669786988,
+    &quot;jti&quot;: &quot;906f4bfa-3218-4d07-a036-ac6b44ded67e&quot;,
+    &quot;type&quot;: &quot;access&quot;,
+    &quot;sub&quot;: [
+        &quot;system&quot;,
+        &quot;deploy&quot;
+    ],
+    &quot;nbf&quot;: 1669786988,
+    &quot;exp&quot;: 1669787888,
+    &quot;iss&quot;: &quot;shakenfist&quot;,
+    &quot;nonce&quot;: &quot;ByKNRUVBfMBoQC1Z&quot;
+}
+.
+HMACSHA256(
+    base64UrlEncode(header) + &quot;.&quot; +
+    base64UrlEncode(payload),
+    your-256-bit-secret
+)
+</code></pre></div>
+<p>You can see here that Shaken Fist stores the authenticated namespace <code>system</code> and
+the key used to authenticate <code>deploy</code> under the <code>sub</code> key in this token. <em>You should
+not assume that the content of JWT tokens produced by Shaken Fist are opaque to
+users.</em></p>
+<p>For releases prior to v0.7, the token was blindly trusted for authentication. From
+v0.7 we verify that the named key still exists in the namespace before authorizing
+API requests. This test is performed by updating a "nonce" value for a given key
+when the key is updated. The JWT token a caller is handed includes this nonce, and
+if the nonce we are handed on a request does not match the current value in the
+database the request is rejected.</p>
+<h2 id="inter-node-authentication">Inter-node Authentication</h2>
+<p>Requests between Shaken Fist nodes use the same authentication system and REST API
+as external API requests. When a node makes an API request to another node, the
+originating node will create (or reuse) a "service key" specific to the namespace
+of the original request.</p>
+<p>When a request is made from the "system" namespace for a resource in a different
+namespace, the API request is made using the foreign namespace and the foreign
+namespace's service key.</p>
+<p>Service keys exist in the namespace's key data structures just as other keys do,
+and are therefore visible when you list keys. As of v0.7, service keys expire
+after five minutes, and are never reused. Before v0.7 service keys were always
+named "_service_key". From v0.7 service keys have a name of the form
+"_service_key[a-zA-Z]+".</p>
+<h2 id="key-storage">Key Storage</h2>
+<p>Shaken Fist stores the access keys in <code>etcd</code>. The keys are stored as the base64
+encoding of the key post salting and hashing. The python <code>bcrypt</code> library is used
+to perform salting, hashing, and key verification.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -1630,10 +2061,10 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "/", "features": [], "search": "/assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="/assets/javascripts/bundle.50899def.min.js"></script>
+      <script src="../../assets/javascripts/bundle.50899def.min.js"></script>
       
     
   </body>
