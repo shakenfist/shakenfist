@@ -28,6 +28,10 @@ if test "x$1" = "x-HEAD" ; then
             echo "$file does not exist in the end state, skipping."
         fi
     done
+    if [ -z "${filtered_files}" ]; then
+        echo "No python files in change post filtration."
+        exit 0
+    fi
 
     echo "Running flake8 on ${filtered_files}"
     diff -u --from-file /dev/null ${filtered_files} | $FLAKE_COMMAND ${filtered_files}
