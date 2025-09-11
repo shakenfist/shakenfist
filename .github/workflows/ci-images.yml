@@ -86,6 +86,13 @@ jobs:
             path: actions
             fetch-depth: 0
 
+        - name: Checkout the shakenfist repository
+          uses: actions/checkout@v4
+          with:
+            repository: shakenfist/shakenfist
+            path: shakenfist
+            force-depth: 2
+
         - name: Build image
           run: |
             cd ${GITHUB_WORKSPACE}/actions
