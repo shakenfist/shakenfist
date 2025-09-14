@@ -1,3 +1,191 @@
 [build-system]
-requires = ["pbr>=5.10.0", "setuptools >= 65.3.0", "wheel"]
-build-backend = 'setuptools.build_meta'
+requires = [
+    "setuptools>=61.0",
+    "setuptools_scm[simple]>=6.2",
+    "wheel",
+    "build",
+    "twine"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shakenfist"
+dynamic = ["version"]
+
+description = "An opinionated minimal cloud"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    # A bit vague because we expect this to come from an OS package
+    "psutil>=5.9.0",                      # bsd
+
+    # Our requirements -- we specify exact versions here and let renovate update
+    # them for the develop branch as required. Releases never update requirements.
+    "shakenfist-utilities==0.7.3",        # apache2
+    "clingwrap==1.13.0",                   # apache2
+
+    "fixtures==4.2.5",                    # apache2
+    "PyYAML==6.0.2",                      # mit
+    "Jinja2==3.1.6",                      # bsd
+    "setproctitle==1.3.6",                # bsd
+    "click==8.1.8",                       # bsd
+    "werkzeug==3.1.3",                    # bsd
+    "prometheus-client==0.22.1",          # apache2
+    "etcd3gw==2.4.2",                     # apache2
+    "bcrypt==4.3.0",                      # apache2
+    "python-magic==0.4.27",               # mit
+    "webargs==8.7.0",                     # mit
+    "py-cpuinfo==9.0.0",                  # mit
+    "distro==1.9.0",                      # apache2
+    "pbr==7.0.1",                         # apache2
+    "symbolicmode==2.0.1",                # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+    "pycdlib==1.14.0",                    # lgpl
+    "validators==0.35.0",                 # mit
+    "pyprctl==0.1.3",                     # mit
+    "schedule==1.2.2",                    # mit
+    "semver==3.0.4",                      # bsd
+
+    "greenlet==3.2.3",                    # mit
+    "gunicorn==23.0.0",                   # mit
+    "gevent==25.5.1",                     # mit
+    "gunicorn[gevent]==23.0.0",           # mit
+
+    "flask==3.1.1",                       # bsd
+    "Flask-RESTful==0.3.10",              # bsd
+    "flasgger==0.9.7.1",                  # mit
+    "Flask-JWT-Extended==4.7.1",          # mit
+    "flask-request-id-middleware==1.1",   # mit
+
+    "protobuf==5.29.5",                   # bsd
+    "grpcio==1.70.0",                     # apache2
+    "grpcio-status==1.70.0",              # apache2
+    "grpcio-tools==1.70.0",               # apache2
+    "googleapis-common-protos==1.70.0",   # apache2
+
+    "requests==2.32.4",                   # apache2
+    "requests-toolbelt==1.0.0",           # apache2
+    "chardet==5.2.0",                     # lgpl
+    "urllib3==2.5.0",                     # mit
+
+    # These must move as a set
+    "pydantic==2.10.6",                   # mit
+    "pydantic-settings==2.8.0",           # mit
+    "pydantic-core==2.27.2",              # (indirect dependency)
+    "pydantic-extra-types==2.10.2",       # (indirect dependency)
+
+    # Is difficult to get install working, use system packages instead. On Ubuntu
+    # those are: libvirt-daemon-system libvirt-dev python3-libvirt
+    #libvirt-python      # lgpl
+
+    # Indirect dependencies. We do not track license for these.
+    "aniso8601==10.0.1",
+    "annotated-types==0.7.0",
+    "anyio==4.9.0",
+    "async-extensions==4.0.0",
+    "attrs==25.3.0",
+    "blinker==1.9.0",
+    "coloredlogs==15.0.1",
+    "entrypoint==2.1.0",
+    "exceptiongroup==1.3.0",
+    "executor==23.2",
+    "funcs==0.11.0",
+    "futurist==3.1.1",
+    "humanfriendly==10.0",
+    "itsdangerous==2.2.0",
+    "linux-utils==0.7",
+    "MarkupSafe==3.0.2",
+    "marshmallow==4.0.0",
+    "mistune==3.1.3",
+    "mixed-methods==1.1.1",
+    "named==1.4.2",
+    "orderings==1.6.0",
+    "property-manager==3.0",
+    "psutil==7.0.0",
+    "PyJWT==2.10.1",
+    "python-dotenv==1.1.1",
+    "pytz==2025.2",
+    "sniffio==1.3.1",
+    "solus==1.2.2",
+    "typing-aliases==1.10.1",
+    "typing-extensions==4.14.1",
+    "verboselogs==1.7",
+    "zipp==3.21.0",
+    "zope.event==5.1.1",
+    "zope.interface==7.2",
+    "wraps==0.15.0",
+    "certifi==2025.8.3",
+    "charset-normalizer==3.4.3",
+    "debtcollector==3.0.0",
+    "fasteners==0.20",
+    "idna==3.10",
+    "jsonschema==4.25.1",
+    "jsonschema-specifications==2025.9.1",
+    "netaddr==1.3.0",
+    "oslo.concurrency==7.2.0",
+    "oslo.config==10.0.0",
+    "oslo.i18n==6.6.0",
+    "oslo.utils==9.1.0",
+    "packaging==25.0",
+    "prometheus_client==0.22.1",
+    "pydantic_core==2.27.2",
+    "pylogrus==0.4.0",
+    "pyparsing==3.2.4",
+    "referencing==0.36.2",
+    "rfc3986==2.0.0",
+    "rpds-py==0.27.1",
+    "six==1.17.0",
+    "stevedore==5.5.0",
+    "typing_extensions==4.14.1",
+    "tzdata==2025.2",
+    "uv==0.8.17",
+    "wrapt==1.17.3",
+    # END_OF_INDIRECT_DEPS
+]
+
+[project.urls]
+"Homepage" = "https://shakenfist.com"
+"Bug Tracker" = "https://github.com/shakenfist/shakenfist/issues"
+
+[project.scripts]
+sf-ctl = "shakenfist.client.ctl:cli"
+sf-backup = "shakenfist.client.backup:cli"
+
+sf-api = "shakenfist.daemons.external_api.main:main"
+sf-cleaner = "shakenfist.daemons.cleaner.main:main"
+sf-cluster = "shakenfist.daemons.cluster.main:main"
+sf-eventlog = "shakenfist.daemons.eventlog.main:main"
+sf-net = "shakenfist.daemons.network.main:main"
+sf-queues = "shakenfist.daemons.queues.main:main"
+sf-resources = "shakenfist.daemons.resources.main:main"
+sf-sentinel-first = "shakenfist.daemons.sentinel_first.main:main"
+sf-sentinel-last = "shakenfist.daemons.sentinel_last.main:main"
+sf-sidechannel = "shakenfist.daemons.sidechannel.main:main"
+sf-transfers = "shakenfist.daemons.transfers.main:main"
+
+sf-privexec = "shakenfist.daemons.privexec.main:main"
+sf-nodelock = "shakenfist.daemons.nodelock.main:main"
+
+[tool.setuptools]
+packages = ["shakenfist"]
+
+[tool.setuptools.package-data]
+shakenfist = [
+    "deploy/**"
+]
+
+[tool.setuptools_scm]
+git_describe_command = "git describe --dirty --tags --match v* --first-parent"
+write_to = "shakenfist/_version.py"
+
+[project.optional-dependencies]
+test = [
+    "coverage==7.9.2",          # apache2
+    "testtools==2.7.2",         # mit
+    "mock==5.2.0",              # bsd
+    "stestr==4.2.0",            # apache2
+    "flake8==7.3.0",            # mit
+    "tox==4.28.0",              # mit
+    "mkdocs==1.6.1",            # bsd
+    "mkdocs-material==9.6.17",  # mit
+    "testscenarios==0.5.0",     # bsd
+]

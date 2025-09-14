@@ -54,9 +54,13 @@ jobs:
             install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
 
           python3 -m venv  --system-site-packages /srv/ci/venv
+          . /srv/ci/venv/bin/activate
+
           cd ${GITHUB_WORKSPACE}/shakenfist
-          /srv/ci/venv/bin/pip install -r requirements.txt
-          /srv/ci/venv/bin/pip install pyupgrade reorder-python-imports
+
+          pip3 install uv
+          uv pip install -r pyproject.toml
+          uv pip install pyupgrade reorder-python-imports
 
       - name: Scan for obsolete syntax
         env:

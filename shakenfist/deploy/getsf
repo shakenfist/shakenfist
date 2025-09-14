@@ -7,6 +7,9 @@ function on_exit {
     }
 trap 'on_exit $?' EXIT
 
+# Where are we running from, from https://stackoverflow.com/questions/59895/
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 # Color helpers, from https://stackoverflow.com/questions/5947742/
 Color_Off='\033[0m'       # Text Reset
 Red='\033[0;31m'          # Red
@@ -596,6 +599,11 @@ echo
 # Build local wheels if required
 mkdir -p /srv/shakenfist/packages
 
+sudo apt-get install -y python3-venv
+python3 -mvenv /tmp/venv-build
+. /tmp/venv-build/bin/activate
+pip3 install uv build
+
 if [ ! -z ${GETSF_SERVER_REPO} ]; then
     echo
     status "Installing package build dependencies"
@@ -613,10 +621,11 @@ if [ ! -z ${GETSF_SERVER_REPO} ]; then
     if [ -e dist ]; then
         rm -rf build dist *.egg-info
     fi
-    rm -f deploy.tgz doc.tgz
-    tar czf deploy.tgz deploy
-    tar czf docs.tgz docs
-    python3 setup.py sdist bdist_wheel
+
+    rm -f dist/*
+    . /tmp/venv-build/bin/activate
+    python3 -mbuild --wheel .
+
     twine check dist/*
     cp dist/*.whl /srv/shakenfist/packages/
 
@@ -637,8 +646,11 @@ if [ ! -z ${GETSF_CLIENT_REPO} ]; then
     if [ -e dist ]; then
         rm -rf build dist *.egg-info
     fi
-    python3 setup.py sdist bdist_wheel
-    twine check dist/*
+
+    rm -f dist/*
+    . /tmp/venv-build/bin/activate
+    python3 -mbuild --wheel .
+
     cp dist/*.whl /srv/shakenfist/packages/
 
     GETSF_CLIENT_PACKAGE="/srv/shakenfist/packages/"$(ls dist/*.whl | sed 's/dist\///')
@@ -658,8 +670,11 @@ if [ ! -z ${GETSF_AGENT_REPO} ]; then
     if [ -e dist ]; then
         rm -rf build dist *.egg-info
     fi
-    python3 setup.py sdist bdist_wheel
-    twine check dist/*
+
+    rm -f dist/*
+    . /tmp/venv-build/bin/activate
+    python3 -mbuild --wheel .
+
     cp dist/*.whl /srv/shakenfist/packages
 
     GETSF_AGENT_PACKAGE="/srv/shakenfist/packages/"$(ls dist/*.whl | sed 's/dist\///')
@@ -884,7 +899,7 @@ cat - > /root/sf-deploy << DEPLOYEOF
 #!/bin/bash
 
 echo "Upgrading ansible-galaxy dependancies..."
-ansible-galaxy install --force -v -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml | cat -
+ansible-galaxy install --force -v -r ${SCRIPT_DIR}/requirements.yml | cat -
 
 echo "Current state of ansible-galaxy roles:"
 ansible-galaxy role list
@@ -1023,7 +1038,7 @@ cat - >> /root/sf-deploy << DEPLOYEOF
 EOF
 )
 
-/srv/shakenfist/venv/share/shakenfist/installer/install $@
+${SCRIPT_DIR}/install $@
 DEPLOYEOF
 chmod u+rx /root/sf-deploy
 

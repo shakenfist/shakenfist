@@ -213,9 +213,11 @@
 
 # Setup the TLS CA on the primary
 - hosts: localhost
-  gather_facts: yes
-  connection: ssh
+  any_errors_fatal: true
   become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
   tags: pki
 
   tasks:
@@ -229,7 +231,7 @@
       file:
         path: /etc/pki/CA
         state: directory
-        mode: "0755"
+        mode: u=rwx
 
     - name: Make /etc/pki/qemu
       file:
@@ -242,7 +244,7 @@
         path: /etc/pki/CA/ca-cert.pem
       register: ca_cert
 
-    - name: Setup CA template
+    - name: Setup CA template for {{deploy_name}}
       copy:
         content: |
           cn = Shaken Fist CA for {{deploy_name}}
@@ -262,7 +264,6 @@
     - name: Set permissions on the CA authority key
       file:
         path: /etc/pki/CA/certificate_authority_key.pem
-        mode: '0400'
 
     - name: Create CA certificate
       shell:
@@ -1523,102 +1524,80 @@
         state: directory
         mode: "0755"
 
-    - name: Check which sf_instance module we're using
-      stat:
-        path: /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance
-      register: new_style_sf_instance
+    - name: Lookup the installed location of ansible modules
+      shell: |
+        /srv/shakenfist/venv/bin/sf-client ansible_module_path
+      register: ansible_module_path
+      ignore_errors: True
 
-    - name: Install ansible instance module (new style)
+    - name: Find sf_instance module
+      set_fact:
+        sf_instance_path: "{{ lookup('ansible.builtin.first_found', paths) }}"
+      vars:
+        paths:
+          - "{{ ansible_module_path.stdout }}/sf_instance"
+          - /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance
+          - /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance.py
+
+    - name: Install sf_instance ansible module
       copy:
-        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance
+        src: "{{ sf_instance_path }}"
         remote_src: yes
         dest: /usr/share/ansible/plugins/modules/sf_instance
         owner: root
         group: root
         mode: "0644"
-      when: new_style_sf_instance.stat.exists
 
-    - name: Install ansible instance module (old style)
+    - name: Find sf_network module
+      set_fact:
+        sf_network_path: "{{ lookup('ansible.builtin.first_found', paths) }}"
+      vars:
+        paths:
+          - "{{ ansible_module_path.stdout }}/sf_network"
+          - /srv/shakenfist/venv/share/shakenfist/ansible/sf_network
+          - /srv/shakenfist/venv/share/shakenfist/ansible/sf_network.py
+
+    - name: Install sf_network ansible module
       copy:
-        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance.py
-        remote_src: yes
-        dest: /usr/share/ansible/plugins/modules/sf_instance.py
-        owner: root
-        group: root
-        mode: "0644"
-      when: not new_style_sf_instance.stat.exists
-
-    - name: Check which sf_network module we're using
-      stat:
-        path: /srv/shakenfist/venv/share/shakenfist/ansible/sf_network
-      register: new_style_sf_network
-
-    - name: Install ansible network module (new style)
-      copy:
-        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_network
+        src: "{{ sf_network_path }}"
         remote_src: yes
         dest: /usr/share/ansible/plugins/modules/sf_network
         owner: root
         group: root
         mode: "0644"
-      when: new_style_sf_network.stat.exists
 
-    - name: Install ansible network module (old style)
+    - name: Find sf_namespace module
+      set_fact:
+        sf_namespace_path: "{{ lookup('ansible.builtin.first_found', paths) }}"
+      vars:
+        paths:
+          - "{{ ansible_module_path.stdout }}/sf_namespace"
+          - /srv/shakenfist/venv/share/shakenfist/ansible/sf_namespace
+          - /srv/shakenfist/venv/share/shakenfist/ansible/sf_namespace.py
+
+    - name: Install sf_namespace ansible module
       copy:
-        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_network.py
-        remote_src: yes
-        dest: /usr/share/ansible/plugins/modules/sf_network.py
-        owner: root
-        group: root
-        mode: "0644"
-      when: not new_style_sf_network.stat.exists
-
-    - name: Check which sf_namespace module we're using
-      stat:
-        path: /srv/shakenfist/venv/share/shakenfist/ansible/sf_namespace
-      register: new_style_sf_namespace
-
-    - name: Install ansible namespace module (new style)
-      copy:
-        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_namespace
+        src: "{{ sf_namespace_path }}"
         remote_src: yes
         dest: /usr/share/ansible/plugins/modules/sf_namespace
         owner: root
         group: root
         mode: "0644"
-      when: new_style_sf_namespace.stat.exists
 
-    - name: Install ansible namespace module (old style)
+    - name: Find sf_snapshot module
+      set_fact:
+        sf_snapshot_path: "{{ lookup('ansible.builtin.first_found', paths) }}"
+      vars:
+        paths:
+          - "{{ ansible_module_path.stdout }}/sf_snapshot"
+          - /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot
+          - /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot.py
+
+    - name: Install sf_snapshot ansible module
       copy:
-        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_namespace.py
-        remote_src: yes
-        dest: /usr/share/ansible/plugins/modules/sf_namespace.py
-        owner: root
-        group: root
-        mode: "0644"
-      when: not new_style_sf_namespace.stat.exists
-
-    - name: Check which sf_snapshot module we're using
-      stat:
-        path: /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot
-      register: new_style_sf_snapshot
-
-    - name: Install ansible snapshot module (new style)
-      copy:
-        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot
+        src: "{{ sf_snapshot_path }}"
         remote_src: yes
         dest: /usr/share/ansible/plugins/modules/sf_snapshot
         owner: root
         group: root
         mode: "0644"
-      when: new_style_sf_snapshot.stat.exists
-
-    - name: Install ansible snapshot module (old style)
-      copy:
-        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot.py
-        remote_src: yes
-        dest: /usr/share/ansible/plugins/modules/sf_snapshot.py
-        owner: root
-        group: root
-        mode: "0644"
-      when: not new_style_sf_snapshot.stat.exists

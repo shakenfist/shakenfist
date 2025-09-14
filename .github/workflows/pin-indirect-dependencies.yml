@@ -49,9 +49,13 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
             install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
 
-          cd ${GITHUB_WORKSPACE}/shakenfist
           python3 -m venv  --system-site-packages /srv/ci/venv
-          /srv/ci/venv/bin/pip install -r requirements.txt
+          . /srv/ci/venv/bin/activate
+
+          cd ${GITHUB_WORKSPACE}/shakenfist
+
+          pip3 install uv
+          uv pip install -r pyproject.toml
 
       - name: List all our dependencies
         run: |
@@ -69,8 +73,8 @@ jobs:
           for depver in $(/srv/ci/venv/bin/pip freeze --local); do
             dep=$(echo ${depver} | sed 's/==.*//')
 
-            if [ $(egrep -ic "^${dep}==" requirements.txt) -lt 1 ]; then
-              echo "${depver}" >> requirements.txt
+            if [ $(egrep -ic "${dep}==" pyproject.toml) -lt 1 ]; then
+              sed -i pyproject.toml "s/    # END_OF_INDIRECT_DEPS/    \"${depver}\",\n    # END_OF_INDIRECT_DEPS/"
             fi
           done
 

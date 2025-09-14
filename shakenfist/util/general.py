@@ -9,7 +9,6 @@ import uuid
 import cpuinfo
 import distro
 import flask
-from pbr.packaging import get_version
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import eventlog
