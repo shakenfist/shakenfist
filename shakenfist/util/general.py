@@ -9,7 +9,7 @@ import uuid
 import cpuinfo
 import distro
 import flask
-from pbr.version import VersionInfo
+from pbr.packaging import get_version
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import eventlog
@@ -67,7 +67,7 @@ def get_version():
     global CACHED_VERSION
 
     if not CACHED_VERSION:
-        CACHED_VERSION = VersionInfo('shakenfist').version_string()
+        CACHED_VERSION = get_version('shakenfist')
     return CACHED_VERSION
 
 
