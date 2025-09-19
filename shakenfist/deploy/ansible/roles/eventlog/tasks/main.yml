@@ -1,0 +1,8 @@
+---
+- debug:
+    msg: "Executing eventlog role action {{ role_action }}."
+
+- include_tasks: "{{ role_action }}.yml"
+
+- debug:
+    msg: "Completed eventlog role action {{ role_action }}."

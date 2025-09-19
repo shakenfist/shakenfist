@@ -1,0 +1,91 @@
+---
+- name: Rotate logs and remove old logs
+  shell: |
+    journalctl --rotate
+    journalctl --vacuum-time=2d
+    /usr/sbin/logrotate -f /etc/logrotate.conf
+  ignore_errors: True
+
+- name: Make /usr/share/ansible/plugins/modules
+  file:
+    path: /usr/share/ansible/plugins/modules
+    state: directory
+    mode: "0755"
+
+- name: Lookup the installed location of ansible modules
+  shell: |
+    /srv/shakenfist/venv/bin/sf-client admin ansible_module_path
+  register: ansible_module_path
+  ignore_errors: True
+
+- name: Find sf_instance module
+  set_fact:
+    sf_instance_path: "{{ lookup('ansible.builtin.first_found', paths) }}"
+  vars:
+    paths:
+      - "{{ ansible_module_path.stdout }}/sf_instance"
+      - /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance
+      - /srv/shakenfist/venv/share/shakenfist/ansible/sf_instance.py
+
+- name: Install sf_instance ansible module
+  copy:
+    src: "{{ sf_instance_path }}"
+    remote_src: yes
+    dest: /usr/share/ansible/plugins/modules/sf_instance
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Find sf_network module
+  set_fact:
+    sf_network_path: "{{ lookup('ansible.builtin.first_found', paths) }}"
+  vars:
+    paths:
+      - "{{ ansible_module_path.stdout }}/sf_network"
+      - /srv/shakenfist/venv/share/shakenfist/ansible/sf_network
+      - /srv/shakenfist/venv/share/shakenfist/ansible/sf_network.py
+
+- name: Install sf_network ansible module
+  copy:
+    src: "{{ sf_network_path }}"
+    remote_src: yes
+    dest: /usr/share/ansible/plugins/modules/sf_network
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Find sf_namespace module
+  set_fact:
+    sf_namespace_path: "{{ lookup('ansible.builtin.first_found', paths) }}"
+  vars:
+    paths:
+      - "{{ ansible_module_path.stdout }}/sf_namespace"
+      - /srv/shakenfist/venv/share/shakenfist/ansible/sf_namespace
+      - /srv/shakenfist/venv/share/shakenfist/ansible/sf_namespace.py
+
+- name: Install sf_namespace ansible module
+  copy:
+    src: "{{ sf_namespace_path }}"
+    remote_src: yes
+    dest: /usr/share/ansible/plugins/modules/sf_namespace
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Find sf_snapshot module
+  set_fact:
+    sf_snapshot_path: "{{ lookup('ansible.builtin.first_found', paths) }}"
+  vars:
+    paths:
+      - "{{ ansible_module_path.stdout }}/sf_snapshot"
+      - /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot
+      - /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot.py
+
+- name: Install sf_snapshot ansible module
+  copy:
+    src: "{{ sf_snapshot_path }}"
+    remote_src: yes
+    dest: /usr/share/ansible/plugins/modules/sf_snapshot
+    owner: root
+    group: root
+    mode: "0644"

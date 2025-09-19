@@ -1,0 +1,30 @@
+---
+- name: Write an ansible inventory file to handle ad hoc commands
+  template:
+    src: templates/inventory.yaml
+    dest: /etc/sf/inventory.yaml
+    owner: root
+    group: sudo
+    mode: u=r,g=r,o=
+
+- name: Find hypervisor with lowest MTU
+  set_fact:
+    lowest_mtu_hypervisor: "{{ groups['hypervisors'] | sort('node_mtu' | int) | first }}"
+
+- name: Find lowest MTU
+  set_fact:
+    lowest_mtu: "{{ hostvars[lowest_mtu_hypervisor]['node_mtu'] }}"
+
+- name: Write syslog file
+  template:
+    src: templates/rsyslog-server-01-sf.conf
+    dest: /etc/rsyslog.d/01-sf.conf
+    owner: root
+    group: sudo
+    mode: u=r,g=r,o=
+
+- name: Restart syslog
+  service:
+    name: rsyslog
+    enabled: yes
+    state: restarted

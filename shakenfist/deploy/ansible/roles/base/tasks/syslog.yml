@@ -1,0 +1,16 @@
+---
+- name: Send syslog to the primary server, unless I am the primary server
+  template:
+    src: templates/rsyslog-client-01-sf.conf
+    dest: /etc/rsyslog.d/01-sf.conf
+    owner: root
+    group: sudo
+    mode: u=r,g=r,o=
+  when: syslog_target != node_mesh_ip
+
+- name: Restart syslog
+  service:
+    name: rsyslog
+    enabled: yes
+    state: restarted
+  when: syslog_target != node_mesh_ip

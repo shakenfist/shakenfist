@@ -1,0 +1,5 @@
+---
+- name: Force a systemd reload
+  debug:
+    msg: Reload systemd
+  notify: Reload systemd

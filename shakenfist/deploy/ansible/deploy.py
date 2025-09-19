@@ -97,7 +97,7 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
     env['ANSIBLE_SSH_PIPELINING'] = '0'
 
     obj = subprocess.Popen(
-        ('ansible-playbook -vvv -i hosts --extra-vars "@/etc/sf/deploy-vars.json" '
+        ('ansible-playbook -i hosts --extra-vars "@/etc/sf/deploy-vars.json" '
          '%s deploy.yml'
          % ' '.join(sys.argv[1:])),
         stdin=subprocess.PIPE,

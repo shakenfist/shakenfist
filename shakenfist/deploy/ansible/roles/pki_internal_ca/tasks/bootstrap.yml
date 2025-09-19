@@ -1,0 +1,55 @@
+---
+- debug:
+    msg:
+      - "Bootstrapping CA for {{ deploy_name }}."
+      - "CA cert path: {{ ca_cert_path }}"
+      - "CA key path: {{ ca_key_path }}"
+      - "CA template path: {{ ca_template_path }}"
+
+- name: Install CA setup tools
+  apt:
+    name:
+      - gnutls-bin
+    state: latest
+
+- name: Make {{ ca_path }}
+  file:
+    path: "{{ ca_path }}"
+    state: directory
+    mode: u=rwx
+
+- name: Check if the CA is already setup
+  stat:
+    path: "{{ ca_cert_path }}"
+  register: ca_cert
+
+- name: Setup CA template for {{deploy_name}}
+  template:
+    src: templates/ca_template.tmpl
+    dest: "{{ ca_template_path }}"
+    owner: root
+    mode: u=r
+  when: not ca_cert.stat.exists
+
+- name: Create CA authority key
+  shell:
+    umask 277 && certtool --generate-privkey > "{{ ca_key_path }}"
+  when: not ca_cert.stat.exists
+
+- name: Set permissions on the CA authority key
+  file:
+    path: "{{ ca_key_path }}"
+    mode: u=r
+
+- name: Create CA certificate
+  shell:
+    certtool --generate-self-signed \
+        --template "{{ ca_template_path }}" \
+        --load-privkey "{{ ca_key_path }}" \
+        --outfile "{{ ca_cert_path }}"
+  when: not ca_cert.stat.exists
+
+- name: Set permissions on the CA certificate
+  file:
+    path: "{{ ca_cert_path }}"
+    mode: ugo=r

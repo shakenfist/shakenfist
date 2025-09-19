@@ -1,0 +1,110 @@
+---
+- name: Ensure the node exists in etcd
+  shell: |
+    /srv/shakenfist/venv/bin/sf-ctl initialise-node
+  environment:
+    SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
+    SHAKENFIST_NODE_NAME: "{{ node_name }}"
+    SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
+  when: inventory_hostname not in groups.get('eventlog_node', [])
+
+- name: Register the other SF daemons, one node at a time (eventlog node)
+  shell: |
+    /srv/shakenfist/venv/bin/sf-ctl register-daemon \
+        sentinel-last privexec net resources \
+        sidechannel queues api cleaner cluster transfers
+  environment:
+    SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
+    SHAKENFIST_NODE_NAME: "{{ node_name }}"
+    SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
+  when: inventory_hostname in groups.get('eventlog_node', [])
+
+- name: Register the other SF daemons, one node at a time
+  shell: |
+    /srv/shakenfist/venv/bin/sf-ctl register-daemon \
+        sentinel-first sentinel-last privexec nodelock net resources \
+        sidechannel queues api cleaner cluster transfers
+  environment:
+    SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
+    SHAKENFIST_NODE_NAME: "{{ node_name }}"
+    SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
+  when: inventory_hostname not in groups.get('eventlog_node', [])
+
+# The ordering of units here is to match the order they must start in, not
+# alphabetical order.
+- name: Restart the other SF daemons, one node at a time (eventlog node)
+  service:
+    name: "sf-{{ item }}"
+    enabled: yes
+    state: restarted
+    daemon_reload: no
+  with_items:
+    - privexec
+    - net
+    - resources
+    - sidechannel
+    - queues
+    - api
+    - cleaner
+    - cluster
+    - transfers
+    - sentinel-last
+  when: inventory_hostname in groups.get('eventlog_node', [])
+
+- name: Restart the other SF daemons, one node at a time
+  service:
+    name: "sf-{{ item }}"
+    enabled: yes
+    state: restarted
+    daemon_reload: no
+  with_items:
+    - sentinel-first
+    - privexec
+    - nodelock
+    - net
+    - resources
+    - sidechannel
+    - queues
+    - api
+    - cleaner
+    - cluster
+    - transfers
+    - sentinel-last
+  when: inventory_hostname not in groups.get('eventlog_node', [])
+
+- name: Make sure sf.target unit is active
+  vars:
+    cmdCheck: systemctl status sf.target
+    cmdSet: systemctl isolate sf.target
+  ansible.builtin.shell:
+    cmd: '{{ cmdCheck }} && exit 0; {{ cmdSet }}; {{ cmdCheck }} && exit 1; exit 2'
+  register: _
+  changed_when: _.rc == 1
+  failed_when: _.rc == 2
+
+- name: Capture the list of running SF processes
+  shell: |
+    ps -ef | egrep "^root.*sf-"
+  register: sf_processes
+
+- name: Log SF processes
+  debug:
+    msg: "{{ sf_processes.stdout.split('\n') }}"
+
+- name: Capture the status of the SF target
+  shell: |
+    systemctl status sf.target
+  register: sf_systemd_status
+
+- name: Log SF target status
+  debug:
+    msg: "{{ sf_systemd_status.stdout.split('\n') }}"
+
+- name: Capture the SF target journal
+  shell: |
+    journalctl -u sf.target
+  register: sf_systemd_journal
+
+- name: Log SF target journal
+  debug:
+    msg: "{{ sf_systemd_journal.stdout.split('\n') }}"

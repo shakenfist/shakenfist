@@ -1,0 +1,68 @@
+---
+- debug:
+    msg:
+      - "Template path: {{ template_path }}"
+
+- name: Install network node dependencies
+  apt:
+    name:
+      - dnsmasq
+      - dnsmasq-utils
+    state: latest
+
+- name: Disable dnsmasq
+  service:
+    name: dnsmasq
+    enabled: no
+    state: stopped
+
+- name: Remove dnsmasq unit
+  file:
+    path: /usr/lib/systemd/system/dnsmasq.service
+    state: absent
+  notify: Reload systemd
+
+- name: Copy dhcp config template
+  copy:
+    src: "{{ template_path }}/dhcp.tmpl"
+    remote_src: yes
+    dest: /srv/shakenfist/dhcp.tmpl
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Copy dhcp hosts template
+  copy:
+    src: "{{ template_path }}/dhcphosts.tmpl"
+    remote_src: yes
+    dest: /srv/shakenfist/dhcphosts.tmpl
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Copy DNS hosts template
+  copy:
+    src: "{{ template_path }}/dnshosts.tmpl"
+    remote_src: yes
+    dest: /srv/shakenfist/dnshosts.tmpl
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Configure ipforwarding to be enabled on boot
+  copy:
+    content: |
+      net.ipv4.ip_forward = 1
+    dest: /etc/sysctl.d/10-sf-ipforwarding.conf
+    owner: root
+    mode: u=r,g=r,o=r
+
+- name: Configure ipforwarding to be enabled now
+  shell: |
+    sysctl -w net.ipv4.ip_forward=1
+  ignore_errors: True
+  
+- name: Reset failed systemd units
+  shell: |
+    systemctl daemon-reload
+    systemctl reset-failed
