@@ -362,10 +362,14 @@ jobs:
         run: |
           set -x
 
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          mkdir -p /srv/github/artifacts
+          mkdir -p /srv/github/bundle
+          chmod ugo+rwx /srv/github /srv/github/artifacts /srv/github/bundle
+
           # Fetch unit test tracing. Sometimes this isn't present if we failed
           # super early in the CI job.
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          mkdir -p /srv/github/bundle/
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp \
               ${{ matrix.os.base_image_user }}@${primary}:/srv/ci/traces \
