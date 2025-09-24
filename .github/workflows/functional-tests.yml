@@ -360,8 +360,6 @@ jobs:
       - name: Gather logs
         if: always()
         run: |
-          set -x
-
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
           mkdir -p /srv/github/artifacts
@@ -384,6 +382,14 @@ jobs:
               --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+
+          # Zip it all up
+          cd /srv/github
+          sudo chown -R debian:debian /srv/github
+          sudo find . -ls
+
+          echo
+          zip -rq artifacts/bundle.zip bundle/*
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -725,8 +731,6 @@ jobs:
       - name: Gather logs
         if: always()
         run: |
-          set -x
-
           # Fetch unit test tracing. Sometimes this isn't present if we failed
           # super early in the CI job.
           . ${GITHUB_WORKSPACE}/ci-environment.sh
@@ -745,6 +749,14 @@ jobs:
               --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+
+          # Zip it all up
+          cd /srv/github
+          sudo chown -R debian:debian /srv/github
+          sudo find . -ls
+
+          echo
+          zip -rq artifacts/bundle.zip bundle/*
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -935,8 +947,6 @@ jobs:
       - name: Gather logs
         if: always()
         run: |
-          set -x
-
           # We need the ssh key in the place ansible expects it to be, which isn't
           # true on the CI worker node.
           cp /srv/github/id_ci /home/debian/.ssh/id_rsa
@@ -946,6 +956,14 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+
+          # Zip it all up
+          cd /srv/github
+          sudo chown -R debian:debian /srv/github
+          sudo find . -ls
+
+          echo
+          zip -rq artifacts/bundle.zip bundle/*
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -1125,8 +1143,6 @@ jobs:
       - name: Gather logs
         if: always()
         run: |
-          set -x
-
           # We need the ssh key in the place ansible expects it to be, which isn't
           # true on the CI worker node.
           cp /srv/github/id_ci /home/debian/.ssh/id_rsa
@@ -1136,6 +1152,14 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+
+          # Zip it all up
+          cd /srv/github
+          sudo chown -R debian:debian /srv/github
+          sudo find . -ls
+
+          echo
+          zip -rq artifacts/bundle.zip bundle/*
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -1290,8 +1314,6 @@ jobs:
       - name: Gather logs
         if: always()
         run: |
-          set -x
-
           # We need the ssh key in the place ansible expects it to be, which isn't
           # true on the CI worker node.
           cp /srv/github/id_ci /home/debian/.ssh/id_rsa
@@ -1300,6 +1322,14 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+
+          # Zip it all up
+          cd /srv/github
+          sudo chown -R debian:debian /srv/github
+          sudo find . -ls
+
+          echo
+          zip -rq artifacts/bundle.zip bundle/*
 
       - uses: actions/upload-artifact@v4
         if: always()
