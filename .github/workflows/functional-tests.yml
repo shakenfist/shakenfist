@@ -267,11 +267,12 @@ jobs:
               ${GITHUB_WORKSPACE}/client-python \
               ${{ matrix.os.base_image_user }}@${primary}:client-python
 
-          script="cd shakenfist/shakenfist/deploy/;"
+          script="cd shakenfist/;"
           script="${script} . /etc/sf/sfrc;"
 
           script="${script} python3 -mvenv /tmp/functests;"
-          script="${script} /tmp/functests/bin/pip3 install -U -r ../requirements.txt -r ../test-requirements.txt;"
+          script="${script} /tmp/functests/bin/pip3 install -U uv;"
+          script="${script} /tmp/functests/bin/uv pip install -U -r pyproject.toml --all-extras;"
           script="${script} echo -e '\n\nvenv pip after packages:\n';"
           script="${script} /tmp/functests/bin/pip3 list;"
           script="${script} echo -e '\n---\n';"
@@ -642,11 +643,12 @@ jobs:
               ${GITHUB_WORKSPACE}/client-python \
               ${{ matrix.os.base_image_user }}@${primary}:client-python
 
-          script="cd shakenfist/shakenfist/deploy/;"
+          script="cd shakenfist/;"
           script="${script} . /etc/sf/sfrc;"
 
           script="${script} python3 -mvenv /tmp/functests;"
-          script="${script} /tmp/functests/bin/pip3 install -U -r ../requirements.txt -r ../test-requirements.txt;"
+          script="${script} /tmp/functests/bin/pip3 install -U uv;"
+          script="${script} /tmp/functests/bin/uv pip install -U -r pyproject.toml --all-extras;"
           script="${script} echo -e '\n\nvenv pip after packages:\n';"
           script="${script} /tmp/functests/bin/pip3 list;"
           script="${script} echo -e '\n---\n';"
