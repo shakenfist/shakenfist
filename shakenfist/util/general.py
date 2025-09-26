@@ -59,15 +59,22 @@ def recorded_method(func):
     return wrapper
 
 
-CACHED_VERSION = None
+VERSION_CACHE = None
 
 
 def get_version():
-    global CACHED_VERSION
+    global VERSION_CACHE
 
-    if not CACHED_VERSION:
-        CACHED_VERSION = get_version('shakenfist')
-    return CACHED_VERSION
+    if not VERSION_CACHE:
+        try:
+            from shakenfist import _version
+            sf_version = VERSION_CACHE = _version.version
+        except ImportError:
+            sf_version = VERSION_CACHE = 'unreleased development version'
+    else:
+        sf_version = VERSION_CACHE
+
+    return sf_version
 
 
 def get_user_agent():
