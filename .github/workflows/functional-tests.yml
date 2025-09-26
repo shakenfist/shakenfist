@@ -281,7 +281,7 @@ jobs:
           script="${script} cd ~/client-python;"
           script="${script} /tmp/functests/bin/pip3 install -e .;"
 
-          script="${script} cd ~/shakenfist/deploy/;"
+          script="${script} cd ~/shakenfist/shakenfist/deploy/;"
           script="${script} set -e;"
           script="${script} /tmp/functests/bin/stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
 
@@ -657,7 +657,7 @@ jobs:
           script="${script} cd ~/client-python;"
           script="${script} /tmp/functests/bin/pip3 install -e .;"
 
-          script="${script} cd ~/shakenfist/deploy/;"
+          script="${script} cd ~/shakenfist/shakenfist/deploy/;"
           script="${script} set -e;"
           script="${script} /tmp/functests/bin/stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
 
