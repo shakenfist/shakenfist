@@ -353,6 +353,7 @@ jobs:
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary}:/etc/sf/inventory.yaml /srv/github/
           sed -i 's|/root/.ssh|/home/debian/.ssh|g' /srv/github/inventory.yaml
+          sed -i 's|localhost|primary|g' /srv/github/inventory.yaml
 
           echo "====="
           cat /srv/github/inventory.yaml
