@@ -281,7 +281,7 @@ jobs:
 
           script="${script} echo -e '\n\nInstall client-python:\n';"
           script="${script} cd ~/client-python;"
-          script="${script} pip3 install -e .;"
+          script="${script} pip3 install .;"
 
           script="${script} cd ~/shakenfist/shakenfist/deploy/;"
           script="${script} set -e;"
@@ -659,7 +659,7 @@ jobs:
 
           script="${script} echo -e '\n\nInstall client-python:\n';"
           script="${script} cd ~/client-python;"
-          script="${script} pip3 install -e .;"
+          script="${script} pip3 install .;"
 
           script="${script} cd ~/shakenfist/shakenfist/deploy/;"
           script="${script} set -e;"
