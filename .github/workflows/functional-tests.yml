@@ -271,20 +271,21 @@ jobs:
           script="${script} . /etc/sf/sfrc;"
 
           script="${script} python3 -mvenv /tmp/functests;"
-          script="${script} /tmp/functests/bin/pip3 install -U uv;"
-          script="${script} /tmp/functests/bin/uv pip install -U -r pyproject.toml --all-extras;"
-          script="${script} /tmp/functests/bin/uv pip install -U stestr;"
+          script="${script} . /tmp/functests/bin/activate;"
+          script="${script} pip3 install -U uv;"
+          script="${script} uv pip install -U -r pyproject.toml --all-extras;"
+          script="${script} uv pip install -U stestr;"
           script="${script} echo -e '\n\nvenv pip after packages:\n';"
-          script="${script} /tmp/functests/bin/pip3 list;"
+          script="${script} pip3 list;"
           script="${script} echo -e '\n---\n';"
 
           script="${script} echo -e '\n\nInstall client-python:\n';"
           script="${script} cd ~/client-python;"
-          script="${script} /tmp/functests/bin/pip3 install -e .;"
+          script="${script} pip3 install -e .;"
 
           script="${script} cd ~/shakenfist/shakenfist/deploy/;"
           script="${script} set -e;"
-          script="${script} /tmp/functests/bin/stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
+          script="${script} stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
 
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} "${script}"
@@ -648,20 +649,21 @@ jobs:
           script="${script} . /etc/sf/sfrc;"
 
           script="${script} python3 -mvenv /tmp/functests;"
-          script="${script} /tmp/functests/bin/pip3 install -U uv;"
-          script="${script} /tmp/functests/bin/uv pip install -U -r pyproject.toml --all-extras;"
-          script="${script} /tmp/functests/bin/uv pip install -U stestr;"
+          script="${script} . /tmp/functests/bin/activate;"
+          script="${script} pip3 install -U uv;"
+          script="${script} uv pip install -U -r pyproject.toml --all-extras;"
+          script="${script} uv pip install -U stestr;"
           script="${script} echo -e '\n\nvenv pip after packages:\n';"
-          script="${script} /tmp/functests/bin/pip3 list;"
+          script="${script} pip3 list;"
           script="${script} echo -e '\n---\n';"
 
           script="${script} echo -e '\n\nInstall client-python:\n';"
           script="${script} cd ~/client-python;"
-          script="${script} /tmp/functests/bin/pip3 install -e .;"
+          script="${script} pip3 install -e .;"
 
           script="${script} cd ~/shakenfist/shakenfist/deploy/;"
           script="${script} set -e;"
-          script="${script} /tmp/functests/bin/stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
+          script="${script} stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
 
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} "${script}"
