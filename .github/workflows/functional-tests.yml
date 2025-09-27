@@ -243,7 +243,7 @@ jobs:
           setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
           setup="${setup} . /etc/sf/sfrc;"
           setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
-          setup="${setup} sf-client artifact upload"
+          setup="${setup} /srv/shakenfist/venv/bin/sf-client artifact upload"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
               "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
@@ -339,7 +339,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs -t 1.75 --ignore sf_cleaner'
+              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75 --ignore sf_cleaner'
 
       - name: Check for reasonable data rates
         timeout-minutes: 5
@@ -572,7 +572,7 @@ jobs:
           while [ $count -lt 60 ]
           do
             ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client instance list'
+              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client instance list'
             if [ $? == 0 ]; then
               exit 0
             fi
@@ -590,7 +590,7 @@ jobs:
           setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
           setup="${setup} . /etc/sf/sfrc;"
           setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
-          setup="${setup} sf-client artifact upload"
+          setup="${setup} /srv/shakenfist/venv/bin/sf-client artifact upload"
 
           # The cluster CI image, used by all CI types
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -623,7 +623,7 @@ jobs:
           echo ""
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} \
-              '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24 > /dev/null; echo -n "."; done'
+              '. /etc/sf/sfrc; for i in `seq 100`; do /srv/shakenfist/venv/bin/sf-client --async=continue network create background-$i 10.$i.0.0/24 > /dev/null; echo -n "."; done'
           echo ""
 
       - name: Make the traces directory
@@ -714,7 +714,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs -t 1.75'
+              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75'
 
       - name: Check for reasonable data rates
         timeout-minutes: 5
@@ -882,7 +882,7 @@ jobs:
           while [ $count -lt 60 ]
           do
             ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary '. /etc/sf/sfrc; sf-client instance list'
+              debian@$primary '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client instance list'
             if [ $? == 0 ]; then
               exit 0
             fi
@@ -900,7 +900,7 @@ jobs:
           setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
           setup="${setup} . /etc/sf/sfrc;"
           setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
-          setup="${setup} sf-client artifact upload"
+          setup="${setup} /srv/shakenfist/venv/bin/sf-client artifact upload"
 
           # The cluster CI image, used by all CI types
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -930,7 +930,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary '. /etc/sf/sfrc; sf-client node cpuhogs -t 1.75'
+              debian@$primary '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75'
 
       - name: Check for reasonable data rates
         timeout-minutes: 5
@@ -1076,7 +1076,7 @@ jobs:
           while [ $count -lt 60 ]
           do
             ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary '. /etc/sf/sfrc; sf-client instance list'
+              debian@$primary '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client instance list'
             if [ $? == 0 ]; then
               exit 0
             fi
@@ -1094,7 +1094,7 @@ jobs:
           setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
           setup="${setup} . /etc/sf/sfrc;"
           setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
-          setup="${setup} sf-client artifact upload"
+          setup="${setup} /srv/shakenfist/venv/bin/sf-client artifact upload"
 
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@${UPLOAD_TARGET} \
@@ -1124,7 +1124,7 @@ jobs:
           set -x
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           for node in ${sf1_uuid} ${sf2_uuid} ${sf3_uuid} ${sf4_uuid} ${sf5_uuid}; do
-              sf-client instance reboot --hard ${node}
+              /srv/shakenfist/venv/bin/sf-client instance reboot --hard ${node}
           done
           sleep 90
 
@@ -1287,7 +1287,7 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              debian@$primary '. /etc/sf/sfrc; sf-client node list'
+              debian@$primary '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node list'
 
       - name: Wait for five minutes
         run: sleep 300
