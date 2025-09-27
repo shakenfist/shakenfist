@@ -17,7 +17,8 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
 
     def test_disappearing_source_cache(self):
         p = subprocess.run(
-            ['sudo sf-client artifact download debian-11 '
+            ['sudo /srv/shakenfist/venv/bin/sf-client '
+             'artifact download debian-11 '
              '/var/www/html/debian-11-disappearing-cache'],
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
@@ -64,7 +65,8 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
         n = n['name']
 
         p = subprocess.run(
-            ['sudo sf-client artifact download debian-11 '
+            ['sudo /srv/shakenfist/venv/bin/sf-client '
+             'artifact download debian-11 '
              '/var/www/html/debian-11-disappearing-instance'],
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(

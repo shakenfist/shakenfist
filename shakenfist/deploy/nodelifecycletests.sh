@@ -11,6 +11,9 @@ function log {
 # Install dependencies
 sudo apt-get install -y jq
 
+# Active the venv which has the client
+. /srv/shakenfist/venv/bin/activate
+
 # Log nodes
 echo
 sf-client node list

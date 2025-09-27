@@ -1069,9 +1069,9 @@ if [ -z $1 ]; then
     . /etc/sf/sfrc
 
     if [ -z GETSF_SKIP_COMMON_IMAGES ]; then
-        sf-client artifact cache ubuntu:24.04 --shared
-        sf-client artifact cache debian:12 --shared
-        sf-client artifact cache cirros --shared
+        /srv/shakenfist/venv/binsf-client artifact cache ubuntu:24.04 --shared
+        /srv/shakenfist/venv/binsf-client artifact cache debian:12 --shared
+        /srv/shakenfist/venv/binsf-client artifact cache cirros --shared
     fi
 
     question_start
