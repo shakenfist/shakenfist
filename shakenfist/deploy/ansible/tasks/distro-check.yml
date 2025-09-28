@@ -4,3 +4,15 @@
     prompt: "\nWARNING: Only Ubuntu and Debian are supported at present ({{ ansible_distribution }} detected), this will probably fail"
     seconds: 30
   when: ansible_distribution.split(' ', 1)[0] | lower not in ["ubuntu", "debian"]
+
+- name: Warn if unsupported version of Debian
+  pause:
+    prompt: "\nWARNING: Only Debian 12 is supported at present ({{ ansible_distribution_major_version }} detected), this will probably fail"
+    seconds: 30
+  when: ansible_distribution.split(' ', 1)[0] | lower == "debian" and ansible_distribution_major_version != "12"
+
+- name: Warn if unsupported version of Ubuntu
+  pause:
+    prompt: "\nWARNING: Only Ubuntu 24.04 is supported at present ({{ ansible_distribution_major_version }} detected), this will probably fail"
+    seconds: 30
+  when: ansible_distribution.split(' ', 1)[0] | lower == "ubuntu" and ansible_distribution_major_version != "24.04"
