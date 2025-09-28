@@ -447,15 +447,6 @@ jobs:
       matrix:
         os: [
           {
-            description: 'debian 11 single machine',
-            job_name: 'debian-11-localhost',
-            base_image: 'sf://label/ci-images/debian-11',
-            base_image_user: 'debian',
-            topology: 'localhost',
-            concurrency: 3,
-            stestr_config: 'cluster-ci.conf'
-          },
-          {
             description: 'debian 12 cluster',
             job_name: 'debian-12-slim-primary',
             base_image: 'sf://label/ci-images/debian-12',
@@ -476,7 +467,7 @@ jobs:
           {
             description: 'guests',
             job_name: 'guests',
-            base_image: 'sf://label/ci-images/debian-11',
+            base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
             topology: 'slim-primary',
             concurrency: 5,
@@ -831,7 +822,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
-              base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
+              base_image=sf://label/ci-images/debian-12 base_image_user=debian" \
               ansible/ci-topology-slim-primary.yml
 
           nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
@@ -1025,7 +1016,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
-              base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
+              base_image=sf://label/ci-images/debian-12 base_image_user=debian" \
               ansible/ci-topology-slim-primary.yml
 
           nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
@@ -1221,7 +1212,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
-              base_image=sf://label/ci-images/debian-11 base_image_user=debian" \
+              base_image=sf://label/ci-images/debian-12 base_image_user=debian" \
               ansible/ci-topology-localhost-upgrade.yml
 
           echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV

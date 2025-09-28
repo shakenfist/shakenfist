@@ -7,10 +7,10 @@ The purpose of this guide is to walk you through a Shaken Fist installation. Sha
 
 [//]: # (Note that if you change the list of supported operating systems you must also update python_verison.md in this directory)
 
-Shaken Fist only supports Ubuntu 24.04, Debian 11, and Debian 12, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. Bug reports are welcome if you have any issues, and may be filed at https://github.com/shakenfist/shakenfist/issues
+Shaken Fist only supports Ubuntu 24.04, and Debian 12, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. Bug reports are welcome if you have any issues, and may be filed at https://github.com/shakenfist/shakenfist/issues
 
 ???+ note
-    Debian 10 and Ubuntu 22.04 support were dropped in v0.8, as supporting
+    Debian 10, Debian 11 and Ubuntu 22.04 support were dropped in v0.8, as supporting
     older versions of ansible became burdensome. Debian 12 support was added
     in v0.8.
 
