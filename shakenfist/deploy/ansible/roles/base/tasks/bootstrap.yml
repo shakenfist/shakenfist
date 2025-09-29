@@ -14,9 +14,8 @@
     mode: "0755"
 
 - name: Disable auto-starting of dnsmasq on installation
-  copy:
-    content: |
-      disable dnsmasq.service
+  template:
+    src: templates/00-sf-disable-dnsmasq.tmpl 
     dest: /etc/systemd/system-preset/00-sf-disable-dnsmasq.preset
     owner: root
     group: root
@@ -106,17 +105,9 @@
     state: directory
     mode: "0755"
     
-- name: Make /etc/sysctl.d/
-  file:
-    path: /etc/sysctl.d
-    state: directory
-    mode: u+rw,go+r
-    
 - name: Configure IPv6 to be disabled on boot
-  copy:
-    content: |
-      net.ipv6.conf.all.disable_ipv6 = 1
-      net.ipv6.conf.default.disable_ipv6 = 1
+  template:
+    src: templates/10-sf-ipv6.tmpl
     dest: /etc/sysctl.d/10-sf-ipv6.conf
     owner: root
     mode: u=r,g=r,o=r
@@ -128,13 +119,8 @@
   ignore_errors: True
 
 - name: Disable system suspend
-  copy:
-    content: |
-      [Sleep]
-      AllowSuspend=no
-      AllowHibernation=no
-      AllowSuspendThenHibernate=no
-      AllowHybridSleep=no
+  template:
+    src: templates/sleep.tmpl  
     dest: /etc/systemd/sleep.conf
     owner: root
     mode: u=r,g=r,o=r
@@ -145,39 +131,8 @@
     state: restarted
 
 - name: Configure journald to not consume heaps of disk
-  copy:
-    content: |
-      [Journal]
-      #Storage=auto
-      #Compress=yes
-      #Seal=yes
-      #SplitMode=uid
-      #SyncIntervalSec=5m
-      #RateLimitIntervalSec=30s
-      #RateLimitBurst=10000
-      #SystemMaxUse=
-      #SystemKeepFree=
-      SystemMaxFileSize=1000M
-      #SystemMaxFiles=100
-      #RuntimeMaxUse=
-      #RuntimeKeepFree=
-      #RuntimeMaxFileSize=
-      #RuntimeMaxFiles=100
-      #MaxRetentionSec=
-      #MaxFileSec=1month
-      #ForwardToSyslog=yes
-      #ForwardToKMsg=no
-      #ForwardToConsole=no
-      #ForwardToWall=yes
-      #TTYPath=/dev/console
-      #MaxLevelStore=debug
-      #MaxLevelSyslog=debug
-      #MaxLevelKMsg=notice
-      #MaxLevelConsole=info
-      #MaxLevelWall=emerg
-      #LineMax=48K
-      #ReadKMsg=yes
-      #Audit=no
+  template:
+    src: templates/journald.tmpl
     dest: /etc/systemd/journald.conf
     owner: root
     mode: u=r,g=r,o=r
