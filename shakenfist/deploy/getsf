@@ -113,7 +113,6 @@ elif [ ${GETSF_RELEASE} == "pre-release" ]; then
     GETSF_AGENT_PACKAGE="shakenfist-agent"
 elif [ ${GETSF_RELEASE} == "local" ]; then
     status "We will use local packages."
-    PIP_EXTRA="--force-reinstall"
 
     question_start
     echo "Do you want to build packages from a local git repository"
@@ -833,33 +832,32 @@ if [ ${has_ansible} == 0 ]; then
 fi
 
 # We _have_ to have Shaken Fist installed on the primary to boostrap the installer,
-# so we do that separately now. That primary venv needs a modern pip on Debian 10
-# for bcrypt installation to work.
+# so we do that separately now. `uv` also doesn't support direct pathing to a venv,
+# so we need to activate the venv to do the installs.
 echo
 status "Setup primary venv."
 python3 -m venv --system-site-packages /srv/shakenfist/venv
 /srv/shakenfist/venv/bin/pip install -U pip
+/srv/shakenfist/venv/bin/pip install -U uv
+. /srv/shakenfist/venv/bin/activate
 
+echo
+status "Install Shaken Fist server in primary venv."
 if [ ${GETSF_SERVER_PACKAGE} == "shakenfist" ]; then
-    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} shakenfist
+    uv pip install ${PIP_EXTRA} shakenfist
 else
-    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} ${GETSF_SERVER_PACKAGE}
+    uv pip install ${PIP_EXTRA} ${GETSF_SERVER_PACKAGE}
 fi
 
+echo
+status "Install Shaken Fist client in primary venv."
 if [ ${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
-    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} shakenfist-client
+    uv pip install ${PIP_EXTRA} shakenfist-client
 else
-    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
+    uv pip install ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
 fi
 
-# NOTE(mikal): I don't love how we need to do this, but it seems to be required
-# to make sure CI is using the right version and tox isn't installing one of its
-# own.
-echo
-status "Install client package in system pip on the primary node."
-export PIP_BREAK_SYSTEM_PACKAGES=1
-pip3 install -U ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
-echo
+deactivate
 
 # NOTE(mikal): chasing how ansible doesn't love non-blocking stdout...
 cat - > /tmp/getsf_blocking_test.py << DEPLOYEDEOF
