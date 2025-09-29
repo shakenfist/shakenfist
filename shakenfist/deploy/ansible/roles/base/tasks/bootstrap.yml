@@ -106,6 +106,12 @@
     state: directory
     mode: "0755"
     
+- name: Make /etc/sysctl.d/
+  file:
+    path: /etc/sysctl.d
+    state: directory
+    mode: u+rw,go+r
+    
 - name: Configure IPv6 to be disabled on boot
   copy:
     content: |
