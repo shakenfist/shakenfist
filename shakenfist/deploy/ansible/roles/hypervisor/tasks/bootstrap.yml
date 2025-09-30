@@ -29,7 +29,7 @@
       options kvm_amd nested=1
     dest: /etc/modprobe.d/sf-kvm.conf
     owner: root
-    mode: u=r,g=r,o=r
+    mode: ugo+r
   when: is_amd.rc == 0
 
 - name: Enable nested virtualization on boot (Intel)
@@ -38,7 +38,7 @@
       options kvm_intel nested=1
     dest: /etc/modprobe.d/sf-kvm.conf
     owner: root
-    mode: u=r,g=r,o=r
+    mode: ugo+r
   when: is_intel.rc == 0
 
 - name: Configure KSM to run on boot
@@ -49,7 +49,7 @@
       w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
     dest: /etc/tmpfiles.d/sf-ksm.conf
     owner: root
-    mode: u=r,g=r,o=r
+    mode: ugo+r
   when: ksm_enabled == "1"
 
 # merge_across_nodes requires a reboot, so is skipped below
@@ -68,7 +68,7 @@
       w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
     dest: /etc/tmpfiles.d/sf-ksm.conf
     owner: root
-    mode: u=r,g=r,o=r
+    mode: ugo+r
   when: ksm_enabled != "1"
 
 # merge_across_nodes requires a reboot, so is skipped below

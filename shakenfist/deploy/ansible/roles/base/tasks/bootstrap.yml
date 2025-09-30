@@ -5,13 +5,13 @@
     dest: /etc/hosts
     owner: root
     group: root
-    mode: u=r,g=r,o=r
+    mode: ugo+r
 
 - name: Make /etc/systemd/system-preset/
   file:
     path: /etc/systemd/system-preset
     state: directory
-    mode: "0755"
+    mode: u+rwx,go+rx
 
 - name: Disable auto-starting of dnsmasq on installation
   template:
@@ -19,7 +19,7 @@
     dest: /etc/systemd/system-preset/00-sf-disable-dnsmasq.preset
     owner: root
     group: root
-    mode: u=r,g=r,o=r
+    mode: ugo+r
   notify: Reload systemd
 
 # As recommended on the ansible apt module documentation...
@@ -103,14 +103,26 @@
   file:
     path: /srv/shakenfist
     state: directory
-    mode: "0755"
+    mode: u+rwx,go+rx
+
+- name: Disable system suspend
+  template:
+    src: templates/sleep.tmpl  
+    dest: /etc/systemd/sleep.conf
+    owner: root
+    mode: ugo+r
+
+- name: Restart systemd-logind to disable system suspend
+  service:
+    name: systemd-logind
+    state: restarted
     
 - name: Configure IPv6 to be disabled on boot
   template:
     src: templates/10-sf-ipv6.tmpl
     dest: /etc/sysctl.d/10-sf-ipv6.conf
     owner: root
-    mode: u=r,g=r,o=r
+    mode: ugo+r
 
 - name: Configure IPv6 to be disabled now
   shell: |
@@ -118,24 +130,12 @@
     sysctl -w net.ipv6.conf.default.disable_ipv6=1
   ignore_errors: True
 
-- name: Disable system suspend
-  template:
-    src: templates/sleep.tmpl  
-    dest: /etc/systemd/sleep.conf
-    owner: root
-    mode: u=r,g=r,o=r
-
-- name: Restart systemd-logind to disable system suspend
-  service:
-    name: systemd-logind
-    state: restarted
-
 - name: Configure journald to not consume heaps of disk
   template:
     src: templates/journald.tmpl
     dest: /etc/systemd/journald.conf
     owner: root
-    mode: u=r,g=r,o=r
+    mode: ugo+r
 
 - name: Restart journald
   service:
@@ -146,4 +146,4 @@
   file:
     path: /srv/shakenfist
     state: directory
-    mode: "0755"
+    mode: u+rwx,go+rx

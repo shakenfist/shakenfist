@@ -55,7 +55,7 @@
       net.ipv4.ip_forward = 1
     dest: /etc/sysctl.d/10-sf-ipforwarding.conf
     owner: root
-    mode: u=r,g=r,o=r
+    mode: ugo+r
 
 - name: Configure ipforwarding to be enabled now
   shell: |

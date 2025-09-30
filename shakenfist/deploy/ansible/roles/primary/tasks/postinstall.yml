@@ -10,7 +10,7 @@
   file:
     path: /usr/share/ansible/plugins/modules
     state: directory
-    mode: "0755"
+    mode: u+rwx,go+rx
 
 - name: Lookup the installed location of ansible modules
   shell: |

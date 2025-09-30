@@ -93,7 +93,7 @@
     dest: /etc/apache2/sites-available/sf-example.conf
     owner: root
     group: root
-    mode: u=r,g=r,o=r
+    mode: ugo+r
 
 - name: Restart apache
   service:
