@@ -805,31 +805,11 @@ DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Option
     install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
 echo
 
-# We use Ansible from pypi for Debian 10, and the OS Ansible for everyone else.
-has_ansible=0
-if [ -e /etc/os-release ]; then
-    source /etc/os-release
-    status "Target OS is ${ID} ${VERSION_ID}."
-    if [ ${ID} == "debian" ]; then
-        if [ ${VERSION_ID} -eq "10" ]; then
-            # This is Debian 10, we also need to install python2 for ansible to work
-            status "... Ensuring Debian 10 has python 2 installed."
-            DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
-                install python
-            pip install ansible
-            has_ansible=1
-            echo
-        fi
-    fi
-fi
-
-if [ ${has_ansible} == 0 ]; then
-    echo
-    status "Install ansible"
-    DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
-        install ansible
-    echo
-fi
+echo
+status "Install ansible"
+DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
+    install ansible
+echo
 
 # We _have_ to have Shaken Fist installed on the primary to boostrap the installer,
 # so we do that separately now. `uv` also doesn't support direct pathing to a venv,
