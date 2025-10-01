@@ -99,12 +99,6 @@
     /srv/shakenfist/venv/bin/pip install {{ pip_extra }} {{ client_package }}
   when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
 
-- name: Make /srv/shakenfist/
-  file:
-    path: /srv/shakenfist
-    state: directory
-    mode: u+rwx,go+rx
-
 - name: Disable system suspend
   template:
     src: templates/sleep.tmpl  
@@ -141,9 +135,3 @@
   service:
     name: systemd-journald
     state: restarted
-    
-- name: Create storage directory
-  file:
-    path: /srv/shakenfist
-    state: directory
-    mode: u+rwx,go+rx

@@ -756,6 +756,11 @@ if [ \$? -ne 0 ]; then
     error "It looks like this machine isn't configured to run virtual machines.\nThis might indicate a BIOS configuration error (whatever your chipset\ncalls VT extensions), not having nested virtualization enabled if this\nis a virtual machine, or really ancient hardware. Please correct the\nproblem and re-run."
 fi
 echo
+
+# Make /srv/shakenfist
+mkdir -p /srv/shakenfist
+chmod u+rwx /srv/skakenfist
+chmod go+rx /srv/shakenfist
 PERNODEEOF
 chmod ugo+rx /tmp/sf-per-node-primary
 
