@@ -83,7 +83,6 @@
         agent_package: "{{ agent_package }}"
         client_package: "{{ client_package }}"
         pip_extra: "{{ pip_extra }}"
-        client_on_all_nodes: "{{ client_on_all_nodes }}"
 
 ### Networking
 
@@ -199,7 +198,6 @@
       vars:
         role_action: "config"
         system_key: "{{ admin_password }}"
-        client_on_all_nodes: "{{ client_on_all_nodes }}"
         sf_config_template_path: "{{ playbook_dir }}/roles/base/templates"
 
 - hosts: primary_node

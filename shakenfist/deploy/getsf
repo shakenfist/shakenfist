@@ -580,21 +580,6 @@ fi
 question_end
 echo
 
-question_start
-echo "Should the Shaken Fist client be installed on all nodes?"
-echo "The default is to install the client only on the primary"
-echo "node, but sometimes its convenient to have it everywhere."
-echo
-if [ -z ${GETSF_CLIENT_ON_ALL_NODES} ]; then
-    echo -n "(true or false) >> "
-    read GETSF_CLIENT_ON_ALL_NODES
-    record_answer GETSF_CLIENT_ON_ALL_NODES "${GETSF_CLIENT_ON_ALL_NODES}"
-else
-    echo "(true or false) >> ${GETSF_CLIENT_ON_ALL_NODES}"
-fi
-question_end
-echo
-
 # Build local wheels if required
 mkdir -p /srv/shakenfist/packages
 
@@ -761,6 +746,31 @@ echo
 mkdir -p /srv/shakenfist
 chmod u+rwx /srv/skakenfist
 chmod go+rx /srv/shakenfist
+
+echo
+status "Setup shakenfist venv."
+python3 -m venv --system-site-packages /srv/shakenfist/venv
+/srv/shakenfist/venv/bin/pip install -U pip
+/srv/shakenfist/venv/bin/pip install -U uv
+. /srv/shakenfist/venv/bin/activate
+
+echo
+status "Install Shaken Fist server."
+if [ \${GETSF_SERVER_PACKAGE} == "shakenfist" ]; then
+    uv pip install \${PIP_EXTRA} shakenfist
+else
+    uv pip install \${PIP_EXTRA} \${GETSF_SERVER_PACKAGE}
+fi
+
+echo
+status "Install Shaken Fist client."
+if [ \${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
+    uv pip install \${PIP_EXTRA} shakenfist-client
+else
+    uv pip install \${PIP_EXTRA} \${GETSF_CLIENT_PACKAGE}
+fi
+
+deactivate
 PERNODEEOF
 chmod ugo+rx /tmp/sf-per-node-primary
 
@@ -783,7 +793,6 @@ if [ "${GETSF_NODES}" == "localhost" ]; then
     status "        ...bootstrapping"
     /tmp/sf-per-node-primary
 else
-    # TODO(mikal): Could I replace this with an ansible play so it runs in parallel?
     for node in ${GETSF_NODES[@]}; do
         status "    ...${node}"
         safe_node=$(echo ${node} | tr "-" "_")
@@ -810,38 +819,10 @@ DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Option
     install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
 echo
 
-# We _have_ to have Shaken Fist installed on the primary to boostrap the installer,
-# so we do that separately now. `uv` also doesn't support direct pathing to a venv,
-# so we need to activate the venv to do the installs.
 echo
-status "Setup primary venv."
-python3 -m venv --system-site-packages /srv/shakenfist/venv
-/srv/shakenfist/venv/bin/pip install -U pip
-/srv/shakenfist/venv/bin/pip install -U uv
-. /srv/shakenfist/venv/bin/activate
-
-echo
-status "Install ansible and other installer requirements"
+status "Install ansible and other installer requirements into the primary venv."
 uv pip install -r ${SCRIPT_DIR}/requirements.txt
 echo
-
-echo
-status "Install Shaken Fist server in primary venv."
-if [ ${GETSF_SERVER_PACKAGE} == "shakenfist" ]; then
-    uv pip install ${PIP_EXTRA} shakenfist
-else
-    uv pip install ${PIP_EXTRA} ${GETSF_SERVER_PACKAGE}
-fi
-
-echo
-status "Install Shaken Fist client in primary venv."
-if [ ${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
-    uv pip install ${PIP_EXTRA} shakenfist-client
-else
-    uv pip install ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
-fi
-
-deactivate
 
 # NOTE(mikal): chasing how ansible doesn't love non-blocking stdout...
 cat - > /tmp/getsf_blocking_test.py << DEPLOYEDEOF
@@ -918,10 +899,6 @@ fi
 
 if [ ! -z ${GETSF_SSH_KEY_FILENAME} ]; then
     echo "export SSH_KEY_FILENAME=\"${GETSF_SSH_KEY_FILENAME}\"" >> /root/sf-deploy
-fi
-
-if [ ! -z ${GETSF_CLIENT_ON_ALL_NODES} ]; then
-    echo "export CLIENT_ON_ALL_NODES=\"${GETSF_CLIENT_ON_ALL_NODES}\"" >> /root/sf-deploy
 fi
 
 echo "export KSM_ENABLED=1" >> /root/sf-deploy

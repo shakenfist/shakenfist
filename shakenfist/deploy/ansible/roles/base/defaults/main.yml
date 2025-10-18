@@ -1,5 +1,4 @@
 # shared
-client_on_all_nodes: false
 system_key: "unknown"
 etcd_host: "127.0.0.1"
 node_name: "localhost"

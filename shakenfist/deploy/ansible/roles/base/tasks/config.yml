@@ -14,7 +14,6 @@
     path: /etc/sf
     state: directory
     mode: u+rwx,go+rx
-  when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
 
 - name: Write sfrc file
   template:
@@ -23,7 +22,6 @@
     owner: root
     group: sudo
     mode: u=r,g=r,o=
-  when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
 
 - name: Install sfrc for root user
   lineinfile:
@@ -31,7 +29,6 @@
     create: yes
     regexp: ". /etc/sf/sfrc"
     line: ". /etc/sf/sfrc"
-  when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
 
 - name: Write a global auth file
   template:
@@ -40,7 +37,6 @@
     owner: root
     group: sudo
     mode: u=r,g=r,o=
-  when: inventory_hostname in groups.get('primary_node', []) or client_on_all_nodes
 
 - name: Check if we have an existing config
   stat:

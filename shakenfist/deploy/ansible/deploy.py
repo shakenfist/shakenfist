@@ -84,8 +84,6 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
 
     update_if_specified('extra_config', '[]')
 
-    update_if_specified_bool('client_on_all_nodes', '0')
-
     with open('/etc/sf/deploy-vars.json', 'w') as varsfile:
         varsfile.write(json.dumps(variables, indent=4, sort_keys=True))
 
