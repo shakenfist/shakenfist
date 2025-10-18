@@ -77,6 +77,7 @@
     group: root
     mode: ugo+r
   when: not config_stat_result.stat.exists
+  notify: Reload systemd
 
 - name: Remove obsolete systemd units
   file:
@@ -85,6 +86,7 @@
   with_items:
     - sf.service
     - sf-checksums.service
+  notify: Reload systemd
 
 - name: Write systemd target unit on remote host
   template:
@@ -93,6 +95,7 @@
     owner: root
     group: root
     mode: ugo+r
+  notify: Reload systemd
 
 - name: Write systemd units on remote host
   template:
@@ -113,6 +116,7 @@
     - resources
     - sidechannel
     - transfers
+  notify: Reload systemd
 
 - name: Write systemd unit for API daemon
   template:
@@ -121,6 +125,7 @@
     owner: root
     group: root
     mode: ugo+r
+  notify: Reload systemd
 
 - name: Write systemd unit for eventlog daemon
   template:
@@ -132,6 +137,7 @@
   vars:
     item: eventlog
   when: inventory_hostname in groups.get('eventlog_node', [])
+  notify: Reload systemd
 
 # https://stackoverflow.com/questions/64701241/how-do-i-write-ansible-task-for-systemctl-set-default-graphical-target-without
 - name: Make sure sf.target unit is the default
@@ -143,6 +149,7 @@
   register: _
   changed_when: _.rc == 1
   failed_when: _.rc == 2
+  notify: Reload systemd
 
 - name: Ensure /var/run/sf exists for gunicorn
   file:

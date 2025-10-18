@@ -54,7 +54,7 @@
   roles:
     - role: network
       vars:
-        role_action: validate_mtus
+        role_action: "validate_mtus"
         template_path: "{{ hostvars['localhost']['template_path'] }}"
 
 - hosts: hypervisors
@@ -65,7 +65,7 @@
   roles:
     - role: hypervisor
       vars:
-        role_action: validate_kvm
+        role_action: "validate_kvm"
 
 ### Base node setup
 
@@ -95,7 +95,7 @@
   roles:
     - role: network
       vars:
-        role_action: bootstrap
+        role_action: "bootstrap"
         template_path: "{{ hostvars['localhost']['template_path'] }}"
 
 ### Internal PKI
@@ -109,7 +109,7 @@
   roles:
     - role: pki_internal_ca
       vars:
-        role_action: bootstrap
+        role_action: "bootstrap"
         deploy_name: "{{ deploy_name }}"
 
 - hosts: allsf
@@ -121,13 +121,13 @@
   roles:
     - role: pki_internal_ca
       vars:
-        role_action: host_certificate
+        role_action: "host_certificate"
         deploy_name: "{{ deploy_name }}"
         hostname: "{{ inventory_hostname }}"
 
     - role: pki_internal_ca
       vars:
-        role_action: distribute_certificates
+        role_action: "distribute_certificates"
         deploy_name: "{{ deploy_name }}"
         hostname: "{{ inventory_hostname }}"
 
@@ -141,7 +141,7 @@
   roles:
     - role: hypervisor
       vars:
-        role_action: bootstrap
+        role_action: "bootstrap"
         template_path: "{{ hostvars['localhost']['template_path'] }}"
 
 ### Primary node
@@ -154,7 +154,7 @@
   roles:
     - role: primary
       vars:
-        role_action: bootstrap
+        role_action: "bootstrap"
 
 - hosts: allsf
   become: yes
@@ -201,10 +201,7 @@
         system_key: "{{ admin_password }}"
         client_on_all_nodes: "{{ client_on_all_nodes }}"
         sf_config_template_path: "{{ playbook_dir }}/roles/base/templates"
-    - role: base
-      vars:
-        role_action: "reload_systemd"
- 
+
 - hosts: primary_node
   become: yes
   become_method: sudo
