@@ -61,8 +61,3 @@
   shell: |
     sysctl -w net.ipv4.ip_forward=1
   ignore_errors: True
-  
-- name: Reset failed systemd units
-  shell: |
-    systemctl daemon-reload
-    systemctl reset-failed
