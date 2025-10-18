@@ -46,7 +46,7 @@
 - name: Record API URL from primary node
   set_fact:
     api_url: "{{item['api_url']}}"
-    delegate_to: "localhost"
+  delegate_to: "localhost"
   when: item.get('primary_node', False)
 
 - name: Add node facts
