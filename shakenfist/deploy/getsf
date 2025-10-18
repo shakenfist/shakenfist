@@ -726,11 +726,11 @@ APT_GET="DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpk
 echo
 
 status "Updating apt database."
-eval \${APT_GET} update
+eval ${APT_GET} update
 
 echo
 status "Installing cpu-checker."
-eval \${APT_GET} install cpu-checker
+eval ${APT_GET} install cpu-checker
 echo
 
 # Make sure that KVM will work. This check is in the installer, but its
@@ -744,7 +744,10 @@ echo
 
 # Make /srv/shakenfist
 mkdir -p /srv/shakenfist
-chmod u+rwx /srv/skakenfist
+if [ ! -e /srv/shakenfist ]; then
+    error "Failed to create /srv/shakenfist"
+fi
+chmod u+rwx /srv/shakenfist
 chmod go+rx /srv/shakenfist
 
 echo
@@ -755,19 +758,19 @@ python3 -m venv --system-site-packages /srv/shakenfist/venv
 . /srv/shakenfist/venv/bin/activate
 
 echo
-status "Install Shaken Fist server."
-if [ \${GETSF_SERVER_PACKAGE} == "shakenfist" ]; then
-    uv pip install \${PIP_EXTRA} shakenfist
+status "Install Shaken Fist server from ${GETSF_SERVER_PACKAGE}."
+if [ ${GETSF_SERVER_PACKAGE} == "shakenfist" ]; then
+    uv pip install ${PIP_EXTRA} shakenfist
 else
-    uv pip install \${PIP_EXTRA} \${GETSF_SERVER_PACKAGE}
+    uv pip install ${PIP_EXTRA} ${GETSF_SERVER_PACKAGE}
 fi
 
 echo
-status "Install Shaken Fist client."
-if [ \${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
-    uv pip install \${PIP_EXTRA} shakenfist-client
+status "Install Shaken Fist client from ${GETSF_CLIENT_PACKAGE}."
+if [ \{GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
+    uv pip install ${PIP_EXTRA} shakenfist-client
 else
-    uv pip install \${PIP_EXTRA} \${GETSF_CLIENT_PACKAGE}
+    uv pip install ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
 fi
 
 deactivate
