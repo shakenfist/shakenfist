@@ -37,7 +37,7 @@
 
 - name: Log additional config
   debug:
-    msg: "{{ extra_config }}"
+    msg: "{{ extra_config | from_json }}"
 
 - name: Apply additional config
   shell: |
@@ -45,7 +45,7 @@
         "{{item['name']}}" "{{item['value']}}"
   environment:
     SHAKENFIST_ETCD_HOST: etcd_host
-  loop: "{{ extra_config }}"
+  loop: "{{ extra_config | from_json }}"
 
 - name: Verify configuration
   shell: |
