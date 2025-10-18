@@ -917,6 +917,16 @@ export TOPOLOGY=\$(cat << EOF
 DEPLOYEOF
 
 for node in ${GETSF_NODES[@]}; do
+    if [ "${node}" == "${GETSF_NODES}" ]; then
+        # A single entry list
+        end_comma=""
+    elif [ "${node}" == "${GETSF_NODES[-1]}" ]; then
+        # The last entry in a multi-entry list
+        end_comma=""
+    else
+        end_comma=","
+    fi
+
     safe_node=$(echo ${node} | tr "-" "_")
     calc_egress_nic="GETSF_NODE_EGRESS_NIC_${safe_node}"
     calc_egress_address="GETSF_NODE_EGRESS_ADDRESS_${safe_node}"
@@ -975,7 +985,7 @@ for node in ${GETSF_NODES[@]}; do
     fi
 
     cat - >> /root/sf-deploy << DEPLOYEOF
-  {
+    {
     "name": "${node}",
     "node_egress_nic": "${!calc_egress_nic}",
     "node_egress_ip": "${!calc_egress_address}",
@@ -988,7 +998,7 @@ for node in ${GETSF_NODES[@]}; do
     "hypervisor": ${hypervisor_node},
     "storage": ${storage_node}${api_comma}
     ${api_stanza}
-  },
+  }${end_comma}
 DEPLOYEOF
 done
 
