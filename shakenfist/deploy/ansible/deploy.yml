@@ -24,6 +24,7 @@
         "ram_system_reservation": "{{ ram_system_reservation }}"
         "dns_server": "{{ dns_server }}"
         "http_proxy": "{{ http_proxy }}"
+        "topology_decoded": "{{ topology | from_json }}"
       delegate_to: localhost
       delegate_facts: true
 
@@ -31,12 +32,12 @@
 
     - name: Log topology
       debug:
-        msg: "{{ topology }}"
+        msg: topology_decoded
 
     - name: Add nodes from topology
       # This include is to work around the lack of blocks in loops
       include_tasks: includes/topology_add_node.yml
-      loop: "{{ topology }}"
+      loop: topology_decoded
 
     - name: Set configuration file location
       set_fact:
