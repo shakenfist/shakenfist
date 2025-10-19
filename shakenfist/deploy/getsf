@@ -919,11 +919,15 @@ export TOPOLOGY=\$(cat << EOF
 [
 DEPLOYEOF
 
+last_node=$(echo ${GETSF_NODES} | rev | cut -f 1 -d " " | rev)
+echo "Last node in list is ${last_node}"
+
 for node in ${GETSF_NODES[@]}; do
+    echo "Comparing ${node} to ${last_node}..."
     if [ "${node}" == "${GETSF_NODES}" ]; then
         # A single entry list
         end_comma=""
-    elif [ "${node}" == "${GETSF_NODES[-1]}" ]; then
+    elif [ "${node}" == "${last_node}" ]; then
         # The last entry in a multi-entry list
         end_comma=""
     else
