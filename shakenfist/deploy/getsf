@@ -726,11 +726,11 @@ APT_GET="DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpk
 echo
 
 status "Updating apt database."
-eval ${APT_GET} update
+eval \${APT_GET} update
 
 echo
 status "Installing cpu-checker."
-eval ${APT_GET} install cpu-checker
+eval \${APT_GET} install cpu-checker
 echo
 
 # Make sure that KVM will work. This check is in the installer, but its
