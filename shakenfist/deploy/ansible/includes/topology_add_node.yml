@@ -7,34 +7,39 @@
     ansible_ssh_user: "{{ssh_user}}"
     ansible_ssh_private_key_file: "{{ssh_key_filename}}"
 
+- name: Add {{item['name']}} to allsf
+  add_host:
+    hostname: "{{item['name']}}"
+    groups: sfall
+
 - name: Add {{item['name']}} as a hypervisor (if configured)
   add_host:
     hostname: "{{item['name']}}"
-    groups: hypervisors, sf_prometheus_exporters, sfall
+    groups: hypervisors, sf_prometheus_exporters
   when: item.get('hypervisor', False)
 
 - name: Add {{item['name']}} as an etcd master (if configured)
   add_host:
     hostname: "{{item['name']}}"
-    groups: etcd_master, sfall
+    groups: etcd_master
   when: item.get('etcd_master', False)
 
 - name: Add {{item['name']}} as a network node (if configured, should only be one)
   add_host:
     hostname: "{{item['name']}}"
-    groups: network_node, sf_prometheus_exporters, sfall
+    groups: network_node, sf_prometheus_exporters
   when: item.get('network_node', False)
 
 - name: Add {{item['name']}} as a eventlog node (if configured, should only be one)
   add_host:
     hostname: "{{item['name']}}"
-    groups: eventlog_node, sf_prometheus_exporters, sfall
+    groups: eventlog_node, sf_prometheus_exporters
   when: item.get('eventlog_node', False)
 
 - name: Add {{item['name']}} as a primary node (if configured, should only be one)
   add_host:
     hostname: "{{item['name']}}"
-    groups: primary_node, sfall
+    groups: primary_node
   when: item.get('primary_node', False)
 
 - name: Add {{item['name']}} as a storage node
