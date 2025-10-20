@@ -9,7 +9,7 @@ function log {
 # Install dependencies
 sudo apt-get install -y pwgen
 
-cd /home/debian/shakenfist/deploy/ansible_module_ci
+cd /home/debian/shakenfist/shakenfist/deploy/ansible_module_ci
 for scenario in *.yml; do
     echo
     echo
