@@ -778,7 +778,7 @@ status "Install Shaken Fist server from \${local_server_package}."
 status "Install Shaken Fist client from \${local_client_package}."
 status "Install Shaken Fist agent from \${local_agent_package}."
 echo
-uv pip install ${PIP_EXTRA} \${local_server_package} \${local_client_package} \${local_agent_package}
+uv pip install --reinstall ${PIP_EXTRA} \${local_server_package} \${local_client_package} \${local_agent_package}
 
 deactivate
 PERNODEEOF
