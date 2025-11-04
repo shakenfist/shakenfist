@@ -757,21 +757,28 @@ python3 -m venv --system-site-packages /srv/shakenfist/venv
 /srv/shakenfist/venv/bin/pip install -U uv
 . /srv/shakenfist/venv/bin/activate
 
-echo
-status "Install Shaken Fist server from ${GETSF_SERVER_PACKAGE}."
+
+local_server_package=$("/tmp/"$(basename ${GETSF_SERVER_PACKAGE}))
 if [ ${GETSF_SERVER_PACKAGE} == "shakenfist" ]; then
-    uv pip install ${PIP_EXTRA} shakenfist
-else
-    uv pip install ${PIP_EXTRA} ${GETSF_SERVER_PACKAGE}
+    local_server_package=shakenfist
+fi
+
+local_client_package=$("/tmp/"$(basename ${GETSF_CLIENT_PACKAGE}))
+if [ \${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
+    local_server_package=shakenfist-client
+fi
+
+local_agent_package=$("/tmp/"$(basename ${GETSF_AGENT_PACKAGE}))
+if [ ${GETSF_CLIENT_PACKAGE} == "shakenfist-agent" ]; then
+    local_server_package=shakenfist-agent
 fi
 
 echo
-status "Install Shaken Fist client from ${GETSF_CLIENT_PACKAGE}."
-if [ \{GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
-    uv pip install ${PIP_EXTRA} shakenfist-client
-else
-    uv pip install ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
-fi
+status "Install Shaken Fist server from \${local_server_package}."
+status "Install Shaken Fist client from \${local_client_package}."
+status "Install Shaken Fist agent from \${local_agent_package}."
+echo
+uv pip install ${PIP_EXTRA} \${local_server_package} \${local_client_package} \${local_agent_package}
 
 deactivate
 PERNODEEOF
