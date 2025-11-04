@@ -758,18 +758,18 @@ python3 -m venv --system-site-packages /srv/shakenfist/venv
 . /srv/shakenfist/venv/bin/activate
 
 
-local_server_package=$("/tmp/"$(basename ${GETSF_SERVER_PACKAGE}))
+local_server_package="/tmp/"$(basename ${GETSF_SERVER_PACKAGE})
 if [ ${GETSF_SERVER_PACKAGE} == "shakenfist" ]; then
     local_server_package=shakenfist
 fi
 
-local_client_package=$("/tmp/"$(basename ${GETSF_CLIENT_PACKAGE}))
-if [ \${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
+local_client_package="/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
+if [ ${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
     local_server_package=shakenfist-client
 fi
 
-local_agent_package=$("/tmp/"$(basename ${GETSF_AGENT_PACKAGE}))
-if [ ${GETSF_CLIENT_PACKAGE} == "shakenfist-agent" ]; then
+local_agent_package="/tmp/"$(basename ${GETSF_AGENT_PACKAGE})
+if [ ${GETSF_AGENT_PACKAGE} == "shakenfist-agent" ]; then
     local_server_package=shakenfist-agent
 fi
 
