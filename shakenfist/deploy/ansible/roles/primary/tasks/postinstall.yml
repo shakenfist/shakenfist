@@ -30,7 +30,6 @@
 - name: Install sf_instance ansible module
   copy:
     src: "{{ sf_instance_path }}"
-    remote_src: yes
     dest: /usr/share/ansible/plugins/modules/sf_instance
     owner: root
     group: root
@@ -48,7 +47,6 @@
 - name: Install sf_network ansible module
   copy:
     src: "{{ sf_network_path }}"
-    remote_src: yes
     dest: /usr/share/ansible/plugins/modules/sf_network
     owner: root
     group: root
@@ -66,7 +64,6 @@
 - name: Install sf_namespace ansible module
   copy:
     src: "{{ sf_namespace_path }}"
-    remote_src: yes
     dest: /usr/share/ansible/plugins/modules/sf_namespace
     owner: root
     group: root
@@ -84,7 +81,6 @@
 - name: Install sf_snapshot ansible module
   copy:
     src: "{{ sf_snapshot_path }}"
-    remote_src: yes
     dest: /usr/share/ansible/plugins/modules/sf_snapshot
     owner: root
     group: root

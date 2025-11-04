@@ -182,7 +182,6 @@
 - name: Copy libvirt template
   copy:
     src: "{{hostvars['localhost']['template_path']}}/libvirt.tmpl"
-    remote_src: yes
     dest: /srv/shakenfist/libvirt.tmpl
     owner: root
     group: root
