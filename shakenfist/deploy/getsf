@@ -1045,16 +1045,21 @@ if [ -z $1 ]; then
     cp /etc/sf/shakenfist.json ${home_dir}/.shakenfist
     chown ${SUDO_USER}:${SUDO_USER} ${home_dir}/.shakenfist
 
+    status "Symlink sf-client to a well known location."
+    ln -s /srv/shakenfist/venv/bin/sf-client /usr/local/bin/sf-client
+
     status "Pause briefly to let Shaken Fist settle."
     sleep 5
 
-    status "Pre-fetching common images."
+    status "List Shaken Fist nodes."
     . /etc/sf/sfrc
+    sf-client node list
 
     if [ -z GETSF_SKIP_COMMON_IMAGES ]; then
-        /srv/shakenfist/venv/binsf-client artifact cache ubuntu:24.04 --shared
-        /srv/shakenfist/venv/binsf-client artifact cache debian:12 --shared
-        /srv/shakenfist/venv/binsf-client artifact cache cirros --shared
+        status "Pre-fetching common images."
+        sf-client artifact cache ubuntu:24.04 --shared
+        sf-client artifact cache debian:12 --shared
+        sf-client artifact cache cirros --shared
     fi
 
     question_start
