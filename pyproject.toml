@@ -66,7 +66,7 @@ dependencies = [
     "requests==2.32.4",                   # apache2
     "requests-toolbelt==1.0.0",           # apache2
     "chardet==5.2.0",                     # lgpl
-    "urllib3==2.5.0",                     # mit
+    "urllib3==2.6.0",                     # mit
 
     # These must move as a set
     "pydantic==2.10.6",                   # mit
