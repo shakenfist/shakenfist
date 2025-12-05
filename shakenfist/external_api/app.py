@@ -19,7 +19,6 @@ import flask
 import flask_restful
 from flask_jwt_extended import JWTManager
 from flask_request_id import RequestID
-from pbr.version import VersionInfo
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
@@ -40,6 +39,7 @@ from shakenfist.external_api import network as api_network
 from shakenfist.external_api import node as api_node
 from shakenfist.external_api import snapshot as api_snapshot
 from shakenfist.external_api import upload as api_upload
+from shakenfist.util import general as util_general
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -58,7 +58,7 @@ swagger = flasgger.Swagger(app, template={
     'info': {
         'title': 'Shaken Fist REST API',
         'description': 'Shaken Fist cluster control via REST API',
-        'version': VersionInfo('shakenfist').version_string(),
+        'version': util_general.get_version(),
     },
     'host': config.API_ADVERTISED_HOST,
     'basePath': config.API_ADVERTISED_BASE_PATH,

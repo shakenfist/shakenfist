@@ -1,0 +1,192 @@
+---
+# Determine what architecture we're on. Derived from
+# https://github.com/redhat-openstack/ansible-role-tripleo-parts
+- name: Do we have Intel CPUs?
+  command: grep -q Intel /proc/cpuinfo
+  ignore_errors: true
+  register: is_intel
+
+- name: Do we have AMD CPUs?
+  command: grep -q AMD /proc/cpuinfo
+  ignore_errors: true
+  register: is_amd
+
+- name: Enable nested virtualization now (AMD)
+  shell: |
+    modprobe -r kvm_intel || true
+    modprobe kvm_amd nested=1
+  when: is_amd.rc == 0
+
+- name: Enable nested virtualization now (Intel)
+  shell: |
+    modprobe -r kvm_amd
+    modprobe kvm_intel nested=1
+  when: is_intel.rc == 0
+
+- name: Enable nested virtualization on boot (AMD)
+  copy:
+    content: |
+      options kvm_amd nested=1
+    dest: /etc/modprobe.d/sf-kvm.conf
+    owner: root
+    mode: ugo+r
+  when: is_amd.rc == 0
+
+- name: Enable nested virtualization on boot (Intel)
+  copy:
+    content: |
+      options kvm_intel nested=1
+    dest: /etc/modprobe.d/sf-kvm.conf
+    owner: root
+    mode: ugo+r
+  when: is_intel.rc == 0
+
+- name: Configure KSM to run on boot
+  copy:
+    content: |
+      w /sys/kernel/mm/ksm/run - - - - 1
+      w /sys/kernel/mm/ksm/pages_to_scan - - - - 1000000
+      w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
+    dest: /etc/tmpfiles.d/sf-ksm.conf
+    owner: root
+    mode: ugo+r
+  when: ksm_enabled == "1"
+
+# merge_across_nodes requires a reboot, so is skipped below
+- name: Configure KSM to run now
+  shell: |
+    echo "1" > /sys/kernel/mm/ksm/run
+    echo "100000" > /sys/kernel/mm/ksm/pages_to_scan
+  ignore_errors: True
+  when: ksm_enabled == "1"
+
+- name: Configure KSM to not run on boot
+  copy:
+    content: |
+      w /sys/kernel/mm/ksm/run - - - - 0
+      w /sys/kernel/mm/ksm/pages_to_scan - - - - 0
+      w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
+    dest: /etc/tmpfiles.d/sf-ksm.conf
+    owner: root
+    mode: ugo+r
+  when: ksm_enabled != "1"
+
+# merge_across_nodes requires a reboot, so is skipped below
+- name: Configure KSM to not run now
+  shell: |
+    echo "0" > /sys/kernel/mm/ksm/run
+    echo "0" > /sys/kernel/mm/ksm/pages_to_scan
+  ignore_errors: True
+  when: ksm_enabled != "1"
+
+- name: Enable SPICE TLS
+  lineinfile:
+    path: /etc/libvirt/qemu.conf
+    regexp: "#spice_tls = "
+    line: 'spice_tls = 1'
+
+- name: Configure SPICE TLS PKI directory
+  lineinfile:
+    path: /etc/libvirt/qemu.conf
+    regexp: "#spice_tls_x509_cert_dir = "
+    line: 'spice_tls_x509_cert_dir = "/etc/pki/libvirt-spice"'
+
+# Ensure libvirt has BPF and perfmon capabilities (see the Debian bug
+# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=979964 for details).
+- name: Let libvirt use BPF
+  lineinfile:
+    path: /etc/apparmor.d/local/usr.sbin.libvirtd
+    regexp: "  capability bpf,"
+    line: '  capability bpf,'
+
+- name: Let libvirt use perfmon
+  lineinfile:
+    path: /etc/apparmor.d/local/usr.sbin.libvirtd
+    regexp: "  capability perfmon,"
+    line: '  capability perfmon,'
+
+- name: Let libvirt use sys_rawio
+  lineinfile:
+    path: /etc/apparmor.d/local/usr.sbin.libvirtd
+    regexp: "  capability sys_rawio,"
+    line: '  capability sys_rawio,'
+
+- name: Check that the /etc/apparmor.d/local/abstractions/libvirt-qemu exists
+  stat:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+  register: stat_result
+
+# NOTE(mikal): this wont work if the user has configured a different
+# path for the instance path. We should fix that.
+- name: Add an apparmor rule for NVMe disks (modern Debian)
+  lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    regexp: "/srv/shakenfist/instances.*nvme.*"
+    line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
+  when: stat_result.stat.exists
+
+# NOTE(mikal): and fix it here too.
+- name: Add an apparmor rule for NVMe disks (older Debian)
+  lineinfile:
+    path: /etc/apparmor.d/abstractions/libvirt-qemu
+    regexp: "/srv/shakenfist/instances.*nvme.*"
+    line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
+  when: not stat_result.stat.exists
+
+# Let libvirt read the SSL configuration for its SPICE connections (see the
+# Debian bug https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1030684 for
+# details).
+- name: Let libvirt read our openssl config
+  lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    regexp: "/etc/ssl/openssl.cnf r,"
+    line: '/etc/ssl/openssl.cnf r,'
+  when: stat_result.stat.exists
+
+- name: Let libvirt read our openssl config
+  lineinfile:
+    path: /etc/apparmor.d/abstractions/libvirt-qemu
+    regexp: "/etc/ssl/openssl.cnf r,"
+    line: '/etc/ssl/openssl.cnf r,'
+  when: not stat_result.stat.exists
+
+# For instances which are started with no network interface, but then hotplug
+# one later, we need to ensure that we always have access to /dev/vhost-net.
+# See https://bugs.launchpad.net/ubuntu/+source/libvirt/+bug/1815910 for
+# details.
+- name: Add an apparmor rule to always allow vhost-net access
+  lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    regexp: "/dev/vhost-net rw,"
+    line: '/dev/vhost-net rw,'
+  when: stat_result.stat.exists
+
+- name: Add an apparmor rule to always allow vhost-net access
+  lineinfile:
+    path: /etc/apparmor.d/abstractions/libvirt-qemu
+    regexp: "/dev/vhost-net rw,"
+    line: '/dev/vhost-net rw,'
+  when: not stat_result.stat.exists
+
+- name: Restart apparmor
+  service:
+    name: apparmor
+    enabled: yes
+    state: restarted
+
+- name: Restart libvirt
+  service:
+    name: libvirtd
+    state: restarted
+
+- name: Copy libvirt template
+  copy:
+    src: "{{hostvars['localhost']['template_path']}}/libvirt.tmpl"
+    dest: /srv/shakenfist/libvirt.tmpl
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Turn off default libvirt networking
+  shell: virsh net-destroy default
+  ignore_errors: True

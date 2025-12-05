@@ -1,0 +1,23 @@
+# shared
+system_key: "unknown"
+etcd_host: "127.0.0.1"
+node_name: "localhost"
+node_mesh_ip: "127.0.0.1"
+
+# bootstrap
+server_package: "shakenfist"
+agent_package: "shakenfist-agent"
+client_package: "shakenfist-client"
+pip_extra: ""
+
+# syslog
+syslog_target: "unknown"
+
+# config
+sf_config_template_path: "unknown"
+
+# register
+# ...
+
+# create_admin_namespace
+eventlog_node_ip: "127.0.0.1"

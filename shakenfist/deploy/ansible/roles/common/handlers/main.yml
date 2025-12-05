@@ -1,0 +1,17 @@
+---
+# Shared handlers
+
+- name: Reload systemd
+  become: true
+  systemd:
+    daemon_reload: yes
+
+- name: Restart journald
+  service:
+    name: systemd-journald
+    state: restarted
+
+- name: Restart logind
+  service:
+    name: systemd-logind
+    state: restarted

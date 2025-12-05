@@ -1,0 +1,157 @@
+---
+- name: Use Hashicorp Vault for "system" namespace key (if enabled)
+  block:
+    - set_fact:
+        system_key: "{{lookup('hashivault', '{{ vault_system_key_path }}', 'key')}}"
+      when: vault_system_key_path is defined
+
+  rescue:
+    - fail:
+        msg: "Ensure that you have installed ansible-modules-hashivault ie. pip install ansible-modules-hashivault"
+
+- name: Create config directory
+  file:
+    path: /etc/sf
+    state: directory
+    mode: u+rwx,go+rx
+
+- name: Write sfrc file
+  template:
+    src: files/sfrc
+    dest: /etc/sf/sfrc
+    owner: root
+    group: sudo
+    mode: u=r,g=r,o=
+
+- name: Install sfrc for root user
+  lineinfile:
+    path: /root/.bashrc
+    create: yes
+    regexp: ". /etc/sf/sfrc"
+    line: ". /etc/sf/sfrc"
+
+- name: Write a global auth file
+  template:
+    src: files/shakenfist.json
+    dest: /etc/sf/shakenfist.json
+    owner: root
+    group: sudo
+    mode: u=r,g=r,o=
+
+- name: Check if we have an existing config
+  stat:
+    path: /etc/sf/config
+  register: config_stat_result
+
+- name: Log stat result for existing config
+  debug:
+    msg: "Existing config: {{ config_stat_result }}"
+
+- name: Dump the expected location of the config file from the remote host
+  debug:
+    msg: "Remote config template path: {{ sf_config_template_path }}/config"
+
+- name: Fetch config template from remote host
+  fetch:
+    src: "{{ sf_config_template_path }}/config"
+    dest: /tmp/{{ ansible_host }}_config
+    flat: yes
+    fail_on_missing: yes
+  when: not config_stat_result.stat.exists
+
+- name: Ensure /etc/sf exists
+  file:
+    path: /etc/sf
+    state: directory
+  when: not config_stat_result.stat.exists
+
+- name: Write config file on remote host
+  template:
+    src: /tmp/{{ ansible_host }}_config
+    dest: /etc/sf/config
+    owner: root
+    group: root
+    mode: ugo+r
+  when: not config_stat_result.stat.exists
+  notify: Reload systemd
+
+- name: Remove obsolete systemd units
+  file:
+    dest: /etc/systemd/system/{{ item }}
+    state: absent
+  with_items:
+    - sf.service
+    - sf-checksums.service
+  notify: Reload systemd
+
+- name: Write systemd target unit on remote host
+  template:
+    src: files/sf.target
+    dest: /etc/systemd/system/sf.target
+    owner: root
+    group: root
+    mode: ugo+r
+  notify: Reload systemd
+
+- name: Write systemd units on remote host
+  template:
+    src: files/sf.service
+    dest: /etc/systemd/system/sf-{{ item }}.service
+    owner: root
+    group: root
+    mode: ugo+r
+  with_items:
+    - sentinel-first
+    - sentinel-last
+    - privexec
+    - nodelock
+    - cleaner
+    - cluster
+    - net
+    - queues
+    - resources
+    - sidechannel
+    - transfers
+  notify: Reload systemd
+
+- name: Write systemd unit for API daemon
+  template:
+    src: files/sf-api.service
+    dest: /etc/systemd/system/sf-api.service
+    owner: root
+    group: root
+    mode: ugo+r
+  notify: Reload systemd
+
+- name: Write systemd unit for eventlog daemon
+  template:
+    src: files/sf.service
+    dest: /etc/systemd/system/sf-{{ item }}.service
+    owner: root
+    group: root
+    mode: ugo+r
+  vars:
+    item: eventlog
+  when: inventory_hostname in groups.get('eventlog_node', [])
+  notify: Reload systemd
+
+# https://stackoverflow.com/questions/64701241/how-do-i-write-ansible-task-for-systemctl-set-default-graphical-target-without
+- name: Make sure sf.target unit is the default
+  vars:
+    cmdCheck: systemctl get-default | grep -q ^sf.target$
+    cmdSet: systemctl set-default sf.target
+  ansible.builtin.shell:
+    cmd: '{{ cmdCheck }} && exit 0; {{ cmdSet }}; {{ cmdCheck }} && exit 1; exit 2'
+  register: _
+  changed_when: _.rc == 1
+  failed_when: _.rc == 2
+  notify: Reload systemd
+
+- name: Ensure /var/run/sf exists for gunicorn
+  file:
+    path: /var/run/sf
+    state: directory
+    owner: root
+    group: root
+    mode: u=rw,g=r,o=r
+  when: not config_stat_result.stat.exists

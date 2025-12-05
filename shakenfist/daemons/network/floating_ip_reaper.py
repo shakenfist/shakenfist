@@ -36,6 +36,8 @@ class Job(util_concurrency.Job):
 
             # Ensure we haven't leaked any floating IPs (because we used to).
             floating_network = network.floating_network()
+            if not floating_network:
+                return
             LOG.debug('Floating network registrations: %s'
                       % floating_network.ipam.in_use)
 

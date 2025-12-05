@@ -94,11 +94,15 @@ class Job(util_concurrency.Job):
             # this once to avoid doing it over and over below.
             routed_by_network = defaultdict(list)
             fn = network.floating_network()
-            for addr in fn.ipam.in_use:
-                resv = fn.ipam.get_reservation(addr)
-                if resv and resv['type'] == ipam.RESERVATION_TYPE_ROUTED:
-                    network_uuid = resv['user'][1]
-                    routed_by_network[network_uuid].append(addr)
+            if fn:
+                # fn should never be None, but we do in fact see it during
+                # installation at the moment and I am not sure why. I suspect
+                # a startup race.
+                for addr in fn.ipam.in_use:
+                    resv = fn.ipam.get_reservation(addr)
+                    if resv and resv['type'] == ipam.RESERVATION_TYPE_ROUTED:
+                        network_uuid = resv['user'][1]
+                        routed_by_network[network_uuid].append(addr)
 
             # Ensure we are on every network we have a host for
             for network_uuid in host_networks:

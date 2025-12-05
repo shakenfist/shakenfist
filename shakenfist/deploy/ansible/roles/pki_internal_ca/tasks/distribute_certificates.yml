@@ -1,0 +1,46 @@
+---
+- debug:
+    msg:
+      - "Distributing host certificate for {{ hostname }}."
+      - "CA cert path: {{ ca_cert_path }}"
+      - "CA key path: {{ ca_key_path }}"
+      - "CA template path: {{ ca_template_path }}"
+      - "Host cert path: {{ host_cert_path }}"
+      - "Host key path: {{ host_key_path }}"
+      - "Host template path: {{ host_template_path }}"
+
+- name: Make /etc/pki/CA
+  file:
+    path: /etc/pki/CA
+    state: directory
+    mode: '0755'
+
+- name: Make /etc/pki/libvirt-spice
+  file:
+    path: /etc/pki/libvirt-spice
+    state: directory
+    mode: '0755'
+
+- name: Copy CA certificate to host
+  copy:
+    src: "{{ ca_cert_path }}"
+    dest: /etc/pki/libvirt-spice/ca-cert.pem
+    owner: root
+    group: root
+    mode: '0444'
+
+- name: Copy host key to host
+  copy:
+    src: "{{ host_key_path }}"
+    dest: /etc/pki/libvirt-spice/server-key.pem
+    owner: root
+    group: root
+    mode: '0444'
+
+- name: Copy host certificate to host
+  copy:
+    src: "{{ host_cert_path }}"
+    dest: /etc/pki/libvirt-spice/server-cert.pem
+    owner: root
+    group: root
+    mode: '0444'
