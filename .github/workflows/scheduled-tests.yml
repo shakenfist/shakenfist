@@ -316,6 +316,3 @@ jobs:
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
 
-      - name: Debug output
-        if: failure()
-        run: 'echo Created ${{ steps.create-issue.outputs.url }}'
