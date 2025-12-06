@@ -22,8 +22,8 @@ dependencies = [
 
     # Our requirements -- we specify exact versions here and let renovate update
     # them for the develop branch as required. Releases never update requirements.
-    "shakenfist-utilities==0.7.3",        # apache2
-    "clingwrap==1.13.0",                   # apache2
+    "shakenfist-utilities==0.8.4",        # apache2
+    "clingwrap==1.13.0",                  # apache2
 
     "fixtures==4.2.5",                    # apache2
     "PyYAML==6.0.2",                      # mit
