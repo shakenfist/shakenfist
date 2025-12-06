@@ -28,7 +28,8 @@ jobs:
             base_image_user: 'debian',
             topology: 'localhost',
             concurrency: 3,
-            branch: 'develop'
+            branch: 'develop',
+            stestr_config: 'cluster-ci.conf'
           },
           {
             description: 'develop branch on debian 12 cluster',
@@ -37,7 +38,8 @@ jobs:
             base_image_user: 'debian',
             topology: 'slim-primary',
             concurrency: 5,
-            branch: 'develop'
+            branch: 'develop',
+            stestr_config: 'cluster-ci.conf'
           },
           {
             description: 'develop branch on ubuntu 24.04 cluster',
@@ -46,7 +48,8 @@ jobs:
             base_image_user: 'ubuntu',
             topology: 'slim-primary',
             concurrency: 5,
-            branch: 'develop'
+            branch: 'develop',
+            stestr_config: 'cluster-ci.conf'
           }
         ]
     runs-on: [self-hosted, vm]
@@ -127,6 +130,7 @@ jobs:
           tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
+        timeout-minutes: 30
         run: |
           set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
@@ -212,6 +216,10 @@ jobs:
               -o UserKnownHostsFile=/dev/null \
               ${GITHUB_WORKSPACE}/shakenfist \
               ${{ matrix.os.base_image_user }}@${primary}:shakenfist
+          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/client-python \
+              ${{ matrix.os.base_image_user }}@${primary}:client-python
 
           script="cd shakenfist/deploy/;"
           script="${script} . /etc/sf/sfrc;"
@@ -222,7 +230,7 @@ jobs:
           script="${script} /tmp/functests/bin/pip3 list;"
           script="${script} echo -e '\n---\n';"
 
-          script="${script} /tmp/functests/bin/pip3 install -e ${GITHUB_WORKSPACE}/client-python/;"
+          script="${script} /tmp/functests/bin/pip3 install -e ~/client-python/;"
 
           script="${script} set -e;"
           script="${script} /tmp/functests/bin/stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
@@ -237,7 +245,7 @@ jobs:
           touch /srv/ci/failed
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} \
-              "cd shakenfist/deploy; stestr failing --config cluster-ci.conf" > /srv/ci/failed
+              "cd shakenfist/deploy; stestr failing --config ${{ matrix.os.stestr_config }}" > /srv/ci/failed
 
           echo
           failed=$(cat /srv/ci/failed | grep "FAIL: " | \
