@@ -24,7 +24,21 @@ tox -ecover                      # Generate coverage report
 
 - `sf-ctl` - Control CLI
 - `sf-api` - REST API server
+- `sf-database` - Database microservice daemon (runs on etcd_master)
 - `sf-cleaner`, `sf-cluster`, `sf-net`, `sf-queues`, `sf-resources` - Daemons
+
+### Generating gRPC Stubs from Proto Files
+
+Proto files are in `protos/` and generated Python stubs go to `shakenfist/protos/`.
+To regenerate after modifying `.proto` files:
+
+```bash
+cd shakenfist/protos
+../../protos/_make_stubs.sh
+```
+
+**Note:** Requires `grpcio-tools` installed. The script works on both macOS and
+Linux.
 
 ## Code Style and Conventions
 
@@ -112,6 +126,7 @@ shakenfist/
 │   │   ├── api/             # External API server (Flask)
 │   │   ├── cleaner/         # Resource cleanup
 │   │   ├── cluster/         # Cluster maintenance
+│   │   ├── database/        # Database microservice (etcd wrapper)
 │   │   ├── eventlog/        # Event logging service
 │   │   ├── network/         # Network daemon
 │   │   ├── queues/          # Job queue processing
@@ -142,19 +157,62 @@ shakenfist/
 | `artifact.py` | Versioned disk images with labeling |
 | `blob.py` | Content-addressable binary storage with replication |
 | `baseobject.py` | State machine, versioning, DB sync for all objects |
-| `etcd.py` | Distributed state storage and locking |
+| `etcd.py` | Distributed state storage and locking (with database service shim) |
+| `database.py` | Database microservice client library |
 | `config.py` | 100+ Pydantic settings with etcd/env overrides |
 
-### Storage: etcd
+### Storage: etcd and Database Service
 
-All cluster state is stored in etcd:
+All cluster state is stored in etcd. Access can be either direct or via the
+database microservice (controlled by `DATABASE_USE_DIRECT_ETCD` config):
 
 ```python
-# Access pattern
+# Access pattern (works with both direct etcd and database service)
 etcd.get('object_type', 'parent_uuid', 'object_uuid')
 etcd.put('object_type', 'parent_uuid', 'object_uuid', data)
 etcd.delete('object_type', 'parent_uuid', 'object_uuid')
 ```
+
+The database microservice (`sf-database`) runs on the etcd_master node and
+provides a gRPC interface for all database operations. This abstraction layer:
+- Centralizes etcd access to a single service
+- Enables future migration to other backends (e.g., MariaDB)
+- Will eventually provide in-memory caching
+
+Configuration options:
+- `DATABASE_NODE_IP` - IP address of the database service node
+- `DATABASE_API_PORT` - gRPC API port (default: 13005)
+- `DATABASE_METRICS_PORT` - Prometheus metrics port (default: 13006)
+- `DATABASE_USE_DIRECT_ETCD` - Bypass service and use etcd directly (default: True)
+
+### Configuration Bootstrap Order
+
+**IMPORTANT**: Shaken Fist has a two-stage configuration system due to a
+chicken-and-egg problem: some configuration values are stored in etcd, but
+the etcd connection itself must be configured before etcd can be read.
+
+**Stage 1 - Environment/File (before etcd):**
+- `SHAKENFIST_ETCD_HOST` - **Must be set via environment variable** (cannot be
+  stored in etcd because we need it to connect to etcd)
+- `SHAKENFIST_DATABASE_USE_DIRECT_ETCD` - Should be set via environment to
+  determine how to access the database during bootstrap
+
+**Stage 2 - etcd-stored configuration:**
+- All other `SHAKENFIST_*` settings can be stored in etcd at `/sf/config`
+- These are loaded by `load_etcd_settings()` at module import time in `config.py`
+- Settings from etcd are exported as environment variables for the process
+
+**Implications for Ansible deployment:**
+- When running `sf-ctl` commands that need etcd access, always pass
+  `SHAKENFIST_ETCD_HOST` as an environment variable in the task
+- Use Jinja2 templating (e.g., `"{{ etcd_host }}"`) not literal strings
+- The database daemon registration must use `SHAKENFIST_DATABASE_USE_DIRECT_ETCD=True`
+  because the database service isn't running yet during its own registration
+
+**Implications for CLI tools (sf-ctl, sf-backup):**
+- These tools read `/etc/sf/config` at startup to populate environment variables
+- Environment variables set before running the tool take precedence over the
+  config file values
 
 ### Locking
 

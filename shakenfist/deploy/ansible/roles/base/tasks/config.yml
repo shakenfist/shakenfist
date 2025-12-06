@@ -135,6 +135,18 @@
   when: inventory_hostname in groups.get('eventlog_node', [])
   notify: Reload systemd
 
+- name: Write systemd unit for database daemon
+  template:
+    src: files/sf.service
+    dest: /etc/systemd/system/sf-{{ item }}.service
+    owner: root
+    group: root
+    mode: ugo+r
+  vars:
+    item: database
+  when: inventory_hostname in groups.get('etcd_master', [])
+  notify: Reload systemd
+
 # https://stackoverflow.com/questions/64701241/how-do-i-write-ansible-task-for-systemctl-set-default-graphical-target-without
 - name: Make sure sf.target unit is the default
   vars:

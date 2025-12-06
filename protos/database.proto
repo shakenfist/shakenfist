@@ -1,0 +1,204 @@
+syntax = "proto3";
+
+package shakenfist.protos;
+
+service DatabaseService {
+  // Key-Value Operations
+  rpc Get (GetRequest) returns (GetReply) {}
+  rpc GetPrefix (GetPrefixRequest) returns (GetPrefixReply) {}
+  rpc Put (PutRequest) returns (StatusReply) {}
+  rpc Create (CreateRequest) returns (StatusReply) {}
+  rpc Delete (DeleteRequest) returns (StatusReply) {}
+  rpc DeletePrefix (DeletePrefixRequest) returns (StatusReply) {}
+  rpc ReplaceMany (ReplaceManyRequest) returns (ReplaceManyReply) {}
+
+  // Queue Operations
+  rpc Enqueue (EnqueueRequest) returns (StatusReply) {}
+  rpc Dequeue (DequeueRequest) returns (DequeueReply) {}
+  rpc Resolve (ResolveRequest) returns (StatusReply) {}
+  rpc GetQueueLength (QueueLengthRequest) returns (QueueLengthReply) {}
+  rpc RestartQueue (RestartQueueRequest) returns (StatusReply) {}
+
+  // Lock Operations
+  rpc AcquireLock (ClusterLockRequest) returns (ClusterLockReply) {}
+  rpc ReleaseLock (ClusterReleaseLockRequest) returns (StatusReply) {}
+  rpc GetLockHolder (ClusterGetLockHolderRequest) returns (ClusterLockHolderReply) {}
+  rpc ClearStaleLocks (ClusterClearStaleLocksRequest) returns (StatusReply) {}
+  rpc GetExistingLocks (ClusterGetExistingLocksRequest) returns (ClusterGetExistingLocksReply) {}
+
+  // Maintenance
+  rpc Compact (CompactRequest) returns (StatusReply) {}
+}
+
+// Generic status reply
+message StatusReply {
+  bool success = 1;
+  string error = 2;
+}
+
+// Key-Value Operations
+
+message GetRequest {
+  string object_type = 1;
+  string subtype = 2;
+  string name = 3;
+}
+
+message GetReply {
+  bool found = 1;
+  string value = 2;  // JSON-encoded data
+}
+
+message GetPrefixRequest {
+  string object_type = 1;
+  string subtype = 2;
+  string prefix = 3;
+  int64 limit = 4;
+}
+
+message KeyValue {
+  string key = 1;
+  string value = 2;  // JSON-encoded data
+}
+
+message GetPrefixReply {
+  repeated KeyValue results = 1;
+}
+
+message PutRequest {
+  string object_type = 1;
+  string subtype = 2;
+  string name = 3;
+  string data = 4;  // JSON-encoded data
+}
+
+message CreateRequest {
+  string object_type = 1;
+  string subtype = 2;
+  string name = 3;
+  string data = 4;  // JSON-encoded data
+}
+
+message DeleteRequest {
+  string object_type = 1;
+  string subtype = 2;
+  string name = 3;
+}
+
+message DeletePrefixRequest {
+  string path = 1;
+}
+
+message Mutation {
+  string path = 1;
+  string original_data = 2;  // JSON-encoded, empty string for None
+  string new_data = 3;       // JSON-encoded, empty string for None (delete)
+  bool original_is_none = 4;
+  bool new_is_none = 5;
+}
+
+message ReplaceManyRequest {
+  repeated Mutation mutations = 1;
+  bool suppress_failure_audit = 2;
+}
+
+message MutationFailure {
+  string path = 1;
+  string desired = 2;
+  string actual = 3;
+  string replacement = 4;
+}
+
+message ReplaceManyReply {
+  bool success = 1;
+  repeated MutationFailure failures = 2;
+}
+
+// Queue Operations
+
+message EnqueueRequest {
+  string queue_name = 1;
+  string work_item = 2;  // JSON-encoded data
+  double delay = 3;
+}
+
+message DequeueRequest {
+  string queue_name = 1;
+}
+
+message DequeueReply {
+  bool found = 1;
+  string job_name = 2;
+  string work_item = 3;  // JSON-encoded data
+}
+
+message ResolveRequest {
+  string queue_name = 1;
+  string job_name = 2;
+}
+
+message QueueLengthRequest {
+  string queue_name = 1;
+}
+
+message QueueLengthReply {
+  int64 processing = 1;
+  int64 queued = 2;
+  int64 deferred = 3;
+}
+
+message RestartQueueRequest {
+  string queue_name = 1;
+}
+
+// Lock Operations
+
+message ClusterLockRequest {
+  string object_type = 1;
+  string subtype = 2;
+  string name = 3;
+  string lock_data = 4;  // JSON-encoded lock holder info
+}
+
+message ClusterLockReply {
+  bool acquired = 1;
+}
+
+message ClusterReleaseLockRequest {
+  string object_type = 1;
+  string subtype = 2;
+  string name = 3;
+  string lock_data = 4;  // JSON-encoded, for CAS verification
+}
+
+message ClusterGetLockHolderRequest {
+  string object_type = 1;
+  string subtype = 2;
+  string name = 3;
+}
+
+message ClusterLockHolderReply {
+  bool held = 1;
+  string holder = 2;  // JSON-encoded lock holder info
+}
+
+message ClusterClearStaleLocksRequest {
+  string node_name = 1;
+}
+
+message ClusterGetExistingLocksRequest {}
+
+message ClusterLockEntry {
+  string key = 1;
+  string holder = 2;  // JSON-encoded lock holder info
+}
+
+message ClusterGetExistingLocksReply {
+  repeated ClusterLockEntry locks = 1;
+}
+
+// Maintenance Operations
+
+message CompactRequest {
+  int64 revision = 1;
+}

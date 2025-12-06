@@ -223,16 +223,7 @@
         http_proxy: "{{ hostvars['localhost']['http_proxy'] }}"
         extra_config: "{{ extra_config }}"
 
-- hosts: eventlog_node
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-  roles:
-    - role: eventlog
-      vars:
-        role_action: "bootstrap"
-
+# Register all nodes in etcd (init-node creates the node object)
 - hosts: allsf
   become: yes
   become_method: sudo
@@ -245,6 +236,31 @@
         etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         node_name: "{{ node_name }}"
         node_mesh_ip: "{{ node_mesh_ip }}"
+
+# The database daemon must start before eventlog when the database service
+# is enabled (DATABASE_USE_DIRECT_ETCD=False). By default, direct etcd access
+# is used and this step is skipped. This must run AFTER node registration
+# because register-daemon requires the node to exist in etcd.
+- hosts: etcd_master
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+  roles:
+    - role: database
+      vars:
+        role_action: "bootstrap"
+      when: not (database_use_direct_etcd | default(true) | bool)
+
+- hosts: eventlog_node
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+  roles:
+    - role: eventlog
+      vars:
+        role_action: "bootstrap"
 
 - hosts: etcd_master
   become: yes

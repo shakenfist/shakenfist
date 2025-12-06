@@ -84,6 +84,10 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
 
     update_if_specified('extra_config', '[]')
 
+    # Database microservice: when false, use the database gRPC microservice
+    # instead of direct etcd access
+    update_if_specified_bool('database_use_direct_etcd', '1')
+
     with open('/etc/sf/deploy-vars.json', 'w') as varsfile:
         varsfile.write(json.dumps(variables, indent=4, sort_keys=True))
 
