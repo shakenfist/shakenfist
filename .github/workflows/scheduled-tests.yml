@@ -211,6 +211,7 @@ jobs:
       - name: Run functional tests
         timeout-minutes: 180
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
