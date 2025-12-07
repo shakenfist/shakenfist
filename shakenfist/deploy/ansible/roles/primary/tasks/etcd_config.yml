@@ -5,6 +5,7 @@
         AUTH_SECRET_SEED "{{ auth_secret }}"
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
 
 - name: Set ram reservation in etcd
   shell: |
@@ -12,6 +13,7 @@
         RAM_SYSTEM_RESERVATION "{{ ram_system_reservation }}"
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
 
 - name: Set lowest_mtu in etcd
   shell: |
@@ -19,6 +21,7 @@
         MAX_HYPERVISOR_MTU "{{ lowest_mtu }}"
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
 
 - name: Set DNS server in etcd
   shell: |
@@ -26,6 +29,7 @@
         DNS_SERVER "{{ dns_server }}"
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
 
 - name: Set HTTP proxy in etcd
   shell: |
@@ -33,6 +37,7 @@
         HTTP_PROXY "{{ http_proxy }}"
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
   when: hostvars['localhost']['http_proxy'] | length != 0
 
 - name: Log additional config
@@ -45,6 +50,7 @@
         "{{item['name']}}" "{{item['value']}}"
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
   loop: "{{ extra_config | from_json }}"
 
 - name: Verify configuration
@@ -52,12 +58,14 @@
     /srv/shakenfist/venv/bin/sf-ctl verify-config
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
 
 - name: Parse back etcd configuration
   shell: |
     /srv/shakenfist/venv/bin/sf-ctl show-etcd-config
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
   register: etcd_config
 
 - name: Log etcd config
