@@ -117,9 +117,10 @@ def verify_config():
 
 @click.command()
 def initialise_node():
-    click.echo('Initializing node...')
+    click.echo(f'Initializing node "{config.NODE_NAME}" with mesh IP '
+               f'{config.NODE_MESH_IP}...')
     n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
-    click.echo(f'Node is now in state {n.state.value}.')
+    click.echo(f'Node "{config.NODE_NAME}" is now in state {n.state.value}.')
 
 
 @click.command()
