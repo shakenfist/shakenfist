@@ -11,7 +11,6 @@
     SHAKENFIST_NODE_NAME: "{{ node_name }}"
     SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
     SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
-  when: inventory_hostname not in groups.get('eventlog_node', [])
 
 - name: Register the other SF daemons, one node at a time (eventlog node)
   shell: |

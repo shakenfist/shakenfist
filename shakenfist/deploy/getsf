@@ -888,7 +888,7 @@ if [ -z ${GETSF_ADMIN_PASSWORD} ]; then
 fi
 
 cat - > /root/sf-deploy << DEPLOYEOF
-#!/bin/bash
+#!/bin/bash -e
 
 echo "Upgrading ansible-galaxy dependancies..."
 ansible-galaxy install --force -v -r ${SCRIPT_DIR}/requirements.yml | cat -
