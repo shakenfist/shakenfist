@@ -1,4 +1,8 @@
 ---
+# Note: All sf-ctl commands during installation must use direct etcd access
+# because the database microservice may not be running yet. The config file
+# might have DATABASE_USE_DIRECT_ETCD=0 (use microservice), but we override
+# that here to ensure bootstrap works correctly.
 - name: Ensure the node exists in etcd
   shell: |
     /srv/shakenfist/venv/bin/sf-ctl initialise-node
@@ -6,6 +10,7 @@
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
     SHAKENFIST_NODE_NAME: "{{ node_name }}"
     SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
   when: inventory_hostname not in groups.get('eventlog_node', [])
 
 - name: Register the other SF daemons, one node at a time (eventlog node)
@@ -17,6 +22,7 @@
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
     SHAKENFIST_NODE_NAME: "{{ node_name }}"
     SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
   when: inventory_hostname in groups.get('eventlog_node', [])
 
 - name: Register the other SF daemons, one node at a time
@@ -28,6 +34,7 @@
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
     SHAKENFIST_NODE_NAME: "{{ node_name }}"
     SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
   when: inventory_hostname not in groups.get('eventlog_node', [])
 
 # The ordering of units here is to match the order they must start in, not
