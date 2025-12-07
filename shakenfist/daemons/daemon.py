@@ -34,6 +34,7 @@ DAEMON_NAMES = {
     'checksums': 'sf-checksums',
     'cleaner': 'sf-cleaner',
     'cluster': 'sf-cluster',
+    'database': 'sf-database',
     'eventlog': 'sf-eventlog',
     'main': 'sf-main',
     'net': 'sf-net',
