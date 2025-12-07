@@ -75,6 +75,7 @@
   vars:
     paths:
       - "{{ ansible_module_path.stdout }}/sf_snapshot"
+      - "{{ ansible_module_path.stdout }}/sf_snapshot.py"
       - /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot
       - /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot.py
 
