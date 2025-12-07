@@ -10,7 +10,7 @@
 - name: Add {{item['name']}} to allsf
   add_host:
     hostname: "{{item['name']}}"
-    groups: sfall
+    groups: allsf
 
 - name: Add {{item['name']}} as a hypervisor (if configured)
   add_host:

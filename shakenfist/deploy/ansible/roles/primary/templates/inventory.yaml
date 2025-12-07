@@ -1,7 +1,7 @@
 ---
 all:
   hosts:
-{% for svr in groups.sfall %}
+{% for svr in groups.allsf %}
     {{hostvars[svr]['ansible_fqdn']}}:
       ansible_fqdn: {{hostvars[svr]['ansible_fqdn']}}
       ansible_ssh_host: {{hostvars[svr]['ansible_ssh_host']}}
