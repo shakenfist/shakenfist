@@ -126,6 +126,10 @@ def initialise_node():
 @click.argument('daemon', nargs=-1)
 def register_daemon(daemon):
     n = Node.from_db(config.NODE_NAME)
+    if n is None:
+        raise click.ClickException(
+            f'Node "{config.NODE_NAME}" not found in database. '
+            f'Run "sf-ctl initialise-node" first to create the node.')
     for d in daemon:
         click.echo(f'Registering {d} on node...')
         n.register_daemon(d)
