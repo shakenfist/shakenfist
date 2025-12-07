@@ -243,6 +243,25 @@ class InstanceEndpoint(Resource):
 
 **IMPORTANT**: Decorator order matters! See comments in `external_api/app.py`.
 
+### REST API URL Structure
+
+The REST API is documented via OpenAPI at https://openapi.shakenfist.com. Key
+points about URL structure:
+
+- **When talking directly to gunicorn** (port 13000): The base URL is `/`
+  - Example: `http://localhost:13000/auth/namespaces`
+  - Example: `http://localhost:13000/instances`
+
+- **When talking through Apache** (standard external access): The `/api/`
+  prefix is added by the Apache reverse proxy configuration
+  - Example: `http://host/api/auth/namespaces`
+
+- **There is no version prefix** (no `/v1/` or `/2/`) in the API paths
+
+All endpoints require JWT authorization via Bearer token header (except
+`/auth` POST for obtaining tokens). A request to a protected endpoint
+without authentication returns HTTP 401 Unauthorized.
+
 ### Operation Queue System
 
 Operations use a state machine:
