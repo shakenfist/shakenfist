@@ -102,7 +102,7 @@
 
 - name: Verify API is responding
   shell: |
-    curl -s -o /dev/null -w "%{http_code}" http://localhost:13000/api/2/auth/namespaces
+    curl -s -o /dev/null -w "%{http_code}" http://localhost:13000/auth/namespaces
   register: api_response
   failed_when: api_response.stdout != "401"
   retries: 5
