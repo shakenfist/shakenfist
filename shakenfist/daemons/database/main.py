@@ -365,22 +365,12 @@ def main():
     daemon.write_pid_file('database')
     m = Monitor('database')
 
-    # Wait for nodelock daemon to be healthy before starting
-    while not daemon.health_check_nodelock():
-        LOG.info('Waiting for nodelock daemon to be healthy')
-        time.sleep(1)
-    LOG.info('nodelock daemon reports healthy')
-
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     database_pb2_grpc.add_DatabaseServiceServicer_to_server(
         DatabaseService(m), server)
     server.add_insecure_port(
         f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
 
-    LOG.info(
-        f'Starting database gRPC server on '
-        f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}'
-    )
     server.start()
     m.run()
     server.stop(1).wait()
