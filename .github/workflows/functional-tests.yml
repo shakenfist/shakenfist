@@ -206,12 +206,6 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} /tmp/getsf-wrapper
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
 
       - name: Wait for API to start answering
         run: |
@@ -548,12 +542,6 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} /tmp/getsf-wrapper
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
 
       - name: Wait for API to start answering
         run: |
@@ -861,12 +849,6 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               debian@$primary /tmp/getsf-wrapper
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
 
       - name: Wait for API to start answering
         run: |
@@ -1057,12 +1039,6 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               debian@$primary /tmp/getsf-wrapper
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
 
       - name: Wait for API to start answering
         run: |
@@ -1265,14 +1241,7 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              debian@$primary /tmp/getsf-wrapper
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              debian@$primary /tmp/getsf-wrapper          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               debian@$primary 'sudo chmod ugo+r /etc/sf/*'
 

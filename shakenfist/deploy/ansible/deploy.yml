@@ -209,11 +209,6 @@
   roles:
     - role: primary
       vars:
-        role_action: "grafana"
-        deploy_name: "{{ deploy_name }}"
-        system_key: "{{ admin_password }}"
-    - role: primary
-      vars:
         role_action: "etcd_config"
         etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         auth_secret: "{{ hostvars['localhost']['auth_secret'] }}"
@@ -282,5 +277,13 @@
   gather_facts: yes
   connection: ssh
   roles:
+    - role: primary
+      vars:
+        role_action: "apache2"
+    - role: primary
+      vars:
+        role_action: "grafana"
+        deploy_name: "{{ deploy_name }}"
+        system_key: "{{ admin_password }}"
     - role: primary
       role_action: "postinstall"

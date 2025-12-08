@@ -1077,8 +1077,15 @@ if [ -z $1 ]; then
     status "Pause briefly to let Shaken Fist settle."
     sleep 5
 
-    status "List Shaken Fist nodes."
+    status "Setup apache2 load balancing."
+    sudo rm /etc/apache2/sites-enabled/*
+    sudo a2ensite sf-example.conf
+    sudo apachectl graceful
+
+    status "Load sfrc."
     . /etc/sf/sfrc
+
+    status "List Shaken Fist nodes."
     sf-client node list
 
     if [ -z GETSF_SKIP_COMMON_IMAGES ]; then
