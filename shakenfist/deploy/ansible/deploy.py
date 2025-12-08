@@ -140,18 +140,7 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
         sys.exit(obj.returncode)
 
     # Reset any previously failed systemd units so we notice if we cause
-    # failures.
-    obj = subprocess.Popen('systemctl reset-failed', shell=True)
-    if obj.returncode != 0:
-        log_write('***************************************************')
-        log_write('*                     WARNING                     *')
-        log_write('*                                                 *')
-        log_write('* The return code from systemctl reset-failed.    *')
-        log_write('* indicates a failure. You will need to examine   *')
-        log_write('* your systemd logs to determine why. You can     *')
-        log_write('* also request assistance by filing a github      *')
-        log_write('* issue at                                        *')
-        log_write('* https://github.com/shakenfist/shakenfist/issues *')
-        log_write('***************************************************')
-
-    sys.exit(obj.returncode)
+    # failures. We deliberately ignore the return code here because its
+    # just a preventative measure.
+    subprocess.Popen('systemctl reset-failed', shell=True)
+    sys.exit(0)
