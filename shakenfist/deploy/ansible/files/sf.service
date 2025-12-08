@@ -26,9 +26,15 @@ After=multi-user.target
 After=sf-sentinel-first.service
 {% elif item == "nodelock" %}
 After=sf-sentinel-first.service
+{% elif item == "database" %}
+After=sf-sentinel-first.service
+Before=sf-sentinel-last.service
 {% elif item != "sentinel-last" %}
 After=sf-privexec.service
 After=sf-nodelock.service
+{% if not database_use_direct_etcd | default(true) | bool %}
+After=sf-database.service
+{% endif %}
 Before=sf-sentinel-last.service
 {% endif%}
 PartOf=sf.target

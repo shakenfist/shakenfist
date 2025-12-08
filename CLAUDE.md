@@ -214,6 +214,26 @@ the etcd connection itself must be configured before etcd can be read.
 - Environment variables set before running the tool take precedence over the
   config file values
 
+### Systemd Service Ordering
+
+Shaken Fist daemons are managed via systemd with careful ordering defined in
+`deploy/ansible/files/sf.service`. The startup order is:
+
+1. `sentinel-first` - Starts first (after multi-user.target), waits for shutdown
+2. `privexec`, `nodelock`, `database` - Start after sentinel-first (in parallel)
+3. All other daemons - Start after privexec, nodelock, and (when database
+   microservice is enabled) database
+4. `sentinel-last` - Starts after all other daemons, signals shutdown state
+
+**When `DATABASE_USE_DIRECT_ETCD=False`** (database microservice enabled):
+- The `sf-database` service starts early (after sentinel-first)
+- All other daemons (api, cleaner, cluster, queues, etc.) have
+  `After=sf-database.service` added to ensure they wait for the database
+  service to be ready before starting
+
+This ordering is critical because daemons like `sf-api` will hang on startup
+if they try to connect to the database microservice before it's running.
+
 ### Locking
 
 Use `ClusterLock` for distributed operations:
