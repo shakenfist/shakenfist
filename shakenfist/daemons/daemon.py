@@ -3,6 +3,7 @@ import logging
 from math import inf
 import os
 import signal
+import socket
 import threading
 import time
 
@@ -239,6 +240,7 @@ class Daemon:
         n = Node.from_db(config.NODE_NAME)
         n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_RUNNING)
         n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon starting')
+        send_systemd_ready()
 
     def record_exit(self):
         n = Node.from_db(config.NODE_NAME)
@@ -250,6 +252,7 @@ class Daemon:
             if not str(e).startswith('Invalid state change from stopping to degraded'):
                 raise e
         n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon stopped')
+        send_systemd_status('Terminated')
 
     def idle(self, seconds):
         for _ in range(int(seconds / 0.2)):
@@ -257,6 +260,29 @@ class Daemon:
             self.check_daemon_state()
             if os.path.exists(self.abort_path):
                 break
+
+
+def _send_systemd_notification(message):
+    # If running systemd and we are Type=notify...
+    addr = os.environ.get('NOTIFY_SOCKET')
+    if addr:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        sock.connect(addr)
+        sock.sendall(message)
+        sock.close()
+
+
+def send_systemd_ready():
+    _send_systemd_notification(b'READY=1')
+
+
+def send_systemd_stopping():
+    _send_systemd_notification(b'STOPPING=1')
+
+
+def send_systemd_status(message):
+    _send_systemd_notification(f'STATUS={message}'.encode('utf-8'))
+
 
 
 class WorkerPoolDaemon(Daemon):
@@ -301,8 +327,6 @@ class WorkerPoolDaemon(Daemon):
 
             LOG.info(f'There are {len(self.workers)} remaining workers')
             LOG.info('Stopped')
-
-            LOG.info('Terminated')
             self.record_exit()
 
     def reap_workers(self):
@@ -315,7 +339,9 @@ class WorkerPoolDaemon(Daemon):
                 LOG.info(f'Reaping thread {thread_name} with ident '
                          f'{thread_ident}')
                 self.workers[thread_name]['thread'].join(0.2)
+
         self.workers = remaining_workers
+        send_systemd_status(f'{len(self.workers)} active workers')
 
     def start_job(self, processing_class, args, name):
         worker_object = processing_class(*args)

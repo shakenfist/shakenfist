@@ -40,7 +40,7 @@ Before=sf-sentinel-last.service
 PartOf=sf.target
 
 [Service]
-Type=simple
+Type=notify
 User=root
 Group=root
 

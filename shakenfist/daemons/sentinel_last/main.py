@@ -1,14 +1,18 @@
 # NOTE(mikal): this daemon's role is to notice that you've exited the Shaken
 # Fist target run-level and therefore the node is stopping not going missing.
 # You should never manually stop this daemon!
+import os
 import setproctitle
 import signal
+import socket
 import time
 
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
+from shakenfist.daemons.daemon import send_systemd_ready
+from shakenfist.daemons.daemon import send_systemd_stopping
 from shakenfist.node import Node
 
 
@@ -32,6 +36,7 @@ def main():
 
     n = Node.from_db(config.NODE_NAME)
     n.set_daemon_state('sentinel-last', Node.DAEMON_STATE_RUNNING)
+    send_systemd_ready()
 
     while daemon.check_abort_path(ABORT_PATH):
         LOG.debug('Checking in')
@@ -39,6 +44,7 @@ def main():
         time.sleep(15)
 
     LOG.info('Stopping')
+    send_systemd_stopping()
     n.set_daemon_state('sentinel-last', Node.DAEMON_STATE_STOPPED)
     n.state = Node.STATE_STOPPING
     LOG.info('Stopped')
