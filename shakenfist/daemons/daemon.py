@@ -284,7 +284,6 @@ def send_systemd_status(message):
     _send_systemd_notification(f'STATUS={message}'.encode('utf-8'))
 
 
-
 class WorkerPoolDaemon(Daemon):
     def __init__(self, name):
         super().__init__(name)

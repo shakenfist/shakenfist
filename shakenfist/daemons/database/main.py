@@ -10,7 +10,6 @@ enable future migration to other database backends.
 
 from concurrent import futures
 import json
-import time
 
 import grpc
 from prometheus_client import Counter
@@ -19,7 +18,13 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
+from shakenfist.daemons.daemon import send_systemd_ready
+from shakenfist.daemons.daemon import send_systemd_status
+from shakenfist.etcd import set_force_direct_etcd
+from shakenfist.exceptions import InvalidStateException
+from shakenfist.node import Node
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.util import general as util_general
@@ -328,7 +333,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
 
 
 class Monitor(daemon.WorkerPoolDaemon):
-    """Background monitor for the database daemon."""
+    """Background monitor for the database daemon.
+
+    The database daemon is special because it provides database access to other
+    daemons. This means we must use direct etcd access for our own startup and
+    shutdown recording, otherwise we'd have a chicken-and-egg problem.
+    """
 
     def __init__(self, id):
         super().__init__(id)
@@ -349,6 +359,35 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         start_http_server(config.DATABASE_METRICS_PORT)
 
+    def record_start(self):
+        # Override to use direct etcd access. The database daemon can't use
+        # the database service for its own startup recording because WE ARE
+        # the database service.
+        set_force_direct_etcd(True)
+        try:
+            n = Node.from_db(config.NODE_NAME)
+            n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_RUNNING)
+            n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon starting')
+        finally:
+            set_force_direct_etcd(False)
+        send_systemd_ready()
+
+    def record_exit(self):
+        # Override to use direct etcd access.
+        set_force_direct_etcd(True)
+        try:
+            n = Node.from_db(config.NODE_NAME)
+            try:
+                n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPED)
+            except InvalidStateException as e:
+                if not str(e).startswith(
+                        'Invalid state change from stopping to degraded'):
+                    raise e
+            n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon stopped')
+        finally:
+            set_force_direct_etcd(False)
+        send_systemd_status('Terminated')
+
     def _run_inner(self):
         while daemon.check_abort_path(self.abort_path):
             try:
@@ -363,15 +402,27 @@ class Monitor(daemon.WorkerPoolDaemon):
 
 def main():
     daemon.write_pid_file('database')
-    m = Monitor('database')
 
+    # Create the gRPC server and start it BEFORE creating the Monitor.
+    # This ensures the gRPC server is accepting connections before we send
+    # the systemd READY notification.
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    database_pb2_grpc.add_DatabaseServiceServicer_to_server(
-        DatabaseService(m), server)
     server.add_insecure_port(
         f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
 
+    # Start the server first so it's listening
     server.start()
+    LOG.info('gRPC server started and listening on '
+             f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
+
+    # Now create the monitor and add the service to the server.
+    # The Monitor will handle systemd READY notification during record_start(),
+    # but we need to ensure it uses direct etcd access for its own startup
+    # since WE are the database service (chicken-and-egg problem).
+    m = Monitor('database')
+    database_pb2_grpc.add_DatabaseServiceServicer_to_server(
+        DatabaseService(m), server)
+
     m.run()
     server.stop(1).wait()
 

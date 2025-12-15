@@ -185,6 +185,11 @@ Configuration options:
 - `DATABASE_METRICS_PORT` - Prometheus metrics port (default: 13006)
 - `DATABASE_USE_DIRECT_ETCD` - Bypass service and use etcd directly (default: True)
 
+**Thread-local direct etcd override**: The database daemon itself uses
+`etcd.set_force_direct_etcd(True)` during its startup/shutdown to avoid a
+chicken-and-egg problem - it needs to record its daemon state in etcd but
+can't use the database service because it IS the database service.
+
 ### Configuration Bootstrap Order
 
 **IMPORTANT**: Shaken Fist has a two-stage configuration system due to a

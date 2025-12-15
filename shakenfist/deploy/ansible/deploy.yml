@@ -171,7 +171,7 @@
 ### etcd
 
 #    ETCD_MAX_REQUEST_BYTES is from https://github.com/etcd-io/etcd/issues/9043
-- hosts: etcd
+- hosts: etcd_master
   tags: etcd
   roles:
     - role: andrewrothstein.etcd-cluster
@@ -232,22 +232,10 @@
         node_name: "{{ node_name }}"
         node_mesh_ip: "{{ node_mesh_ip }}"
 
-# The database daemon must start before eventlog when the database service
-# is enabled (DATABASE_USE_DIRECT_ETCD=False). By default, direct etcd access
-# is used and this step is skipped. This must run AFTER node registration
-# because register-daemon requires the node to exist in etcd.
-- hosts: etcd_master
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-  roles:
-    - role: database
-      vars:
-        role_action: "bootstrap"
-      when: not (database_use_direct_etcd | default(true) | bool)
-
-- hosts: eventlog_node
+# The eventlog role bootstraps caches in etcd. This runs on eventlog_node hosts.
+# Note: eventlog_node is populated dynamically via add_host, so we target allsf
+# and use a condition to filter to the correct hosts.
+- hosts: allsf
   become: yes
   become_method: sudo
   gather_facts: yes
@@ -256,8 +244,12 @@
     - role: eventlog
       vars:
         role_action: "bootstrap"
+      when: inventory_hostname in groups.get('eventlog_node', [])
 
-- hosts: etcd_master
+# Create the admin namespace. This only needs to run once on any etcd_master.
+# Note: etcd_master is populated dynamically via add_host, so we target allsf
+# and use a condition to filter to the correct hosts.
+- hosts: allsf
   become: yes
   become_method: sudo
   gather_facts: yes
@@ -270,6 +262,7 @@
         etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         node_mesh_ip: "{{ node_mesh_ip }}"
         eventlog_node_ip: "{{hostvars[groups['eventlog_node'][0]]['node_mesh_ip']}}"
+      when: inventory_hostname in groups.get('etcd_master', [])
 
 - hosts: primary_node
   become: yes

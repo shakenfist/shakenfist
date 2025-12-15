@@ -32,9 +32,11 @@ def get_database_client():
     """Get or create a thread-local gRPC channel to the database service."""
     c = getattr(local, 'sf_database_client', None)
     if c:
-        # Ensure the channel is ready
+        # Ensure the channel is ready. Use a longer timeout (2 seconds) to
+        # handle service startup delays, especially during bootstrap when
+        # multiple services are starting simultaneously.
         try:
-            grpc.channel_ready_future(c).result(timeout=0.5)
+            grpc.channel_ready_future(c).result(timeout=2.0)
         except grpc.FutureTimeoutError:
             # We do not close the channel here because this causes grpc to
             # sometimes throw a traceback from another thread trying to
@@ -70,12 +72,17 @@ def reset_client():
 
 
 def _retry_database(func):
-    """Decorator to retry database operations on failure."""
+    """Decorator to retry database operations on failure.
+
+    Uses exponential backoff with 5 attempts to handle transient failures
+    during service startup or network issues.
+    """
     def wrapper(*args, **kwargs):
         attempt = 0
         last_exception = None
+        max_attempts = 5
 
-        while attempt < 3:
+        while attempt < max_attempts:
             try:
                 return func(*args, **kwargs)
             except grpc.RpcError as e:
@@ -83,10 +90,12 @@ def _retry_database(func):
                 if attempt > 0:
                     LOG.with_fields({
                         'function': func.__name__,
-                        'attempt': attempt
-                    }).info('Failed database request via gRPC')
+                        'attempt': attempt,
+                        'max_attempts': max_attempts
+                    }).info('Failed database request via gRPC, retrying')
                 reset_client()
-                time.sleep(attempt / 10.0)
+                # Exponential backoff: 0.5, 1, 2, 4 seconds
+                time.sleep(0.5 * (2 ** attempt))
                 attempt += 1
 
         if last_exception:

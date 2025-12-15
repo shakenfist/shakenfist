@@ -1,10 +1,8 @@
 # NOTE(mikal): this daemon's role is to notice that you've exited the Shaken
 # Fist target run-level and therefore the node is stopping not going missing.
 # You should never manually stop this daemon!
-import os
 import setproctitle
 import signal
-import socket
 import time
 
 from shakenfist_utilities import logs  # noreorder

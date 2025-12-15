@@ -29,7 +29,11 @@ def _use_database_service():
 
     Returns True if the database service is configured and enabled.
     Returns False during bootstrap or if DATABASE_USE_DIRECT_ETCD is True.
+    Returns False if force_direct_etcd is set for this thread.
     """
+    # Thread-local override for the database daemon's own operations
+    if get_force_direct_etcd():
+        return False
     if config.DATABASE_USE_DIRECT_ETCD:
         return False
     if not config.DATABASE_NODE_IP:
@@ -84,6 +88,22 @@ class WrappedEtcdClient(Etcd3Client):
 local = threading.local()
 local.sf_etcd_client = None
 local.sf_etcd_native_client = None
+local.force_direct_etcd = False
+
+
+def set_force_direct_etcd(value):
+    """Force direct etcd access for this thread.
+
+    This is used by the database daemon to avoid a chicken-and-egg problem:
+    the database daemon itself needs to use direct etcd access for its own
+    startup/shutdown recording, since it IS the database service.
+    """
+    local.force_direct_etcd = value
+
+
+def get_force_direct_etcd():
+    """Check if direct etcd access is forced for this thread."""
+    return getattr(local, 'force_direct_etcd', False)
 
 
 def get_etcd_client():
