@@ -24,7 +24,7 @@
 
 - name: Register the database daemon if it runs on this node
   shell: |
-    /srv/shakenfist/venv/bin/sf-ctl register-daemon eventlog
+    /srv/shakenfist/venv/bin/sf-ctl register-daemon database
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
     SHAKENFIST_NODE_NAME: "{{ node_name }}"
@@ -47,9 +47,7 @@
 # alphabetical order. These must come up first on all machines.
 #
 # Start the database daemon on etcd_master nodes when the database service is
-# enabled. Note: etcd_master is populated dynamically via add_host earlier in
-# the deploy, so by the time register.yml runs, the group is populated.
-# Note: database_use_direct_etcd is a string "0" or "1", not a boolean.
+# enabled. Note: database_use_direct_etcd is a string "0" or "1", not a boolean.
 - name: The database daemon must start first
   service:
     name: "sf-database"

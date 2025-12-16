@@ -16,11 +16,17 @@ from shakenfist_utilities.random import random_id  # noreorder
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import node
+from shakenfist.etcd import set_force_direct_etcd
 from shakenfist.config import config
 from shakenfist.constants import API_REQUESTS
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_HISTORIC
 from shakenfist.constants import EVENT_TYPES
 from shakenfist.daemons import daemon
+from shakenfist.daemons.daemon import send_systemd_ready
+from shakenfist.daemons.daemon import send_systemd_status
+from shakenfist.exceptions import InvalidStateException
+from shakenfist.node import Node
 from shakenfist.protos import event_pb2
 from shakenfist.protos import event_pb2_grpc
 from shakenfist.util import general as util_general
@@ -162,6 +168,14 @@ class EventService(event_pb2_grpc.EventServiceServicer):
 
 
 class Monitor(daemon.WorkerPoolDaemon):
+    """Background monitor for the eventlog daemon.
+
+    The eventlog daemon is special because it provides event logging to other
+    daemons. This means we must force events to the dead letter queue during
+    our own startup and shutdown, otherwise we'd have a self-deadlock trying
+    to send events to ourselves via gRPC.
+    """
+
     def __init__(self, id):
         super().__init__(id)
         self.counters = {
@@ -176,6 +190,42 @@ class Monitor(daemon.WorkerPoolDaemon):
                 'Number of %s events seen' % event_type)
 
         start_http_server(config.EVENTLOG_METRICS_PORT)
+
+    def record_start(self):
+        # Override to use direct etcd and force events to the dead letter
+        # queue. The eventlog daemon can't use the database microservice
+        # during startup because we might not be running yet, and we can't
+        # use ourselves for event logging because WE ARE the eventlog service.
+        set_force_direct_etcd(True)
+        eventlog.set_force_event_dlq(True)
+        try:
+            n = Node.from_db(config.NODE_NAME)
+            n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_RUNNING)
+            n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon starting')
+        finally:
+            set_force_direct_etcd(False)
+            eventlog.set_force_event_dlq(False)
+        send_systemd_ready()
+
+    def record_exit(self):
+        # Override to use direct etcd and force events to the dead letter
+        # queue. The database microservice may have already stopped, and we
+        # can't use ourselves for event logging during shutdown.
+        set_force_direct_etcd(True)
+        eventlog.set_force_event_dlq(True)
+        try:
+            n = Node.from_db(config.NODE_NAME)
+            try:
+                n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPED)
+            except InvalidStateException as e:
+                if not str(e).startswith(
+                        'Invalid state change from stopping to degraded'):
+                    raise e
+            n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon stopped')
+        finally:
+            set_force_direct_etcd(False)
+            eventlog.set_force_event_dlq(False)
+        send_systemd_status('Terminated')
 
     def _run_inner(self):
         prune_targets = []
