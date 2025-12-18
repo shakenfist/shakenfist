@@ -8,7 +8,7 @@
 #   pki: tasks associated with setup of certifying authorities or PKI certificates
 #     (for example those for the SPICE console).
 
-- hosts: local
+- hosts: localhost
   gather_facts: yes
   connection: local
   become: yes
@@ -25,7 +25,7 @@
         "dns_server": "{{ dns_server }}"
         "http_proxy": "{{ http_proxy }}"
         "topology_decoded": "{{ topology | from_json }}"
-      delegate_to: local
+      delegate_to: localhost
       delegate_facts: true
 
     - include_tasks: tasks/distro-check.yml
@@ -60,7 +60,7 @@
     - name: Set configuration file location
       set_fact:
         "template_path": "{{ playbook_dir }}/../templates"
-      delegate_to: local
+      delegate_to: localhost
       delegate_facts: true
 
 ### Preinstall validation
@@ -74,7 +74,7 @@
     - role: network
       vars:
         role_action: "validate_mtus"
-        template_path: "{{ hostvars['local']['template_path'] }}"
+        template_path: "{{ hostvars['localhost']['template_path'] }}"
 
 - hosts: hypervisors
   become: yes
@@ -114,11 +114,11 @@
     - role: network
       vars:
         role_action: "bootstrap"
-        template_path: "{{ hostvars['local']['template_path'] }}"
+        template_path: "{{ hostvars['localhost']['template_path'] }}"
 
 ### Internal PKI
 
-- hosts: local
+- hosts: localhost
   become: yes
   become_method: sudo
   gather_facts: yes
@@ -160,7 +160,7 @@
     - role: hypervisor
       vars:
         role_action: "bootstrap"
-        template_path: "{{ hostvars['local']['template_path'] }}"
+        template_path: "{{ hostvars['localhost']['template_path'] }}"
 
 ### Primary node
 
@@ -229,11 +229,11 @@
       vars:
         role_action: "etcd_config"
         etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
-        auth_secret: "{{ hostvars['local']['auth_secret'] }}"
-        ram_system_reservation: "{{ hostvars['local']['ram_system_reservation'] }}"
+        auth_secret: "{{ hostvars['localhost']['auth_secret'] }}"
+        ram_system_reservation: "{{ hostvars['localhost']['ram_system_reservation'] }}"
         lowest_mtu: "{{ hostvars[groups['primary_node'][0]]['lowest_mtu'] }}"
-        dns_server: "{{ hostvars['local']['dns_server'] }}"
-        http_proxy: "{{ hostvars['local']['http_proxy'] }}"
+        dns_server: "{{ hostvars['localhost']['dns_server'] }}"
+        http_proxy: "{{ hostvars['localhost']['http_proxy'] }}"
         extra_config: "{{ extra_config }}"
 
 # Register all nodes in etcd (init-node creates the node object)

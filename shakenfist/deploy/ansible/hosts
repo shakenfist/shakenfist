@@ -3,9 +3,6 @@
 #
 # During normal deployment, deploy.py generates /etc/sf/ansible-hosts with
 # the full topology including all hosts, groups, and their variables.
-#
-# "local" is a special host for running tasks on the deploy machine itself.
-# This is separate from any topology node that might be named "localhost".
 
 [local]
-local ansible_connection=local
+localhost ansible_connection=local
