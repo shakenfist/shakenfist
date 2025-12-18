@@ -219,6 +219,22 @@ the etcd connection itself must be configured before etcd can be read.
 - Environment variables set before running the tool take precedence over the
   config file values
 
+### Ansible Inventory: "local" vs Topology Nodes
+
+The Ansible deployment uses a special host named `local` (NOT `localhost`) for
+tasks that run on the deploy machine itself (e.g., PKI certificate generation).
+This is distinct from any topology node that might be named "localhost".
+
+- **`local`** - The deploy machine. Always has `ansible_connection=local`. Used
+  by plays with `hosts: local` and `delegate_to: local`.
+- **Topology nodes** - Defined in the topology JSON. May include a node named
+  "localhost" for single-machine deployments. These are accessed via SSH.
+
+This separation prevents variable conflicts when a topology node is named
+"localhost". The generated hosts file (`/etc/sf/ansible-hosts`) contains:
+- `[local]` group with just `local ansible_connection=local`
+- Group-based entries for each topology node with SSH connection settings
+
 ### Systemd Service Ordering
 
 Shaken Fist daemons are managed via systemd with careful ordering defined in

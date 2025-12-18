@@ -29,21 +29,21 @@
 - name: Move aside old certificate
   shell:
     mv "{{ host_cert_path }}" "{{ host_key_path }}".$(date +%Y%m%d)".pem"
-  delegate_to: localhost
+  delegate_to: local
   delegate_facts: true
   when: host_cert.stat.exists and not host_cert_expires.meta.stdout == "Certificate will expire"
 
 - name: Check if the host certificate still exists
   stat:
     path: "{{ host_cert_path }}"
-  delegate_to: localhost
+  delegate_to: local
   delegate_facts: true
   register: host_cert
 
 - name: Check if the host key exists
   stat:
     path: "{{ host_key_path }}"
-  delegate_to: localhost
+  delegate_to: local
   delegate_facts: true
   register: host_key
 
@@ -58,14 +58,14 @@
     dest: "{{ host_template_path }}"
     owner: root
     mode: u=r
-  delegate_to: localhost
+  delegate_to: local
   delegate_facts: true
   when: not host_cert.stat.exists
 
 - name: Create host key
   shell:
     umask 277 && certtool --generate-privkey > "{{ host_key_path }}"
-  delegate_to: localhost
+  delegate_to: local
   delegate_facts: true
   when: not host_key.stat.exists
 
@@ -77,6 +77,6 @@
       --load-ca-certificate "{{ ca_cert_path }}" \
       --load-ca-privkey "{{ ca_key_path }}" \
       --outfile "{{ host_cert_path }}"
-  delegate_to: localhost
+  delegate_to: local
   delegate_facts: true
   when: not host_cert.stat.exists
