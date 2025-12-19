@@ -187,7 +187,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 ], None, None, force_placement='sf-3')
 
         except apiclient.ResourceNotFoundException as e:
-            self.skip('Target node does not exist. %s' % e)
+            self.skipTest('Target node does not exist. %s' % e)
             return
 
         self.assertIsNotNone(inst_hyp1_vm1['uuid'])
