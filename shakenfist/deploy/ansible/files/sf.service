@@ -45,6 +45,13 @@ User=root
 Group=root
 
 EnvironmentFile=/etc/sf/config
+{% if item not in ["database", "eventlog", "sentinel-first", "sentinel-last"] %}
+# Most daemons use the database microservice for etcd access. Exceptions are:
+# - database: it IS the database service, can't use itself
+# - eventlog: excluded due to startup ordering issues (to be migrated later)
+# - sentinel-first/sentinel-last: marker services that don't need etcd
+Environment=SHAKENFIST_DATABASE_USE_DIRECT_ETCD=false
+{% endif %}
 ExecStartPre=/srv/shakenfist/venv/bin/sf-ctl verify-config
 ExecStartPre=rm -f /run/sf/{{ item }}*.abort
 ExecStartPre=rm -f /run/sf/{{ item }}*.pid
