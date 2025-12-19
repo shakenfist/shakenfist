@@ -1,25 +1,8 @@
+# This file is only used when running ansible directly without deploy.py,
+# or as a fallback when no topology is provided.
+#
+# During normal deployment, deploy.py generates /etc/sf/ansible-hosts with
+# the full topology including all hosts, groups, and their variables.
+
 [local]
 localhost ansible_connection=local
-
-[primary_node]
-[network_node]
-[eventlog_node]
-[hypervisors]
-[storage]
-
-[allsf:children]
-  primary_node
-  network_node
-  eventlog_node
-  hypervisors
-  etcd_master
-  storage
-
-[allsf:vars]
-  ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-  ansible_python_interpreter='/usr/bin/python3'
-
-[etcd:children]
-  allsf
-
-[etcd_master]

@@ -22,15 +22,15 @@ dependencies = [
 
     # Our requirements -- we specify exact versions here and let renovate update
     # them for the develop branch as required. Releases never update requirements.
-    "shakenfist-utilities==0.7.3",        # apache2
-    "clingwrap==1.13.0",                   # apache2
+    "shakenfist-utilities==0.8.4",        # apache2
+    "clingwrap==1.13.0",                  # apache2
 
     "fixtures==4.2.5",                    # apache2
     "PyYAML==6.0.2",                      # mit
     "Jinja2==3.1.6",                      # bsd
     "setproctitle==1.3.6",                # bsd
     "click==8.1.8",                       # bsd
-    "werkzeug==3.1.3",                    # bsd
+    "werkzeug==3.1.4",                    # bsd
     "prometheus-client==0.22.1",          # apache2
     "etcd3gw==2.4.2",                     # apache2
     "bcrypt==4.3.0",                      # apache2
@@ -66,7 +66,7 @@ dependencies = [
     "requests==2.32.4",                   # apache2
     "requests-toolbelt==1.0.0",           # apache2
     "chardet==5.2.0",                     # lgpl
-    "urllib3==2.5.0",                     # mit
+    "urllib3==2.6.0",                     # mit
 
     # These must move as a set
     "pydantic==2.10.6",                   # mit
@@ -101,7 +101,7 @@ dependencies = [
     "named==1.4.2",
     "orderings==1.6.0",
     "property-manager==3.0",
-    "psutil==7.0.0",
+    "psutil==7.1.3",
     "PyJWT==2.10.1",
     "python-dotenv==1.1.1",
     "pytz==2025.2",
@@ -110,7 +110,7 @@ dependencies = [
     "typing-aliases==1.10.1",
     "typing-extensions==4.14.1",
     "verboselogs==1.7",
-    "zipp==3.21.0",
+    "zipp==3.23.0",
     "zope.event==5.1.1",
     "zope.interface==7.2",
     "wraps==0.15.0",
@@ -153,6 +153,7 @@ sf-backup = "shakenfist.client.backup:cli"
 sf-api = "shakenfist.daemons.external_api.main:main"
 sf-cleaner = "shakenfist.daemons.cleaner.main:main"
 sf-cluster = "shakenfist.daemons.cluster.main:main"
+sf-database = "shakenfist.daemons.database.main:main"
 sf-eventlog = "shakenfist.daemons.eventlog.main:main"
 sf-net = "shakenfist.daemons.network.main:main"
 sf-queues = "shakenfist.daemons.queues.main:main"
@@ -186,6 +187,6 @@ test = [
     "flake8==7.3.0",            # mit
     "tox==4.28.0",              # mit
     "mkdocs==1.6.1",            # bsd
-    "mkdocs-material==9.6.17",  # mit
+    "mkdocs-material==9.7.0",  # mit
     "testscenarios==0.5.0",     # bsd
 ]

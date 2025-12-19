@@ -64,8 +64,8 @@ export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
 
 export KSM_ENABLED=1
 
-# Topology is in JSON
-read -r -d '' TOPOLOGY <<'EOF'
+# Topology is in JSON (the || true handles read's exit code with heredocs)
+read -r -d '' TOPOLOGY <<'EOF' || true
 [
   {
     "name": "sf-primary",

@@ -13,7 +13,8 @@ LOG = logs.setup_console(__name__)
 
 
 # Utilities not started by systemd need to load /etc/sf/config to ensure
-# that they are correctly configured
+# that they are correctly configured. Environment variables set before
+# running the utility take precedence over values in the config file.
 if os.path.exists('/etc/sf/config'):
     with open('/etc/sf/config') as f:
         for line in f.readlines():
@@ -27,7 +28,8 @@ if os.path.exists('/etc/sf/config'):
             key, value = line.split('=')
             value = value.strip('\'"')
 
-            os.environ[key] = value
+            if key not in os.environ:
+                os.environ[key] = value
 
 # We skip verifying the auth seed config setting here because we might be
 # bootstrapping it.
@@ -115,15 +117,20 @@ def verify_config():
 
 @click.command()
 def initialise_node():
-    click.echo('Initializing node...')
+    click.echo(f'Initializing node "{config.NODE_NAME}" with mesh IP '
+               f'{config.NODE_MESH_IP}...')
     n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
-    click.echo(f'Node is now in state {n.state.value}.')
+    click.echo(f'Node "{config.NODE_NAME}" is now in state {n.state.value}.')
 
 
 @click.command()
 @click.argument('daemon', nargs=-1)
 def register_daemon(daemon):
     n = Node.from_db(config.NODE_NAME)
+    if n is None:
+        raise click.ClickException(
+            f'Node "{config.NODE_NAME}" not found in database. '
+            f'Run "sf-ctl initialise-node" first to create the node.')
     for d in daemon:
         click.echo(f'Registering {d} on node...')
         n.register_daemon(d)

@@ -7,7 +7,7 @@ class TestUpgrades(base.BaseTestCase):
     def test_upgraded_data_exists(self):
         # There is an upgraded namespace called 'upgrade'
         if 'upgrade' not in self.system_client.get_namespaces():
-            self.skip('There is no upgrade namespace')
+            self.skipTest('There is no upgrade namespace')
 
         # Collect networks and check
         networks_by_name = {}

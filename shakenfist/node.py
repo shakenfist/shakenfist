@@ -36,7 +36,7 @@ class Node(dbo):
 
     # Remember that this list must align with what sf-ctl is called with in
     # deploy.yml.
-    VALID_DAEMONS = ['eventlog', 'net', 'resources', 'sidechannel',
+    VALID_DAEMONS = ['database', 'eventlog', 'net', 'resources', 'sidechannel',
                      'queues', 'api', 'checksums', 'cleaner', 'cluster',
                      'transfers', 'privexec', 'nodelock', 'sentinel-first',
                      'sentinel-last']

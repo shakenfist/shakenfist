@@ -75,6 +75,7 @@
   vars:
     paths:
       - "{{ ansible_module_path.stdout }}/sf_snapshot"
+      - "{{ ansible_module_path.stdout }}/sf_snapshot.py"
       - /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot
       - /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot.py
 
@@ -85,3 +86,33 @@
     owner: root
     group: root
     mode: "0644"
+
+# Sanity checks to verify the deployment succeeded
+- name: Verify sf-api service is active
+  shell: |
+    systemctl is-active sf-api
+  register: sf_api_status
+  failed_when: sf_api_status.stdout != "active"
+
+- name: Verify sf-queues service is active
+  shell: |
+    systemctl is-active sf-queues
+  register: sf_queues_status
+  failed_when: sf_queues_status.stdout != "active"
+
+- name: Verify API is responding
+  shell: |
+    curl -s -o /dev/null -w "%{http_code}" http://localhost:13000/auth/namespaces
+  register: api_response
+  failed_when: api_response.stdout != "401"
+  retries: 5
+  delay: 2
+  until: api_response.stdout == "401"
+
+- name: Log deployment sanity check results
+  debug:
+    msg: |
+      Deployment sanity checks passed:
+      - sf-api: {{ sf_api_status.stdout }}
+      - sf-queues: {{ sf_queues_status.stdout }}
+      - API responding: HTTP {{ api_response.stdout }} (expected 401 Unauthorized)

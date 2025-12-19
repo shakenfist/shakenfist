@@ -6,33 +6,4 @@
     SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
     SHAKENFIST_NODE_NAME: "{{node_name}}"
     SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
-
-- name: Ensure the node exists in etcd
-  shell: |
-    /srv/shakenfist/venv/bin/sf-ctl initialise-node
-  environment:
-    SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
-    SHAKENFIST_NODE_NAME: "{{node_name}}"
-    SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
-
-- name: Register the eventlog daemon and its dependencies
-  shell: |
-    /srv/shakenfist/venv/bin/sf-ctl register-daemon \
-        sentinel-first nodelock eventlog
-  environment:
-    SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
-    SHAKENFIST_NODE_NAME: "{{node_name}}"
-    SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
-
-# This must happen first to avoid gRPC event errors in the logs on single
-# machine installs.
-- name: Restart the eventlog daemon and its dependencies
-  service:
-    name: "sf-{{ item }}"
-    enabled: yes
-    state: restarted
-    daemon_reload: no
-  with_items:
-    - sentinel-first
-    - nodelock
-    - eventlog
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"

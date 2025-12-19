@@ -2,6 +2,7 @@
 Description=Shaken Fist API daemon
 After=sf-privexec.service
 After=sf-nodelock.service
+After=sf-database.service
 Before=sf-sentinel-last.service
 PartOf=sf.target
 ReloadPropagatedFrom=sf.target

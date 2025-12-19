@@ -26,15 +26,21 @@ After=multi-user.target
 After=sf-sentinel-first.service
 {% elif item == "nodelock" %}
 After=sf-sentinel-first.service
+{% elif item == "database" %}
+# The database service only depends on sentinel-first, which ensures the node
+# is properly initialized. It must start before other daemons that use the
+# database service.
+After=sf-sentinel-first.service
 {% elif item != "sentinel-last" %}
 After=sf-privexec.service
 After=sf-nodelock.service
+After=sf-database.service
 Before=sf-sentinel-last.service
 {% endif%}
 PartOf=sf.target
 
 [Service]
-Type=simple
+Type=notify
 User=root
 Group=root
 

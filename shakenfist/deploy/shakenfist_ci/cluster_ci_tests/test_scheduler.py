@@ -15,7 +15,7 @@ class TestAffinity(base.BaseNamespacedTestCase):
     def test_affinity(self):
         nodes = self.system_client.get_nodes()
         if len(nodes) < 3:
-            self.skip('Insufficient nodes for test')
+            self.skipTest('Insufficient nodes for test')
 
         # Create an instance with a tag
         inst1 = self.test_client.create_instance(

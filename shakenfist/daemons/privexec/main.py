@@ -18,6 +18,8 @@ import setproctitle
 from shakenfist_utilities import random      # noreorder
 from shakenfist_utilities import logs        # noreorder
 
+from shakenfist.daemons.daemon import send_systemd_ready
+from shakenfist.daemons.daemon import send_systemd_stopping
 from shakenfist.daemons.privexec import util as privexec_util
 from shakenfist.protos import common_pb2
 from shakenfist.protos import privexec_pb2
@@ -529,6 +531,7 @@ def main():
     s.listen(1)
     s.settimeout(0.2)
     LOG.info('Listening for incoming requests')
+    send_systemd_ready()
 
     workers = {}
     while not EXIT.is_set():
@@ -558,6 +561,7 @@ def main():
         workers = remaining_workers
 
     LOG.info('Stopping')
+    send_systemd_stopping()
 
     start_time = time.time()
     while workers:

@@ -34,9 +34,27 @@
       debug:
         msg: "{{ topology_decoded }}"
 
-    - name: Add nodes from topology
-      # This include is to work around the lack of blocks in loops
-      include_tasks: includes/topology_add_node.yml
+    # Note: Group membership is set in the generated hosts file created by
+    # deploy.py. However, node-specific variables (node_name, node_mesh_ip,
+    # etc.) must be set via set_fact to avoid template recursion issues when
+    # the hostname matches a variable value (e.g., node_name=localhost on a
+    # host named localhost).
+
+    - name: Record API URL from primary node
+      set_fact:
+        api_url: "{{ item['api_url'] }}"
+      loop: "{{ topology_decoded }}"
+      when: item.get('primary_node', False)
+
+    - name: Set node facts for each host
+      set_fact:
+        node_name: "{{ item['name'] }}"
+        node_egress_ip: "{{ item['node_egress_ip'] }}"
+        node_egress_nic: "{{ item['node_egress_nic'] }}"
+        node_mesh_ip: "{{ item['node_mesh_ip'] }}"
+        node_mesh_nic: "{{ item['node_mesh_nic'] }}"
+      delegate_to: "{{ item['name'] }}"
+      delegate_facts: true
       loop: "{{ topology_decoded }}"
 
     - name: Set configuration file location
@@ -171,7 +189,7 @@
 ### etcd
 
 #    ETCD_MAX_REQUEST_BYTES is from https://github.com/etcd-io/etcd/issues/9043
-- hosts: etcd
+- hosts: etcd_master
   tags: etcd
   roles:
     - role: andrewrothstein.etcd-cluster
@@ -209,11 +227,6 @@
   roles:
     - role: primary
       vars:
-        role_action: "grafana"
-        deploy_name: "{{ deploy_name }}"
-        system_key: "{{ admin_password }}"
-    - role: primary
-      vars:
         role_action: "etcd_config"
         etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         auth_secret: "{{ hostvars['localhost']['auth_secret'] }}"
@@ -223,16 +236,7 @@
         http_proxy: "{{ hostvars['localhost']['http_proxy'] }}"
         extra_config: "{{ extra_config }}"
 
-- hosts: eventlog_node
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-  roles:
-    - role: eventlog
-      vars:
-        role_action: "bootstrap"
-
+# Register all nodes in etcd (init-node creates the node object)
 - hosts: allsf
   become: yes
   become_method: sudo
@@ -246,6 +250,19 @@
         node_name: "{{ node_name }}"
         node_mesh_ip: "{{ node_mesh_ip }}"
 
+# The eventlog role bootstraps caches in etcd
+- hosts: eventlog_node
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+  roles:
+    - role: eventlog
+      vars:
+        role_action: "bootstrap"
+
+# Create the admin namespace. This only needs to run once, so we run it on the
+# first etcd_master node.
 - hosts: etcd_master
   become: yes
   become_method: sudo
@@ -259,6 +276,7 @@
         etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         node_mesh_ip: "{{ node_mesh_ip }}"
         eventlog_node_ip: "{{hostvars[groups['eventlog_node'][0]]['node_mesh_ip']}}"
+      when: inventory_hostname == groups['etcd_master'][0]
 
 - hosts: primary_node
   become: yes
@@ -266,5 +284,13 @@
   gather_facts: yes
   connection: ssh
   roles:
+    - role: primary
+      vars:
+        role_action: "apache2"
+    - role: primary
+      vars:
+        role_action: "grafana"
+        deploy_name: "{{ deploy_name }}"
+        system_key: "{{ admin_password }}"
     - role: primary
       role_action: "postinstall"

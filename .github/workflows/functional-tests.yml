@@ -201,16 +201,11 @@ jobs:
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} /tmp/getsf-wrapper
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
 
       - name: Wait for API to start answering
         run: |
@@ -238,6 +233,7 @@ jobs:
 
       - name: Import cached images
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
           setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
@@ -257,6 +253,7 @@ jobs:
       - name: Run functional tests
         timeout-minutes: 30
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
@@ -540,16 +537,11 @@ jobs:
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${primary} /tmp/getsf-wrapper
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
-              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
 
       - name: Wait for API to start answering
         run: |
@@ -576,6 +568,7 @@ jobs:
 
       - name: Import cached images
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
           setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
@@ -626,6 +619,7 @@ jobs:
       - name: Run functional tests
         timeout-minutes: 120
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
@@ -850,16 +844,11 @@ jobs:
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               debian@$primary /tmp/getsf-wrapper
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
 
       - name: Wait for API to start answering
         run: |
@@ -886,6 +875,7 @@ jobs:
 
       - name: Import cached images
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
           setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
@@ -1044,16 +1034,11 @@ jobs:
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               debian@$primary /tmp/getsf-wrapper
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
 
       - name: Wait for API to start answering
         run: |
@@ -1080,6 +1065,7 @@ jobs:
 
       - name: Import cached images
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
           setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
@@ -1238,6 +1224,7 @@ jobs:
       - name: Run getsf to only install etcd, and then restore a backup
         timeout-minutes: 30
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
@@ -1250,16 +1237,12 @@ jobs:
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
+          set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               debian@$primary /tmp/getsf-wrapper
-          echo ""
-          echo ""
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              debian@$primary \
-              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
+
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               debian@$primary 'sudo chmod ugo+r /etc/sf/*'

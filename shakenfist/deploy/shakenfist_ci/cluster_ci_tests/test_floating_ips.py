@@ -17,7 +17,7 @@ class TestFloatingIPs(base.BaseNamespacedTestCase):
         self._await_networks_ready([self.net['uuid']])
 
     def test_simple(self):
-        self.skip('Disabled because unreliable')
+        self.skipTest('Disabled because unreliable')
 
         ud = """#!/bin/sh
 sudo apt-get update

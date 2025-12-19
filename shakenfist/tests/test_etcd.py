@@ -14,6 +14,7 @@ LOG, _ = logs.setup(__name__)
 class FakeConfig(BaseSettings):
     NODE_NAME: str = 'thisnode'
     SLOW_LOCK_THRESHOLD: int = 2
+    DATABASE_USE_DIRECT_ETCD: bool = True
 
 
 fake_config = FakeConfig()

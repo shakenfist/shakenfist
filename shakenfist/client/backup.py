@@ -14,7 +14,8 @@ LOG = logs.setup_console(__name__)
 
 
 # Utilities not started by systemd need to load /etc/sf/config to ensure
-# that they are correctly configured
+# that they are correctly configured. Environment variables set before
+# running the utility take precedence over values in the config file.
 if os.path.exists('/etc/sf/config'):
     with open('/etc/sf/config') as f:
         for line in f.readlines():
@@ -28,7 +29,8 @@ if os.path.exists('/etc/sf/config'):
             key, value = line.split('=')
             value = value.strip('\'"')
 
-            os.environ[key] = value
+            if key not in os.environ:
+                os.environ[key] = value
 
 sf_config = importlib.import_module('shakenfist.config')
 config = sf_config.config

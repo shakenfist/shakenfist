@@ -52,7 +52,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
                     }
                 ], None, None, force_placement=socket.getfqdn())
         except apiclient.ResourceNotFoundException as e:
-            self.skip('Target node does not exist. %s' % e)
+            self.skipTest('Target node does not exist. %s' % e)
             return
 
         self._await_instance_ready(inst['uuid'])
@@ -85,7 +85,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
                     }
                 ], None, None, force_placement='sf-2')
         except apiclient.ResourceNotFoundException as e:
-            self.skip('Target node does not exist. %s' % e)
+            self.skipTest('Target node does not exist. %s' % e)
             return
 
         self._await_instance_ready(inst['uuid'])

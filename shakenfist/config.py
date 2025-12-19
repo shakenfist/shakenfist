@@ -219,6 +219,28 @@ class SFConfig(BaseSettings):
         13003,
         description='Port for the internal eventlog gRPC API.'
     )
+
+    # Database Service Options
+    DATABASE_NODE_IP: str = Field(
+        '',
+        description='Mesh IP of the node running the database service.'
+    )
+    DATABASE_API_PORT: int = Field(
+        13005,
+        description='Port for the internal database gRPC API.'
+    )
+    DATABASE_METRICS_PORT: int = Field(
+        13006,
+        description='Prometheus metrics port for the database daemon.'
+    )
+    DATABASE_USE_DIRECT_ETCD: bool = Field(
+        True,
+        description=(
+            'Bypass the database service and use etcd directly. Set to False '
+            'to use the database microservice.'
+        )
+    )
+
     USAGE_EVENT_FREQUENCY: int = Field(
         60,
         description='How frequently to collect usage events.'

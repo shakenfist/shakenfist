@@ -19,6 +19,7 @@ from shakenfist import constants
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
+from shakenfist.daemons.daemon import send_systemd_stopping
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist.eventlog import add_event_multi
@@ -997,6 +998,7 @@ class Monitor(daemon.Daemon):
                 util_general.ignore_exception('side channel monitor', e)
 
         LOG.info('Stopping')
+        send_systemd_stopping()
 
         while self.monitors:
             LOG.info(f'There are {len(self.monitors)} threads remaining')

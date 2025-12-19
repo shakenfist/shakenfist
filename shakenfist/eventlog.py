@@ -29,6 +29,51 @@ LOG, _ = logs.setup(__name__)
 local = threading.local()
 local.sf_eventlog_client = None
 
+# Thread-local flag to force events directly to the dead letter queue (etcd).
+# This is used during daemon startup to avoid circular dependencies - for example
+# the database daemon needs to record events during startup but the eventlog
+# daemon isn't running yet.
+local.sf_force_event_dlq = False
+
+# Module-level state for tracking eventlog service availability. When the service
+# is unavailable, we skip gRPC attempts and go directly to the dead letter queue
+# for a cooldown period to avoid slow retries on every event.
+_eventlog_unavailable_until = 0
+_eventlog_unavailable_lock = threading.Lock()
+EVENTLOG_UNAVAILABLE_COOLDOWN = 60  # seconds
+
+
+def set_force_event_dlq(value):
+    """Force events to go directly to the dead letter queue (etcd).
+
+    This is used during daemon startup when the eventlog daemon may not be
+    available yet. Events will be queued in etcd and processed later.
+    """
+    local.sf_force_event_dlq = value
+
+
+def get_force_event_dlq():
+    """Check if events should be forced to the dead letter queue."""
+    return getattr(local, 'sf_force_event_dlq', False)
+
+
+def _mark_eventlog_unavailable():
+    """Mark the eventlog service as unavailable for a cooldown period."""
+    global _eventlog_unavailable_until
+    with _eventlog_unavailable_lock:
+        _eventlog_unavailable_until = time.time() + EVENTLOG_UNAVAILABLE_COOLDOWN
+
+
+def _is_eventlog_available():
+    """Check if the eventlog service should be considered available.
+
+    Returns True if we should try gRPC, False if we should skip to DLQ.
+    """
+    with _eventlog_unavailable_lock:
+        if time.time() < _eventlog_unavailable_until:
+            return False
+        return True
+
 
 def get_eventlog_client():
     c = getattr(local, 'sf_eventlog_client', None)
@@ -219,7 +264,15 @@ def add_event_multi(
             log.info('Added event')
 
     # *** Note that the APIs are different here!
-    if not config.EVENTLOG_SUPPRESS_GRPC:
+    # If force_event_dlq is set, skip gRPC and go directly to the dead letter
+    # queue. This is used during daemon startup to avoid circular dependencies.
+    #
+    # We also check if the eventlog service has been marked as unavailable due
+    # to a recent failure. If so, we skip gRPC and go to DLQ to avoid slow
+    # retries on every event. The cooldown period allows the service time to
+    # recover before we try again.
+    if (not config.EVENTLOG_SUPPRESS_GRPC and not get_force_event_dlq()
+            and _is_eventlog_available()):
         # If your eventlog server isn't setup, we get cranky. Note that this
         # happens during unit test discovery for py3 unit tests.
         if not config.EVENTLOG_NODE_IP:
@@ -229,26 +282,19 @@ def add_event_multi(
                 f'{caller}')
             return
 
-        # Try the new way
-        attempts = 0
-        while attempts < 3:
-            try:
-                # Here we get an exception on error, because there's only one
-                # message sent.
-                _add_event_multi_inner(
-                    event_type, log, timestamp, simpler_objects, message,
-                    duration=duration, extra=extra)
-                return
-            except grpc.RpcError:
-                attempts += 1
-                time.sleep(0.2)
-
-        # Try the old way
-        simpler_objects = _add_event_inner(
-            event_type, log, timestamp, simpler_objects, message,
-            duration=duration, extra=extra)
-        if not simpler_objects:
+        # Try gRPC once. If it fails, mark the service as unavailable and fall
+        # through to the dead letter queue. This avoids slow retries when the
+        # service is down.
+        try:
+            _add_event_multi_inner(
+                event_type, log, timestamp, simpler_objects, message,
+                duration=duration, extra=extra)
             return
+        except grpc.RpcError as e:
+            log.info('Failed to send event with gRPC, marking eventlog service '
+                     f'unavailable for {EVENTLOG_UNAVAILABLE_COOLDOWN}s and '
+                     f'using dead letter queue: {e}')
+            _mark_eventlog_unavailable()
 
     # And then the dead letter queue for the remainders
     _add_event_dlq_inner(

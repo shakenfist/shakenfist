@@ -1,0 +1,24 @@
+---
+# The database daemon provides a gRPC interface to etcd, centralizing all
+# database access. This is only used when DATABASE_USE_DIRECT_ETCD is False.
+# When enabled, the database daemon must start before other daemons that
+# depend on database access.
+
+# Note: We must use direct etcd access for registering the database daemon
+# itself, since the database gRPC service isn't running yet. This is a
+# bootstrap chicken-and-egg problem.
+- name: Register the database daemon
+  shell: |
+    /srv/shakenfist/venv/bin/sf-ctl register-daemon database
+  environment:
+    SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+    SHAKENFIST_NODE_NAME: "{{node_name}}"
+    SHAKENFIST_NODE_MESH_IP: "{{node_mesh_ip}}"
+    SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
+
+- name: Start the database daemon
+  service:
+    name: sf-database
+    enabled: yes
+    state: restarted
+    daemon_reload: no

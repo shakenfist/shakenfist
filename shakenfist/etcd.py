@@ -24,6 +24,23 @@ from shakenfist.util import json as util_json
 LOG, _ = logs.setup(__name__)
 
 
+def _use_database_service():
+    """Check if we should use the database microservice instead of direct etcd.
+
+    Returns True if the database service is configured and enabled.
+    Returns False during bootstrap or if DATABASE_USE_DIRECT_ETCD is True.
+    Returns False if force_direct_etcd is set for this thread.
+    """
+    # Thread-local override for the database daemon's own operations
+    if get_force_direct_etcd():
+        return False
+    if config.DATABASE_USE_DIRECT_ETCD:
+        return False
+    if not config.DATABASE_NODE_IP:
+        return False
+    return True
+
+
 class WrappedEtcdClient(Etcd3Client):
     def __init__(self, host=None, port=2379, protocol='http',
                  ca_cert=None, cert_key=None, cert_cert=None, timeout=None,
@@ -71,6 +88,22 @@ class WrappedEtcdClient(Etcd3Client):
 local = threading.local()
 local.sf_etcd_client = None
 local.sf_etcd_native_client = None
+local.force_direct_etcd = False
+
+
+def set_force_direct_etcd(value):
+    """Force direct etcd access for this thread.
+
+    This is used by the database daemon to avoid a chicken-and-egg problem:
+    the database daemon itself needs to use direct etcd access for its own
+    startup/shutdown recording, since it IS the database service.
+    """
+    local.force_direct_etcd = value
+
+
+def get_force_direct_etcd():
+    """Check if direct etcd access is forced for this thread."""
+    return getattr(local, 'force_direct_etcd', False)
 
 
 def get_etcd_client():
@@ -163,6 +196,7 @@ class ClusterLock:
         self.path = _construct_key(objecttype, subtype, name, prefix='sflocks')
 
         self.objecttype = objecttype
+        self.subtype = subtype
         self.objectname = name
         self.name = name
 
@@ -185,7 +219,13 @@ class ClusterLock:
         self.log_ctx = log_ctx.with_fields(self.lock_data)
 
     def get_holder(self, key_prefix=''):
-        value = get_raw(self.path)
+        if _use_database_service():
+            from shakenfist import database
+            value = database.get_lock_holder(
+                self.objecttype, self.subtype, self.name)
+        else:
+            value = get_raw(self.path)
+
         if value is None or value == {}:
             return {'holder': None}
 
@@ -198,6 +238,10 @@ class ClusterLock:
         return value
 
     def acquire(self):
+        if _use_database_service():
+            from shakenfist import database
+            return database.acquire_lock(
+                self.objecttype, self.subtype, self.name, self.lock_data)
         return create_raw(self.path, self.lock_data)
 
     def is_acquired(self):
@@ -225,6 +269,10 @@ class ClusterLock:
             % (self.name, self.timeout))
 
     def release(self):
+        if _use_database_service():
+            from shakenfist import database
+            return database.release_lock(
+                self.objecttype, self.subtype, self.name, self.lock_data)
         return transactional_delete_raw(self.path, self.lock_data)
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
@@ -243,6 +291,10 @@ class ClusterLock:
 
 @retry_etcd_forever
 def clear_stale_locks():
+    if _use_database_service():
+        from shakenfist import database
+        return database.clear_stale_locks()
+
     # Remove all locks held by former processes on this node. This is required
     # after an unclean restart, otherwise we need to wait for these locks to
     # timeout and that can take a long time.
@@ -261,6 +313,10 @@ def clear_stale_locks():
 
 @retry_etcd_forever
 def get_existing_locks():
+    if _use_database_service():
+        from shakenfist import database
+        return database.get_existing_locks()
+
     key_val = {}
     for key, holder in get_prefix_raw('/sflocks/'):
         key_val[key] = holder
@@ -278,21 +334,33 @@ def _construct_key(objecttype, subtype, name, prefix='sf'):
 
 
 def put(objecttype, subtype, name, data):
+    if _use_database_service():
+        from shakenfist import database
+        return database.put(objecttype, subtype, name, data)
     path = _construct_key(objecttype, subtype, name)
     put_raw(path, data)
 
 
 def create(objecttype, subtype, name, data):
+    if _use_database_service():
+        from shakenfist import database
+        return database.create(objecttype, subtype, name, data)
     path = _construct_key(objecttype, subtype, name)
     return create_raw(path, data)
 
 
 def get(objecttype, subtype, name):
+    if _use_database_service():
+        from shakenfist import database
+        return database.get(objecttype, subtype, name)
     path = _construct_key(objecttype, subtype, name)
     return get_raw(path)
 
 
 def get_all(objecttype, subtype, prefix=None, limit=0):
+    if _use_database_service():
+        from shakenfist import database
+        return database.get_all(objecttype, subtype, prefix=prefix, limit=limit)
     path = _construct_key(objecttype, subtype, prefix)
     return get_prefix_raw(path, limit=limit)
 
@@ -316,6 +384,9 @@ def replace(objecttype, subtype, name, original_data, new_data):
 
 
 def delete(objecttype, subtype, name):
+    if _use_database_service():
+        from shakenfist import database
+        return database.delete(objecttype, subtype, name)
     path = _construct_key(objecttype, subtype, name)
     return delete_raw(path)
 
@@ -323,17 +394,27 @@ def delete(objecttype, subtype, name):
 @retry_etcd_forever
 def delete_all(objecttype, subtype, name=None):
     path = _construct_key(objecttype, subtype, name)
+    if _use_database_service():
+        from shakenfist import database
+        return database.delete_prefix(path)
     get_etcd_client().delete_prefix(path)
 
 
 @retry_etcd_forever
 def delete_prefix(path):
+    if _use_database_service():
+        from shakenfist import database
+        return database.delete_prefix(path)
     get_etcd_client().delete_prefix(path)
     LOG.info('etcd deleteprefix %s' % path)
 
 
 @retry_etcd_forever
 def enqueue(queuename, workitem, delay=0):
+    if _use_database_service():
+        from shakenfist import database
+        return database.enqueue(queuename, workitem, delay=delay)
+
     # This might retry if we clash with another enqueue at literally (to the
     # millisecond) the same time. It should be unlikely?
     attempts = 0
@@ -363,6 +444,10 @@ def enqueue(queuename, workitem, delay=0):
 
 
 def dequeue(queuename):
+    if _use_database_service():
+        from shakenfist import database
+        return database.dequeue(queuename)
+
     queue_path = _construct_key('queue', queuename, None)
     for path, workitem in get_prefix_raw(queue_path, limit=1):
         jobname = path.split('/')[-1]
@@ -405,6 +490,10 @@ def dequeue(queuename):
 
 
 def resolve(queuename, jobname):
+    if _use_database_service():
+        from shakenfist import database
+        return database.resolve(queuename, jobname)
+
     delete('processing', queuename, jobname)
     LOG.with_fields({
         'jobname': jobname,
@@ -413,6 +502,10 @@ def resolve(queuename, jobname):
 
 
 def get_queue_length(queuename):
+    if _use_database_service():
+        from shakenfist import database
+        return database.get_queue_length(queuename)
+
     queued = 0
     deferred = 0
     for name, _ in get_all('queue', queuename):
@@ -426,6 +519,10 @@ def get_queue_length(queuename):
 
 
 def restart_queue(queuename):
+    if _use_database_service():
+        from shakenfist import database
+        return database.restart_queue(queuename)
+
     queue_path = _construct_key('processing', queuename, None)
 
     for path, workitem in get_prefix_raw(queue_path):
@@ -511,6 +608,10 @@ def _retry_etcd_native_client(func):
 
 @_retry_etcd_native_client
 def compact(revision):
+    if _use_database_service():
+        from shakenfist import database
+        return database.compact(revision)
+
     channel = get_etcd_native_client()
     stub = etcd_pb2_grpc.KVStub(channel)
     try:
@@ -664,6 +765,10 @@ def transactional_delete_raw(path, original_data):
 # descriptions, not bytes.
 @_retry_etcd_native_client
 def replace_many_raw(mutations, suppress_failure_audit=False):
+    if _use_database_service():
+        from shakenfist import database
+        return database.replace_many_raw(mutations, suppress_failure_audit)
+
     original_values_by_path = {}
     new_values_by_path = {}
 

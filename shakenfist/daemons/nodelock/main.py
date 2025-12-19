@@ -14,6 +14,7 @@ from google.protobuf.message import DecodeError
 import setproctitle
 from shakenfist_utilities import logs
 
+from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.protos import nodelock_pb2
 
 
@@ -50,6 +51,7 @@ def main():
     s.listen(1)
     s.settimeout(0.2)
     LOG.info('Listening for incoming requests')
+    send_systemd_ready()
 
     while not EXIT.is_set():
         try:

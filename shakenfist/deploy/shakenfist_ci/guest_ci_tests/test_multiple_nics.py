@@ -18,7 +18,7 @@ class TestMultipleNics(base.BaseNamespacedTestCase):
                                     self.net_two['uuid']])
 
     def test_simple(self):
-        self.skip('systemctl says degraded via sf-agent, requires debugging')
+        self.skipTest('systemctl says degraded via sf-agent, requires debugging')
 
         ud = """#!/bin/sh
 sudo echo ''                      >  /etc/network/interfaces

@@ -78,25 +78,3 @@
     name: grafana-server
     enabled: yes
     state: restarted
-
-- name: Install apache2
-  apt:
-    name: apache2
-    state: latest
-
-- name: Enable proxy modules for apache
-  shell: a2enmod proxy proxy_http lbmethod_byrequests
-
-- name: Write apache site
-  template:
-    src: files/apache-site-primary.conf
-    dest: /etc/apache2/sites-available/sf-example.conf
-    owner: root
-    group: root
-    mode: ugo+r
-
-- name: Restart apache
-  service:
-    name: apache2
-    enabled: yes
-    state: restarted
