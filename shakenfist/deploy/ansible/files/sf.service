@@ -45,6 +45,11 @@ User=root
 Group=root
 
 EnvironmentFile=/etc/sf/config
+{% if item == "queues" %}
+# sf-queues uses the database microservice for etcd access. This enables
+# incremental migration of daemons to the database service.
+Environment=SHAKENFIST_DATABASE_USE_DIRECT_ETCD=false
+{% endif %}
 ExecStartPre=/srv/shakenfist/venv/bin/sf-ctl verify-config
 ExecStartPre=rm -f /run/sf/{{ item }}*.abort
 ExecStartPre=rm -f /run/sf/{{ item }}*.pid
