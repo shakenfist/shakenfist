@@ -1241,7 +1241,9 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              debian@$primary /tmp/getsf-wrapper          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              debian@$primary /tmp/getsf-wrapper
+
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               debian@$primary 'sudo chmod ugo+r /etc/sf/*'
 
