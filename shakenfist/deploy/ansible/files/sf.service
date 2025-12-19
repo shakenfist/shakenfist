@@ -45,8 +45,8 @@ User=root
 Group=root
 
 EnvironmentFile=/etc/sf/config
-{% if item == "queues" %}
-# sf-queues uses the database microservice for etcd access. This enables
+{% if item in ["queues", "net"] %}
+# These daemons use the database microservice for etcd access. This enables
 # incremental migration of daemons to the database service.
 Environment=SHAKENFIST_DATABASE_USE_DIRECT_ETCD=false
 {% endif %}
