@@ -250,17 +250,6 @@
         node_name: "{{ node_name }}"
         node_mesh_ip: "{{ node_mesh_ip }}"
 
-# The eventlog role bootstraps caches in etcd
-- hosts: eventlog_node
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-  roles:
-    - role: eventlog
-      vars:
-        role_action: "bootstrap"
-
 # Create the admin namespace. This only needs to run once, so we run it on the
 # first etcd_master node.
 - hosts: etcd_master
