@@ -83,6 +83,7 @@
       - cpu-checker
       - git
       - libmagic-dev
+      - libmariadb-dev
       - libssl-dev
       - libvirt-daemon-system
       - libvirt-dev

@@ -1,0 +1,15 @@
+---
+# Install and configure MariaDB server on etcd_master nodes
+
+- name: Install MariaDB server and client
+  apt:
+    name:
+      - mariadb-server
+      - mariadb-client
+    state: latest
+
+- name: Enable and start MariaDB service
+  service:
+    name: mariadb
+    enabled: yes
+    state: started
