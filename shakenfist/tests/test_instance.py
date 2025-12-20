@@ -36,7 +36,6 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
 
-    @mock.patch('shakenfist.cache.update_object_state_cache')
     @mock.patch('shakenfist.etcd.get',
                 return_value={
                     'uuid': 'uuid42',
@@ -66,7 +65,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.ClusterLock')
     @mock.patch('time.time', return_value=1234)
     def test_instance_new(self, mock_time, mock_get_lock, mock_get_attribute,
-                          mock_create, mock_put, mock_get, mock_cache_update):
+                          mock_create, mock_put, mock_get):
         instance.Instance.new(
             'barry', 1, 2048, 'namespace', 'sshkey',
             [{}], 'userdata', {'memory': 16384, 'model': 'cirrus', 'vdi': 'spice'},

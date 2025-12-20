@@ -22,7 +22,6 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import artifact
 from shakenfist import baseobject
 from shakenfist import blob
-from shakenfist import cache
 from shakenfist import constants
 from shakenfist.constants import get_object_class
 from shakenfist import etcd
@@ -1931,7 +1930,9 @@ def instances_in_namespace(namespace):
 
 
 def all_instances():
-    for object_uuid in cache.read_object_state_cache_all(Instance.object_type):
+    for object_key, _ in etcd.get_all(Instance.object_type, None):
+        # object_key is the full etcd path like /sf/instance/{uuid}
+        object_uuid = object_key.split('/')[-1]
         i = Instance.from_db(object_uuid, suppress_failure_audit=True)
         if i:
             yield i

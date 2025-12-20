@@ -8,7 +8,6 @@ import re
 from etcd3gw.lock import Lock
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import cache
 from shakenfist import constants
 from shakenfist.constants import get_object_class
 from shakenfist import etcd
@@ -60,16 +59,16 @@ def _maintain_version_cache(max_cache_age):
 
     # Ignore metrics for deleted nodes, but include nodes in an error state
     # as they may return.
-    for node_uuid in cache.read_object_state_cache_many(
-            'node', [DatabaseBackedObject.STATE_INITIAL,
+    target_states = [DatabaseBackedObject.STATE_INITIAL,
                      DatabaseBackedObject.STATE_CREATED,
-                     'degraded']):
-        n = etcd.get('node', None, node_uuid)
-        if not n:
+                     'degraded']
+    for node_key, n in etcd.get_all('node', None):
+        # node_key is the full etcd path, extract the node name (fqdn)
+        node_name = node_key.split('/')[-1]
+        state_data = etcd.get('attribute/node', node_name, 'state')
+        if not state_data or state_data.get('value') not in target_states:
             continue
-
-        node_name = n['fqdn']
-        d = etcd.get('metrics', n['fqdn'], None)
+        d = etcd.get('metrics', node_name, None)
         if not d:
             continue
 
@@ -473,11 +472,6 @@ class DatabaseBackedObject:
             new_state = State(new_value, time.time(), message=message)
             self._db_set_attribute(state_attribute_name, new_state)
 
-            # Only standard states are cached right now
-            if not self.__in_memory_only and state_attribute_name == 'state':
-                cache.update_object_state_cache(
-                    self.object_type, self.uuid, orig.value, new_value)
-
     @state.setter
     def state(self, new_value):
         self._state_update(new_value)
@@ -523,8 +517,6 @@ class DatabaseBackedObject:
         }
 
     def hard_delete(self):
-        cache.update_object_state_cache(
-            self.object_type, self.uuid, self.state.value, self.STATE_HARD_DELETED)
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
@@ -606,12 +598,18 @@ class DatabaseBackedObjectIterator:
         # if the caller is slow to iterate they can end up with inconsistent
         # values as objects shift state underneath them (for example an active
         # instance shifting from created to delete-wait while you're iterating).
-        objuuids = cache.read_object_state_cache_many(
-                self.base_object.object_type, target_states)
-        for objuuid in objuuids:
-            static_values = etcd.get(self.base_object.object_type, None, objuuid)
-            if static_values:
-                yield objuuid, static_values
+        results = []
+        for objkey, static_values in etcd.get_all(
+                self.base_object.object_type, None):
+            # objkey is the full etcd path like /sf/node/node1_net, extract
+            # the object identifier (last component of the path)
+            objuuid = objkey.split('/')[-1]
+            state_data = etcd.get(
+                f'attribute/{self.base_object.object_type}', objuuid, 'state')
+            if state_data and state_data.get('value') in target_states:
+                results.append((objkey, static_values))
+        for objkey, static_values in results:
+            yield objkey, static_values
 
     def apply_filters(self, o):
         for f in self.filters:

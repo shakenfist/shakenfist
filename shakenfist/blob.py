@@ -15,7 +15,6 @@ import magic
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
-from shakenfist import cache
 from shakenfist import etcd
 from shakenfist.etcd_schema.operations.baseclusteroperation \
     import PRIORITY
@@ -870,13 +869,6 @@ class Blob(dbo):
                     c[alg] = extra_hashes[alg]
 
             self._db_set_attribute('checksums', c)
-
-        # Avoid holding the checksum lock while updating the blob hash cache
-        hashes = {}
-        for alg in BLOB_HASH_ALGORITHMS:
-            if alg in c:
-                hashes[alg] = c[alg]
-        cache.update_blob_hash_cache(self.uuid, hashes)
 
         return True
 
