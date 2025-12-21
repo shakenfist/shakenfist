@@ -71,6 +71,7 @@ nav:
         - "Agent protocol": developer_guide/agent_protocol.md
         - "Authentication": developer_guide/authentication.md
         - "CI API coverage": developer_guide/ci_api_coverage.md
+        - "Mypy": developer_guide/mypy.md
         - "Release process": developer_guide/release_process.md
         - "Standards": developer_guide/standards.md
         - "State machine": developer_guide/state_machine.md

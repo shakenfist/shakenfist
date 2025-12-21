@@ -189,6 +189,23 @@ test = [
     "flake8==7.3.0",            # mit
     "tox==4.28.0",              # mit
     "mkdocs==1.6.1",            # bsd
-    "mkdocs-material==9.7.1",  # mit
+    "mkdocs-material==9.7.1",   # mit
     "testscenarios==0.5.0",     # bsd
+    "mypy==1.14.1",             # mit
+    "types-PyYAML==6.0.12.20250516",      # apache2
+    "types-requests==2.32.0.20250602",    # apache2
 ]
+
+# mypy configuration
+# We're incrementally rolling out mypy, starting with the schema module.
+# See docs/developer_guide/mypy.md for the rollout strategy.
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+# Strict checking for new/typed modules
+[[tool.mypy.overrides]]
+module = "shakenfist.schema.sqlalchemy"
+strict = true

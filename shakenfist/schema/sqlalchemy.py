@@ -25,13 +25,16 @@
 
 from enum import Enum
 from typing import Annotated
+from typing import Any
 from typing import get_args
 from typing import get_origin
+from typing import Optional
 from typing import Union
 
 from pydantic import BaseModel
 import sqlalchemy as sa
 from sqlalchemy.dialects import mysql
+from sqlalchemy.engine.interfaces import Dialect
 from shakenfist_utilities import logs
 
 
@@ -57,7 +60,8 @@ class SQLUniqueIndex:
     pass
 
 
-def _get_index_markers_from_metadata(metadata: list) -> tuple:
+def _get_index_markers_from_metadata(
+        metadata: list[Any]) -> tuple[bool, bool]:
     """Extract index markers from Pydantic field metadata.
 
     Returns (has_index, is_unique) tuple.
@@ -70,7 +74,7 @@ def _get_index_markers_from_metadata(metadata: list) -> tuple:
     return False, False
 
 
-def _get_index_markers(annotation) -> tuple:
+def _get_index_markers(annotation: Any) -> tuple[bool, bool]:
     """Extract index markers from an Annotated type.
 
     Returns (has_index, is_unique) tuple.
@@ -89,7 +93,7 @@ def _get_index_markers(annotation) -> tuple:
     return False, False
 
 
-def _get_compound_indexes(model: type[BaseModel]) -> list:
+def _get_compound_indexes(model: type[BaseModel]) -> list[tuple[str, ...]]:
     """Extract compound index definitions from model config.
 
     Returns list of tuples, each containing column names for a compound index.
@@ -102,13 +106,14 @@ def _get_compound_indexes(model: type[BaseModel]) -> list:
     if not schema_extra:
         return []
 
-    return schema_extra.get('sql_indexes', [])
+    indexes: list[tuple[str, ...]] = schema_extra.get('sql_indexes', [])
+    return indexes
 
 
 # Mapping from Python types to SQLAlchemy column types. Note that we use
 # mysql.LONGTEXT for JSON because MariaDB's JSON type is an alias for LONGTEXT
 # with JSON validation, and we want explicit control.
-PYTHON_TO_SQLALCHEMY = {
+PYTHON_TO_SQLALCHEMY: dict[type[Any], sa.types.TypeEngine[Any]] = {
     str: sa.String(255),
     int: sa.BigInteger(),
     float: sa.Double(),
@@ -117,7 +122,7 @@ PYTHON_TO_SQLALCHEMY = {
 }
 
 
-def _unwrap_annotated(annotation):
+def _unwrap_annotated(annotation: Any) -> Any:
     """Unwrap an Annotated type to get the base type.
 
     Returns the base type (first arg of Annotated, or the original if not
@@ -128,7 +133,7 @@ def _unwrap_annotated(annotation):
     return annotation
 
 
-def _is_optional(annotation) -> tuple:
+def _is_optional(annotation: Any) -> tuple[bool, Any]:
     """Check if a type annotation is Optional[X].
 
     Returns (is_optional, inner_type).
@@ -146,13 +151,13 @@ def _is_optional(annotation) -> tuple:
     return False, annotation
 
 
-def _is_uuid_type(annotation) -> bool:
+def _is_uuid_type(annotation: Any) -> bool:
     """Check if a type annotation is a UUID type."""
     type_str = str(annotation)
     return 'UUID' in type_str or 'uuid' in type_str.lower()
 
 
-def _is_enum_type(annotation) -> bool:
+def _is_enum_type(annotation: Any) -> bool:
     """Check if a type annotation is an Enum subclass."""
     try:
         return isinstance(annotation, type) and issubclass(annotation, Enum)
@@ -160,7 +165,7 @@ def _is_enum_type(annotation) -> bool:
         return False
 
 
-def _is_complex_type(annotation) -> bool:
+def _is_complex_type(annotation: Any) -> bool:
     """Check if a type should be stored as JSON (lists, dicts, nested models).
     """
     origin = get_origin(annotation)
@@ -174,7 +179,7 @@ def _is_complex_type(annotation) -> bool:
     return False
 
 
-def _get_sqlalchemy_type(annotation):
+def _get_sqlalchemy_type(annotation: Any) -> sa.types.TypeEngine[Any]:
     """Convert a Python type annotation to a SQLAlchemy column type."""
     # Unwrap Annotated types first
     annotation = _unwrap_annotated(annotation)
@@ -209,8 +214,8 @@ def pydantic_to_sqlalchemy_table(
         model: type[BaseModel],
         table_name: str,
         metadata: sa.MetaData,
-        primary_key_field: str = None,
-        indexes: list[tuple] = None,
+        primary_key_field: Optional[str] = None,
+        indexes: Optional[list[tuple[str, ...]]] = None,
         include_id_column: bool = True) -> sa.Table:
     """Convert a Pydantic model to a SQLAlchemy Table.
 
@@ -234,8 +239,8 @@ def pydantic_to_sqlalchemy_table(
     Returns:
         A SQLAlchemy Table object with indexes attached.
     """
-    columns = []
-    table_indexes = []
+    columns: list[sa.Column[Any]] = []
+    table_indexes: list[tuple[str, bool]] = []
 
     # Add auto-increment id column unless we're using a field as primary key
     if include_id_column and not primary_key_field:
@@ -269,7 +274,7 @@ def pydantic_to_sqlalchemy_table(
             table_indexes.append((field_name, is_unique))
 
     # Collect all index definitions
-    all_indexes = []
+    all_indexes: list[tuple[str, tuple[str, ...], bool]] = []
 
     # Add single-column indexes from field annotations
     for field_name, is_unique in table_indexes:
@@ -304,7 +309,9 @@ def pydantic_to_sqlalchemy_table(
     return table
 
 
-def get_table_creation_sql(table: sa.Table, dialect=None) -> str:
+def get_table_creation_sql(
+        table: sa.Table,
+        dialect: Optional[Dialect] = None) -> str:
     """Generate the CREATE TABLE SQL for a table.
 
     This is useful for debugging and for understanding what will be created.
@@ -315,7 +322,7 @@ def get_table_creation_sql(table: sa.Table, dialect=None) -> str:
     return str(CreateTable(table).compile(dialect=dialect))
 
 
-def ensure_table_exists(engine: sa.Engine, table: sa.Table):
+def ensure_table_exists(engine: sa.Engine, table: sa.Table) -> None:
     """Ensure a table exists in the database, creating it if necessary.
 
     This is idempotent - it won't fail if the table already exists.
@@ -344,7 +351,7 @@ def table_exists(engine: sa.Engine, table_name: str) -> bool:
     return sa.inspect(engine).has_table(table_name)
 
 
-def get_table_columns(engine: sa.Engine, table_name: str) -> dict:
+def get_table_columns(engine: sa.Engine, table_name: str) -> dict[str, Any]:
     """Get the columns of an existing table.
 
     Returns a dict mapping column name to column info.
@@ -355,7 +362,9 @@ def get_table_columns(engine: sa.Engine, table_name: str) -> dict:
     return {col['name']: col for col in inspector.get_columns(table_name)}
 
 
-def compare_schemas(engine: sa.Engine, table: sa.Table) -> dict:
+def compare_schemas(
+        engine: sa.Engine,
+        table: sa.Table) -> dict[str, list[str]]:
     """Compare a Table definition with the actual database table.
 
     Returns a dict describing differences:

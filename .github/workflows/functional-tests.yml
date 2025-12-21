@@ -44,6 +44,12 @@ jobs:
           . /tmp/venv-test/bin/activate
           tox -eflake8
 
+      - name: Type check with mypy
+        timeout-minutes: 5
+        run: |
+          . /tmp/venv-test/bin/activate
+          tox -emypy
+
       - name: Attempt to install requirements
         timeout-minutes: 5
         run: |
