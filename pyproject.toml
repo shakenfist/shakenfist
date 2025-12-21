@@ -38,7 +38,7 @@ dependencies = [
     "webargs==8.7.0",                     # mit
     "py-cpuinfo==9.0.0",                  # mit
     "distro==1.9.0",                      # apache2
-    "pbr==7.0.1",                         # apache2
+    "pbr==7.0.3",                         # apache2
     "symbolicmode==2.0.1",                # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
     "pycdlib==1.14.0",                    # lgpl
     "validators==0.35.0",                 # mit
