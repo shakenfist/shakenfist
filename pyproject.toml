@@ -131,7 +131,7 @@ dependencies = [
     "prometheus_client==0.22.1",
     "pydantic_core==2.27.2",
     "pylogrus==0.4.0",
-    "pyparsing==3.2.4",
+    "pyparsing==3.2.5",
     "referencing==0.36.2",
     "rfc3986==2.0.0",
     "rpds-py==0.27.1",
