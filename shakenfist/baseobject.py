@@ -664,5 +664,6 @@ def namespace_filter(namespace, o):
     return o.namespace == namespace
 
 
-# Import Pydantic State from schema - this replaces the old class below
-from shakenfist.schema.object_state import State
+# Import Pydantic State from schema - this replaces the old class below.
+# Placed here to avoid circular imports during module loading.
+from shakenfist.schema.object_state import State  # noqa: E402
