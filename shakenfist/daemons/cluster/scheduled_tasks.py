@@ -4,7 +4,6 @@ import time
 
 from shakenfist_utilities import logs                 # noreorder
 
-from shakenfist.cache import read_object_state_cache
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import FINAL_OBJECT_STATES
@@ -47,7 +46,12 @@ def per_blob_checks():
 
 
 def _fill_per_blob_queue():
-    for blob_uuid in read_object_state_cache(Blob.object_type, Blob.STATE_CREATED):
+    for objkey, _ in etcd.get_all(Blob.object_type, None):
+        blob_uuid = objkey.split('/')[-1]
+        state_data = etcd.get(
+            f'attribute/{Blob.object_type}', blob_uuid, 'state')
+        if not state_data or state_data.get('value') != Blob.STATE_CREATED:
+            continue
         b = Blob.from_db(blob_uuid)
         if not b:
             continue
@@ -124,8 +128,12 @@ def per_instance_checks_and_usage():
 
 
 def _fill_per_instance_queue():
-    for instance_uuid in read_object_state_cache(
-            Instance.object_type, Instance.STATE_CREATED):
+    for objkey, _ in etcd.get_all(Instance.object_type, None):
+        instance_uuid = objkey.split('/')[-1]
+        state_data = etcd.get(
+            f'attribute/{Instance.object_type}', instance_uuid, 'state')
+        if not state_data or state_data.get('value') != Instance.STATE_CREATED:
+            continue
         inst = Instance.from_db(instance_uuid)
         if not inst:
             continue
@@ -213,12 +221,16 @@ def per_deleted_object_checks():
 
 def _fill_per_deleted_object_queue():
     for objtype in OBJECT_NAMES_TO_CLASSES:
-        for state in FINAL_OBJECT_STATES:
-            for obj_uuid in read_object_state_cache(objtype, state):
-                obj = get_object_class(objtype).from_db(obj_uuid)
-                if not obj:
-                    continue
-                DELETED_OBJECTS_QUEUE.put(obj)
+        for objkey, _ in etcd.get_all(objtype, None):
+            obj_uuid = objkey.split('/')[-1]
+            state_data = etcd.get(f'attribute/{objtype}', obj_uuid, 'state')
+            state_value = state_data.get('value') if state_data else None
+            if state_value not in FINAL_OBJECT_STATES:
+                continue
+            obj = get_object_class(objtype).from_db(obj_uuid)
+            if not obj:
+                continue
+            DELETED_OBJECTS_QUEUE.put(obj)
 
 
 def _process_per_deleted_object_queue(execution_limit=10):

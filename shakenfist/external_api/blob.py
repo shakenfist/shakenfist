@@ -18,12 +18,12 @@ from shakenfist_utilities import logs  # noreorder
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 
-from shakenfist import cache
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist import etcd
 from shakenfist.daemons import daemon
 from shakenfist.etcd_schema.operations.baseclusteroperation \
     import PRIORITY
@@ -323,15 +323,17 @@ class BlobChecksumsEndpoint(sf_api.Resource):
         if not hash:
             return sf_api.error(400, 'you must specify a hash')
 
-        blobs = cache.search_blob_hash_cache('sha512', hash)
-        for blob_uuid in blobs:
+        # Search for blobs matching the given hash by iterating through all
+        # blobs. This replaces the previous cache-based lookup.
+        for objkey, _ in etcd.get_all(Blob.object_type, None):
+            blob_uuid = objkey.split('/')[-1]
             b = Blob.from_db(blob_uuid)
             if not b:
                 continue
-            if not b.state.value == dbo.STATE_CREATED:
+            if b.state.value != dbo.STATE_CREATED:
                 continue
 
-            if b.checksums.get('sha512') == hash:
+            if b.checksums.get(algorithm) == hash:
                 out = b.external_view()
                 out['instances'] = instance_usage_for_blob_uuid(b.uuid)
                 return out
