@@ -80,6 +80,7 @@ nav:
        - "Installation": operator_guide/installation.md
        - "Artifacts": operator_guide/artifacts.md
        - "Authentication": operator_guide/authentication.md
+       - "Database": operator_guide/database.md
        - "Locks": operator_guide/locks.md
        - "Networking": operator_guide/networking/overview.md
        - "Power States": operator_guide/power_states.md
