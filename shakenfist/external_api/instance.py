@@ -20,27 +20,27 @@ from webargs import fields
 from webargs.flaskparser import use_kwargs
 
 from shakenfist import baseobject
-from shakenfist.etcd_schema.operations.baseclusteroperation import dependency
-from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
-from shakenfist.etcd_schema.operations.artifact_fetch_op \
+from shakenfist.schema.operations.baseclusteroperation import dependency
+from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.schema.operations.artifact_fetch_op \
     import create_and_enqueue as afo_create_and_enqueue
-from shakenfist.etcd_schema.operations.artifact_fetch_op \
+from shakenfist.schema.operations.artifact_fetch_op \
     import model_tasks as afo_tasks
-from shakenfist.etcd_schema.operations.net_op \
+from shakenfist.schema.operations.net_op \
     import create_and_enqueue as net_create_and_enqueue
-from shakenfist.etcd_schema.operations.net_op \
+from shakenfist.schema.operations.net_op \
     import model_tasks as net_tasks
-from shakenfist.etcd_schema.operations.node_aop_op \
+from shakenfist.schema.operations.node_aop_op \
     import create_and_enqueue as na_create_and_enqueue
-from shakenfist.etcd_schema.operations.node_aop_op \
+from shakenfist.schema.operations.node_aop_op \
     import model_tasks as na_tasks
-from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
+from shakenfist.schema.operations.node_inst_net_iface_op \
     import create_and_enqueue as niio_create_and_enqueue
-from shakenfist.etcd_schema.operations.node_inst_net_iface_op \
+from shakenfist.schema.operations.node_inst_net_iface_op \
     import model_tasks as niio_tasks
-from shakenfist.etcd_schema.operations.node_inst_netdesc_op \
+from shakenfist.schema.operations.node_inst_netdesc_op \
     import create_and_enqueue as nino_create_and_enqueue
-from shakenfist.etcd_schema.operations.node_inst_netdesc_op \
+from shakenfist.schema.operations.node_inst_netdesc_op \
     import model_tasks as nino_tasks
 from shakenfist import eventlog
 from shakenfist import exceptions

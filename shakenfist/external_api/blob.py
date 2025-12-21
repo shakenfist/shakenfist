@@ -25,11 +25,11 @@ from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist.daemons import daemon
-from shakenfist.etcd_schema.operations.baseclusteroperation \
+from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
-from shakenfist.etcd_schema.operations.node_blob_op \
+from shakenfist.schema.operations.node_blob_op \
     import create_and_enqueue as nbo_create_and_enqueue
-from shakenfist.etcd_schema.operations.node_blob_op \
+from shakenfist.schema.operations.node_blob_op \
     import model_tasks as nbo_tasks
 from shakenfist import eventlog
 from shakenfist.external_api import base as api_base

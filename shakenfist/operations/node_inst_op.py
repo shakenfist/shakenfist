@@ -5,7 +5,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_USAGE
-from shakenfist.etcd_schema.operations import node_inst_op as schema
+from shakenfist.schema.operations import node_inst_op as schema
 from shakenfist.instance import Instance
 from shakenfist.instance import Instances
 from shakenfist.instance import this_node_filter

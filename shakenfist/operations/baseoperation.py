@@ -2,7 +2,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist import etcd
-from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 
 
 class BaseOperationException(Exception):

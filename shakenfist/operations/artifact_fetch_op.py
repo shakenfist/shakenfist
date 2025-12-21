@@ -4,7 +4,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.artifact import Artifact
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.etcd_schema.operations import artifact_fetch_op as schema
+from shakenfist.schema.operations import artifact_fetch_op as schema
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import HTTPError
 from shakenfist.exceptions import TooManyMatches

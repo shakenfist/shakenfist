@@ -11,9 +11,9 @@ from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.blob import Blob
 from shakenfist import etcd
-from shakenfist.etcd_schema.operations import baseclusteroperation as bco_schema
-from shakenfist.etcd_schema.operations import node_blob_op as nbo_schema
-from shakenfist.etcd_schema.operations import node_inst_op as nio_schema
+from shakenfist.schema.operations import baseclusteroperation as bco_schema
+from shakenfist.schema.operations import node_blob_op as nbo_schema
+from shakenfist.schema.operations import node_inst_op as nio_schema
 from shakenfist.instance import Instance
 from shakenfist.network.network import Network
 from shakenfist.node import Node

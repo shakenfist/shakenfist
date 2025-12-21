@@ -1,6 +1,6 @@
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.etcd_schema.operations import net_iface_ip_op as schema
+from shakenfist.schema.operations import net_iface_ip_op as schema
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation

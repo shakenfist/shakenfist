@@ -21,18 +21,18 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
-from shakenfist.etcd_schema.operations.net_op \
+from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.schema.operations.net_op \
     import create_and_enqueue as net_create_and_enqueue
-from shakenfist.etcd_schema.operations.net_op \
+from shakenfist.schema.operations.net_op \
     import model_tasks as net_tasks
-from shakenfist.etcd_schema.operations.net_macaddr_ip_op \
+from shakenfist.schema.operations.net_macaddr_ip_op \
     import create_and_enqueue as nmi_create_and_enqueue
-from shakenfist.etcd_schema.operations.net_macaddr_ip_op \
+from shakenfist.schema.operations.net_macaddr_ip_op \
     import model_tasks as nmi_tasks
-from shakenfist.etcd_schema.operations.node_net_op \
+from shakenfist.schema.operations.node_net_op \
     import create_and_enqueue as nn_create_and_enqueue
-from shakenfist.etcd_schema.operations.node_net_op \
+from shakenfist.schema.operations.node_net_op \
     import model_tasks as nn_tasks
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import CannotAssignFloatingGateway

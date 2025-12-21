@@ -1,6 +1,6 @@
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.etcd_schema.operations import net_op as schema
+from shakenfist.schema.operations import net_op as schema
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import EnsureMeshFailed
 from shakenfist.network.network import Network

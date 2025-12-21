@@ -1,6 +1,6 @@
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.etcd_schema.operations import node_net_op as schema
+from shakenfist.schema.operations import node_net_op as schema
 from shakenfist.network.network import Network
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException

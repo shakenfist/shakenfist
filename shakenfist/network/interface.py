@@ -9,11 +9,11 @@ from shakenfist import exceptions
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
-from shakenfist.etcd_schema.operations.baseclusteroperation \
+from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
-from shakenfist.etcd_schema.operations.net_iface_ip_op \
+from shakenfist.schema.operations.net_iface_ip_op \
     import create_and_enqueue as nii_create_and_enqueue
-from shakenfist.etcd_schema.operations.net_iface_ip_op \
+from shakenfist.schema.operations.net_iface_ip_op \
     import model_tasks as nii_tasks
 from shakenfist.util import network as util_network
 

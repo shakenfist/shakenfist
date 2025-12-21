@@ -14,11 +14,11 @@ from shakenfist import instance
 from shakenfist import ipam
 from shakenfist.network import network
 from shakenfist.network import interface
-from shakenfist.etcd_schema.operations.baseclusteroperation \
+from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
-from shakenfist.etcd_schema.operations.net_op \
+from shakenfist.schema.operations.net_op \
     import create_and_enqueue as net_create_and_enqueue
-from shakenfist.etcd_schema.operations.net_op \
+from shakenfist.schema.operations.net_op \
     import model_tasks as net_tasks
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import network as util_network

@@ -18,10 +18,10 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import QCOW2_CLUSTER_SIZE
 from shakenfist.constants import TRANSCODE_DESCRIPTION
-from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
-from shakenfist.etcd_schema.operations.imgcache_op \
+from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.schema.operations.imgcache_op \
     import create_and_enqueue as ic_create_and_enqueue
-from shakenfist.etcd_schema.operations.imgcache_op \
+from shakenfist.schema.operations.imgcache_op \
     import model_tasks as ic_tasks
 from shakenfist.eventlog import add_event_multi
 from shakenfist.util import general as util_general

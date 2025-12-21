@@ -3,7 +3,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
-from shakenfist.etcd_schema.operations import node_inst_netdesc_op as schema
+from shakenfist.schema.operations import node_inst_netdesc_op as schema
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import ImagesCannotShrinkException
 from shakenfist.exceptions import InvalidStateException
@@ -13,9 +13,9 @@ from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
-from shakenfist.etcd_schema.operations.net_iface_op \
+from shakenfist.schema.operations.net_iface_op \
     import create_and_enqueue as ni_create_and_enqueue
-from shakenfist.etcd_schema.operations.net_iface_op \
+from shakenfist.schema.operations.net_iface_op \
     import model_tasks as ni_tasks
 from shakenfist import scheduler
 from shakenfist.util import general as util_general
