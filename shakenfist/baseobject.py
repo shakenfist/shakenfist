@@ -529,12 +529,23 @@ class DatabaseBackedObject:
                 self._db_set_attribute('metadata', md)
 
     def _external_view(self):
-        return {
-            'uuid': self.uuid,
-            'state': self.state.value,
-            'metadata': self.metadata,
-            'version': self.version
-        }
+        # Import here to avoid circular imports during module loading
+        from shakenfist.schema.external_view import BaseExternalView
+
+        # Phase 1: Fields handled by Pydantic model (grows over time)
+        # The model handles transformations like State -> state value string
+        partial = BaseExternalView(
+            uuid=self.uuid,
+            state=self.state,
+            version=self.version,
+            metadata=self.metadata
+        )
+        out = partial.model_dump()
+
+        # Phase 2: Fields not yet migrated to Pydantic (shrinks over time)
+        # Currently empty for base class - subclasses add their own fields
+
+        return out
 
     def hard_delete(self):
         etcd.delete(self.object_type, None, self.uuid)
