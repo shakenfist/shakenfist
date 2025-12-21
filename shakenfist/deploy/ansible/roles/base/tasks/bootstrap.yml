@@ -85,6 +85,7 @@
       - libmagic-dev
       - libmariadb-dev
       - libssl-dev
+      - python3-mysqldb
       - libvirt-daemon-system
       - libvirt-dev
       - lm-sensors
