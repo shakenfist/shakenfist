@@ -331,6 +331,47 @@ Queue priorities (per-node and global):
 4. **State machine transitions** - Follow documented state machines in
    `docs/developer_guide/state_machine.md`
 
+## Enabling MariaDB State for an Object Type
+
+When migrating an object type to use MariaDB for state storage, follow these
+steps (Blob was the first object type migrated as a reference):
+
+1. **Set the class variable** in the object class:
+   ```python
+   class MyObject(DatabaseBackedObject):
+       use_mariadb_state = True
+   ```
+
+2. **Bump the object version** to trigger migration:
+   ```python
+   current_version = N + 1  # Increment from current version
+   ```
+
+3. **Add an upgrade step** to migrate existing state from etcd to MariaDB:
+   ```python
+   @classmethod
+   def _upgrade_step_N_to_N+1(cls, static_values):
+       if not mariadb.is_configured():
+           return
+       state_data = etcd.get('attribute/myobject', static_values['uuid'], 'state')
+       if state_data:
+           state = State(**state_data)
+           mariadb.set_state('myobject', static_values['uuid'], state)
+   ```
+
+4. **Update tests** that use the `State` class:
+   - Use keyword arguments: `State(value='created', update_time=123.0)`
+   - Use float for `update_time` (not int)
+
+5. **Run tests and mypy** to verify:
+   ```bash
+   tox -epy38
+   tox -emypy
+   ```
+
+The dual-write strategy ensures backwards compatibility: state changes are
+written to both MariaDB and etcd, with reads preferring MariaDB.
+
 ## Documentation
 
 - MkDocs site: `mkdocs serve` from project root
@@ -338,3 +379,4 @@ Queue priorities (per-node and global):
   - `docs/manifesto.md` - Design philosophy
   - `docs/developer_guide/` - Development guidance
   - `docs/components/` - Architecture docs
+  - `docs/operator_guide/database.md` - Database architecture and MariaDB migration

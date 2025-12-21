@@ -224,6 +224,83 @@ differences = compare_schemas(engine, table)
 # }
 ```
 
+## Object State Storage
+
+Object state (e.g., "created", "deleted", "error") is being migrated from etcd
+attributes to a dedicated MariaDB table for improved query performance.
+
+### The object_states Table
+
+The `object_states` table stores state for all object types:
+
+```python
+from typing import Annotated, Optional
+from pydantic import BaseModel, ConfigDict, Field
+from shakenfist.schema.sqlalchemy import SQLIndex, SQLUniqueIndex
+
+class ObjectState(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            'sql_indexes': [
+                ['object_type', 'state_value'],  # Efficient queries by type+state
+            ]
+        }
+    )
+
+    object_uuid: Annotated[str, SQLUniqueIndex(), Field(max_length=36)]
+    object_type: Annotated[str, SQLIndex(), Field(max_length=32)]
+    state_value: Annotated[str, SQLIndex(), Field(max_length=32)]
+    update_time: float
+    message: Optional[str] = None
+```
+
+### State Class
+
+The `State` class is a Pydantic model that replaces the original `baseobject.State`
+class. It provides the same interface for backwards compatibility:
+
+```python
+from shakenfist.schema.object_state import State
+
+state = State(value='created', update_time=time.time(), message='optional msg')
+print(state.value)        # 'created'
+print(state.update_time)  # 1234567890.123
+print(state.obj_dict())   # {'value': 'created', 'update_time': 1234567890.123}
+```
+
+### Migration Strategy
+
+State data is migrated incrementally per object type:
+
+1. **Dual-write**: New state changes are written to both etcd and MariaDB
+2. **Read priority**: State reads prefer MariaDB, falling back to etcd
+3. **Upgrade step**: When an object's version is bumped, its existing state
+   is migrated from etcd to MariaDB
+
+### Enabling MariaDB State for an Object Type
+
+To enable MariaDB state storage for an object type:
+
+```python
+class MyObject(DatabaseBackedObject):
+    object_type = 'myobject'
+    current_version = 2  # Bump version for migration
+
+    # Enable MariaDB state storage
+    use_mariadb_state = True
+
+    @classmethod
+    def _upgrade_step_1_to_2(cls, static_values):
+        # Migrate existing state to MariaDB
+        if not mariadb.is_configured():
+            return
+
+        state_data = etcd.get('attribute/myobject', static_values['uuid'], 'state')
+        if state_data:
+            state = State(**state_data)
+            mariadb.set_state('myobject', static_values['uuid'], state)
+```
+
 ## Best Practices
 
 ### Schema Evolution

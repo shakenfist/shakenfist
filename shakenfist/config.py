@@ -3,6 +3,7 @@ import json
 import os
 import socket
 import sys
+from typing import NoReturn
 
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import ConnectionFailedError
@@ -12,11 +13,11 @@ from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
-def get_node_name():
+def get_node_name() -> str:
     return socket.getfqdn()
 
 
-def load_etcd_settings():
+def load_etcd_settings() -> None:
     if not os.getenv('SHAKENFIST_ETCD_HOST'):
         return
 
@@ -401,6 +402,28 @@ class SFConfig(BaseSettings):
         description='Log when a new etcd connection is created, only useful in CI.'
     )
 
+    # MariaDB
+    MARIADB_HOST: str = Field(
+        '',
+        description='Hostname or IP of the MariaDB server.'
+    )
+    MARIADB_PORT: int = Field(
+        3306,
+        description='Port for the MariaDB server.'
+    )
+    MARIADB_USER: str = Field(
+        'shakenfist',
+        description='Username for MariaDB connections.'
+    )
+    MARIADB_PASSWORD: str = Field(
+        '',
+        description='Password for MariaDB connections.'
+    )
+    MARIADB_DATABASE: str = Field(
+        'shakenfist',
+        description='Database name for Shaken Fist data.'
+    )
+
     class Config:
         env_prefix = 'SHAKENFIST_'
 
@@ -409,7 +432,7 @@ load_etcd_settings()
 config = SFConfig()
 
 
-def _config_failure(failures):
+def _config_failure(failures: list[str]) -> NoReturn:
     print('Configuration failed validation!')
     print()
     print('Configuration as read:')
@@ -422,8 +445,8 @@ def _config_failure(failures):
     sys.exit(1)
 
 
-def verify_config(skip_auth_seed=False):
-    failures = []
+def verify_config(skip_auth_seed: bool = False) -> None:
+    failures: list[str] = []
     if config.ETCD_HOST == '':
         failures.append('You must configure ETCD_HOST')
 

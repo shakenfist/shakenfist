@@ -11,9 +11,9 @@ from shakenfist import baseobject
 
 class JSONEncoderCustomTypes(json.JSONEncoder):
     def default(self, obj):
-        if type(obj) is baseobject.State:
+        if isinstance(obj, baseobject.State):
             return obj.obj_dict()
-        if type(obj) is uuid.UUID:
+        if isinstance(obj, uuid.UUID):
             return str(obj)
         if isinstance(obj, Enum):
             return obj.name
