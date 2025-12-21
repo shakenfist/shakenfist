@@ -1,7 +1,7 @@
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.blob import Blob
-from shakenfist.etcd_schema.operations import node_aop_op as schema
+from shakenfist.schema.operations import node_aop_op as schema
 from shakenfist.instance import Instance
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.operations.baseoperation import BaseClusterOperation

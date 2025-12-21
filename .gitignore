@@ -138,3 +138,9 @@ dmypy.json
 deploy/gitrepos/
 
 .vscode
+
+# Generated version file
+shakenfist/_version.py
+
+# Claude planning files
+PLAN-*.md

@@ -16,11 +16,11 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import etcd
-from shakenfist.etcd_schema.operations.baseclusteroperation \
+from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
-from shakenfist.etcd_schema.operations.node_blob_op \
+from shakenfist.schema.operations.node_blob_op \
     import create_and_enqueue as nbo_create_and_enqueue
-from shakenfist.etcd_schema.operations.node_blob_op \
+from shakenfist.schema.operations.node_blob_op \
     import model_tasks as nbo_tasks
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter

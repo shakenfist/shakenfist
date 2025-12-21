@@ -30,6 +30,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libmariadb-dev python3-mysqldb
+
       - name: Upgrade base test tools
         timeout-minutes: 5
         run: |
@@ -43,6 +48,12 @@ jobs:
         run: |
           . /tmp/venv-test/bin/activate
           tox -eflake8
+
+      - name: Type check with mypy
+        timeout-minutes: 5
+        run: |
+          . /tmp/venv-test/bin/activate
+          tox -emypy
 
       - name: Attempt to install requirements
         timeout-minutes: 5

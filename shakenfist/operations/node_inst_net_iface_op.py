@@ -1,10 +1,10 @@
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.etcd_schema.operations.net_iface_op \
+from shakenfist.schema.operations.net_iface_op \
     import create_and_enqueue as ni_create_and_enqueue
-from shakenfist.etcd_schema.operations.net_iface_op \
+from shakenfist.schema.operations.net_iface_op \
     import model_tasks as ni_tasks
-from shakenfist.etcd_schema.operations import node_inst_net_iface_op as schema
+from shakenfist.schema.operations import node_inst_net_iface_op as schema
 from shakenfist.instance import Instance
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface

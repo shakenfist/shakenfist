@@ -204,6 +204,18 @@
         etcd_additional_envvars:
           ETCD_MAX_REQUEST_BYTES: 100000000
 
+### MariaDB
+
+- hosts: etcd_master
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+  roles:
+    - role: mariadb
+      vars:
+        role_action: "bootstrap"
+
 ### Write config and configure client
 
 - hosts: allsf

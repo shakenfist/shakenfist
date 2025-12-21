@@ -1,0 +1,8 @@
+---
+- debug:
+    msg: "Executing mariadb role action {{ role_action }}."
+
+- include_tasks: "{{ role_action }}.yml"
+
+- debug:
+    msg: "Completed mariadb role action {{ role_action }}."

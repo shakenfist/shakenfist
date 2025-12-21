@@ -15,15 +15,15 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
-from shakenfist.etcd_schema.operations.baseclusteroperation \
+from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
-from shakenfist.etcd_schema.operations.net_iface_op \
+from shakenfist.schema.operations.net_iface_op \
     import create_and_enqueue as ni_create_and_enqueue
-from shakenfist.etcd_schema.operations.net_iface_op \
+from shakenfist.schema.operations.net_iface_op \
     import model_tasks as ni_tasks
-from shakenfist.etcd_schema.operations.net_iface_ip_op \
+from shakenfist.schema.operations.net_iface_ip_op \
     import create_and_enqueue as nii_create_and_enqueue
-from shakenfist.etcd_schema.operations.net_iface_ip_op \
+from shakenfist.schema.operations.net_iface_ip_op \
     import model_tasks as nii_tasks
 from shakenfist.util import general as util_general
 

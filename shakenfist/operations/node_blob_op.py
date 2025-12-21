@@ -6,7 +6,7 @@ from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
-from shakenfist.etcd_schema.operations import node_blob_op as schema
+from shakenfist.schema.operations import node_blob_op as schema
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException

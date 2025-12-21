@@ -26,15 +26,15 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
-from shakenfist.etcd_schema.operations.baseclusteroperation \
+from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
-from shakenfist.etcd_schema.operations.net_op \
+from shakenfist.schema.operations.net_op \
     import create_and_enqueue as net_create_and_enqueue
-from shakenfist.etcd_schema.operations.net_op \
+from shakenfist.schema.operations.net_op \
     import model_tasks as net_tasks
-from shakenfist.etcd_schema.operations.net_ip_op \
+from shakenfist.schema.operations.net_ip_op \
     import create_and_enqueue as nip_create_and_enqueue
-from shakenfist.etcd_schema.operations.net_ip_op \
+from shakenfist.schema.operations.net_ip_op \
     import model_tasks as nip_tasks
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util import concurrency as util_concurrency

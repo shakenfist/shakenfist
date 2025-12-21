@@ -25,16 +25,16 @@ from shakenfist import blob
 from shakenfist import constants
 from shakenfist.constants import get_object_class
 from shakenfist import etcd
-from shakenfist.etcd_schema.operations.baseclusteroperation import PRIORITY
-from shakenfist.etcd_schema.operations.node_inst_op \
+from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.schema.operations.node_inst_op \
     import create_and_enqueue as nio_create_and_enqueue
-from shakenfist.etcd_schema.operations.node_inst_op \
+from shakenfist.schema.operations.node_inst_op \
     import model_tasks as nio_tasks
-from shakenfist.etcd_schema.operations.node_inst_snap_op \
+from shakenfist.schema.operations.node_inst_snap_op \
     import create_and_enqueue as niso_create_and_enqueue
-from shakenfist.etcd_schema.operations.node_inst_snap_op \
+from shakenfist.schema.operations.node_inst_snap_op \
     import snapshot as niso_snapshot
-from shakenfist.etcd_schema.operations.node_inst_snap_op \
+from shakenfist.schema.operations.node_inst_snap_op \
     import model_tasks as niso_tasks
 from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions

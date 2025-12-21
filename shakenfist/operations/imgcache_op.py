@@ -7,7 +7,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.blob import Blob
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist.etcd_schema.operations import imgcache_op as schema
+from shakenfist.schema.operations import imgcache_op as schema
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import BlobDeleted
 from shakenfist.operations.baseoperation import BaseClusterOperation
