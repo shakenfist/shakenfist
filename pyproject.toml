@@ -46,6 +46,7 @@ dependencies = [
     "schedule==1.2.2",                    # mit
     "semver==3.0.4",                      # bsd
     "mysqlclient==2.2.7",                 # gpl
+    "SQLAlchemy==2.0.36",                 # mit
 
     "greenlet==3.2.3",                    # mit
     "gunicorn==23.0.0",                   # mit
