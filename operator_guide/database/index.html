@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/user_guide/objects/">
+        <link rel="canonical" href="https://shakenfist.com/operator_guide/database/">
       
       
-        <link rel="prev" href="../events/">
+        <link rel="prev" href="../authentication/">
       
       
-        <link rel="next" href="../metadata/">
+        <link rel="next" href="../locks/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Objects - Shaken Fist</title>
+        <title>Database - Shaken Fist</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#objects" class="md-skip">
+        <a href="#database-architecture" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Objects
+              Database
             
           </span>
         </div>
@@ -557,20 +557,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
           <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
@@ -591,7 +589,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -609,7 +607,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/" class="md-nav__link">
+      <a href="../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -637,7 +635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../authentication/" class="md-nav__link">
+      <a href="../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -665,7 +663,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ansible/" class="md-nav__link">
+      <a href="../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -693,7 +691,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../artifacts/" class="md-nav__link">
+      <a href="../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -721,7 +719,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../affinity/" class="md-nav__link">
+      <a href="../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -749,7 +747,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../consoles/" class="md-nav__link">
+      <a href="../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -777,7 +775,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../events/" class="md-nav__link">
+      <a href="../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -802,19 +800,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -830,7 +819,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -843,7 +831,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../metadata/" class="md-nav__link">
+      <a href="../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -1600,18 +1588,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
           <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
@@ -1632,7 +1622,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1650,7 +1640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/installation/" class="md-nav__link">
+      <a href="../installation/" class="md-nav__link">
         
   
   
@@ -1678,7 +1668,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/artifacts/" class="md-nav__link">
+      <a href="../artifacts/" class="md-nav__link">
         
   
   
@@ -1706,7 +1696,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/authentication/" class="md-nav__link">
+      <a href="../authentication/" class="md-nav__link">
         
   
   
@@ -1731,10 +1721,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../operator_guide/database/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1750,6 +1767,293 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#etcd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        etcd
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="etcd">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#object-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Object Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mariadb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MariaDB
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MariaDB">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Schema System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pydantic-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pydantic Models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sqlalchemy-table-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SQLAlchemy Table Generation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SQLAlchemy Table Generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#type-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type Mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#index-annotations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Index Annotations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Index Annotations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-column-indexes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single-Column Indexes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compound-indexes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compound Indexes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generated-index-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generated Index Names
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schema-evolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Evolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolling-deployments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rolling Deployments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1762,7 +2066,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/locks/" class="md-nav__link">
+      <a href="../locks/" class="md-nav__link">
         
   
   
@@ -1790,7 +2094,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/networking/overview/" class="md-nav__link">
+      <a href="../networking/overview/" class="md-nav__link">
         
   
   
@@ -1818,7 +2122,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/power_states/" class="md-nav__link">
+      <a href="../power_states/" class="md-nav__link">
         
   
   
@@ -1846,7 +2150,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/python_versions/" class="md-nav__link">
+      <a href="../python_versions/" class="md-nav__link">
         
   
   
@@ -1874,7 +2178,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/threads/" class="md-nav__link">
+      <a href="../threads/" class="md-nav__link">
         
   
   
@@ -1902,7 +2206,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/upgrades/" class="md-nav__link">
+      <a href="../upgrades/" class="md-nav__link">
         
   
   
@@ -1950,6 +2254,281 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#etcd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        etcd
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="etcd">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#object-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Object Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mariadb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MariaDB
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MariaDB">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Schema System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pydantic-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pydantic Models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sqlalchemy-table-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SQLAlchemy Table Generation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SQLAlchemy Table Generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#type-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type Mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#index-annotations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Index Annotations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Index Annotations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-column-indexes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single-Column Indexes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compound-indexes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compound Indexes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generated-index-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generated Index Names
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schema-evolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Evolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolling-deployments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rolling Deployments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1968,26 +2547,272 @@
   
 
 
-<h1 id="objects">Objects</h1>
-<p>Everything that you interact with in Shaken Fist is an object. Objects are
-almost always referred to by a UUID (specifically a version 4 UUID) as a
-string. The exceptions are: <code>node</code>s; <code>namespace</code>s; and <code>key</code>s within a namespace.</p>
-<p>In general an object is referred to in the API or on the command line "by
-reference", which means you can either pass the object's name or its UUID to the
-command. So for example if we had an instance with the UUID
-0a38d51e-2f72-4848-80fb-03031978633b named "mikal", then we could run either of
-the commands below to the same effect:</p>
-<div class="highlight"><pre><span></span><code>sf-client instance show 0a38d51e-2f72-4848-80fb-03031978633b
-sf-client instance show mikal
+<h1 id="database-architecture">Database Architecture</h1>
+<p>Shaken Fist uses a combination of databases for different purposes. This page
+describes the database architecture, how data is organized, and how the schema
+system works.</p>
+<h2 id="overview">Overview</h2>
+<p>Shaken Fist currently uses two database backends:</p>
+<ul>
+<li><strong>etcd</strong>: A distributed key-value store used for cluster coordination,
+  configuration, locks, and object storage.</li>
+<li><strong>MariaDB</strong>: A relational database being introduced for structured data that
+  benefits from SQL queries and indexing.</li>
+</ul>
+<h2 id="etcd">etcd</h2>
+<p>etcd is the primary database for Shaken Fist and is used for:</p>
+<ul>
+<li><strong>Object storage</strong>: All Shaken Fist objects (instances, networks, blobs,
+  artifacts, etc.) are stored in etcd.</li>
+<li><strong>Cluster coordination</strong>: Node discovery, leader election, and distributed
+  state.</li>
+<li><strong>Distributed locking</strong>: See the <a href="../locks/">Locks</a> documentation.</li>
+<li><strong>Configuration</strong>: Cluster-wide configuration stored at <code>/sf/config</code>.</li>
+<li><strong>Event logs</strong>: Audit trails and operational events for objects.</li>
+<li><strong>Queues</strong>: Work queues for cluster operations.</li>
+</ul>
+<h3 id="key-structure">Key Structure</h3>
+<p>etcd keys follow a hierarchical structure:</p>
+<div class="highlight"><pre><span></span><code>/sf/                          # Root prefix for all Shaken Fist data
+/sf/object/{type}/{uuid}      # Object definitions
+/sf/attribute/{type}/{uuid}/  # Object attributes (state, placement, etc.)
+/sf/event/{type}/{uuid}/      # Event logs for objects
+/sf/queue/                    # Work queues
+/sflocks/                     # Distributed locks
 </code></pre></div>
-<p>In the case where you refer to an object by name, a lookup occurs of all
-objects visible to you (those in your namespace, and namespaces that trust
-your namespace). Additionally, shared artifacts are included if you're using
-an artifact command.</p>
-<p>It is possible that the name you're using isn't unique. For example there might
-be two instances named "mikal" with different UUIDs. In that case, you will get
-an error indicating that there was more than one object which matched, and you'll
-need to use a UUID to refer to the object.</p>
+<h3 id="object-types">Object Types</h3>
+<p>Each object type has a dedicated key prefix:</p>
+<table>
+<thead>
+<tr>
+<th>Object Type</th>
+<th>Key Prefix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Instance</td>
+<td><code>/sf/object/instance/</code></td>
+</tr>
+<tr>
+<td>Network</td>
+<td><code>/sf/object/network/</code></td>
+</tr>
+<tr>
+<td>Network Interface</td>
+<td><code>/sf/object/networkinterface/</code></td>
+</tr>
+<tr>
+<td>Blob</td>
+<td><code>/sf/object/blob/</code></td>
+</tr>
+<tr>
+<td>Artifact</td>
+<td><code>/sf/object/artifact/</code></td>
+</tr>
+<tr>
+<td>Node</td>
+<td><code>/sf/object/node/</code></td>
+</tr>
+<tr>
+<td>Namespace</td>
+<td><code>/sf/object/namespace/</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="mariadb">MariaDB</h2>
+<p>MariaDB is being introduced for data that benefits from:</p>
+<ul>
+<li>Complex queries with filtering and sorting</li>
+<li>Indexed lookups on multiple columns</li>
+<li>Structured data with well-defined schemas</li>
+<li>Transaction support</li>
+</ul>
+<p>MariaDB is deployed on etcd master nodes and uses Galera for multi-master
+replication across the cluster.</p>
+<h3 id="connection">Connection</h3>
+<p>Shaken Fist connects to MariaDB using SQLAlchemy. The connection details are
+configured during cluster deployment.</p>
+<h2 id="schema-system">Schema System</h2>
+<p>Shaken Fist uses Pydantic models for schema definition. These models serve
+multiple purposes:</p>
+<ol>
+<li><strong>Validation</strong>: Ensuring data conforms to expected types and constraints</li>
+<li><strong>Serialization</strong>: Converting between Python objects and JSON for etcd</li>
+<li><strong>SQL Generation</strong>: Automatically generating SQLAlchemy tables for MariaDB</li>
+</ol>
+<h3 id="pydantic-models">Pydantic Models</h3>
+<p>Schema definitions live in <code>shakenfist/schema/</code>. For example, cluster operations
+have their schemas defined in <code>shakenfist/schema/operations/</code>.</p>
+<p>A typical schema looks like:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">UUID4</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">model_tasks</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">verify_size_and_checksum</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">ensure_local</span> <span class="o">=</span> <span class="mi">2</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">model</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">uuid</span><span class="p">:</span> <span class="n">UUID4</span>
+    <span class="n">node_uuid</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">blob_uuid</span><span class="p">:</span> <span class="n">UUID4</span>
+    <span class="n">priority</span><span class="p">:</span> <span class="n">PRIORITY</span>
+    <span class="n">request_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">tasks</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">model_tasks</span><span class="p">]</span>
+    <span class="n">version</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">le</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="sqlalchemy-table-generation">SQLAlchemy Table Generation</h3>
+<p>The <code>shakenfist.schema.sqlalchemy</code> module provides utilities to automatically
+convert Pydantic models to SQLAlchemy tables. This keeps the schema definition
+in one place and avoids hand-writing SQL.</p>
+<h4 id="basic-usage">Basic Usage</h4>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">pydantic_to_sqlalchemy_table</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sqlalchemy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sa</span>
+
+<span class="n">metadata</span> <span class="o">=</span> <span class="n">sa</span><span class="o">.</span><span class="n">MetaData</span><span class="p">()</span>
+<span class="n">table</span> <span class="o">=</span> <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">(</span>
+    <span class="n">MyModel</span><span class="p">,</span>
+    <span class="s1">&#39;my_table&#39;</span><span class="p">,</span>
+    <span class="n">metadata</span><span class="p">,</span>
+    <span class="n">primary_key_field</span><span class="o">=</span><span class="s1">&#39;uuid&#39;</span>
+<span class="p">)</span>
+</code></pre></div>
+<h4 id="type-mapping">Type Mapping</h4>
+<p>Python types are mapped to SQL column types:</p>
+<table>
+<thead>
+<tr>
+<th>Python Type</th>
+<th>SQL Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>str</code></td>
+<td><code>VARCHAR(255)</code></td>
+</tr>
+<tr>
+<td><code>int</code></td>
+<td><code>BIGINT</code></td>
+</tr>
+<tr>
+<td><code>float</code></td>
+<td><code>DOUBLE</code></td>
+</tr>
+<tr>
+<td><code>bool</code></td>
+<td><code>BOOLEAN</code></td>
+</tr>
+<tr>
+<td><code>bytes</code></td>
+<td><code>LARGEBINARY</code></td>
+</tr>
+<tr>
+<td><code>UUID</code></td>
+<td><code>CHAR(36)</code></td>
+</tr>
+<tr>
+<td><code>Enum</code></td>
+<td><code>VARCHAR(64)</code></td>
+</tr>
+<tr>
+<td><code>list</code>, <code>dict</code>, nested models</td>
+<td><code>LONGTEXT</code> (JSON)</td>
+</tr>
+<tr>
+<td><code>Optional[X]</code></td>
+<td>Nullable column of type X</td>
+</tr>
+</tbody>
+</table>
+<h3 id="index-annotations">Index Annotations</h3>
+<p>Indexes can be defined directly in the Pydantic model using Python's
+<code>Annotated</code> types. This keeps index definitions co-located with the schema.</p>
+<h4 id="single-column-indexes">Single-Column Indexes</h4>
+<p>Use <code>SQLIndex()</code> or <code>SQLUniqueIndex()</code> markers:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLIndex</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>           <span class="c1"># Creates idx_users_uuid</span>
+    <span class="n">email</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span><span class="p">()]</span>    <span class="c1"># Creates uidx_users_email</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>                                   <span class="c1"># No index</span>
+</code></pre></div>
+<h4 id="compound-indexes">Compound Indexes</h4>
+<p>For indexes spanning multiple columns, use the model's configuration:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Event</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span>
+        <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span>
+            <span class="s1">&#39;sql_indexes&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">(</span><span class="s1">&#39;object_type&#39;</span><span class="p">,</span> <span class="s1">&#39;object_uuid&#39;</span><span class="p">),</span>  <span class="c1"># Compound index</span>
+                <span class="p">(</span><span class="s1">&#39;timestamp&#39;</span><span class="p">,),</span>                   <span class="c1"># Single column via config</span>
+            <span class="p">]</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+
+    <span class="n">object_type</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">object_uuid</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">timestamp</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">message</span><span class="p">:</span> <span class="nb">str</span>
+</code></pre></div>
+<h4 id="generated-index-names">Generated Index Names</h4>
+<p>Index names follow a predictable pattern:</p>
+<ul>
+<li>Single-column: <code>idx_{table}_{column}</code> or <code>uidx_{table}_{column}</code> (unique)</li>
+<li>Compound: <code>idx_{table}_{col1}_{col2}_{...}</code></li>
+</ul>
+<h3 id="table-lifecycle">Table Lifecycle</h3>
+<p>The <code>ensure_table_exists()</code> function handles idempotent table creation:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">,</span>
+    <span class="n">ensure_table_exists</span>
+<span class="p">)</span>
+
+<span class="c1"># Create table definition</span>
+<span class="n">table</span> <span class="o">=</span> <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">(</span><span class="n">MyModel</span><span class="p">,</span> <span class="s1">&#39;my_table&#39;</span><span class="p">,</span> <span class="n">metadata</span><span class="p">)</span>
+
+<span class="c1"># Create table and indexes in database (idempotent)</span>
+<span class="n">ensure_table_exists</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="schema-comparison">Schema Comparison</h3>
+<p>To detect schema drift between the Pydantic model and the database:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">compare_schemas</span>
+
+<span class="n">differences</span> <span class="o">=</span> <span class="n">compare_schemas</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>
+<span class="c1"># Returns: {</span>
+<span class="c1">#     &#39;missing_columns&#39;: [...],  # In model but not in DB</span>
+<span class="c1">#     &#39;extra_columns&#39;: [...],    # In DB but not in model</span>
+<span class="c1">#     &#39;type_mismatches&#39;: [...]   # Different types</span>
+<span class="c1"># }</span>
+</code></pre></div>
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="schema-evolution">Schema Evolution</h3>
+<p>When adding new fields:</p>
+<ol>
+<li>Add the field to the Pydantic model with a default value</li>
+<li>Use <code>Optional[X]</code> for fields that may not exist in old data</li>
+<li>Include a version field to track schema versions</li>
+<li>Handle missing fields gracefully in code</li>
+</ol>
+<h3 id="rolling-deployments">Rolling Deployments</h3>
+<p>During rolling upgrades where nodes may run different versions:</p>
+<ol>
+<li>New fields should be optional until all nodes are upgraded</li>
+<li>Old code should ignore unknown fields</li>
+<li>Use version fields to detect and handle schema differences</li>
+</ol>
+<h3 id="performance-considerations">Performance Considerations</h3>
+<ul>
+<li>Use indexes for fields that are frequently queried</li>
+<li>Prefer compound indexes for queries that filter on multiple columns</li>
+<li>Keep JSON/LONGTEXT fields for data that doesn't need indexing</li>
+<li>Use MariaDB for data requiring complex queries; etcd for simple key-value
+  lookups</li>
+</ul>
 
 
 

@@ -10,27 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/kerbside/config/">
+        <link rel="canonical" href="https://shakenfist.com/developer_guide/mypy/">
       
       
+        <link rel="prev" href="../ci_api_coverage/">
+      
+      
+        <link rel="next" href="../release_process/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
-        <title>Configuration - Shaken Fist</title>
+        <title>Mypy - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -49,7 +53,7 @@
       
     
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#configuring-kerbside" class="md-skip">
+        <a href="#type-checking-with-mypy" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +94,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -110,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Configuration
+              Mypy
             
           </span>
         </div>
@@ -226,7 +230,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -256,7 +260,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -283,7 +287,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../manifesto/" class="md-nav__link">
+      <a href="../../manifesto/" class="md-nav__link">
         
   
   
@@ -357,7 +361,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../overview/" class="md-nav__link">
+      <a href="../../components/overview/" class="md-nav__link">
         
   
   
@@ -385,7 +389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../components/kerbside/" class="md-nav__link">
         
   
   
@@ -420,7 +424,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../features/" class="md-nav__link">
+      <a href="../../features/" class="md-nav__link">
         
   
   
@@ -494,7 +498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../release_notes/v07-v08/" class="md-nav__link">
+      <a href="../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -529,7 +533,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/" class="md-nav__link">
+      <a href="../../community/" class="md-nav__link">
         
   
   
@@ -603,7 +607,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/usage/" class="md-nav__link">
+      <a href="../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -631,7 +635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/authentication/" class="md-nav__link">
+      <a href="../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -659,7 +663,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/ansible/" class="md-nav__link">
+      <a href="../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -687,7 +691,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/artifacts/" class="md-nav__link">
+      <a href="../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -715,7 +719,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/affinity/" class="md-nav__link">
+      <a href="../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -743,7 +747,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/consoles/" class="md-nav__link">
+      <a href="../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -771,7 +775,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/events/" class="md-nav__link">
+      <a href="../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -799,7 +803,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/objects/" class="md-nav__link">
+      <a href="../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -827,7 +831,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/metadata/" class="md-nav__link">
+      <a href="../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -859,18 +863,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -891,7 +897,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -956,7 +962,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/admin/" class="md-nav__link">
+      <a href="../api_reference/admin/" class="md-nav__link">
         
   
   
@@ -984,7 +990,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
+      <a href="../api_reference/agentoperations/" class="md-nav__link">
         
   
   
@@ -1012,7 +1018,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
+      <a href="../api_reference/artifacts/" class="md-nav__link">
         
   
   
@@ -1040,7 +1046,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/authentication/" class="md-nav__link">
+      <a href="../api_reference/authentication/" class="md-nav__link">
         
   
   
@@ -1068,7 +1074,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+      <a href="../api_reference/blob_checksums/" class="md-nav__link">
         
   
   
@@ -1096,7 +1102,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/blobs/" class="md-nav__link">
+      <a href="../api_reference/blobs/" class="md-nav__link">
         
   
   
@@ -1124,7 +1130,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+      <a href="../api_reference/clusteroperations/" class="md-nav__link">
         
   
   
@@ -1152,7 +1158,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/instances/" class="md-nav__link">
+      <a href="../api_reference/instances/" class="md-nav__link">
         
   
   
@@ -1180,7 +1186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/label/" class="md-nav__link">
+      <a href="../api_reference/label/" class="md-nav__link">
         
   
   
@@ -1208,7 +1214,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/networks/" class="md-nav__link">
+      <a href="../api_reference/networks/" class="md-nav__link">
         
   
   
@@ -1236,7 +1242,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
+      <a href="../api_reference/interfaces/" class="md-nav__link">
         
   
   
@@ -1264,7 +1270,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/nodes/" class="md-nav__link">
+      <a href="../api_reference/nodes/" class="md-nav__link">
         
   
   
@@ -1292,7 +1298,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/upload/" class="md-nav__link">
+      <a href="../api_reference/upload/" class="md-nav__link">
         
   
   
@@ -1328,7 +1334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/agent_protocol/" class="md-nav__link">
+      <a href="../agent_protocol/" class="md-nav__link">
         
   
   
@@ -1356,7 +1362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/authentication/" class="md-nav__link">
+      <a href="../authentication/" class="md-nav__link">
         
   
   
@@ -1384,7 +1390,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/ci_api_coverage/" class="md-nav__link">
+      <a href="../ci_api_coverage/" class="md-nav__link">
         
   
   
@@ -1409,10 +1415,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../../developer_guide/mypy/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mypy
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1428,6 +1461,264 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#current-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-mypy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running mypy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rollout-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rollout Strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rollout Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-schema-module-current" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Schema Module (Current)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-new-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: New Code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-core-utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Core Utilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-object-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Object Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guidelines-for-adding-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guidelines for Adding Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Guidelines for Adding Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#use-modern-syntax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use Modern Syntax
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-optional-explicitly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use Optional Explicitly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-any-sparingly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use Any Sparingly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#leverage-pydantic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Leverage Pydantic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-new-typed-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a New Typed Module
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Patterns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#type-aliases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type Aliases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generic-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generic Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#callable-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Callable Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ide-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IDE Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1440,7 +1731,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/release_process/" class="md-nav__link">
+      <a href="../release_process/" class="md-nav__link">
         
   
   
@@ -1468,7 +1759,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/standards/" class="md-nav__link">
+      <a href="../standards/" class="md-nav__link">
         
   
   
@@ -1496,7 +1787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/state_machine/" class="md-nav__link">
+      <a href="../state_machine/" class="md-nav__link">
         
   
   
@@ -1524,7 +1815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/updating_docs/" class="md-nav__link">
+      <a href="../updating_docs/" class="md-nav__link">
         
   
   
@@ -1552,7 +1843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/workflow/" class="md-nav__link">
+      <a href="../workflow/" class="md-nav__link">
         
   
   
@@ -1634,7 +1925,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/installation/" class="md-nav__link">
+      <a href="../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -1662,7 +1953,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/artifacts/" class="md-nav__link">
+      <a href="../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -1690,7 +1981,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/authentication/" class="md-nav__link">
+      <a href="../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -1718,7 +2009,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/database/" class="md-nav__link">
+      <a href="../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -1746,7 +2037,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/locks/" class="md-nav__link">
+      <a href="../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -1774,7 +2065,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/networking/overview/" class="md-nav__link">
+      <a href="../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -1802,7 +2093,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/power_states/" class="md-nav__link">
+      <a href="../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -1830,7 +2121,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/python_versions/" class="md-nav__link">
+      <a href="../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -1858,7 +2149,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/threads/" class="md-nav__link">
+      <a href="../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -1886,7 +2177,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/upgrades/" class="md-nav__link">
+      <a href="../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -1941,10 +2232,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#basic-settings" class="md-nav__link">
+  <a href="#current-status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Basic Settings
+        Current Status
       
     </span>
   </a>
@@ -1952,10 +2243,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#tls-settings" class="md-nav__link">
+  <a href="#running-mypy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TLS Settings
+        Running mypy
       
     </span>
   </a>
@@ -1963,10 +2254,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#keystone-settings" class="md-nav__link">
+  <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Keystone Settings
+        Configuration
       
     </span>
   </a>
@@ -1974,10 +2265,193 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#proxy-api-service" class="md-nav__link">
+  <a href="#rollout-strategy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Proxy API Service
+        Rollout Strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rollout Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-schema-module-current" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Schema Module (Current)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-new-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: New Code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-core-utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Core Utilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-object-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Object Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guidelines-for-adding-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guidelines for Adding Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Guidelines for Adding Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#use-modern-syntax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use Modern Syntax
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-optional-explicitly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use Optional Explicitly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-any-sparingly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use Any Sparingly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#leverage-pydantic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Leverage Pydantic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-new-typed-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a New Typed Module
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Patterns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#type-aliases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type Aliases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generic-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generic Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#callable-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Callable Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ide-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IDE Integration
       
     </span>
   </a>
@@ -1985,21 +2459,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#traffic-inspection" class="md-nav__link">
+  <a href="#ci-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Traffic Inspection
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#logging-and-monitoring-settings" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logging and Monitoring Settings
+        CI Integration
       
     </span>
   </a>
@@ -2026,268 +2489,167 @@
   
 
 
-<h1 id="configuring-kerbside">Configuring Kerbside</h1>
-<p>The following options are provided by Kerbside.</p>
-<h2 id="basic-settings">Basic Settings</h2>
-<table>
-<thead>
-<tr>
-<th>Configuration option </th>
-<th>Type </th>
-<th>Description </th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>SOURCES_PATH </td>
-<td>String </td>
-<td>The path the console sources file (sources.yaml) resides at. </td>
-</tr>
-<tr>
-<td>SQL_URL </td>
-<td>String </td>
-<td>The sqlalchemy SQL connection URL for the VDI proxy database. </td>
-</tr>
-<tr>
-<td>CONSOLE_TOKEN_DURATION </td>
-<td>Integer  (default 1) </td>
-<td>The number of minutes a console access token should be valid for. </td>
-</tr>
-<tr>
-<td>AUTH_SECRET_SEED </td>
-<td>String  (no default) </td>
-<td>A random string used to hash the signatures on JWT authentication tokens. That is, knowledge of this string is required to sign a JWT.</td>
-</tr>
-<tr>
-<td>API_TOKEN_DURATION </td>
-<td>Integer  (default 60) </td>
-<td>The number of minutes that a JWT is valid for after being issued. Importantly, Keystone credentials are only validated on JWT creation, so it is possible for a JWT to outlive the Keystone user access token it encapsulates.   </td>
-</tr>
-</tbody>
-</table>
-<h2 id="tls-settings">TLS Settings</h2>
-<table>
-<thead>
-<tr>
-<th>Configuration option </th>
-<th>Type </th>
-<th>Description </th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>CACERT_PATH </td>
-<td>String </td>
-<td>The path to the TLS CA certificate. </td>
-</tr>
-<tr>
-<td>PROXY_HOST_SUBJECT </td>
-<td>String </td>
-<td>The TLS Host-Subject to use for the proxy TLS certificate. </td>
-</tr>
-<tr>
-<td>PROXY_HOST_CERT_PATH </td>
-<td>String </td>
-<td>The path to the TLS certificate for the proxy.   </td>
-</tr>
-<tr>
-<td>PROXY_HOST_CERT_KEY_PATH </td>
-<td>String </td>
-<td>The path to the file containing the key for the proxy TLS certificate.   </td>
-</tr>
-</tbody>
-</table>
-<h2 id="keystone-settings">Keystone Settings</h2>
-<table>
-<thead>
-<tr>
-<th>Configuration option </th>
-<th>Type </th>
-<th>Description </th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>KEYSTONE_AUTH_URL </td>
-<td>String  (no default) </td>
-<td>The URL including scheme and port that is to be used to authenticate the Keystone service account for the proxy, and subsequently all proxy user authentications.   </td>
-</tr>
-<tr>
-<td>KEYSTONE_SERVICE_AUTH_USER </td>
-<td>String  (no default)   </td>
-<td>The service account username. </td>
-</tr>
-<tr>
-<td>KEYSTONE_SERVICE_AUTH_PASSWORD </td>
-<td>String  (no default)   </td>
-<td>The password for the service account. </td>
-</tr>
-<tr>
-<td>KEYSTONE_SERVICE_AUTH_USER_DOMAIN_ID </td>
-<td>String  (default “default”)   </td>
-<td>The domain the service account resides in. </td>
-</tr>
-<tr>
-<td>KEYSTONE_SERVICE_AUTH_PROJECT </td>
-<td>String  (default “admin”)   </td>
-<td>The project the service account resides in. </td>
-</tr>
-<tr>
-<td>KEYSTONE_SERVICE_AUTH_PROJECT_DOMAIN_ID </td>
-<td>String  (default “default”)   </td>
-<td>The project domain the service account resides in. </td>
-</tr>
-<tr>
-<td>KEYSTONE_ACCESS_GROUP </td>
-<td>String  (default “kerbside”) </td>
-<td>The Keystone group that users wishing to access the VDI proxy administrative interface or REST API must be a member of. </td>
-</tr>
-</tbody>
-</table>
-<h2 id="proxy-api-service">Proxy API Service</h2>
-<table>
-<thead>
-<tr>
-<th>Configuration option </th>
-<th>Type </th>
-<th>Description </th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>API_PORT </td>
-<td>Integer  (default 13002) </td>
-<td>The TCP port that the REST API and HTML administrative interface will listen on. </td>
-</tr>
-<tr>
-<td>API_TIMEOUT </td>
-<td>Integer  (default 30) </td>
-<td>The maximum number of seconds an API request can take to execute before gunicorn will kill it. The VDI proxy has no long API requests, so this should not need tuning.   </td>
-</tr>
-<tr>
-<td>API_COMMAND_LINE </td>
-<td>String </td>
-<td>The command line used to execute gunicorn to serve the REST API and HTML administrative interface.   </td>
-</tr>
-<tr>
-<td>PID_FILE_LOCATION </td>
-<td>String  (default /tmp/)   </td>
-<td>The directory the gunicorn PID file is located in. </td>
-</tr>
-<tr>
-<td>PUBLIC_FQDN </td>
-<td>String </td>
-<td>The DNS name for the load balancers serving all Kerbside traffic. This needs to be configured to ensure DNS and the SSL certificates for the VDI proxy match or the certificates will be invalid.   </td>
-</tr>
-<tr>
-<td>NODE_NAME </td>
-<td>String </td>
-<td>A unique name for each machine or container running the VDI proxy. This is used for logging purposes.   </td>
-</tr>
-<tr>
-<td>VDI_ADDRESS </td>
-<td>String </td>
-<td>The IP the VDI proxy will bind to. </td>
-</tr>
-<tr>
-<td>VDI_SECURE_PORT </td>
-<td>Integer  (defaults to 5898)  </td>
-<td>The port the VDI proxy will serve SPICE TLS SPICE sessions over.   </td>
-</tr>
-<tr>
-<td>VDI_INSECURE_PORT</td>
-<td>Integer  (defaults to 5988) </td>
-<td>The port the VDI proxy will serve insecure SPICE sessions over. These insecure sessions are only used to redirect the user to the secure port.   </td>
-</tr>
-</tbody>
-</table>
-<h2 id="traffic-inspection">Traffic Inspection</h2>
-<p>Being able to inspect traffic being passed by the proxy is useful during both development and whilst
- diagnosing issues in production but has obvious privacy concerns. The VDI proxy may be configured
-to log details of traffic for all sessions by setting the <code>KERBSIDE_TRAFFIC_INSPECTION</code> environment
-variable to “1”. This will write session traffic details to the directory configured by 
-<code>KERBSIDE_TRAFFIC_OUTPUT_PATH</code>, in a sub directory per session identifier. Additionally, more
-detailed information can be logged by also setting <code>KERBSIDE_TRAFFIC_INSPECTION_INTIMATE</code> to “1”.</p>
-<p>Traffic inspection is per proxy not per session and implies a restart of the proxy before it is
-enabled. This ensures that users are aware that traffic inspection has been enabled. If traffic
-inspection is enabled, audit messages are recorded per channel logged (as not all channels need to
-flow through the same proxy machine). Additionally, the display channel is altered to show a
-dashed red and yellow border to provide a visual warning that this inspection is occurring.</p>
-<table>
-<thead>
-<tr>
-<th>Configuration option </th>
-<th>Type </th>
-<th>Description </th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>TRAFFIC_INSPECTION </td>
-<td>Boolean  (default False) </td>
-<td>Whether to log detailed traffic information. Defaults to false, but can be useful for debugging service issues in production.   </td>
-</tr>
-<tr>
-<td>TRAFFIC_INSPECTION_INTIMATE </td>
-<td>Boolean  (default False) </td>
-<td>If TRAFFIC_INSPECTION is true and this option is also set to true, then log intimate debug details of sessions including keystrokes and all display frames.   </td>
-</tr>
-<tr>
-<td>TRAFFIC_OUTPUT_PATH </td>
-<td>String  (default /tmp) </td>
-<td>Where to write traffic inspection logs to if enabled.     </td>
-</tr>
-</tbody>
-</table>
-<h2 id="logging-and-monitoring-settings">Logging and Monitoring Settings</h2>
-<p>The VDI proxy provides Prometheus style metrics on port 9999 (configurable using the 
-<code>PROMETHEUS_METRICS_PORT</code> configuration option). These metric values are also be logged for later
-processing if desired. Values tracked include: 
-* Number of active console sessions. 
-* Number of active console channels. 
-* Bandwidth and latency information for each console channel. 
-* REST API request statuses as a metric with labels for each HTTP status code. 
-* REST API request response latency as a histogram per HTTP status code. </p>
-<table>
-<thead>
-<tr>
-<th>Configuration option </th>
-<th>Type </th>
-<th>Description </th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>LOG_OUTPUT_PATH </td>
-<td>String   </td>
-<td>Where to write logs to. If stdout, then stdout is used, if blank syslog is used. </td>
-</tr>
-<tr>
-<td>LOG_OUTPUT_JSON </td>
-<td>Boolean  (default False) </td>
-<td>If true, log entries are in JSON.</td>
-</tr>
-<tr>
-<td>LOG_VERBOSE </td>
-<td>Boolean  (default False) </td>
-<td>Whether to log verbose debugging information.     </td>
-</tr>
-<tr>
-<td>PROMETHEUS_METRICS_PORT </td>
-<td>Integer  (default 13003) </td>
-<td>The TCP port that the prometheus metrics HTTP server will listen on.   </td>
-</tr>
-</tbody>
-</table>
+<h1 id="type-checking-with-mypy">Type Checking with mypy</h1>
+<p>Shaken Fist is incrementally adopting mypy for static type checking. This page
+documents the rollout strategy and guidelines for adding type annotations to
+the codebase.</p>
+<h2 id="current-status">Current Status</h2>
+<p>Type checking is enforced for:</p>
+<ul>
+<li><code>shakenfist/schema/sqlalchemy.py</code> - Pydantic to SQLAlchemy conversion</li>
+</ul>
+<p>Additional modules will be added over time as they are annotated.</p>
+<h2 id="running-mypy">Running mypy</h2>
+<p>To run type checking locally:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Run mypy via tox (recommended)</span>
+tox<span class="w"> </span>-e<span class="w"> </span>mypy
+
+<span class="c1"># Or run mypy directly</span>
+mypy<span class="w"> </span>--strict<span class="w"> </span>--ignore-missing-imports<span class="w"> </span>shakenfist/schema/sqlalchemy.py
+</code></pre></div>
+<h2 id="configuration">Configuration</h2>
+<p>mypy is configured in <code>pyproject.toml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[tool.mypy]</span>
+<span class="n">python_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;3.11&quot;</span>
+<span class="n">warn_return_any</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<span class="n">warn_unused_configs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<span class="n">ignore_missing_imports</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+
+<span class="c1"># Strict checking for typed modules</span>
+<span class="k">[[tool.mypy.overrides]]</span>
+<span class="n">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shakenfist.schema.sqlalchemy&quot;</span>
+<span class="n">strict</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+</code></pre></div>
+<p>The <code>ignore_missing_imports = true</code> setting is necessary because some of our
+dependencies (like <code>shakenfist_utilities</code>) don't have type stubs.</p>
+<h2 id="rollout-strategy">Rollout Strategy</h2>
+<p>We're adopting an incremental approach to type checking:</p>
+<h3 id="phase-1-schema-module-current">Phase 1: Schema Module (Current)</h3>
+<p>Start with the <code>shakenfist/schema/</code> module because:</p>
+<ul>
+<li>Pydantic models already have type annotations</li>
+<li>The SQLAlchemy utilities benefit most from type checking</li>
+<li>It's a self-contained module with clear boundaries</li>
+</ul>
+<h3 id="phase-2-new-code">Phase 2: New Code</h3>
+<p>All new code should include type annotations. When adding new files or
+significantly modifying existing ones, add type annotations and enable strict
+checking.</p>
+<h3 id="phase-3-core-utilities">Phase 3: Core Utilities</h3>
+<p>Gradually add types to utility modules that are used across the codebase:</p>
+<ul>
+<li><code>shakenfist/util/</code></li>
+<li><code>shakenfist/constants.py</code></li>
+<li><code>shakenfist/config.py</code></li>
+</ul>
+<h3 id="phase-4-object-classes">Phase 4: Object Classes</h3>
+<p>Add types to the object model layer:</p>
+<ul>
+<li><code>shakenfist/baseobject.py</code></li>
+<li><code>shakenfist/instance.py</code></li>
+<li><code>shakenfist/network/</code></li>
+<li>etc.</li>
+</ul>
+<h2 id="guidelines-for-adding-types">Guidelines for Adding Types</h2>
+<h3 id="use-modern-syntax">Use Modern Syntax</h3>
+<p>Use Python 3.9+ type annotation syntax:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Good - use built-in generics</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">items</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+    <span class="o">...</span>
+
+<span class="c1"># Avoid - old typing module generics</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">items</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+    <span class="o">...</span>
+</code></pre></div>
+<h3 id="use-optional-explicitly">Use Optional Explicitly</h3>
+<p>Never use implicit Optional. If a parameter can be None, annotate it
+explicitly:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Good</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">find</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Result</span><span class="p">]:</span>
+    <span class="o">...</span>
+
+<span class="c1"># Bad - implicit Optional</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">find</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>  <span class="c1"># mypy will reject this</span>
+    <span class="o">...</span>
+</code></pre></div>
+<h3 id="use-any-sparingly">Use Any Sparingly</h3>
+<p>When dealing with dynamic types, use <code>Any</code> but document why:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_annotation</span><span class="p">(</span><span class="n">field</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process a type annotation.</span>
+
+<span class="sd">    We use Any here because type annotations can be arbitrary types,</span>
+<span class="sd">    generic aliases, or special forms that don&#39;t have a common base.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="o">...</span>
+</code></pre></div>
+<h3 id="leverage-pydantic">Leverage Pydantic</h3>
+<p>Pydantic models are already typed. Use them as the source of truth for types
+in related code:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.operations.node_blob_op</span><span class="w"> </span><span class="kn">import</span> <span class="n">model</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">process_operation</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">model</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="c1"># op.uuid, op.blob_uuid, etc. are all properly typed</span>
+    <span class="o">...</span>
+</code></pre></div>
+<h3 id="adding-a-new-typed-module">Adding a New Typed Module</h3>
+<ol>
+<li>Add type annotations to all functions and classes</li>
+<li>Add an override section in <code>pyproject.toml</code>:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="k">[[tool.mypy.overrides]]</span>
+<span class="n">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shakenfist.your_module&quot;</span>
+<span class="n">strict</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+</code></pre></div>
+<ol>
+<li>Add the module to the tox mypy command in <code>tox.ini</code></li>
+<li>Run <code>tox -e mypy</code> to verify</li>
+</ol>
+<h2 id="common-patterns">Common Patterns</h2>
+<h3 id="type-aliases">Type Aliases</h3>
+<p>Define type aliases for complex types:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeAlias</span>
+
+<span class="n">IndexColumns</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+<span class="n">IndexDefinition</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">IndexColumns</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span>
+</code></pre></div>
+<h3 id="generic-classes">Generic Classes</h3>
+<p>When writing generic utilities, use TypeVar:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeVar</span><span class="p">,</span> <span class="n">Generic</span>
+
+<span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s1">&#39;T&#39;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="s1">&#39;DatabaseBackedObject&#39;</span><span class="p">)</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Repository</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">T</span><span class="p">]):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">uuid</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">T</span><span class="p">]:</span>
+        <span class="o">...</span>
+</code></pre></div>
+<h3 id="callable-types">Callable Types</h3>
+<p>For callbacks and function parameters:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">with_retry</span><span class="p">(</span>
+    <span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">T</span><span class="p">],</span>
+    <span class="n">retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">T</span><span class="p">:</span>
+    <span class="o">...</span>
+</code></pre></div>
+<h2 id="ide-integration">IDE Integration</h2>
+<p>Most modern IDEs support mypy integration:</p>
+<ul>
+<li><strong>VS Code</strong>: Install the Pylance or mypy extensions</li>
+<li><strong>PyCharm</strong>: Built-in support for type checking</li>
+<li><strong>vim/neovim</strong>: Use ALE or coc.nvim with mypy</li>
+</ul>
+<h2 id="ci-integration">CI Integration</h2>
+<p>The mypy check runs as part of CI. Any PR that modifies a typed module must
+pass mypy strict checks.</p>
 
 
 
 
 
 
-
-  
-  
 
 
 
@@ -2331,10 +2693,10 @@ processing if desired. Values tracked include:
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": [], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
