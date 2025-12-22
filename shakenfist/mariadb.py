@@ -73,17 +73,31 @@ def _get_metadata() -> sa.MetaData:
 
 
 def _get_object_states_table() -> sa.Table:
-    """Get or create the object_states table definition."""
+    """Get or create the object_states table definition.
+
+    The table uses a composite primary key of (object_type, object_uuid) because
+    different object types can share the same UUID. For example, a Network and
+    its associated IPAM both use the network's UUID.
+    """
     global _object_states_table
     if _object_states_table is None:
         metadata = _get_metadata()
-        _object_states_table = pydantic_to_sqlalchemy_table(
-            ObjectState,
+        # Build the table manually to support composite primary key
+        _object_states_table = sa.Table(
             'object_states',
             metadata,
-            primary_key_field='object_uuid',
-            include_id_column=False
+            sa.Column('object_uuid', sa.String(36), nullable=False),
+            sa.Column('object_type', sa.String(32), nullable=False),
+            sa.Column('state_value', sa.String(32), nullable=True),
+            sa.Column('update_time', sa.Double(), nullable=False),
+            sa.Column('message', sa.String(255), nullable=True),
+            # Composite primary key
+            sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
         )
+        # Add indexes
+        sa.Index('idx_object_states_type_state',
+                 _object_states_table.c.object_type,
+                 _object_states_table.c.state_value)
     return _object_states_table
 
 
@@ -123,7 +137,12 @@ def get_state(object_type: str, object_uuid: str) -> Optional[State]:
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(table).where(table.c.object_uuid == object_uuid)
+            stmt = sa.select(table).where(
+                sa.and_(
+                    table.c.object_type == object_type,
+                    table.c.object_uuid == object_uuid
+                )
+            )
             result = conn.execute(stmt).fetchone()
 
             if result is None:
@@ -179,10 +198,11 @@ def set_state(object_type: str, object_uuid: str, state: State) -> bool:
         return False
 
 
-def delete_state(object_uuid: str) -> bool:
+def delete_state(object_type: str, object_uuid: str) -> bool:
     """Delete state for an object from MariaDB.
 
     Args:
+        object_type: The type of object (e.g., 'blob', 'instance').
         object_uuid: The UUID of the object.
 
     Returns:
@@ -193,12 +213,17 @@ def delete_state(object_uuid: str) -> bool:
 
     try:
         with engine.connect() as conn:
-            stmt = sa.delete(table).where(table.c.object_uuid == object_uuid)
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.object_type == object_type,
+                    table.c.object_uuid == object_uuid
+                )
+            )
             conn.execute(stmt)
             conn.commit()
             return True
     except OperationalError as e:
-        LOG.warning(f'MariaDB delete failed for {object_uuid}: {e}')
+        LOG.warning(f'MariaDB delete failed for {object_type}/{object_uuid}: {e}')
         return False
 
 

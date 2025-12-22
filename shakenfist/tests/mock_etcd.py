@@ -178,19 +178,14 @@ class MockEtcd():
             f'MockMariaDB.set_state({key}): {state.value}')
         return True
 
-    def _mariadb_delete_state(self, object_uuid: str) -> bool:
+    def _mariadb_delete_state(self, object_type: str, object_uuid: str) -> bool:
         """Mock implementation of mariadb.delete_state()"""
-        # Delete all states for this uuid regardless of object_type
-        deleted = []
-        for key in list(self.mariadb_states.keys()):
-            if key.endswith(f'/{object_uuid}'):
-                del self.mariadb_states[key]
-                deleted.append(key)
-        if deleted:
-            self._trace(f'MockMariaDB.delete_state({object_uuid}): '
-                        f'deleted {deleted}')
+        key = f'{object_type}/{object_uuid}'
+        if key in self.mariadb_states:
+            del self.mariadb_states[key]
+            self._trace(f'MockMariaDB.delete_state({key}): deleted')
         else:
-            self._trace(f'MockMariaDB.delete_state({object_uuid}): not found')
+            self._trace(f'MockMariaDB.delete_state({key}): not found')
         return True
 
     def _mariadb_get_objects_by_state(self, object_type: str,
