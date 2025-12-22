@@ -2001,6 +2001,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#object-state-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Object State Storage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Object State Storage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-object_states-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The object_states Table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State Class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling-mariadb-state-for-an-object-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling MariaDB State for an Object Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#best-practices" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2478,6 +2539,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#object-state-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Object State Storage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Object State Storage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-object_states-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The object_states Table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State Class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling-mariadb-state-for-an-object-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling MariaDB State for an Object Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#best-practices" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2788,6 +2910,68 @@ in one place and avoids hand-writing SQL.</p>
 <span class="c1">#     &#39;extra_columns&#39;: [...],    # In DB but not in model</span>
 <span class="c1">#     &#39;type_mismatches&#39;: [...]   # Different types</span>
 <span class="c1"># }</span>
+</code></pre></div>
+<h2 id="object-state-storage">Object State Storage</h2>
+<p>Object state (e.g., "created", "deleted", "error") is being migrated from etcd
+attributes to a dedicated MariaDB table for improved query performance.</p>
+<h3 id="the-object_states-table">The object_states Table</h3>
+<p>The <code>object_states</code> table stores state for all object types:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Optional</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLIndex</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ObjectState</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span>
+        <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span>
+            <span class="s1">&#39;sql_indexes&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">[</span><span class="s1">&#39;object_type&#39;</span><span class="p">,</span> <span class="s1">&#39;state_value&#39;</span><span class="p">],</span>  <span class="c1"># Efficient queries by type+state</span>
+            <span class="p">]</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+
+    <span class="n">object_uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">36</span><span class="p">)]</span>
+    <span class="n">object_type</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)]</span>
+    <span class="n">state_value</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)]</span>
+    <span class="n">update_time</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">message</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+<h3 id="state-class">State Class</h3>
+<p>The <code>State</code> class is a Pydantic model that replaces the original <code>baseobject.State</code>
+class. It provides the same interface for backwards compatibility:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.object_state</span><span class="w"> </span><span class="kn">import</span> <span class="n">State</span>
+
+<span class="n">state</span> <span class="o">=</span> <span class="n">State</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s1">&#39;created&#39;</span><span class="p">,</span> <span class="n">update_time</span><span class="o">=</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">(),</span> <span class="n">message</span><span class="o">=</span><span class="s1">&#39;optional msg&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>        <span class="c1"># &#39;created&#39;</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">update_time</span><span class="p">)</span>  <span class="c1"># 1234567890.123</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">obj_dict</span><span class="p">())</span>   <span class="c1"># {&#39;value&#39;: &#39;created&#39;, &#39;update_time&#39;: 1234567890.123}</span>
+</code></pre></div>
+<h3 id="migration-strategy">Migration Strategy</h3>
+<p>State data is migrated incrementally per object type:</p>
+<ol>
+<li><strong>Dual-write</strong>: New state changes are written to both etcd and MariaDB</li>
+<li><strong>Read priority</strong>: State reads prefer MariaDB, falling back to etcd</li>
+<li><strong>Upgrade step</strong>: When an object's version is bumped, its existing state
+   is migrated from etcd to MariaDB</li>
+</ol>
+<h3 id="enabling-mariadb-state-for-an-object-type">Enabling MariaDB State for an Object Type</h3>
+<p>To enable MariaDB state storage for an object type:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MyObject</span><span class="p">(</span><span class="n">DatabaseBackedObject</span><span class="p">):</span>
+    <span class="n">object_type</span> <span class="o">=</span> <span class="s1">&#39;myobject&#39;</span>
+    <span class="n">current_version</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># Bump version for migration</span>
+
+    <span class="c1"># Enable MariaDB state storage</span>
+    <span class="n">use_mariadb_state</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_upgrade_step_1_to_2</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">static_values</span><span class="p">):</span>
+        <span class="c1"># Migrate existing state to MariaDB</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mariadb</span><span class="o">.</span><span class="n">is_configured</span><span class="p">():</span>
+            <span class="k">return</span>
+
+        <span class="n">state_data</span> <span class="o">=</span> <span class="n">etcd</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;attribute/myobject&#39;</span><span class="p">,</span> <span class="n">static_values</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">],</span> <span class="s1">&#39;state&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">state_data</span><span class="p">:</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">State</span><span class="p">(</span><span class="o">**</span><span class="n">state_data</span><span class="p">)</span>
+            <span class="n">mariadb</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="s1">&#39;myobject&#39;</span><span class="p">,</span> <span class="n">static_values</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">],</span> <span class="n">state</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="best-practices">Best Practices</h2>
 <h3 id="schema-evolution">Schema Evolution</h3>
