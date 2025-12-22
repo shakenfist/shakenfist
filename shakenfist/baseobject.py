@@ -128,9 +128,6 @@ class DatabaseBackedObject:
     upgrade_supported = True
     state_targets = None
 
-    # Set to True in subclasses to use MariaDB for state storage
-    use_mariadb_state = False
-
     STATE_INITIAL = 'initial'
     STATE_CREATING = 'creating'
     STATE_CREATED = 'created'
@@ -429,9 +426,8 @@ class DatabaseBackedObject:
         return self._state_read(state_attribute_name='state')
 
     def _state_read(self, state_attribute_name='state'):
-        # For the primary 'state' attribute, try MariaDB first if enabled
-        if (state_attribute_name == 'state' and self.use_mariadb_state
-                and mariadb.is_configured()):
+        # For the primary 'state' attribute, try MariaDB first if configured
+        if state_attribute_name == 'state' and mariadb.is_configured():
             state = mariadb.get_state(self.object_type, self.uuid)
             if state is not None:
                 return state
@@ -484,9 +480,8 @@ class DatabaseBackedObject:
             new_state = State(value=new_value, update_time=time.time(),
                               message=message)
 
-            # Write to MariaDB if enabled for this object type
-            if (state_attribute_name == 'state' and self.use_mariadb_state
-                    and mariadb.is_configured()):
+            # Write to MariaDB for the primary state attribute
+            if state_attribute_name == 'state' and mariadb.is_configured():
                 mariadb.set_state(self.object_type, self.uuid, new_state)
 
             # Always write to etcd for backwards compatibility during transition

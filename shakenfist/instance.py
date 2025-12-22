@@ -150,9 +150,6 @@ class Instance(dbowo):
     object_type = 'instance'
     current_version = 17
 
-    # Enable MariaDB state storage for Instance objects
-    use_mariadb_state = True
-
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
     STATE_PREFLIGHT = 'preflight'

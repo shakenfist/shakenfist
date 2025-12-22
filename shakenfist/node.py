@@ -23,9 +23,6 @@ class Node(dbo):
     initial_version = 2
     current_version = 9
 
-    # Enable MariaDB state storage for Node objects
-    use_mariadb_state = True
-
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
     STATE_STOPPING = 'stopping'

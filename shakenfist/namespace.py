@@ -20,9 +20,6 @@ class Namespace(dbo):
     object_type = 'namespace'
     current_version = 6
 
-    # Enable MariaDB state storage for Namespace objects
-    use_mariadb_state = True
-
     # docs/developer_guide/state_machine.md has a description of these states.
     ACTIVE_STATES = {dbo.STATE_CREATED}
 

@@ -36,9 +36,6 @@ class IPAM(dbo):
     initial_version = 7
     current_version = 8
 
-    # Enable MariaDB state storage for IPAM objects
-    use_mariadb_state = True
-
     state_targets = {
         None: (dbo.STATE_CREATED),
         dbo.STATE_CREATED: (dbo.STATE_DELETED),

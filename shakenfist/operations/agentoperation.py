@@ -14,9 +14,6 @@ class AgentOperation(BaseOperation):
     initial_version = 1
     current_version = 2
 
-    # Enable MariaDB state storage for AgentOperation objects
-    use_mariadb_state = True
-
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
         dbo.STATE_INITIAL: (BaseOperation.STATE_PREFLIGHT,

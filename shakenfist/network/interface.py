@@ -26,9 +26,6 @@ class NetworkInterface(dbo):
     initial_version = 2
     current_version = 4
 
-    # Enable MariaDB state storage for NetworkInterface objects
-    use_mariadb_state = True
-
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
         None: (dbo.STATE_INITIAL, ),

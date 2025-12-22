@@ -19,9 +19,6 @@ class DnsMasq(managedexecutable.ManagedExecutable):
     initial_version = 1
     current_version = 3
 
-    # Enable MariaDB state storage for DnsMasq objects
-    use_mariadb_state = True
-
     def __init__(self, static_values):
         self.upgrade(static_values)
 

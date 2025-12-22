@@ -32,9 +32,6 @@ class Artifact(dbowo):
     object_type = 'artifact'
     current_version = 8
 
-    # Enable MariaDB state storage for Artifact objects
-    use_mariadb_state = True
-
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
         None: (dbo.STATE_INITIAL),
