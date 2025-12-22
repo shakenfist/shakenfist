@@ -148,7 +148,10 @@ class ConnectedVSockChannel():
 
 class Instance(dbowo):
     object_type = 'instance'
-    current_version = 16
+    current_version = 17
+
+    # Enable MariaDB state storage for Instance objects
+    use_mariadb_state = True
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -313,6 +316,20 @@ class Instance(dbowo):
     @classmethod
     def _upgrade_step_15_to_16(cls, static_values):
         ...
+
+    @classmethod
+    def _upgrade_step_16_to_17(cls, static_values):
+        # Migrate state from etcd to MariaDB
+        from shakenfist import mariadb
+        from shakenfist.schema.object_state import State
+
+        if not mariadb.is_configured():
+            return
+
+        state_data = etcd.get('attribute/instance', static_values['uuid'], 'state')
+        if state_data:
+            state = State(**state_data)
+            mariadb.set_state('instance', static_values['uuid'], state)
 
     @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
