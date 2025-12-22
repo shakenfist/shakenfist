@@ -111,6 +111,10 @@ def verify_config():
 
 @click.command()
 def initialise_node():
+    # Ensure MariaDB schema exists before creating node state
+    if mariadb.is_configured():
+        mariadb.ensure_schema()
+
     click.echo(f'Initializing node "{config.NODE_NAME}" with mesh IP '
                f'{config.NODE_MESH_IP}...')
     n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
