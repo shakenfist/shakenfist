@@ -18,7 +18,10 @@ LOG, _ = logs.setup(__name__)
 
 class Namespace(dbo):
     object_type = 'namespace'
-    current_version = 5
+    current_version = 6
+
+    # Enable MariaDB state storage for Namespace objects
+    use_mariadb_state = True
 
     # docs/developer_guide/state_machine.md has a description of these states.
     ACTIVE_STATES = {dbo.STATE_CREATED}
@@ -99,6 +102,20 @@ class Namespace(dbo):
     @classmethod
     def _upgrade_step_4_to_5(cls, static_values):
         cls._upgrade_metadata_to_attribute(static_values['uuid'])
+
+    @classmethod
+    def _upgrade_step_5_to_6(cls, static_values):
+        # Migrate state from etcd to MariaDB
+        from shakenfist import mariadb
+        from shakenfist.schema.object_state import State
+
+        if not mariadb.is_configured():
+            return
+
+        state_data = etcd.get('attribute/namespace', static_values['uuid'], 'state')
+        if state_data:
+            state = State(**state_data)
+            mariadb.set_state('namespace', static_values['uuid'], state)
 
     @classmethod
     def new(cls, name):

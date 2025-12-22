@@ -30,7 +30,10 @@ UPLOAD_URL = 'sf://upload/'
 
 class Artifact(dbowo):
     object_type = 'artifact'
-    current_version = 7
+    current_version = 8
+
+    # Enable MariaDB state storage for Artifact objects
+    use_mariadb_state = True
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -83,6 +86,20 @@ class Artifact(dbowo):
     @classmethod
     def _upgrade_step_6_to_7(cls, static_values):
         ...
+
+    @classmethod
+    def _upgrade_step_7_to_8(cls, static_values):
+        # Migrate state from etcd to MariaDB
+        from shakenfist import mariadb
+        from shakenfist.schema.object_state import State
+
+        if not mariadb.is_configured():
+            return
+
+        state_data = etcd.get('attribute/artifact', static_values['uuid'], 'state')
+        if state_data:
+            state = State(**state_data)
+            mariadb.set_state('artifact', static_values['uuid'], state)
 
     @classmethod
     def new(cls, artifact_type, source_url, name=None, max_versions=0,

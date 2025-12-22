@@ -21,7 +21,10 @@ LOG, _ = logs.setup(__name__)
 class Node(dbo):
     object_type = 'node'
     initial_version = 2
-    current_version = 8
+    current_version = 9
+
+    # Enable MariaDB state storage for Node objects
+    use_mariadb_state = True
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
@@ -105,6 +108,20 @@ class Node(dbo):
     @classmethod
     def _upgrade_step_7_to_8(cls, static_values):
         ...
+
+    @classmethod
+    def _upgrade_step_8_to_9(cls, static_values):
+        # Migrate state from etcd to MariaDB
+        from shakenfist import mariadb
+        from shakenfist.schema.object_state import State
+
+        if not mariadb.is_configured():
+            return
+
+        state_data = etcd.get('attribute/node', static_values['fqdn'], 'state')
+        if state_data:
+            state = State(**state_data)
+            mariadb.set_state('node', static_values['fqdn'], state)
 
     @classmethod
     def new(cls, name, ip):
