@@ -13,6 +13,7 @@ from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.util import callstack as util_callstack
@@ -126,6 +127,9 @@ class DatabaseBackedObject:
     current_version = None
     upgrade_supported = True
     state_targets = None
+
+    # Set to True in subclasses to use MariaDB for state storage
+    use_mariadb_state = False
 
     STATE_INITIAL = 'initial'
     STATE_CREATING = 'creating'
@@ -348,9 +352,9 @@ class DatabaseBackedObject:
                                                  ('blob', 'ref_count'),
                                                  ('blob', 'last_used')]:
             # Coerce the value into a dictionary.
-            if type(value) is State:
+            if isinstance(value, State):
                 event_values = value.obj_dict()
-            elif type(value) is dict:
+            elif isinstance(value, dict):
                 event_values = value.copy()
             else:
                 event_values = {'value': value}
@@ -425,9 +429,17 @@ class DatabaseBackedObject:
         return self._state_read(state_attribute_name='state')
 
     def _state_read(self, state_attribute_name='state'):
+        # For the primary 'state' attribute, try MariaDB first if enabled
+        if (state_attribute_name == 'state' and self.use_mariadb_state
+                and mariadb.is_configured()):
+            state = mariadb.get_state(self.object_type, self.uuid)
+            if state is not None:
+                return state
+            # Fall through to etcd if not found in MariaDB
+
         db_data = self._db_get_attribute(state_attribute_name)
         if not db_data:
-            return State(None, 0)
+            return State(value=None, update_time=0)
         return State(**db_data)
 
     def _state_update(self, new_value, skip_transition_validation=False,
@@ -469,7 +481,15 @@ class DatabaseBackedObject:
                             'object=%s uuid=%s',
                             orig.value, new_value, self.object_type, self.uuid)
 
-            new_state = State(new_value, time.time(), message=message)
+            new_state = State(value=new_value, update_time=time.time(),
+                              message=message)
+
+            # Write to MariaDB if enabled for this object type
+            if (state_attribute_name == 'state' and self.use_mariadb_state
+                    and mariadb.is_configured()):
+                mariadb.set_state(self.object_type, self.uuid, new_state)
+
+            # Always write to etcd for backwards compatibility during transition
             self._db_set_attribute(state_attribute_name, new_state)
 
     @state.setter
@@ -509,12 +529,23 @@ class DatabaseBackedObject:
                 self._db_set_attribute('metadata', md)
 
     def _external_view(self):
-        return {
-            'uuid': self.uuid,
-            'state': self.state.value,
-            'metadata': self.metadata,
-            'version': self.version
-        }
+        # Import here to avoid circular imports during module loading
+        from shakenfist.schema.external_view import BaseExternalView
+
+        # Phase 1: Fields handled by Pydantic model (grows over time)
+        # The model handles transformations like State -> state value string
+        partial = BaseExternalView(
+            uuid=self.uuid,
+            state=self.state,
+            version=self.version,
+            metadata=self.metadata
+        )
+        out = partial.model_dump()
+
+        # Phase 2: Fields not yet migrated to Pydantic (shrinks over time)
+        # Currently empty for base class - subclasses add their own fields
+
+        return out
 
     def hard_delete(self):
         etcd.delete(self.object_type, None, self.uuid)
@@ -633,38 +664,6 @@ def namespace_filter(namespace, o):
     return o.namespace == namespace
 
 
-class State:
-    def __init__(self, value, update_time, message=None):
-        self.__value = value
-        self.__update_time = update_time
-        self.__message = message
-
-    def __repr__(self):
-        return 'State(' + str(self.obj_dict()) + ')'
-
-    def __eq__(self, other):
-        return self.__hash__() == other.__hash__()
-
-    def __hash__(self):
-        return hash(str(self.obj_dict()))
-
-    @property
-    def value(self):
-        return self.__value
-
-    @property
-    def update_time(self):
-        return self.__update_time
-
-    @property
-    def message(self):
-        return self.__message
-
-    def obj_dict(self):
-        retval = {
-            'value': self.__value,
-            'update_time': self.__update_time
-        }
-        if self.__message:
-            retval['message'] = self.__message
-        return retval
+# Import Pydantic State from schema - this replaces the old class below.
+# Placed here to avoid circular imports during module loading.
+from shakenfist.schema.object_state import State  # noqa: E402

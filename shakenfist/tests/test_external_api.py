@@ -41,9 +41,9 @@ class BaseFakeObject:
         if isinstance(self._state, list):
             s = self._state[0]
             self._state = self._state[1:]
-            return State(s, 1)
+            return State(value=s, update_time=1)
         else:
-            return State(self._state, 1)
+            return State(value=self._state, update_time=1)
 
     @state.setter
     def state(self, state):

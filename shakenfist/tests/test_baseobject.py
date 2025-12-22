@@ -16,25 +16,28 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
                 ])
     def test_state(self, mock_get_attribute):
         d = DatabaseBackedObject('uuid')
-        self.assertEqual(d.state, State(None, 2))
-        self.assertEqual(d.state, State(DatabaseBackedObject.STATE_INITIAL, 4))
-        self.assertEqual(d.state, State(
-            DatabaseBackedObject.STATE_CREATED, 10))
+        self.assertEqual(d.state, State(value=None, update_time=2))
+        self.assertEqual(d.state,
+                         State(value=DatabaseBackedObject.STATE_INITIAL,
+                               update_time=4))
+        self.assertEqual(d.state,
+                         State(value=DatabaseBackedObject.STATE_CREATED,
+                               update_time=10))
 
     def test_property_state_object_full(self):
-        s = State('state1', 3)
+        s = State(value='state1', update_time=3.0)
 
         self.assertEqual(s.value, 'state1')
-        self.assertEqual(s.update_time, 3)
+        self.assertEqual(s.update_time, 3.0)
 
         self.assertEqual(s.obj_dict(), {
             'value': 'state1',
-            'update_time': 3,
+            'update_time': 3.0,
         })
 
-        self.assertEqual(s, State('state1', 3))
+        self.assertEqual(s, State(value='state1', update_time=3.0))
         self.assertEqual(str(s),
-                         "State({'value': 'state1', 'update_time': 3})")
+                         "State({'value': 'state1', 'update_time': 3.0})")
 
     @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')

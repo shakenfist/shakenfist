@@ -569,7 +569,7 @@ class Instance(dbowo):
     def agent_state(self):
         db_data = self._db_get_attribute('agent_state')
         if not db_data:
-            return baseobject.State(None, 0)
+            return baseobject.State(value=None, update_time=0)
         return baseobject.State(**db_data)
 
     @agent_state.setter
@@ -578,7 +578,7 @@ class Instance(dbowo):
         if orig.value == new_value:
             return
 
-        new_state = baseobject.State(new_value, time.time())
+        new_state = baseobject.State(value=new_value, update_time=time.time())
         self._db_set_attribute('agent_state', new_state)
 
     @property
