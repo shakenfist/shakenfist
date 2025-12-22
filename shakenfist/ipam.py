@@ -34,13 +34,30 @@ class IPAM(dbo):
     # the upgrade is painful.
     object_type = 'ipam'
     initial_version = 7
-    current_version = 7
+    current_version = 8
+
+    # Enable MariaDB state storage for IPAM objects
+    use_mariadb_state = True
 
     state_targets = {
         None: (dbo.STATE_CREATED),
         dbo.STATE_CREATED: (dbo.STATE_DELETED),
         dbo.STATE_DELETED: None
     }
+
+    @classmethod
+    def _upgrade_step_7_to_8(cls, static_values):
+        # Migrate state from etcd to MariaDB
+        from shakenfist import mariadb
+        from shakenfist.schema.object_state import State
+
+        if not mariadb.is_configured():
+            return
+
+        state_data = etcd.get('attribute/ipam', static_values['uuid'], 'state')
+        if state_data:
+            state = State(**state_data)
+            mariadb.set_state('ipam', static_values['uuid'], state)
 
     def __init__(self, static_values):
         self._in_memory_only = static_values.get('in_memory_only', False)

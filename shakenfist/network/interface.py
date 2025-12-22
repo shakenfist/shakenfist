@@ -24,7 +24,10 @@ LOG, _ = logs.setup(__name__)
 class NetworkInterface(dbo):
     object_type = 'interface'
     initial_version = 2
-    current_version = 3
+    current_version = 4
+
+    # Enable MariaDB state storage for NetworkInterface objects
+    use_mariadb_state = True
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -50,6 +53,20 @@ class NetworkInterface(dbo):
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values):
         cls._upgrade_metadata_to_attribute(static_values['uuid'])
+
+    @classmethod
+    def _upgrade_step_3_to_4(cls, static_values):
+        # Migrate state from etcd to MariaDB
+        from shakenfist import mariadb
+        from shakenfist.schema.object_state import State
+
+        if not mariadb.is_configured():
+            return
+
+        state_data = etcd.get('attribute/interface', static_values['uuid'], 'state')
+        if state_data:
+            state = State(**state_data)
+            mariadb.set_state('interface', static_values['uuid'], state)
 
     @classmethod
     def new(cls, interface_uuid, netdesc, instance_uuid, order):
