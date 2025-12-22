@@ -17,7 +17,10 @@ class DnsMasq(managedexecutable.ManagedExecutable):
     # upgrade.
     object_type = 'dhcp'
     initial_version = 1
-    current_version = 2
+    current_version = 3
+
+    # Enable MariaDB state storage for DnsMasq objects
+    use_mariadb_state = True
 
     def __init__(self, static_values):
         self.upgrade(static_values)
@@ -37,6 +40,21 @@ class DnsMasq(managedexecutable.ManagedExecutable):
     def _upgrade_step_1_to_2(cls, static_values):
         static_values['provide_dhcp'] = True
         static_values['provide_dns'] = False
+
+    @classmethod
+    def _upgrade_step_2_to_3(cls, static_values):
+        # Migrate state from etcd to MariaDB
+        from shakenfist import etcd
+        from shakenfist import mariadb
+        from shakenfist.schema.object_state import State
+
+        if not mariadb.is_configured():
+            return
+
+        state_data = etcd.get('attribute/dhcp', static_values['uuid'], 'state')
+        if state_data:
+            state = State(**state_data)
+            mariadb.set_state('dhcp', static_values['uuid'], state)
 
     # Static values
     @property

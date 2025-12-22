@@ -12,7 +12,10 @@ LOG, _ = logs.setup(__name__)
 class AgentOperation(BaseOperation):
     object_type = 'agentoperation'
     initial_version = 1
-    current_version = 1
+    current_version = 2
+
+    # Enable MariaDB state storage for AgentOperation objects
+    use_mariadb_state = True
 
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
@@ -38,6 +41,22 @@ class AgentOperation(BaseOperation):
         self.__namespace = static_values['namespace']
         self.__instance_uuid = static_values['instance_uuid']
         self.__commands = static_values['commands']
+
+    @classmethod
+    def _upgrade_step_1_to_2(cls, static_values):
+        # Migrate state from etcd to MariaDB
+        from shakenfist import etcd
+        from shakenfist import mariadb
+        from shakenfist.schema.object_state import State
+
+        if not mariadb.is_configured():
+            return
+
+        state_data = etcd.get(
+            'attribute/agentoperation', static_values['uuid'], 'state')
+        if state_data:
+            state = State(**state_data)
+            mariadb.set_state('agentoperation', static_values['uuid'], state)
 
     @classmethod
     def new(cls, operation_uuid, namespace, instance_uuid, commands):
