@@ -16,8 +16,6 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import etcd
-from shakenfist import mariadb
-from shakenfist.schema.object_state import State
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
 from shakenfist.schema.operations.node_blob_op \

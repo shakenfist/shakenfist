@@ -229,8 +229,6 @@ CACHED_TOKENS = {}
 
 
 def get_api_token(base_url, namespace='system'):
-    global CACHED_TOKENS
-
     if namespace in CACHED_TOKENS:
         expiry, access_token = CACHED_TOKENS[namespace]
         if expiry - time.time() > 15:
