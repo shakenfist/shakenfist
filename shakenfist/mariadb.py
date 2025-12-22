@@ -118,9 +118,6 @@ def get_state(object_type: str, object_uuid: str) -> Optional[State]:
     Returns:
         A State object, or None if no state exists for this object.
     """
-    if not is_configured():
-        return None
-
     engine = _get_engine()
     table = _get_object_states_table()
 
@@ -155,9 +152,6 @@ def set_state(object_type: str, object_uuid: str, state: State) -> bool:
     Returns:
         True if the write succeeded, False otherwise.
     """
-    if not is_configured():
-        return False
-
     engine = _get_engine()
     table = _get_object_states_table()
 
@@ -194,9 +188,6 @@ def delete_state(object_uuid: str) -> bool:
     Returns:
         True if the delete succeeded (or row didn't exist), False otherwise.
     """
-    if not is_configured():
-        return False
-
     engine = _get_engine()
     table = _get_object_states_table()
 
@@ -225,9 +216,6 @@ def get_objects_by_state(object_type: str,
     Returns:
         List of object UUIDs matching the criteria.
     """
-    if not is_configured():
-        return []
-
     engine = _get_engine()
     table = _get_object_states_table()
 
@@ -258,9 +246,6 @@ def get_all_states_for_type(object_type: str) -> list[tuple[str, State]]:
     Returns:
         List of tuples (object_uuid, State).
     """
-    if not is_configured():
-        return []
-
     engine = _get_engine()
     table = _get_object_states_table()
 

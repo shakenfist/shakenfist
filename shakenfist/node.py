@@ -108,17 +108,8 @@ class Node(dbo):
 
     @classmethod
     def _upgrade_step_8_to_9(cls, static_values):
-        # Migrate state from etcd to MariaDB
-        from shakenfist import mariadb
-        from shakenfist.schema.object_state import State
-
-        if not mariadb.is_configured():
-            return
-
-        state_data = etcd.get('attribute/node', static_values['fqdn'], 'state')
-        if state_data:
-            state = State(**state_data)
-            mariadb.set_state('node', static_values['fqdn'], state)
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
+        ...
 
     @classmethod
     def new(cls, name, ip):

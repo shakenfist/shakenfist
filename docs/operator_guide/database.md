@@ -268,38 +268,24 @@ print(state.update_time)  # 1234567890.123
 print(state.obj_dict())   # {'value': 'created', 'update_time': 1234567890.123}
 ```
 
-### Migration Strategy
+### Migration from etcd
 
-State data is migrated incrementally per object type:
+For existing deployments that stored state in etcd, use the migration command:
 
-1. **Dual-write**: New state changes are written to both etcd and MariaDB
-2. **Read priority**: State reads prefer MariaDB, falling back to etcd
-3. **Upgrade step**: When an object's version is bumped, its existing state
-   is migrated from etcd to MariaDB
-
-### Enabling MariaDB State for an Object Type
-
-To enable MariaDB state storage for an object type:
-
-```python
-class MyObject(DatabaseBackedObject):
-    object_type = 'myobject'
-    current_version = 2  # Bump version for migration
-
-    # Enable MariaDB state storage
-    use_mariadb_state = True
-
-    @classmethod
-    def _upgrade_step_1_to_2(cls, static_values):
-        # Migrate existing state to MariaDB
-        if not mariadb.is_configured():
-            return
-
-        state_data = etcd.get('attribute/myobject', static_values['uuid'], 'state')
-        if state_data:
-            state = State(**state_data)
-            mariadb.set_state('myobject', static_values['uuid'], state)
+```bash
+# Stop all Shaken Fist services first
+sf-ctl migrate-state-to-mariadb
 ```
+
+This command:
+1. Reads state from etcd for all object types
+2. Writes the state to MariaDB
+3. Removes the state entries from etcd
+
+Use `--dry-run` to preview what would be migrated without making changes.
+
+MariaDB is now required for all deployments - state is stored only in MariaDB,
+not in etcd.
 
 ## Best Practices
 

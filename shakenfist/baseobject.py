@@ -426,13 +426,14 @@ class DatabaseBackedObject:
         return self._state_read(state_attribute_name='state')
 
     def _state_read(self, state_attribute_name='state'):
-        # For the primary 'state' attribute, try MariaDB first if configured
-        if state_attribute_name == 'state' and mariadb.is_configured():
+        # Primary state is stored in MariaDB
+        if state_attribute_name == 'state':
             state = mariadb.get_state(self.object_type, self.uuid)
             if state is not None:
                 return state
-            # Fall through to etcd if not found in MariaDB
+            return State(value=None, update_time=0)
 
+        # Secondary state attributes (like 'power_state') are in etcd
         db_data = self._db_get_attribute(state_attribute_name)
         if not db_data:
             return State(value=None, update_time=0)
@@ -480,12 +481,12 @@ class DatabaseBackedObject:
             new_state = State(value=new_value, update_time=time.time(),
                               message=message)
 
-            # Write to MariaDB for the primary state attribute
-            if state_attribute_name == 'state' and mariadb.is_configured():
+            # Primary state is stored in MariaDB
+            if state_attribute_name == 'state':
                 mariadb.set_state(self.object_type, self.uuid, new_state)
-
-            # Always write to etcd for backwards compatibility during transition
-            self._db_set_attribute(state_attribute_name, new_state)
+            else:
+                # Secondary state attributes (like 'power_state') go to etcd
+                self._db_set_attribute(state_attribute_name, new_state)
 
     @state.setter
     def state(self, new_value):
@@ -545,8 +546,7 @@ class DatabaseBackedObject:
     def hard_delete(self):
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
-        if mariadb.is_configured():
-            mariadb.delete_state(self.uuid)
+        mariadb.delete_state(self.uuid)
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
 
 
@@ -622,36 +622,19 @@ class DatabaseBackedObjectIterator:
         else:
             raise exceptions.InvalidObjectPrefilter(self.prefilter)
 
-        # Use MariaDB for efficient state-based filtering when configured
-        if mariadb.is_configured():
-            matching_uuids = set(mariadb.get_objects_by_state(
-                self.base_object.object_type, list(target_states)))
+        # Use MariaDB for efficient state-based filtering
+        matching_uuids = set(mariadb.get_objects_by_state(
+            self.base_object.object_type, list(target_states)))
 
-            # Fetch static values only for objects in the target states
-            results = []
-            for objkey, static_values in etcd.get_all(
-                    self.base_object.object_type, None):
-                objuuid = objkey.split('/')[-1]
-                if objuuid in matching_uuids:
-                    results.append((objkey, static_values))
-            for objkey, static_values in results:
-                yield objkey, static_values
-            return
-
-        # Fallback to etcd-based filtering (N+1 queries)
-        # We fetch all the results in a block here before we yield them, because
-        # if the caller is slow to iterate they can end up with inconsistent
-        # values as objects shift state underneath them (for example an active
-        # instance shifting from created to delete-wait while you're iterating).
+        # Fetch static values only for objects in the target states
+        # We fetch all results in a block before yielding to avoid inconsistency
+        # if the caller is slow to iterate (e.g., an active instance shifting
+        # from created to delete-wait while you're iterating).
         results = []
         for objkey, static_values in etcd.get_all(
                 self.base_object.object_type, None):
-            # objkey is the full etcd path like /sf/node/node1_net, extract
-            # the object identifier (last component of the path)
             objuuid = objkey.split('/')[-1]
-            state_data = etcd.get(
-                f'attribute/{self.base_object.object_type}', objuuid, 'state')
-            if state_data and state_data.get('value') in target_states:
+            if objuuid in matching_uuids:
                 results.append((objkey, static_values))
         for objkey, static_values in results:
             yield objkey, static_values

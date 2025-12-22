@@ -37,18 +37,8 @@ class Upload(dbo):
 
     @classmethod
     def _upgrade_step_3_to_4(cls, static_values):
-        # Migrate state from etcd to MariaDB
-        from shakenfist import etcd
-        from shakenfist import mariadb
-        from shakenfist.schema.object_state import State
-
-        if not mariadb.is_configured():
-            return
-
-        state_data = etcd.get('attribute/upload', static_values['uuid'], 'state')
-        if state_data:
-            state = State(**state_data)
-            mariadb.set_state('upload', static_values['uuid'], state)
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
+        ...
 
     @classmethod
     def new(cls, upload_uuid, node):

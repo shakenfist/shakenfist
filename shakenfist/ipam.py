@@ -44,17 +44,8 @@ class IPAM(dbo):
 
     @classmethod
     def _upgrade_step_7_to_8(cls, static_values):
-        # Migrate state from etcd to MariaDB
-        from shakenfist import mariadb
-        from shakenfist.schema.object_state import State
-
-        if not mariadb.is_configured():
-            return
-
-        state_data = etcd.get('attribute/ipam', static_values['uuid'], 'state')
-        if state_data:
-            state = State(**state_data)
-            mariadb.set_state('ipam', static_values['uuid'], state)
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
+        ...
 
     def __init__(self, static_values):
         self._in_memory_only = static_values.get('in_memory_only', False)
