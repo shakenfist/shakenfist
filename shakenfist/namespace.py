@@ -10,6 +10,7 @@ from shakenfist_utilities import random as sfrandom  # noreorder
 from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import access_tokens
 
 
@@ -17,7 +18,7 @@ LOG, _ = logs.setup(__name__)
 
 
 class Namespace(dbo):
-    object_type = 'namespace'
+    object_type = ObjectType.NAMESPACE
     initial_version = 2
     current_version = 6
 

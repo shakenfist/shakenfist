@@ -8,6 +8,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.managed_executables import managedexecutable
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -15,7 +16,7 @@ class DnsMasq(managedexecutable.ManagedExecutable):
     # Note that this slightly confusing object type is required for historical
     # reasons so that objects and config files don't need to be renamed on
     # upgrade.
-    object_type = 'dhcp'
+    object_type = ObjectType.DHCP
     initial_version = 1
     current_version = 3
 

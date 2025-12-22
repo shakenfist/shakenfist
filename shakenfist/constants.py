@@ -1,5 +1,7 @@
 import importlib
 
+from shakenfist.schema.object_types import ObjectType
+
 # Note the most exciting constants ever
 KiB = 1024
 MiB = 1024 * 1024
@@ -69,41 +71,8 @@ EVENT_TYPES = [EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE, EVENT_TYPE_STATUS,
                EVENT_TYPE_USAGE, EVENT_TYPE_RESOURCES, EVENT_TYPE_PRUNE,
                EVENT_TYPE_HISTORIC]
 
-# Fake object type for API request tracing
-API_REQUESTS = 'api-requests'
-
 # Blob hashing algorithms
 BLOB_HASH_ALGORITHMS = ['sha1', 'sha256', 'sha512', 'xxh128']
-
-# Object names, noting that api-requests is a "meta" object.
-OBJECT_NAMES = [
-    'agentoperation',
-    'api-requests',
-    'artifact',
-    'artifact_fetch_op',
-    'blob',
-    'dhcp',
-    'imgcache_op',
-    'instance',
-    'ipam',
-    'namespace',
-    'net_iface_op',
-    'net_iface_ip_op',
-    'net_ip_op',
-    'net_macaddr_ip_op',
-    'net_op',
-    'network',
-    'interface',
-    'node',
-    'node_aop_op',
-    'node_blob_op',
-    'node_inst_net_iface_op',
-    'node_inst_netdesc_op',
-    'node_inst_op',
-    'node_inst_snap_op',
-    'node_net_op',
-    'upload'
-]
 
 OBJECT_NAMES_TO_CLASSES = {
     'agentoperation': 'operations.agentoperation.AgentOperation',

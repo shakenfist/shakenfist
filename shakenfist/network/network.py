@@ -41,6 +41,7 @@ from shakenfist.exceptions import DeadNetwork
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
 from shakenfist.util import concurrency as util_concurrency
@@ -50,7 +51,7 @@ LOG, _ = logs.setup(__name__)
 
 
 class Network(dbowo):
-    object_type = 'network'
+    object_type = ObjectType.NETWORK
     initial_version = 2
     current_version = 8
 

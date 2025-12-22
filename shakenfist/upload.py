@@ -5,13 +5,14 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.schema.object_types import ObjectType
 
 
 LOG, _ = logs.setup(__name__)
 
 
 class Upload(dbo):
-    object_type = 'upload'
+    object_type = ObjectType.UPLOAD
     initial_version = 2
     current_version = 4
 

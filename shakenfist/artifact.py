@@ -15,6 +15,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.namespace import namespace_is_trusted
+from shakenfist.schema.object_types import ObjectType
 
 
 LOG, _ = logs.setup(__name__)
@@ -29,7 +30,7 @@ UPLOAD_URL = 'sf://upload/'
 
 
 class Artifact(dbowo):
-    object_type = 'artifact'
+    object_type = ObjectType.ARTIFACT
     current_version = 8
 
     # docs/developer_guide/state_machine.md has a description of these states.

@@ -12,6 +12,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import GiB
 from shakenfist.exceptions import NoSuchDaemon
 from shakenfist.exceptions import NoSuchDaemonState
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import general as util_general
 
 
@@ -19,7 +20,7 @@ LOG, _ = logs.setup(__name__)
 
 
 class Node(dbo):
-    object_type = 'node'
+    object_type = ObjectType.NODE
     initial_version = 2
     current_version = 9
 

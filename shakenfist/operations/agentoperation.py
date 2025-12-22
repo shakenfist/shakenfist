@@ -4,13 +4,14 @@ from shakenfist import blob
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.operations.baseoperation import BaseOperation
+from shakenfist.schema.object_types import ObjectType
 
 
 LOG, _ = logs.setup(__name__)
 
 
 class AgentOperation(BaseOperation):
-    object_type = 'agentoperation'
+    object_type = ObjectType.AGENTOPERATION
     initial_version = 1
     current_version = 2
 

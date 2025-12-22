@@ -31,6 +31,7 @@ from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import GiB
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
 from shakenfist.exceptions import BlobDeleted
@@ -58,7 +59,7 @@ LOG, _ = logs.setup(__name__)
 # we reserve its UUID, so we do allow the size of the blob to be set after
 # creation.
 class Blob(dbo):
-    object_type = 'blob'
+    object_type = ObjectType.BLOB
     initial_version = 2
     current_version = 9
 

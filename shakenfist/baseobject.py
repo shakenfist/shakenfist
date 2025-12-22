@@ -4,18 +4,19 @@ from collections import defaultdict
 from functools import partial
 from math import inf
 import re
+from typing import ClassVar
 
 from etcd3gw.lock import Lock
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import constants
 from shakenfist.constants import get_object_class
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import mariadb
-from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.constants import EVENT_TYPE_MUTATE
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
@@ -88,7 +89,7 @@ def _maintain_version_cache(max_cache_age):
         metrics[node_name] = d['metrics']
         log.debug('Considering metrics entry')
 
-    for possible_objname in constants.OBJECT_NAMES:
+    for possible_objname in ObjectType:
         nodes_by_version = defaultdict(list, [])
         node_metric_age = {}
         minimum = inf
@@ -122,7 +123,7 @@ def get_maximum_object_version(objname, max_cache_age=300):
 
 
 class DatabaseBackedObject:
-    object_type = 'unknown'
+    object_type: ClassVar[ObjectType] = ObjectType.UNKNOWN
     initial_version = 1
     current_version = None
     upgrade_supported = True

@@ -9,6 +9,7 @@ from shakenfist import exceptions
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
 from shakenfist.schema.operations.net_iface_ip_op \
@@ -22,7 +23,7 @@ LOG, _ = logs.setup(__name__)
 
 
 class NetworkInterface(dbo):
-    object_type = 'interface'
+    object_type = ObjectType.INTERFACE
     initial_version = 2
     current_version = 4
 

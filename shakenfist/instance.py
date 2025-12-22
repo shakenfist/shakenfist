@@ -52,6 +52,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.operations.baseoperation import BaseClusterOperation as bco
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -147,7 +148,7 @@ class ConnectedVSockChannel():
 
 
 class Instance(dbowo):
-    object_type = 'instance'
+    object_type = ObjectType.INSTANCE
     current_version = 17
 
     # docs/developer_guide/state_machine.md has a description of these states.

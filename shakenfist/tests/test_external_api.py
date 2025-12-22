@@ -14,6 +14,7 @@ from shakenfist.config import BaseSettings
 from shakenfist.config import config
 from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -57,7 +58,7 @@ class BaseFakeObject:
 
 
 class FakeInstance(BaseFakeObject):
-    object_type = 'instance'
+    object_type = ObjectType.INSTANCE
 
     def __init__(self, uuid=None, namespace=None,
                  state=dbo.STATE_CREATED, power_state='on',
@@ -87,7 +88,7 @@ class FakeInstance(BaseFakeObject):
 
 
 class FakeNetwork(BaseFakeObject):
-    object_type = 'network'
+    object_type = ObjectType.NETWORK
 
     def __init__(self, uuid=None, vxid=None, namespace=None,
                  name=None, netblock=None, state=dbo.STATE_CREATED):
