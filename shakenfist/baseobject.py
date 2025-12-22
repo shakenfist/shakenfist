@@ -622,6 +622,23 @@ class DatabaseBackedObjectIterator:
         else:
             raise exceptions.InvalidObjectPrefilter(self.prefilter)
 
+        # Use MariaDB for efficient state-based filtering when configured
+        if mariadb.is_configured():
+            matching_uuids = set(mariadb.get_objects_by_state(
+                self.base_object.object_type, list(target_states)))
+
+            # Fetch static values only for objects in the target states
+            results = []
+            for objkey, static_values in etcd.get_all(
+                    self.base_object.object_type, None):
+                objuuid = objkey.split('/')[-1]
+                if objuuid in matching_uuids:
+                    results.append((objkey, static_values))
+            for objkey, static_values in results:
+                yield objkey, static_values
+            return
+
+        # Fallback to etcd-based filtering (N+1 queries)
         # We fetch all the results in a block here before we yield them, because
         # if the caller is slow to iterate they can end up with inconsistent
         # values as objects shift state underneath them (for example an active
