@@ -545,6 +545,8 @@ class DatabaseBackedObject:
     def hard_delete(self):
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
+        if mariadb.is_configured():
+            mariadb.delete_state(self.uuid)
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
 
 
