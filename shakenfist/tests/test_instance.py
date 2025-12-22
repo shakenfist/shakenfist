@@ -12,7 +12,6 @@ import testtools
 from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist.baseobject import State
 from shakenfist.config import SFConfig
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
