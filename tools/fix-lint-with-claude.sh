@@ -318,12 +318,19 @@ fi
 
 echo -e "${YELLOW}Step 6: Pushing to remote...${NC}"
 
-# Get current branch
-current_branch=$(git rev-parse --abbrev-ref HEAD)
+# Get current branch - in GitHub Actions PR context, use GITHUB_HEAD_REF
+# as the checkout is in detached HEAD state
+if [ -n "${GITHUB_HEAD_REF}" ]; then
+    current_branch="${GITHUB_HEAD_REF}"
+else
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+fi
+
+echo "Pushing to branch: ${current_branch}"
 
 # Push to origin
 set +e
-git push origin "${current_branch}"
+git push origin "HEAD:${current_branch}"
 push_exit_code=$?
 set -e
 
