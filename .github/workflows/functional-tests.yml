@@ -66,12 +66,13 @@ jobs:
           pip3 install uv
           uv pip install -r pyproject.toml
 
-      - name: Run python3 unit tests
+      - name: Run python3 unit tests and gather coverage data
         id: py3_tests
         timeout-minutes: 10
         run: |
           . /tmp/venv-test/bin/activate
-          tox -epy3
+          tox -ecover
+          zip -r cover.zip cover
 
       - name: List failing tests
         if: ${{ failure() && steps.py3_tests.outcome == 'failure' }}
@@ -120,13 +121,6 @@ jobs:
 
           # Post the comment
           gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/pr-comment.md
-
-      - name: Generate coverage report
-        timeout-minutes: 10
-        run: |
-          . /tmp/venv-test/bin/activate
-          tox -ecover
-          zip -r cover.zip cover
 
       - uses: actions/upload-artifact@v4
         with:
