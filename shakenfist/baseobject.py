@@ -66,8 +66,8 @@ def _maintain_version_cache(max_cache_age):
     for node_key, n in etcd.get_all('node', None):
         # node_key is the full etcd path, extract the node name (fqdn)
         node_name = node_key.split('/')[-1]
-        state_data = etcd.get('attribute/node', node_name, 'state')
-        if not state_data or state_data.get('value') not in target_states:
+        state = mariadb.get_state('node', node_name)
+        if not state or state.value not in target_states:
             continue
         d = etcd.get('metrics', node_name, None)
         if not d:
