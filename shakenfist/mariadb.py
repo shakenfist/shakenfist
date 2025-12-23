@@ -50,14 +50,22 @@ OBJECT_STATES_VERSION = 1
 def _use_database_service() -> bool:
     """Check if we should use the database microservice instead of direct access.
 
-    Returns True if the database service is configured and enabled.
-    Returns False if DATABASE_USE_DIRECT_ETCD is True (database daemon mode).
+    Returns True if the database service is configured and we should use it.
+    Returns False if we should use direct MariaDB access (database daemon mode).
+
+    The logic is:
+    1. If DATABASE_USE_DIRECT_ETCD is True AND MARIADB_HOST is configured,
+       use direct access (this is the database daemon on an etcd_master node).
+    2. If DATABASE_NODE_IP is configured, use the database service.
+    3. Otherwise we have no way to access the database.
     """
-    # The database daemon sets DATABASE_USE_DIRECT_ETCD=true (not via the
-    # environment variable mechanism, but by not setting the env var that
-    # would set it to false). When this is true, we use direct MariaDB access.
-    if config.DATABASE_USE_DIRECT_ETCD:
+    # The database daemon sets DATABASE_USE_DIRECT_ETCD=true. When this is true
+    # AND we have MariaDB configured, we use direct MariaDB access. This only
+    # happens on etcd_master nodes which have the MariaDB credentials.
+    if config.DATABASE_USE_DIRECT_ETCD and config.MARIADB_HOST:
         return False
+
+    # For all other cases, try to use the database service via gRPC
     if not config.DATABASE_NODE_IP:
         return False
     return True
