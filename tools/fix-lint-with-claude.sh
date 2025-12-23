@@ -152,8 +152,9 @@ fi
 
 # Run flake8 via tox (which uses flake8wrap.sh -HEAD to check only changes
 # since HEAD~1 and excludes generated protobuf code)
+# Use -q to reduce tox verbosity and only show flake8 output
 set +e
-tox -eflake8 > "${output_dir}/flake8-errors.txt" 2>&1
+tox -q -eflake8 > "${output_dir}/flake8-errors.txt" 2>&1
 flake8_exit_code=$?
 set -e
 
@@ -260,9 +261,9 @@ fi
 echo
 echo -e "${YELLOW}Step 4: Verifying fix...${NC}"
 
-# Re-run flake8 via tox
+# Re-run flake8 via tox (quiet mode)
 set +e
-tox -eflake8 > "${output_dir}/flake8-verify.txt" 2>&1
+tox -q -eflake8 > "${output_dir}/flake8-verify.txt" 2>&1
 verify_exit_code=$?
 set -e
 
