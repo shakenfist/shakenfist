@@ -110,12 +110,24 @@ def verify_config():
 
 
 @click.command()
-def initialise_node():
-    # Ensure MariaDB schema exists before creating node state. This will raise
-    # an error if MariaDB is not configured, which is intentional - MariaDB is
-    # required for all deployments.
-    mariadb.ensure_schema()
+def ensure_mariadb_schema():
+    """Ensure the MariaDB schema exists.
 
+    This command should be run on a database node (etcd_master) before
+    initializing any nodes. It creates the required MariaDB tables if
+    they don't already exist. Only nodes with direct MariaDB access
+    (MARIADB_HOST configured) can run this command.
+    """
+    if not config.MARIADB_HOST:
+        raise click.ClickException(
+            'This command requires MARIADB_HOST to be configured. '
+            'It should only be run on database nodes (etcd_master).')
+    mariadb.ensure_schema()
+    click.echo('MariaDB schema verified.')
+
+
+@click.command()
+def initialise_node():
     click.echo(f'Initializing node "{config.NODE_NAME}" with mesh IP '
                f'{config.NODE_MESH_IP}...')
     n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
@@ -265,6 +277,7 @@ cli.add_command(migrate_state_to_mariadb)
 cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
 cli.add_command(verify_config)
+cli.add_command(ensure_mariadb_schema)
 cli.add_command(initialise_node)
 cli.add_command(register_daemon)
 cli.add_command(deregister_daemon)

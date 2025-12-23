@@ -3,6 +3,15 @@
 # because the database microservice may not be running yet. The config file
 # might have DATABASE_USE_DIRECT_ETCD=0 (use microservice), but we override
 # that here to ensure bootstrap works correctly.
+#
+# Ensure MariaDB schema exists before initializing any nodes. This must run
+# on an etcd_master node which has direct MariaDB access configured.
+- name: Ensure MariaDB schema exists
+  shell: |
+    /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
+  delegate_to: "{{ groups['etcd_master'][0] }}"
+  run_once: true
+
 - name: Ensure the node exists in etcd
   shell: |
     /srv/shakenfist/venv/bin/sf-ctl initialise-node
