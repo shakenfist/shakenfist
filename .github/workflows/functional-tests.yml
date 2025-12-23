@@ -67,13 +67,14 @@ jobs:
           uv pip install -r pyproject.toml
 
       - name: Run python3 unit tests
+        id: py3_tests
         timeout-minutes: 10
         run: |
           . /tmp/venv-test/bin/activate
           tox -epy3
 
       - name: List failing tests
-        if: failure()
+        if: ${{ failure() && steps.py3_tests.outcome == 'failure' }}
         id: failures
         run: |
           echo "Gathering list of failed tests..."
@@ -94,6 +95,31 @@ jobs:
           echo "EOF" >> ${GITHUB_OUTPUT}
           echo "GITHUB_OUTPUT is:"
           cat ${GITHUB_OUTPUT}
+
+      - name: Post failing tests to PR
+        if: ${{ failure() && steps.py3_tests.outcome == 'failure' && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Build the comment body
+          cat > /tmp/pr-comment.md << 'COMMENT_EOF'
+          ## Unit Test Failures
+
+          The following unit tests failed:
+
+          ```
+          COMMENT_EOF
+
+          cat /srv/ci/failed >> /tmp/pr-comment.md
+
+          cat >> /tmp/pr-comment.md << 'COMMENT_EOF'
+          ```
+
+          [View full test output](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          COMMENT_EOF
+
+          # Post the comment
+          gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/pr-comment.md
 
       - name: Generate coverage report
         timeout-minutes: 10
