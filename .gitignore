@@ -137,7 +137,10 @@ dmypy.json
 # Deployer git repos
 deploy/gitrepos/
 
-.vscode
+# VS Code - ignore user-specific files but keep workspace settings
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 
 # Generated version file
 shakenfist/_version.py
