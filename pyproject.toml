@@ -204,6 +204,12 @@ warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
 
+# Ignore generated protobuf/gRPC code - these files are auto-generated and
+# have type issues that we can't fix without modifying the generator.
+[[tool.mypy.overrides]]
+module = "shakenfist.protos.*"
+ignore_errors = true
+
 # Strict checking for new/typed modules
 [[tool.mypy.overrides]]
 module = "shakenfist.schema.sqlalchemy"
