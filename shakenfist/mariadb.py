@@ -8,28 +8,66 @@
 # The object_states table stores state for all object types in a single
 # table, with object_type discriminating between them. State validation
 # is handled per-type in Python code using each object's state_targets dict.
+#
+# Access is routed through the database microservice (gRPC) for most daemons.
+# Only the database daemon uses direct MariaDB access, which it does by
+# calling the _direct_* functions.
 
 import threading
 from typing import Optional
 
+import grpc
 import sqlalchemy as sa
 from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs
 
 from shakenfist.config import config
+from shakenfist.protos import database_pb2
+from shakenfist.protos import database_pb2_grpc
 from shakenfist.schema.object_state import State
 from shakenfist.schema.sqlalchemy import ensure_table_exists
 
 
 LOG, _ = logs.setup(__name__)
 
-# Thread-local storage for database connections
+# Thread-local storage for database connections and gRPC channels
 _local = threading.local()
 
 # Module-level metadata for table definitions
 _metadata: Optional[sa.MetaData] = None
 _object_states_table: Optional[sa.Table] = None
 
+
+def _use_database_service() -> bool:
+    """Check if we should use the database microservice instead of direct access.
+
+    Returns True if the database service is configured and enabled.
+    Returns False if DATABASE_USE_DIRECT_ETCD is True (database daemon mode).
+    """
+    # The database daemon sets DATABASE_USE_DIRECT_ETCD=true (not via the
+    # environment variable mechanism, but by not setting the env var that
+    # would set it to false). When this is true, we use direct MariaDB access.
+    if config.DATABASE_USE_DIRECT_ETCD:
+        return False
+    if not config.DATABASE_NODE_IP:
+        return False
+    return True
+
+
+def _get_database_stub():
+    """Get or create a gRPC stub for the database service."""
+    if not hasattr(_local, 'database_channel') or _local.database_channel is None:
+        _local.database_channel = grpc.insecure_channel(
+            f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
+        _local.database_stub = database_pb2_grpc.DatabaseServiceStub(
+            _local.database_channel)
+    return _local.database_stub
+
+
+# =============================================================================
+# Direct MariaDB Access Functions
+# These are used by the database daemon which needs direct access.
+# =============================================================================
 
 def _get_connection_url() -> str:
     """Build the MariaDB connection URL from config."""
@@ -103,7 +141,8 @@ def ensure_schema() -> None:
     """Ensure the MariaDB schema exists.
 
     This creates the object_states table if it doesn't exist. Safe to call
-    multiple times - it's idempotent.
+    multiple times - it's idempotent. Only the database daemon should call
+    this function.
     """
     if not config.MARIADB_HOST:
         LOG.warning('MariaDB not configured, skipping schema creation')
@@ -120,15 +159,10 @@ def is_configured() -> bool:
     return bool(config.MARIADB_HOST)
 
 
-def get_state(object_type: str, object_uuid: str) -> Optional[State]:
-    """Read state for an object from MariaDB.
+def _direct_get_state(object_type: str, object_uuid: str) -> Optional[State]:
+    """Read state for an object directly from MariaDB.
 
-    Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
-        object_uuid: The UUID of the object.
-
-    Returns:
-        A State object, or None if no state exists for this object.
+    This is the direct access version used by the database daemon.
     """
     engine = _get_engine()
     table = _get_object_states_table()
@@ -156,18 +190,11 @@ def get_state(object_type: str, object_uuid: str) -> Optional[State]:
         return None
 
 
-def set_state(object_type: str, object_uuid: str, state: State) -> bool:
-    """Write state for an object to MariaDB.
+def _direct_set_state(object_type: str, object_uuid: str, state: State) -> bool:
+    """Write state for an object directly to MariaDB.
 
+    This is the direct access version used by the database daemon.
     Uses INSERT ... ON DUPLICATE KEY UPDATE for atomic upsert.
-
-    Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
-        object_uuid: The UUID of the object.
-        state: The State object to store.
-
-    Returns:
-        True if the write succeeded, False otherwise.
     """
     engine = _get_engine()
     table = _get_object_states_table()
@@ -196,15 +223,10 @@ def set_state(object_type: str, object_uuid: str, state: State) -> bool:
         return False
 
 
-def delete_state(object_type: str, object_uuid: str) -> bool:
-    """Delete state for an object from MariaDB.
+def _direct_delete_state(object_type: str, object_uuid: str) -> bool:
+    """Delete state for an object directly from MariaDB.
 
-    Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
-        object_uuid: The UUID of the object.
-
-    Returns:
-        True if the delete succeeded (or row didn't exist), False otherwise.
+    This is the direct access version used by the database daemon.
     """
     engine = _get_engine()
     table = _get_object_states_table()
@@ -221,23 +243,16 @@ def delete_state(object_type: str, object_uuid: str) -> bool:
             conn.commit()
             return True
     except OperationalError as e:
-        LOG.warning(f'MariaDB delete failed for {object_type}/{object_uuid}: {e}')
+        LOG.warning(
+            f'MariaDB delete failed for {object_type}/{object_uuid}: {e}')
         return False
 
 
-def get_objects_by_state(object_type: str,
-                         state_values: list[str]) -> list[str]:
+def _direct_get_objects_by_state(object_type: str,
+                                  state_values: list[str]) -> list[str]:
     """Get all object UUIDs of a given type in specified states.
 
-    This is the primary use case for MariaDB state storage - efficient
-    queries across object states without scanning all objects in etcd.
-
-    Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
-        state_values: List of state values to match.
-
-    Returns:
-        List of object UUIDs matching the criteria.
+    This is the direct access version used by the database daemon.
     """
     engine = _get_engine()
     table = _get_object_states_table()
@@ -258,10 +273,160 @@ def get_objects_by_state(object_type: str,
         return []
 
 
+# =============================================================================
+# gRPC Client Functions
+# These call the database microservice for state operations.
+# =============================================================================
+
+def _grpc_get_state(object_type: str, object_uuid: str) -> Optional[State]:
+    """Read state for an object via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetObjectStateRequest(
+            object_type=object_type,
+            object_uuid=object_uuid
+        )
+        reply = stub.GetObjectState(request)
+        if not reply.found:
+            return None
+        return State(
+            value=reply.state_value if reply.state_value else None,
+            update_time=reply.update_time,
+            message=reply.message if reply.message else None
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetObjectState failed for {object_type}/{object_uuid}: {e}')
+        return None
+
+
+def _grpc_set_state(object_type: str, object_uuid: str, state: State) -> bool:
+    """Write state for an object via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.SetObjectStateRequest(
+            object_type=object_type,
+            object_uuid=object_uuid,
+            state_value=state.value or '',
+            update_time=state.update_time,
+            message=state.message or ''
+        )
+        reply = stub.SetObjectState(request)
+        return reply.success
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC SetObjectState failed for {object_type}/{object_uuid}: {e}')
+        return False
+
+
+def _grpc_delete_state(object_type: str, object_uuid: str) -> bool:
+    """Delete state for an object via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteObjectStateRequest(
+            object_type=object_type,
+            object_uuid=object_uuid
+        )
+        reply = stub.DeleteObjectState(request)
+        return reply.success
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteObjectState failed for {object_type}/{object_uuid}: {e}')
+        return False
+
+
+def _grpc_get_objects_by_state(object_type: str,
+                                state_values: list[str]) -> list[str]:
+    """Get all object UUIDs of a given type in specified states via gRPC."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetObjectsByStateRequest(
+            object_type=object_type,
+            state_values=state_values
+        )
+        reply = stub.GetObjectsByState(request)
+        return list(reply.object_uuids)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetObjectsByState failed for {object_type}: {e}')
+        return []
+
+
+# =============================================================================
+# Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def get_state(object_type: str, object_uuid: str) -> Optional[State]:
+    """Read state for an object.
+
+    Args:
+        object_type: The type of object (e.g., 'blob', 'instance').
+        object_uuid: The UUID of the object.
+
+    Returns:
+        A State object, or None if no state exists for this object.
+    """
+    if _use_database_service():
+        return _grpc_get_state(object_type, object_uuid)
+    return _direct_get_state(object_type, object_uuid)
+
+
+def set_state(object_type: str, object_uuid: str, state: State) -> bool:
+    """Write state for an object.
+
+    Args:
+        object_type: The type of object (e.g., 'blob', 'instance').
+        object_uuid: The UUID of the object.
+        state: The State object to store.
+
+    Returns:
+        True if the write succeeded, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_set_state(object_type, object_uuid, state)
+    return _direct_set_state(object_type, object_uuid, state)
+
+
+def delete_state(object_type: str, object_uuid: str) -> bool:
+    """Delete state for an object.
+
+    Args:
+        object_type: The type of object (e.g., 'blob', 'instance').
+        object_uuid: The UUID of the object.
+
+    Returns:
+        True if the delete succeeded (or row didn't exist), False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_delete_state(object_type, object_uuid)
+    return _direct_delete_state(object_type, object_uuid)
+
+
+def get_objects_by_state(object_type: str,
+                         state_values: list[str]) -> list[str]:
+    """Get all object UUIDs of a given type in specified states.
+
+    This is the primary use case for MariaDB state storage - efficient
+    queries across object states without scanning all objects in etcd.
+
+    Args:
+        object_type: The type of object (e.g., 'blob', 'instance').
+        state_values: List of state values to match.
+
+    Returns:
+        List of object UUIDs matching the criteria.
+    """
+    if _use_database_service():
+        return _grpc_get_objects_by_state(object_type, state_values)
+    return _direct_get_objects_by_state(object_type, state_values)
+
+
 def get_all_states_for_type(object_type: str) -> list[tuple[str, State]]:
     """Get all states for a given object type.
 
-    Useful for migrations and debugging.
+    Useful for migrations and debugging. This function always uses direct
+    access as it's only called by admin tools and the database daemon.
 
     Args:
         object_type: The type of object (e.g., 'blob', 'instance').

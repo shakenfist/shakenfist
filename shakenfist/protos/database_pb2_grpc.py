@@ -5,7 +5,7 @@ import warnings
 
 from shakenfist.protos import database_pb2 as database__pb2
 
-GRPC_GENERATED_VERSION = '1.70.0'
+GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in database_pb2_grpc.py depends on'
+        + ' but the generated code in database_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -123,6 +123,26 @@ class DatabaseServiceStub(object):
                 '/shakenfist.protos.DatabaseService/Compact',
                 request_serializer=database__pb2.CompactRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetObjectState = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetObjectState',
+                request_serializer=database__pb2.GetObjectStateRequest.SerializeToString,
+                response_deserializer=database__pb2.GetObjectStateReply.FromString,
+                _registered_method=True)
+        self.SetObjectState = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/SetObjectState',
+                request_serializer=database__pb2.SetObjectStateRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteObjectState = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteObjectState',
+                request_serializer=database__pb2.DeleteObjectStateRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetObjectsByState = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetObjectsByState',
+                request_serializer=database__pb2.GetObjectsByStateRequest.SerializeToString,
+                response_deserializer=database__pb2.GetObjectsByStateReply.FromString,
                 _registered_method=True)
 
 
@@ -241,6 +261,31 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetObjectState(self, request, context):
+        """Object State Operations (MariaDB)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetObjectState(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteObjectState(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetObjectsByState(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -333,6 +378,26 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.Compact,
                     request_deserializer=database__pb2.CompactRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetObjectState': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetObjectState,
+                    request_deserializer=database__pb2.GetObjectStateRequest.FromString,
+                    response_serializer=database__pb2.GetObjectStateReply.SerializeToString,
+            ),
+            'SetObjectState': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetObjectState,
+                    request_deserializer=database__pb2.SetObjectStateRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteObjectState': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteObjectState,
+                    request_deserializer=database__pb2.DeleteObjectStateRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetObjectsByState': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetObjectsByState,
+                    request_deserializer=database__pb2.GetObjectsByStateRequest.FromString,
+                    response_serializer=database__pb2.GetObjectsByStateReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -821,6 +886,114 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/Compact',
             database__pb2.CompactRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetObjectState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetObjectState',
+            database__pb2.GetObjectStateRequest.SerializeToString,
+            database__pb2.GetObjectStateReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetObjectState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/SetObjectState',
+            database__pb2.SetObjectStateRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteObjectState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteObjectState',
+            database__pb2.DeleteObjectStateRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetObjectsByState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetObjectsByState',
+            database__pb2.GetObjectsByStateRequest.SerializeToString,
+            database__pb2.GetObjectsByStateReply.FromString,
             options,
             channel_credentials,
             insecure,

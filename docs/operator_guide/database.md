@@ -55,20 +55,37 @@ Each object type has a dedicated key prefix:
 
 ## MariaDB
 
-MariaDB is being introduced for data that benefits from:
+MariaDB is used for object state storage, providing:
 
-- Complex queries with filtering and sorting
-- Indexed lookups on multiple columns
-- Structured data with well-defined schemas
-- Transaction support
+- Efficient queries by object type and state value
+- Indexed lookups for state-based filtering
+- Better performance than etcd for scanning large numbers of objects
 
 MariaDB is deployed on etcd master nodes and uses Galera for multi-master
 replication across the cluster.
 
+### Access Pattern
+
+**Important**: Only the database service daemon (`sf-database`) has direct
+access to MariaDB. All other daemons access MariaDB through the database
+service's gRPC interface.
+
+This architecture:
+
+- Centralizes database access in a single service
+- Provides consistent Prometheus metrics for all database operations
+- Enables clean separation of concerns
+- Simplifies connection management
+
+The `shakenfist.mariadb` module automatically routes requests:
+
+- If `DATABASE_USE_DIRECT_ETCD=True` (database daemon): Direct MariaDB access
+- If `DATABASE_USE_DIRECT_ETCD=False` (all other daemons): gRPC to database service
+
 ### Connection
 
-Shaken Fist connects to MariaDB using SQLAlchemy. The connection details are
-configured during cluster deployment.
+The database service connects to MariaDB using SQLAlchemy. Connection details
+are configured during cluster deployment.
 
 ## Schema System
 
@@ -226,8 +243,10 @@ differences = compare_schemas(engine, table)
 
 ## Object State Storage
 
-Object state (e.g., "created", "deleted", "error") is being migrated from etcd
-attributes to a dedicated MariaDB table for improved query performance.
+Object state (e.g., "created", "deleted", "error") is stored in a dedicated
+MariaDB table for improved query performance. Access is routed through the
+database service's gRPC interface for all daemons except the database daemon
+itself.
 
 ### The object_states Table
 

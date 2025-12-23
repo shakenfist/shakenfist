@@ -1,7 +1,8 @@
 from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -272,3 +273,59 @@ class CompactRequest(_message.Message):
     REVISION_FIELD_NUMBER: _ClassVar[int]
     revision: int
     def __init__(self, revision: _Optional[int] = ...) -> None: ...
+
+class GetObjectStateRequest(_message.Message):
+    __slots__ = ("object_type", "object_uuid")
+    OBJECT_TYPE_FIELD_NUMBER: _ClassVar[int]
+    OBJECT_UUID_FIELD_NUMBER: _ClassVar[int]
+    object_type: str
+    object_uuid: str
+    def __init__(self, object_type: _Optional[str] = ..., object_uuid: _Optional[str] = ...) -> None: ...
+
+class GetObjectStateReply(_message.Message):
+    __slots__ = ("found", "state_value", "update_time", "message")
+    FOUND_FIELD_NUMBER: _ClassVar[int]
+    STATE_VALUE_FIELD_NUMBER: _ClassVar[int]
+    UPDATE_TIME_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    found: bool
+    state_value: str
+    update_time: float
+    message: str
+    def __init__(self, found: bool = ..., state_value: _Optional[str] = ..., update_time: _Optional[float] = ..., message: _Optional[str] = ...) -> None: ...
+
+class SetObjectStateRequest(_message.Message):
+    __slots__ = ("object_type", "object_uuid", "state_value", "update_time", "message")
+    OBJECT_TYPE_FIELD_NUMBER: _ClassVar[int]
+    OBJECT_UUID_FIELD_NUMBER: _ClassVar[int]
+    STATE_VALUE_FIELD_NUMBER: _ClassVar[int]
+    UPDATE_TIME_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    object_type: str
+    object_uuid: str
+    state_value: str
+    update_time: float
+    message: str
+    def __init__(self, object_type: _Optional[str] = ..., object_uuid: _Optional[str] = ..., state_value: _Optional[str] = ..., update_time: _Optional[float] = ..., message: _Optional[str] = ...) -> None: ...
+
+class DeleteObjectStateRequest(_message.Message):
+    __slots__ = ("object_type", "object_uuid")
+    OBJECT_TYPE_FIELD_NUMBER: _ClassVar[int]
+    OBJECT_UUID_FIELD_NUMBER: _ClassVar[int]
+    object_type: str
+    object_uuid: str
+    def __init__(self, object_type: _Optional[str] = ..., object_uuid: _Optional[str] = ...) -> None: ...
+
+class GetObjectsByStateRequest(_message.Message):
+    __slots__ = ("object_type", "state_values")
+    OBJECT_TYPE_FIELD_NUMBER: _ClassVar[int]
+    STATE_VALUES_FIELD_NUMBER: _ClassVar[int]
+    object_type: str
+    state_values: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, object_type: _Optional[str] = ..., state_values: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class GetObjectsByStateReply(_message.Message):
+    __slots__ = ("object_uuids",)
+    OBJECT_UUIDS_FIELD_NUMBER: _ClassVar[int]
+    object_uuids: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, object_uuids: _Optional[_Iterable[str]] = ...) -> None: ...
