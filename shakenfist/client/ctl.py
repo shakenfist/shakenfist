@@ -111,18 +111,33 @@ def verify_config():
 
 @click.command()
 def ensure_mariadb_schema():
-    """Ensure the MariaDB schema exists.
+    """Ensure the MariaDB schema exists and is up to date.
 
     This command should be run on a database node (etcd_master) before
     initializing any nodes. It creates the required MariaDB tables if
-    they don't already exist. Only nodes with direct MariaDB access
-    (MARIADB_HOST configured) can run this command.
+    they don't already exist, and applies any pending schema migrations.
+    Only nodes with direct MariaDB access (MARIADB_HOST configured) can
+    run this command.
     """
     if not config.MARIADB_HOST:
         raise click.ClickException(
             'This command requires MARIADB_HOST to be configured. '
             'It should only be run on database nodes (etcd_master).')
-    mariadb.ensure_schema()
+
+    results = mariadb.ensure_schema()
+
+    for r in results:
+        if r['migrated']:
+            if r['start_version'] <= 0:
+                click.echo(f"Created table '{r['table']}' at version "
+                           f"{r['end_version']}")
+            else:
+                click.echo(f"Migrated table '{r['table']}' from version "
+                           f"{r['start_version']} to {r['end_version']}")
+        else:
+            click.echo(f"Table '{r['table']}' is up to date "
+                       f"(version {r['end_version']})")
+
     click.echo('MariaDB schema verified.')
 
 

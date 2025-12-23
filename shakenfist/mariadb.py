@@ -12,7 +12,13 @@
 # Access is routed through the database microservice (gRPC) for most daemons.
 # Only the database daemon uses direct MariaDB access, which it does by
 # calling the _direct_* functions.
+#
+# Schema Versioning:
+# Each table has a version number tracked in the schema_versions table.
+# When ensure_schema() is called, it checks the current version and applies
+# any necessary migrations. This follows the same pattern as eventlog.py.
 
+import time
 import threading
 from typing import Any, Optional
 
@@ -25,7 +31,6 @@ from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.schema.object_state import State
-from shakenfist.schema.sqlalchemy import ensure_table_exists
 
 
 LOG, _ = logs.setup(__name__)
@@ -35,7 +40,11 @@ _local = threading.local()
 
 # Module-level metadata for table definitions
 _metadata: Optional[sa.MetaData] = None
+_schema_versions_table: Optional[sa.Table] = None
 _object_states_table: Optional[sa.Table] = None
+
+# Current schema versions for each table. Increment when making schema changes.
+OBJECT_STATES_VERSION = 1
 
 
 def _use_database_service() -> bool:
@@ -112,6 +121,86 @@ def _get_metadata() -> sa.MetaData:
     return _metadata
 
 
+def _get_schema_versions_table() -> sa.Table:
+    """Get or create the schema_versions table definition.
+
+    This table tracks the schema version of each table in the database,
+    allowing for incremental migrations when the schema changes.
+    """
+    global _schema_versions_table
+    if _schema_versions_table is None:
+        metadata = _get_metadata()
+        _schema_versions_table = sa.Table(
+            'schema_versions',
+            metadata,
+            sa.Column('table_name', sa.String(64), primary_key=True),
+            sa.Column('version', sa.Integer(), nullable=False),
+            sa.Column('updated_at', sa.Double(), nullable=False),
+        )
+    return _schema_versions_table
+
+
+def _get_table_version(engine: sa.Engine, table_name: str) -> int:
+    """Get the current schema version for a table.
+
+    Returns 0 if the table has no version record (new installation).
+    Returns -1 if the schema_versions table doesn't exist yet.
+    """
+    versions_table = _get_schema_versions_table()
+
+    # Check if schema_versions table exists
+    if not sa.inspect(engine).has_table('schema_versions'):
+        return -1
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(versions_table.c.version).where(
+                versions_table.c.table_name == table_name
+            )
+            result = conn.execute(stmt).fetchone()
+            if result is None:
+                return 0
+            return int(result.version)
+    except OperationalError as e:
+        LOG.warning(f'Failed to get schema version for {table_name}: {e}')
+        return -1
+
+
+def _set_table_version(engine: sa.Engine, table_name: str, version: int) -> None:
+    """Set the schema version for a table."""
+    versions_table = _get_schema_versions_table()
+
+    try:
+        with engine.connect() as conn:
+            # Use MySQL's INSERT ... ON DUPLICATE KEY UPDATE for upsert
+            stmt = sa.dialects.mysql.insert(versions_table).values(
+                table_name=table_name,
+                version=version,
+                updated_at=time.time()
+            )
+            stmt = stmt.on_duplicate_key_update(
+                version=version,
+                updated_at=time.time()
+            )
+            conn.execute(stmt)
+            conn.commit()
+            LOG.info(f'Set schema version for {table_name} to {version}')
+    except OperationalError as e:
+        LOG.error(f'Failed to set schema version for {table_name}: {e}')
+        raise
+
+
+def _ensure_schema_versions_table(engine: sa.Engine) -> None:
+    """Ensure the schema_versions table exists.
+
+    This is the bootstrap table that must exist before we can track
+    versions of other tables.
+    """
+    versions_table = _get_schema_versions_table()
+    versions_table.metadata.create_all(engine, tables=[versions_table],
+                                       checkfirst=True)
+
+
 def _get_object_states_table() -> sa.Table:
     """Get or create the object_states table definition.
 
@@ -139,22 +228,87 @@ def _get_object_states_table() -> sa.Table:
     return _object_states_table
 
 
-def ensure_schema() -> None:
-    """Ensure the MariaDB schema exists.
+def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the object_states table schema is up to date.
 
-    This creates the object_states table if it doesn't exist. Safe to call
-    multiple times - it's idempotent. Only the database daemon should call
-    this function.
+    Applies any necessary migrations based on the current version.
+    Returns a dict with migration status information.
+    """
+    table_name = 'object_states'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_object_states_table()
 
-    Raises RuntimeError if MARIADB_HOST is not configured.
+    # Version 0 or -1 means table doesn't exist yet - create it
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version {OBJECT_STATES_VERSION})')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        # Create indexes
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = OBJECT_STATES_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    # Future migrations would go here, following this pattern:
+    # if current_ver == 1:
+    #     LOG.info('Upgrading object_states from v1 to v2')
+    #     with engine.connect() as conn:
+    #         conn.execute(sa.text('ALTER TABLE object_states ADD COLUMN ...'))
+    #         conn.commit()
+    #     current_ver = 2
+    #     _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': OBJECT_STATES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def ensure_schema() -> list[dict[str, Any]]:
+    """Ensure all MariaDB tables exist with current schema versions.
+
+    This is the main entry point for schema management. It creates any
+    missing tables and applies migrations to bring existing tables up
+    to the current version.
+
+    Safe to call multiple times - it's idempotent. Only nodes with direct
+    MariaDB access (MARIADB_HOST configured) should call this function.
+
+    Returns:
+        List of dicts describing the migration status for each table.
+
+    Raises:
+        RuntimeError: If MARIADB_HOST is not configured.
     """
     if not config.MARIADB_HOST:
         raise RuntimeError('MariaDB is not configured (MARIADB_HOST not set)')
 
     engine = _get_engine()
-    table = _get_object_states_table()
-    ensure_table_exists(engine, table)
-    LOG.info('MariaDB schema verified')
+    results = []
+
+    # First, ensure the schema_versions table exists (bootstrap)
+    _ensure_schema_versions_table(engine)
+
+    # Then ensure each application table is up to date
+    results.append(_ensure_object_states_schema(engine))
+
+    # Log summary
+    migrated = [r for r in results if r['migrated']]
+    if migrated:
+        LOG.info(f'MariaDB schema updated: {len(migrated)} table(s) migrated')
+    else:
+        LOG.info('MariaDB schema verified (no migrations needed)')
+
+    return results
 
 
 def _direct_get_state(object_type: str, object_uuid: str) -> Optional[State]:
