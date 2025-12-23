@@ -129,11 +129,9 @@ def _get_object_states_table() -> sa.Table:
             sa.Column('message', sa.String(255), nullable=True),
             # Composite primary key
             sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
+            # Index for efficient queries by type and state
+            sa.Index('idx_object_states_type_state', 'object_type', 'state_value'),
         )
-        # Add indexes
-        sa.Index('idx_object_states_type_state',
-                 _object_states_table.c.object_type,
-                 _object_states_table.c.state_value)
     return _object_states_table
 
 
