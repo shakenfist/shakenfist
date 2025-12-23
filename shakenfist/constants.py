@@ -1,7 +1,5 @@
 import importlib
 
-from shakenfist.schema.object_types import ObjectType
-
 # Note the most exciting constants ever
 KiB = 1024
 MiB = 1024 * 1024

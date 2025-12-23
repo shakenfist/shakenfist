@@ -9,6 +9,7 @@ from typing import ClassVar
 from etcd3gw.lock import Lock
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.constants import ETCD_ATTEMPT_TIMEOUT
 from shakenfist.constants import get_object_class
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
@@ -396,7 +397,7 @@ class DatabaseBackedObject:
                 })
 
     def get_lock(self, subtype=None, op=None, global_scope=True,
-                 timeout=constants.ETCD_ATTEMPT_TIMEOUT):
+                 timeout=ETCD_ATTEMPT_TIMEOUT):
         # There is no point locking in-memory objects
         if self.in_memory_only:
             return NoopLock()
