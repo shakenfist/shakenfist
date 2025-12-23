@@ -161,8 +161,10 @@ def stop(daemon):
     n.set_daemon_state(daemon, Node.DAEMON_STATE_STOPPING)
 
 
-# All object types that have state stored in etcd
+# All object types that have state stored in etcd. This includes both regular
+# objects (instances, networks, etc.) and cluster operations (node_blob_op, etc.)
 OBJECT_TYPES_WITH_STATE = [
+    # Regular objects
     'agentoperation',
     'artifact',
     'blob',
@@ -174,6 +176,21 @@ OBJECT_TYPES_WITH_STATE = [
     'network',
     'node',
     'upload',
+    # Cluster operations (from CLUSTER_OPERATIONS enum)
+    'artifact_fetch_op',
+    'imgcache_op',
+    'net_iface_ip_op',
+    'net_iface_op',
+    'net_ip_op',
+    'net_macaddr_ip_op',
+    'net_op',
+    'node_aop_op',
+    'node_blob_op',
+    'node_inst_net_iface_op',
+    'node_inst_netdesc_op',
+    'node_inst_op',
+    'node_inst_snap_op',
+    'node_net_op',
 ]
 
 
