@@ -14,7 +14,7 @@
 # calling the _direct_* functions.
 
 import threading
-from typing import Optional
+from typing import Any, Optional
 
 import grpc
 import sqlalchemy as sa
@@ -54,13 +54,17 @@ def _use_database_service() -> bool:
     return True
 
 
-def _get_database_stub():
-    """Get or create a gRPC stub for the database service."""
+def _get_database_stub() -> Any:
+    """Get or create a gRPC stub for the database service.
+
+    Returns Any because the generated protobuf stubs are untyped.
+    """
     if not hasattr(_local, 'database_channel') or _local.database_channel is None:
         _local.database_channel = grpc.insecure_channel(
             f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
+        # DatabaseServiceStub is generated untyped code
         _local.database_stub = database_pb2_grpc.DatabaseServiceStub(
-            _local.database_channel)
+            _local.database_channel)  # type: ignore[no-untyped-call]
     return _local.database_stub
 
 
@@ -306,7 +310,7 @@ def _grpc_set_state(object_type: str, object_uuid: str, state: State) -> bool:
             message=state.message or ''
         )
         reply = stub.SetObjectState(request)
-        return reply.success
+        return bool(reply.success)
     except grpc.RpcError as e:
         LOG.warning(
             f'gRPC SetObjectState failed for {object_type}/{object_uuid}: {e}')
@@ -322,7 +326,7 @@ def _grpc_delete_state(object_type: str, object_uuid: str) -> bool:
             object_uuid=object_uuid
         )
         reply = stub.DeleteObjectState(request)
-        return reply.success
+        return bool(reply.success)
     except grpc.RpcError as e:
         LOG.warning(
             f'gRPC DeleteObjectState failed for {object_type}/{object_uuid}: {e}')
