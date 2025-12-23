@@ -6,6 +6,8 @@ from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist.config import config
 from shakenfist import etcd
+from shakenfist import mariadb
+from shakenfist.schema.object_state import State
 
 
 LOG, _ = logs.setup(__name__)
@@ -25,8 +27,8 @@ def base_mutations(object_type, metadata, target=None):
         'operation_uuid': metadata['uuid']
     }
 
-    # Create the cluster operation, enqueue it, place it into the per-blob
-    # cache, and emit an event about that all in a single etcd transaction.
+    # Create the cluster operation and enqueue it in a single etcd transaction.
+    # State is stored in MariaDB separately.
     mutations = [
         {
             'path': f'/sf/{object_type}/{metadata["uuid"]}',
@@ -34,19 +36,15 @@ def base_mutations(object_type, metadata, target=None):
             'new_data': metadata
         },
         {
-            'path': f'/sf/attribute/{object_type}/{metadata["uuid"]}/state',
-            'original_data': None,
-            'new_data': {
-                'value': 'queued',
-                'update_time': creation_time
-            }
-        },
-        {
             'path': f'{queue_name}/{job_name}',
             'original_data': None,
             'new_data': work_item
         }
     ]
+
+    # Store initial state in MariaDB
+    initial_state = State(value='queued', update_time=creation_time)
+    mariadb.set_state(object_type, metadata['uuid'], initial_state)
 
     correlation_id = sf_random.random_id()
     tasks_str = ', '.join(metadata['tasks'])

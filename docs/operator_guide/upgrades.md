@@ -34,3 +34,52 @@ Which will pull in all the relevant other python packages it requires.
 
 Then simply re-run `getsf` as you did when you first installed and the cluster
 will upgrade.
+
+## MariaDB schema migrations
+
+Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The
+MariaDB schema is versioned, and migrations are applied automatically during
+cluster deployment via `getsf`.
+
+Each MariaDB table has a version number tracked in the `schema_versions` table.
+When the cluster is deployed or upgraded, the `sf-ctl ensure-mariadb-schema`
+command runs automatically on an etcd_master node to:
+
+1. Create any missing tables
+2. Apply any pending schema migrations to bring tables up to the current version
+
+This is similar to how the eventlog sqlite databases handle schema upgrades.
+
+### Manual schema verification
+
+You can manually check or apply schema migrations by running on an etcd_master
+node:
+
+```
+sudo /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
+```
+
+This will output the current version of each table and whether any migrations
+were applied. For example:
+
+```
+Table 'object_states' is up to date (version 1)
+MariaDB schema verified.
+```
+
+Or if a migration was needed:
+
+```
+Migrated table 'object_states' from version 1 to 2
+MariaDB schema verified.
+```
+
+### Database service architecture
+
+Only etcd_master nodes have direct access to MariaDB credentials. All other
+nodes access MariaDB data through a gRPC database microservice that runs on
+etcd_master nodes. This means:
+
+* Schema migrations only need to run on etcd_master nodes
+* Non-etcd_master nodes do not require MariaDB credentials
+* The database service must be running before other daemons can access state data

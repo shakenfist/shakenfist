@@ -10,6 +10,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.schema.object_types import ObjectType
 
 
 # Please note: IPAMs are a "foundational" baseobject type, which means they
@@ -32,15 +33,20 @@ RESERVATION_TYPE_UNKNOWN = 'unknown'
 class IPAM(dbo):
     # There were older versions of ipam, but we don't admit to them because
     # the upgrade is painful.
-    object_type = 'ipam'
+    object_type = ObjectType.IPAM
     initial_version = 7
-    current_version = 7
+    current_version = 8
 
     state_targets = {
         None: (dbo.STATE_CREATED),
         dbo.STATE_CREATED: (dbo.STATE_DELETED),
         dbo.STATE_DELETED: None
     }
+
+    @classmethod
+    def _upgrade_step_7_to_8(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
+        ...
 
     def __init__(self, static_values):
         self._in_memory_only = static_values.get('in_memory_only', False)

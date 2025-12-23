@@ -415,16 +415,6 @@ class Monitor(daemon.Daemon):
 
                         etcd.resolve(queue_name, jobname)
 
-        # Remove old entries from the hard-deleted state caches
-        for object_type in OBJECT_NAMES_TO_CLASSES:
-            with etcd.ClusterLock('cache', None, object_type, op='Hard deleted prune'):
-                hd = etcd.get('cache', object_type, 'hard-deleted')
-                if hd:
-                    for obj in list(hd.keys()):
-                        if time.time() - hd[obj] > 7 * 3600 * 24:
-                            del hd[obj]
-                    etcd.put('cache', object_type, 'hard-deleted', hd)
-
         # And we're done
         LOG.info('Cluster maintenance loop complete')
 

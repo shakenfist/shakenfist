@@ -38,8 +38,10 @@ config = sf_config.config
 
 # These imports _must_ occur after the extra config setup has run.
 from shakenfist import etcd                                # noqa
+from shakenfist import mariadb                             # noqa
 from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
+from shakenfist.schema.object_state import State           # noqa
 
 
 @click.group()
@@ -108,6 +110,38 @@ def verify_config():
 
 
 @click.command()
+def ensure_mariadb_schema():
+    """Ensure the MariaDB schema exists and is up to date.
+
+    This command should be run on a database node (etcd_master) before
+    initializing any nodes. It creates the required MariaDB tables if
+    they don't already exist, and applies any pending schema migrations.
+    Only nodes with direct MariaDB access (MARIADB_HOST configured) can
+    run this command.
+    """
+    if not config.MARIADB_HOST:
+        raise click.ClickException(
+            'This command requires MARIADB_HOST to be configured. '
+            'It should only be run on database nodes (etcd_master).')
+
+    results = mariadb.ensure_schema()
+
+    for r in results:
+        if r['migrated']:
+            if r['start_version'] <= 0:
+                click.echo(f"Created table '{r['table']}' at version "
+                           f"{r['end_version']}")
+            else:
+                click.echo(f"Migrated table '{r['table']}' from version "
+                           f"{r['start_version']} to {r['end_version']}")
+        else:
+            click.echo(f"Table '{r['table']}' is up to date "
+                       f"(version {r['end_version']})")
+
+    click.echo('MariaDB schema verified.')
+
+
+@click.command()
 def initialise_node():
     click.echo(f'Initializing node "{config.NODE_NAME}" with mesh IP '
                f'{config.NODE_MESH_IP}...')
@@ -154,10 +188,111 @@ def stop(daemon):
     n.set_daemon_state(daemon, Node.DAEMON_STATE_STOPPING)
 
 
+# All object types that have state stored in etcd. This includes both regular
+# objects (instances, networks, etc.) and cluster operations (node_blob_op, etc.)
+OBJECT_TYPES_WITH_STATE = [
+    # Regular objects
+    'agentoperation',
+    'artifact',
+    'blob',
+    'dhcp',
+    'instance',
+    'interface',
+    'ipam',
+    'namespace',
+    'network',
+    'node',
+    'upload',
+    # Cluster operations (from CLUSTER_OPERATIONS enum)
+    'artifact_fetch_op',
+    'imgcache_op',
+    'net_iface_ip_op',
+    'net_iface_op',
+    'net_ip_op',
+    'net_macaddr_ip_op',
+    'net_op',
+    'node_aop_op',
+    'node_blob_op',
+    'node_inst_net_iface_op',
+    'node_inst_netdesc_op',
+    'node_inst_op',
+    'node_inst_snap_op',
+    'node_net_op',
+]
+
+
+@click.command()
+@click.option('--dry-run', is_flag=True, default=False,
+              help='Show what would be migrated without making changes')
+def migrate_state_to_mariadb(dry_run):
+    """Migrate all object state from etcd to MariaDB.
+
+    This command should be run once during an upgrade to move state data
+    from etcd attributes to the MariaDB object_states table. All Shaken Fist
+    services should be stopped before running this command.
+
+    After migration, the state entries are removed from etcd.
+    """
+    # Ensure the MariaDB schema exists. This will raise an error if MariaDB
+    # is not configured.
+    if not dry_run:
+        click.echo('Ensuring MariaDB schema exists...')
+        mariadb.ensure_schema()
+
+    total_migrated = 0
+    total_skipped = 0
+
+    for object_type in OBJECT_TYPES_WITH_STATE:
+        click.echo(f'\nMigrating {object_type} objects...')
+        migrated = 0
+        skipped = 0
+
+        # Iterate through all objects of this type
+        for objkey, _ in etcd.get_all(object_type, None):
+            # Extract UUID from the etcd key
+            objuuid = objkey.split('/')[-1]
+
+            # Get state from etcd
+            state_data = etcd.get(f'attribute/{object_type}', objuuid, 'state')
+            if not state_data:
+                skipped += 1
+                continue
+
+            if dry_run:
+                click.echo(f'  Would migrate {objuuid}: {state_data.get("value")}')
+            else:
+                # Write to MariaDB
+                state = State(**state_data)
+                mariadb.set_state(object_type, objuuid, state)
+
+                # Remove from etcd
+                etcd.delete(f'attribute/{object_type}', objuuid, 'state')
+
+            migrated += 1
+
+            # Show progress every 100 objects
+            if migrated % 100 == 0:
+                click.echo(f'  ... {migrated} objects processed')
+
+        click.echo(f'  {object_type}: {migrated} migrated, {skipped} skipped')
+        total_migrated += migrated
+        total_skipped += skipped
+
+    click.echo(f'\nTotal: {total_migrated} objects migrated, '
+               f'{total_skipped} objects skipped (no state)')
+
+    if dry_run:
+        click.echo('\nThis was a dry run. No changes were made.')
+    else:
+        click.echo('\nMigration complete. You can now start Shaken Fist services.')
+
+
 cli.add_command(bootstrap_system_key)
+cli.add_command(migrate_state_to_mariadb)
 cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
 cli.add_command(verify_config)
+cli.add_command(ensure_mariadb_schema)
 cli.add_command(initialise_node)
 cli.add_command(register_daemon)
 cli.add_command(deregister_daemon)

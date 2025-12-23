@@ -6,6 +6,7 @@
     name:
       - mariadb-server
       - mariadb-client
+      - python3-mysqldb
     state: latest
 
 - name: Enable and start MariaDB service
@@ -13,3 +14,25 @@
     name: mariadb
     enabled: yes
     state: started
+
+- name: Create shakenfist database
+  community.mysql.mysql_db:
+    name: shakenfist
+    state: present
+    login_unix_socket: /run/mysqld/mysqld.sock
+
+- name: Create shakenfist database user
+  community.mysql.mysql_user:
+    name: shakenfist
+    password: "{{ mariadb_password }}"
+    priv: 'shakenfist.*:ALL'
+    host: '%'
+    state: present
+    login_unix_socket: /run/mysqld/mysqld.sock
+
+- name: Configure MariaDB to listen on mesh network only
+  lineinfile:
+    path: /etc/mysql/mariadb.conf.d/50-server.cnf
+    regexp: '^bind-address'
+    line: 'bind-address = {{ node_mesh_ip }}'
+  notify: Restart MariaDB

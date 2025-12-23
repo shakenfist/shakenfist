@@ -8,6 +8,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.managed_executables import managedexecutable
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -15,9 +16,9 @@ class DnsMasq(managedexecutable.ManagedExecutable):
     # Note that this slightly confusing object type is required for historical
     # reasons so that objects and config files don't need to be renamed on
     # upgrade.
-    object_type = 'dhcp'
+    object_type = ObjectType.DHCP
     initial_version = 1
-    current_version = 2
+    current_version = 3
 
     def __init__(self, static_values):
         self.upgrade(static_values)
@@ -37,6 +38,11 @@ class DnsMasq(managedexecutable.ManagedExecutable):
     def _upgrade_step_1_to_2(cls, static_values):
         static_values['provide_dhcp'] = True
         static_values['provide_dns'] = False
+
+    @classmethod
+    def _upgrade_step_2_to_3(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
+        ...
 
     # Static values
     @property

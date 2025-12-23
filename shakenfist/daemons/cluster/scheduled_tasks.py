@@ -11,6 +11,7 @@ from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.blob import Blob
 from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.schema.operations import baseclusteroperation as bco_schema
 from shakenfist.schema.operations import node_blob_op as nbo_schema
 from shakenfist.schema.operations import node_inst_op as nio_schema
@@ -223,8 +224,8 @@ def _fill_per_deleted_object_queue():
     for objtype in OBJECT_NAMES_TO_CLASSES:
         for objkey, _ in etcd.get_all(objtype, None):
             obj_uuid = objkey.split('/')[-1]
-            state_data = etcd.get(f'attribute/{objtype}', obj_uuid, 'state')
-            state_value = state_data.get('value') if state_data else None
+            state = mariadb.get_state(objtype, obj_uuid)
+            state_value = state.value if state else None
             if state_value not in FINAL_OBJECT_STATES:
                 continue
             obj = get_object_class(objtype).from_db(obj_uuid)
