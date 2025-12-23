@@ -136,8 +136,8 @@ echo -e "${BLUE}Shaken Fist Auto-Delinter${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo
 
-# Step 1: Create venv and run flake8
-echo -e "${YELLOW}Step 1: Running flake8 to capture lint errors...${NC}"
+# Step 1: Create venv and run flake8 via tox
+echo -e "${YELLOW}Step 1: Running flake8 via tox to capture lint errors...${NC}"
 echo
 
 # Create venv if needed
@@ -145,14 +145,15 @@ if [ ! -d "/tmp/venv-lint" ]; then
     python3 -m venv /tmp/venv-lint
     . /tmp/venv-lint/bin/activate
     pip install -q uv
-    uv pip install -q tox tox-uv flake8
+    uv pip install -q tox tox-uv
 else
     . /tmp/venv-lint/bin/activate
 fi
 
-# Run flake8 and capture output
+# Run flake8 via tox (which uses flake8wrap.sh -HEAD to check only changes
+# since HEAD~1 and excludes generated protobuf code)
 set +e
-flake8 --max-line-length=120 shakenfist/ > "${output_dir}/flake8-errors.txt" 2>&1
+tox -eflake8 > "${output_dir}/flake8-errors.txt" 2>&1
 flake8_exit_code=$?
 set -e
 
@@ -193,8 +194,9 @@ echo
 
 # Build the prompt
 cat > "${output_dir}/claude-prompt.txt" << 'PROMPT_EOF'
-The flake8 linter has found errors in the Shaken Fist codebase. Please fix
-all of the lint errors listed below.
+The flake8 linter has found errors in files changed by this PR. Please fix
+all of the lint errors listed below. These errors are only from files
+modified in the current commit (not pre-existing errors).
 
 ## Lint Errors
 
@@ -223,13 +225,13 @@ cat >> "${output_dir}/claude-prompt.txt" << 'PROMPT_EOF'
    - Trim trailing whitespace
 
 4. After making fixes, verify by running:
-   flake8 --max-line-length=120 shakenfist/
+   tox -eflake8
 
 5. Only stage your changes with 'git add' - do NOT commit
 
 ## Important Notes
 
-- Fix ALL errors, not just some of them
+- Fix ALL errors listed above, not just some of them
 - Be careful not to change code logic, only style issues
 - If an import is "unused" but needed for side effects, add a noqa comment
 - Test that your changes don't break the code
@@ -258,9 +260,9 @@ fi
 echo
 echo -e "${YELLOW}Step 4: Verifying fix...${NC}"
 
-# Re-run flake8
+# Re-run flake8 via tox
 set +e
-flake8 --max-line-length=120 shakenfist/ > "${output_dir}/flake8-verify.txt" 2>&1
+tox -eflake8 > "${output_dir}/flake8-verify.txt" 2>&1
 verify_exit_code=$?
 set -e
 
