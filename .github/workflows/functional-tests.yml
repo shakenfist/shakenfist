@@ -1433,7 +1433,7 @@ jobs:
 
   enqueue_pr_comment:
     if: always() && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, static]
     permissions:
       pull-requests: write
     outputs:
@@ -1469,7 +1469,7 @@ jobs:
 
   merge_pr_comment:
     if: always() && github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, static]
     permissions:
       pull-requests: write
     outputs:
@@ -1523,7 +1523,7 @@ jobs:
                     value: "In Progress"
 
   can_see_status:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, static]
     steps:
       - name: "Immediate success"
         run: true
@@ -1536,7 +1536,7 @@ jobs:
     if: always() && github.event_name != 'merge_group'
     permissions:
       actions: read
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, static]
     steps:
       - env:
           NEEDS_JSON: "${{toJSON(needs)}}"
@@ -1576,7 +1576,7 @@ jobs:
     if: always() && github.event_name == 'merge_group'
     permissions:
       actions: read
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, static]
     steps:
       - env:
           NEEDS_JSON: "${{toJSON(needs)}}"
