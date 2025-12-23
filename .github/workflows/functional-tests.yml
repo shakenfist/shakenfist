@@ -158,6 +158,28 @@ jobs:
         run: |
           tools/fix-lint-with-claude.sh --ci
 
+  # Reviews PRs using Claude Code. Runs on all PRs after sanity_checks completes.
+  automated_reviewer:
+    runs-on: [self-hosted, claude-code]
+    needs: sanity_checks
+    name: "Automated reviewer"
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-reviewer
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run automated reviewer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tools/review-pr-with-claude.sh --ci --pr ${{ github.event.pull_request.number }}
+
   functional_matrix_pr:
     if: always() && github.event_name != 'merge_group'
     runs-on: [self-hosted, vm, debian-12]
