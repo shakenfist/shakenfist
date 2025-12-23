@@ -25,7 +25,6 @@ from shakenfist.blob import placement_filter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
-from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.daemons.cluster import scheduled_tasks
 from shakenfist.exceptions import InvalidStateException
