@@ -163,7 +163,7 @@ jobs:
     runs-on: [self-hosted, claude-code]
     needs: sanity_checks
     name: "Automated reviewer"
-    if: ${{ always() && github.event_name == 'pull_request' }}
+    if: github.event_name == 'pull_request'
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-reviewer
       cancel-in-progress: true
