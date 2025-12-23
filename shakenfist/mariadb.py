@@ -17,10 +17,8 @@ from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs
 
 from shakenfist.config import config
-from shakenfist.schema.object_state import ObjectState
 from shakenfist.schema.object_state import State
 from shakenfist.schema.sqlalchemy import ensure_table_exists
-from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
 
 
 LOG, _ = logs.setup(__name__)
