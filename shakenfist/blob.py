@@ -16,8 +16,6 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import etcd
-from shakenfist import mariadb
-from shakenfist.schema.object_state import State
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
 from shakenfist.schema.operations.node_blob_op \
@@ -63,9 +61,6 @@ class Blob(dbo):
     object_type = 'blob'
     initial_version = 2
     current_version = 9
-
-    # Enable MariaDB state storage for Blob objects
-    use_mariadb_state = True
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -133,17 +128,8 @@ class Blob(dbo):
 
     @classmethod
     def _upgrade_step_8_to_9(cls, static_values):
-        # Migrate state to MariaDB. Read from etcd attribute and write to
-        # MariaDB. The dual-write strategy means new state changes will go
-        # to both stores, so we just need to seed MariaDB with current state.
-        if not mariadb.is_configured():
-            return
-
-        blob_uuid = static_values['uuid']
-        state_data = etcd.get('attribute/blob', blob_uuid, 'state')
-        if state_data:
-            state = State(**state_data)
-            mariadb.set_state('blob', blob_uuid, state)
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
+        ...
 
     @classmethod
     def normalize_timestamp(cls, timestamp):

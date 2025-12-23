@@ -17,7 +17,7 @@ class DnsMasq(managedexecutable.ManagedExecutable):
     # upgrade.
     object_type = 'dhcp'
     initial_version = 1
-    current_version = 2
+    current_version = 3
 
     def __init__(self, static_values):
         self.upgrade(static_values)
@@ -37,6 +37,11 @@ class DnsMasq(managedexecutable.ManagedExecutable):
     def _upgrade_step_1_to_2(cls, static_values):
         static_values['provide_dhcp'] = True
         static_values['provide_dns'] = False
+
+    @classmethod
+    def _upgrade_step_2_to_3(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
+        ...
 
     # Static values
     @property

@@ -8,13 +8,13 @@ from shakenfist.tests import base
 
 
 class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
+    @mock.patch('shakenfist.mariadb.get_state',
                 side_effect=[
-                    {'value': None, 'update_time': 2},
-                    {'value': DatabaseBackedObject.STATE_INITIAL, 'update_time': 4},
-                    {'value': DatabaseBackedObject.STATE_CREATED, 'update_time': 10},
+                    State(value=None, update_time=2),
+                    State(value=DatabaseBackedObject.STATE_INITIAL, update_time=4),
+                    State(value=DatabaseBackedObject.STATE_CREATED, update_time=10),
                 ])
-    def test_state(self, mock_get_attribute):
+    def test_state(self, mock_mariadb_get_state):
         d = DatabaseBackedObject('uuid')
         self.assertEqual(d.state, State(value=None, update_time=2))
         self.assertEqual(d.state,
@@ -41,16 +41,19 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
+    @mock.patch('shakenfist.mariadb.get_state',
+                side_effect=[
+                    State(value=DatabaseBackedObject.STATE_INITIAL, update_time=4),
+                    State(value=DatabaseBackedObject.STATE_ERROR, update_time=4),
+                ])
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
                 side_effect=[
                     {},
                     {'message': 'bad error'},
-                    {'value': DatabaseBackedObject.STATE_INITIAL, 'update_time': 4},
-                    {'value': DatabaseBackedObject.STATE_ERROR, 'update_time': 4},
                     {'message': 'real bad'},
                 ])
-    def test_property_error_msg(self, mock_get_attribute, mock_set_attribute,
-                                mock_add_event):
+    def test_property_error_msg(self, mock_get_attribute, mock_mariadb_get_state,
+                                mock_set_attribute, mock_add_event):
         d = DatabaseBackedObject('uuid')
         self.assertEqual(d.error, None)
         self.assertEqual(d.error, 'bad error')

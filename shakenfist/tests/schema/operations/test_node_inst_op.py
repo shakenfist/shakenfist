@@ -110,8 +110,7 @@ class NodeInstOpTestCase(base.ShakenFistTestCase):
                 'value': 'queued',
                 'update_time': 123.0
             },
-            self.mock_etcd.get_raw(
-                f'/sf/attribute/node_inst_op/{op_uuid}/state')
+            self.mock_etcd.get_mariadb_state('node_inst_op', op_uuid)
         )
         self.assertEqual(
             {

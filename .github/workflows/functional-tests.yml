@@ -20,6 +20,8 @@ jobs:
   sanity_checks:
     runs-on: [self-hosted, vm, debian-12]
     needs: enqueue_pr_comment
+    outputs:
+      flake8_failed: ${{ steps.flake8.outcome == 'failure' }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-lint
       cancel-in-progress: true
@@ -44,6 +46,7 @@ jobs:
           uv pip install tox tox-uv
 
       - name: Lint with flake8
+        id: flake8
         timeout-minutes: 5
         run: |
           . /tmp/venv-test/bin/activate
@@ -127,6 +130,55 @@ jobs:
                   - title: "Status"
                     short: true
                     value: "Failure in sanity tests"
+
+  # Runs if the "Lint with flake8" step in the sanity_checks job fails.
+  # Uses always() so it runs even when sanity_checks fails.
+  automated_delinter:
+    runs-on: [self-hosted, claude-code]
+    needs: sanity_checks
+    name: "Automated delinter"
+    if: ${{ always() && needs.sanity_checks.outputs.flake8_failed == 'true' }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-delinter
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "Claude Code run by Shakenfist Bot"
+          git config user.email "bot@shakenfist.com"
+
+      - name: Run automated delinter
+        run: |
+          tools/fix-lint-with-claude.sh --ci
+
+  # Reviews PRs using Claude Code. Runs on all PRs after sanity_checks completes.
+  automated_reviewer:
+    runs-on: [self-hosted, claude-code]
+    needs: sanity_checks
+    name: "Automated reviewer"
+    if: github.event_name == 'pull_request'
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-reviewer
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run automated reviewer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tools/review-pr-with-claude.sh --ci --pr ${{ github.event.pull_request.number }}
 
   functional_matrix_pr:
     if: always() && github.event_name != 'merge_group'

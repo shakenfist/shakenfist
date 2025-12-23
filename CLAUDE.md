@@ -331,46 +331,33 @@ Queue priorities (per-node and global):
 4. **State machine transitions** - Follow documented state machines in
    `docs/developer_guide/state_machine.md`
 
-## Enabling MariaDB State for an Object Type
+## MariaDB State Storage
 
-When migrating an object type to use MariaDB for state storage, follow these
-steps (Blob was the first object type migrated as a reference):
+Object state (e.g., "created", "deleted", "error") is stored in MariaDB in the
+`object_states` table. This is required for all deployments - MariaDB must be
+configured.
 
-1. **Set the class variable** in the object class:
-   ```python
-   class MyObject(DatabaseBackedObject):
-       use_mariadb_state = True
-   ```
+### Migrating Existing Deployments
 
-2. **Bump the object version** to trigger migration:
-   ```python
-   current_version = N + 1  # Increment from current version
-   ```
+When upgrading an existing deployment to use MariaDB for state storage:
 
-3. **Add an upgrade step** to migrate existing state from etcd to MariaDB:
-   ```python
-   @classmethod
-   def _upgrade_step_N_to_N+1(cls, static_values):
-       if not mariadb.is_configured():
-           return
-       state_data = etcd.get('attribute/myobject', static_values['uuid'], 'state')
-       if state_data:
-           state = State(**state_data)
-           mariadb.set_state('myobject', static_values['uuid'], state)
-   ```
+1. Stop all Shaken Fist services on all nodes
+2. Run `sf-ctl migrate-state-to-mariadb` to migrate state data from etcd
+3. Start services via getsf
 
-4. **Update tests** that use the `State` class:
-   - Use keyword arguments: `State(value='created', update_time=123.0)`
-   - Use float for `update_time` (not int)
+The migration command copies all state from etcd attributes to MariaDB and
+removes the old etcd entries.
 
-5. **Run tests and mypy** to verify:
-   ```bash
-   tox -epy38
-   tox -emypy
-   ```
+### State Class
 
-The dual-write strategy ensures backwards compatibility: state changes are
-written to both MariaDB and etcd, with reads preferring MariaDB.
+The `State` class is a Pydantic model:
+```python
+from shakenfist.schema.object_state import State
+
+state = State(value='created', update_time=123.0, message='optional')
+```
+
+Use keyword arguments and float for `update_time` (not int).
 
 ## Documentation
 

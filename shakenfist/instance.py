@@ -148,7 +148,7 @@ class ConnectedVSockChannel():
 
 class Instance(dbowo):
     object_type = 'instance'
-    current_version = 16
+    current_version = 17
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -312,6 +312,11 @@ class Instance(dbowo):
 
     @classmethod
     def _upgrade_step_15_to_16(cls, static_values):
+        ...
+
+    @classmethod
+    def _upgrade_step_16_to_17(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
 
     @classmethod

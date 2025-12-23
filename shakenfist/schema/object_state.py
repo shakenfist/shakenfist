@@ -21,7 +21,6 @@ from pydantic import ConfigDict
 from pydantic import Field
 
 from shakenfist.schema.sqlalchemy import SQLIndex
-from shakenfist.schema.sqlalchemy import SQLUniqueIndex
 
 
 class State(BaseModel):
@@ -76,9 +75,12 @@ class ObjectState(BaseModel):
     """Schema for object state storage in MariaDB.
 
     This model represents a single row in the object_states table. The
-    combination of (object_type, object_uuid) forms the logical primary key,
-    though we use object_uuid alone as the primary key since UUIDs are unique
-    across all object types.
+    combination of (object_type, object_uuid) forms the primary key because
+    different object types can share the same UUID. For example, a Network
+    and its associated IPAM both use the network's UUID.
+
+    Note: The actual table is created manually in mariadb.py to support
+    the composite primary key. This model is used for reference only.
 
     Attributes:
         object_uuid: The UUID of the object this state belongs to.
@@ -97,10 +99,10 @@ class ObjectState(BaseModel):
         }
     )
 
-    # Primary key - UUID is unique across all object types
-    object_uuid: Annotated[str, SQLUniqueIndex(), Field(max_length=36)]
+    # Part of composite primary key (object_type, object_uuid)
+    object_uuid: Annotated[str, Field(max_length=36)]
 
-    # Object type for filtering queries
+    # Part of composite primary key (object_type, object_uuid)
     object_type: Annotated[str, SQLIndex(), Field(max_length=32)]
 
     # The actual state value - validated per-type in Python code

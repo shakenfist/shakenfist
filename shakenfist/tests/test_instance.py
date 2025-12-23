@@ -12,7 +12,6 @@ import testtools
 from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist.baseobject import State
 from shakenfist.config import SFConfig
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
@@ -71,14 +70,17 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
             [{}], 'userdata', {'memory': 16384, 'model': 'cirrus', 'vdi': 'spice'},
             instance_uuid='uuid42',)
 
+        # State is now stored in MariaDB, so check via the mock
         self.assertEqual(
-            ('attribute/instance', 'uuid42', 'state',
-             State(value=instance.Instance.STATE_INITIAL, update_time=1234)),
-            mock_put.mock_calls[0][1])
+            {
+                'value': instance.Instance.STATE_INITIAL,
+                'update_time': 1234
+            },
+            self.mock_etcd.get_mariadb_state('instance', 'uuid42'))
         self.assertEqual(
             ('attribute/instance', 'uuid42',
              'power_state', {'power_state': instance.Instance.STATE_INITIAL}),
-            mock_put.mock_calls[1][1])
+            mock_put.mock_calls[0][1])
 
         self.assertEqual(
             ('instance', None, 'uuid42',
@@ -93,7 +95,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'ssh_key': 'sshkey',
                  'user_data': 'userdata',
                  'uuid': 'uuid42',
-                 'version': 16,
+                 'version': 17,
                  'video': {'memory': 16384, 'model': 'cirrus', 'vdi': 'spice'},
                  'uefi': False,
                  'configdrive': 'openstack-disk',

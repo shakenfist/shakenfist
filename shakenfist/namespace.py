@@ -18,7 +18,7 @@ LOG, _ = logs.setup(__name__)
 
 class Namespace(dbo):
     object_type = 'namespace'
-    current_version = 5
+    current_version = 6
 
     # docs/developer_guide/state_machine.md has a description of these states.
     ACTIVE_STATES = {dbo.STATE_CREATED}
@@ -99,6 +99,11 @@ class Namespace(dbo):
     @classmethod
     def _upgrade_step_4_to_5(cls, static_values):
         cls._upgrade_metadata_to_attribute(static_values['uuid'])
+
+    @classmethod
+    def _upgrade_step_5_to_6(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
+        ...
 
     @classmethod
     def new(cls, name):
@@ -224,8 +229,6 @@ CACHED_TOKENS = {}
 
 
 def get_api_token(base_url, namespace='system'):
-    global CACHED_TOKENS
-
     if namespace in CACHED_TOKENS:
         expiry, access_token = CACHED_TOKENS[namespace]
         if expiry - time.time() > 15:

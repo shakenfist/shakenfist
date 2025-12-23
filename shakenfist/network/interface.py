@@ -24,7 +24,7 @@ LOG, _ = logs.setup(__name__)
 class NetworkInterface(dbo):
     object_type = 'interface'
     initial_version = 2
-    current_version = 3
+    current_version = 4
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -50,6 +50,11 @@ class NetworkInterface(dbo):
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values):
         cls._upgrade_metadata_to_attribute(static_values['uuid'])
+
+    @classmethod
+    def _upgrade_step_3_to_4(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
+        ...
 
     @classmethod
     def new(cls, interface_uuid, netdesc, instance_uuid, order):

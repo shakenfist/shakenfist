@@ -21,7 +21,7 @@ LOG, _ = logs.setup(__name__)
 class Node(dbo):
     object_type = 'node'
     initial_version = 2
-    current_version = 8
+    current_version = 9
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
@@ -104,6 +104,11 @@ class Node(dbo):
 
     @classmethod
     def _upgrade_step_7_to_8(cls, static_values):
+        ...
+
+    @classmethod
+    def _upgrade_step_8_to_9(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
 
     @classmethod

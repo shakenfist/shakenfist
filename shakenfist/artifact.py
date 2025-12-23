@@ -30,7 +30,7 @@ UPLOAD_URL = 'sf://upload/'
 
 class Artifact(dbowo):
     object_type = 'artifact'
-    current_version = 7
+    current_version = 8
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -82,6 +82,11 @@ class Artifact(dbowo):
 
     @classmethod
     def _upgrade_step_6_to_7(cls, static_values):
+        ...
+
+    @classmethod
+    def _upgrade_step_7_to_8(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
 
     @classmethod
