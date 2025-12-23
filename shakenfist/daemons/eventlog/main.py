@@ -18,11 +18,11 @@ from shakenfist import eventlog
 from shakenfist import node
 from shakenfist.etcd import set_force_direct_etcd
 from shakenfist.config import config
-from shakenfist.constants import API_REQUESTS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_HISTORIC
 from shakenfist.constants import EVENT_TYPES
 from shakenfist.daemons import daemon
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_status
 from shakenfist.exceptions import InvalidStateException
@@ -115,9 +115,9 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                 extra['object_type'] = request.object_type
                 extra['object_uuid'] = request.object_uuid
                 self._record_with_dlq(
-                    request.event_type, API_REQUESTS, extra['request-id'],
-                    request.message, request.duration, extra, timestamp,
-                    request.fqdn, correlation_id=correlation_id)
+                    request.event_type, ObjectType.API_REQUESTS,
+                    extra['request-id'], request.message, request.duration,
+                    extra, timestamp, request.fqdn, correlation_id=correlation_id)
 
         except Exception as e:
             util_general.ignore_exception(
@@ -150,14 +150,15 @@ class EventService(event_pb2_grpc.EventServiceServicer):
             self.monitor.counters[request.event_type].inc()
 
             # Piggy back request tracing onto object events
-            if 'request-id' in extra and API_REQUESTS not in logged_types:
+            if 'request-id' in extra and ObjectType.API_REQUESTS not in logged_types:
                 # Add object information from the original event to extra
                 tweaked_extra = self._add_other_objects(
-                    API_REQUESTS, request.objects, extra)
+                    ObjectType.API_REQUESTS, request.objects, extra)
                 self._record_with_dlq(
-                    request.event_type, API_REQUESTS, extra['request-id'],
-                    request.message, request.duration, tweaked_extra, timestamp,
-                    request.fqdn, correlation_id=correlation_id)
+                    request.event_type, ObjectType.API_REQUESTS,
+                    extra['request-id'], request.message, request.duration,
+                    tweaked_extra, timestamp, request.fqdn,
+                    correlation_id=correlation_id)
 
         except Exception as e:
             util_general.ignore_exception(

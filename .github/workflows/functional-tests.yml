@@ -20,6 +20,8 @@ jobs:
   sanity_checks:
     runs-on: [self-hosted, vm, debian-12]
     needs: enqueue_pr_comment
+    outputs:
+      flake8_failed: ${{ steps.flake8.outcome == 'failure' }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-lint
       cancel-in-progress: true
@@ -44,6 +46,7 @@ jobs:
           uv pip install tox tox-uv
 
       - name: Lint with flake8
+        id: flake8
         timeout-minutes: 5
         run: |
           . /tmp/venv-test/bin/activate
@@ -63,14 +66,16 @@ jobs:
           pip3 install uv
           uv pip install -r pyproject.toml
 
-      - name: Run python3 unit tests
+      - name: Run python3 unit tests and gather coverage data
+        id: py3_tests
         timeout-minutes: 10
         run: |
           . /tmp/venv-test/bin/activate
-          tox -epy3
+          tox -ecover
+          zip -r cover.zip cover
 
       - name: List failing tests
-        if: failure()
+        if: ${{ failure() && steps.py3_tests.outcome == 'failure' }}
         id: failures
         run: |
           echo "Gathering list of failed tests..."
@@ -92,12 +97,30 @@ jobs:
           echo "GITHUB_OUTPUT is:"
           cat ${GITHUB_OUTPUT}
 
-      - name: Generate coverage report
-        timeout-minutes: 10
+      - name: Post failing tests to PR
+        if: ${{ failure() && steps.py3_tests.outcome == 'failure' && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          . /tmp/venv-test/bin/activate
-          tox -ecover
-          zip -r cover.zip cover
+          # Build the comment body
+          cat > /tmp/pr-comment.md << 'COMMENT_EOF'
+          ## Unit Test Failures
+
+          The following unit tests failed:
+
+          ```
+          COMMENT_EOF
+
+          cat /srv/ci/failed >> /tmp/pr-comment.md
+
+          cat >> /tmp/pr-comment.md << 'COMMENT_EOF'
+          ```
+
+          [View full test output](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          COMMENT_EOF
+
+          # Post the comment
+          gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/pr-comment.md
 
       - uses: actions/upload-artifact@v4
         with:
@@ -127,6 +150,55 @@ jobs:
                   - title: "Status"
                     short: true
                     value: "Failure in sanity tests"
+
+  # Runs if the "Lint with flake8" step in the sanity_checks job fails.
+  # Uses always() so it runs even when sanity_checks fails.
+  automated_delinter:
+    runs-on: [self-hosted, claude-code]
+    needs: sanity_checks
+    name: "Automated delinter"
+    if: ${{ always() && needs.sanity_checks.outputs.flake8_failed == 'true' }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-delinter
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "Claude Code run by Shakenfist Bot"
+          git config user.email "bot@shakenfist.com"
+
+      - name: Run automated delinter
+        run: |
+          tools/fix-lint-with-claude.sh --ci
+
+  # Reviews PRs using Claude Code. Runs on all PRs after sanity_checks completes.
+  automated_reviewer:
+    runs-on: [self-hosted, claude-code]
+    needs: sanity_checks
+    name: "Automated reviewer"
+    if: github.event_name == 'pull_request'
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-reviewer
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run automated reviewer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tools/review-pr-with-claude.sh --ci --pr ${{ github.event.pull_request.number }}
 
   functional_matrix_pr:
     if: always() && github.event_name != 'merge_group'
@@ -210,7 +282,7 @@ jobs:
           tools/run_remote ${primary} python3 tools/buffer.py
 
       - name: Run getsf installer on primary
-        timeout-minutes: 30
+        timeout-minutes: 45
         run: |
           set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
@@ -262,7 +334,7 @@ jobs:
               ${{ matrix.os.base_image_user }}@${primary} "sudo mkdir -p /srv/ci/traces; sudo chown -R ${{ matrix.os.base_image_user }}:${{ matrix.os.base_image_user }} /srv/ci/traces"
 
       - name: Run functional tests
-        timeout-minutes: 30
+        timeout-minutes: 45
         run: |
           set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh

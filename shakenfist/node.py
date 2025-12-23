@@ -12,6 +12,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import GiB
 from shakenfist.exceptions import NoSuchDaemon
 from shakenfist.exceptions import NoSuchDaemonState
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import general as util_general
 
 
@@ -19,9 +20,9 @@ LOG, _ = logs.setup(__name__)
 
 
 class Node(dbo):
-    object_type = 'node'
+    object_type = ObjectType.NODE
     initial_version = 2
-    current_version = 8
+    current_version = 9
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
@@ -104,6 +105,11 @@ class Node(dbo):
 
     @classmethod
     def _upgrade_step_7_to_8(cls, static_values):
+        ...
+
+    @classmethod
+    def _upgrade_step_8_to_9(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
 
     @classmethod

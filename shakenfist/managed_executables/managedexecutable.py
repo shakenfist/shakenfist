@@ -9,13 +9,14 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.schema.object_types import ObjectType
 
 
 LOG, _ = logs.setup(__name__)
 
 
 class ManagedExecutable(dbo):
-    object_type = 'unknown_managed_executable'
+    object_type = ObjectType.UNKNOWN_MANAGED_EXECUTABLE
 
     state_targets = {
         None: (dbo.STATE_CREATED),

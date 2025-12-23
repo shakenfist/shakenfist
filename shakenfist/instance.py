@@ -52,6 +52,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.operations.baseoperation import BaseClusterOperation as bco
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -147,8 +148,8 @@ class ConnectedVSockChannel():
 
 
 class Instance(dbowo):
-    object_type = 'instance'
-    current_version = 16
+    object_type = ObjectType.INSTANCE
+    current_version = 17
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -312,6 +313,11 @@ class Instance(dbowo):
 
     @classmethod
     def _upgrade_step_15_to_16(cls, static_values):
+        ...
+
+    @classmethod
+    def _upgrade_step_16_to_17(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
 
     @classmethod

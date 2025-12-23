@@ -161,34 +161,44 @@ shakenfist/
 | `database.py` | Database microservice client library |
 | `config.py` | 100+ Pydantic settings with etcd/env overrides |
 
-### Storage: etcd and Database Service
+### Storage: etcd, MariaDB, and the Database Service
 
-All cluster state is stored in etcd. Access can be either direct or via the
-database microservice (controlled by `DATABASE_USE_DIRECT_ETCD` config):
+Shaken Fist uses two database backends:
+- **etcd**: Object storage, cluster coordination, locks, queues
+- **MariaDB**: Object state storage (for efficient state-based queries)
+
+The database microservice (`sf-database`) runs on the etcd_master node and
+provides a gRPC interface for all database operations:
 
 ```python
-# Access pattern (works with both direct etcd and database service)
+# etcd access (works with both direct and via database service)
 etcd.get('object_type', 'parent_uuid', 'object_uuid')
 etcd.put('object_type', 'parent_uuid', 'object_uuid', data)
 etcd.delete('object_type', 'parent_uuid', 'object_uuid')
+
+# MariaDB state access (automatically routed through database service)
+from shakenfist import mariadb
+mariadb.get_state('instance', 'uuid-here')
+mariadb.set_state('instance', 'uuid-here', state)
+mariadb.get_objects_by_state('instance', ['created', 'error'])
 ```
 
-The database microservice (`sf-database`) runs on the etcd_master node and
-provides a gRPC interface for all database operations. This abstraction layer:
-- Centralizes etcd access to a single service
-- Enables future migration to other backends (e.g., MariaDB)
-- Will eventually provide in-memory caching
+This abstraction layer:
+- Centralizes all database access to a single service
+- Only the database daemon has direct access to etcd and MariaDB
+- Provides prometheus metrics for all database operations
+- Enables clean separation of concerns
 
 Configuration options:
 - `DATABASE_NODE_IP` - IP address of the database service node
 - `DATABASE_API_PORT` - gRPC API port (default: 13005)
 - `DATABASE_METRICS_PORT` - Prometheus metrics port (default: 13006)
-- `DATABASE_USE_DIRECT_ETCD` - Bypass service and use etcd directly (default: True)
+- `DATABASE_USE_DIRECT_ETCD` - Set to false for all daemons except database
 
-**Thread-local direct etcd override**: The database daemon itself uses
-`etcd.set_force_direct_etcd(True)` during its startup/shutdown to avoid a
-chicken-and-egg problem - it needs to record its daemon state in etcd but
-can't use the database service because it IS the database service.
+**Database daemon special case**: The database daemon uses direct etcd/MariaDB
+access (implicit `DATABASE_USE_DIRECT_ETCD=True`) and uses
+`etcd.set_force_direct_etcd(True)` during startup/shutdown to avoid a
+chicken-and-egg problem.
 
 ### Configuration Bootstrap Order
 
@@ -224,17 +234,25 @@ the etcd connection itself must be configured before etcd can be read.
 Shaken Fist daemons are managed via systemd with careful ordering defined in
 `deploy/ansible/files/sf.service`. The startup order is:
 
-1. `sentinel-first` - Starts first (after multi-user.target), waits for shutdown
-2. `privexec`, `nodelock`, `database` - Start after sentinel-first (in parallel)
-3. All other daemons - Start after privexec, nodelock, and (when database
-   microservice is enabled) database
-4. `sentinel-last` - Starts after all other daemons, signals shutdown state
+1. `database` - Starts first (after multi-user.target), provides gRPC access to
+   etcd and MariaDB for all other daemons
+2. `sentinel-first` - Starts after database, marks node as starting
+3. `privexec`, `nodelock` - Start after sentinel-first
+4. All other daemons - Start after privexec, nodelock, and database
+5. `sentinel-last` - Starts after all other daemons, signals shutdown state
 
-**When `DATABASE_USE_DIRECT_ETCD=False`** (database microservice enabled):
-- The `sf-database` service starts early (after sentinel-first)
-- All other daemons (api, cleaner, cluster, queues, etc.) have
-  `After=sf-database.service` added to ensure they wait for the database
-  service to be ready before starting
+**Database Access Pattern**:
+- The `sf-database` service is the **only** daemon with direct access to etcd
+  and MariaDB
+- All other daemons access databases through the database service's gRPC interface
+- The database daemon uses `DATABASE_USE_DIRECT_ETCD=True` (implicit, by not
+  setting the env var to false) to use direct database access
+- Other daemons have `SHAKENFIST_DATABASE_USE_DIRECT_ETCD=false` set, routing
+  their database operations through the gRPC interface
+
+**Exceptions**:
+- `eventlog` - Uses direct etcd for its own startup/shutdown to avoid deadlock
+- `sentinel-last` - Marker service that doesn't need database access
 
 This ordering is critical because daemons like `sf-api` will hang on startup
 if they try to connect to the database microservice before it's running.
@@ -331,46 +349,33 @@ Queue priorities (per-node and global):
 4. **State machine transitions** - Follow documented state machines in
    `docs/developer_guide/state_machine.md`
 
-## Enabling MariaDB State for an Object Type
+## MariaDB State Storage
 
-When migrating an object type to use MariaDB for state storage, follow these
-steps (Blob was the first object type migrated as a reference):
+Object state (e.g., "created", "deleted", "error") is stored in MariaDB in the
+`object_states` table. This is required for all deployments - MariaDB must be
+configured.
 
-1. **Set the class variable** in the object class:
-   ```python
-   class MyObject(DatabaseBackedObject):
-       use_mariadb_state = True
-   ```
+### Migrating Existing Deployments
 
-2. **Bump the object version** to trigger migration:
-   ```python
-   current_version = N + 1  # Increment from current version
-   ```
+When upgrading an existing deployment to use MariaDB for state storage:
 
-3. **Add an upgrade step** to migrate existing state from etcd to MariaDB:
-   ```python
-   @classmethod
-   def _upgrade_step_N_to_N+1(cls, static_values):
-       if not mariadb.is_configured():
-           return
-       state_data = etcd.get('attribute/myobject', static_values['uuid'], 'state')
-       if state_data:
-           state = State(**state_data)
-           mariadb.set_state('myobject', static_values['uuid'], state)
-   ```
+1. Stop all Shaken Fist services on all nodes
+2. Run `sf-ctl migrate-state-to-mariadb` to migrate state data from etcd
+3. Start services via getsf
 
-4. **Update tests** that use the `State` class:
-   - Use keyword arguments: `State(value='created', update_time=123.0)`
-   - Use float for `update_time` (not int)
+The migration command copies all state from etcd attributes to MariaDB and
+removes the old etcd entries.
 
-5. **Run tests and mypy** to verify:
-   ```bash
-   tox -epy38
-   tox -emypy
-   ```
+### State Class
 
-The dual-write strategy ensures backwards compatibility: state changes are
-written to both MariaDB and etcd, with reads preferring MariaDB.
+The `State` class is a Pydantic model:
+```python
+from shakenfist.schema.object_state import State
+
+state = State(value='created', update_time=123.0, message='optional')
+```
+
+Use keyword arguments and float for `update_time` (not int).
 
 ## Documentation
 

@@ -8,6 +8,7 @@ import os
 import time
 from collections import defaultdict
 from itertools import count
+from typing import Optional
 from unittest import mock
 
 from shakenfist.constants import get_object_class
@@ -16,6 +17,7 @@ from shakenfist.namespace import Namespace
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
+from shakenfist.schema.object_state import State
 from shakenfist.util import json as util_json
 
 
@@ -30,6 +32,7 @@ class MockEtcd():
     def __init__(self, test_obj, nodes=None, node_count=0):
         self.test_obj = test_obj
         self.db = {}
+        self.mariadb_states = {}  # Mock MariaDB state storage
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -98,6 +101,31 @@ class MockEtcd():
         self.etcd_replace_many_raw.start()
         self.test_obj.addCleanup(self.etcd_replace_many_raw.stop)
 
+        # Mock MariaDB functions for state storage
+        self.mariadb_get_state = mock.patch(
+            'shakenfist.mariadb.get_state',
+            side_effect=self._mariadb_get_state)
+        self.mariadb_get_state.start()
+        self.test_obj.addCleanup(self.mariadb_get_state.stop)
+
+        self.mariadb_set_state = mock.patch(
+            'shakenfist.mariadb.set_state',
+            side_effect=self._mariadb_set_state)
+        self.mariadb_set_state.start()
+        self.test_obj.addCleanup(self.mariadb_set_state.stop)
+
+        self.mariadb_delete_state = mock.patch(
+            'shakenfist.mariadb.delete_state',
+            side_effect=self._mariadb_delete_state)
+        self.mariadb_delete_state.start()
+        self.test_obj.addCleanup(self.mariadb_delete_state.stop)
+
+        self.mariadb_get_objects_by_state = mock.patch(
+            'shakenfist.mariadb.get_objects_by_state',
+            side_effect=self._mariadb_get_objects_by_state)
+        self.mariadb_get_objects_by_state.start()
+        self.test_obj.addCleanup(self.mariadb_get_objects_by_state.stop)
+
         # Setup basic DB data
         for n in self.nodes:
             Node.new(n[0], n[1])
@@ -113,6 +141,81 @@ class MockEtcd():
     def _trace(self, m):
         if self.emit_tracing:
             print(m)
+
+    #
+    # MariaDB mock operations
+    #
+
+    def _mariadb_get_state(self, object_type: str,
+                           object_uuid: str) -> Optional[State]:
+        """Mock implementation of mariadb.get_state()"""
+        # Key by object_type and object_uuid to avoid collisions between
+        # different object types sharing the same UUID (e.g., ipam/network)
+        key = f'{object_type}/{object_uuid}'
+        if key in self.mariadb_states:
+            data = self.mariadb_states[key]
+            self._trace(f'MockMariaDB.get_state({key}): {data}')
+            return State(
+                value=data['state_value'],
+                update_time=data['update_time'],
+                message=data['message']
+            )
+        self._trace(f'MockMariaDB.get_state({key}): None')
+        return None
+
+    def _mariadb_set_state(self, object_type: str, object_uuid: str,
+                           state: State) -> bool:
+        """Mock implementation of mariadb.set_state()"""
+        key = f'{object_type}/{object_uuid}'
+        self.mariadb_states[key] = {
+            'object_type': object_type,
+            'object_uuid': object_uuid,
+            'state_value': state.value,
+            'update_time': state.update_time,
+            'message': state.message
+        }
+        self._trace(
+            f'MockMariaDB.set_state({key}): {state.value}')
+        return True
+
+    def _mariadb_delete_state(self, object_type: str, object_uuid: str) -> bool:
+        """Mock implementation of mariadb.delete_state()"""
+        key = f'{object_type}/{object_uuid}'
+        if key in self.mariadb_states:
+            del self.mariadb_states[key]
+            self._trace(f'MockMariaDB.delete_state({key}): deleted')
+        else:
+            self._trace(f'MockMariaDB.delete_state({key}): not found')
+        return True
+
+    def _mariadb_get_objects_by_state(self, object_type: str,
+                                      state_values: list[str]) -> list[str]:
+        """Mock implementation of mariadb.get_objects_by_state()"""
+        result = []
+        for key, data in self.mariadb_states.items():
+            if (data['object_type'] == object_type and
+                    data['state_value'] in state_values):
+                result.append(data['object_uuid'])
+        self._trace(
+            f'MockMariaDB.get_objects_by_state({object_type}, '
+            f'{state_values}): {result}')
+        return result
+
+    def get_mariadb_state(self, object_type: str,
+                          object_uuid: str) -> Optional[dict]:
+        """Get state from the mock MariaDB store for test assertions.
+
+        Returns a dict with 'value' and 'update_time' keys, matching the format
+        previously used in etcd, or None if no state exists.
+        """
+        key = f'{object_type}/{object_uuid}'
+        if key in self.mariadb_states:
+            data = self.mariadb_states[key]
+            return {
+                'value': data['state_value'],
+                'update_time': data['update_time']
+            }
+        return None
 
     #
     # DB operations - Low level
@@ -344,12 +447,14 @@ class MockEtcd():
         network._state_update(set_state, skip_transition_validation=True)
 
         # Ignore cluster operations because we don't do them in unit tests.
+        # Use skip_transition_validation since operations may start in
+        # various states depending on how they were created.
         last_op = network.last_cluster_operation
         if last_op and last_op.get('op_type'):
             op = get_object_class(last_op.get('op_type')).from_db(
                 last_op.get('op_uuid'))
-            op.state = op.STATE_EXECUTING
-            op.state = op.STATE_COMPLETE
+            op._state_update(op.STATE_EXECUTING, skip_transition_validation=True)
+            op._state_update(op.STATE_COMPLETE, skip_transition_validation=True)
 
         return network
 

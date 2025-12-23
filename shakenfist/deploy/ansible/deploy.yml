@@ -215,6 +215,7 @@
     - role: mariadb
       vars:
         role_action: "bootstrap"
+        mariadb_password: "{{ mariadb_password }}"
 
 ### Write config and configure client
 
@@ -229,6 +230,7 @@
       vars:
         role_action: "config"
         system_key: "{{ admin_password }}"
+        mariadb_password: "{{ mariadb_password }}"
         sf_config_template_path: "{{ playbook_dir }}/roles/base/templates"
 
 - hosts: primary_node

@@ -4,15 +4,16 @@ from shakenfist import blob
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.operations.baseoperation import BaseOperation
+from shakenfist.schema.object_types import ObjectType
 
 
 LOG, _ = logs.setup(__name__)
 
 
 class AgentOperation(BaseOperation):
-    object_type = 'agentoperation'
+    object_type = ObjectType.AGENTOPERATION
     initial_version = 1
-    current_version = 1
+    current_version = 2
 
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
@@ -38,6 +39,11 @@ class AgentOperation(BaseOperation):
         self.__namespace = static_values['namespace']
         self.__instance_uuid = static_values['instance_uuid']
         self.__commands = static_values['commands']
+
+    @classmethod
+    def _upgrade_step_1_to_2(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
+        ...
 
     @classmethod
     def new(cls, operation_uuid, namespace, instance_uuid, commands):

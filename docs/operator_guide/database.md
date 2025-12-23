@@ -55,20 +55,37 @@ Each object type has a dedicated key prefix:
 
 ## MariaDB
 
-MariaDB is being introduced for data that benefits from:
+MariaDB is used for object state storage, providing:
 
-- Complex queries with filtering and sorting
-- Indexed lookups on multiple columns
-- Structured data with well-defined schemas
-- Transaction support
+- Efficient queries by object type and state value
+- Indexed lookups for state-based filtering
+- Better performance than etcd for scanning large numbers of objects
 
 MariaDB is deployed on etcd master nodes and uses Galera for multi-master
 replication across the cluster.
 
+### Access Pattern
+
+**Important**: Only the database service daemon (`sf-database`) has direct
+access to MariaDB. All other daemons access MariaDB through the database
+service's gRPC interface.
+
+This architecture:
+
+- Centralizes database access in a single service
+- Provides consistent Prometheus metrics for all database operations
+- Enables clean separation of concerns
+- Simplifies connection management
+
+The `shakenfist.mariadb` module automatically routes requests:
+
+- If `DATABASE_USE_DIRECT_ETCD=True` (database daemon): Direct MariaDB access
+- If `DATABASE_USE_DIRECT_ETCD=False` (all other daemons): gRPC to database service
+
 ### Connection
 
-Shaken Fist connects to MariaDB using SQLAlchemy. The connection details are
-configured during cluster deployment.
+The database service connects to MariaDB using SQLAlchemy. Connection details
+are configured during cluster deployment.
 
 ## Schema System
 
@@ -226,8 +243,10 @@ differences = compare_schemas(engine, table)
 
 ## Object State Storage
 
-Object state (e.g., "created", "deleted", "error") is being migrated from etcd
-attributes to a dedicated MariaDB table for improved query performance.
+Object state (e.g., "created", "deleted", "error") is stored in a dedicated
+MariaDB table for improved query performance. Access is routed through the
+database service's gRPC interface for all daemons except the database daemon
+itself.
 
 ### The object_states Table
 
@@ -268,38 +287,24 @@ print(state.update_time)  # 1234567890.123
 print(state.obj_dict())   # {'value': 'created', 'update_time': 1234567890.123}
 ```
 
-### Migration Strategy
+### Migration from etcd
 
-State data is migrated incrementally per object type:
+For existing deployments that stored state in etcd, use the migration command:
 
-1. **Dual-write**: New state changes are written to both etcd and MariaDB
-2. **Read priority**: State reads prefer MariaDB, falling back to etcd
-3. **Upgrade step**: When an object's version is bumped, its existing state
-   is migrated from etcd to MariaDB
-
-### Enabling MariaDB State for an Object Type
-
-To enable MariaDB state storage for an object type:
-
-```python
-class MyObject(DatabaseBackedObject):
-    object_type = 'myobject'
-    current_version = 2  # Bump version for migration
-
-    # Enable MariaDB state storage
-    use_mariadb_state = True
-
-    @classmethod
-    def _upgrade_step_1_to_2(cls, static_values):
-        # Migrate existing state to MariaDB
-        if not mariadb.is_configured():
-            return
-
-        state_data = etcd.get('attribute/myobject', static_values['uuid'], 'state')
-        if state_data:
-            state = State(**state_data)
-            mariadb.set_state('myobject', static_values['uuid'], state)
+```bash
+# Stop all Shaken Fist services first
+sf-ctl migrate-state-to-mariadb
 ```
+
+This command:
+1. Reads state from etcd for all object types
+2. Writes the state to MariaDB
+3. Removes the state entries from etcd
+
+Use `--dry-run` to preview what would be migrated without making changes.
+
+MariaDB is now required for all deployments - state is stored only in MariaDB,
+not in etcd.
 
 ## Best Practices
 
