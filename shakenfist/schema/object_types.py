@@ -16,10 +16,22 @@ class ObjectType(str, Enum):
     string in SQL queries and JSON serialization. For example:
         ObjectType.INSTANCE.value == 'instance'
         ObjectType.INSTANCE == 'instance'  # Also works due to str inheritance
+        str(ObjectType.INSTANCE) == 'instance'  # Works due to __str__ override
+        f'{ObjectType.INSTANCE}' == 'instance'  # Works in f-strings too
 
     The enum values match the object_type class attribute on each
     DatabaseBackedObject subclass.
     """
+
+    def __str__(self) -> str:
+        """Return the enum value as a string.
+
+        This override is needed because the default str(Enum) returns
+        'EnumName.MEMBER_NAME' rather than the value. Since we want to use
+        these values in etcd paths, error messages, and other string contexts,
+        we override __str__ to return the value directly.
+        """
+        return self.value
 
     # Core objects
     AGENTOPERATION = 'agentoperation'
