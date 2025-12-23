@@ -143,20 +143,16 @@ def ensure_schema() -> None:
     This creates the object_states table if it doesn't exist. Safe to call
     multiple times - it's idempotent. Only the database daemon should call
     this function.
+
+    Raises RuntimeError if MARIADB_HOST is not configured.
     """
     if not config.MARIADB_HOST:
-        LOG.warning('MariaDB not configured, skipping schema creation')
-        return
+        raise RuntimeError('MariaDB is not configured (MARIADB_HOST not set)')
 
     engine = _get_engine()
     table = _get_object_states_table()
     ensure_table_exists(engine, table)
     LOG.info('MariaDB schema verified')
-
-
-def is_configured() -> bool:
-    """Check if MariaDB is configured and available."""
-    return bool(config.MARIADB_HOST)
 
 
 def _direct_get_state(object_type: str, object_uuid: str) -> Optional[State]:
@@ -249,7 +245,7 @@ def _direct_delete_state(object_type: str, object_uuid: str) -> bool:
 
 
 def _direct_get_objects_by_state(object_type: str,
-                                  state_values: list[str]) -> list[str]:
+                                 state_values: list[str]) -> list[str]:
     """Get all object UUIDs of a given type in specified states.
 
     This is the direct access version used by the database daemon.
@@ -336,7 +332,7 @@ def _grpc_delete_state(object_type: str, object_uuid: str) -> bool:
 
 
 def _grpc_get_objects_by_state(object_type: str,
-                                state_values: list[str]) -> list[str]:
+                               state_values: list[str]) -> list[str]:
     """Get all object UUIDs of a given type in specified states via gRPC."""
     try:
         stub = _get_database_stub()

@@ -111,9 +111,10 @@ def verify_config():
 
 @click.command()
 def initialise_node():
-    # Ensure MariaDB schema exists before creating node state
-    if mariadb.is_configured():
-        mariadb.ensure_schema()
+    # Ensure MariaDB schema exists before creating node state. This will raise
+    # an error if MariaDB is not configured, which is intentional - MariaDB is
+    # required for all deployments.
+    mariadb.ensure_schema()
 
     click.echo(f'Initializing node "{config.NODE_NAME}" with mesh IP '
                f'{config.NODE_MESH_IP}...')
@@ -188,12 +189,8 @@ def migrate_state_to_mariadb(dry_run):
 
     After migration, the state entries are removed from etcd.
     """
-    if not mariadb.is_configured():
-        raise click.ClickException(
-            'MariaDB is not configured. Set MARIADB_HOST and related '
-            'config options before running this command.')
-
-    # Ensure the MariaDB schema exists
+    # Ensure the MariaDB schema exists. This will raise an error if MariaDB
+    # is not configured.
     if not dry_run:
         click.echo('Ensuring MariaDB schema exists...')
         mariadb.ensure_schema()

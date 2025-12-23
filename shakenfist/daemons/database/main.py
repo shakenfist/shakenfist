@@ -480,6 +480,16 @@ class Monitor(daemon.WorkerPoolDaemon):
 def main():
     daemon.write_pid_file('database')
 
+    # MariaDB is required for the database service. Abort early with a clear
+    # error message if it's not configured.
+    if not config.MARIADB_HOST:
+        LOG.error('MariaDB is not configured. The database service requires '
+                  'MARIADB_HOST to be set. Aborting.')
+        raise SystemExit(1)
+
+    # Ensure the MariaDB schema exists before accepting requests
+    mariadb.ensure_schema()
+
     # Create the gRPC server
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     server.add_insecure_port(
