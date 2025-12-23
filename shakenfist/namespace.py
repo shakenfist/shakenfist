@@ -18,6 +18,7 @@ LOG, _ = logs.setup(__name__)
 
 class Namespace(dbo):
     object_type = 'namespace'
+    initial_version = 2
     current_version = 6
 
     # docs/developer_guide/state_machine.md has a description of these states.
@@ -33,26 +34,6 @@ class Namespace(dbo):
 
         # We treat a namespace name as a UUID here for historical reasons
         super().__init__(static_values['uuid'], static_values['version'])
-
-    @classmethod
-    def _upgrade_step_1_to_2(cls, static_values):
-        static_values['uuid'] = static_values['name']
-        del static_values['name']
-
-        etcd.put('attribute/namespace', static_values['uuid'], 'state',
-                 {
-                     'update_time': time.time(),
-                     'value': 'created'
-                 })
-
-        etcd.put('attribute/namespace', static_values['uuid'], 'keys',
-                 {'keys': static_values['keys']})
-        del static_values['keys']
-
-        if 'service_key' in static_values:
-            etcd.put('attribute/namespace', static_values['uuid'], 'service_key',
-                     {'service_key': static_values['service_key']})
-            del static_values['service_key']
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values):
