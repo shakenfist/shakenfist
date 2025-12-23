@@ -1,8 +1,12 @@
 ---
 - debug:
     msg: "Executing pki_internal_ca role action {{ role_action }}."
+  delegate_to: localhost
+  run_once: true
 
 - include_tasks: "{{ role_action }}.yml"
 
 - debug:
     msg: "Completed pki_internal_ca role action {{ role_action }}."
+  delegate_to: localhost
+  run_once: true
