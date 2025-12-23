@@ -292,7 +292,7 @@ if [ "${dry_run}" = true ]; then
 fi
 
 # Run Claude Code
-claude -p "$(cat "${output_dir}/claude-prompt.txt")" \
+cat "${output_dir}/claude-prompt.txt" | claude -p - \
     --dangerously-skip-permissions \
     --max-turns "${max_turns}" \
     --output-format text || true
