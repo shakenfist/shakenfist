@@ -68,4 +68,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tools/review-pr-with-claude.sh --ci --pr ${{ github.event.issue.number }}
+          tools/review-pr-with-claude.sh --ci --force --pr ${{ github.event.issue.number }}

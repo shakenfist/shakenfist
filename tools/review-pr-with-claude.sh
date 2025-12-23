@@ -14,6 +14,7 @@
 #   --interactive       Run Claude in interactive mode (default: headless)
 #   --ci                CI mode: output machine-readable status, no colors
 #   --dry-run           Don't post the review, just print it
+#   --force             Review even if bot has already reviewed this PR
 #   --output-dir DIR    Directory for output files (default: temp dir)
 #   --help              Show this help message
 #
@@ -46,6 +47,7 @@ max_turns=20
 interactive=false
 ci_mode=false
 dry_run=false
+force=false
 output_dir=""
 
 # Colors for output (disabled in CI mode)
@@ -86,6 +88,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --dry-run)
             dry_run=true
+            shift
+            ;;
+        --force)
+            force=true
             shift
             ;;
         --output-dir)
@@ -207,12 +213,19 @@ fi
 echo -e "${YELLOW}Step 4: Checking for existing reviews...${NC}"
 
 existing_review=$(gh pr view "${pr_number}" --json reviews \
-    --jq '.reviews[] | select(.author.login == "github-actions[bot]" or .author.login == "shakenfist-bot") | .id' \
+    --jq '.reviews[] | select(.author.login == "github-actions" or .author.login == "shakenfist-bot") | .id' \
     2>/dev/null | head -1 || true)
 
 if [ -n "${existing_review}" ]; then
-    echo -e "${YELLOW}Note: Bot has already reviewed this PR${NC}"
-    echo "Proceeding with new review anyway..."
+    if [ "${force}" = true ]; then
+        echo -e "${YELLOW}Note: Bot has already reviewed this PR${NC}"
+        echo "Proceeding with new review (--force specified)..."
+    else
+        echo -e "${YELLOW}Bot has already reviewed this PR${NC}"
+        echo "Use --force to review again"
+        ci_output "review_skipped" "already_reviewed"
+        exit 0
+    fi
 fi
 echo
 
