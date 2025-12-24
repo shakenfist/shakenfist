@@ -142,26 +142,49 @@ def ensure_mariadb_schema():
 
 
 @click.command()
-def initialise_node():
-    click.echo(f'Initializing node "{config.NODE_NAME}" with mesh IP '
-               f'{config.NODE_MESH_IP}...')
-    n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
-    click.echo(f'Node "{config.NODE_NAME}" is now in state {n.state.value}.')
+@click.option('--node-name', default=None,
+              help='Node name to initialize (defaults to NODE_NAME from config)')
+@click.option('--node-mesh-ip', default=None,
+              help='Node mesh IP (defaults to NODE_MESH_IP from config)')
+def initialise_node(node_name, node_mesh_ip):
+    """Initialize a node in the database.
+
+    When run without arguments, initializes the local node using NODE_NAME
+    and NODE_MESH_IP from the configuration. When run with --node-name and
+    --node-mesh-ip, can initialize any node (useful for bootstrapping from
+    the etcd_master with direct database access).
+    """
+    node_name = node_name or config.NODE_NAME
+    node_mesh_ip = node_mesh_ip or config.NODE_MESH_IP
+
+    click.echo(f'Initializing node "{node_name}" with mesh IP '
+               f'{node_mesh_ip}...')
+    n = Node.new(node_name, node_mesh_ip)
+    click.echo(f'Node "{node_name}" is now in state {n.state.value}.')
 
 
 @click.command()
 @click.argument('daemon', nargs=-1)
-def register_daemon(daemon):
-    n = Node.from_db(config.NODE_NAME)
+@click.option('--node-name', default=None,
+              help='Node name to register daemons on (defaults to NODE_NAME)')
+def register_daemon(daemon, node_name):
+    """Register one or more daemons on a node.
+
+    When run without --node-name, registers daemons on the local node.
+    When run with --node-name, can register daemons on any node (useful
+    for bootstrapping from the etcd_master with direct database access).
+    """
+    node_name = node_name or config.NODE_NAME
+    n = Node.from_db(node_name)
     if n is None:
         raise click.ClickException(
-            f'Node "{config.NODE_NAME}" not found in database. '
+            f'Node "{node_name}" not found in database. '
             f'Run "sf-ctl initialise-node" first to create the node.')
     for d in daemon:
-        click.echo(f'Registering {d} on node...')
+        click.echo(f'Registering {d} on node "{node_name}"...')
         n.register_daemon(d)
         click.echo(f'Daemon is now in state {n.get_daemon_state(d).value}.')
-    click.echo(f'Node is now in state {n.state.value}.')
+    click.echo(f'Node "{node_name}" is now in state {n.state.value}.')
 
 
 @click.command()
