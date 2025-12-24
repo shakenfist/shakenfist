@@ -26,8 +26,6 @@
 # BEFORE any node proceeds to initialise-node. Without this, Ansible would
 # skip this task on non-etcd-master nodes and immediately proceed to the next
 # task, causing a race condition.
-#
-# Note: database_use_direct_etcd is a string "0" or "1", not a boolean.
 - name: Start the database daemon on etcd_master nodes
   service:
     name: "sf-database"
@@ -36,7 +34,6 @@
     daemon_reload: no
   delegate_to: "{{ groups['etcd_master'][0] }}"
   run_once: true
-  when: (database_use_direct_etcd | default("1")) == "0"
 
 # Step 3: Now that the database service is running, initialize all nodes.
 # Non-etcd-master nodes will use DATABASE_NODE_IP to contact the gRPC service.
