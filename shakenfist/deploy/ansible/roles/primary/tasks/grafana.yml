@@ -3,6 +3,9 @@
   apt:
     name: prometheus
     state: latest
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
 - name: Write prometheus configuration file
   template:
@@ -24,6 +27,9 @@
       - software-properties-common
     update_cache: yes
     state: latest
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
 - name: Check if grafana packages are already setup
   stat:
@@ -44,6 +50,9 @@
     name: grafana
     update_cache: yes
     state: latest
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
 - name: Write grafana config
   template:
