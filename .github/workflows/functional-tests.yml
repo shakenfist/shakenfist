@@ -153,6 +153,7 @@ jobs:
 
   # Runs if the "Lint with flake8" step in the sanity_checks job fails.
   # Uses always() so it runs even when sanity_checks fails.
+  # Skip if the last commit was from the bot to prevent infinite loops.
   automated_delinter:
     runs-on: [self-hosted, claude-code]
     needs: sanity_checks
@@ -167,14 +168,32 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Use DEPENDENCIES_TOKEN (a PAT) instead of GITHUB_TOKEN so that
+          # commits pushed by this workflow will trigger other workflows.
+          # The default GITHUB_TOKEN deliberately doesn't trigger workflows
+          # to prevent infinite loops.
+          token: ${{ secrets.DEPENDENCIES_TOKEN }}
+
+      - name: Check if last commit was from bot
+        id: check_bot
+        run: |
+          LAST_AUTHOR_EMAIL=$(git log -1 --format='%ae')
+          echo "Last commit author: $LAST_AUTHOR_EMAIL"
+          if [ "$LAST_AUTHOR_EMAIL" = "bot@shakenfist.com" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Skipping delinter - last commit was from bot"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Configure git
+        if: steps.check_bot.outputs.skip != 'true'
         run: |
           git config user.name "Claude Code run by Shakenfist Bot"
           git config user.email "bot@shakenfist.com"
 
       - name: Run automated delinter
+        if: steps.check_bot.outputs.skip != 'true'
         run: |
           tools/fix-lint-with-claude.sh --ci
 
