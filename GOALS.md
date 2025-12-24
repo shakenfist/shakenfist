@@ -15,3 +15,5 @@
 ## Not yet started
 
 * ansible-lint for the deployment Ansible
+* mTLS with a private CA for gRPC services
+* SO_PASSCRED for UDS services
