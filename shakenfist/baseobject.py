@@ -450,7 +450,7 @@ class DatabaseBackedObject:
 
         # Only standard states have validation right now
         if state_attribute_name == 'state':
-            if orig.value == self.STATE_DELETED and self.object_type != 'node':
+            if orig.value == self.STATE_DELETED and self.object_type != ObjectType.NODE:
                 LOG.with_fields(
                     {
                         'uuid': self.uuid,
@@ -475,8 +475,7 @@ class DatabaseBackedObject:
                         'object=%s uuid=%s',
                         orig.value, new_value, self.object_type, self.uuid)
 
-        new_state = State(value=new_value, update_time=time.time(),
-                            message=message)
+        new_state = State(value=new_value, update_time=time.time(), message=message)
 
         # Primary state is stored in MariaDB
         if state_attribute_name == 'state':
