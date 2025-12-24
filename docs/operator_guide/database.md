@@ -306,6 +306,76 @@ Use `--dry-run` to preview what would be migrated without making changes.
 MariaDB is now required for all deployments - state is stored only in MariaDB,
 not in etcd.
 
+## Administrative Commands
+
+The `sf-ctl` command provides several database-related administrative functions.
+These commands are typically used during cluster bootstrap and maintenance.
+
+### ensure-mariadb-schema
+
+Ensures the MariaDB schema exists and is up to date. This command must be run
+on an etcd_master node (which has `MARIADB_HOST` configured):
+
+```bash
+sf-ctl ensure-mariadb-schema
+```
+
+This is automatically run during cluster deployment before any nodes are
+initialized.
+
+### initialise-node
+
+Creates a node record in the database. By default, it uses the local node's
+configuration:
+
+```bash
+sf-ctl initialise-node
+```
+
+For cluster bootstrap, this command can initialize any node when run from an
+etcd_master with direct database access:
+
+```bash
+# Run on etcd_master to initialize a remote node
+SHAKENFIST_DATABASE_USE_DIRECT_ETCD=True \
+sf-ctl initialise-node --node-name sf-2 --node-mesh-ip 10.0.0.2
+```
+
+This is useful during deployment when the database service isn't running yet.
+
+### register-daemon
+
+Registers one or more daemons on a node. By default, it registers on the local
+node:
+
+```bash
+sf-ctl register-daemon sentinel-first privexec nodelock
+```
+
+For cluster bootstrap, daemons can be registered on any node when run from an
+etcd_master with direct database access:
+
+```bash
+# Run on etcd_master to register daemons on a remote node
+SHAKENFIST_DATABASE_USE_DIRECT_ETCD=True \
+sf-ctl register-daemon database --node-name sf-1
+```
+
+This allows all node and daemon registration to happen before the database
+service starts, avoiding chicken-and-egg problems during bootstrap.
+
+### migrate-state-to-mariadb
+
+Migrates object state from etcd to MariaDB for existing deployments:
+
+```bash
+# Preview what would be migrated
+sf-ctl migrate-state-to-mariadb --dry-run
+
+# Perform the migration
+sf-ctl migrate-state-to-mariadb
+```
+
 ## Best Practices
 
 ### Schema Evolution
