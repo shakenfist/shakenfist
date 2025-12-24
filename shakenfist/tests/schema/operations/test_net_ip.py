@@ -139,8 +139,7 @@ class NetIPOpTestCase(base.ShakenFistTestCase):
                 'value': 'queued',
                 'update_time': 123.0
             },
-            self.mock_etcd.get_raw(
-                f'/sf/attribute/net_ip_op/{op_uuid}/state')
+            self.mock_etcd.get_mariadb_state('net_ip_op', op_uuid)
         )
         self.assertEqual(
             {

@@ -1,63 +1,82 @@
 ---
-# Note: All sf-ctl commands during installation must use direct etcd access
-# because the database microservice may not be running yet. The config file
-# might have DATABASE_USE_DIRECT_ETCD=0 (use microservice), but we override
-# that here to ensure bootstrap works correctly.
+# Bootstrap order is critical for the database microservice:
+#
+# 1. Ensure MariaDB schema exists (runs on etcd_master[0] with direct access)
+# 2. Run initialise-node and register-daemon for all nodes (delegated to
+#    etcd_master[0] with direct etcd/mariadb access)
+# 3. Start the database daemon on etcd_master nodes (provides gRPC access)
+# 4. Start remaining daemons
+#
+# All sf-ctl commands run on etcd_master[0] with DATABASE_USE_DIRECT_ETCD=True
+# to ensure direct access to etcd and mariadb. This avoids the chicken-and-egg
+# problem where we'd need the database service to register the database daemon.
+
+# Step 1: Ensure MariaDB schema exists before anything else. This runs on
+# etcd_master[0] which has direct MariaDB access via MARIADB_HOST.
+- name: Ensure MariaDB schema exists
+  shell: |
+    /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
+  delegate_to: "{{ groups['etcd_master'][0] }}"
+  run_once: true
+
+# Step 2: Initialize all nodes and register their daemons. All commands run
+# on etcd_master[0] with direct database access, using --node-name to specify
+# which node to operate on.
 - name: Ensure the node exists in etcd
   shell: |
-    /srv/shakenfist/venv/bin/sf-ctl initialise-node
+    /srv/shakenfist/venv/bin/sf-ctl initialise-node \
+        --node-name "{{ node_name }}" \
+        --node-mesh-ip "{{ node_mesh_ip }}"
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
-    SHAKENFIST_NODE_NAME: "{{ node_name }}"
-    SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
     SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
+  delegate_to: "{{ groups['etcd_master'][0] }}"
 
 - name: Register the eventlog daemon if it runs on this node
   shell: |
-    /srv/shakenfist/venv/bin/sf-ctl register-daemon eventlog
+    /srv/shakenfist/venv/bin/sf-ctl register-daemon eventlog \
+        --node-name "{{ node_name }}"
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
-    SHAKENFIST_NODE_NAME: "{{ node_name }}"
-    SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
     SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
+  delegate_to: "{{ groups['etcd_master'][0] }}"
   when: inventory_hostname in groups.get('eventlog_node', [])
 
 - name: Register the database daemon if it runs on this node
   shell: |
-    /srv/shakenfist/venv/bin/sf-ctl register-daemon database
+    /srv/shakenfist/venv/bin/sf-ctl register-daemon database \
+        --node-name "{{ node_name }}"
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
-    SHAKENFIST_NODE_NAME: "{{ node_name }}"
-    SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
     SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
+  delegate_to: "{{ groups['etcd_master'][0] }}"
   when: inventory_hostname in groups.get('etcd_master', [])
 
 - name: Register the other SF daemons
   shell: |
     /srv/shakenfist/venv/bin/sf-ctl register-daemon \
         sentinel-first sentinel-last privexec nodelock net resources \
-        sidechannel queues api cleaner cluster transfers
+        sidechannel queues api cleaner cluster transfers \
+        --node-name "{{ node_name }}"
   environment:
     SHAKENFIST_ETCD_HOST: "{{ etcd_host }}"
-    SHAKENFIST_NODE_NAME: "{{ node_name }}"
-    SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
     SHAKENFIST_DATABASE_USE_DIRECT_ETCD: "True"
+  delegate_to: "{{ groups['etcd_master'][0] }}"
 
-# The ordering of units here is to match the order they must start in, not
-# alphabetical order. These must come up first on all machines.
-#
-# Start the database daemon on etcd_master nodes when the database service is
-# enabled. Note: database_use_direct_etcd is a string "0" or "1", not a boolean.
-- name: The database daemon must start first
+# Step 3: Start the database daemon on etcd_master nodes. This must happen
+# after all nodes and daemons are registered, so the database daemon can
+# find its own registration in etcd.
+- name: Start the database daemon on etcd_master nodes
   service:
     name: "sf-database"
     enabled: yes
     state: restarted
     daemon_reload: no
-  when:
-    - inventory_hostname in groups.get('etcd_master', [])
-    - (database_use_direct_etcd | default("1")) == "0"
+  delegate_to: "{{ groups['etcd_master'][0] }}"
+  run_once: true
 
+# Step 4: Start the remaining daemons. The ordering here is to match the order
+# they must start in, not alphabetical order.
 - name: Base daemons everywhere
   service:
     name: "sf-{{ item }}"

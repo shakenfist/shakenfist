@@ -18,6 +18,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist import eventlog
+from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
@@ -332,6 +333,71 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_general.ignore_exception('database Compact failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
+    # Object State Operations (MariaDB)
+    # These operations provide access to MariaDB state storage for all daemons.
+    # The database service uses direct MariaDB access; all other daemons call
+    # these gRPC methods.
+
+    def GetObjectState(self, request, context):
+        """Get state for an object from MariaDB."""
+        try:
+            self.monitor.counters['get_object_state'].inc()
+            state = mariadb.get_state(request.object_type, request.object_uuid)
+            if state is None:
+                return database_pb2.GetObjectStateReply(found=False)
+            return database_pb2.GetObjectStateReply(
+                found=True,
+                state_value=state.value or '',
+                update_time=state.update_time,
+                message=state.message or ''
+            )
+        except Exception as e:
+            util_general.ignore_exception('database GetObjectState failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetObjectStateReply(found=False)
+
+    def SetObjectState(self, request, context):
+        """Set state for an object in MariaDB."""
+        try:
+            self.monitor.counters['set_object_state'].inc()
+            from shakenfist.schema.object_state import State
+            state = State(
+                value=request.state_value,
+                update_time=request.update_time,
+                message=request.message if request.message else None
+            )
+            success = mariadb.set_state(
+                request.object_type, request.object_uuid, state)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_general.ignore_exception('database SetObjectState failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def DeleteObjectState(self, request, context):
+        """Delete state for an object from MariaDB."""
+        try:
+            self.monitor.counters['delete_object_state'].inc()
+            success = mariadb.delete_state(
+                request.object_type, request.object_uuid)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_general.ignore_exception(
+                'database DeleteObjectState failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetObjectsByState(self, request, context):
+        """Get all object UUIDs of a given type in specified states."""
+        try:
+            self.monitor.counters['get_objects_by_state'].inc()
+            uuids = mariadb.get_objects_by_state(
+                request.object_type, list(request.state_values))
+            return database_pb2.GetObjectsByStateReply(object_uuids=uuids)
+        except Exception as e:
+            util_general.ignore_exception(
+                'database GetObjectsByState failed', e)
+            return database_pb2.GetObjectsByStateReply(object_uuids=[])
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -350,7 +416,10 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get', 'get_prefix', 'put', 'create', 'delete', 'delete_prefix',
             'replace_many', 'enqueue', 'dequeue', 'resolve', 'get_queue_length',
             'restart_queue', 'acquire_lock', 'release_lock', 'get_lock_holder',
-            'clear_stale_locks', 'get_existing_locks', 'compact'
+            'clear_stale_locks', 'get_existing_locks', 'compact',
+            # MariaDB state operations
+            'get_object_state', 'set_object_state', 'delete_object_state',
+            'get_objects_by_state'
         ]
         for op in operations:
             self.counters[op] = Counter(
@@ -410,6 +479,16 @@ class Monitor(daemon.WorkerPoolDaemon):
 
 def main():
     daemon.write_pid_file('database')
+
+    # MariaDB is required for the database service. Abort early with a clear
+    # error message if it's not configured.
+    if not config.MARIADB_HOST:
+        LOG.error('MariaDB is not configured. The database service requires '
+                  'MARIADB_HOST to be set. Aborting.')
+        raise SystemExit(1)
+
+    # Ensure the MariaDB schema exists before accepting requests
+    mariadb.ensure_schema()
 
     # Create the gRPC server
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

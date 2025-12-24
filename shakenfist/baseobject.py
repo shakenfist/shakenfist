@@ -4,18 +4,20 @@ from collections import defaultdict
 from functools import partial
 from math import inf
 import re
+from typing import ClassVar
 
 from etcd3gw.lock import Lock
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import constants
+from shakenfist.constants import ETCD_ATTEMPT_TIMEOUT
 from shakenfist.constants import get_object_class
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import mariadb
-from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.constants import EVENT_TYPE_MUTATE
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
@@ -66,8 +68,8 @@ def _maintain_version_cache(max_cache_age):
     for node_key, n in etcd.get_all('node', None):
         # node_key is the full etcd path, extract the node name (fqdn)
         node_name = node_key.split('/')[-1]
-        state_data = etcd.get('attribute/node', node_name, 'state')
-        if not state_data or state_data.get('value') not in target_states:
+        state = mariadb.get_state('node', node_name)
+        if not state or state.value not in target_states:
             continue
         d = etcd.get('metrics', node_name, None)
         if not d:
@@ -88,7 +90,7 @@ def _maintain_version_cache(max_cache_age):
         metrics[node_name] = d['metrics']
         log.debug('Considering metrics entry')
 
-    for possible_objname in constants.OBJECT_NAMES:
+    for possible_objname in ObjectType:
         nodes_by_version = defaultdict(list, [])
         node_metric_age = {}
         minimum = inf
@@ -122,14 +124,11 @@ def get_maximum_object_version(objname, max_cache_age=300):
 
 
 class DatabaseBackedObject:
-    object_type = 'unknown'
+    object_type: ClassVar[ObjectType] = ObjectType.UNKNOWN
     initial_version = 1
     current_version = None
     upgrade_supported = True
     state_targets = None
-
-    # Set to True in subclasses to use MariaDB for state storage
-    use_mariadb_state = False
 
     STATE_INITIAL = 'initial'
     STATE_CREATING = 'creating'
@@ -398,7 +397,7 @@ class DatabaseBackedObject:
                 })
 
     def get_lock(self, subtype=None, op=None, global_scope=True,
-                 timeout=constants.ETCD_ATTEMPT_TIMEOUT):
+                 timeout=ETCD_ATTEMPT_TIMEOUT):
         # There is no point locking in-memory objects
         if self.in_memory_only:
             return NoopLock()
@@ -429,14 +428,14 @@ class DatabaseBackedObject:
         return self._state_read(state_attribute_name='state')
 
     def _state_read(self, state_attribute_name='state'):
-        # For the primary 'state' attribute, try MariaDB first if enabled
-        if (state_attribute_name == 'state' and self.use_mariadb_state
-                and mariadb.is_configured()):
+        # Primary state is stored in MariaDB
+        if state_attribute_name == 'state':
             state = mariadb.get_state(self.object_type, self.uuid)
             if state is not None:
                 return state
-            # Fall through to etcd if not found in MariaDB
+            return State(value=None, update_time=0)
 
+        # Secondary state attributes (like 'power_state') are in etcd
         db_data = self._db_get_attribute(state_attribute_name)
         if not db_data:
             return State(value=None, update_time=0)
@@ -449,47 +448,40 @@ class DatabaseBackedObject:
         if orig.value == new_value:
             return
 
-        # NOTE(mikal): I'm adding this lock back in, even though I don't want to,
-        # because until we can do this entire update (the state change and the
-        # cache update) in a single transaction its going to continue to cause
-        # me problems. This all needs a rethink.
-        with self.get_lock_attr(state_attribute_name, 'update'):
-            # Only standard states have validation right now
-            if state_attribute_name == 'state':
-                if orig.value == self.STATE_DELETED and self.object_type != 'node':
-                    LOG.with_fields(
-                        {
-                            'uuid': self.uuid,
-                            'object_type': self.object_type,
-                            'original state': orig,
-                            'new state': new_value
-                        }).warn('Objects do not undelete')
+        # Only standard states have validation right now
+        if state_attribute_name == 'state':
+            if orig.value == self.STATE_DELETED and self.object_type != ObjectType.NODE:
+                LOG.with_fields(
+                    {
+                        'uuid': self.uuid,
+                        'object_type': self.object_type,
+                        'original state': orig,
+                        'new state': new_value
+                    }).warn('Objects do not undelete')
+                raise exceptions.InvalidStateException(
+                    'Invalid state change from %s to %s for '
+                    'object=%s uuid=%s',
+                    orig.value, new_value, self.object_type, self.uuid)
+
+            # Ensure state change is valid
+            if not skip_transition_validation:
+                if not self.state_targets:
+                    raise exceptions.NoStateTransitionsDefined(
+                        self.object_type)
+
+                if new_value not in self.state_targets.get(orig.value, []):
                     raise exceptions.InvalidStateException(
                         'Invalid state change from %s to %s for '
                         'object=%s uuid=%s',
                         orig.value, new_value, self.object_type, self.uuid)
 
-                # Ensure state change is valid
-                if not skip_transition_validation:
-                    if not self.state_targets:
-                        raise exceptions.NoStateTransitionsDefined(
-                            self.object_type)
+        new_state = State(value=new_value, update_time=time.time(), message=message)
 
-                    if new_value not in self.state_targets.get(orig.value, []):
-                        raise exceptions.InvalidStateException(
-                            'Invalid state change from %s to %s for '
-                            'object=%s uuid=%s',
-                            orig.value, new_value, self.object_type, self.uuid)
-
-            new_state = State(value=new_value, update_time=time.time(),
-                              message=message)
-
-            # Write to MariaDB if enabled for this object type
-            if (state_attribute_name == 'state' and self.use_mariadb_state
-                    and mariadb.is_configured()):
-                mariadb.set_state(self.object_type, self.uuid, new_state)
-
-            # Always write to etcd for backwards compatibility during transition
+        # Primary state is stored in MariaDB
+        if state_attribute_name == 'state':
+            mariadb.set_state(self.object_type, self.uuid, new_state)
+        else:
+            # Secondary state attributes (like 'power_state') go to etcd
             self._db_set_attribute(state_attribute_name, new_state)
 
     @state.setter
@@ -550,6 +542,7 @@ class DatabaseBackedObject:
     def hard_delete(self):
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
+        mariadb.delete_state(self.object_type, self.uuid)
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
 
 
@@ -625,19 +618,19 @@ class DatabaseBackedObjectIterator:
         else:
             raise exceptions.InvalidObjectPrefilter(self.prefilter)
 
-        # We fetch all the results in a block here before we yield them, because
-        # if the caller is slow to iterate they can end up with inconsistent
-        # values as objects shift state underneath them (for example an active
-        # instance shifting from created to delete-wait while you're iterating).
+        # Use MariaDB for efficient state-based filtering
+        matching_uuids = set(mariadb.get_objects_by_state(
+            self.base_object.object_type, list(target_states)))
+
+        # Fetch static values only for objects in the target states
+        # We fetch all results in a block before yielding to avoid inconsistency
+        # if the caller is slow to iterate (e.g., an active instance shifting
+        # from created to delete-wait while you're iterating).
         results = []
         for objkey, static_values in etcd.get_all(
                 self.base_object.object_type, None):
-            # objkey is the full etcd path like /sf/node/node1_net, extract
-            # the object identifier (last component of the path)
             objuuid = objkey.split('/')[-1]
-            state_data = etcd.get(
-                f'attribute/{self.base_object.object_type}', objuuid, 'state')
-            if state_data and state_data.get('value') in target_states:
+            if objuuid in matching_uuids:
                 results.append((objkey, static_values))
         for objkey, static_values in results:
             yield objkey, static_values

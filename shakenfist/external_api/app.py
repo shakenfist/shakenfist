@@ -24,6 +24,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import constants
 from shakenfist import eventlog
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.external_api import admin as api_admin
@@ -81,7 +82,7 @@ def log_request_info():
             body = 'base64:%s' % base64.b64encode(flask.request.get_data())
 
     eventlog.add_event(
-        constants.EVENT_TYPE_AUDIT, constants.API_REQUESTS,
+        constants.EVENT_TYPE_AUDIT, ObjectType.API_REQUESTS,
         flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
         '%s api request received' % flask.request.method, extra={
             'url': str(flask.request.url),
@@ -111,7 +112,7 @@ def log_response_info(response):
             body = 'base64:%s' % base64.b64encode(body)
 
     eventlog.add_event(
-        constants.EVENT_TYPE_AUDIT, constants.API_REQUESTS,
+        constants.EVENT_TYPE_AUDIT, ObjectType.API_REQUESTS,
         flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
         '%s api response sent' % flask.request.method, extra={
             'status': response.status_code,

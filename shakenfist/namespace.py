@@ -10,6 +10,7 @@ from shakenfist_utilities import random as sfrandom  # noreorder
 from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import access_tokens
 
 
@@ -17,8 +18,9 @@ LOG, _ = logs.setup(__name__)
 
 
 class Namespace(dbo):
-    object_type = 'namespace'
-    current_version = 5
+    object_type = ObjectType.NAMESPACE
+    initial_version = 2
+    current_version = 6
 
     # docs/developer_guide/state_machine.md has a description of these states.
     ACTIVE_STATES = {dbo.STATE_CREATED}
@@ -33,26 +35,6 @@ class Namespace(dbo):
 
         # We treat a namespace name as a UUID here for historical reasons
         super().__init__(static_values['uuid'], static_values['version'])
-
-    @classmethod
-    def _upgrade_step_1_to_2(cls, static_values):
-        static_values['uuid'] = static_values['name']
-        del static_values['name']
-
-        etcd.put('attribute/namespace', static_values['uuid'], 'state',
-                 {
-                     'update_time': time.time(),
-                     'value': 'created'
-                 })
-
-        etcd.put('attribute/namespace', static_values['uuid'], 'keys',
-                 {'keys': static_values['keys']})
-        del static_values['keys']
-
-        if 'service_key' in static_values:
-            etcd.put('attribute/namespace', static_values['uuid'], 'service_key',
-                     {'service_key': static_values['service_key']})
-            del static_values['service_key']
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values):
@@ -99,6 +81,11 @@ class Namespace(dbo):
     @classmethod
     def _upgrade_step_4_to_5(cls, static_values):
         cls._upgrade_metadata_to_attribute(static_values['uuid'])
+
+    @classmethod
+    def _upgrade_step_5_to_6(cls, static_values):
+        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
+        ...
 
     @classmethod
     def new(cls, name):
@@ -224,8 +211,6 @@ CACHED_TOKENS = {}
 
 
 def get_api_token(base_url, namespace='system'):
-    global CACHED_TOKENS
-
     if namespace in CACHED_TOKENS:
         expiry, access_token = CACHED_TOKENS[namespace]
         if expiry - time.time() > 15:

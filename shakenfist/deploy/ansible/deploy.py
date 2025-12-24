@@ -173,6 +173,8 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
         'admin_password', ''.join(secrets.choice(PASSWORD_CHARS) for i in range(12)))
     update_if_specified(
         'auth_secret', ''.join(secrets.choice(PASSWORD_CHARS) for i in range(50)))
+    update_if_specified(
+        'mariadb_password', ''.join(secrets.choice(PASSWORD_CHARS) for i in range(24)))
 
     # vault_system_key_path must be absent not empty if unset
     update_if_specified('vault_system_key_path', '')

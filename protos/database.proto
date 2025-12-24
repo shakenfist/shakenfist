@@ -28,6 +28,12 @@ service DatabaseService {
 
   // Maintenance
   rpc Compact (CompactRequest) returns (StatusReply) {}
+
+  // Object State Operations (MariaDB)
+  rpc GetObjectState (GetObjectStateRequest) returns (GetObjectStateReply) {}
+  rpc SetObjectState (SetObjectStateRequest) returns (StatusReply) {}
+  rpc DeleteObjectState (DeleteObjectStateRequest) returns (StatusReply) {}
+  rpc GetObjectsByState (GetObjectsByStateRequest) returns (GetObjectsByStateReply) {}
 }
 
 // Generic status reply
@@ -201,4 +207,42 @@ message ClusterGetExistingLocksReply {
 
 message CompactRequest {
   int64 revision = 1;
+}
+
+// Object State Operations (MariaDB)
+// These operations manage object state in MariaDB, which is used for
+// efficient state queries and persistence.
+
+message GetObjectStateRequest {
+  string object_type = 1;  // e.g., 'blob', 'instance', 'network'
+  string object_uuid = 2;
+}
+
+message GetObjectStateReply {
+  bool found = 1;
+  string state_value = 2;   // The state string, e.g., 'created', 'deleted'
+  double update_time = 3;   // Unix timestamp of last update
+  string message = 4;       // Optional message explaining the state
+}
+
+message SetObjectStateRequest {
+  string object_type = 1;
+  string object_uuid = 2;
+  string state_value = 3;
+  double update_time = 4;
+  string message = 5;       // Optional
+}
+
+message DeleteObjectStateRequest {
+  string object_type = 1;
+  string object_uuid = 2;
+}
+
+message GetObjectsByStateRequest {
+  string object_type = 1;
+  repeated string state_values = 2;  // List of states to match
+}
+
+message GetObjectsByStateReply {
+  repeated string object_uuids = 1;
 }

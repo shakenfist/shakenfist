@@ -66,10 +66,16 @@
     - name: Attempt to install qemu-kvm
       apt:
         name: qemu-kvm
+      register: apt_action
+      retries: 100
+      until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
   rescue:
     - name: Attempt to install qemu-system-x86 instead
       apt:
         name: qemu-system-x86
+      register: apt_action
+      retries: 100
+      until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
 # We install libvirt, even on non-hypervisors, because we use it to track
 # the CPU topology and load of the node.
@@ -104,6 +110,9 @@
       - unzip
       - xxhash
     state: latest
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
 - name: Enable desired services
   service:

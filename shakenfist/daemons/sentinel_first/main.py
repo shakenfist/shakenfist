@@ -1,10 +1,8 @@
 # NOTE(mikal): this daemon's role is to notice that the node has been started
 # or shutdown. You should never manually stop this daemon!
 #
-# IMPORTANT: This daemon must use direct etcd access because it starts BEFORE
-# the database microservice. The database service has After=sf-sentinel-first,
-# so if we tried to use the database service here, we'd create a circular
-# dependency deadlock.
+# This daemon starts after the database service, so it uses the database
+# service for both etcd and MariaDB access like other daemons.
 import setproctitle
 import signal
 import time
@@ -15,7 +13,6 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_stopping
-from shakenfist.etcd import set_force_direct_etcd
 from shakenfist.node import Node
 
 
@@ -37,11 +34,6 @@ def main():
     daemon.clear_abort_path(ABORT_PATH)
     setproctitle.setproctitle('sf-sentinel-first')
     LOG.info('Started')
-
-    # Force direct etcd access for this daemon. We start BEFORE the database
-    # microservice (sf-database has After=sf-sentinel-first), so we cannot use
-    # the database service without creating a circular dependency.
-    set_force_direct_etcd(True)
 
     n = Node.from_db(config.NODE_NAME)
     n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_RUNNING)
