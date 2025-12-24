@@ -24,7 +24,8 @@ Description=Shaken Fist {{ item }} daemon
 # The database service is the very first to start. It provides gRPC access to
 # both etcd and MariaDB for all other daemons. It must start before everything
 # else, including sentinel-first.
-After=multi-user.target
+After=multi-user.target mariadb.service
+Requires=mariadb.service
 {% elif item == "sentinel-first" %}
 # sentinel-first starts after database so it can use the database service for
 # etcd and MariaDB access.
