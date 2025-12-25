@@ -348,7 +348,7 @@ class MockEtcd():
         to_delete = []
         for key, reservation in self.ipam_reservations.items():
             if (key.startswith(prefix) and
-                    reservation.reservation_type == ReservationType.DELETION_HALO.value
+                    reservation.reservation_type == ReservationType.DELETION_HALO
                     and reservation.reserved_at < older_than):
                 to_delete.append(key)
         for key in to_delete:

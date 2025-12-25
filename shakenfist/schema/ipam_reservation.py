@@ -85,7 +85,7 @@ class IPAMReservation(BaseModel):
     address: Annotated[str, SQLIndex(), Field(max_length=45)]
 
     # How this address is being used
-    reservation_type: Annotated[str, SQLIndex(), Field(max_length=32)]
+    reservation_type: Annotated[ReservationType, SQLIndex(), Field(max_length=32)]
 
     # The object using this address (e.g., an instance or network)
     user_type: Optional[str] = Field(default=None, max_length=32)
@@ -118,7 +118,7 @@ class IPAMReservation(BaseModel):
             'address': self.address,
             'user': user,
             'when': self.reserved_at,
-            'type': self.reservation_type,
+            'type': self.reservation_type.value,
             'comment': self.comment or ''
         }
 

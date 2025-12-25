@@ -263,7 +263,7 @@ class IPAM(dbo):
             return
 
         for res in mariadb.get_reservations_for_ipam(self.uuid):
-            if res.reservation_type == ReservationType.DELETION_HALO.value:
+            if res.reservation_type == ReservationType.DELETION_HALO:
                 yield res.address
 
     def get_random_address(self) -> str:
