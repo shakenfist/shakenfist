@@ -4,6 +4,7 @@ from unittest import mock
 
 from shakenfist import exceptions
 from shakenfist import ipam
+from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
@@ -21,28 +22,41 @@ class IPAMTestCase(base.ShakenFistTestCase):
         ipam_uuid = str(uuid.uuid4())
         ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
 
-        self.assertEqual(['192.168.1.0', '192.168.1.1', '192.168.1.255'], ipm.in_use)
-        self.assertEqual({
-                             'address': '192.168.1.0',
-                             'user': ['network', ipam_uuid],
-                             'when': 1632261535.027476,
-                             'type': ReservationType.NETWORK.value,
-                             'comment': ''
-                         }, ipm.get_reservation('192.168.1.0'))
-        self.assertEqual({
-                             'address': '192.168.1.1',
-                             'user': ['network', ipam_uuid],
-                             'when': 1632261535.027476,
-                             'type': ReservationType.GATEWAY.value,
-                             'comment': ''
-                         }, ipm.get_reservation('192.168.1.1'))
-        self.assertEqual({
-                             'address': '192.168.1.255',
-                             'user': ['network', ipam_uuid],
-                             'when': 1632261535.027476,
-                             'type': ReservationType.BROADCAST.value,
-                             'comment': ''
-                         }, ipm.get_reservation('192.168.1.255'))
+        self.assertEqual({'192.168.1.0', '192.168.1.1', '192.168.1.255'}, ipm.in_use)
+        # Verify reservations using IPAMReservation objects
+        self.assertEqual(
+            IPAMReservation(
+                ipam_uuid=ipam_uuid,
+                address='192.168.1.0',
+                reservation_type=ReservationType.NETWORK,
+                user_type='network',
+                user_uuid=ipam_uuid,
+                reserved_at=1632261535.027476,
+                comment=None
+            ),
+            ipm.get_reservation('192.168.1.0'))
+        self.assertEqual(
+            IPAMReservation(
+                ipam_uuid=ipam_uuid,
+                address='192.168.1.1',
+                reservation_type=ReservationType.GATEWAY,
+                user_type='network',
+                user_uuid=ipam_uuid,
+                reserved_at=1632261535.027476,
+                comment=None
+            ),
+            ipm.get_reservation('192.168.1.1'))
+        self.assertEqual(
+            IPAMReservation(
+                ipam_uuid=ipam_uuid,
+                address='192.168.1.255',
+                reservation_type=ReservationType.BROADCAST,
+                user_type='network',
+                user_uuid=ipam_uuid,
+                reserved_at=1632261535.027476,
+                comment=None
+            ),
+            ipm.get_reservation('192.168.1.255'))
         self.assertIsNone(ipm.get_reservation('192.168.1.2'))
 
     def test_get_address_at_index(self):
