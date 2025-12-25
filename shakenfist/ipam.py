@@ -6,10 +6,13 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.schema.ipam_reservation import IPAMReservation
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 
 
@@ -19,6 +22,7 @@ from shakenfist.schema.object_types import ObjectType
 
 LOG, _ = logs.setup(__name__)
 
+# Legacy etcd path - only used for migration
 IPAM_RESERVATIONS_PATH = '/sf/ipam_reservations/%s/'
 RESERVATION_TYPE_NETWORK = 'network'
 RESERVATION_TYPE_BROADCAST = 'broadcast'
@@ -128,10 +132,7 @@ class IPAM(dbo):
         if self._in_memory_only:
             return self.__in_memory_store.keys()
 
-        reservations = []
-        for _, data in etcd.get_prefix_raw(self.reservations_path):
-            reservations.append(data['address'])
-        return reservations
+        return mariadb.get_addresses_in_use(self.uuid)
 
     @property
     def in_use_counter(self):
@@ -159,25 +160,37 @@ class IPAM(dbo):
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
 
-        reservation = {
-            'address': address,
-            'user': user,
-            'when': time.time(),
-            'type': reservation_type,
-            'comment': comment
-        }
+        user_type = None
+        user_uuid = None
+        if user:
+            if isinstance(user, (list, tuple)) and len(user) == 2:
+                user_type, user_uuid = user
+            elif isinstance(user, str):
+                user_uuid = user
+
+        reservation = IPAMReservation(
+            ipam_uuid=self.uuid,
+            address=address,
+            reservation_type=reservation_type,
+            user_type=user_type,
+            user_uuid=user_uuid,
+            reserved_at=time.time(),
+            comment=comment or None
+        )
 
         self.release_haloed(config.IP_DELETION_HALO_DURATION)
 
         if self._in_memory_only:
             if address in self.__in_memory_store:
                 return False
-            self.__in_memory_store[address] = reservation
+            self.__in_memory_store[address] = reservation.to_legacy_dict()
             return True
 
-        if not etcd.create_raw(self.reservations_path + address, reservation):
+        if not mariadb.reserve_address(reservation):
             return False
-        self.add_event(EVENT_TYPE_AUDIT, 'reserved address', extra=reservation)
+        self.add_event(
+            EVENT_TYPE_AUDIT, 'reserved address',
+            extra=reservation.to_legacy_dict())
         return True
 
     def release(self, address):
@@ -195,22 +208,28 @@ class IPAM(dbo):
         if not original_reservation:
             return False
 
-        halo_reservation = {
-            'address': address,
-            'user': None,
-            'when': time.time(),
-            'type': RESERVATION_TYPE_DELETION_HALO,
-            'comment': ''
-        }
+        halo_reservation = IPAMReservation(
+            ipam_uuid=self.uuid,
+            address=address,
+            reservation_type=RESERVATION_TYPE_DELETION_HALO,
+            user_type=None,
+            user_uuid=None,
+            reserved_at=time.time(),
+            comment=None
+        )
 
-        reservation_path = self.reservations_path + address
-        if not etcd.replace_raw(
-                reservation_path, original_reservation, halo_reservation):
+        if not mariadb.release_address(self.uuid, address, halo_reservation):
             return False
+
+        # Get legacy dict for the event log
+        if isinstance(original_reservation, IPAMReservation):
+            extra = original_reservation.to_legacy_dict()
+        else:
+            extra = original_reservation
 
         self.add_event(
             EVENT_TYPE_AUDIT, 'released address to deletion-halo',
-            extra=original_reservation)
+            extra=extra)
         return True
 
     @staticmethod
@@ -231,14 +250,9 @@ class IPAM(dbo):
                     freed += 1
             return freed
 
-        # Handle the possible allocation race here where something's halo is
-        # removed and its immediately allocated, but at the same time we
-        # remove its halo by using a transactional_delete_raw.
-        for key, data in etcd.get_prefix_raw(self.reservations_path):
-            if self._should_free(data, duration):
-                if etcd.transactional_delete_raw(key, data):
-                    freed += 1
-        return freed
+        # Calculate the cutoff time for deletion-halo expiry
+        older_than = time.time() - duration
+        return mariadb.release_haloed_addresses(self.uuid, older_than)
 
     def get_haloed_addresses(self):
         if self._in_memory_only:
@@ -248,9 +262,9 @@ class IPAM(dbo):
                     yield address
             return
 
-        for _, data in etcd.get_prefix_raw(self.reservations_path):
-            if data['type'] == RESERVATION_TYPE_DELETION_HALO:
-                yield data['address']
+        for res in mariadb.get_reservations_for_ipam(self.uuid):
+            if res.reservation_type == RESERVATION_TYPE_DELETION_HALO:
+                yield res.address
 
     def get_random_address(self):
         bits = random.getrandbits(
@@ -309,7 +323,7 @@ class IPAM(dbo):
         if self._in_memory_only:
             return self.__in_memory_store.get(address)
 
-        return etcd.get_raw(self.reservations_path + address)
+        return mariadb.get_reservation(self.uuid, address)
 
     def get_allocation_age(self, address):
         if not address:
@@ -319,13 +333,15 @@ class IPAM(dbo):
         r = self.get_reservation(address)
         if not r:
             return None
+        if isinstance(r, IPAMReservation):
+            return r.reserved_at
         return r.get('when', time.time())
 
     def hard_delete(self):
         if self._in_memory_only:
             return
 
-        etcd.delete_prefix(self.reservations_path)
+        mariadb.delete_reservations_for_ipam(self.uuid)
         super().hard_delete()
 
 

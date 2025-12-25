@@ -595,6 +595,167 @@ def _grpc_get_objects_by_state(object_type: str,
 
 
 # =============================================================================
+# IPAM gRPC Client Functions
+# These call the database microservice for IPAM operations.
+# =============================================================================
+
+def _grpc_reserve_address(reservation: IPAMReservation) -> bool:
+    """Atomically reserve an IP address via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReserveAddressRequest(
+            reservation=database_pb2.IPAMReservationData(
+                ipam_uuid=reservation.ipam_uuid,
+                address=reservation.address,
+                reservation_type=reservation.reservation_type,
+                user_type=reservation.user_type or '',
+                user_uuid=reservation.user_uuid or '',
+                reserved_at=reservation.reserved_at,
+                comment=reservation.comment or ''
+            )
+        )
+        reply = stub.ReserveAddress(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ReserveAddress failed for {reservation.ipam_uuid}/'
+            f'{reservation.address}: {e}')
+        return False
+
+
+def _grpc_release_address(ipam_uuid: str, address: str,
+                          halo_reservation: IPAMReservation) -> bool:
+    """Release an IP address via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReleaseAddressRequest(
+            ipam_uuid=ipam_uuid,
+            address=address,
+            halo_reservation=database_pb2.IPAMReservationData(
+                ipam_uuid=halo_reservation.ipam_uuid,
+                address=halo_reservation.address,
+                reservation_type=halo_reservation.reservation_type,
+                user_type=halo_reservation.user_type or '',
+                user_uuid=halo_reservation.user_uuid or '',
+                reserved_at=halo_reservation.reserved_at,
+                comment=halo_reservation.comment or ''
+            )
+        )
+        reply = stub.ReleaseAddress(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC ReleaseAddress failed for {ipam_uuid}/{address}: {e}')
+        return False
+
+
+def _grpc_get_reservation(ipam_uuid: str,
+                          address: str) -> Optional[IPAMReservation]:
+    """Get a single reservation via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetReservationRequest(
+            ipam_uuid=ipam_uuid,
+            address=address
+        )
+        reply = stub.GetReservation(request)
+        if not reply.found:
+            return None
+        return IPAMReservation(
+            ipam_uuid=reply.reservation.ipam_uuid,
+            address=reply.reservation.address,
+            reservation_type=reply.reservation.reservation_type,
+            user_type=reply.reservation.user_type or None,
+            user_uuid=reply.reservation.user_uuid or None,
+            reserved_at=reply.reservation.reserved_at,
+            comment=reply.reservation.comment or None
+        )
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetReservation failed for {ipam_uuid}/{address}: {e}')
+        return None
+
+
+def _grpc_get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
+    """Get all reservations for an IPAM via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetReservationsForIPAMRequest(ipam_uuid=ipam_uuid)
+        reply = stub.GetReservationsForIPAM(request)
+        result = []
+        for res in reply.reservations:
+            result.append(IPAMReservation(
+                ipam_uuid=res.ipam_uuid,
+                address=res.address,
+                reservation_type=res.reservation_type,
+                user_type=res.user_type or None,
+                user_uuid=res.user_uuid or None,
+                reserved_at=res.reserved_at,
+                comment=res.comment or None
+            ))
+        return result
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetReservationsForIPAM failed for {ipam_uuid}: {e}')
+        return []
+
+
+def _grpc_delete_reservation(ipam_uuid: str, address: str) -> bool:
+    """Delete a single reservation via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteReservationRequest(
+            ipam_uuid=ipam_uuid,
+            address=address
+        )
+        reply = stub.DeleteReservation(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteReservation failed for {ipam_uuid}/{address}: {e}')
+        return False
+
+
+def _grpc_delete_reservations_for_ipam(ipam_uuid: str) -> int:
+    """Delete all reservations for an IPAM via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteReservationsForIPAMRequest(
+            ipam_uuid=ipam_uuid)
+        reply = stub.DeleteReservationsForIPAM(request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteReservationsForIPAM failed for {ipam_uuid}: {e}')
+        return 0
+
+
+def _grpc_release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
+    """Release expired deletion-halo addresses via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReleaseHaloedAddressesRequest(
+            ipam_uuid=ipam_uuid,
+            older_than=older_than
+        )
+        reply = stub.ReleaseHaloedAddresses(request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ReleaseHaloedAddresses failed for {ipam_uuid}: {e}')
+        return 0
+
+
+def _grpc_get_addresses_in_use(ipam_uuid: str) -> set[str]:
+    """Get all addresses in use for an IPAM via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAddressesInUseRequest(ipam_uuid=ipam_uuid)
+        reply = stub.GetAddressesInUse(request)
+        return set(reply.addresses)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetAddressesInUse failed for {ipam_uuid}: {e}')
+        return set()
+
+
+# =============================================================================
 # Public API Functions
 # These route to either direct or gRPC access based on configuration.
 # =============================================================================
@@ -969,8 +1130,7 @@ def _direct_get_addresses_in_use(ipam_uuid: str) -> set[str]:
 
 # =============================================================================
 # IPAM Reservation Public API Functions
-# For now, these use direct access since gRPC support isn't added yet.
-# When gRPC is added, these will route like the state functions.
+# These route to either direct or gRPC access based on configuration.
 # =============================================================================
 
 def reserve_address(reservation: IPAMReservation) -> bool:
@@ -982,7 +1142,8 @@ def reserve_address(reservation: IPAMReservation) -> bool:
     Returns:
         True if the reservation was created, False if already reserved.
     """
-    # TODO: Add gRPC routing when IPAM gRPC methods are implemented
+    if _use_database_service():
+        return _grpc_reserve_address(reservation)
     return _direct_reserve_address(reservation)
 
 
@@ -998,7 +1159,8 @@ def release_address(ipam_uuid: str, address: str,
     Returns:
         True if successful, False otherwise.
     """
-    # TODO: Add gRPC routing when IPAM gRPC methods are implemented
+    if _use_database_service():
+        return _grpc_release_address(ipam_uuid, address, halo_reservation)
     return _direct_release_address(ipam_uuid, address, halo_reservation)
 
 
@@ -1012,7 +1174,8 @@ def get_reservation(ipam_uuid: str, address: str) -> Optional[IPAMReservation]:
     Returns:
         The IPAMReservation if found, None otherwise.
     """
-    # TODO: Add gRPC routing when IPAM gRPC methods are implemented
+    if _use_database_service():
+        return _grpc_get_reservation(ipam_uuid, address)
     return _direct_get_reservation(ipam_uuid, address)
 
 
@@ -1025,7 +1188,8 @@ def get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
     Returns:
         List of IPAMReservation objects.
     """
-    # TODO: Add gRPC routing when IPAM gRPC methods are implemented
+    if _use_database_service():
+        return _grpc_get_reservations_for_ipam(ipam_uuid)
     return _direct_get_reservations_for_ipam(ipam_uuid)
 
 
@@ -1039,7 +1203,8 @@ def delete_reservation(ipam_uuid: str, address: str) -> bool:
     Returns:
         True if deleted, False if not found or error.
     """
-    # TODO: Add gRPC routing when IPAM gRPC methods are implemented
+    if _use_database_service():
+        return _grpc_delete_reservation(ipam_uuid, address)
     return _direct_delete_reservation(ipam_uuid, address)
 
 
@@ -1052,7 +1217,8 @@ def delete_reservations_for_ipam(ipam_uuid: str) -> int:
     Returns:
         Number of reservations deleted.
     """
-    # TODO: Add gRPC routing when IPAM gRPC methods are implemented
+    if _use_database_service():
+        return _grpc_delete_reservations_for_ipam(ipam_uuid)
     return _direct_delete_reservations_for_ipam(ipam_uuid)
 
 
@@ -1066,7 +1232,8 @@ def release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
     Returns:
         Number of reservations deleted.
     """
-    # TODO: Add gRPC routing when IPAM gRPC methods are implemented
+    if _use_database_service():
+        return _grpc_release_haloed_addresses(ipam_uuid, older_than)
     return _direct_release_haloed_addresses(ipam_uuid, older_than)
 
 
@@ -1079,5 +1246,6 @@ def get_addresses_in_use(ipam_uuid: str) -> set[str]:
     Returns:
         Set of IP addresses that are reserved.
     """
-    # TODO: Add gRPC routing when IPAM gRPC methods are implemented
+    if _use_database_service():
+        return _grpc_get_addresses_in_use(ipam_uuid)
     return _direct_get_addresses_in_use(ipam_uuid)

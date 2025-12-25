@@ -55,11 +55,13 @@ Each object type has a dedicated key prefix:
 
 ## MariaDB
 
-MariaDB is used for object state storage, providing:
+MariaDB is used for object state storage and IPAM reservation tracking,
+providing:
 
 - Efficient queries by object type and state value
 - Indexed lookups for state-based filtering
 - Better performance than etcd for scanning large numbers of objects
+- Atomic IP address reservation with database-level uniqueness constraints
 
 MariaDB is deployed on etcd master nodes and uses Galera for multi-master
 replication across the cluster.
@@ -306,6 +308,73 @@ Use `--dry-run` to preview what would be migrated without making changes.
 MariaDB is now required for all deployments - state is stored only in MariaDB,
 not in etcd.
 
+## IPAM Reservation Storage
+
+IPAM (IP Address Manager) reservations are stored in MariaDB for atomic address
+allocation. This provides:
+
+- **Atomic reservation**: Uses database uniqueness constraints to prevent race
+  conditions when multiple nodes try to allocate the same address
+- **Efficient queries**: Indexes on ipam_uuid and address for fast lookups
+- **Deletion halo**: Supports the deletion-halo pattern where recently released
+  addresses are temporarily unavailable to prevent reuse conflicts
+
+### The ipam_reservations Table
+
+The `ipam_reservations` table uses a composite primary key on (ipam_uuid, address):
+
+```python
+class IPAMReservation(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            'sql_indexes': [
+                ['ipam_uuid', 'address'],      # Composite unique key
+                ['user_type', 'user_uuid'],    # Query by user
+            ]
+        }
+    )
+
+    ipam_uuid: Annotated[str, SQLIndex(), Field(max_length=36)]
+    address: Annotated[str, SQLIndex(), Field(max_length=45)]
+    reservation_type: Annotated[str, SQLIndex(), Field(max_length=32)]
+    user_type: Optional[str] = Field(default=None, max_length=32)
+    user_uuid: Optional[str] = Field(default=None, max_length=36)
+    reserved_at: float
+    comment: Optional[str] = None
+```
+
+### Reservation Types
+
+IPAM supports several reservation types:
+
+| Type | Description |
+|------|-------------|
+| `network` | The network address (e.g., 10.0.0.0) |
+| `broadcast` | The broadcast address (e.g., 10.0.0.255) |
+| `gateway` | The gateway address for the network |
+| `floating` | A floating IP that can be moved between instances |
+| `routed` | A routed IP address for external connectivity |
+| `instance` | An IP assigned to an instance interface |
+| `deletion-halo` | A recently-released address in the deletion halo |
+
+### Migration from etcd
+
+For existing deployments that stored IPAM reservations in etcd, use the
+migration command:
+
+```bash
+# Stop all Shaken Fist services first
+sf-ctl migrate-ipam-to-mariadb --dry-run
+
+# Perform the migration
+sf-ctl migrate-ipam-to-mariadb
+```
+
+This command:
+1. Reads all reservations from `/sf/ipam_reservations/` in etcd
+2. Writes each reservation to the MariaDB ipam_reservations table
+3. Removes the reservation entries from etcd
+
 ## Administrative Commands
 
 The `sf-ctl` command provides several database-related administrative functions.
@@ -375,6 +444,22 @@ sf-ctl migrate-state-to-mariadb --dry-run
 # Perform the migration
 sf-ctl migrate-state-to-mariadb
 ```
+
+### migrate-ipam-to-mariadb
+
+Migrates IPAM reservations from etcd to MariaDB for existing deployments:
+
+```bash
+# Preview what would be migrated
+sf-ctl migrate-ipam-to-mariadb --dry-run
+
+# Perform the migration
+sf-ctl migrate-ipam-to-mariadb
+```
+
+This command scans all `/sf/ipam_reservations/` entries in etcd, converts them
+to the new IPAMReservation format, writes them to MariaDB, and removes the
+original entries from etcd.
 
 ## Best Practices
 
