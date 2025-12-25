@@ -111,9 +111,11 @@ def _get_connection_url() -> str:
     if not config.MARIADB_HOST:
         raise RuntimeError('MARIADB_HOST not configured')
 
-    # Use mysqldb driver which is available via python3-mysqldb
+    # Use mariadb dialect with mysqldb driver. The mariadb dialect is required
+    # for MariaDB-specific types like INET4. The mysqldb driver is available
+    # via python3-mysqldb.
     return (
-        f'mysql+mysqldb://{config.MARIADB_USER}:{config.MARIADB_PASSWORD}'
+        f'mariadb+mysqldb://{config.MARIADB_USER}:{config.MARIADB_PASSWORD}'
         f'@{config.MARIADB_HOST}:{config.MARIADB_PORT}/{config.MARIADB_DATABASE}'
     )
 

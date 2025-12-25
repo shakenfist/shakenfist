@@ -34,6 +34,7 @@ from typing import Union
 from pydantic import BaseModel
 import sqlalchemy as sa
 from sqlalchemy.dialects import mysql
+from sqlalchemy.dialects.mysql import mariadb
 from sqlalchemy.engine.interfaces import Dialect
 from shakenfist_utilities import logs
 
@@ -318,7 +319,7 @@ def get_table_creation_sql(
     """
     from sqlalchemy.schema import CreateTable
     if dialect is None:
-        dialect = mysql.dialect()
+        dialect = mariadb.MariaDBDialect()
     return str(CreateTable(table).compile(dialect=dialect))
 
 

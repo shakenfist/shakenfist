@@ -66,6 +66,21 @@ providing:
 MariaDB is deployed on etcd master nodes and uses Galera for multi-master
 replication across the cluster.
 
+### MariaDB Required (Not MySQL)
+
+Shaken Fist requires **MariaDB** specifically, not MySQL. While MariaDB is
+largely compatible with MySQL at the protocol level, Shaken Fist uses
+MariaDB-specific features that are not available in MySQL:
+
+- **INET4 column type**: Provides efficient 4-byte storage for IPv4 addresses
+  (vs 15 bytes for VARCHAR) with native comparison and indexing support. This
+  type was introduced in MariaDB 10.10 and is not available in MySQL.
+
+SQLAlchemy is configured to use the `mariadb://` dialect (not `mysql://`) to
+ensure proper support for these MariaDB-specific types. The underlying driver
+(`mysqlclient`) remains the same since MariaDB maintains MySQL protocol
+compatibility.
+
 ### Access Pattern
 
 **Important**: Only the database service daemon (`sf-database`) has direct
@@ -158,6 +173,7 @@ Python types are mapped to SQL column types:
 | `bytes` | `LARGEBINARY` |
 | `UUID` | `CHAR(36)` |
 | `Enum` | `VARCHAR(64)` |
+| `IPv4Address` | `INET4` (MariaDB-specific) |
 | `list`, `dict`, nested models | `LONGTEXT` (JSON) |
 | `Optional[X]` | Nullable column of type X |
 
@@ -324,6 +340,8 @@ allocation. This provides:
 The `ipam_reservations` table uses a composite primary key on (ipam_uuid, address):
 
 ```python
+from ipaddress import IPv4Address
+
 class IPAMReservation(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
@@ -335,13 +353,17 @@ class IPAMReservation(BaseModel):
     )
 
     ipam_uuid: Annotated[str, SQLIndex(), Field(max_length=36)]
-    address: Annotated[str, SQLIndex(), Field(max_length=45)]
-    reservation_type: Annotated[str, SQLIndex(), Field(max_length=32)]
+    address: Annotated[IPv4Address, SQLIndex()]  # Maps to INET4 column
+    reservation_type: ReservationType            # Enum stored as VARCHAR
     user_type: Optional[str] = Field(default=None, max_length=32)
     user_uuid: Optional[str] = Field(default=None, max_length=36)
     reserved_at: float
     comment: Optional[str] = None
 ```
+
+The `address` field uses Python's `ipaddress.IPv4Address` type, which maps to
+MariaDB's `INET4` column type. This provides efficient 4-byte storage and native
+IP address comparison operations.
 
 ### Reservation Types
 
