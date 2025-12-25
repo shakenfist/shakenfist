@@ -60,8 +60,9 @@ _ipam_reservations_table: Optional[sa.Table] = None
 #                         ENUM(ReservationType)
 #   ipam_reservations v3: Changed address from VARCHAR(45) to INET4
 #   ipam_reservations v4: Changed user_type from VARCHAR(32) to ENUM(ObjectType)
+#   ipam_reservations v5: Changed ipam_uuid and user_uuid from VARCHAR(36) to UUID
 OBJECT_STATES_VERSION = 2
-IPAM_RESERVATIONS_VERSION = 4
+IPAM_RESERVATIONS_VERSION = 5
 
 
 def _use_database_service() -> bool:
@@ -337,12 +338,12 @@ def _get_ipam_reservations_table() -> sa.Table:
         _ipam_reservations_table = sa.Table(
             'ipam_reservations',
             metadata,
-            sa.Column('ipam_uuid', sa.String(36), nullable=False),
+            sa.Column('ipam_uuid', sa.Uuid(), nullable=False),
             sa.Column('address', INET4(), nullable=False),
             sa.Column('reservation_type', sa.Enum(ReservationType),
                       nullable=False),
             sa.Column('user_type', sa.Enum(ObjectType), nullable=True),
-            sa.Column('user_uuid', sa.String(36), nullable=True),
+            sa.Column('user_uuid', sa.Uuid(), nullable=True),
             sa.Column('reserved_at', sa.Double(), nullable=False),
             sa.Column('comment', sa.Text(), nullable=True),
             # Composite primary key ensures uniqueness
@@ -442,6 +443,22 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
             ))
             conn.commit()
         current_ver = 4
+        _set_table_version(engine, table_name, current_ver)
+
+    # Migration from v4 to v5: Convert UUID columns from VARCHAR(36) to UUID
+    if current_ver == 4:
+        LOG.info('Upgrading ipam_reservations from v4 to v5: '
+                 'converting UUID columns to native UUID type')
+        with engine.connect() as conn:
+            # ALTER TABLE to change ipam_uuid and user_uuid from VARCHAR to UUID
+            # MariaDB will automatically convert existing UUID string values
+            conn.execute(sa.text(
+                'ALTER TABLE ipam_reservations '
+                'MODIFY COLUMN ipam_uuid UUID NOT NULL, '
+                'MODIFY COLUMN user_uuid UUID NULL'
+            ))
+            conn.commit()
+        current_ver = 5
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -717,11 +734,11 @@ def _grpc_reserve_address(reservation: IPAMReservation) -> bool:
         stub = _get_database_stub()
         request = database_pb2.ReserveAddressRequest(  # type: ignore[attr-defined]
             reservation=database_pb2.IPAMReservationData(  # type: ignore[attr-defined]
-                ipam_uuid=reservation.ipam_uuid,
+                ipam_uuid=str(reservation.ipam_uuid),
                 address=str(reservation.address),
                 reservation_type=reservation.reservation_type,
                 user_type=_object_type_to_string(reservation.user_type),
-                user_uuid=reservation.user_uuid or '',
+                user_uuid=str(reservation.user_uuid) if reservation.user_uuid else '',
                 reserved_at=reservation.reserved_at,
                 comment=reservation.comment or ''
             )
@@ -744,11 +761,11 @@ def _grpc_release_address(ipam_uuid: str, address: str,
             ipam_uuid=ipam_uuid,
             address=address,
             halo_reservation=database_pb2.IPAMReservationData(  # type: ignore[attr-defined]
-                ipam_uuid=halo_reservation.ipam_uuid,
+                ipam_uuid=str(halo_reservation.ipam_uuid),
                 address=str(halo_reservation.address),
                 reservation_type=halo_reservation.reservation_type,
                 user_type=_object_type_to_string(halo_reservation.user_type),
-                user_uuid=halo_reservation.user_uuid or '',
+                user_uuid=str(halo_reservation.user_uuid) if halo_reservation.user_uuid else '',
                 reserved_at=halo_reservation.reserved_at,
                 comment=halo_reservation.comment or ''
             )

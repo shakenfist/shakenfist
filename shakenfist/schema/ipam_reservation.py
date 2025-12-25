@@ -17,6 +17,7 @@ from typing import Optional
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import UUID4
 from shakenfist_utilities import logs
 
 from shakenfist.schema.object_types import ObjectType
@@ -85,7 +86,7 @@ class IPAMReservation(BaseModel):
     )
 
     # The IPAM this reservation belongs to
-    ipam_uuid: Annotated[str, SQLIndex(), Field(max_length=36)]
+    ipam_uuid: Annotated[UUID4, SQLIndex()]
 
     # The IPv4 address - uses Python's ipaddress.IPv4Address type
     # This maps to MariaDB INET4 column type for efficient storage and indexing
@@ -97,7 +98,7 @@ class IPAMReservation(BaseModel):
     # The object using this address (e.g., an instance or network)
     # user_type is an ObjectType enum for type safety and efficient storage
     user_type: Optional[ObjectType] = None
-    user_uuid: Optional[str] = Field(default=None, max_length=36)
+    user_uuid: Optional[UUID4] = None
 
     # When the reservation was made (Unix epoch seconds)
     reserved_at: float
@@ -120,8 +121,8 @@ class IPAMReservation(BaseModel):
         """
         user = None
         if self.user_type and self.user_uuid:
-            # Convert ObjectType enum to string for legacy format
-            user = (str(self.user_type), self.user_uuid)
+            # Convert ObjectType enum and UUID4 to strings for legacy format
+            user = (str(self.user_type), str(self.user_uuid))
 
         return {
             'address': str(self.address),
@@ -181,11 +182,11 @@ class IPAMReservation(BaseModel):
             A dict with all reservation fields.
         """
         return {
-            'ipam_uuid': self.ipam_uuid,
+            'ipam_uuid': str(self.ipam_uuid),
             'address': str(self.address),
             'reservation_type': self.reservation_type,
             'user_type': str(self.user_type) if self.user_type else None,
-            'user_uuid': self.user_uuid,
+            'user_uuid': str(self.user_uuid) if self.user_uuid else None,
             'reserved_at': self.reserved_at,
             'comment': self.comment
         }
