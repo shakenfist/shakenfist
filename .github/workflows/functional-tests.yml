@@ -1519,7 +1519,6 @@ jobs:
       - functional_matrix_merge
       - ansible_modules
       - node_lifecycle
-      - upgrade_0_6_15
       - merge_pr_comment
     if: always() && github.event_name == 'merge_group'
     permissions:
