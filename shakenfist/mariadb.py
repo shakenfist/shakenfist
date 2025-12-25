@@ -603,8 +603,9 @@ def _grpc_reserve_address(reservation: IPAMReservation) -> bool:
     """Atomically reserve an IP address via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.ReserveAddressRequest(
-            reservation=database_pb2.IPAMReservationData(
+        # type: ignore comments needed for generated protobuf code
+        request = database_pb2.ReserveAddressRequest(  # type: ignore[attr-defined]
+            reservation=database_pb2.IPAMReservationData(  # type: ignore[attr-defined]
                 ipam_uuid=reservation.ipam_uuid,
                 address=reservation.address,
                 reservation_type=reservation.reservation_type,
@@ -628,10 +629,10 @@ def _grpc_release_address(ipam_uuid: str, address: str,
     """Release an IP address via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.ReleaseAddressRequest(
+        request = database_pb2.ReleaseAddressRequest(  # type: ignore[attr-defined]
             ipam_uuid=ipam_uuid,
             address=address,
-            halo_reservation=database_pb2.IPAMReservationData(
+            halo_reservation=database_pb2.IPAMReservationData(  # type: ignore[attr-defined]
                 ipam_uuid=halo_reservation.ipam_uuid,
                 address=halo_reservation.address,
                 reservation_type=halo_reservation.reservation_type,
@@ -653,7 +654,7 @@ def _grpc_get_reservation(ipam_uuid: str,
     """Get a single reservation via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.GetReservationRequest(
+        request = database_pb2.GetReservationRequest(  # type: ignore[attr-defined]
             ipam_uuid=ipam_uuid,
             address=address
         )
@@ -678,7 +679,9 @@ def _grpc_get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
     """Get all reservations for an IPAM via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.GetReservationsForIPAMRequest(ipam_uuid=ipam_uuid)
+        # type: ignore for generated protobuf code
+        request = database_pb2.GetReservationsForIPAMRequest(  # type: ignore[attr-defined]
+            ipam_uuid=ipam_uuid)
         reply = stub.GetReservationsForIPAM(request)
         result = []
         for res in reply.reservations:
@@ -701,7 +704,7 @@ def _grpc_delete_reservation(ipam_uuid: str, address: str) -> bool:
     """Delete a single reservation via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.DeleteReservationRequest(
+        request = database_pb2.DeleteReservationRequest(  # type: ignore[attr-defined]
             ipam_uuid=ipam_uuid,
             address=address
         )
@@ -717,7 +720,8 @@ def _grpc_delete_reservations_for_ipam(ipam_uuid: str) -> int:
     """Delete all reservations for an IPAM via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.DeleteReservationsForIPAMRequest(
+        # type: ignore for generated protobuf code
+        request = database_pb2.DeleteReservationsForIPAMRequest(  # type: ignore[attr-defined]
             ipam_uuid=ipam_uuid)
         reply = stub.DeleteReservationsForIPAM(request)
         return int(reply.count)
@@ -731,7 +735,8 @@ def _grpc_release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
     """Release expired deletion-halo addresses via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.ReleaseHaloedAddressesRequest(
+        # type: ignore for generated protobuf code
+        request = database_pb2.ReleaseHaloedAddressesRequest(  # type: ignore[attr-defined]
             ipam_uuid=ipam_uuid,
             older_than=older_than
         )
@@ -747,7 +752,9 @@ def _grpc_get_addresses_in_use(ipam_uuid: str) -> set[str]:
     """Get all addresses in use for an IPAM via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.GetAddressesInUseRequest(ipam_uuid=ipam_uuid)
+        # type: ignore for generated protobuf code
+        request = database_pb2.GetAddressesInUseRequest(  # type: ignore[attr-defined]
+            ipam_uuid=ipam_uuid)
         reply = stub.GetAddressesInUse(request)
         return set(reply.addresses)
     except grpc.RpcError as e:
