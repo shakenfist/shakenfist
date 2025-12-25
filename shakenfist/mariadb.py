@@ -32,6 +32,7 @@ from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.schema.ipam_reservation import IPAMReservation
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_state import State
 
 
@@ -300,7 +301,8 @@ def _get_ipam_reservations_table() -> sa.Table:
             metadata,
             sa.Column('ipam_uuid', sa.String(36), nullable=False),
             sa.Column('address', sa.String(45), nullable=False),
-            sa.Column('reservation_type', sa.String(32), nullable=False),
+            sa.Column('reservation_type', sa.Enum(ReservationType),
+                      nullable=False),
             sa.Column('user_type', sa.String(32), nullable=True),
             sa.Column('user_uuid', sa.String(36), nullable=True),
             sa.Column('reserved_at', sa.Double(), nullable=False),
@@ -1094,7 +1096,7 @@ def _direct_release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
             stmt = sa.delete(table).where(
                 sa.and_(
                     table.c.ipam_uuid == ipam_uuid,
-                    table.c.reservation_type == 'deletion-halo',
+                    table.c.reservation_type == ReservationType.DELETION_HALO,
                     table.c.reserved_at < older_than
                 )
             )
