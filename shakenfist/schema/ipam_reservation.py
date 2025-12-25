@@ -9,6 +9,7 @@
 # not object types.
 
 from enum import Enum
+from ipaddress import IPv4Address
 from typing import Annotated
 from typing import Any
 from typing import Optional
@@ -59,7 +60,7 @@ class IPAMReservation(BaseModel):
 
     Attributes:
         ipam_uuid: The UUID of the IPAM this reservation belongs to.
-        address: The IP address being reserved (IPv4 or IPv6, max 45 chars).
+        address: The IPv4 address being reserved.
         reservation_type: How this address is being used.
         user_type: The type of object using this address (if any).
         user_uuid: The UUID of the object using this address (if any).
@@ -81,8 +82,9 @@ class IPAMReservation(BaseModel):
     # The IPAM this reservation belongs to
     ipam_uuid: Annotated[str, SQLIndex(), Field(max_length=36)]
 
-    # The IP address - 45 chars for IPv6 with zone ID
-    address: Annotated[str, SQLIndex(), Field(max_length=45)]
+    # The IPv4 address - uses Python's ipaddress.IPv4Address type
+    # This maps to MariaDB INET4 column type for efficient storage and indexing
+    address: Annotated[IPv4Address, SQLIndex()]
 
     # How this address is being used
     reservation_type: Annotated[ReservationType, SQLIndex(), Field(max_length=32)]
@@ -101,7 +103,7 @@ class IPAMReservation(BaseModel):
         """Convert to the legacy etcd reservation format.
 
         The legacy format uses:
-        - 'address': the IP address
+        - 'address': the IP address as a string
         - 'user': tuple of (object_type, object_uuid) or None
         - 'when': Unix timestamp
         - 'type': reservation type string
@@ -115,7 +117,7 @@ class IPAMReservation(BaseModel):
             user = (self.user_type, self.user_uuid)
 
         return {
-            'address': self.address,
+            'address': str(self.address),
             'user': user,
             'when': self.reserved_at,
             'type': self.reservation_type.value,
@@ -145,9 +147,13 @@ class IPAMReservation(BaseModel):
                 # Very old format might have user as a string
                 user_uuid = user
 
+        # Convert address string to IPv4Address
+        address_str = data['address']
+        address = IPv4Address(address_str)
+
         return cls(
             ipam_uuid=ipam_uuid,
-            address=data['address'],
+            address=address,
             reservation_type=data.get('type', ReservationType.UNKNOWN.value),
             user_type=user_type,
             user_uuid=user_uuid,
@@ -163,7 +169,7 @@ class IPAMReservation(BaseModel):
         """
         return {
             'ipam_uuid': self.ipam_uuid,
-            'address': self.address,
+            'address': str(self.address),
             'reservation_type': self.reservation_type,
             'user_type': self.user_type,
             'user_uuid': self.user_uuid,

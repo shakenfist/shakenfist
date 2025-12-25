@@ -275,12 +275,15 @@ class MockEtcd():
     #
 
     def _ipam_key(self, ipam_uuid: str, address: str) -> str:
-        """Generate a unique key for an IPAM reservation."""
+        """Generate a unique key for an IPAM reservation.
+
+        The address can be either a string or an IPv4Address object.
+        """
         return f'{ipam_uuid}/{address}'
 
     def _mariadb_reserve_address(self, reservation: IPAMReservation) -> bool:
         """Mock implementation of mariadb.reserve_address()"""
-        key = self._ipam_key(reservation.ipam_uuid, reservation.address)
+        key = self._ipam_key(reservation.ipam_uuid, str(reservation.address))
         if key in self.ipam_reservations:
             self._trace(f'MockMariaDB.reserve_address({key}): already exists')
             return False

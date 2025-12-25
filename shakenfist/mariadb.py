@@ -18,12 +18,14 @@
 # When ensure_schema() is called, it checks the current version and applies
 # any necessary migrations. This follows the same pattern as eventlog.py.
 
+from ipaddress import IPv4Address
 import time
 import threading
 from typing import Any, Optional
 
 import grpc
 import sqlalchemy as sa
+from sqlalchemy.dialects.mysql import INET4
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs
@@ -53,10 +55,12 @@ _ipam_reservations_table: Optional[sa.Table] = None
 #   object_states v1: Initial schema with VARCHAR(32) for object_type
 #   object_states v2: Changed object_type from VARCHAR(32) to ENUM(ObjectType)
 #   ipam_reservations v1: Initial schema with VARCHAR(32) for reservation_type
+#                         and VARCHAR(45) for address
 #   ipam_reservations v2: Changed reservation_type from VARCHAR(32) to
 #                         ENUM(ReservationType)
+#   ipam_reservations v3: Changed address from VARCHAR(45) to INET4
 OBJECT_STATES_VERSION = 2
-IPAM_RESERVATIONS_VERSION = 2
+IPAM_RESERVATIONS_VERSION = 3
 
 
 def _use_database_service() -> bool:
@@ -317,6 +321,9 @@ def _get_ipam_reservations_table() -> sa.Table:
     This table stores IP address reservations for all IPAMs. The combination
     of (ipam_uuid, address) is unique - each address can only be reserved
     once within a given IPAM.
+
+    The address column uses MariaDB's INET4 type for efficient IPv4 storage
+    and indexing (4 bytes vs up to 15 bytes for string representation).
     """
     global _ipam_reservations_table
     if _ipam_reservations_table is None:
@@ -325,7 +332,7 @@ def _get_ipam_reservations_table() -> sa.Table:
             'ipam_reservations',
             metadata,
             sa.Column('ipam_uuid', sa.String(36), nullable=False),
-            sa.Column('address', sa.String(45), nullable=False),
+            sa.Column('address', INET4(), nullable=False),
             sa.Column('reservation_type', sa.Enum(ReservationType),
                       nullable=False),
             sa.Column('user_type', sa.String(32), nullable=True),
@@ -365,7 +372,7 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
     table = _get_ipam_reservations_table()
 
     # Version 0 or -1 means table doesn't exist yet - create it with current
-    # schema (which includes the ENUM type)
+    # schema (which includes the ENUM and INET4 types)
     if current_ver <= 0:
         LOG.info(f'Creating {table_name} table (version {IPAM_RESERVATIONS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
@@ -396,6 +403,22 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
             ))
             conn.commit()
         current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
+
+    # Migration from v2 to v3: Convert address from VARCHAR(45) to INET4
+    if current_ver == 2:
+        LOG.info('Upgrading ipam_reservations from v2 to v3: '
+                 'converting address to INET4')
+        with engine.connect() as conn:
+            # ALTER TABLE to change column type from VARCHAR to INET4
+            # MariaDB will automatically convert existing IP string values
+            # to INET4 format
+            conn.execute(sa.text(
+                'ALTER TABLE ipam_reservations '
+                'MODIFY COLUMN address INET4 NOT NULL'
+            ))
+            conn.commit()
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -651,7 +674,7 @@ def _grpc_reserve_address(reservation: IPAMReservation) -> bool:
         request = database_pb2.ReserveAddressRequest(  # type: ignore[attr-defined]
             reservation=database_pb2.IPAMReservationData(  # type: ignore[attr-defined]
                 ipam_uuid=reservation.ipam_uuid,
-                address=reservation.address,
+                address=str(reservation.address),
                 reservation_type=reservation.reservation_type,
                 user_type=reservation.user_type or '',
                 user_uuid=reservation.user_uuid or '',
@@ -678,7 +701,7 @@ def _grpc_release_address(ipam_uuid: str, address: str,
             address=address,
             halo_reservation=database_pb2.IPAMReservationData(  # type: ignore[attr-defined]
                 ipam_uuid=halo_reservation.ipam_uuid,
-                address=halo_reservation.address,
+                address=str(halo_reservation.address),
                 reservation_type=halo_reservation.reservation_type,
                 user_type=halo_reservation.user_type or '',
                 user_uuid=halo_reservation.user_uuid or '',
@@ -707,7 +730,7 @@ def _grpc_get_reservation(ipam_uuid: str,
             return None
         return IPAMReservation(
             ipam_uuid=reply.reservation.ipam_uuid,
-            address=reply.reservation.address,
+            address=IPv4Address(reply.reservation.address),
             reservation_type=reply.reservation.reservation_type,
             user_type=reply.reservation.user_type or None,
             user_uuid=reply.reservation.user_uuid or None,
@@ -730,7 +753,7 @@ def _grpc_get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
         for res in reply.reservations:
             result.append(IPAMReservation(
                 ipam_uuid=res.ipam_uuid,
-                address=res.address,
+                address=IPv4Address(res.address),
                 reservation_type=res.reservation_type,
                 user_type=res.user_type or None,
                 user_uuid=res.user_uuid or None,
@@ -933,7 +956,7 @@ def _direct_reserve_address(reservation: IPAMReservation) -> bool:
         with engine.connect() as conn:
             stmt = sa.insert(table).values(
                 ipam_uuid=reservation.ipam_uuid,
-                address=reservation.address,
+                address=str(reservation.address),
                 reservation_type=reservation.reservation_type,
                 user_type=reservation.user_type,
                 user_uuid=reservation.user_uuid,
@@ -961,7 +984,7 @@ def _direct_release_address(ipam_uuid: str, address: str,
 
     Args:
         ipam_uuid: The IPAM UUID.
-        address: The IP address to release.
+        address: The IP address to release (as string).
         halo_reservation: The new reservation data with deletion-halo type.
 
     Returns:
@@ -999,7 +1022,7 @@ def _direct_get_reservation(ipam_uuid: str,
 
     Args:
         ipam_uuid: The IPAM UUID.
-        address: The IP address.
+        address: The IP address (as string).
 
     Returns:
         The IPAMReservation if found, None otherwise.
@@ -1020,9 +1043,10 @@ def _direct_get_reservation(ipam_uuid: str,
             if result is None:
                 return None
 
+            # MariaDB INET4 returns the address as a string
             return IPAMReservation(
                 ipam_uuid=result.ipam_uuid,
-                address=result.address,
+                address=IPv4Address(result.address),
                 reservation_type=result.reservation_type,
                 user_type=result.user_type,
                 user_uuid=result.user_uuid,
@@ -1055,7 +1079,7 @@ def _direct_get_reservations_for_ipam(
             return [
                 IPAMReservation(
                     ipam_uuid=row.ipam_uuid,
-                    address=row.address,
+                    address=IPv4Address(row.address),
                     reservation_type=row.reservation_type,
                     user_type=row.user_type,
                     user_uuid=row.user_uuid,
@@ -1074,7 +1098,7 @@ def _direct_delete_reservation(ipam_uuid: str, address: str) -> bool:
 
     Args:
         ipam_uuid: The IPAM UUID.
-        address: The IP address.
+        address: The IP address (as string).
 
     Returns:
         True if deleted, False if not found or error.
@@ -1158,7 +1182,7 @@ def _direct_get_addresses_in_use(ipam_uuid: str) -> set[str]:
         ipam_uuid: The IPAM UUID.
 
     Returns:
-        Set of IP addresses that are reserved.
+        Set of IP addresses (as strings) that are reserved.
     """
     engine = _get_engine()
     table = _get_ipam_reservations_table()
@@ -1169,7 +1193,8 @@ def _direct_get_addresses_in_use(ipam_uuid: str) -> set[str]:
                 table.c.ipam_uuid == ipam_uuid
             )
             result = conn.execute(stmt).fetchall()
-            return {row.address for row in result}
+            # INET4 returns addresses as strings
+            return {str(row.address) for row in result}
     except OperationalError as e:
         LOG.warning(f'MariaDB query failed for IPAM {ipam_uuid}: {e}')
         return set()
@@ -1200,7 +1225,7 @@ def release_address(ipam_uuid: str, address: str,
 
     Args:
         ipam_uuid: The IPAM UUID.
-        address: The IP address to release.
+        address: The IP address to release (as string).
         halo_reservation: The new reservation data with deletion-halo type.
 
     Returns:
@@ -1216,7 +1241,7 @@ def get_reservation(ipam_uuid: str, address: str) -> Optional[IPAMReservation]:
 
     Args:
         ipam_uuid: The IPAM UUID.
-        address: The IP address.
+        address: The IP address (as string).
 
     Returns:
         The IPAMReservation if found, None otherwise.
@@ -1245,7 +1270,7 @@ def delete_reservation(ipam_uuid: str, address: str) -> bool:
 
     Args:
         ipam_uuid: The IPAM UUID.
-        address: The IP address.
+        address: The IP address (as string).
 
     Returns:
         True if deleted, False if not found or error.
@@ -1291,7 +1316,7 @@ def get_addresses_in_use(ipam_uuid: str) -> set[str]:
         ipam_uuid: The IPAM UUID.
 
     Returns:
-        Set of IP addresses that are reserved.
+        Set of IP addresses (as strings) that are reserved.
     """
     if _use_database_service():
         return _grpc_get_addresses_in_use(ipam_uuid)

@@ -1,5 +1,6 @@
 import time
 import uuid
+from ipaddress import IPv4Address
 from unittest import mock
 
 from shakenfist import exceptions
@@ -27,7 +28,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             IPAMReservation(
                 ipam_uuid=ipam_uuid,
-                address='192.168.1.0',
+                address=IPv4Address('192.168.1.0'),
                 reservation_type=ReservationType.NETWORK,
                 user_type='network',
                 user_uuid=ipam_uuid,
@@ -38,7 +39,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             IPAMReservation(
                 ipam_uuid=ipam_uuid,
-                address='192.168.1.1',
+                address=IPv4Address('192.168.1.1'),
                 reservation_type=ReservationType.GATEWAY,
                 user_type='network',
                 user_uuid=ipam_uuid,
@@ -49,7 +50,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             IPAMReservation(
                 ipam_uuid=ipam_uuid,
-                address='192.168.1.255',
+                address=IPv4Address('192.168.1.255'),
                 reservation_type=ReservationType.BROADCAST,
                 user_type='network',
                 user_uuid=ipam_uuid,
