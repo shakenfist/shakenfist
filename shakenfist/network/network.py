@@ -12,8 +12,8 @@ from shakenfist import baseobject
 from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import instance
-from shakenfist import ipam
 from shakenfist.network import interface
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations as dbowo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
@@ -318,7 +318,7 @@ class Network(dbowo):
     def assign_floating_gateway(self):
         fn = floating_network()
         floating_gateway = fn.ipam.reserve_random_free_address(
-            self.unique_label(), ipam.RESERVATION_TYPE_GATEWAY, '')
+            self.unique_label(), ReservationType.GATEWAY, '')
         if self._update_floating_gateway(floating_gateway):
             return
         fn.ipam.release(floating_gateway)

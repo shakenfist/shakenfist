@@ -6,9 +6,9 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
-from shakenfist import ipam
 from shakenfist.network import network
 from shakenfist.network import interface
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -50,7 +50,7 @@ class Job(util_concurrency.Job):
                     floating_gateways.append(fg)
                     if floating_network.ipam.is_free(fg):
                         floating_network.ipam.reserve(
-                            fg, n.unique_label(), ipam.RESERVATION_TYPE_GATEWAY,
+                            fg, n.unique_label(), ReservationType.GATEWAY,
                             'Rescued from incorrect registration')
                         LOG.with_fields({
                             'network': n.uuid,
@@ -65,7 +65,7 @@ class Job(util_concurrency.Job):
                     floating_addresses.append(fa)
                     if floating_network.ipam.is_free(fa):
                         floating_network.ipam.reserve(
-                            fg, n.unique_label(), ipam.RESERVATION_TYPE_FLOATING,
+                            fg, n.unique_label(), ReservationType.FLOATING,
                             'Rescued from incorrect registration')
                         LOG.with_fields({
                             'interface': ni.uuid,
@@ -78,7 +78,7 @@ class Job(util_concurrency.Job):
                 reservation = floating_network.ipam.get_reservation(addr)
                 if not reservation:
                     continue
-                if reservation.get('type') != ipam.RESERVATION_TYPE_ROUTED:
+                if reservation.get('type') != ReservationType.ROUTED.value:
                     continue
                 user_type, user_uuid = reservation['user']
                 if user_type != 'network':

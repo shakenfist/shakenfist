@@ -14,9 +14,9 @@ from shakenfist import artifact
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import instance
-from shakenfist import ipam
 from shakenfist import namespace
 from shakenfist.network import network
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
@@ -147,9 +147,9 @@ class Monitor(daemon.Daemon):
                 reservation = fn.ipam.get_reservation(addr)
                 if not reservation:
                     continue
-                if reservation['type'] not in [ipam.RESERVATION_TYPE_GATEWAY,
-                                               ipam.RESERVATION_TYPE_FLOATING,
-                                               ipam.RESERVATION_TYPE_ROUTED]:
+                if reservation['type'] not in [ReservationType.GATEWAY.value,
+                                               ReservationType.FLOATING.value,
+                                               ReservationType.ROUTED.value]:
                     continue
 
                 leaked = False

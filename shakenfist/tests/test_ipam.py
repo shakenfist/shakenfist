@@ -4,6 +4,7 @@ from unittest import mock
 
 from shakenfist import exceptions
 from shakenfist import ipam
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -25,21 +26,21 @@ class IPAMTestCase(base.ShakenFistTestCase):
                              'address': '192.168.1.0',
                              'user': ['network', ipam_uuid],
                              'when': 1632261535.027476,
-                             'type': ipam.RESERVATION_TYPE_NETWORK,
+                             'type': ReservationType.NETWORK.value,
                              'comment': ''
                          }, ipm.get_reservation('192.168.1.0'))
         self.assertEqual({
                              'address': '192.168.1.1',
                              'user': ['network', ipam_uuid],
                              'when': 1632261535.027476,
-                             'type': ipam.RESERVATION_TYPE_GATEWAY,
+                             'type': ReservationType.GATEWAY.value,
                              'comment': ''
                          }, ipm.get_reservation('192.168.1.1'))
         self.assertEqual({
                              'address': '192.168.1.255',
                              'user': ['network', ipam_uuid],
                              'when': 1632261535.027476,
-                             'type': ipam.RESERVATION_TYPE_BROADCAST,
+                             'type': ReservationType.BROADCAST.value,
                              'comment': ''
                          }, ipm.get_reservation('192.168.1.255'))
         self.assertIsNone(ipm.get_reservation('192.168.1.2'))
@@ -63,7 +64,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
         self.assertNotIn('192.168.1.10', ipm.in_use)
         self.assertTrue(
             ipm.reserve('192.168.1.10', ('test', '123'),
-                        ipam.RESERVATION_TYPE_FLOATING, ''))
+                        ReservationType.FLOATING, ''))
         self.assertIn('192.168.1.10', ipm.in_use)
 
         # Check for halo
@@ -81,16 +82,16 @@ class IPAMTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(True, ipm.is_free('192.168.1.24'))
         ipm.reserve('192.168.1.24', ('test', '123'),
-                    ipam.RESERVATION_TYPE_FLOATING, '')
+                    ReservationType.FLOATING, '')
         self.assertEqual(False, ipm.is_free('192.168.1.24'))
         self.assertEqual(
             False, ipm.reserve('192.168.1.24', ('test', '123'),
-                               ipam.RESERVATION_TYPE_FLOATING, ''))
+                               ReservationType.FLOATING, ''))
 
         self.assertEqual(True, ipm.is_free('192.168.1.42'))
         self.assertEqual(
             True, ipm.reserve('192.168.1.42', ('test', '123'),
-                              ipam.RESERVATION_TYPE_FLOATING, ''))
+                              ReservationType.FLOATING, ''))
         self.assertEqual(False, ipm.is_free('192.168.1.42'))
 
     def test_get_free_random_ip(self):
@@ -99,7 +100,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
 
         for _ in range(800):
             ipm.reserve_random_free_address(
-                ('test', '123'), ipam.RESERVATION_TYPE_FLOATING, '')
+                ('test', '123'), ReservationType.FLOATING, '')
 
         # The extra three are the reserved network, broadcast, and gateway
         # addresses
@@ -112,7 +113,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
         try:
             for _ in range(65025):
                 ipm.reserve_random_free_address(
-                    ('test', '123'), ipam.RESERVATION_TYPE_FLOATING, '')
+                    ('test', '123'), ReservationType.FLOATING, '')
 
         except exceptions.CongestedNetwork:
             pass
