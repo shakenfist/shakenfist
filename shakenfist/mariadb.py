@@ -34,6 +34,7 @@ from shakenfist.protos import database_pb2_grpc
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_state import State
+from shakenfist.schema.object_types import ObjectType
 
 
 LOG, _ = logs.setup(__name__)
@@ -229,7 +230,7 @@ def _get_object_states_table() -> sa.Table:
             'object_states',
             metadata,
             sa.Column('object_uuid', sa.String(36), nullable=False),
-            sa.Column('object_type', sa.String(32), nullable=False),
+            sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
             sa.Column('state_value', sa.String(32), nullable=True),
             sa.Column('update_time', sa.Double(), nullable=False),
             sa.Column('message', sa.String(255), nullable=True),
