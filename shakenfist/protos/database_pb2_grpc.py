@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import database_pb2 as database__pb2
+from shakenfist.protos import database_pb2 as database__pb2
 
 GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__
