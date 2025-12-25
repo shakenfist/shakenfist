@@ -11,7 +11,7 @@
 
 * Move privileged operations to privexec. Perhaps move all process executions. Perhaps have multiple privexec daemons with different access levels.
 * Opportunistically convert to f-strings
-* Remove IPAMReservation.to_legacy_dict() and from_legacy_dict() once etcd migration is complete. Update ipam.py in-memory store to use IPAMReservation objects directly, and event logs to use model_dump().
+* Remove IPAMReservation.to_legacy_dict() and from_legacy_dict() once etcd migration is complete. The in-memory store now uses IPAMReservation objects directly. Event logs still use to_legacy_dict() and should be updated to use model_dump().
 
 ## Not yet started
 
