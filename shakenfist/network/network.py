@@ -12,6 +12,7 @@ from shakenfist import baseobject
 from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import instance
+from shakenfist import ipam
 from shakenfist.network import interface
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.baseobject import DatabaseBackedObject as dbo

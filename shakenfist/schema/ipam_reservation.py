@@ -17,7 +17,6 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
-from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.sqlalchemy import SQLIndex
 
 

@@ -14,6 +14,7 @@ from shakenfist import artifact
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import instance
+from shakenfist import ipam
 from shakenfist import namespace
 from shakenfist.network import network
 from shakenfist.schema.ipam_reservation import ReservationType

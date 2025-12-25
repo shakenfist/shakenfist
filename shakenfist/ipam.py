@@ -6,7 +6,6 @@ from typing import Any, Optional, Union
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
