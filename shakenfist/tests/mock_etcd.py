@@ -292,7 +292,7 @@ class MockEtcd():
         return True
 
     def _mariadb_release_address(self, ipam_uuid: str, address: str,
-                                  halo_reservation: IPAMReservation) -> bool:
+                                 halo_reservation: IPAMReservation) -> bool:
         """Mock implementation of mariadb.release_address()"""
         key = self._ipam_key(ipam_uuid, address)
         if key not in self.ipam_reservations:
@@ -303,7 +303,7 @@ class MockEtcd():
         return True
 
     def _mariadb_get_reservation(self, ipam_uuid: str,
-                                  address: str) -> Optional[IPAMReservation]:
+                                 address: str) -> Optional[IPAMReservation]:
         """Mock implementation of mariadb.get_reservation()"""
         key = self._ipam_key(ipam_uuid, address)
         reservation = self.ipam_reservations.get(key)
@@ -345,7 +345,7 @@ class MockEtcd():
         return len(to_delete)
 
     def _mariadb_release_haloed_addresses(self, ipam_uuid: str,
-                                           older_than: float) -> int:
+                                          older_than: float) -> int:
         """Mock implementation of mariadb.release_haloed_addresses()"""
         from shakenfist.schema.ipam_reservation import ReservationType
 
