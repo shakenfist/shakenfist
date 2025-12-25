@@ -603,7 +603,6 @@ def _grpc_reserve_address(reservation: IPAMReservation) -> bool:
     """Atomically reserve an IP address via the database microservice."""
     try:
         stub = _get_database_stub()
-        # type: ignore comments needed for generated protobuf code
         request = database_pb2.ReserveAddressRequest(  # type: ignore[attr-defined]
             reservation=database_pb2.IPAMReservationData(  # type: ignore[attr-defined]
                 ipam_uuid=reservation.ipam_uuid,
@@ -679,7 +678,6 @@ def _grpc_get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
     """Get all reservations for an IPAM via the database microservice."""
     try:
         stub = _get_database_stub()
-        # type: ignore for generated protobuf code
         request = database_pb2.GetReservationsForIPAMRequest(  # type: ignore[attr-defined]
             ipam_uuid=ipam_uuid)
         reply = stub.GetReservationsForIPAM(request)
@@ -720,7 +718,6 @@ def _grpc_delete_reservations_for_ipam(ipam_uuid: str) -> int:
     """Delete all reservations for an IPAM via the database microservice."""
     try:
         stub = _get_database_stub()
-        # type: ignore for generated protobuf code
         request = database_pb2.DeleteReservationsForIPAMRequest(  # type: ignore[attr-defined]
             ipam_uuid=ipam_uuid)
         reply = stub.DeleteReservationsForIPAM(request)
@@ -735,7 +732,6 @@ def _grpc_release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
     """Release expired deletion-halo addresses via the database microservice."""
     try:
         stub = _get_database_stub()
-        # type: ignore for generated protobuf code
         request = database_pb2.ReleaseHaloedAddressesRequest(  # type: ignore[attr-defined]
             ipam_uuid=ipam_uuid,
             older_than=older_than
@@ -752,7 +748,6 @@ def _grpc_get_addresses_in_use(ipam_uuid: str) -> set[str]:
     """Get all addresses in use for an IPAM via the database microservice."""
     try:
         stub = _get_database_stub()
-        # type: ignore for generated protobuf code
         request = database_pb2.GetAddressesInUseRequest(  # type: ignore[attr-defined]
             ipam_uuid=ipam_uuid)
         reply = stub.GetAddressesInUse(request)
