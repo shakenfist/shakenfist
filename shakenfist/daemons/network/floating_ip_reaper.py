@@ -91,7 +91,7 @@ class Job(util_concurrency.Job):
                         % reservation.user_type)
                     continue
 
-                n = network.Network.from_db(reservation.user_uuid)
+                n = network.Network.from_db(str(reservation.user_uuid))
                 if not n:
                     LOG.with_fields({
                         'address': addr,
@@ -131,7 +131,7 @@ class Job(util_concurrency.Job):
                     # was using this address might still be in process.
                     res = floating_network.ipam.get_reservation(ip)
                     if res and res.user_type and res.user_uuid:
-                        o = get_object_class(res.user_type).from_db(res.user_uuid)
+                        o = get_object_class(res.user_type).from_db(str(res.user_uuid))
                         if o:
                             obj_state = o.state
                             if (

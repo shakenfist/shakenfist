@@ -158,7 +158,7 @@ class Monitor(daemon.Daemon):
                     leaked = True
                 else:
                     obj = get_object_class(reservation.user_type).from_db(
-                        reservation.user_uuid)
+                        str(reservation.user_uuid))
                     if not obj:
                         leaked = True
                     else:

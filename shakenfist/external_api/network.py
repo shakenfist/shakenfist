@@ -647,7 +647,9 @@ class NetworkUnrouteAddressEndpoint(sf_api.Resource):
         reservation = fn.ipam.get_reservation(address)
         if not reservation:
             return sf_api.error(404, 'address not routed')
-        if (reservation.user_type, reservation.user_uuid) != network_from_db.unique_label():
+        # Compare with str(user_uuid) since unique_label() returns a string UUID
+        res_label = (reservation.user_type, str(reservation.user_uuid) if reservation.user_uuid else None)
+        if res_label != network_from_db.unique_label():
             return sf_api.error(403, 'address not routed by this network')
 
         network_from_db.add_event(EVENT_TYPE_AUDIT, 'unroute request from REST API')
