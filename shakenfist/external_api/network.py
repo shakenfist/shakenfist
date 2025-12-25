@@ -586,7 +586,9 @@ class NetworkAddressesEndpoint(sf_api.Resource):
     def get(self, network_ref=None, network_from_db=None):
         out = []
         for addr in network_from_db.ipam.in_use:
-            out.append(network_from_db.ipam.get_reservation(addr))
+            reservation = network_from_db.ipam.get_reservation(addr)
+            if reservation:
+                out.append(reservation.model_dump(mode='json'))
         return out
 
 
@@ -645,7 +647,7 @@ class NetworkUnrouteAddressEndpoint(sf_api.Resource):
         reservation = fn.ipam.get_reservation(address)
         if not reservation:
             return sf_api.error(404, 'address not routed')
-        if reservation['user'] != network_from_db.unique_label():
+        if (reservation.user_type, reservation.user_uuid) != network_from_db.unique_label():
             return sf_api.error(403, 'address not routed by this network')
 
         network_from_db.add_event(EVENT_TYPE_AUDIT, 'unroute request from REST API')

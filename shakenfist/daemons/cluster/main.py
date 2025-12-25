@@ -148,27 +148,30 @@ class Monitor(daemon.Daemon):
                 reservation = fn.ipam.get_reservation(addr)
                 if not reservation:
                     continue
-                if reservation['type'] not in [ReservationType.GATEWAY.value,
-                                               ReservationType.FLOATING.value,
-                                               ReservationType.ROUTED.value]:
+                if reservation.reservation_type not in [ReservationType.GATEWAY,
+                                                        ReservationType.FLOATING,
+                                                        ReservationType.ROUTED]:
                     continue
 
                 leaked = False
-                object_type, object_uuid = reservation['user']
-                obj = get_object_class(object_type).from_db(object_uuid)
-                if not obj:
+                if not reservation.user_type or not reservation.user_uuid:
                     leaked = True
                 else:
-                    s = obj.state
-                    if (s.value == dbo.STATE_DELETED and
-                            time.time() - s.update_time > 300):
+                    obj = get_object_class(reservation.user_type).from_db(
+                        reservation.user_uuid)
+                    if not obj:
                         leaked = True
+                    else:
+                        s = obj.state
+                        if (s.value == dbo.STATE_DELETED and
+                                time.time() - s.update_time > 300):
+                            leaked = True
 
                 if leaked:
                     fn.ipam.release(addr)
                     eventlog.add_event_multi(
                         EVENT_TYPE_AUDIT,
-                        [fn.ipam, (object_type, object_uuid)],
+                        [fn.ipam, (reservation.user_type, reservation.user_uuid)],
                         'cleaned up an address which refers to a deleted object')
 
         # Cleanup old uploads which were never completed

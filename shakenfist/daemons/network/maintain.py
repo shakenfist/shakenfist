@@ -100,9 +100,8 @@ class Job(util_concurrency.Job):
                 # a startup race.
                 for addr in fn.ipam.in_use:
                     resv = fn.ipam.get_reservation(addr)
-                    if resv and resv['type'] == ReservationType.ROUTED.value:
-                        network_uuid = resv['user'][1]
-                        routed_by_network[network_uuid].append(addr)
+                    if resv and resv.reservation_type == ReservationType.ROUTED:
+                        routed_by_network[resv.user_uuid].append(addr)
 
             # Ensure we are on every network we have a host for
             for network_uuid in host_networks:
