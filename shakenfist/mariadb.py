@@ -404,7 +404,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     return results
 
 
-def _direct_get_state(object_type: str, object_uuid: str) -> Optional[State]:
+def _direct_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
     """Read state for an object directly from MariaDB.
 
     This is the direct access version used by the database daemon.
@@ -435,7 +435,7 @@ def _direct_get_state(object_type: str, object_uuid: str) -> Optional[State]:
         return None
 
 
-def _direct_set_state(object_type: str, object_uuid: str, state: State) -> bool:
+def _direct_set_state(object_type: ObjectType, object_uuid: str, state: State) -> bool:
     """Write state for an object directly to MariaDB.
 
     This is the direct access version used by the database daemon.
@@ -468,7 +468,7 @@ def _direct_set_state(object_type: str, object_uuid: str, state: State) -> bool:
         return False
 
 
-def _direct_delete_state(object_type: str, object_uuid: str) -> bool:
+def _direct_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
     """Delete state for an object directly from MariaDB.
 
     This is the direct access version used by the database daemon.
@@ -493,7 +493,7 @@ def _direct_delete_state(object_type: str, object_uuid: str) -> bool:
         return False
 
 
-def _direct_get_objects_by_state(object_type: str,
+def _direct_get_objects_by_state(object_type: ObjectType,
                                  state_values: list[str]) -> list[str]:
     """Get all object UUIDs of a given type in specified states.
 
@@ -523,7 +523,7 @@ def _direct_get_objects_by_state(object_type: str,
 # These call the database microservice for state operations.
 # =============================================================================
 
-def _grpc_get_state(object_type: str, object_uuid: str) -> Optional[State]:
+def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
     """Read state for an object via the database microservice."""
     try:
         stub = _get_database_stub()
@@ -545,7 +545,7 @@ def _grpc_get_state(object_type: str, object_uuid: str) -> Optional[State]:
         return None
 
 
-def _grpc_set_state(object_type: str, object_uuid: str, state: State) -> bool:
+def _grpc_set_state(object_type: ObjectType, object_uuid: str, state: State) -> bool:
     """Write state for an object via the database microservice."""
     try:
         stub = _get_database_stub()
@@ -564,7 +564,7 @@ def _grpc_set_state(object_type: str, object_uuid: str, state: State) -> bool:
         return False
 
 
-def _grpc_delete_state(object_type: str, object_uuid: str) -> bool:
+def _grpc_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
     """Delete state for an object via the database microservice."""
     try:
         stub = _get_database_stub()
@@ -580,7 +580,7 @@ def _grpc_delete_state(object_type: str, object_uuid: str) -> bool:
         return False
 
 
-def _grpc_get_objects_by_state(object_type: str,
+def _grpc_get_objects_by_state(object_type: ObjectType,
                                state_values: list[str]) -> list[str]:
     """Get all object UUIDs of a given type in specified states via gRPC."""
     try:
@@ -765,11 +765,11 @@ def _grpc_get_addresses_in_use(ipam_uuid: str) -> set[str]:
 # These route to either direct or gRPC access based on configuration.
 # =============================================================================
 
-def get_state(object_type: str, object_uuid: str) -> Optional[State]:
+def get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
     """Read state for an object.
 
     Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
+        object_type: The type of object.
         object_uuid: The UUID of the object.
 
     Returns:
@@ -780,11 +780,11 @@ def get_state(object_type: str, object_uuid: str) -> Optional[State]:
     return _direct_get_state(object_type, object_uuid)
 
 
-def set_state(object_type: str, object_uuid: str, state: State) -> bool:
+def set_state(object_type: ObjectType, object_uuid: str, state: State) -> bool:
     """Write state for an object.
 
     Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
+        object_type: The type of object.
         object_uuid: The UUID of the object.
         state: The State object to store.
 
@@ -796,11 +796,11 @@ def set_state(object_type: str, object_uuid: str, state: State) -> bool:
     return _direct_set_state(object_type, object_uuid, state)
 
 
-def delete_state(object_type: str, object_uuid: str) -> bool:
+def delete_state(object_type: ObjectType, object_uuid: str) -> bool:
     """Delete state for an object.
 
     Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
+        object_type: The type of object.
         object_uuid: The UUID of the object.
 
     Returns:
@@ -811,7 +811,7 @@ def delete_state(object_type: str, object_uuid: str) -> bool:
     return _direct_delete_state(object_type, object_uuid)
 
 
-def get_objects_by_state(object_type: str,
+def get_objects_by_state(object_type: ObjectType,
                          state_values: list[str]) -> list[str]:
     """Get all object UUIDs of a given type in specified states.
 
@@ -819,7 +819,7 @@ def get_objects_by_state(object_type: str,
     queries across object states without scanning all objects in etcd.
 
     Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
+        object_type: The type of object.
         state_values: List of state values to match.
 
     Returns:
@@ -830,14 +830,14 @@ def get_objects_by_state(object_type: str,
     return _direct_get_objects_by_state(object_type, state_values)
 
 
-def get_all_states_for_type(object_type: str) -> list[tuple[str, State]]:
+def get_all_states_for_type(object_type: ObjectType) -> list[tuple[str, State]]:
     """Get all states for a given object type.
 
     Useful for migrations and debugging. This function always uses direct
     access as it's only called by admin tools and the database daemon.
 
     Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
+        object_type: The type of object.
 
     Returns:
         List of tuples (object_uuid, State).

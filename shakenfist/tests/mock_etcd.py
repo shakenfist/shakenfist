@@ -19,6 +19,7 @@ from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.object_state import State
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import json as util_json
 
 
@@ -197,7 +198,7 @@ class MockEtcd():
     # MariaDB mock operations
     #
 
-    def _mariadb_get_state(self, object_type: str,
+    def _mariadb_get_state(self, object_type: ObjectType,
                            object_uuid: str) -> Optional[State]:
         """Mock implementation of mariadb.get_state()"""
         # Key by object_type and object_uuid to avoid collisions between
@@ -214,7 +215,7 @@ class MockEtcd():
         self._trace(f'MockMariaDB.get_state({key}): None')
         return None
 
-    def _mariadb_set_state(self, object_type: str, object_uuid: str,
+    def _mariadb_set_state(self, object_type: ObjectType, object_uuid: str,
                            state: State) -> bool:
         """Mock implementation of mariadb.set_state()"""
         key = f'{object_type}/{object_uuid}'
@@ -229,7 +230,8 @@ class MockEtcd():
             f'MockMariaDB.set_state({key}): {state.value}')
         return True
 
-    def _mariadb_delete_state(self, object_type: str, object_uuid: str) -> bool:
+    def _mariadb_delete_state(self, object_type: ObjectType,
+                              object_uuid: str) -> bool:
         """Mock implementation of mariadb.delete_state()"""
         key = f'{object_type}/{object_uuid}'
         if key in self.mariadb_states:
@@ -239,7 +241,7 @@ class MockEtcd():
             self._trace(f'MockMariaDB.delete_state({key}): not found')
         return True
 
-    def _mariadb_get_objects_by_state(self, object_type: str,
+    def _mariadb_get_objects_by_state(self, object_type: ObjectType,
                                       state_values: list[str]) -> list[str]:
         """Mock implementation of mariadb.get_objects_by_state()"""
         result = []
@@ -252,7 +254,7 @@ class MockEtcd():
             f'{state_values}): {result}')
         return result
 
-    def get_mariadb_state(self, object_type: str,
+    def get_mariadb_state(self, object_type: ObjectType,
                           object_uuid: str) -> Optional[dict]:
         """Get state from the mock MariaDB store for test assertions.
 
