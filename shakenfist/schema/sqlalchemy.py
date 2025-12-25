@@ -199,7 +199,7 @@ def _get_sqlalchemy_type(annotation: Any) -> sa.types.TypeEngine[Any]:
 
     # Complex types (lists, dicts, nested models) -> JSON
     if _is_complex_type(annotation):
-        return mysql.LONGTEXT()  # type: ignore[no-untyped-call]
+        return mysql.LONGTEXT()
 
     # Basic Python types
     if annotation in PYTHON_TO_SQLALCHEMY:
@@ -207,7 +207,7 @@ def _get_sqlalchemy_type(annotation: Any) -> sa.types.TypeEngine[Any]:
 
     # Fallback to JSON for anything we don't recognize
     LOG.warning(f'Unknown type annotation {annotation}, falling back to JSON')
-    return mysql.LONGTEXT()  # type: ignore[no-untyped-call]
+    return mysql.LONGTEXT()
 
 
 def pydantic_to_sqlalchemy_table(
@@ -318,7 +318,7 @@ def get_table_creation_sql(
     """
     from sqlalchemy.schema import CreateTable
     if dialect is None:
-        dialect = mysql.dialect()  # type: ignore[no-untyped-call]
+        dialect = mysql.dialect()
     return str(CreateTable(table).compile(dialect=dialect))
 
 
