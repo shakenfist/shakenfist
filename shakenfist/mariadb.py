@@ -49,8 +49,14 @@ _object_states_table: Optional[sa.Table] = None
 _ipam_reservations_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
-OBJECT_STATES_VERSION = 1
-IPAM_RESERVATIONS_VERSION = 1
+# Version history:
+#   object_states v1: Initial schema with VARCHAR(32) for object_type
+#   object_states v2: Changed object_type from VARCHAR(32) to ENUM(ObjectType)
+#   ipam_reservations v1: Initial schema with VARCHAR(32) for reservation_type
+#   ipam_reservations v2: Changed reservation_type from VARCHAR(32) to
+#                         ENUM(ReservationType)
+OBJECT_STATES_VERSION = 2
+IPAM_RESERVATIONS_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -242,6 +248,15 @@ def _get_object_states_table() -> sa.Table:
     return _object_states_table
 
 
+def _build_object_type_enum_values() -> str:
+    """Build the ENUM values string for ObjectType.
+
+    Returns a comma-separated list of quoted enum values for use in
+    ALTER TABLE statements.
+    """
+    return ', '.join(f"'{ot.value}'" for ot in ObjectType)
+
+
 def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
     """Ensure the object_states table schema is up to date.
 
@@ -253,7 +268,8 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_object_states_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it
+    # Version 0 or -1 means table doesn't exist yet - create it with current
+    # schema (which includes the ENUM type)
     if current_ver <= 0:
         LOG.info(f'Creating {table_name} table (version {OBJECT_STATES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
@@ -269,14 +285,22 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
         current_ver = OBJECT_STATES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
-    # Future migrations would go here, following this pattern:
-    # if current_ver == 1:
-    #     LOG.info('Upgrading object_states from v1 to v2')
-    #     with engine.connect() as conn:
-    #         conn.execute(sa.text('ALTER TABLE object_states ADD COLUMN ...'))
-    #         conn.commit()
-    #     current_ver = 2
-    #     _set_table_version(engine, table_name, current_ver)
+    # Migration from v1 to v2: Convert object_type from VARCHAR(32) to ENUM
+    if current_ver == 1:
+        LOG.info('Upgrading object_states from v1 to v2: '
+                 'converting object_type to ENUM')
+        enum_values = _build_object_type_enum_values()
+        with engine.connect() as conn:
+            # ALTER TABLE to change column type from VARCHAR to ENUM
+            # MariaDB will automatically convert existing string values to
+            # enum values if they match
+            conn.execute(sa.text(
+                f'ALTER TABLE object_states '
+                f'MODIFY COLUMN object_type ENUM({enum_values}) NOT NULL'
+            ))
+            conn.commit()
+        current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
 
     return {
         'table': table_name,
@@ -320,6 +344,15 @@ def _get_ipam_reservations_table() -> sa.Table:
     return _ipam_reservations_table
 
 
+def _build_reservation_type_enum_values() -> str:
+    """Build the ENUM values string for ReservationType.
+
+    Returns a comma-separated list of quoted enum values for use in
+    ALTER TABLE statements.
+    """
+    return ', '.join(f"'{rt.value}'" for rt in ReservationType)
+
+
 def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
     """Ensure the ipam_reservations table schema is up to date.
 
@@ -331,7 +364,8 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_ipam_reservations_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it
+    # Version 0 or -1 means table doesn't exist yet - create it with current
+    # schema (which includes the ENUM type)
     if current_ver <= 0:
         LOG.info(f'Creating {table_name} table (version {IPAM_RESERVATIONS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
@@ -347,14 +381,22 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
         current_ver = IPAM_RESERVATIONS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
-    # Future migrations would go here, following this pattern:
-    # if current_ver == 1:
-    #     LOG.info('Upgrading ipam_reservations from v1 to v2')
-    #     with engine.connect() as conn:
-    #         conn.execute(sa.text('ALTER TABLE ipam_reservations ADD COLUMN ...'))
-    #         conn.commit()
-    #     current_ver = 2
-    #     _set_table_version(engine, table_name, current_ver)
+    # Migration from v1 to v2: Convert reservation_type from VARCHAR(32) to ENUM
+    if current_ver == 1:
+        LOG.info('Upgrading ipam_reservations from v1 to v2: '
+                 'converting reservation_type to ENUM')
+        enum_values = _build_reservation_type_enum_values()
+        with engine.connect() as conn:
+            # ALTER TABLE to change column type from VARCHAR to ENUM
+            # MariaDB will automatically convert existing string values to
+            # enum values if they match
+            conn.execute(sa.text(
+                f'ALTER TABLE ipam_reservations '
+                f'MODIFY COLUMN reservation_type ENUM({enum_values}) NOT NULL'
+            ))
+            conn.commit()
+        current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
 
     return {
         'table': table_name,
