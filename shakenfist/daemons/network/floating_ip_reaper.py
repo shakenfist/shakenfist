@@ -9,6 +9,7 @@ from shakenfist.daemons import daemon
 from shakenfist.network import network
 from shakenfist.network import interface
 from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -80,7 +81,7 @@ class Job(util_concurrency.Job):
                     continue
                 if reservation.reservation_type != ReservationType.ROUTED:
                     continue
-                if reservation.user_type != 'network':
+                if reservation.user_type != ObjectType.NETWORK:
                     LOG.with_fields({
                         'address': addr,
                         'user_type': reservation.user_type,

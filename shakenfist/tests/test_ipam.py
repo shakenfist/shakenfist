@@ -7,6 +7,7 @@ from shakenfist import exceptions
 from shakenfist import ipam
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -30,7 +31,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
                 ipam_uuid=ipam_uuid,
                 address=IPv4Address('192.168.1.0'),
                 reservation_type=ReservationType.NETWORK,
-                user_type='network',
+                user_type=ObjectType.NETWORK,
                 user_uuid=ipam_uuid,
                 reserved_at=1632261535.027476,
                 comment=None
@@ -41,7 +42,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
                 ipam_uuid=ipam_uuid,
                 address=IPv4Address('192.168.1.1'),
                 reservation_type=ReservationType.GATEWAY,
-                user_type='network',
+                user_type=ObjectType.NETWORK,
                 user_uuid=ipam_uuid,
                 reserved_at=1632261535.027476,
                 comment=None
@@ -52,7 +53,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
                 ipam_uuid=ipam_uuid,
                 address=IPv4Address('192.168.1.255'),
                 reservation_type=ReservationType.BROADCAST,
-                user_type='network',
+                user_type=ObjectType.NETWORK,
                 user_uuid=ipam_uuid,
                 reserved_at=1632261535.027476,
                 comment=None
@@ -78,7 +79,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
 
         self.assertNotIn('192.168.1.10', ipm.in_use)
         self.assertTrue(
-            ipm.reserve('192.168.1.10', ('test', '123'),
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, '123'),
                         ReservationType.FLOATING, ''))
         self.assertIn('192.168.1.10', ipm.in_use)
 
@@ -96,16 +97,16 @@ class IPAMTestCase(base.ShakenFistTestCase):
         ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
 
         self.assertEqual(True, ipm.is_free('192.168.1.24'))
-        ipm.reserve('192.168.1.24', ('test', '123'),
+        ipm.reserve('192.168.1.24', (ObjectType.INSTANCE, '123'),
                     ReservationType.FLOATING, '')
         self.assertEqual(False, ipm.is_free('192.168.1.24'))
         self.assertEqual(
-            False, ipm.reserve('192.168.1.24', ('test', '123'),
+            False, ipm.reserve('192.168.1.24', (ObjectType.INSTANCE, '123'),
                                ReservationType.FLOATING, ''))
 
         self.assertEqual(True, ipm.is_free('192.168.1.42'))
         self.assertEqual(
-            True, ipm.reserve('192.168.1.42', ('test', '123'),
+            True, ipm.reserve('192.168.1.42', (ObjectType.INSTANCE, '123'),
                               ReservationType.FLOATING, ''))
         self.assertEqual(False, ipm.is_free('192.168.1.42'))
 
@@ -115,7 +116,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
 
         for _ in range(800):
             ipm.reserve_random_free_address(
-                ('test', '123'), ReservationType.FLOATING, '')
+                (ObjectType.INSTANCE, '123'), ReservationType.FLOATING, '')
 
         # The extra three are the reserved network, broadcast, and gateway
         # addresses
@@ -128,7 +129,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
         try:
             for _ in range(65025):
                 ipm.reserve_random_free_address(
-                    ('test', '123'), ReservationType.FLOATING, '')
+                    (ObjectType.INSTANCE, '123'), ReservationType.FLOATING, '')
 
         except exceptions.CongestedNetwork:
             pass

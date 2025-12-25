@@ -17,8 +17,13 @@ from typing import Optional
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from shakenfist_utilities import logs
 
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.sqlalchemy import SQLIndex
+
+
+LOG, _ = logs.setup(__name__)
 
 
 class ReservationType(str, Enum):
@@ -90,7 +95,8 @@ class IPAMReservation(BaseModel):
     reservation_type: Annotated[ReservationType, SQLIndex(), Field(max_length=32)]
 
     # The object using this address (e.g., an instance or network)
-    user_type: Optional[str] = Field(default=None, max_length=32)
+    # user_type is an ObjectType enum for type safety and efficient storage
+    user_type: Optional[ObjectType] = None
     user_uuid: Optional[str] = Field(default=None, max_length=36)
 
     # When the reservation was made (Unix epoch seconds)
@@ -114,7 +120,8 @@ class IPAMReservation(BaseModel):
         """
         user = None
         if self.user_type and self.user_uuid:
-            user = (self.user_type, self.user_uuid)
+            # Convert ObjectType enum to string for legacy format
+            user = (str(self.user_type), self.user_uuid)
 
         return {
             'address': str(self.address),
@@ -142,7 +149,13 @@ class IPAMReservation(BaseModel):
         user_uuid = None
         if user:
             if isinstance(user, (list, tuple)) and len(user) == 2:
-                user_type, user_uuid = user
+                user_type_str, user_uuid = user
+                # Convert string to ObjectType enum if possible
+                try:
+                    user_type = ObjectType(user_type_str)
+                except ValueError:
+                    LOG.error(f'Unknown user_type in legacy IPAM reservation: '
+                              f'{user_type_str}')
             elif isinstance(user, str):
                 # Very old format might have user as a string
                 user_uuid = user
@@ -171,7 +184,7 @@ class IPAMReservation(BaseModel):
             'ipam_uuid': self.ipam_uuid,
             'address': str(self.address),
             'reservation_type': self.reservation_type,
-            'user_type': self.user_type,
+            'user_type': str(self.user_type) if self.user_type else None,
             'user_uuid': self.user_uuid,
             'reserved_at': self.reserved_at,
             'comment': self.comment

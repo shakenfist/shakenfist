@@ -59,8 +59,9 @@ _ipam_reservations_table: Optional[sa.Table] = None
 #   ipam_reservations v2: Changed reservation_type from VARCHAR(32) to
 #                         ENUM(ReservationType)
 #   ipam_reservations v3: Changed address from VARCHAR(45) to INET4
+#   ipam_reservations v4: Changed user_type from VARCHAR(32) to ENUM(ObjectType)
 OBJECT_STATES_VERSION = 2
-IPAM_RESERVATIONS_VERSION = 3
+IPAM_RESERVATIONS_VERSION = 4
 
 
 def _use_database_service() -> bool:
@@ -326,6 +327,9 @@ def _get_ipam_reservations_table() -> sa.Table:
 
     The address column uses MariaDB's INET4 type for efficient IPv4 storage
     and indexing (4 bytes vs up to 15 bytes for string representation).
+
+    The user_type column uses an ENUM type for efficient storage (1-2 bytes
+    vs 32 bytes for VARCHAR) and type safety.
     """
     global _ipam_reservations_table
     if _ipam_reservations_table is None:
@@ -337,7 +341,7 @@ def _get_ipam_reservations_table() -> sa.Table:
             sa.Column('address', INET4(), nullable=False),
             sa.Column('reservation_type', sa.Enum(ReservationType),
                       nullable=False),
-            sa.Column('user_type', sa.String(32), nullable=True),
+            sa.Column('user_type', sa.Enum(ObjectType), nullable=True),
             sa.Column('user_uuid', sa.String(36), nullable=True),
             sa.Column('reserved_at', sa.Double(), nullable=False),
             sa.Column('comment', sa.Text(), nullable=True),
@@ -421,6 +425,23 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
             ))
             conn.commit()
         current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
+    # Migration from v3 to v4: Convert user_type from VARCHAR(32) to ENUM
+    if current_ver == 3:
+        LOG.info('Upgrading ipam_reservations from v3 to v4: '
+                 'converting user_type to ENUM')
+        enum_values = _build_object_type_enum_values()
+        with engine.connect() as conn:
+            # ALTER TABLE to change column type from VARCHAR to ENUM
+            # MariaDB will automatically convert existing string values to
+            # enum values if they match. NULL values remain NULL.
+            conn.execute(sa.text(
+                f'ALTER TABLE ipam_reservations '
+                f'MODIFY COLUMN user_type ENUM({enum_values}) NULL'
+            ))
+            conn.commit()
+        current_ver = 4
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -665,6 +686,27 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
 
 
 # =============================================================================
+# Helper functions for ObjectType conversion
+# =============================================================================
+
+def _string_to_object_type(s: Optional[str]) -> Optional[ObjectType]:
+    """Convert a string to an ObjectType enum, returning None if invalid."""
+    if not s:
+        return None
+    try:
+        return ObjectType(s)
+    except ValueError:
+        return None
+
+
+def _object_type_to_string(ot: Optional[ObjectType]) -> str:
+    """Convert an ObjectType enum to a string for gRPC, empty string if None."""
+    if ot is None:
+        return ''
+    return str(ot)
+
+
+# =============================================================================
 # IPAM gRPC Client Functions
 # These call the database microservice for IPAM operations.
 # =============================================================================
@@ -678,7 +720,7 @@ def _grpc_reserve_address(reservation: IPAMReservation) -> bool:
                 ipam_uuid=reservation.ipam_uuid,
                 address=str(reservation.address),
                 reservation_type=reservation.reservation_type,
-                user_type=reservation.user_type or '',
+                user_type=_object_type_to_string(reservation.user_type),
                 user_uuid=reservation.user_uuid or '',
                 reserved_at=reservation.reserved_at,
                 comment=reservation.comment or ''
@@ -705,7 +747,7 @@ def _grpc_release_address(ipam_uuid: str, address: str,
                 ipam_uuid=halo_reservation.ipam_uuid,
                 address=str(halo_reservation.address),
                 reservation_type=halo_reservation.reservation_type,
-                user_type=halo_reservation.user_type or '',
+                user_type=_object_type_to_string(halo_reservation.user_type),
                 user_uuid=halo_reservation.user_uuid or '',
                 reserved_at=halo_reservation.reserved_at,
                 comment=halo_reservation.comment or ''
@@ -734,7 +776,7 @@ def _grpc_get_reservation(ipam_uuid: str,
             ipam_uuid=reply.reservation.ipam_uuid,
             address=IPv4Address(reply.reservation.address),
             reservation_type=reply.reservation.reservation_type,
-            user_type=reply.reservation.user_type or None,
+            user_type=_string_to_object_type(reply.reservation.user_type),
             user_uuid=reply.reservation.user_uuid or None,
             reserved_at=reply.reservation.reserved_at,
             comment=reply.reservation.comment or None
@@ -757,7 +799,7 @@ def _grpc_get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
                 ipam_uuid=res.ipam_uuid,
                 address=IPv4Address(res.address),
                 reservation_type=res.reservation_type,
-                user_type=res.user_type or None,
+                user_type=_string_to_object_type(res.user_type),
                 user_uuid=res.user_uuid or None,
                 reserved_at=res.reserved_at,
                 comment=res.comment or None

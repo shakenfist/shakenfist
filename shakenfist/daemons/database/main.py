@@ -410,7 +410,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 ipam_uuid=request.reservation.ipam_uuid,
                 address=request.reservation.address,
                 reservation_type=request.reservation.reservation_type,
-                user_type=request.reservation.user_type or None,
+                user_type=mariadb._string_to_object_type(
+                    request.reservation.user_type),
                 user_uuid=request.reservation.user_uuid or None,
                 reserved_at=request.reservation.reserved_at,
                 comment=request.reservation.comment or None
@@ -430,7 +431,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 ipam_uuid=request.halo_reservation.ipam_uuid,
                 address=request.halo_reservation.address,
                 reservation_type=request.halo_reservation.reservation_type,
-                user_type=request.halo_reservation.user_type or None,
+                user_type=mariadb._string_to_object_type(
+                    request.halo_reservation.user_type),
                 user_uuid=request.halo_reservation.user_uuid or None,
                 reserved_at=request.halo_reservation.reserved_at,
                 comment=request.halo_reservation.comment or None
@@ -456,7 +458,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     ipam_uuid=reservation.ipam_uuid,
                     address=reservation.address,
                     reservation_type=reservation.reservation_type,
-                    user_type=reservation.user_type or '',
+                    user_type=mariadb._object_type_to_string(
+                        reservation.user_type),
                     user_uuid=reservation.user_uuid or '',
                     reserved_at=reservation.reserved_at,
                     comment=reservation.comment or ''
@@ -480,7 +483,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     ipam_uuid=res.ipam_uuid,
                     address=res.address,
                     reservation_type=res.reservation_type,
-                    user_type=res.user_type or '',
+                    user_type=mariadb._object_type_to_string(res.user_type),
                     user_uuid=res.user_uuid or '',
                     reserved_at=res.reserved_at,
                     comment=res.comment or ''

@@ -3,7 +3,7 @@ import random
 import time
 from collections.abc import Iterator
 from ipaddress import IPv4Address
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from shakenfist_utilities import logs  # noreorder
 
@@ -90,11 +90,11 @@ class IPAM(dbo):
             o = IPAM.from_db(ipam_uuid)
 
         o.state = cls.STATE_CREATED
-        o.reserve(o.network_address, ('network', network_uuid),
+        o.reserve(o.network_address, (ObjectType.NETWORK, network_uuid),
                   ReservationType.NETWORK, '')
-        o.reserve(o.broadcast_address, ('network', network_uuid),
+        o.reserve(o.broadcast_address, (ObjectType.NETWORK, network_uuid),
                   ReservationType.BROADCAST, '')
-        o.reserve(o.get_address_at_index(1), ('network', network_uuid),
+        o.reserve(o.get_address_at_index(1), (ObjectType.NETWORK, network_uuid),
                   ReservationType.GATEWAY, '')
         return o
 
@@ -156,14 +156,14 @@ class IPAM(dbo):
         return address not in self.in_use
 
     def reserve(self, address: Optional[str],
-                user: Optional[tuple[str, str] | str],
+                user: Optional[Union[tuple[ObjectType, str], str]],
                 reservation_type: ReservationType, comment: str) -> bool:
         if not address:
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
 
-        user_type = None
-        user_uuid = None
+        user_type: Optional[ObjectType] = None
+        user_uuid: Optional[str] = None
         if user:
             if isinstance(user, (list, tuple)) and len(user) == 2:
                 user_type, user_uuid = user
@@ -267,7 +267,7 @@ class IPAM(dbo):
             self.ipblock.max_prefixlen - self.ipblock.prefixlen)
         return str(ipaddress.IPv4Address(self.ipblock.network_address + bits))
 
-    def reserve_random_free_address(self, unique_label_tuple: tuple[str, str],
+    def reserve_random_free_address(self, unique_label_tuple: tuple[ObjectType, str],
                                     address_type: ReservationType,
                                     comment: str) -> str:
         # Fast path give up for full networks
