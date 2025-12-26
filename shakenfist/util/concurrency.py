@@ -194,9 +194,11 @@ def hash_file(path, algorithm_str):
 
 
 def enable_nat(network_uuid, network_address, network_mask, vxid):
+    # Convert network_uuid to string if it's a UUID object
+    network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
         enable_nat_request=privexec_pb2.EnableNATRequest(
-            network_uuid=network_uuid,
+            network_uuid=network_uuid_str,
             network_address=network_address,
             network_mask=network_mask,
             vxid=vxid
@@ -209,9 +211,11 @@ def enable_nat(network_uuid, network_address, network_mask, vxid):
 
 
 def ensure_vxlan_mesh(network_uuid, vxid, node_ips):
+    # Convert network_uuid to string if it's a UUID object
+    network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
         ensure_vxlan_mesh_request=privexec_pb2.EnsureVXLANMeshRequest(
-            network_uuid=network_uuid,
+            network_uuid=network_uuid_str,
             vxid=vxid,
             node_ips=node_ips
         )
@@ -224,9 +228,11 @@ def ensure_vxlan_mesh(network_uuid, vxid, node_ips):
 
 
 def add_floating_ip(network_uuid, floating_address, inner_address):
+    # Convert network_uuid to string if it's a UUID object
+    network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
         add_floating_ip_request=privexec_pb2.AddFloatingIPRequest(
-            network_uuid=network_uuid,
+            network_uuid=network_uuid_str,
             floating_address=floating_address,
             inner_address=inner_address
         )
@@ -238,9 +244,11 @@ def add_floating_ip(network_uuid, floating_address, inner_address):
 
 
 def remove_floating_ip(network_uuid, floating_address):
+    # Convert network_uuid to string if it's a UUID object
+    network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
         remove_floating_ip_request=privexec_pb2.RemoveFloatingIPRequest(
-            network_uuid=network_uuid,
+            network_uuid=network_uuid_str,
             floating_address=floating_address
         )
     )
