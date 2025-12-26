@@ -299,10 +299,10 @@ class NetworksEndpoint(sf_api.Resource):
                 else:
                     LOG.with_fields({'network': n}).warning(
                         'Network in use, cannot be deleted by delete-all')
-                    networks_unable.append(n.uuid)
+                    networks_unable.append(str(n.uuid))
                     continue
 
-            networks_del.append(n.uuid)
+            networks_del.append(str(n.uuid))
 
         if networks_unable:
             return sf_api.error(403, {'deleted': networks_del,

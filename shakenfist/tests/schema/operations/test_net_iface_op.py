@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
 from shakenfist.schema.operations.net_iface_op import create_and_enqueue
@@ -77,7 +78,7 @@ class NetIfaceOpTestCase(base.ShakenFistTestCase):
 
         d = model(
             uuid=u1,
-            network_uuid='floating',
+            network_uuid=FLOATING_NETWORK_UUID,
             interface_uuid=u2,
             tasks=[model_tasks.interface_float],
             priority=PRIORITY.user_facing,
@@ -88,7 +89,7 @@ class NetIfaceOpTestCase(base.ShakenFistTestCase):
         )
 
         serialized = d.model_dump(mode='json')
-        self.assertEqual('floating', serialized['network_uuid'])
+        self.assertEqual(str(FLOATING_NETWORK_UUID), serialized['network_uuid'])
 
     def test_model_bad_network_uuid(self):
         u1 = str(uuid4())

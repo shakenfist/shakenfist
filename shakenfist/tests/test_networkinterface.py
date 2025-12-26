@@ -6,9 +6,9 @@ from shakenfist.tests import base
 
 GET_ALL_INTERFACES = [
     (None, {
-        'uuid': 'ifaceuuid',
-        'instance_uuid': 'instuuid',
-        'network_uuid': 'netuuid',
+        'uuid': '11111111-1111-4111-8111-111111111111',
+        'instance_uuid': '22222222-2222-4222-8222-222222222222',
+        'network_uuid': '33333333-3333-4333-8333-333333333333',
         'macaddr': '1a:91:64:d2:15:39',
         'ipv4': '127.0.0.5',
         'order': 0,
@@ -16,9 +16,9 @@ GET_ALL_INTERFACES = [
         'version': 4
     }),
     (None, {
-        'uuid': 'ifaceuuid2',
-        'instance_uuid': 'instuuid',
-        'network_uuid': 'netuuid',
+        'uuid': '44444444-4444-4444-8444-444444444444',
+        'instance_uuid': '22222222-2222-4222-8222-222222222222',
+        'network_uuid': '33333333-3333-4333-8333-333333333333',
         'macaddr': '1a:91:64:d2:15:40',
         'ipv4': '127.0.0.6',
         'order': 1,
@@ -29,9 +29,9 @@ GET_ALL_INTERFACES = [
 
 JUST_INTERFACES = [
     {
-        'uuid': 'ifaceuuid',
-        'instance_uuid': 'instuuid',
-        'network_uuid': 'netuuid',
+        'uuid': '11111111-1111-4111-8111-111111111111',
+        'instance_uuid': '22222222-2222-4222-8222-222222222222',
+        'network_uuid': '33333333-3333-4333-8333-333333333333',
         'macaddr': '1a:91:64:d2:15:39',
         'ipv4': '127.0.0.5',
         'order': 0,
@@ -39,9 +39,9 @@ JUST_INTERFACES = [
         'version': 4
     },
     {
-        'uuid': 'ifaceuuid2',
-        'instance_uuid': 'instuuid',
-        'network_uuid': 'netuuid',
+        'uuid': '44444444-4444-4444-8444-444444444444',
+        'instance_uuid': '22222222-2222-4222-8222-222222222222',
+        'network_uuid': '33333333-3333-4333-8333-333333333333',
         'macaddr': '1a:91:64:d2:15:40',
         'ipv4': '127.0.0.6',
         'order': 1,

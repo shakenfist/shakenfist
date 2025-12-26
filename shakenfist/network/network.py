@@ -357,7 +357,7 @@ class Network(dbowo):
             'egress_veth_outer': 'egr-%06x-o' % self.vxid,
             'egress_veth_inner': 'egr-%06x-i' % self.vxid,
 
-            'netns': self.uuid,
+            'netns': str(self.uuid),
 
             'ipblock': self.ipblock,
             'netmask': self.netmask,
