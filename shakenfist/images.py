@@ -264,7 +264,7 @@ class ImageFetchHelper:
         elif mimetype in ['application/x-cd-image', 'application/x-iso9660-image']:
             blob_path = blob.Blob.filepath(b.uuid)
             cache_path = os.path.join(
-                config.STORAGE_PATH, 'image_cache', b.uuid + '.iso')
+                config.STORAGE_PATH, 'image_cache', f'{b.uuid}.iso')
             if not os.path.exists(cache_path):
                 util_general.link(blob_path, cache_path)
 
@@ -276,7 +276,7 @@ class ImageFetchHelper:
             remote_blob.ensure_local(instance_object=self.instance)
 
             cache_path = os.path.join(
-                config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
+                config.STORAGE_PATH, 'image_cache', f'{b.uuid}.qcow2')
             remote_blob_path = blob.Blob.filepath(remote_blob.uuid)
             if not os.path.exists(cache_path):
                 util_general.link(remote_blob_path, cache_path)
@@ -286,14 +286,14 @@ class ImageFetchHelper:
 
             if mimetype == 'application/gzip':
                 cache_path = os.path.join(
-                    config.STORAGE_PATH, 'image_cache', b.uuid)
+                    config.STORAGE_PATH, 'image_cache', str(b.uuid))
                 with util_general.RecordedOperation('decompress image', self.instance):
                     util_concurrency.execute(
                         f'gunzip -k -q -c {blob_path} > {cache_path}')
                 blob_path = cache_path
 
             cache_path = os.path.join(
-                config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
+                config.STORAGE_PATH, 'image_cache', f'{b.uuid}.qcow2')
             cache_info = util_image.identify(blob_path)
 
             cluster_size_as_int = int(util_image.convert_numeric_qemu_value(
