@@ -511,7 +511,7 @@ class Instance(dbowo):
 
     @property
     def instance_path(self):
-        return os.path.join(config.STORAGE_PATH, 'instances', self.uuid)
+        return os.path.join(config.STORAGE_PATH, 'instances', str(self.uuid))
 
     # Calculated properties
     @property
@@ -1769,12 +1769,12 @@ class Instance(dbowo):
                 artifacts.append(artifact.Artifact.new(
                     artifact.Artifact.TYPE_OTHER,
                     f'{artifact.INSTANCE_URL}{self.uuid}/console',
-                    name='%s/console' % self.uuid, max_versions=1,
+                    name=f'{self.uuid}/console', max_versions=1,
                     namespace='system'))
             artifacts.append(artifact.Artifact.new(
                     artifact.Artifact.TYPE_OTHER,
                     f'{artifact.INSTANCE_URL}{self.uuid}/console',
-                    name='%s/console' % self.uuid, max_versions=1,
+                    name=f'{self.uuid}/console', max_versions=1,
                     namespace=self.namespace))
 
             blob_uuid = str(uuid4())

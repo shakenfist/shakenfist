@@ -244,7 +244,7 @@ class ImageFetchHelper:
         os.makedirs(
             os.path.join(config.STORAGE_PATH, 'image_cache'), exist_ok=True)
         cached_locally = util_general.file_permutation_exists(
-            os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid),
+            os.path.join(config.STORAGE_PATH, 'image_cache', str(b.uuid)),
             ['iso', 'qcow2'])
         mimetype = b.info.get('mime-type', '')
 

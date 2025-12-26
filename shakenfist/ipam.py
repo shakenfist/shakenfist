@@ -58,7 +58,7 @@ class IPAM(dbo):
         self.__ipblock: str = static_values['ipblock']
 
         self.cached_ipblock_object: Optional[ipaddress.IPv4Network] = None
-        self.reservations_path: str = IPAM_RESERVATIONS_PATH % self.uuid
+        self.reservations_path: str = IPAM_RESERVATIONS_PATH % str(self.uuid)
 
         if self._in_memory_only:
             # In-memory store now uses IPAMReservation objects directly

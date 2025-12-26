@@ -109,7 +109,7 @@ class NodeBlobOp(BaseClusterOperation):
 
     def _ensure_local(self, b):
         locations = b.locations
-        if config.NODE_NAME in locations and os.path.exists(Blob.filepath(b.uuid)):
+        if config.NODE_NAME in locations and os.path.exists(Blob.filepath(str(b.uuid))):
             return
 
         metrics = etcd.get('metrics', config.NODE_NAME, None)
