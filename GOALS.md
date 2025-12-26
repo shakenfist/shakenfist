@@ -34,3 +34,4 @@
 * ansible-lint for the deployment Ansible
 * mTLS with a private CA for gRPC services
 * SO_PASSCRED for UDS services
+* Progressively convert to more modern python features like f-strings
