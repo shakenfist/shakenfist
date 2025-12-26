@@ -419,7 +419,7 @@ def migrate_floating_network_uuid(dry_run):
         click.echo('Cannot migrate - would overwrite existing network.')
         return
 
-    click.echo(f'Found legacy floating network with UUID "floating"')
+    click.echo('Found legacy floating network with UUID "floating"')
     click.echo(f'Will migrate to UUID: {FLOATING_NETWORK_UUID}')
 
     if dry_run:
