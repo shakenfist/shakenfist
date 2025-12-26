@@ -18,6 +18,7 @@
   - Migrate existing node references from hostname to UUID
   - Update all code that looks up nodes by hostname to use the FQDN field instead
 * Add mypy UUID4 type hint to BaseObject.__uuid. This is blocked on the same Node object migration above -- BaseObject.__uuid is currently typed as str because Node objects use their hostname (FQDN) as their UUID instead of a proper UUID. Once nodes use real UUIDs, we can add UUID4 typing to __uuid which would then propagate type safety to unique_label() and from_db() methods.
+* Use enums instead of strings in gRPC protos. Many gRPC message fields currently use strings where enums would provide better type safety and validation. This would require updating the proto definitions and regenerating the Python bindings.
 
 ## Not yet started
 
