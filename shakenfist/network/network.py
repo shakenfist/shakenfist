@@ -410,7 +410,7 @@ class Network(dbowo):
 
         # The floating network always exists, and would fail the vx_bridge
         # test we apply to other networks.
-        if self.uuid == 'floating':
+        if self.uuid == FLOATING_NETWORK_UUID:
             return True
 
         subst = self.subst_dict()
@@ -436,7 +436,7 @@ class Network(dbowo):
         # Some calls don't make sense on the floating network and are ignored
         def wrapper(*args, **kwargs):
             # The first argument is "self"
-            if args[0].uuid == 'floating':
+            if args[0].uuid == FLOATING_NETWORK_UUID:
                 return
             return func(*args, **kwargs)
         return wrapper
@@ -784,7 +784,7 @@ class Network(dbowo):
     # server redirects there.
     def add_floating_ip(self, floating_address, inner_address, affected_objects):
         affected_objects.append(self)
-        affected_objects.append(('network', 'floating'))
+        affected_objects.append(('network', FLOATING_NETWORK_UUID))
         add_event_multi(
             EVENT_TYPE_AUDIT, affected_objects, 'adding floating ip',
             extra={
@@ -792,20 +792,20 @@ class Network(dbowo):
                 'inner': inner_address
             })
         util_concurrency.add_floating_ip(
-            self.uuid, floating_address, inner_address)
+            str(self.uuid), floating_address, inner_address)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
     def remove_floating_ip(self, floating_address, inner_address, affected_objects):
         affected_objects.append(self)
-        affected_objects.append(('network', 'floating'))
+        affected_objects.append(('network', FLOATING_NETWORK_UUID))
         add_event_multi(
             EVENT_TYPE_AUDIT, affected_objects, 'remove floating ip',
             extra={
                 'floating': floating_address,
                 'inner': inner_address
             })
-        util_concurrency.remove_floating_ip(self.uuid, floating_address)
+        util_concurrency.remove_floating_ip(str(self.uuid), floating_address)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
@@ -835,7 +835,7 @@ class Networks(dbo_iter):
 
     def __iter__(self):
         for _, n in self.get_iterator():
-            if n['uuid'] == 'floating':
+            if n['uuid'] == str(FLOATING_NETWORK_UUID):
                 continue
 
             n = Network(n)

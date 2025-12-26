@@ -23,6 +23,7 @@ from shakenfist.network import network
 from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
@@ -142,7 +143,7 @@ class NetworkEndpoint(sf_api.Resource):
     @api_base.redirect_to_network_node
     @api_base.log_token_use
     def delete(self, network_ref=None, network_from_db=None, namespace=None):
-        if network_ref == 'floating':
+        if network_ref == str(FLOATING_NETWORK_UUID):
             return sf_api.error(403, 'you cannot delete the floating network')
 
         # If a namespace is specified, ensure the network is in it
