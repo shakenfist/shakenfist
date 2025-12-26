@@ -715,7 +715,7 @@ class DnsMasqTestCase(testtools.TestCase):
             mock_signal.assert_called_with(signal.SIGHUP)
             mock_execute.assert_called_with(
                 'dnsmasq --conf-file=%s/config' % dir,
-                namespace=network_uuid)
+                netns=n.uuid)
 
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._send_signal',
@@ -755,7 +755,7 @@ class DnsMasqTestCase(testtools.TestCase):
             mock_signal.assert_called_with(signal.SIGKILL)
             mock_execute.assert_called_with(
                 'dnsmasq --conf-file=%s/config' % dir,
-                namespace=network_uuid)
+                netns=n.uuid)
 
             with open(os.path.join(dir, 'leases')) as f:
                 leases = f.read()

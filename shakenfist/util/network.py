@@ -58,20 +58,20 @@ def _clean_ip_json(data):
     return [x for x in j if x]
 
 
-def check_for_interface(name, namespace=None, up=False):
+def check_for_interface(name, netns=None, up=False):
     log = LOG.with_fields({
         'name': name,
-        'namespace': namespace
+        'netns': netns
     }
     )
-    if namespace:
-        if not os.path.exists('/var/run/netns/%s' % namespace):
+    if netns:
+        if not os.path.exists('/var/run/netns/%s' % str(netns)):
             log.info('Interface is down, namespace missing')
             return False
 
     stdout, stderr = concurrency.execute(
         'ip -pretty -json link show %s' % name,
-        check_exit_code=[0, 1], namespace=namespace,
+        check_exit_code=[0, 1], netns=netns,
         suppress_command_logging=True)
 
     if stderr.rstrip('\n').endswith(' does not exist.'):
@@ -87,10 +87,10 @@ def check_for_interface(name, namespace=None, up=False):
     return True
 
 
-def get_interface_addresses(name, namespace=None):
+def get_interface_addresses(name, netns=None):
     stdout, _ = concurrency.execute(
         'ip -pretty -json addr show %s' % name,
-        check_exit_code=[0, 1], namespace=namespace)
+        check_exit_code=[0, 1], netns=netns)
 
     addresses = []
     for elem in _clean_ip_json(stdout):
@@ -99,49 +99,49 @@ def get_interface_addresses(name, namespace=None):
     return addresses
 
 
-def get_interface_statistics(name, namespace=None):
+def get_interface_statistics(name, netns=None):
     stdout, stderr = concurrency.execute(
         'ip -s -pretty -json link show %s' % name,
-        check_exit_code=[0, 1], namespace=namespace,
+        check_exit_code=[0, 1], netns=netns,
         suppress_command_logging=True)
 
     if not stdout:
         raise NoInterfaceStatistics(
-            'No statistics for interface %s in namespace %s (%s)'
-            % (name, namespace, stderr))
+            'No statistics for interface %s in netns %s (%s)'
+            % (name, netns, stderr))
 
     try:
         stats = _clean_ip_json(stdout)
         return stats[0].get('stats64')
     except IndexError:
         raise NoInterfaceStatistics(
-            'No statistics for interface %s in namespace %s (%s)'
-            % (name, namespace, stderr))
+            'No statistics for interface %s in netns %s (%s)'
+            % (name, netns, stderr))
 
 
-def get_interface_mtus(namespace=None):
+def get_interface_mtus(netns=None):
     stdout, _ = concurrency.execute(
         'ip -pretty -json link show',
-        check_exit_code=[0, 1], namespace=namespace,
+        check_exit_code=[0, 1], netns=netns,
         suppress_command_logging=True)
 
     for elem in _clean_ip_json(stdout):
         yield elem['ifname'], elem['mtu']
 
 
-def get_interface_mtu(interface, namespace=None):
+def get_interface_mtu(interface, netns=None):
     stdout, _ = concurrency.execute(
         'ip -pretty -json link show %s' % interface,
-        check_exit_code=[0, 1], namespace=namespace,
+        check_exit_code=[0, 1], netns=netns,
         suppress_command_logging=True)
 
     for elem in _clean_ip_json(stdout):
         return elem['mtu']
 
 
-def get_default_routes(namespace):
+def get_default_routes(netns):
     stdout, _ = concurrency.execute(
-        'ip route list default', namespace=namespace)
+        'ip route list default', netns=netns)
 
     if not stdout:
         return []
@@ -154,18 +154,18 @@ def get_default_routes(namespace):
     return routes
 
 
-def add_default_route(namespace, router):
+def add_default_route(netns, router):
     try:
         concurrency.execute(
-            f'route add default gw {router}', namespace=namespace)
+            f'route add default gw {router}', netns=netns)
     except ProcessExecutionError as e:
         if e.stderr != 'SIOCADDRT: File exists\n':
             raise e
 
 
-def delete_default_route(namespace, router):
+def delete_default_route(netns, router):
     concurrency.execute(
-        f'route del default gw {router}', namespace=namespace)
+        f'route del default gw {router}', netns=netns)
 
 
 def get_safe_interface_name(interface):
@@ -250,19 +250,19 @@ def random_macaddr():
                                                   random.randint(0, 255))
 
 
-def add_address_to_interface(namespace, address, netmask, device):
+def add_address_to_interface(netns, address, netmask, device):
     # Adding an address to an interface can sometimes require waiting briefly
     # to ensure the address appears. This is a wrapper which does all that
     # for you. This used to error if repeated attempts fail, but that's so
     # common its not useful. This needs revisiting.
     log = LOG.with_fields({
-        'namespace': namespace,
+        'netns': netns,
         'address': address,
         'netmask': netmask,
         'device': device
     })
 
-    def _add_address(namespace, address, netmask, device):
+    def _add_address(netns, address, netmask, device):
         if not address:
             raise InvalidAddress(address)
 
@@ -273,17 +273,17 @@ def add_address_to_interface(namespace, address, netmask, device):
                     netmask=netmask,
                     device=device
                 ),
-                namespace=namespace)
+                netns=netns)
             concurrency.execute(
-                'ip link set %s up' % device, namespace=namespace)
+                'ip link set %s up' % device, netns=netns)
 
         except ProcessExecutionError as e:
             if e.stderr.rstrip() != 'RTNETLINK answers: File exists':
                 raise e
 
     attempts = 0
-    _add_address(namespace, address, netmask, device)
-    while address not in list(get_interface_addresses(device, namespace=namespace)):
+    _add_address(netns, address, netmask, device)
+    while address not in list(get_interface_addresses(device, netns=netns)):
         time.sleep(0.5)
         attempts += 1
         if attempts == 5:
@@ -291,4 +291,4 @@ def add_address_to_interface(namespace, address, netmask, device):
                 'Repeated failures to add address to device')
             return
 
-        _add_address(namespace, address, netmask, device)
+        _add_address(netns, address, netmask, device)

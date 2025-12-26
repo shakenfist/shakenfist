@@ -487,7 +487,7 @@ class Network(dbowo):
                     'ip link set %(vx_veth_outer)s up' % subst)
                 util_concurrency.execute(
                     'ip link set %(vx_veth_inner)s up' % subst,
-                    namespace=self.uuid)
+                    netns=self.uuid)
                 util_network.add_address_to_interface(
                     self.uuid, subst['router'], subst['netmask'],
                     subst['vx_veth_inner'])
@@ -532,7 +532,7 @@ class Network(dbowo):
                     return
 
                 addresses = list(util_network.get_interface_addresses(
-                    subst['egress_veth_inner'], namespace=subst['netns']))
+                    subst['egress_veth_inner'], netns=subst['netns']))
                 self.log.with_fields({
                     'addresses': addresses,
                     'current_address': subst['floating_gateway']}).debug(

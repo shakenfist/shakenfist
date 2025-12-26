@@ -105,18 +105,21 @@ def _marshal_privexec_request(request, expected_field):
 
 
 def execute(command, check_exit_code=[0], env_variables=None,
-            namespace=None, iopriority=None, cwd=None,
+            netns=None, iopriority=None, cwd=None,
             suppress_command_logging=False):
     try:
         request_id = flask.request.environ.get('FLASK_REQUEST_ID')
     except RuntimeError:
         request_id = None
 
+    # Convert netns to string if it's a UUID object
+    netns_str = str(netns) if netns else None
+
     execution_id = sf_random.random_id()
     request = privexec_pb2.PrivExecRequest(
         execute_request=common_pb2.ExecuteRequest(
             command=command,
-            network_namespace=namespace,
+            network_namespace=netns_str,
             io_priority=iopriority,
             working_directory=cwd,
             request_id=request_id,
@@ -140,7 +143,7 @@ def execute(command, check_exit_code=[0], env_variables=None,
     if not suppress_command_logging:
         LOG.with_fields({
             'command': command,
-            'namespace': namespace,
+            'netns': netns_str,
             'iopriority': iopriority,
             'environment_variables': env_variables,
             'working_directory': cwd,
@@ -260,10 +263,12 @@ def create_vxlan_interface(vx_id, mesh_interface):
         raise CreateVXLANInterfaceFailed()
 
 
-def create_network_namespace(namespace):
+def create_network_namespace(netns):
+    # Convert netns to string if it's a UUID object
+    netns_str = str(netns)
     request = privexec_pb2.PrivExecRequest(
         create_network_namespace_request=privexec_pb2.CreateNetworkNamespaceRequest(
-            namespace=namespace
+            namespace=netns_str
         )
     )
     reply = _marshal_privexec_request(
