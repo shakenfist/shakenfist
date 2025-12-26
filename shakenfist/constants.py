@@ -72,6 +72,12 @@ EVENT_TYPES = [EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE, EVENT_TYPE_STATUS,
 # Blob hashing algorithms
 BLOB_HASH_ALGORITHMS = ['sha1', 'sha256', 'sha512', 'xxh128']
 
+# Well-known UUID for the floating network. This is a valid UUID4 that contains
+# "F10A7" (FLOAT) repeated throughout for easy identification. The floating
+# network previously used the string "floating" as its UUID, but this was not
+# a valid UUID4. Use "sf-ctl migrate-floating-network-uuid" to migrate.
+FLOATING_NETWORK_UUID = 'f10a7f10-a7f1-4a7f-a10a-7f10a7f10a7f'
+
 OBJECT_NAMES_TO_CLASSES = {
     'agentoperation': 'operations.agentoperation.AgentOperation',
     'artifact': 'artifact.Artifact',

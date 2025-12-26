@@ -9,6 +9,7 @@ from uuid import uuid4
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
+from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import instance
@@ -852,9 +853,9 @@ def networks_in_namespace(namespace):
 
 
 def floating_network():
-    floating_network = Network.from_db('floating', suppress_failure_audit=True)
-    if not floating_network:
-        Network.new(network_uuid='floating',
+    fn = Network.from_db(FLOATING_NETWORK_UUID, suppress_failure_audit=True)
+    if not fn:
+        Network.new(network_uuid=FLOATING_NETWORK_UUID,
                     vxid=0,
                     netblock=config.FLOATING_NETWORK,
                     provide_dhcp=False,
@@ -862,4 +863,5 @@ def floating_network():
                     provide_dns=False,
                     namespace=None,
                     name='floating')
-    return floating_network
+        fn = Network.from_db(FLOATING_NETWORK_UUID)
+    return fn
