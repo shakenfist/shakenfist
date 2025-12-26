@@ -776,12 +776,14 @@ class Blob(dbo):
 
     @staticmethod
     def filedir(blob_uuid):
+        blob_uuid = str(blob_uuid)
         path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid[0:2])
         os.makedirs(path, exist_ok=True)
         return path
 
     @staticmethod
     def filepath(blob_uuid):
+        blob_uuid = str(blob_uuid)
         return os.path.join(Blob.filedir(blob_uuid), blob_uuid)
 
     @property
