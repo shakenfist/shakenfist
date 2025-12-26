@@ -22,6 +22,7 @@ from ipaddress import IPv4Address
 import time
 import threading
 from typing import Any, Optional
+from uuid import UUID
 
 import grpc
 import sqlalchemy as sa
@@ -1036,7 +1037,7 @@ def _direct_reserve_address(reservation: IPAMReservation) -> bool:
         return False
 
 
-def _direct_release_address(ipam_uuid: str, address: str,
+def _direct_release_address(ipam_uuid: UUID, address: str,
                             halo_reservation: IPAMReservation) -> bool:
     """Release an IP address by updating it to deletion-halo state.
 
@@ -1077,7 +1078,7 @@ def _direct_release_address(ipam_uuid: str, address: str,
         return False
 
 
-def _direct_get_reservation(ipam_uuid: str,
+def _direct_get_reservation(ipam_uuid: UUID,
                             address: str) -> Optional[IPAMReservation]:
     """Get a single reservation by IPAM UUID and address.
 
@@ -1120,7 +1121,7 @@ def _direct_get_reservation(ipam_uuid: str,
 
 
 def _direct_get_reservations_for_ipam(
-        ipam_uuid: str) -> list[IPAMReservation]:
+        ipam_uuid: UUID) -> list[IPAMReservation]:
     """Get all reservations for an IPAM.
 
     Args:
@@ -1154,7 +1155,7 @@ def _direct_get_reservations_for_ipam(
         return []
 
 
-def _direct_delete_reservation(ipam_uuid: str, address: str) -> bool:
+def _direct_delete_reservation(ipam_uuid: UUID, address: str) -> bool:
     """Delete a single reservation (hard delete).
 
     Args:
@@ -1183,7 +1184,7 @@ def _direct_delete_reservation(ipam_uuid: str, address: str) -> bool:
         return False
 
 
-def _direct_delete_reservations_for_ipam(ipam_uuid: str) -> int:
+def _direct_delete_reservations_for_ipam(ipam_uuid: UUID) -> int:
     """Delete all reservations for an IPAM (hard delete).
 
     Args:
@@ -1206,7 +1207,7 @@ def _direct_delete_reservations_for_ipam(ipam_uuid: str) -> int:
         return 0
 
 
-def _direct_release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
+def _direct_release_haloed_addresses(ipam_uuid: UUID, older_than: float) -> int:
     """Delete deletion-halo reservations older than the specified time.
 
     Args:
@@ -1236,7 +1237,7 @@ def _direct_release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
         return 0
 
 
-def _direct_get_addresses_in_use(ipam_uuid: str) -> set[str]:
+def _direct_get_addresses_in_use(ipam_uuid: UUID) -> set[str]:
     """Get all addresses currently in use for an IPAM.
 
     Args:
@@ -1280,7 +1281,7 @@ def reserve_address(reservation: IPAMReservation) -> bool:
     return _direct_reserve_address(reservation)
 
 
-def release_address(ipam_uuid: str, address: str,
+def release_address(ipam_uuid: UUID, address: str,
                     halo_reservation: IPAMReservation) -> bool:
     """Release an IP address by updating it to deletion-halo state.
 
@@ -1293,11 +1294,11 @@ def release_address(ipam_uuid: str, address: str,
         True if successful, False otherwise.
     """
     if _use_database_service():
-        return _grpc_release_address(ipam_uuid, address, halo_reservation)
+        return _grpc_release_address(str(ipam_uuid), address, halo_reservation)
     return _direct_release_address(ipam_uuid, address, halo_reservation)
 
 
-def get_reservation(ipam_uuid: str, address: str) -> Optional[IPAMReservation]:
+def get_reservation(ipam_uuid: UUID, address: str) -> Optional[IPAMReservation]:
     """Get a single reservation by IPAM UUID and address.
 
     Args:
@@ -1308,11 +1309,11 @@ def get_reservation(ipam_uuid: str, address: str) -> Optional[IPAMReservation]:
         The IPAMReservation if found, None otherwise.
     """
     if _use_database_service():
-        return _grpc_get_reservation(ipam_uuid, address)
+        return _grpc_get_reservation(str(ipam_uuid), address)
     return _direct_get_reservation(ipam_uuid, address)
 
 
-def get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
+def get_reservations_for_ipam(ipam_uuid: UUID) -> list[IPAMReservation]:
     """Get all reservations for an IPAM.
 
     Args:
@@ -1322,11 +1323,11 @@ def get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
         List of IPAMReservation objects.
     """
     if _use_database_service():
-        return _grpc_get_reservations_for_ipam(ipam_uuid)
+        return _grpc_get_reservations_for_ipam(str(ipam_uuid))
     return _direct_get_reservations_for_ipam(ipam_uuid)
 
 
-def delete_reservation(ipam_uuid: str, address: str) -> bool:
+def delete_reservation(ipam_uuid: UUID, address: str) -> bool:
     """Delete a single reservation (hard delete).
 
     Args:
@@ -1337,11 +1338,11 @@ def delete_reservation(ipam_uuid: str, address: str) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_reservation(ipam_uuid, address)
+        return _grpc_delete_reservation(str(ipam_uuid), address)
     return _direct_delete_reservation(ipam_uuid, address)
 
 
-def delete_reservations_for_ipam(ipam_uuid: str) -> int:
+def delete_reservations_for_ipam(ipam_uuid: UUID) -> int:
     """Delete all reservations for an IPAM (hard delete).
 
     Args:
@@ -1351,11 +1352,11 @@ def delete_reservations_for_ipam(ipam_uuid: str) -> int:
         Number of reservations deleted.
     """
     if _use_database_service():
-        return _grpc_delete_reservations_for_ipam(ipam_uuid)
+        return _grpc_delete_reservations_for_ipam(str(ipam_uuid))
     return _direct_delete_reservations_for_ipam(ipam_uuid)
 
 
-def release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
+def release_haloed_addresses(ipam_uuid: UUID, older_than: float) -> int:
     """Delete deletion-halo reservations older than the specified time.
 
     Args:
@@ -1366,11 +1367,11 @@ def release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
         Number of reservations deleted.
     """
     if _use_database_service():
-        return _grpc_release_haloed_addresses(ipam_uuid, older_than)
+        return _grpc_release_haloed_addresses(str(ipam_uuid), older_than)
     return _direct_release_haloed_addresses(ipam_uuid, older_than)
 
 
-def get_addresses_in_use(ipam_uuid: str) -> set[str]:
+def get_addresses_in_use(ipam_uuid: UUID) -> set[str]:
     """Get all addresses currently in use for an IPAM.
 
     Args:
@@ -1380,5 +1381,5 @@ def get_addresses_in_use(ipam_uuid: str) -> set[str]:
         Set of IP addresses (as strings) that are reserved.
     """
     if _use_database_service():
-        return _grpc_get_addresses_in_use(ipam_uuid)
+        return _grpc_get_addresses_in_use(str(ipam_uuid))
     return _direct_get_addresses_in_use(ipam_uuid)

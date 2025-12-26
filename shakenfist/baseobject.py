@@ -1,10 +1,12 @@
 import json
 import time
+import uuid
 from collections import defaultdict
 from functools import partial
 from math import inf
 import re
 from typing import ClassVar
+from typing import Union
 
 from etcd3gw.lock import Lock
 from shakenfist_utilities import logs  # noreorder
@@ -145,15 +147,22 @@ class DatabaseBackedObject:
 
     VALID_OBJECT_TYPE_RE = re.compile(r'^[a-z_]+$')
 
-    def __init__(self, object_uuid, version=None, in_memory_only=False):
-        self.__uuid = object_uuid
+    def __init__(self, object_uuid: Union[str, uuid.UUID], version=None,
+                 in_memory_only=False):
+        # Store UUID as a uuid.UUID object for type safety. Subclasses like
+        # Node that use non-UUID identifiers (e.g., hostnames) should override
+        # the uuid property to return a string.
+        if isinstance(object_uuid, uuid.UUID):
+            self.__uuid = object_uuid
+        else:
+            self.__uuid = uuid.UUID(object_uuid)
         self.__version = version
 
         self.__in_memory_only = in_memory_only
         if self.__in_memory_only:
             self.__in_memory_values = {}
 
-        self.log = LOG.with_fields({self.object_type: self.__uuid})
+        self.log = LOG.with_fields({self.object_type: str(self.__uuid)})
 
         # Not very good schema rule enforcement for object naming...
         m = self.VALID_OBJECT_TYPE_RE.match(self.object_type)
@@ -205,7 +214,7 @@ class DatabaseBackedObject:
                         'Not committing online upgrade, as not all nodes are updated')
 
     @property
-    def uuid(self):
+    def uuid(self) -> uuid.UUID:
         return self.__uuid
 
     @property
