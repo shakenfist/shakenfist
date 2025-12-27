@@ -32,7 +32,7 @@ class ManagedExecutable(dbo):
         self.__owner_uuid = static_values['owner_uuid']
         self.__config_templates = {}
         self.__config_dir = os.path.join(config.STORAGE_PATH, self.object_type,
-                                         self.uuid)
+                                         str(self.uuid))
 
     # Static values
     @property

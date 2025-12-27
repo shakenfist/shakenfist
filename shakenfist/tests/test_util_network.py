@@ -23,7 +23,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         self.assertEqual(False, found)
         mock_execute.assert_called_with(
             'ip -pretty -json link show banana0',
-            check_exit_code=[0, 1], namespace=None, suppress_command_logging=True)
+            check_exit_code=[0, 1], netns=None, suppress_command_logging=True)
 
     @mock.patch(
         'shakenfist.util.concurrency.execute',
@@ -41,7 +41,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         self.assertEqual(True, found)
         mock_execute.assert_called_with(
             'ip -pretty -json link show eth0',
-            check_exit_code=[0, 1], namespace=None, suppress_command_logging=True)
+            check_exit_code=[0, 1], netns=None, suppress_command_logging=True)
 
     @mock.patch(
         'shakenfist.util.concurrency.execute',
@@ -51,7 +51,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         self.assertEqual([], found)
         mock_execute.assert_called_with(
             'ip -pretty -json addr show eth0',
-            check_exit_code=[0, 1], namespace=None)
+            check_exit_code=[0, 1], netns=None)
 
     @mock.patch(
         'shakenfist.util.concurrency.execute',
@@ -86,7 +86,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         self.assertEqual(['192.168.1.28'], found)
         mock_execute.assert_called_with(
             'ip -pretty -json addr show eth0',
-            check_exit_code=[0, 1], namespace=None)
+            check_exit_code=[0, 1], netns=None)
 
     @mock.patch(
         'shakenfist.util.concurrency.execute',
@@ -118,11 +118,11 @@ class UtilTestCase(base.ShakenFistTestCase):
     },{},{},{} ]""", ''))
     def test_get_interface_addresses_namespace(self, mock_execute):
         found = list(util_network.get_interface_addresses(
-            'eth0', namespace='bananarama'))
+            'eth0', netns='bananarama'))
         self.assertEqual(['192.168.1.28'], found)
         mock_execute.assert_called_with(
             'ip -pretty -json addr show eth0',
-            check_exit_code=[0, 1], namespace='bananarama')
+            check_exit_code=[0, 1], netns='bananarama')
 
     @mock.patch(
         'shakenfist.util.concurrency.execute',
@@ -133,7 +133,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         found = util_network.get_default_routes('mynamespace')
         self.assertEqual(['192.168.1.247'], found)
         mock_execute.assert_called_with(
-            'ip route list default', namespace='mynamespace')
+            'ip route list default', netns='mynamespace')
 
     @mock.patch('shakenfist.util.concurrency.execute')
     def test_create_interface_bridge(self, mock_execute):

@@ -196,7 +196,7 @@ class AuthWithLingeringInstance(base.ShakenFistTestCase):
 
         self.mock_etcd.create_namespace('foo', 'key1', 'banana')
         self.mock_etcd.create_instance(
-            name='fooinst', uuid='123', namespace='foo')
+            name='fooinst', namespace='foo')
 
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.

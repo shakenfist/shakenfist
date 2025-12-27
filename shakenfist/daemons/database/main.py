@@ -398,6 +398,150 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetObjectsByState failed', e)
             return database_pb2.GetObjectsByStateReply(object_uuids=[])
 
+    # IPAM Reservation Operations (MariaDB)
+    # These operations provide atomic IP address reservation and management.
+
+    def ReserveAddress(self, request, context):
+        """Atomically reserve an IP address."""
+        try:
+            self.monitor.counters['reserve_address'].inc()
+            from shakenfist.schema.ipam_reservation import IPAMReservation
+            reservation = IPAMReservation(
+                ipam_uuid=request.reservation.ipam_uuid,
+                address=request.reservation.address,
+                reservation_type=request.reservation.reservation_type,
+                user_type=mariadb._string_to_object_type(
+                    request.reservation.user_type),
+                user_uuid=request.reservation.user_uuid or None,
+                reserved_at=request.reservation.reserved_at,
+                comment=request.reservation.comment or None
+            )
+            success = mariadb._direct_reserve_address(reservation)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_general.ignore_exception('database ReserveAddress failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def ReleaseAddress(self, request, context):
+        """Release an IP address (convert to deletion-halo)."""
+        try:
+            self.monitor.counters['release_address'].inc()
+            from shakenfist.schema.ipam_reservation import IPAMReservation
+            halo_reservation = IPAMReservation(
+                ipam_uuid=request.halo_reservation.ipam_uuid,
+                address=request.halo_reservation.address,
+                reservation_type=request.halo_reservation.reservation_type,
+                user_type=mariadb._string_to_object_type(
+                    request.halo_reservation.user_type),
+                user_uuid=request.halo_reservation.user_uuid or None,
+                reserved_at=request.halo_reservation.reserved_at,
+                comment=request.halo_reservation.comment or None
+            )
+            success = mariadb._direct_release_address(
+                request.ipam_uuid, request.address, halo_reservation)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_general.ignore_exception('database ReleaseAddress failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetReservation(self, request, context):
+        """Get a single reservation."""
+        try:
+            self.monitor.counters['get_reservation'].inc()
+            reservation = mariadb._direct_get_reservation(
+                request.ipam_uuid, request.address)
+            if reservation is None:
+                return database_pb2.GetReservationReply(found=False)
+            return database_pb2.GetReservationReply(
+                found=True,
+                reservation=database_pb2.IPAMReservationData(
+                    ipam_uuid=reservation.ipam_uuid,
+                    address=reservation.address,
+                    reservation_type=reservation.reservation_type,
+                    user_type=mariadb._object_type_to_string(
+                        reservation.user_type),
+                    user_uuid=reservation.user_uuid or '',
+                    reserved_at=reservation.reserved_at,
+                    comment=reservation.comment or ''
+                )
+            )
+        except Exception as e:
+            util_general.ignore_exception('database GetReservation failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetReservationReply(found=False)
+
+    def GetReservationsForIPAM(self, request, context):
+        """Get all reservations for an IPAM."""
+        try:
+            self.monitor.counters['get_reservations_for_ipam'].inc()
+            reservations = mariadb._direct_get_reservations_for_ipam(
+                request.ipam_uuid)
+            result = []
+            for res in reservations:
+                result.append(database_pb2.IPAMReservationData(
+                    ipam_uuid=res.ipam_uuid,
+                    address=res.address,
+                    reservation_type=res.reservation_type,
+                    user_type=mariadb._object_type_to_string(res.user_type),
+                    user_uuid=res.user_uuid or '',
+                    reserved_at=res.reserved_at,
+                    comment=res.comment or ''
+                ))
+            return database_pb2.GetReservationsForIPAMReply(reservations=result)
+        except Exception as e:
+            util_general.ignore_exception(
+                'database GetReservationsForIPAM failed', e)
+            return database_pb2.GetReservationsForIPAMReply(reservations=[])
+
+    def DeleteReservation(self, request, context):
+        """Delete a single reservation."""
+        try:
+            self.monitor.counters['delete_reservation'].inc()
+            success = mariadb._direct_delete_reservation(
+                request.ipam_uuid, request.address)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_general.ignore_exception(
+                'database DeleteReservation failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def DeleteReservationsForIPAM(self, request, context):
+        """Delete all reservations for an IPAM."""
+        try:
+            self.monitor.counters['delete_reservations_for_ipam'].inc()
+            count = mariadb._direct_delete_reservations_for_ipam(
+                request.ipam_uuid)
+            return database_pb2.DeleteCountReply(count=count)
+        except Exception as e:
+            util_general.ignore_exception(
+                'database DeleteReservationsForIPAM failed', e)
+            return database_pb2.DeleteCountReply(count=0)
+
+    def ReleaseHaloedAddresses(self, request, context):
+        """Release expired deletion-halo addresses."""
+        try:
+            self.monitor.counters['release_haloed_addresses'].inc()
+            count = mariadb._direct_release_haloed_addresses(
+                request.ipam_uuid, request.older_than)
+            return database_pb2.DeleteCountReply(count=count)
+        except Exception as e:
+            util_general.ignore_exception(
+                'database ReleaseHaloedAddresses failed', e)
+            return database_pb2.DeleteCountReply(count=0)
+
+    def GetAddressesInUse(self, request, context):
+        """Get all addresses in use for an IPAM."""
+        try:
+            self.monitor.counters['get_addresses_in_use'].inc()
+            addresses = mariadb._direct_get_addresses_in_use(request.ipam_uuid)
+            return database_pb2.GetAddressesInUseReply(
+                addresses=list(addresses))
+        except Exception as e:
+            util_general.ignore_exception(
+                'database GetAddressesInUse failed', e)
+            return database_pb2.GetAddressesInUseReply(addresses=[])
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -419,7 +563,12 @@ class Monitor(daemon.WorkerPoolDaemon):
             'clear_stale_locks', 'get_existing_locks', 'compact',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
-            'get_objects_by_state'
+            'get_objects_by_state',
+            # MariaDB IPAM operations
+            'reserve_address', 'release_address', 'get_reservation',
+            'get_reservations_for_ipam', 'delete_reservation',
+            'delete_reservations_for_ipam', 'release_haloed_addresses',
+            'get_addresses_in_use'
         ]
         for op in operations:
             self.counters[op] = Counter(

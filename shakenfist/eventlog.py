@@ -381,7 +381,8 @@ def upgrade_data_store():
 
 
 def _shard_db_path(objtype, objuuid):
-    path = os.path.join(config.STORAGE_PATH, 'events', objtype, objuuid[0:2])
+    objuuid_str = str(objuuid)
+    path = os.path.join(config.STORAGE_PATH, 'events', objtype, objuuid_str[0:2])
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -577,7 +578,7 @@ class EventLogChunk:
             })
 
         self.dbdir = _shard_db_path(self.objtype, self.objuuid)
-        self.dbpath = os.path.join(self.dbdir, self.objuuid + '.' + self.chunk)
+        self.dbpath = os.path.join(self.dbdir, f'{self.objuuid}.{self.chunk}')
         self.bootstrapped = False
 
         self.lock = util_concurrency.NodeLock(

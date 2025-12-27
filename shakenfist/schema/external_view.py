@@ -12,7 +12,8 @@
 # 3. Once all fields are in the model, _external_view() just returns
 #    model.model_dump()
 
-from typing import Any, Dict, Optional
+import uuid as uuid_module
+from typing import Any, Dict, Optional, Union
 
 from pydantic import BaseModel, field_serializer
 
@@ -27,16 +28,21 @@ class BaseExternalView(BaseModel):
     a State object to just its value string.
 
     Fields handled here:
-    - uuid: Object identifier
+    - uuid: Object identifier (accepts both str and uuid.UUID, serializes to str)
     - state: Transformed from State object to value string
     - version: Schema version
     - metadata: User-defined key-value pairs
     """
 
-    uuid: str
+    uuid: Union[str, uuid_module.UUID]
     state: State
     version: int
     metadata: Dict[str, Any]
+
+    @field_serializer('uuid')
+    def serialize_uuid(self, value: Union[str, uuid_module.UUID]) -> str:
+        """Serialize UUID to string for API output."""
+        return str(value)
 
     @field_serializer('state')
     def serialize_state(self, state: State) -> Optional[str]:

@@ -1,7 +1,5 @@
 from enum import Enum
-from typing import Literal
 from typing import Optional
-from typing import Union
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -39,7 +37,7 @@ class model_tasks(Enum):
 
 class model(BaseModel):
     uuid: UUID4
-    network_uuid: Union[UUID4, Literal['floating']]
+    network_uuid: UUID4
     priority: PRIORITY
     request_id: Optional[str]
     tasks: list[model_tasks]

@@ -18,19 +18,26 @@
 # When ensure_schema() is called, it checks the current version and applies
 # any necessary migrations. This follows the same pattern as eventlog.py.
 
+from ipaddress import IPv4Address
 import time
 import threading
 from typing import Any, Optional
+from uuid import UUID
 
 import grpc
 import sqlalchemy as sa
+from sqlalchemy.dialects.mysql import INET4
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs
 
 from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
+from shakenfist.schema.ipam_reservation import IPAMReservation
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_state import State
+from shakenfist.schema.object_types import ObjectType
 
 
 LOG, _ = logs.setup(__name__)
@@ -42,9 +49,21 @@ _local = threading.local()
 _metadata: Optional[sa.MetaData] = None
 _schema_versions_table: Optional[sa.Table] = None
 _object_states_table: Optional[sa.Table] = None
+_ipam_reservations_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
-OBJECT_STATES_VERSION = 1
+# Version history:
+#   object_states v1: Initial schema with VARCHAR(32) for object_type
+#   object_states v2: Changed object_type from VARCHAR(32) to ENUM(ObjectType)
+#   ipam_reservations v1: Initial schema with VARCHAR(32) for reservation_type
+#                         and VARCHAR(45) for address
+#   ipam_reservations v2: Changed reservation_type from VARCHAR(32) to
+#                         ENUM(ReservationType)
+#   ipam_reservations v3: Changed address from VARCHAR(45) to INET4
+#   ipam_reservations v4: Changed user_type from VARCHAR(32) to ENUM(ObjectType)
+#   ipam_reservations v5: Changed ipam_uuid and user_uuid from VARCHAR(36) to UUID
+OBJECT_STATES_VERSION = 2
+IPAM_RESERVATIONS_VERSION = 5
 
 
 def _use_database_service() -> bool:
@@ -95,9 +114,11 @@ def _get_connection_url() -> str:
     if not config.MARIADB_HOST:
         raise RuntimeError('MARIADB_HOST not configured')
 
-    # Use mysqldb driver which is available via python3-mysqldb
+    # Use mariadb dialect with mysqldb driver. The mariadb dialect is required
+    # for MariaDB-specific types like INET4. The mysqldb driver is available
+    # via python3-mysqldb.
     return (
-        f'mysql+mysqldb://{config.MARIADB_USER}:{config.MARIADB_PASSWORD}'
+        f'mariadb+mysqldb://{config.MARIADB_USER}:{config.MARIADB_PASSWORD}'
         f'@{config.MARIADB_HOST}:{config.MARIADB_PORT}/{config.MARIADB_DATABASE}'
     )
 
@@ -224,7 +245,7 @@ def _get_object_states_table() -> sa.Table:
             'object_states',
             metadata,
             sa.Column('object_uuid', sa.String(36), nullable=False),
-            sa.Column('object_type', sa.String(32), nullable=False),
+            sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
             sa.Column('state_value', sa.String(32), nullable=True),
             sa.Column('update_time', sa.Double(), nullable=False),
             sa.Column('message', sa.String(255), nullable=True),
@@ -234,6 +255,15 @@ def _get_object_states_table() -> sa.Table:
             sa.Index('idx_object_states_type_state', 'object_type', 'state_value'),
         )
     return _object_states_table
+
+
+def _build_object_type_enum_values() -> str:
+    """Build the ENUM values string for ObjectType.
+
+    Returns a comma-separated list of quoted enum values for use in
+    ALTER TABLE statements.
+    """
+    return ', '.join(f"'{ot.value}'" for ot in ObjectType)
 
 
 def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
@@ -247,7 +277,8 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_object_states_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it
+    # Version 0 or -1 means table doesn't exist yet - create it with current
+    # schema (which includes the ENUM type)
     if current_ver <= 0:
         LOG.info(f'Creating {table_name} table (version {OBJECT_STATES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
@@ -263,20 +294,179 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
         current_ver = OBJECT_STATES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
-    # Future migrations would go here, following this pattern:
-    # if current_ver == 1:
-    #     LOG.info('Upgrading object_states from v1 to v2')
-    #     with engine.connect() as conn:
-    #         conn.execute(sa.text('ALTER TABLE object_states ADD COLUMN ...'))
-    #         conn.commit()
-    #     current_ver = 2
-    #     _set_table_version(engine, table_name, current_ver)
+    # Migration from v1 to v2: Convert object_type from VARCHAR(32) to ENUM
+    if current_ver == 1:
+        LOG.info('Upgrading object_states from v1 to v2: '
+                 'converting object_type to ENUM')
+        enum_values = _build_object_type_enum_values()
+        with engine.connect() as conn:
+            # ALTER TABLE to change column type from VARCHAR to ENUM
+            # MariaDB will automatically convert existing string values to
+            # enum values if they match
+            conn.execute(sa.text(
+                f'ALTER TABLE object_states '
+                f'MODIFY COLUMN object_type ENUM({enum_values}) NOT NULL'
+            ))
+            conn.commit()
+        current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
 
     return {
         'table': table_name,
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': OBJECT_STATES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_ipam_reservations_table() -> sa.Table:
+    """Get or create the ipam_reservations table definition.
+
+    This table stores IP address reservations for all IPAMs. The combination
+    of (ipam_uuid, address) is unique - each address can only be reserved
+    once within a given IPAM.
+
+    The address column uses MariaDB's INET4 type for efficient IPv4 storage
+    and indexing (4 bytes vs up to 15 bytes for string representation).
+
+    The user_type column uses an ENUM type for efficient storage (1-2 bytes
+    vs 32 bytes for VARCHAR) and type safety.
+    """
+    global _ipam_reservations_table
+    if _ipam_reservations_table is None:
+        metadata = _get_metadata()
+        _ipam_reservations_table = sa.Table(
+            'ipam_reservations',
+            metadata,
+            sa.Column('ipam_uuid', sa.Uuid(), nullable=False),
+            sa.Column('address', INET4(), nullable=False),
+            sa.Column('reservation_type', sa.Enum(ReservationType),
+                      nullable=False),
+            sa.Column('user_type', sa.Enum(ObjectType), nullable=True),
+            sa.Column('user_uuid', sa.Uuid(), nullable=True),
+            sa.Column('reserved_at', sa.Double(), nullable=False),
+            sa.Column('comment', sa.Text(), nullable=True),
+            # Composite primary key ensures uniqueness
+            sa.PrimaryKeyConstraint('ipam_uuid', 'address'),
+            # Index for efficient queries by IPAM
+            sa.Index('idx_ipam_reservations_ipam', 'ipam_uuid'),
+            # Index for finding reservations by user
+            sa.Index('idx_ipam_reservations_user', 'user_type', 'user_uuid'),
+            # Index for finding reservations by type (e.g., deletion-halo)
+            sa.Index('idx_ipam_reservations_type', 'reservation_type'),
+        )
+    return _ipam_reservations_table
+
+
+def _build_reservation_type_enum_values() -> str:
+    """Build the ENUM values string for ReservationType.
+
+    Returns a comma-separated list of quoted enum values for use in
+    ALTER TABLE statements.
+    """
+    return ', '.join(f"'{rt.value}'" for rt in ReservationType)
+
+
+def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the ipam_reservations table schema is up to date.
+
+    Applies any necessary migrations based on the current version.
+    Returns a dict with migration status information.
+    """
+    table_name = 'ipam_reservations'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_ipam_reservations_table()
+
+    # Version 0 or -1 means table doesn't exist yet - create it with current
+    # schema (which includes the ENUM and INET4 types)
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version {IPAM_RESERVATIONS_VERSION})')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        # Create indexes
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = IPAM_RESERVATIONS_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    # Migration from v1 to v2: Convert reservation_type from VARCHAR(32) to ENUM
+    if current_ver == 1:
+        LOG.info('Upgrading ipam_reservations from v1 to v2: '
+                 'converting reservation_type to ENUM')
+        enum_values = _build_reservation_type_enum_values()
+        with engine.connect() as conn:
+            # ALTER TABLE to change column type from VARCHAR to ENUM
+            # MariaDB will automatically convert existing string values to
+            # enum values if they match
+            conn.execute(sa.text(
+                f'ALTER TABLE ipam_reservations '
+                f'MODIFY COLUMN reservation_type ENUM({enum_values}) NOT NULL'
+            ))
+            conn.commit()
+        current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
+
+    # Migration from v2 to v3: Convert address from VARCHAR(45) to INET4
+    if current_ver == 2:
+        LOG.info('Upgrading ipam_reservations from v2 to v3: '
+                 'converting address to INET4')
+        with engine.connect() as conn:
+            # ALTER TABLE to change column type from VARCHAR to INET4
+            # MariaDB will automatically convert existing IP string values
+            # to INET4 format
+            conn.execute(sa.text(
+                'ALTER TABLE ipam_reservations '
+                'MODIFY COLUMN address INET4 NOT NULL'
+            ))
+            conn.commit()
+        current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
+    # Migration from v3 to v4: Convert user_type from VARCHAR(32) to ENUM
+    if current_ver == 3:
+        LOG.info('Upgrading ipam_reservations from v3 to v4: '
+                 'converting user_type to ENUM')
+        enum_values = _build_object_type_enum_values()
+        with engine.connect() as conn:
+            # ALTER TABLE to change column type from VARCHAR to ENUM
+            # MariaDB will automatically convert existing string values to
+            # enum values if they match. NULL values remain NULL.
+            conn.execute(sa.text(
+                f'ALTER TABLE ipam_reservations '
+                f'MODIFY COLUMN user_type ENUM({enum_values}) NULL'
+            ))
+            conn.commit()
+        current_ver = 4
+        _set_table_version(engine, table_name, current_ver)
+
+    # Migration from v4 to v5: Convert UUID columns from VARCHAR(36) to UUID
+    if current_ver == 4:
+        LOG.info('Upgrading ipam_reservations from v4 to v5: '
+                 'converting UUID columns to native UUID type')
+        with engine.connect() as conn:
+            # ALTER TABLE to change ipam_uuid and user_uuid from VARCHAR to UUID
+            # MariaDB will automatically convert existing UUID string values
+            conn.execute(sa.text(
+                'ALTER TABLE ipam_reservations '
+                'MODIFY COLUMN ipam_uuid UUID NOT NULL, '
+                'MODIFY COLUMN user_uuid UUID NULL'
+            ))
+            conn.commit()
+        current_ver = 5
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': IPAM_RESERVATIONS_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -308,6 +498,7 @@ def ensure_schema() -> list[dict[str, Any]]:
 
     # Then ensure each application table is up to date
     results.append(_ensure_object_states_schema(engine))
+    results.append(_ensure_ipam_reservations_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -319,7 +510,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     return results
 
 
-def _direct_get_state(object_type: str, object_uuid: str) -> Optional[State]:
+def _direct_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
     """Read state for an object directly from MariaDB.
 
     This is the direct access version used by the database daemon.
@@ -350,7 +541,7 @@ def _direct_get_state(object_type: str, object_uuid: str) -> Optional[State]:
         return None
 
 
-def _direct_set_state(object_type: str, object_uuid: str, state: State) -> bool:
+def _direct_set_state(object_type: ObjectType, object_uuid: str, state: State) -> bool:
     """Write state for an object directly to MariaDB.
 
     This is the direct access version used by the database daemon.
@@ -383,7 +574,7 @@ def _direct_set_state(object_type: str, object_uuid: str, state: State) -> bool:
         return False
 
 
-def _direct_delete_state(object_type: str, object_uuid: str) -> bool:
+def _direct_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
     """Delete state for an object directly from MariaDB.
 
     This is the direct access version used by the database daemon.
@@ -408,7 +599,7 @@ def _direct_delete_state(object_type: str, object_uuid: str) -> bool:
         return False
 
 
-def _direct_get_objects_by_state(object_type: str,
+def _direct_get_objects_by_state(object_type: ObjectType,
                                  state_values: list[str]) -> list[str]:
     """Get all object UUIDs of a given type in specified states.
 
@@ -438,7 +629,7 @@ def _direct_get_objects_by_state(object_type: str,
 # These call the database microservice for state operations.
 # =============================================================================
 
-def _grpc_get_state(object_type: str, object_uuid: str) -> Optional[State]:
+def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
     """Read state for an object via the database microservice."""
     try:
         stub = _get_database_stub()
@@ -460,7 +651,7 @@ def _grpc_get_state(object_type: str, object_uuid: str) -> Optional[State]:
         return None
 
 
-def _grpc_set_state(object_type: str, object_uuid: str, state: State) -> bool:
+def _grpc_set_state(object_type: ObjectType, object_uuid: str, state: State) -> bool:
     """Write state for an object via the database microservice."""
     try:
         stub = _get_database_stub()
@@ -479,7 +670,7 @@ def _grpc_set_state(object_type: str, object_uuid: str, state: State) -> bool:
         return False
 
 
-def _grpc_delete_state(object_type: str, object_uuid: str) -> bool:
+def _grpc_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
     """Delete state for an object via the database microservice."""
     try:
         stub = _get_database_stub()
@@ -495,7 +686,7 @@ def _grpc_delete_state(object_type: str, object_uuid: str) -> bool:
         return False
 
 
-def _grpc_get_objects_by_state(object_type: str,
+def _grpc_get_objects_by_state(object_type: ObjectType,
                                state_values: list[str]) -> list[str]:
     """Get all object UUIDs of a given type in specified states via gRPC."""
     try:
@@ -513,15 +704,199 @@ def _grpc_get_objects_by_state(object_type: str,
 
 
 # =============================================================================
+# Helper functions for ObjectType conversion
+# =============================================================================
+
+def _string_to_object_type(s: Optional[str]) -> Optional[ObjectType]:
+    """Convert a string to an ObjectType enum, returning None if invalid."""
+    if not s:
+        return None
+    try:
+        return ObjectType(s)
+    except ValueError:
+        return None
+
+
+def _object_type_to_string(ot: Optional[ObjectType]) -> str:
+    """Convert an ObjectType enum to a string for gRPC, empty string if None."""
+    if ot is None:
+        return ''
+    return str(ot)
+
+
+# =============================================================================
+# IPAM gRPC Client Functions
+# These call the database microservice for IPAM operations.
+# =============================================================================
+
+def _grpc_reserve_address(reservation: IPAMReservation) -> bool:
+    """Atomically reserve an IP address via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReserveAddressRequest(  # type: ignore[attr-defined]
+            reservation=database_pb2.IPAMReservationData(  # type: ignore[attr-defined]
+                ipam_uuid=str(reservation.ipam_uuid),
+                address=str(reservation.address),
+                reservation_type=reservation.reservation_type,
+                user_type=_object_type_to_string(reservation.user_type),
+                user_uuid=str(reservation.user_uuid) if reservation.user_uuid else '',
+                reserved_at=reservation.reserved_at,
+                comment=reservation.comment or ''
+            )
+        )
+        reply = stub.ReserveAddress(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ReserveAddress failed for {reservation.ipam_uuid}/'
+            f'{reservation.address}: {e}')
+        return False
+
+
+def _grpc_release_address(ipam_uuid: str, address: str,
+                          halo_reservation: IPAMReservation) -> bool:
+    """Release an IP address via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReleaseAddressRequest(  # type: ignore[attr-defined]
+            ipam_uuid=ipam_uuid,
+            address=address,
+            halo_reservation=database_pb2.IPAMReservationData(  # type: ignore[attr-defined]
+                ipam_uuid=str(halo_reservation.ipam_uuid),
+                address=str(halo_reservation.address),
+                reservation_type=halo_reservation.reservation_type,
+                user_type=_object_type_to_string(halo_reservation.user_type),
+                user_uuid=str(halo_reservation.user_uuid) if halo_reservation.user_uuid else '',
+                reserved_at=halo_reservation.reserved_at,
+                comment=halo_reservation.comment or ''
+            )
+        )
+        reply = stub.ReleaseAddress(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC ReleaseAddress failed for {ipam_uuid}/{address}: {e}')
+        return False
+
+
+def _grpc_get_reservation(ipam_uuid: str,
+                          address: str) -> Optional[IPAMReservation]:
+    """Get a single reservation via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetReservationRequest(  # type: ignore[attr-defined]
+            ipam_uuid=ipam_uuid,
+            address=address
+        )
+        reply = stub.GetReservation(request)
+        if not reply.found:
+            return None
+        return IPAMReservation(
+            ipam_uuid=reply.reservation.ipam_uuid,
+            address=IPv4Address(reply.reservation.address),
+            reservation_type=reply.reservation.reservation_type,
+            user_type=_string_to_object_type(reply.reservation.user_type),
+            user_uuid=reply.reservation.user_uuid or None,
+            reserved_at=reply.reservation.reserved_at,
+            comment=reply.reservation.comment or None
+        )
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetReservation failed for {ipam_uuid}/{address}: {e}')
+        return None
+
+
+def _grpc_get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
+    """Get all reservations for an IPAM via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetReservationsForIPAMRequest(  # type: ignore[attr-defined]
+            ipam_uuid=ipam_uuid)
+        reply = stub.GetReservationsForIPAM(request)
+        result = []
+        for res in reply.reservations:
+            result.append(IPAMReservation(
+                ipam_uuid=res.ipam_uuid,
+                address=IPv4Address(res.address),
+                reservation_type=res.reservation_type,
+                user_type=_string_to_object_type(res.user_type),
+                user_uuid=res.user_uuid or None,
+                reserved_at=res.reserved_at,
+                comment=res.comment or None
+            ))
+        return result
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetReservationsForIPAM failed for {ipam_uuid}: {e}')
+        return []
+
+
+def _grpc_delete_reservation(ipam_uuid: str, address: str) -> bool:
+    """Delete a single reservation via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteReservationRequest(  # type: ignore[attr-defined]
+            ipam_uuid=ipam_uuid,
+            address=address
+        )
+        reply = stub.DeleteReservation(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteReservation failed for {ipam_uuid}/{address}: {e}')
+        return False
+
+
+def _grpc_delete_reservations_for_ipam(ipam_uuid: str) -> int:
+    """Delete all reservations for an IPAM via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteReservationsForIPAMRequest(  # type: ignore[attr-defined]
+            ipam_uuid=ipam_uuid)
+        reply = stub.DeleteReservationsForIPAM(request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteReservationsForIPAM failed for {ipam_uuid}: {e}')
+        return 0
+
+
+def _grpc_release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
+    """Release expired deletion-halo addresses via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReleaseHaloedAddressesRequest(  # type: ignore[attr-defined]
+            ipam_uuid=ipam_uuid,
+            older_than=older_than
+        )
+        reply = stub.ReleaseHaloedAddresses(request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ReleaseHaloedAddresses failed for {ipam_uuid}: {e}')
+        return 0
+
+
+def _grpc_get_addresses_in_use(ipam_uuid: str) -> set[str]:
+    """Get all addresses in use for an IPAM via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAddressesInUseRequest(  # type: ignore[attr-defined]
+            ipam_uuid=ipam_uuid)
+        reply = stub.GetAddressesInUse(request)
+        return set(reply.addresses)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetAddressesInUse failed for {ipam_uuid}: {e}')
+        return set()
+
+
+# =============================================================================
 # Public API Functions
 # These route to either direct or gRPC access based on configuration.
 # =============================================================================
 
-def get_state(object_type: str, object_uuid: str) -> Optional[State]:
+def get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
     """Read state for an object.
 
     Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
+        object_type: The type of object.
         object_uuid: The UUID of the object.
 
     Returns:
@@ -532,11 +907,11 @@ def get_state(object_type: str, object_uuid: str) -> Optional[State]:
     return _direct_get_state(object_type, object_uuid)
 
 
-def set_state(object_type: str, object_uuid: str, state: State) -> bool:
+def set_state(object_type: ObjectType, object_uuid: str, state: State) -> bool:
     """Write state for an object.
 
     Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
+        object_type: The type of object.
         object_uuid: The UUID of the object.
         state: The State object to store.
 
@@ -548,11 +923,11 @@ def set_state(object_type: str, object_uuid: str, state: State) -> bool:
     return _direct_set_state(object_type, object_uuid, state)
 
 
-def delete_state(object_type: str, object_uuid: str) -> bool:
+def delete_state(object_type: ObjectType, object_uuid: str) -> bool:
     """Delete state for an object.
 
     Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
+        object_type: The type of object.
         object_uuid: The UUID of the object.
 
     Returns:
@@ -563,7 +938,7 @@ def delete_state(object_type: str, object_uuid: str) -> bool:
     return _direct_delete_state(object_type, object_uuid)
 
 
-def get_objects_by_state(object_type: str,
+def get_objects_by_state(object_type: ObjectType,
                          state_values: list[str]) -> list[str]:
     """Get all object UUIDs of a given type in specified states.
 
@@ -571,7 +946,7 @@ def get_objects_by_state(object_type: str,
     queries across object states without scanning all objects in etcd.
 
     Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
+        object_type: The type of object.
         state_values: List of state values to match.
 
     Returns:
@@ -582,14 +957,14 @@ def get_objects_by_state(object_type: str,
     return _direct_get_objects_by_state(object_type, state_values)
 
 
-def get_all_states_for_type(object_type: str) -> list[tuple[str, State]]:
+def get_all_states_for_type(object_type: ObjectType) -> list[tuple[str, State]]:
     """Get all states for a given object type.
 
     Useful for migrations and debugging. This function always uses direct
     access as it's only called by admin tools and the database daemon.
 
     Args:
-        object_type: The type of object (e.g., 'blob', 'instance').
+        object_type: The type of object.
 
     Returns:
         List of tuples (object_uuid, State).
@@ -615,3 +990,396 @@ def get_all_states_for_type(object_type: str) -> list[tuple[str, State]]:
     except OperationalError as e:
         LOG.warning(f'MariaDB query failed for type {object_type}: {e}')
         return []
+
+
+# =============================================================================
+# IPAM Reservation Direct Access Functions
+# These are used by the database daemon for atomic IP address reservation.
+# =============================================================================
+
+def _direct_reserve_address(reservation: IPAMReservation) -> bool:
+    """Atomically reserve an IP address in MariaDB.
+
+    Uses INSERT with the unique constraint on (ipam_uuid, address) to ensure
+    atomicity. If the address is already reserved, IntegrityError is raised
+    and we return False.
+
+    Args:
+        reservation: The IPAMReservation to store.
+
+    Returns:
+        True if the reservation was created, False if the address was already
+        reserved.
+    """
+    engine = _get_engine()
+    table = _get_ipam_reservations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                ipam_uuid=reservation.ipam_uuid,
+                address=str(reservation.address),
+                reservation_type=reservation.reservation_type,
+                user_type=reservation.user_type,
+                user_uuid=reservation.user_uuid,
+                reserved_at=reservation.reserved_at,
+                comment=reservation.comment
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        # Address already reserved - this is expected and not an error
+        return False
+    except OperationalError as e:
+        LOG.warning(f'MariaDB reserve failed for {reservation.ipam_uuid}/'
+                    f'{reservation.address}: {e}')
+        return False
+
+
+def _direct_release_address(ipam_uuid: UUID, address: str,
+                            halo_reservation: IPAMReservation) -> bool:
+    """Release an IP address by updating it to deletion-halo state.
+
+    Uses a transactional update to atomically change the reservation to
+    deletion-halo state. This preserves the row for the halo period.
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+        address: The IP address to release (as string).
+        halo_reservation: The new reservation data with deletion-halo type.
+
+    Returns:
+        True if the update succeeded, False if the reservation didn't exist
+        or the update failed.
+    """
+    engine = _get_engine()
+    table = _get_ipam_reservations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                sa.and_(
+                    table.c.ipam_uuid == ipam_uuid,
+                    table.c.address == address
+                )
+            ).values(
+                reservation_type=halo_reservation.reservation_type,
+                user_type=halo_reservation.user_type,
+                user_uuid=halo_reservation.user_uuid,
+                reserved_at=halo_reservation.reserved_at,
+                comment=halo_reservation.comment
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB release failed for {ipam_uuid}/{address}: {e}')
+        return False
+
+
+def _direct_get_reservation(ipam_uuid: UUID,
+                            address: str) -> Optional[IPAMReservation]:
+    """Get a single reservation by IPAM UUID and address.
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+        address: The IP address (as string).
+
+    Returns:
+        The IPAMReservation if found, None otherwise.
+    """
+    engine = _get_engine()
+    table = _get_ipam_reservations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                sa.and_(
+                    table.c.ipam_uuid == ipam_uuid,
+                    table.c.address == address
+                )
+            )
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            # MariaDB INET4 returns the address as a string
+            return IPAMReservation(
+                ipam_uuid=result.ipam_uuid,
+                address=IPv4Address(result.address),
+                reservation_type=result.reservation_type,
+                user_type=result.user_type,
+                user_uuid=result.user_uuid,
+                reserved_at=result.reserved_at,
+                comment=result.comment
+            )
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get failed for {ipam_uuid}/{address}: {e}')
+        return None
+
+
+def _direct_get_reservations_for_ipam(
+        ipam_uuid: UUID) -> list[IPAMReservation]:
+    """Get all reservations for an IPAM.
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+
+    Returns:
+        List of IPAMReservation objects.
+    """
+    engine = _get_engine()
+    table = _get_ipam_reservations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.ipam_uuid == ipam_uuid)
+            result = conn.execute(stmt).fetchall()
+
+            return [
+                IPAMReservation(
+                    ipam_uuid=row.ipam_uuid,
+                    address=IPv4Address(row.address),
+                    reservation_type=row.reservation_type,
+                    user_type=row.user_type,
+                    user_uuid=row.user_uuid,
+                    reserved_at=row.reserved_at,
+                    comment=row.comment
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for IPAM {ipam_uuid}: {e}')
+        return []
+
+
+def _direct_delete_reservation(ipam_uuid: UUID, address: str) -> bool:
+    """Delete a single reservation (hard delete).
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+        address: The IP address (as string).
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_ipam_reservations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.ipam_uuid == ipam_uuid,
+                    table.c.address == address
+                )
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for {ipam_uuid}/{address}: {e}')
+        return False
+
+
+def _direct_delete_reservations_for_ipam(ipam_uuid: UUID) -> int:
+    """Delete all reservations for an IPAM (hard delete).
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+
+    Returns:
+        Number of reservations deleted.
+    """
+    engine = _get_engine()
+    table = _get_ipam_reservations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.ipam_uuid == ipam_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for IPAM {ipam_uuid}: {e}')
+        return 0
+
+
+def _direct_release_haloed_addresses(ipam_uuid: UUID, older_than: float) -> int:
+    """Delete deletion-halo reservations older than the specified time.
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+        older_than: Unix timestamp - delete halos reserved before this time.
+
+    Returns:
+        Number of reservations deleted.
+    """
+    engine = _get_engine()
+    table = _get_ipam_reservations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.ipam_uuid == ipam_uuid,
+                    table.c.reservation_type == ReservationType.DELETION_HALO,
+                    table.c.reserved_at < older_than
+                )
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount
+    except OperationalError as e:
+        LOG.warning(f'MariaDB halo release failed for IPAM {ipam_uuid}: {e}')
+        return 0
+
+
+def _direct_get_addresses_in_use(ipam_uuid: UUID) -> set[str]:
+    """Get all addresses currently in use for an IPAM.
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+
+    Returns:
+        Set of IP addresses (as strings) that are reserved.
+    """
+    engine = _get_engine()
+    table = _get_ipam_reservations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.address).where(
+                table.c.ipam_uuid == ipam_uuid
+            )
+            result = conn.execute(stmt).fetchall()
+            # INET4 returns addresses as strings
+            return {str(row.address) for row in result}
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for IPAM {ipam_uuid}: {e}')
+        return set()
+
+
+# =============================================================================
+# IPAM Reservation Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def reserve_address(reservation: IPAMReservation) -> bool:
+    """Atomically reserve an IP address.
+
+    Args:
+        reservation: The IPAMReservation to store.
+
+    Returns:
+        True if the reservation was created, False if already reserved.
+    """
+    if _use_database_service():
+        return _grpc_reserve_address(reservation)
+    return _direct_reserve_address(reservation)
+
+
+def release_address(ipam_uuid: UUID, address: str,
+                    halo_reservation: IPAMReservation) -> bool:
+    """Release an IP address by updating it to deletion-halo state.
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+        address: The IP address to release (as string).
+        halo_reservation: The new reservation data with deletion-halo type.
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_release_address(str(ipam_uuid), address, halo_reservation)
+    return _direct_release_address(ipam_uuid, address, halo_reservation)
+
+
+def get_reservation(ipam_uuid: UUID, address: str) -> Optional[IPAMReservation]:
+    """Get a single reservation by IPAM UUID and address.
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+        address: The IP address (as string).
+
+    Returns:
+        The IPAMReservation if found, None otherwise.
+    """
+    if _use_database_service():
+        return _grpc_get_reservation(str(ipam_uuid), address)
+    return _direct_get_reservation(ipam_uuid, address)
+
+
+def get_reservations_for_ipam(ipam_uuid: UUID) -> list[IPAMReservation]:
+    """Get all reservations for an IPAM.
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+
+    Returns:
+        List of IPAMReservation objects.
+    """
+    if _use_database_service():
+        return _grpc_get_reservations_for_ipam(str(ipam_uuid))
+    return _direct_get_reservations_for_ipam(ipam_uuid)
+
+
+def delete_reservation(ipam_uuid: UUID, address: str) -> bool:
+    """Delete a single reservation (hard delete).
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+        address: The IP address (as string).
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_reservation(str(ipam_uuid), address)
+    return _direct_delete_reservation(ipam_uuid, address)
+
+
+def delete_reservations_for_ipam(ipam_uuid: UUID) -> int:
+    """Delete all reservations for an IPAM (hard delete).
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+
+    Returns:
+        Number of reservations deleted.
+    """
+    if _use_database_service():
+        return _grpc_delete_reservations_for_ipam(str(ipam_uuid))
+    return _direct_delete_reservations_for_ipam(ipam_uuid)
+
+
+def release_haloed_addresses(ipam_uuid: UUID, older_than: float) -> int:
+    """Delete deletion-halo reservations older than the specified time.
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+        older_than: Unix timestamp - delete halos reserved before this time.
+
+    Returns:
+        Number of reservations deleted.
+    """
+    if _use_database_service():
+        return _grpc_release_haloed_addresses(str(ipam_uuid), older_than)
+    return _direct_release_haloed_addresses(ipam_uuid, older_than)
+
+
+def get_addresses_in_use(ipam_uuid: UUID) -> set[str]:
+    """Get all addresses currently in use for an IPAM.
+
+    Args:
+        ipam_uuid: The IPAM UUID.
+
+    Returns:
+        Set of IP addresses (as strings) that are reserved.
+    """
+    if _use_database_service():
+        return _grpc_get_addresses_in_use(str(ipam_uuid))
+    return _direct_get_addresses_in_use(ipam_uuid)

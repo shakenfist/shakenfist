@@ -23,6 +23,7 @@ from shakenfist.network import network
 from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
@@ -142,7 +143,7 @@ class NetworkEndpoint(sf_api.Resource):
     @api_base.redirect_to_network_node
     @api_base.log_token_use
     def delete(self, network_ref=None, network_from_db=None, namespace=None):
-        if network_ref == 'floating':
+        if network_ref == str(FLOATING_NETWORK_UUID):
             return sf_api.error(403, 'you cannot delete the floating network')
 
         # If a namespace is specified, ensure the network is in it
@@ -298,10 +299,10 @@ class NetworksEndpoint(sf_api.Resource):
                 else:
                     LOG.with_fields({'network': n}).warning(
                         'Network in use, cannot be deleted by delete-all')
-                    networks_unable.append(n.uuid)
+                    networks_unable.append(str(n.uuid))
                     continue
 
-            networks_del.append(n.uuid)
+            networks_del.append(str(n.uuid))
 
         if networks_unable:
             return sf_api.error(403, {'deleted': networks_del,
@@ -586,7 +587,9 @@ class NetworkAddressesEndpoint(sf_api.Resource):
     def get(self, network_ref=None, network_from_db=None):
         out = []
         for addr in network_from_db.ipam.in_use:
-            out.append(network_from_db.ipam.get_reservation(addr))
+            reservation = network_from_db.ipam.get_reservation(addr)
+            if reservation:
+                out.append(reservation.model_dump(mode='json'))
         return out
 
 
@@ -645,7 +648,9 @@ class NetworkUnrouteAddressEndpoint(sf_api.Resource):
         reservation = fn.ipam.get_reservation(address)
         if not reservation:
             return sf_api.error(404, 'address not routed')
-        if reservation['user'] != network_from_db.unique_label():
+        # Compare with str(user_uuid) since unique_label() returns a string UUID
+        res_label = (reservation.user_type, str(reservation.user_uuid) if reservation.user_uuid else None)
+        if res_label != network_from_db.unique_label():
             return sf_api.error(403, 'address not routed by this network')
 
         network_from_db.add_event(EVENT_TYPE_AUDIT, 'unroute request from REST API')

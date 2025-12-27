@@ -60,8 +60,9 @@ def upgrade_blob_datastore():
                     relocations[blob_uuid] = entpath
 
         for b in Blobs([partial(placement_filter, config.NODE_NAME)]):
-            old_blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
-            new_blob_path = Blob.filepath(b.uuid)
+            old_blob_path = os.path.join(config.STORAGE_PATH, 'blobs',
+                                         str(b.uuid))
+            new_blob_path = Blob.filepath(str(b.uuid))
 
             if not os.path.exists(old_blob_path):
                 LOG.warning(
@@ -72,8 +73,8 @@ def upgrade_blob_datastore():
                          % (b.uuid, old_blob_path, new_blob_path))
                 os.rename(old_blob_path, new_blob_path)
 
-                if b.uuid in relocations:
-                    cache_entry = relocations[b.uuid]
+                if str(b.uuid) in relocations:
+                    cache_entry = relocations[str(b.uuid)]
                     LOG.info('Relocating image cache entry %s to new blob path %s'
                              % (cache_entry, new_blob_path))
                     os.unlink(cache_entry)

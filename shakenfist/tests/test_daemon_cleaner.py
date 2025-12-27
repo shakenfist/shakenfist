@@ -7,6 +7,10 @@ from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
 
+# Module-level storage for test instance UUIDs that the fake libvirt uses
+_test_instance_uuids = {}
+
+
 class FakeLibvirt:
     VIR_DOMAIN_BLOCKED = 1
     VIR_DOMAIN_CRASHED = 2
@@ -28,16 +32,24 @@ class FakeLibvirtConnection:
         return ['id1', 'id2', 'id3', 'id4', 'id5', 'id6']
 
     def lookupByID(self, id):
-        args = {
-            'id1': ('sf:running', FakeLibvirt.VIR_DOMAIN_RUNNING),
-            'id2': ('apache2', FakeLibvirt.VIR_DOMAIN_RUNNING),
-            'id3': ('sf:shutoff', FakeLibvirt.VIR_DOMAIN_SHUTOFF),
-            'id4': ('sf:crashed', FakeLibvirt.VIR_DOMAIN_CRASHED),
-            'id5': ('sf:paused', FakeLibvirt.VIR_DOMAIN_PAUSED),
-            'id6': ('sf:suspended', FakeLibvirt.VIR_DOMAIN_PMSUSPENDED),
+        # Map domain IDs to (name_key, state) where name_key is used to look
+        # up the actual UUID from _test_instance_uuids
+        domain_map = {
+            'id1': ('running', FakeLibvirt.VIR_DOMAIN_RUNNING),
+            'id2': ('apache2', FakeLibvirt.VIR_DOMAIN_RUNNING),  # non-SF domain
+            'id3': ('shutoff', FakeLibvirt.VIR_DOMAIN_SHUTOFF),
+            'id4': ('crashed', FakeLibvirt.VIR_DOMAIN_CRASHED),
+            'id5': ('paused', FakeLibvirt.VIR_DOMAIN_PAUSED),
+            'id6': ('suspended', FakeLibvirt.VIR_DOMAIN_PMSUSPENDED),
         }
 
-        return FakeLibvirtDomain(*args.get(id))
+        name_key, state = domain_map.get(id)
+        if name_key == 'apache2':
+            # Non-SF domain, return as-is
+            return FakeLibvirtDomain('apache2', state)
+        # SF domain - use the actual instance UUID
+        inst_uuid = _test_instance_uuids.get(name_key, name_key)
+        return FakeLibvirtDomain(f'sf:{inst_uuid}', state)
 
     def lookupByName(self, name):
         return FakeLibvirtDomain(name, FakeLibvirt.VIR_DOMAIN_RUNNING)
@@ -101,19 +113,29 @@ class CleanerTestCase(base.ShakenFistTestCase):
     @mock.patch('os.unlink')
     def test_update_power_states(self, mock_unlink, mock_listdir, mock_time,
                                  mock_exists):
-        for id in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
-            self.mock_etcd.create_instance(
-                id, id, set_state=instance.Instance.STATE_CREATED)
+        global _test_instance_uuids
+
+        # Create instances and store their UUIDs for later lookup
+        instance_uuids = {}
+        for name in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
+            inst = self.mock_etcd.create_instance(
+                name, set_state=instance.Instance.STATE_CREATED)
+            instance_uuids[name] = str(inst.uuid)
+
+        # Populate the module-level dict so FakeLibvirtConnection can find
+        # the instance UUIDs
+        _test_instance_uuids = instance_uuids
 
         cleaner_st.update_power_states()
 
-        for id, state in [('running', 'on'),
-                          ('shutoff', 'off'),
-                          ('crashed', 'crashed'),
-                          ('paused', 'paused'),
-                          ('suspended', 'paused')]:
+        for name, state in [('running', 'on'),
+                            ('shutoff', 'off'),
+                            ('crashed', 'crashed'),
+                            ('paused', 'paused'),
+                            ('suspended', 'paused')]:
+            inst_uuid = instance_uuids[name]
             read_state = self.mock_etcd.get_raw(
-                f'/sf/attribute/instance/{id}/power_state')
+                f'/sf/attribute/instance/{inst_uuid}/power_state')
             self.assertEqual(
                 state, read_state['power_state'],
-                f'State for instance "{id}" does not match "{state}"')
+                f'State for instance "{name}" does not match "{state}"')
