@@ -23,6 +23,7 @@ from shakenfist.daemons.daemon import send_systemd_stopping
 from shakenfist.daemons.privexec import util as privexec_util
 from shakenfist.protos import common_pb2
 from shakenfist.protos import privexec_pb2
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, _ = logs.setup(__name__)
@@ -520,6 +521,7 @@ def write_pid_file():
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     write_pid_file()
     setproctitle.setproctitle('sf-privexec')
 

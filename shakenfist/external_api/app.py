@@ -40,11 +40,13 @@ from shakenfist.external_api import network as api_network
 from shakenfist.external_api import node as api_node
 from shakenfist.external_api import snapshot as api_snapshot
 from shakenfist.external_api import upload as api_upload
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
 LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
+util_exceptions.install_exception_tracking()
 
 
 app = flask.Flask(__name__)

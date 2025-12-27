@@ -10,7 +10,7 @@ from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
-from shakenfist.util import general as util_general
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -124,7 +124,7 @@ class NodeInstNetIfaceOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(inst, n, ni)
         except Exception as e:
-            util_general.ignore_exception('node_inst_net_iface_op', e)
+            util_exceptions.ignore_exception('node_inst_net_iface_op', e)
             self.state = NodeInstNetIfaceOp.STATE_ERROR
             inst.state = Instance.STATE_ERROR
             ni.state = NetworkInterface.STATE_ERROR

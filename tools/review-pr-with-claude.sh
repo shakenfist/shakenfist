@@ -10,7 +10,7 @@
 #
 # Options:
 #   --pr NUMBER         PR number to review (required in CI, auto-detected locally)
-#   --max-turns N       Maximum Claude turns (default: 20)
+#   --max-turns N       Maximum Claude turns (default: 50)
 #   --interactive       Run Claude in interactive mode (default: headless)
 #   --ci                CI mode: output machine-readable status, no colors
 #   --dry-run           Don't post the review, just print it
@@ -43,7 +43,7 @@ cd "${topdir}"
 
 # Default options
 pr_number=""
-max_turns=20
+max_turns=50
 interactive=false
 ci_mode=false
 dry_run=false
@@ -304,11 +304,31 @@ if [ "${dry_run}" = true ]; then
     exit 0
 fi
 
-# Run Claude Code
+# Run Claude Code - use JSON output to capture turn count and other metadata
 cat "${output_dir}/claude-prompt.txt" | claude -p - \
     --dangerously-skip-permissions \
     --max-turns "${max_turns}" \
-    --output-format text || true
+    --output-format json > "${output_dir}/claude-output.json" || true
+
+# Extract and display the result text
+if [ -f "${output_dir}/claude-output.json" ]; then
+    jq -r '.result // empty' "${output_dir}/claude-output.json"
+
+    # Extract metadata for CI output
+    num_turns=$(jq -r '.num_turns // "unknown"' "${output_dir}/claude-output.json")
+    duration_ms=$(jq -r '.duration_ms // "unknown"' "${output_dir}/claude-output.json")
+    cost_usd=$(jq -r '.total_cost_usd // "unknown"' "${output_dir}/claude-output.json")
+
+    echo
+    echo -e "${BLUE}Claude execution stats:${NC}"
+    echo "  Turns: ${num_turns} / ${max_turns}"
+    echo "  Duration: ${duration_ms}ms"
+    echo "  Cost: \$${cost_usd}"
+
+    ci_output "claude_turns" "${num_turns}"
+    ci_output "claude_duration_ms" "${duration_ms}"
+    ci_output "claude_cost_usd" "${cost_usd}"
+fi
 
 echo
 echo -e "${GREEN}========================================${NC}"

@@ -11,7 +11,7 @@ from shakenfist.exceptions import InvalidStateException
 from shakenfist.instance import Instance
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
-from shakenfist.util import general as util_general
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -133,7 +133,7 @@ class NodeInstSnapOp(BaseClusterOperation):
                 self.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
 
         except Exception as e:
-            util_general.ignore_exception('node_inst_snap_op', e)
+            util_exceptions.ignore_exception('node_inst_snap_op', e)
             self.state = NodeInstSnapOp.STATE_ERROR
             inst.state = Instance.STATE_ERROR
             for a in self.accumulated_artifacts:

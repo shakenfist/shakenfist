@@ -29,7 +29,7 @@ from shakenfist.exceptions import InvalidStateException
 from shakenfist.node import Node
 from shakenfist.protos import event_pb2
 from shakenfist.protos import event_pb2_grpc
-from shakenfist.util import general as util_general
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, _ = logs.setup(__name__)
@@ -120,7 +120,7 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                     extra, timestamp, request.fqdn, correlation_id=correlation_id)
 
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'failed to write event for %s %s'
                 % (request.object_type, request.object_uuid), e)
             return event_pb2.EventReply(ack=False)
@@ -161,7 +161,7 @@ class EventService(event_pb2_grpc.EventServiceServicer):
                     correlation_id=correlation_id)
 
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'failed to write event for %s' % request.objects, e)
             return event_pb2.EventReply(ack=False)
 
@@ -260,7 +260,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                     try:
                         _, _, _, objtype, objuuid, _ = k.split('/')
                     except ValueError as e:
-                        util_general.ignore_exception(
+                        util_exceptions.ignore_exception(
                             'failed to parse event key "%s"' % k, e)
                         continue
 
@@ -282,7 +282,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 self.counters[event_type].inc()
                                 etcd.get_etcd_client().delete(k)
                     except Exception as e:
-                        util_general.ignore_exception(
+                        util_exceptions.ignore_exception(
                             f'Failed to write event for {objtype} {objuuid}, will retry', e)
 
                 if results:
@@ -337,12 +337,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                     self.idle(10)
 
             except Exception as e:
-                util_general.ignore_exception('eventlog daemon', e)
+                util_exceptions.ignore_exception('eventlog daemon', e)
 
             self.check_daemon_state()
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     daemon.write_pid_file('eventlog')
     m = Monitor('eventlog')
 

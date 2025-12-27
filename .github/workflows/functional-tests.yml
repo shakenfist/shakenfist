@@ -18,6 +18,7 @@ jobs:
   # These sanity checks used to be three separate jobs, but are now combined
   # to save a little time and reduce CI runner churn.
   sanity_checks:
+    name: "Sanity checks"
     runs-on: [self-hosted, vm, debian-12]
     needs: enqueue_pr_comment
     outputs:
@@ -155,9 +156,9 @@ jobs:
   # Uses always() so it runs even when sanity_checks fails.
   # Skip if the last commit was from the bot to prevent infinite loops.
   automated_delinter:
+    name: "Automated delinter"
     runs-on: [self-hosted, claude-code]
     needs: sanity_checks
-    name: "Automated delinter"
     if: ${{ always() && needs.sanity_checks.outputs.flake8_failed == 'true' }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-delinter
@@ -197,39 +198,22 @@ jobs:
         run: |
           tools/fix-lint-with-claude.sh --ci
 
-  # Reviews PRs using Claude Code. Runs on all PRs after sanity_checks completes.
-  automated_reviewer:
-    runs-on: [self-hosted, claude-code]
-    needs: sanity_checks
-    name: "Automated reviewer"
-    if: github.event_name == 'pull_request'
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-reviewer
-      cancel-in-progress: true
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run automated reviewer
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tools/review-pr-with-claude.sh --ci --pr ${{ github.event.pull_request.number }}
-
   functional_matrix_pr:
+    name: "${{ matrix.pr.name }}"
     if: always() && github.event_name != 'merge_group'
     runs-on: [self-hosted, vm, debian-12]
     needs: enqueue_pr_comment
-    name: "${{ matrix.os.description }}"
+    outputs:
+      # For matrix jobs, we use a JSON object keyed by job_name. Each matrix run
+      # sets its own key, and the outputs get merged. The consuming job can then
+      # check if any value in the object is 'true'.
+      check_logs_failed: ${{ toJSON(steps.set_output.outputs) }}
     strategy:
       fail-fast: false
       matrix:
-        os: [
+        pr: [
           {
-            description: 'smoke',
+            name: 'smoke',
             job_name: 'smoke',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
@@ -239,17 +223,17 @@ jobs:
           },
         ]
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os.job_name }}
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.pr.job_name }}
       cancel-in-progress: true
 
     steps:
       - name: Log matrix details
         run: |
-          echo "job_name: ${{ matrix.os.job_name }}"
-          echo "base_image: ${{ matrix.os.base_image }}"
-          echo "base_image_user: ${{ matrix.os.base_image_user }}"
-          echo "topology: ${{ matrix.os.topology }}"
-          echo "concurrency: ${{ matrix.os.concurrency }}"
+          echo "job_name: ${{ matrix.pr.job_name }}"
+          echo "base_image: ${{ matrix.pr.base_image }}"
+          echo "base_image_user: ${{ matrix.pr.base_image_user }}"
+          echo "topology: ${{ matrix.pr.topology }}"
+          echo "concurrency: ${{ matrix.pr.concurrency }}"
 
       - name: Setup test environment
         uses: shakenfist/actions/setup-test-environment@main
@@ -259,10 +243,10 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
-              base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
-              ansible/ci-topology-${{ matrix.os.topology }}.yml
+              base_image=${{ matrix.pr.base_image }} base_image_user=${{ matrix.pr.base_image_user }}" \
+              ansible/ci-topology-${{ matrix.pr.topology }}.yml
 
-          if [ "${{ matrix.os.topology }}" == "localhost" ]; then
+          if [ "${{ matrix.pr.topology }}" == "localhost" ]; then
             echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
           else
             nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
@@ -286,13 +270,13 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
-              ${{ matrix.os.base_image_user }}@${primary}:.
+              ${{ matrix.pr.base_image_user }}@${primary}:.
 
           echo ""
           echo "Copied tools:"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "ls tools"
+              ${{ matrix.pr.base_image_user }}@${primary} "ls tools"
 
       - name: Log github actions buffering status
         run: |
@@ -307,7 +291,7 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} /tmp/getsf-wrapper
+              ${{ matrix.pr.base_image_user }}@${primary} /tmp/getsf-wrapper
 
       - name: Wait for API to start answering
         run: |
@@ -315,13 +299,13 @@ jobs:
 
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
+              ${{ matrix.pr.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
 
           count=0
           while [ $count -lt 60 ]
           do
             ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
+              ${{ matrix.pr.base_image_user }}@${primary} \
               '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client instance list'
             if [ $? == 0 ]; then
               exit 0
@@ -343,14 +327,14 @@ jobs:
           setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
           setup="${setup} /srv/shakenfist/venv/bin/sf-client artifact upload"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
+              ${{ matrix.pr.base_image_user }}@${UPLOAD_TARGET} \
               "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
 
       - name: Make the traces directory
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "sudo mkdir -p /srv/ci/traces; sudo chown -R ${{ matrix.os.base_image_user }}:${{ matrix.os.base_image_user }} /srv/ci/traces"
+              ${{ matrix.pr.base_image_user }}@${primary} "sudo mkdir -p /srv/ci/traces; sudo chown -R ${{ matrix.pr.base_image_user }}:${{ matrix.pr.base_image_user }} /srv/ci/traces"
 
       - name: Run functional tests
         timeout-minutes: 45
@@ -360,11 +344,11 @@ jobs:
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ${GITHUB_WORKSPACE}/shakenfist \
-              ${{ matrix.os.base_image_user }}@${primary}:shakenfist
+              ${{ matrix.pr.base_image_user }}@${primary}:shakenfist
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ${GITHUB_WORKSPACE}/client-python \
-              ${{ matrix.os.base_image_user }}@${primary}:client-python
+              ${{ matrix.pr.base_image_user }}@${primary}:client-python
 
           script="cd shakenfist/;"
           script="${script} . /etc/sf/sfrc;"
@@ -384,17 +368,17 @@ jobs:
 
           script="${script} cd ~/shakenfist/shakenfist/deploy/;"
           script="${script} set -e;"
-          script="${script} stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
+          script="${script} stestr run --config ${{ matrix.pr.stestr_config }} --concurrency=${{ matrix.pr.concurrency}};"
 
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "${script}"
+              ${{ matrix.pr.base_image_user }}@${primary} "${script}"
 
       - name: List slowest tests
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
+              ${{ matrix.pr.base_image_user }}@${primary} \
               "cd shakenfist/shakenfist/deploy; stestr slowest || true"
 
       - name: List failing tests
@@ -406,7 +390,7 @@ jobs:
           echo "Gathering list of failed tests..."
           touch /srv/ci/failed
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
+              ${{ matrix.pr.base_image_user }}@${primary} \
               "cd shakenfist/shakenfist/deploy; stestr failing || true" > /srv/ci/failed
           echo
 
@@ -424,11 +408,18 @@ jobs:
           cat ${GITHUB_OUTPUT}
 
       - name: Check logs
+        id: check_logs
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.os.job_name }}"
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.pr.job_name }}"
+
+      - name: Set check_logs output for matrix aggregation
+        id: set_output
+        if: always()
+        run: |
+          echo "${{ matrix.pr.job_name }}=${{ steps.check_logs.outcome == 'failure' }}" >> $GITHUB_OUTPUT
 
       # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
       # cost. That's not really something we can control, so just ignore the CPU
@@ -438,7 +429,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75 --ignore sf_cleaner'
+              ${{ matrix.pr.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75 --ignore sf_cleaner'
 
       - name: Check for reasonable data rates
         timeout-minutes: 5
@@ -453,7 +444,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary}:/etc/sf/inventory.yaml /srv/github/
+              ${{ matrix.pr.base_image_user }}@${primary}:/etc/sf/inventory.yaml /srv/github/
           sed -i 's|/root/.ssh|/home/debian/.ssh|g' /srv/github/inventory.yaml
           sed -i 's|localhost|primary|g' /srv/github/inventory.yaml
 
@@ -473,7 +464,7 @@ jobs:
           # super early in the CI job.
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp \
-              ${{ matrix.os.base_image_user }}@${primary}:/srv/ci/traces \
+              ${{ matrix.pr.base_image_user }}@${primary}:/srv/ci/traces \
               /srv/github/bundle/ || true
 
           # We need the ssh key in the place ansible expects it to be, which isn't
@@ -482,7 +473,7 @@ jobs:
           cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
 
           ansible-playbook -i /srv/github/inventory.yaml \
-              --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
+              --extra-vars "base_image_user=${{ matrix.pr.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
@@ -497,7 +488,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle-functional-cluster-${{ matrix.os.job_name }}
+          name: bundle-functional-cluster-${{ matrix.pr.job_name }}
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
@@ -537,16 +528,114 @@ jobs:
 
               ${{ steps.failures.outputs.failures }}
 
+  # Runs if the "Check logs" step in any functional_matrix_pr matrix job fails.
+  # Uses always() so it runs even when functional_matrix_pr fails.
+  # The check_logs_failed output is a JSON object with job_name keys and boolean
+  # values. We check if any value contains 'true' to trigger this job.
+  # Skip if the last commit was from the bot to prevent infinite loops.
+  automated_exception_fixer:
+    name: "Automated exception fixer"
+    runs-on: [self-hosted, claude-code]
+    needs: functional_matrix_pr
+    if: ${{ !cancelled() && contains(needs.functional_matrix_pr.outputs.check_logs_failed, 'true') }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-exception-fixer
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Use DEPENDENCIES_TOKEN (a PAT) instead of GITHUB_TOKEN so that
+          # commits pushed by this workflow will trigger other workflows.
+          # The default GITHUB_TOKEN deliberately doesn't trigger workflows
+          # to prevent infinite loops.
+          token: ${{ secrets.DEPENDENCIES_TOKEN }}
+
+      - name: Check if last commit was from bot and list failed jobs
+        id: check_bot
+        run: |
+          LAST_AUTHOR_EMAIL=$(git log -1 --format='%ae')
+          echo "Last commit author: $LAST_AUTHOR_EMAIL"
+          if [ "$LAST_AUTHOR_EMAIL" = "bot@shakenfist.com" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Skipping exception fixer - last commit was from bot"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Parse the JSON output to find which matrix jobs had log check failures
+          # The output is like: {"smoke": "true", "other": "false"}
+          CHECK_LOGS_OUTPUT='${{ needs.functional_matrix_pr.outputs.check_logs_failed }}'
+          echo "Raw check_logs_failed output: $CHECK_LOGS_OUTPUT"
+
+          FAILED_JOBS=$(echo "$CHECK_LOGS_OUTPUT" | jq -r 'to_entries | .[] | select(.value == "true") | .key' | tr '\n' ' ')
+          echo "Matrix jobs with log check failures: $FAILED_JOBS"
+          echo "failed_jobs=$FAILED_JOBS" >> $GITHUB_OUTPUT
+
+      - name: Download bundles for failed jobs
+        if: steps.check_bot.outputs.skip != 'true'
+        env:
+          FAILED_JOBS: ${{ steps.check_bot.outputs.failed_jobs }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /srv/github/bundles
+          for job in ${FAILED_JOBS}; do
+            echo "Downloading bundle for failed job: ${job}"
+            gh run download ${{ github.run_id }} \
+              --name "bundle-functional-cluster-${job}" \
+              --dir "/srv/github/bundles/${job}"
+          done
+
+          echo
+          echo "Downloaded bundles:"
+          ls -lh /srv/github/bundles/
+
+      - name: Configure git
+        if: steps.check_bot.outputs.skip != 'true'
+        run: |
+          git config user.name "Claude Code run by Shakenfist Bot"
+          git config user.email "bot@shakenfist.com"
+
+      - name: Run automated exception fixer
+        if: steps.check_bot.outputs.skip != 'true'
+        env:
+          BUNDLES_DIR: /srv/github/bundles
+        run: |
+          tools/fix-exceptions-with-claude.sh --ci
+
+  automated_reviewer:
+    name: "Automated reviewer"
+    runs-on: [self-hosted, claude-code]
+    needs: [sanity_checks, functional_matrix_pr]
+    if: github.event_name == 'pull_request'
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-reviewer
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run automated reviewer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tools/review-pr-with-claude.sh --ci --pr ${{ github.event.pull_request.number }}
+
   functional_matrix_merge:
+    name: "${{ matrix.merge.name }}"
     if: github.event_name == 'merge_group'
-    name: "${{ matrix.os.description }}"
     needs: merge_pr_comment
     strategy:
       fail-fast: false
       matrix:
-        os: [
+        merge: [
           {
-            description: 'debian 12 cluster',
+            name: 'Debian 12 cluster',
             job_name: 'debian-12-slim-primary',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
@@ -555,7 +644,7 @@ jobs:
             stestr_config: 'cluster-ci.conf'
           },
           {
-            description: 'ubuntu 24.04 cluster',
+            name: 'Ubuntu 24.04 cluster',
             job_name: 'ubuntu-2404-slim-primary',
             base_image: 'sf://label/ci-images/ubuntu-2404',
             base_image_user: 'ubuntu',
@@ -564,7 +653,7 @@ jobs:
             stestr_config: 'cluster-ci.conf'
           },
           {
-            description: 'guests',
+            name: 'Guests',
             job_name: 'guests',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
@@ -575,17 +664,17 @@ jobs:
         ]
     runs-on: [self-hosted, vm, debian-12]
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os.job_name }}
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.merge.job_name }}
       cancel-in-progress: true
 
     steps:
       - name: Log matrix details
         run: |
-          echo "job_name: ${{ matrix.os.job_name }}"
-          echo "base_image: ${{ matrix.os.base_image }}"
-          echo "base_image_user: ${{ matrix.os.base_image_user }}"
-          echo "topology: ${{ matrix.os.topology }}"
-          echo "concurrency: ${{ matrix.os.concurrency }}"
+          echo "job_name: ${{ matrix.merge.job_name }}"
+          echo "base_image: ${{ matrix.merge.base_image }}"
+          echo "base_image_user: ${{ matrix.merge.base_image_user }}"
+          echo "topology: ${{ matrix.merge.topology }}"
+          echo "concurrency: ${{ matrix.merge.concurrency }}"
 
       - name: Setup test environment
         uses: shakenfist/actions/setup-test-environment@main
@@ -595,10 +684,10 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
-              base_image=${{ matrix.os.base_image }} base_image_user=${{ matrix.os.base_image_user }}" \
-              ansible/ci-topology-${{ matrix.os.topology }}.yml
+              base_image=${{ matrix.merge.base_image }} base_image_user=${{ matrix.merge.base_image_user }}" \
+              ansible/ci-topology-${{ matrix.merge.topology }}.yml
 
-          if [ "${{ matrix.os.topology }}" == "localhost" ]; then
+          if [ "${{ matrix.merge.topology }}" == "localhost" ]; then
             echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
           else
             nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
@@ -622,13 +711,13 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp tools \
-              ${{ matrix.os.base_image_user }}@${primary}:.
+              ${{ matrix.merge.base_image_user }}@${primary}:.
 
           echo ""
           echo "Copied tools:"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "ls tools"
+              ${{ matrix.merge.base_image_user }}@${primary} "ls tools"
 
       - name: Log github actions buffering status
         run: |
@@ -643,7 +732,7 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} /tmp/getsf-wrapper
+              ${{ matrix.merge.base_image_user }}@${primary} /tmp/getsf-wrapper
 
       - name: Wait for API to start answering
         run: |
@@ -651,13 +740,13 @@ jobs:
 
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
+              ${{ matrix.merge.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
 
           count=0
           while [ $count -lt 60 ]
           do
             ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client instance list'
+              ${{ matrix.merge.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client instance list'
             if [ $? == 0 ]; then
               exit 0
             fi
@@ -680,22 +769,22 @@ jobs:
 
           # The cluster CI image, used by all CI types
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
+                ${{ matrix.merge.base_image_user }}@${UPLOAD_TARGET} \
                 "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
 
           # Additional images used only by guest CI
-          if [ "${{ matrix.os.stestr_config }}" == "guest-ci.conf" ]; then
+          if [ "${{ matrix.merge.stestr_config }}" == "guest-ci.conf" ]; then
               ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
                   -o UserKnownHostsFile=/dev/null \
-                  ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
+                  ${{ matrix.merge.base_image_user }}@${UPLOAD_TARGET} \
                   "${setup} ubuntu-2004 /srv/ci/ubuntu:20.04 --shared --no-checksum"
               ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
                   -o UserKnownHostsFile=/dev/null \
-                  ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
+                  ${{ matrix.merge.base_image_user }}@${UPLOAD_TARGET} \
                   "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
               ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
                   -o UserKnownHostsFile=/dev/null \
-                  ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
+                  ${{ matrix.merge.base_image_user }}@${UPLOAD_TARGET} \
                   "${setup} cirros /srv/ci/cirros --shared"
           fi
 
@@ -703,12 +792,12 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
+              ${{ matrix.merge.base_image_user }}@${primary} \
               'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
           echo ""
           echo ""
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
+              ${{ matrix.merge.base_image_user }}@${primary} \
               '. /etc/sf/sfrc; for i in `seq 100`; do /srv/shakenfist/venv/bin/sf-client --async=continue network create background-$i 10.$i.0.0/24 > /dev/null; echo -n "."; done'
           echo ""
 
@@ -716,7 +805,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "sudo mkdir -p /srv/ci/traces; sudo chown -R ${{ matrix.os.base_image_user }}:${{ matrix.os.base_image_user }} /srv/ci/traces"
+              ${{ matrix.merge.base_image_user }}@${primary} "sudo mkdir -p /srv/ci/traces; sudo chown -R ${{ matrix.merge.base_image_user }}:${{ matrix.merge.base_image_user }} /srv/ci/traces"
 
       - name: Run functional tests
         timeout-minutes: 120
@@ -726,11 +815,11 @@ jobs:
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ${GITHUB_WORKSPACE}/shakenfist \
-              ${{ matrix.os.base_image_user }}@${primary}:shakenfist
+              ${{ matrix.merge.base_image_user }}@${primary}:shakenfist
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ${GITHUB_WORKSPACE}/client-python \
-              ${{ matrix.os.base_image_user }}@${primary}:client-python
+              ${{ matrix.merge.base_image_user }}@${primary}:client-python
 
           script="cd shakenfist/;"
           script="${script} . /etc/sf/sfrc;"
@@ -750,17 +839,17 @@ jobs:
 
           script="${script} cd ~/shakenfist/shakenfist/deploy/;"
           script="${script} set -e;"
-          script="${script} stestr run --config ${{ matrix.os.stestr_config }} --concurrency=${{ matrix.os.concurrency}};"
+          script="${script} stestr run --config ${{ matrix.merge.stestr_config }} --concurrency=${{ matrix.merge.concurrency}};"
 
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} "${script}"
+              ${{ matrix.merge.base_image_user }}@${primary} "${script}"
 
       - name: List slowest tests
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
+              ${{ matrix.merge.base_image_user }}@${primary} \
               "cd shakenfist/shakenfist/deploy; stestr slowest || true"
 
       - name: List failing tests
@@ -772,7 +861,7 @@ jobs:
           echo "Gathering list of failed tests..."
           touch /srv/ci/failed
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} \
+              ${{ matrix.merge.base_image_user }}@${primary} \
               "cd shakenfist/shakenfist/deploy; stestr failing || true" > /srv/ci/failed
           echo
 
@@ -794,14 +883,14 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.os.job_name }}"
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.merge.job_name }}"
 
       - name: Check SF process CPU usage
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75'
+              ${{ matrix.merge.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75'
 
       - name: Check for reasonable data rates
         timeout-minutes: 5
@@ -816,7 +905,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary}:/etc/sf/inventory.yaml /srv/github/
+              ${{ matrix.merge.base_image_user }}@${primary}:/etc/sf/inventory.yaml /srv/github/
           sed -i 's|/root/.ssh|/home/debian/.ssh|g' /srv/github/inventory.yaml
 
           echo "====="
@@ -831,7 +920,7 @@ jobs:
           mkdir -p /srv/github/bundle/
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null -rp \
-              ${{ matrix.os.base_image_user }}@${primary}:/srv/ci/traces \
+              ${{ matrix.merge.base_image_user }}@${primary}:/srv/ci/traces \
               /srv/github/bundle/ || true
 
           # We need the ssh key in the place ansible expects it to be, which isn't
@@ -840,7 +929,7 @@ jobs:
           cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
 
           ansible-playbook -i /srv/github/inventory.yaml \
-              --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
+              --extra-vars "base_image_user=${{ matrix.merge.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
@@ -855,7 +944,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bundle-functional-cluster-${{ matrix.os.job_name }}
+          name: bundle-functional-cluster-${{ matrix.merge.job_name }}
           retention-days: 90
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
@@ -902,6 +991,7 @@ jobs:
       #   name: Cancel entire workflow on failure
 
   ansible_modules:
+    name: "Ansible modules"
     if: github.event_name == 'merge_group'
     runs-on: [self-hosted, vm, debian-12]
     needs: merge_pr_comment
@@ -1092,6 +1182,7 @@ jobs:
       #   name: Cancel entire workflow on failure
 
   node_lifecycle:
+    name: "Node lifecycle"
     if: github.event_name == 'merge_group'
     needs: merge_pr_comment
     runs-on: [self-hosted, vm, debian-12]
@@ -1284,6 +1375,7 @@ jobs:
       #   name: Cancel entire workflow on failure
 
   upgrade_0_6_15:
+    name: "Upgrade from 0.6.15"
     if: github.event_name == 'merge_group'
     needs: merge_pr_comment
     runs-on: [self-hosted, vm, debian-12]
@@ -1458,6 +1550,7 @@ jobs:
       #   name: Cancel entire workflow on failure
 
   enqueue_pr_comment:
+    name: "Enqueue PR slack comment"
     if: always() && github.event_name == 'pull_request'
     runs-on: [self-hosted, static]
     permissions:
@@ -1494,6 +1587,7 @@ jobs:
                     value: "In Progress"
 
   merge_pr_comment:
+    name: "Merge attempt slack comment"
     if: always() && github.event_name == 'merge_group'
     runs-on: [self-hosted, static]
     permissions:
@@ -1549,12 +1643,14 @@ jobs:
                     value: "In Progress"
 
   can_see_status:
+    name: "Can see status"
     runs-on: [self-hosted, static]
     steps:
       - name: "Immediate success"
         run: true
 
   can_enqueue:
+    name: "Can enqueue"
     needs:
       - functional_matrix_pr
       - enqueue_pr_comment
@@ -1593,6 +1689,7 @@ jobs:
                     value: "Success"
 
   can_merge:
+    name: "Can merge"
     needs:
       - functional_matrix_merge
       - ansible_modules

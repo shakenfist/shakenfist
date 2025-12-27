@@ -4,7 +4,7 @@ from shakenfist.schema.operations import net_macaddr_ip_op as schema
 from shakenfist.network.network import Network
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
-from shakenfist.util import general as util_general
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -94,7 +94,7 @@ class NetMacaddrIPOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(n)
         except Exception as e:
-            util_general.ignore_exception('net_macaddr_ip_op', e)
+            util_exceptions.ignore_exception('net_macaddr_ip_op', e)
             self.state = NetMacaddrIPOp.STATE_ERROR
 
     def _remove_dhcp_lease(self, n):

@@ -18,6 +18,7 @@ from shakenfist.schema.operations.net_iface_op \
 from shakenfist.schema.operations.net_iface_op \
     import model_tasks as ni_tasks
 from shakenfist import scheduler
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -124,7 +125,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
             except InvalidStateException:
                 self.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
         except Exception as e:
-            util_general.ignore_exception('node_inst_netdesc_op', e)
+            util_exceptions.ignore_exception('node_inst_netdesc_op', e)
             inst.enqueue_delete_due_error(f'Unhandled error: {e}')
             self.state = NodeInstNetdescOp.STATE_ERROR
 

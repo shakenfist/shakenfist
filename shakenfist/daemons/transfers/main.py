@@ -10,8 +10,8 @@ from shakenfist import etcd
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist.util import general as util_general
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, _ = logs.setup(__name__)
@@ -112,12 +112,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                         }
 
             except Exception as e:
-                util_general.ignore_exception('transfer worker', e)
+                util_exceptions.ignore_exception('transfer worker', e)
 
             self.idle(0.2)
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     daemon.write_pid_file('transfers')
     m = Monitor('transfers')
 

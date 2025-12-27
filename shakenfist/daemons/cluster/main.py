@@ -35,6 +35,7 @@ from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_all_node_queues
 from shakenfist.upload import Uploads
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 from shakenfist.util import json as util_json
 
@@ -452,14 +453,14 @@ class Monitor(daemon.Daemon):
                             'scheduled cluster operations', None, threshold=10):
                         schedule.run_pending()
                 except Exception as e:
-                    util_general.ignore_exception('cluster', e)
+                    util_exceptions.ignore_exception('cluster', e)
 
                 try:
                     with util_general.RecordedOperation(
                             'cluster wide cleanup', None, threshold=10):
                         self._cluster_wide_cleanup(last_loop_run)
                 except Exception as e:
-                    util_general.ignore_exception('cluster', e)
+                    util_exceptions.ignore_exception('cluster', e)
 
                 last_loop_run = time.time()
 
@@ -471,6 +472,7 @@ class Monitor(daemon.Daemon):
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     daemon.write_pid_file('cluster')
     m = Monitor('cluster')
     m.run()

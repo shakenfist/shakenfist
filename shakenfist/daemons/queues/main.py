@@ -12,7 +12,7 @@ from shakenfist.daemons.queues import startup_tasks
 from shakenfist.daemons.queues import workitem
 from shakenfist.node import Node
 from shakenfist.util import concurrency as util_concurrency
-from shakenfist.util import general as util_general
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, _ = logs.setup(__name__)
@@ -128,12 +128,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                     self.idle(0.2)
 
             except Exception as e:
-                util_general.ignore_exception('queue worker', e)
+                util_exceptions.ignore_exception('queue worker', e)
 
             self.check_daemon_state()
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     daemon.write_pid_file('queues')
 
     # Because we do work before starting the queue thread, we need to name

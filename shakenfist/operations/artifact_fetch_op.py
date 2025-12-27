@@ -12,7 +12,7 @@ from shakenfist import images
 from shakenfist.instance import Instance
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
-from shakenfist.util import general as util_general
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -91,7 +91,7 @@ class ArtifactFetchOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(inst)
         except Exception as e:
-            util_general.ignore_exception('artifact_fetch_op', e)
+            util_exceptions.ignore_exception('artifact_fetch_op', e)
             self.state = ArtifactFetchOp.STATE_ERROR
 
     def _image_fetch(self, inst):

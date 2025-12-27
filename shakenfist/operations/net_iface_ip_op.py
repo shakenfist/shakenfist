@@ -5,7 +5,7 @@ from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
-from shakenfist.util import general as util_general
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -105,7 +105,7 @@ class NetIfaceIPOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(n, ni)
         except Exception as e:
-            util_general.ignore_exception('net_iface_ip_op', e)
+            util_exceptions.ignore_exception('net_iface_ip_op', e)
             self.state = NetIfaceIPOp.STATE_ERROR
 
     def _interface_defloat(self, n, ni):

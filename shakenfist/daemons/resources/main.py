@@ -25,10 +25,10 @@ from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_background_node_queues
 from shakenfist.operations.baseoperation import get_all_network_queues
 from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
-from shakenfist.util import general as util_general
+from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import network as util_network
-from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -83,7 +83,7 @@ class Monitor(daemon.Daemon):
                     'cpu_load_15': load_15,
                 })
             except Exception as e:
-                util_general.ignore_exception('load average', e)
+                util_exceptions.ignore_exception('load average', e)
 
             # System memory info, converting bytes to mb
             stats = psutil.virtual_memory()
@@ -493,12 +493,13 @@ class Monitor(daemon.Daemon):
                     last_billing = time.time()
 
             except Exception as e:
-                util_general.ignore_exception('resource statistics', e)
+                util_exceptions.ignore_exception('resource statistics', e)
 
             self.idle(1)
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     daemon.write_pid_file('resources')
     m = Monitor('resources')
 

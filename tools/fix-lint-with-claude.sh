@@ -11,7 +11,7 @@
 # Options:
 #   --no-push           Fix and commit but don't push
 #   --no-commit         Fix but don't commit or push
-#   --max-turns N       Maximum Claude turns (default: 30)
+#   --max-turns N       Maximum Claude turns (default: 100)
 #   --interactive       Run Claude in interactive mode (default: headless)
 #   --ci                CI mode: output machine-readable status, no colors
 #   --output-dir DIR    Directory for output files (default: temp dir)
@@ -40,7 +40,7 @@ cd "${topdir}"
 # Default options
 do_push=true
 do_commit=true
-max_turns=30
+max_turns=100
 interactive=false
 ci_mode=false
 output_dir=""
@@ -251,11 +251,31 @@ if [ "${interactive}" = true ]; then
     echo "Run 'claude' and paste the prompt above to fix lint errors interactively."
     exit 1
 else
-    # Headless mode
+    # Headless mode - use JSON output to capture turn count and other metadata
     claude -p "$(cat "${output_dir}/claude-prompt.txt")" \
         --dangerously-skip-permissions \
         --max-turns "${max_turns}" \
-        --output-format text || true
+        --output-format json > "${output_dir}/claude-output.json" || true
+
+    # Extract and display the result text
+    if [ -f "${output_dir}/claude-output.json" ]; then
+        jq -r '.result // empty' "${output_dir}/claude-output.json"
+
+        # Extract metadata for CI output
+        num_turns=$(jq -r '.num_turns // "unknown"' "${output_dir}/claude-output.json")
+        duration_ms=$(jq -r '.duration_ms // "unknown"' "${output_dir}/claude-output.json")
+        cost_usd=$(jq -r '.total_cost_usd // "unknown"' "${output_dir}/claude-output.json")
+
+        echo
+        echo -e "${BLUE}Claude execution stats:${NC}"
+        echo "  Turns: ${num_turns} / ${max_turns}"
+        echo "  Duration: ${duration_ms}ms"
+        echo "  Cost: \$${cost_usd}"
+
+        ci_output "claude_turns" "${num_turns}"
+        ci_output "claude_duration_ms" "${duration_ms}"
+        ci_output "claude_cost_usd" "${cost_usd}"
+    fi
 fi
 
 echo
