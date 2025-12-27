@@ -37,7 +37,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.etcd.get',
                 return_value={
-                    'uuid': 'uuid42',
+                    'uuid': '42424242-4242-4242-8242-424242424242',
                     'cpus': 1,
                     'disk_spec': [{
                         'base': 'cirros',
@@ -68,7 +68,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         instance.Instance.new(
             'barry', 1, 2048, 'namespace', 'sshkey',
             [{}], 'userdata', {'memory': 16384, 'model': 'cirrus', 'vdi': 'spice'},
-            instance_uuid='uuid42',)
+            instance_uuid='42424242-4242-4242-8242-424242424242',)
 
         # State is now stored in MariaDB, so check via the mock
         self.assertEqual(
@@ -76,14 +76,15 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                 'value': instance.Instance.STATE_INITIAL,
                 'update_time': 1234
             },
-            self.mock_etcd.get_mariadb_state('instance', 'uuid42'))
+            self.mock_etcd.get_mariadb_state(
+                'instance', '42424242-4242-4242-8242-424242424242'))
         self.assertEqual(
-            ('attribute/instance', 'uuid42',
+            ('attribute/instance', '42424242-4242-4242-8242-424242424242',
              'power_state', {'power_state': instance.Instance.STATE_INITIAL}),
             mock_put.mock_calls[0][1])
 
         self.assertEqual(
-            ('instance', None, 'uuid42',
+            ('instance', None, '42424242-4242-4242-8242-424242424242',
              {
                  'cpus': 1,
                  'disk_spec': [{}],
@@ -94,7 +95,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'requested_placement': None,
                  'ssh_key': 'sshkey',
                  'user_data': 'userdata',
-                 'uuid': 'uuid42',
+                 'uuid': '42424242-4242-4242-8242-424242424242',
                  'version': 17,
                  'video': {'memory': 16384, 'model': 'cirrus', 'vdi': 'spice'},
                  'uefi': False,
@@ -506,7 +507,7 @@ class InstancesTestCase(base.ShakenFistTestCase):
     def test_base_iteration(self):
         uuids = []
         for i in instance.all_instances():
-            uuids.append(i.uuid)
+            uuids.append(str(i.uuid))
 
         self.assertEqual(3, len(uuids))
         self.assertTrue('373a165e-9720-4e14-bd0e-9612de79ff15' in uuids)
@@ -516,7 +517,7 @@ class InstancesTestCase(base.ShakenFistTestCase):
     def test_placement_filter_all(self):
         uuids = []
         for i in instance.Instances([partial(instance.placement_filter, 'node1')]):
-            uuids.append(i.uuid)
+            uuids.append(str(i.uuid))
 
         self.assertEqual(3, len(uuids))
         self.assertTrue('373a165e-9720-4e14-bd0e-9612de79ff15' in uuids)
@@ -526,13 +527,13 @@ class InstancesTestCase(base.ShakenFistTestCase):
     def test_placement_filter_none(self):
         uuids = []
         for i in instance.Instances([partial(instance.placement_filter, 'node2')]):
-            uuids.append(i.uuid)
+            uuids.append(str(i.uuid))
 
         self.assertEqual([], uuids)
 
     def test_namespace_filter(self):
         uuids = []
         for i in instance.Instances([partial(baseobject.namespace_filter, 'gerkin')]):
-            uuids.append(i.uuid)
+            uuids.append(str(i.uuid))
 
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)

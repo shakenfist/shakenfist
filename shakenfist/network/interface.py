@@ -101,8 +101,8 @@ class NetworkInterface(dbo):
         # expect
         n = self._external_view()
         n.update({
-            'network_uuid': self.network_uuid,
-            'instance_uuid': self.instance_uuid,
+            'network_uuid': str(self.network_uuid),
+            'instance_uuid': str(self.instance_uuid),
             'macaddr': self.macaddr,
             'ipv4': self.ipv4,
             'order': self.order,

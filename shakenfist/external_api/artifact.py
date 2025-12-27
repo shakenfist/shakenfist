@@ -475,7 +475,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
                 blob_path = Blob.filepath(blob_uuid)
 
                 upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
-                upload_path = os.path.join(upload_dir, u.uuid)
+                upload_path = os.path.join(upload_dir, str(u.uuid))
 
                 # NOTE(mikal): we can't use os.rename() here because these paths
                 # might be on different filesystems.

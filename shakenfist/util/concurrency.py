@@ -105,18 +105,21 @@ def _marshal_privexec_request(request, expected_field):
 
 
 def execute(command, check_exit_code=[0], env_variables=None,
-            namespace=None, iopriority=None, cwd=None,
+            netns=None, iopriority=None, cwd=None,
             suppress_command_logging=False):
     try:
         request_id = flask.request.environ.get('FLASK_REQUEST_ID')
     except RuntimeError:
         request_id = None
 
+    # Convert netns to string if it's a UUID object
+    netns_str = str(netns) if netns else None
+
     execution_id = sf_random.random_id()
     request = privexec_pb2.PrivExecRequest(
         execute_request=common_pb2.ExecuteRequest(
             command=command,
-            network_namespace=namespace,
+            network_namespace=netns_str,
             io_priority=iopriority,
             working_directory=cwd,
             request_id=request_id,
@@ -140,7 +143,7 @@ def execute(command, check_exit_code=[0], env_variables=None,
     if not suppress_command_logging:
         LOG.with_fields({
             'command': command,
-            'namespace': namespace,
+            'netns': netns_str,
             'iopriority': iopriority,
             'environment_variables': env_variables,
             'working_directory': cwd,
@@ -191,9 +194,11 @@ def hash_file(path, algorithm_str):
 
 
 def enable_nat(network_uuid, network_address, network_mask, vxid):
+    # Convert network_uuid to string if it's a UUID object
+    network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
         enable_nat_request=privexec_pb2.EnableNATRequest(
-            network_uuid=network_uuid,
+            network_uuid=network_uuid_str,
             network_address=network_address,
             network_mask=network_mask,
             vxid=vxid
@@ -206,9 +211,11 @@ def enable_nat(network_uuid, network_address, network_mask, vxid):
 
 
 def ensure_vxlan_mesh(network_uuid, vxid, node_ips):
+    # Convert network_uuid to string if it's a UUID object
+    network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
         ensure_vxlan_mesh_request=privexec_pb2.EnsureVXLANMeshRequest(
-            network_uuid=network_uuid,
+            network_uuid=network_uuid_str,
             vxid=vxid,
             node_ips=node_ips
         )
@@ -221,9 +228,11 @@ def ensure_vxlan_mesh(network_uuid, vxid, node_ips):
 
 
 def add_floating_ip(network_uuid, floating_address, inner_address):
+    # Convert network_uuid to string if it's a UUID object
+    network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
         add_floating_ip_request=privexec_pb2.AddFloatingIPRequest(
-            network_uuid=network_uuid,
+            network_uuid=network_uuid_str,
             floating_address=floating_address,
             inner_address=inner_address
         )
@@ -235,9 +244,11 @@ def add_floating_ip(network_uuid, floating_address, inner_address):
 
 
 def remove_floating_ip(network_uuid, floating_address):
+    # Convert network_uuid to string if it's a UUID object
+    network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
         remove_floating_ip_request=privexec_pb2.RemoveFloatingIPRequest(
-            network_uuid=network_uuid,
+            network_uuid=network_uuid_str,
             floating_address=floating_address
         )
     )
@@ -260,10 +271,12 @@ def create_vxlan_interface(vx_id, mesh_interface):
         raise CreateVXLANInterfaceFailed()
 
 
-def create_network_namespace(namespace):
+def create_network_namespace(netns):
+    # Convert netns to string if it's a UUID object
+    netns_str = str(netns)
     request = privexec_pb2.PrivExecRequest(
         create_network_namespace_request=privexec_pb2.CreateNetworkNamespaceRequest(
-            namespace=namespace
+            namespace=netns_str
         )
     )
     reply = _marshal_privexec_request(

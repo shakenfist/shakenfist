@@ -64,7 +64,7 @@ class SideChannelJob(util_concurrency.Job):
         super().__init__()
         self.instance = inst
         self.instance_ready = constants.AGENT_NEVER_TALKED
-        self.thread_name = self.instance.uuid
+        self.thread_name = str(self.instance.uuid)
 
         self.abort_path = f'/run/sf/sidechannel-{self.thread_name}.abort'
         daemon.clear_abort_path(self.abort_path)
@@ -358,7 +358,7 @@ class SideChannelExecutorJob(SideChannelJob):
         if len(stdout) > 10 * constants.KiB:
             b = blob.from_memory(stdout.encode('utf-8'))
             b.ref_count_inc(self.agentop)
-            result['stdout_blob'] = b.uuid
+            result['stdout_blob'] = str(b.uuid)
         else:
             result['stdout'] = stdout
 
@@ -366,7 +366,7 @@ class SideChannelExecutorJob(SideChannelJob):
         if len(stderr) > 10 * constants.KiB:
             b = blob.from_memory(stderr.encode('utf-8'))
             b.ref_count_inc(self.agentop)
-            result['stderr_blob'] = b.uuid
+            result['stderr_blob'] = str(b.uuid)
         else:
             result['stderr'] = stderr
 
@@ -599,7 +599,7 @@ class SideChannelExecutorJob(SideChannelJob):
 
                 result = {
                     'stat_result': self._stat_result,
-                    'content_blob': b.uuid
+                    'content_blob': str(b.uuid)
                 }
 
             self.agentop.add_result(self.command_count, result)

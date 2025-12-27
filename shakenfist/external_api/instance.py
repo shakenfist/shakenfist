@@ -45,8 +45,8 @@ from shakenfist.schema.operations.node_inst_netdesc_op \
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import ipam
 from shakenfist.network import network as sfnet
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist import scheduler
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
@@ -319,12 +319,12 @@ def _netdesc_allocate_address(inst, netdesc, order):
         else:
             if 'address' not in netdesc or not netdesc['address']:
                 netdesc['address'] = n.ipam.reserve_random_free_address(
-                    inst.unique_label(), ipam.RESERVATION_TYPE_INSTANCE, '')
+                    inst.unique_label(), ReservationType.INSTANCE, '')
                 inst.add_event(
                     EVENT_TYPE_AUDIT, 'allocated ip address', extra=netdesc)
             else:
                 if not n.ipam.reserve(netdesc['address'], inst.unique_label(),
-                                      ipam.RESERVATION_TYPE_INSTANCE, ''):
+                                      ReservationType.INSTANCE, ''):
                     inst.enqueue_delete_due_error(
                         'failed to reserve an IP on network %s'
                         % netdesc['network_uuid'])

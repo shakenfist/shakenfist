@@ -6,9 +6,10 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
-from shakenfist import ipam
 from shakenfist.network import network
 from shakenfist.network import interface
+from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -50,7 +51,7 @@ class Job(util_concurrency.Job):
                     floating_gateways.append(fg)
                     if floating_network.ipam.is_free(fg):
                         floating_network.ipam.reserve(
-                            fg, n.unique_label(), ipam.RESERVATION_TYPE_GATEWAY,
+                            fg, n.unique_label(), ReservationType.GATEWAY,
                             'Rescued from incorrect registration')
                         LOG.with_fields({
                             'network': n.uuid,
@@ -65,7 +66,7 @@ class Job(util_concurrency.Job):
                     floating_addresses.append(fa)
                     if floating_network.ipam.is_free(fa):
                         floating_network.ipam.reserve(
-                            fg, n.unique_label(), ipam.RESERVATION_TYPE_FLOATING,
+                            fg, n.unique_label(), ReservationType.FLOATING,
                             'Rescued from incorrect registration')
                         LOG.with_fields({
                             'interface': ni.uuid,
@@ -78,19 +79,24 @@ class Job(util_concurrency.Job):
                 reservation = floating_network.ipam.get_reservation(addr)
                 if not reservation:
                     continue
-                if reservation.get('type') != ipam.RESERVATION_TYPE_ROUTED:
+                if reservation.reservation_type != ReservationType.ROUTED:
                     continue
-                user_type, user_uuid = reservation['user']
-                if user_type != 'network':
-                    LOG.with_fields(reservation).error(
+                if reservation.user_type != ObjectType.NETWORK:
+                    LOG.with_fields({
+                        'address': addr,
+                        'user_type': reservation.user_type,
+                        'user_uuid': reservation.user_uuid
+                    }).error(
                         'Objects of type %s should not be routing floating IPs!'
-                        % user_type)
+                        % reservation.user_type)
                     continue
 
-                n = network.Network.from_db(user_uuid)
+                n = network.Network.from_db(str(reservation.user_uuid))
                 if not n:
-                    LOG.with_fields(reservation).error(
-                        'Routed IP reserved by missing network')
+                    LOG.with_fields({
+                        'address': addr,
+                        'user_uuid': reservation.user_uuid
+                    }).error('Routed IP reserved by missing network')
                     continue
 
                 floating_routed.append(addr)
@@ -124,9 +130,8 @@ class Job(util_concurrency.Job):
                     # However, the inverse is also true -- the deletion of whatever
                     # was using this address might still be in process.
                     res = floating_network.ipam.get_reservation(ip)
-                    if res and res.get('user'):
-                        obj_type, obj_uuid = res['user']
-                        o = get_object_class(obj_type).from_db(obj_uuid)
+                    if res and res.user_type and res.user_uuid:
+                        o = get_object_class(res.user_type).from_db(str(res.user_uuid))
                         if o:
                             obj_state = o.state
                             if (
