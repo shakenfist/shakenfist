@@ -160,37 +160,6 @@ def _add_event_multi_inner(
         raise e
 
 
-def _add_event_inner(
-        event_type, log, timestamp, simpler_objects, message, duration=None,
-        extra=None):
-    # Attempt to send with the older EventRequest
-    failed = simpler_objects
-    try:
-        channel = get_eventlog_client()
-        stub = event_pb2_grpc.EventServiceStub(channel)
-
-        for object_type, object_uuid in simpler_objects:
-            request = event_pb2.EventRequest(
-                object_type=str(object_type),
-                object_uuid=str(object_uuid),
-                event_type=event_type,
-                timestamp=timestamp,
-                fqdn=config.NODE_NAME,
-                duration=duration,
-                message=message,
-                extra=util_json.json_dump(extra)
-            )
-            response = stub.RecordEvent(request)
-
-            if not response.ack:
-                del failed[(object_type, object_uuid)]
-
-    except grpc._channel._InactiveRpcError as e:
-        log.info('Failed to send event with gRPC, adding to dead letter queue: %s' % e)
-
-    return failed
-
-
 def _add_event_dlq_inner(
         event_type, log, timestamp, simpler_objects, message, duration=None,
         extra=None):
