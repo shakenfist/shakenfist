@@ -1,9 +1,7 @@
 import os
 import pathlib
 import stat
-import sys
 import time
-import traceback
 import uuid
 
 import cpuinfo
@@ -87,15 +85,6 @@ def get_user_agent():
                 'vendor': architecture['vendor_id_raw'],
                 'version': get_version()
             })
-
-
-def ignore_exception(processname, e):
-    msg = f'[Exception] Ignored error in {processname}: {e}'
-    _, _, tb = sys.exc_info()
-    if tb:
-        msg += '\n%s' % traceback.format_exc()
-
-    LOG.error(msg)
 
 
 def noneish(value):

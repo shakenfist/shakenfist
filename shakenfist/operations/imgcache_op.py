@@ -12,6 +12,7 @@ from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import BlobDeleted
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -107,7 +108,7 @@ class ImageCacheOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(b)
         except Exception as e:
-            util_general.ignore_exception('imgcache_op', e)
+            util_exceptions.ignore_exception('imgcache_op', e)
             self.state = ImageCacheOp.STATE_ERROR
 
     def _archive_transcode(self, b):

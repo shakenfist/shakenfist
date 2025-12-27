@@ -13,9 +13,10 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist.node import Node
+from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
-from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -77,12 +78,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                             job_classes[job_name], [job_name], job_name)
 
             except Exception as e:
-                util_general.ignore_exception('network worker', e)
+                util_exceptions.ignore_exception('network worker', e)
 
             self.idle(5)
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     daemon.write_pid_file('net')
     procname = daemon.process_name('net')
     setproctitle.setproctitle(procname)

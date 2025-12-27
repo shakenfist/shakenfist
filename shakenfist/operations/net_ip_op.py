@@ -4,6 +4,7 @@ from shakenfist.schema.operations import net_ip_op as schema
 from shakenfist.network.network import Network
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -86,7 +87,7 @@ class NetIPOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(n)
         except Exception as e:
-            util_general.ignore_exception('net_ip_op', e)
+            util_exceptions.ignore_exception('net_ip_op', e)
             self.state = NetIPOp.STATE_ERROR
 
     def _route_address(self, n):

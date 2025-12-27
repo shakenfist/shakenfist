@@ -14,6 +14,7 @@ from shakenfist.network.interface import interfaces_for_instance
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 
@@ -92,7 +93,7 @@ class NodeInstOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(inst)
         except Exception as e:
-            util_general.ignore_exception('node_inst_op', e)
+            util_exceptions.ignore_exception('node_inst_op', e)
             self.state = NodeInstOp.STATE_ERROR
             if inst:
                 inst.state = Instance.STATE_ERROR

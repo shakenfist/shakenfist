@@ -151,7 +151,6 @@ dependencies = [
 sf-ctl = "shakenfist.client.ctl:cli"
 sf-backup = "shakenfist.client.backup:cli"
 
-sf-api = "shakenfist.daemons.external_api.main:main"
 sf-cleaner = "shakenfist.daemons.cleaner.main:main"
 sf-cluster = "shakenfist.daemons.cluster.main:main"
 sf-database = "shakenfist.daemons.database.main:main"

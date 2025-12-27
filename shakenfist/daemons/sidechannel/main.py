@@ -28,9 +28,10 @@ from shakenfist import instance
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.protos import agent_pb2
 from shakenfist.protos import common_pb2
+from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
-from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -995,7 +996,7 @@ class Monitor(daemon.Daemon):
                     self.idle(1)
 
             except Exception as e:
-                util_general.ignore_exception('side channel monitor', e)
+                util_exceptions.ignore_exception('side channel monitor', e)
 
         LOG.info('Stopping')
         send_systemd_stopping()
@@ -1011,6 +1012,7 @@ class Monitor(daemon.Daemon):
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     daemon.write_pid_file('sidechannel')
     m = Monitor('sidechannel')
 

@@ -7,6 +7,7 @@ from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -84,12 +85,12 @@ class NetOp(BaseClusterOperation):
         except EnsureMeshFailed as e:
             if n.state.value in n.ACTIVE_STATES:
                 # This should not happen with an active network
-                util_general.ignore_exception('net_op', e)
+                util_exceptions.ignore_exception('net_op', e)
 
             self.state = NetOp.STATE_ERROR
 
         except Exception as e:
-            util_general.ignore_exception('net_op', e)
+            util_exceptions.ignore_exception('net_op', e)
             self.state = NetOp.STATE_ERROR
 
     def _network_deploy(self, n):

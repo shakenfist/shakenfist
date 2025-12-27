@@ -16,6 +16,7 @@ from shakenfist_utilities import logs
 
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.protos import nodelock_pb2
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, _ = logs.setup(__name__)
@@ -38,6 +39,7 @@ def write_pid_file():
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     write_pid_file()
     setproctitle.setproctitle('sf-nodelock')
 

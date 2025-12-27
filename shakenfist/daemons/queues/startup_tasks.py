@@ -21,6 +21,7 @@ from shakenfist.network.interface import interfaces_for_instance
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_node_queues
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 from shakenfist.util import json as util_json
 
@@ -141,7 +142,7 @@ def restore_instances():
                 n.create_on_hypervisor()
                 n.ensure_mesh()
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'restore network %s' % network_uuid, e)
 
     for inst in instances:
@@ -156,7 +157,7 @@ def restore_instances():
                 LOG.with_fields({'instance': inst}).info('Restoring instance')
                 inst.create_on_hypervisor()
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'restore instance %s' % inst, e)
             inst.etcd.enqueue_delete_due_error(
                 'exception while restoring instance on daemon restart')

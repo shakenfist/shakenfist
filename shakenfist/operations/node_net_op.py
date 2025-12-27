@@ -4,6 +4,7 @@ from shakenfist.schema.operations import node_net_op as schema
 from shakenfist.network.network import Network
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -81,7 +82,7 @@ class NodeNetOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(n)
         except Exception as e:
-            util_general.ignore_exception('node_net_op', e)
+            util_exceptions.ignore_exception('node_net_op', e)
             self.state = NodeNetOp.STATE_ERROR
 
     def _network_destroy(self, n):
