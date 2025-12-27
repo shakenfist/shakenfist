@@ -537,7 +537,7 @@ jobs:
     name: "Automated exception fixer"
     runs-on: [self-hosted, claude-code]
     needs: functional_matrix_pr
-    if: ${{ always() && contains(needs.functional_matrix_pr.outputs.check_logs_failed, 'true') }}
+    if: ${{ !cancelled() && contains(needs.functional_matrix_pr.outputs.check_logs_failed, 'true') }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-exception-fixer
       cancel-in-progress: true
