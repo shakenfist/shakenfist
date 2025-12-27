@@ -15,6 +15,32 @@ on:
       - mkdocs.yml
 
 jobs:
+  # Check if the last commit was from the bot to prevent infinite loops in
+  # automated fixer jobs. This runs early so other jobs can depend on it.
+  check_bot_commit:
+    name: "Check bot commit"
+    if: github.event_name == 'pull_request'
+    runs-on: [self-hosted, static]
+    outputs:
+      is_bot: ${{ steps.check.outputs.is_bot }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Check if last commit was from bot
+        id: check
+        run: |
+          LAST_AUTHOR_EMAIL=$(git log -1 --format='%ae')
+          echo "Last commit author: $LAST_AUTHOR_EMAIL"
+          if [ "$LAST_AUTHOR_EMAIL" = "bot@shakenfist.com" ]; then
+            echo "is_bot=true" >> $GITHUB_OUTPUT
+            echo "Last commit was from bot - automated fixers will be skipped"
+          else
+            echo "is_bot=false" >> $GITHUB_OUTPUT
+          fi
+
   # These sanity checks used to be three separate jobs, but are now combined
   # to save a little time and reduce CI runner churn.
   sanity_checks:
@@ -154,12 +180,15 @@ jobs:
 
   # Runs if the "Lint with flake8" step in the sanity_checks job fails.
   # Uses always() so it runs even when sanity_checks fails.
-  # Skip if the last commit was from the bot to prevent infinite loops.
+  # Skip if the last commit was from the bot (checked by check_bot_commit job).
   automated_delinter:
     name: "Automated delinter"
     runs-on: [self-hosted, claude-code]
-    needs: sanity_checks
-    if: ${{ always() && needs.sanity_checks.outputs.flake8_failed == 'true' }}
+    needs: [sanity_checks, check_bot_commit]
+    if: >-
+      ${{ always() &&
+          needs.sanity_checks.outputs.flake8_failed == 'true' &&
+          needs.check_bot_commit.outputs.is_bot != 'true' }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-delinter
       cancel-in-progress: true
@@ -175,26 +204,12 @@ jobs:
           # to prevent infinite loops.
           token: ${{ secrets.DEPENDENCIES_TOKEN }}
 
-      - name: Check if last commit was from bot
-        id: check_bot
-        run: |
-          LAST_AUTHOR_EMAIL=$(git log -1 --format='%ae')
-          echo "Last commit author: $LAST_AUTHOR_EMAIL"
-          if [ "$LAST_AUTHOR_EMAIL" = "bot@shakenfist.com" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "Skipping delinter - last commit was from bot"
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Configure git
-        if: steps.check_bot.outputs.skip != 'true'
         run: |
           git config user.name "Claude Code run by Shakenfist Bot"
           git config user.email "bot@shakenfist.com"
 
       - name: Run automated delinter
-        if: steps.check_bot.outputs.skip != 'true'
         run: |
           tools/fix-lint-with-claude.sh --ci
 
@@ -532,12 +547,15 @@ jobs:
   # Uses always() so it runs even when functional_matrix_pr fails.
   # The check_logs_failed output is a JSON object with job_name keys and boolean
   # values. We check if any value contains 'true' to trigger this job.
-  # Skip if the last commit was from the bot to prevent infinite loops.
+  # Skip if the last commit was from the bot (checked by check_bot_commit job).
   automated_exception_fixer:
     name: "Automated exception fixer"
     runs-on: [self-hosted, claude-code]
-    needs: functional_matrix_pr
-    if: ${{ !cancelled() && contains(needs.functional_matrix_pr.outputs.check_logs_failed, 'true') }}
+    needs: [functional_matrix_pr, check_bot_commit]
+    if: >-
+      ${{ !cancelled() &&
+          contains(needs.functional_matrix_pr.outputs.check_logs_failed, 'true') &&
+          needs.check_bot_commit.outputs.is_bot != 'true' }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-exception-fixer
       cancel-in-progress: true
@@ -553,18 +571,9 @@ jobs:
           # to prevent infinite loops.
           token: ${{ secrets.DEPENDENCIES_TOKEN }}
 
-      - name: Check if last commit was from bot and list failed jobs
-        id: check_bot
+      - name: List failed jobs from matrix
+        id: failed_jobs
         run: |
-          LAST_AUTHOR_EMAIL=$(git log -1 --format='%ae')
-          echo "Last commit author: $LAST_AUTHOR_EMAIL"
-          if [ "$LAST_AUTHOR_EMAIL" = "bot@shakenfist.com" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "Skipping exception fixer - last commit was from bot"
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
           # Parse the JSON output to find which matrix jobs had log check failures
           # The output is like: {"smoke": "true", "other": "false"}
           CHECK_LOGS_OUTPUT='${{ needs.functional_matrix_pr.outputs.check_logs_failed }}'
@@ -575,13 +584,12 @@ jobs:
           echo "failed_jobs=$FAILED_JOBS" >> $GITHUB_OUTPUT
 
       - name: Download bundles for failed jobs
-        if: steps.check_bot.outputs.skip != 'true'
         env:
-          FAILED_JOBS: ${{ steps.check_bot.outputs.failed_jobs }}
+          FAILED_JOBS: ${{ steps.failed_jobs.outputs.failed_jobs }}
           GH_TOKEN: ${{ github.token }}
         run: |
           sudo mkdir -p /srv/github/bundles
-          sudo chown -R debian:debian /srv/gitlab/bundles
+          sudo chown -R debian:debian /srv/github/bundles
           for job in ${FAILED_JOBS}; do
             echo "Downloading bundle for failed job: ${job}"
             gh run download ${{ github.run_id }} \
@@ -594,13 +602,11 @@ jobs:
           ls -lh /srv/github/bundles/
 
       - name: Configure git
-        if: steps.check_bot.outputs.skip != 'true'
         run: |
           git config user.name "Claude Code run by Shakenfist Bot"
           git config user.email "bot@shakenfist.com"
 
       - name: Run automated exception fixer
-        if: steps.check_bot.outputs.skip != 'true'
         env:
           BUNDLES_DIR: /srv/github/bundles
         run: |
