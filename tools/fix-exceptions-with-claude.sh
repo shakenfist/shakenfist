@@ -350,11 +350,31 @@ if [ "${interactive}" = true ]; then
     echo "Run 'claude' and paste the prompt above to fix the exception."
     exit 1
 else
-    # Headless mode
+    # Headless mode - use JSON output to capture turn count and other metadata
     claude -p "$(cat "${work_dir}/claude-prompt.txt")" \
         --dangerously-skip-permissions \
         --max-turns "${max_turns}" \
-        --output-format text || true
+        --output-format json > "${work_dir}/claude-output.json" || true
+
+    # Extract and display the result text
+    if [ -f "${work_dir}/claude-output.json" ]; then
+        jq -r '.result // empty' "${work_dir}/claude-output.json"
+
+        # Extract metadata for CI output
+        num_turns=$(jq -r '.num_turns // "unknown"' "${work_dir}/claude-output.json")
+        duration_ms=$(jq -r '.duration_ms // "unknown"' "${work_dir}/claude-output.json")
+        cost_usd=$(jq -r '.total_cost_usd // "unknown"' "${work_dir}/claude-output.json")
+
+        echo
+        echo -e "${BLUE}Claude execution stats:${NC}"
+        echo "  Turns: ${num_turns} / ${max_turns}"
+        echo "  Duration: ${duration_ms}ms"
+        echo "  Cost: \$${cost_usd}"
+
+        ci_output "claude_turns" "${num_turns}"
+        ci_output "claude_duration_ms" "${duration_ms}"
+        ci_output "claude_cost_usd" "${cost_usd}"
+    fi
 fi
 
 echo
