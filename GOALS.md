@@ -35,3 +35,5 @@
 * mTLS with a private CA for gRPC services
 * SO_PASSCRED for UDS services
 * Progressively convert to more modern python features like f-strings
+* Convert the iptables rule generation we use for virtual networks to the more modern nftables. nftables also has a stable JSON API and python bindings (`nftables` on pypi), so this should clean up a fair bit of command line generation code.
+* Provide network traffic flow exporters for analysis by operators.
