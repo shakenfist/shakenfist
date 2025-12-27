@@ -578,7 +578,7 @@ class EventLogChunk:
             })
 
         self.dbdir = _shard_db_path(self.objtype, self.objuuid)
-        self.dbpath = os.path.join(self.dbdir, self.objuuid + '.' + self.chunk)
+        self.dbpath = os.path.join(self.dbdir, f'{self.objuuid}.{self.chunk}')
         self.bootstrapped = False
 
         self.lock = util_concurrency.NodeLock(
