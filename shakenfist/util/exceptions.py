@@ -52,10 +52,13 @@ def record_exception(exc_type, exc_value, exc_tb):
         data['events'].append(time.time())
 
         os.write(fd, json.dumps(data, indent=4, sort_keys=True).encode())
+        LOG.with_fields(data).debug('Recorded exception')
 
-    except Exception:
+    except Exception as e:
         # Ignore the exception here because we're already on the error path
-        pass
+        LOG.with_fields(data).with_fields({
+            'recording_exception': str(e)
+        }).error('Failed to record exception')
     finally:
         os.close(fd)
 
