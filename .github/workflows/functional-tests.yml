@@ -223,6 +223,7 @@ jobs:
       # sets its own key, and the outputs get merged. The consuming job can then
       # check if any value in the object is 'true'.
       check_logs_failed: ${{ toJSON(steps.set_output.outputs) }}
+      exceptions_found: ${{ toJSON(steps.set_exceptions_output.outputs) }}
     strategy:
       fail-fast: false
       matrix:
@@ -422,6 +423,24 @@ jobs:
           echo "GITHUB_OUTPUT is:"
           cat ${GITHUB_OUTPUT}
 
+      - name: Check for exceptions on disk
+        id: check_exceptions
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} "sudo find /srv/shakenfist/exceptions -type f -ls"
+
+          # Check if any exception files exist and set output
+          EXCEPTION_COUNT=$(tools/run_remote ${primary} \
+              "sudo find /srv/shakenfist/exceptions -type f 2>/dev/null | wc -l")
+          echo "Exception files found: ${EXCEPTION_COUNT}"
+          if [ "${EXCEPTION_COUNT}" -gt 0 ]; then
+            echo "exceptions_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "exceptions_found=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check logs
         id: check_logs
         if: always()
@@ -435,6 +454,12 @@ jobs:
         if: always()
         run: |
           echo "${{ matrix.pr.job_name }}=${{ steps.check_logs.outcome == 'failure' }}" >> $GITHUB_OUTPUT
+
+      - name: Set exceptions output for matrix aggregation
+        id: set_exceptions_output
+        if: always()
+        run: |
+          echo "${{ matrix.pr.job_name }}=${{ steps.check_exceptions.outputs.exceptions_found }}" >> $GITHUB_OUTPUT
 
       # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
       # cost. That's not really something we can control, so just ignore the CPU
@@ -543,9 +568,9 @@ jobs:
 
               ${{ steps.failures.outputs.failures }}
 
-  # Runs if the "Check logs" step in any functional_matrix_pr matrix job fails.
-  # Uses always() so it runs even when functional_matrix_pr fails.
-  # The check_logs_failed output is a JSON object with job_name keys and boolean
+  # Runs if exceptions are found on disk in any functional_matrix_pr matrix job.
+  # Uses !cancelled() so it runs even when functional_matrix_pr fails.
+  # The exceptions_found output is a JSON object with job_name keys and boolean
   # values. We check if any value contains 'true' to trigger this job.
   # Skip if the last commit was from the bot (checked by check_bot_commit job).
   automated_exception_fixer:
@@ -554,7 +579,7 @@ jobs:
     needs: [functional_matrix_pr, check_bot_commit]
     if: >-
       ${{ !cancelled() &&
-          contains(needs.functional_matrix_pr.outputs.check_logs_failed, 'true') &&
+          contains(needs.functional_matrix_pr.outputs.exceptions_found, 'true') &&
           needs.check_bot_commit.outputs.is_bot != 'true' }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-exception-fixer
@@ -574,13 +599,13 @@ jobs:
       - name: List failed jobs from matrix
         id: failed_jobs
         run: |
-          # Parse the JSON output to find which matrix jobs had log check failures
+          # Parse the JSON output to find which matrix jobs had exceptions
           # The output is like: {"smoke": "true", "other": "false"}
-          CHECK_LOGS_OUTPUT='${{ needs.functional_matrix_pr.outputs.check_logs_failed }}'
-          echo "Raw check_logs_failed output: $CHECK_LOGS_OUTPUT"
+          EXCEPTIONS_OUTPUT='${{ needs.functional_matrix_pr.outputs.exceptions_found }}'
+          echo "Raw exceptions_found output: $EXCEPTIONS_OUTPUT"
 
-          FAILED_JOBS=$(echo "$CHECK_LOGS_OUTPUT" | jq -r 'to_entries | .[] | select(.value == "true") | .key' | tr '\n' ' ')
-          echo "Matrix jobs with log check failures: $FAILED_JOBS"
+          FAILED_JOBS=$(echo "$EXCEPTIONS_OUTPUT" | jq -r 'to_entries | .[] | select(.value == "true") | .key' | tr '\n' ' ')
+          echo "Matrix jobs with exceptions: $FAILED_JOBS"
           echo "failed_jobs=$FAILED_JOBS" >> $GITHUB_OUTPUT
 
       - name: Download bundles for failed jobs
