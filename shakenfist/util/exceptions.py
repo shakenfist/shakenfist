@@ -29,10 +29,10 @@ def record_exception(exc_type, exc_value, exc_tb):
 
     h = hashlib.sha256(traceback_str.encode()).hexdigest()[-8:]
     os.makedirs(os.path.join('/srv/shakenfist/exceptions'), exist_ok=True)
-    
+
     flags = os.O_RDWR | os.O_CREAT
     fd = os.open(f'/srv/shakenfist/exceptions/{h}.json', flags, 0o644)
-    
+
     try:
         fcntl.flock(fd, fcntl.LOCK_EX)
         data = {}

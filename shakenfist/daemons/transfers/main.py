@@ -12,7 +12,6 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
-from shakenfist.util import general as util_general
 
 
 LOG, _ = logs.setup(__name__)
