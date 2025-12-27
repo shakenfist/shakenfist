@@ -588,18 +588,17 @@ jobs:
           FAILED_JOBS: ${{ steps.failed_jobs.outputs.failed_jobs }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          sudo mkdir -p /srv/github/bundles
-          sudo chown -R debian:debian /srv/github/bundles
+          mkdir bundles
           for job in ${FAILED_JOBS}; do
             echo "Downloading bundle for failed job: ${job}"
             gh run download ${{ github.run_id }} \
               --name "bundle-functional-cluster-${job}" \
-              --dir "/srv/github/bundles/${job}"
+              --dir "bundles/${job}"
           done
 
           echo
           echo "Downloaded bundles:"
-          ls -lh /srv/github/bundles/
+          ls -lh bundles
 
       - name: Configure git
         run: |
@@ -608,7 +607,7 @@ jobs:
 
       - name: Run automated exception fixer
         env:
-          BUNDLES_DIR: /srv/github/bundles
+          BUNDLES_DIR: bundles
         run: |
           tools/fix-exceptions-with-claude.sh --ci
 
