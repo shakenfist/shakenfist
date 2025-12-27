@@ -393,9 +393,12 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
+          script=". /tmp/functests/bin/activate;"
+          script="${script} cd shakenfist/shakenfist/deploy;"
+          script="${script} stestr slowest || true;"
+
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.pr.base_image_user }}@${primary} \
-              "cd shakenfist/shakenfist/deploy; stestr slowest || true"
+              ${{ matrix.pr.base_image_user }}@${primary} "${script}"
 
       - name: List failing tests
         if: failure()
@@ -405,9 +408,12 @@ jobs:
 
           echo "Gathering list of failed tests..."
           touch /srv/ci/failed
+          script=". /tmp/functests/bin/activate;"
+          script="${script} cd shakenfist/shakenfist/deploy;"
+          script="${script} stestr failing || true;"
+
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.pr.base_image_user }}@${primary} \
-              "cd shakenfist/shakenfist/deploy; stestr failing || true" > /srv/ci/failed
+              ${{ matrix.pr.base_image_user }}@${primary} "${script}" > /srv/ci/failed
           echo
 
           failed=$(cat /srv/ci/failed | egrep "^FAIL: " | \
@@ -879,9 +885,12 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
 
+          script=". /tmp/functests/bin/activate;"
+          script="${script} cd shakenfist/shakenfist/deploy;"
+          script="${script} stestr slowest || true;"
+
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.merge.base_image_user }}@${primary} \
-              "cd shakenfist/shakenfist/deploy; stestr slowest || true"
+              ${{ matrix.merge.base_image_user }}@${primary} "${script}"
 
       - name: List failing tests
         if: failure()
@@ -891,13 +900,16 @@ jobs:
 
           echo "Gathering list of failed tests..."
           touch /srv/ci/failed
+          script=". /tmp/functests/bin/activate;"
+          script="${script} cd shakenfist/shakenfist/deploy;"
+          script="${script} stestr failing || true;"
+
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.merge.base_image_user }}@${primary} \
-              "cd shakenfist/shakenfist/deploy; stestr failing || true" > /srv/ci/failed
+              ${{ matrix.merge.base_image_user }}@${primary} "${script}" > /srv/ci/failed
           echo
 
           failed=$(cat /srv/ci/failed | egrep "^FAIL: " | \
-              sed -z 's/^FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
+              sed -z 's/FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
 
           echo "Failed tests:"
           cat /srv/ci/failed
