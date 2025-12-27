@@ -4,7 +4,6 @@ from unittest import mock
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import eventlog
-from shakenfist.protos import event_pb2
 from shakenfist.protos import event_pb2_grpc
 from shakenfist.tests import base
 
