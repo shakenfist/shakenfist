@@ -54,6 +54,7 @@ from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.operations.baseoperation import BaseClusterOperation as bco
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import libvirt as util_libvirt
@@ -852,7 +853,7 @@ class Instance(dbowo):
                 if inst:
                     inst.undefine()
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'instance delete domain %s' % self, e)
 
         with util_general.RecordedOperation('delete disks', self):
@@ -860,7 +861,7 @@ class Instance(dbowo):
                 if os.path.exists(self.instance_path):
                     shutil.rmtree(self.instance_path)
             except Exception as e:
-                util_general.ignore_exception(
+                util_exceptions.ignore_exception(
                     'instance delete disks %s' % self, e)
 
     def _delete_globally(self):

@@ -17,6 +17,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons.cleaner import scheduled_tasks
 from shakenfist.daemons import daemon
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -181,7 +182,7 @@ class Monitor(daemon.Daemon):
                         extra={'mod_revision': int(kv['mod_revision'])})
 
         except Exception as e:
-            util_general.ignore_exception('etcd compaction', e)
+            util_exceptions.ignore_exception('etcd compaction', e)
 
     def _run_inner(self):
         last_defer_message = 0
@@ -247,6 +248,7 @@ class Monitor(daemon.Daemon):
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     daemon.write_pid_file('cleaner')
     m = Monitor('cleaner')
 

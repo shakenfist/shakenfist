@@ -10,6 +10,7 @@ from shakenfist.schema.operations import node_blob_op as schema
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -95,7 +96,7 @@ class NodeBlobOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(b)
         except Exception as e:
-            util_general.ignore_exception('node_blob_op', e)
+            util_exceptions.ignore_exception('node_blob_op', e)
             self.state = NodeBlobOp.STATE_ERROR
 
     def _verify_size_and_checksum(self, b):

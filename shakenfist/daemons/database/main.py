@@ -29,6 +29,7 @@ from shakenfist.exceptions import InvalidStateException
 from shakenfist.node import Node
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 from shakenfist.util import json as util_json
 
@@ -57,7 +58,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 value=util_json.json_dump(value)
             )
         except Exception as e:
-            util_general.ignore_exception('database Get failed', e)
+            util_exceptions.ignore_exception('database Get failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return database_pb2.GetReply(found=False, value='')
@@ -77,7 +78,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 ))
             return database_pb2.GetPrefixReply(results=results)
         except Exception as e:
-            util_general.ignore_exception('database GetPrefix failed', e)
+            util_exceptions.ignore_exception('database GetPrefix failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return database_pb2.GetPrefixReply(results=[])
@@ -90,7 +91,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             etcd.put(request.object_type, request.subtype, request.name, data)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
-            util_general.ignore_exception('database Put failed', e)
+            util_exceptions.ignore_exception('database Put failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def Create(self, request, context):
@@ -102,7 +103,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 request.object_type, request.subtype, request.name, data)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
-            util_general.ignore_exception('database Create failed', e)
+            util_exceptions.ignore_exception('database Create failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def Delete(self, request, context):
@@ -112,7 +113,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             etcd.delete(request.object_type, request.subtype, request.name)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
-            util_general.ignore_exception('database Delete failed', e)
+            util_exceptions.ignore_exception('database Delete failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def DeletePrefix(self, request, context):
@@ -122,7 +123,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             etcd.delete_prefix(request.path)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
-            util_general.ignore_exception('database DeletePrefix failed', e)
+            util_exceptions.ignore_exception('database DeletePrefix failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def ReplaceMany(self, request, context):
@@ -166,7 +167,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 failures=failure_msgs
             )
         except Exception as e:
-            util_general.ignore_exception('database ReplaceMany failed', e)
+            util_exceptions.ignore_exception('database ReplaceMany failed', e)
             return database_pb2.ReplaceManyReply(
                 success=False,
                 failures=[database_pb2.MutationFailure(
@@ -184,7 +185,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             etcd.enqueue(request.queue_name, workitem, delay=request.delay)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
-            util_general.ignore_exception('database Enqueue failed', e)
+            util_exceptions.ignore_exception('database Enqueue failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def Dequeue(self, request, context):
@@ -202,7 +203,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 work_item=util_json.json_dump(workitem)
             )
         except Exception as e:
-            util_general.ignore_exception('database Dequeue failed', e)
+            util_exceptions.ignore_exception('database Dequeue failed', e)
             return database_pb2.DequeueReply(
                 found=False, job_name='', work_item='')
 
@@ -213,7 +214,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             etcd.resolve(request.queue_name, request.job_name)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
-            util_general.ignore_exception('database Resolve failed', e)
+            util_exceptions.ignore_exception('database Resolve failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def GetQueueLength(self, request, context):
@@ -228,7 +229,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 deferred=deferred
             )
         except Exception as e:
-            util_general.ignore_exception('database GetQueueLength failed', e)
+            util_exceptions.ignore_exception('database GetQueueLength failed', e)
             return database_pb2.QueueLengthReply(
                 processing=0, queued=0, deferred=0)
 
@@ -239,7 +240,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             etcd.restart_queue(request.queue_name)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
-            util_general.ignore_exception('database RestartQueue failed', e)
+            util_exceptions.ignore_exception('database RestartQueue failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     # Lock Operations
@@ -256,7 +257,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             acquired = etcd.create_raw(path, lock_data)
             return database_pb2.ClusterLockReply(acquired=acquired)
         except Exception as e:
-            util_general.ignore_exception('database AcquireLock failed', e)
+            util_exceptions.ignore_exception('database AcquireLock failed', e)
             return database_pb2.ClusterLockReply(acquired=False)
 
     def ReleaseLock(self, request, context):
@@ -271,7 +272,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             released = etcd.transactional_delete_raw(path, lock_data)
             return database_pb2.StatusReply(success=released, error='')
         except Exception as e:
-            util_general.ignore_exception('database ReleaseLock failed', e)
+            util_exceptions.ignore_exception('database ReleaseLock failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def GetLockHolder(self, request, context):
@@ -290,7 +291,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 holder=util_json.json_dump(holder)
             )
         except Exception as e:
-            util_general.ignore_exception('database GetLockHolder failed', e)
+            util_exceptions.ignore_exception('database GetLockHolder failed', e)
             return database_pb2.ClusterLockHolderReply(held=False, holder='')
 
     def ClearStaleLocks(self, request, context):
@@ -300,7 +301,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             etcd.clear_stale_locks()
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'database ClearStaleLocks failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
@@ -317,7 +318,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 ))
             return database_pb2.ClusterGetExistingLocksReply(locks=lock_entries)
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'database GetExistingLocks failed', e)
             return database_pb2.ClusterGetExistingLocksReply(locks=[])
 
@@ -330,7 +331,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             etcd.compact(request.revision)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
-            util_general.ignore_exception('database Compact failed', e)
+            util_exceptions.ignore_exception('database Compact failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     # Object State Operations (MariaDB)
@@ -352,7 +353,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 message=state.message or ''
             )
         except Exception as e:
-            util_general.ignore_exception('database GetObjectState failed', e)
+            util_exceptions.ignore_exception('database GetObjectState failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return database_pb2.GetObjectStateReply(found=False)
@@ -371,7 +372,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 request.object_type, request.object_uuid, state)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
-            util_general.ignore_exception('database SetObjectState failed', e)
+            util_exceptions.ignore_exception('database SetObjectState failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def DeleteObjectState(self, request, context):
@@ -382,7 +383,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 request.object_type, request.object_uuid)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'database DeleteObjectState failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
@@ -394,7 +395,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 request.object_type, list(request.state_values))
             return database_pb2.GetObjectsByStateReply(object_uuids=uuids)
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'database GetObjectsByState failed', e)
             return database_pb2.GetObjectsByStateReply(object_uuids=[])
 
@@ -472,12 +473,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                 # it just serves gRPC requests. We check health periodically.
                 self.idle(10)
             except Exception as e:
-                util_general.ignore_exception('database daemon', e)
+                util_exceptions.ignore_exception('database daemon', e)
 
             self.check_daemon_state()
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     daemon.write_pid_file('database')
 
     # MariaDB is required for the database service. Abort early with a clear

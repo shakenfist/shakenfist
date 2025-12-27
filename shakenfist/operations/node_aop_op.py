@@ -6,6 +6,7 @@ from shakenfist.instance import Instance
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -84,7 +85,7 @@ class NodeAgentopOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(aop)
         except Exception as e:
-            util_general.ignore_exception('node_aop_op', e)
+            util_exceptions.ignore_exception('node_aop_op', e)
             self.state = NodeAgentopOp.STATE_ERROR
             aop.state = Instance.STATE_ERROR
 

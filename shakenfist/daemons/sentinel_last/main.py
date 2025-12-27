@@ -12,6 +12,7 @@ from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_stopping
 from shakenfist.node import Node
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, _ = logs.setup(__name__)
@@ -28,6 +29,7 @@ signal.signal(signal.SIGTERM, exit_gracefully)
 
 
 def main():
+    util_exceptions.install_exception_tracking()
     daemon.clear_abort_path(ABORT_PATH)
     setproctitle.setproctitle('sf-sentinel-last')
     LOG.info('Started')
