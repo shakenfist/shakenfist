@@ -18,15 +18,16 @@ def ignore_exception(processname, e):
     msg = f'[Exception] Ignored error in {processname}: {e}'
     exc_type, exc_value, exc_tb = sys.exc_info()
     if exc_tb:
-        msg += '\n%s' % traceback.format_exc(exc_type, exc_value, exc_tb)
+        msg += '\n'
+        msg += '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
         record_exception(exc_type, exc_value, exc_tb)
     LOG.error(msg)
 
 
 def record_exception(exc_type, exc_value, exc_tb):
-    traceback_str = '\n%s' % traceback.format_exc(exc_type, exc_value, exc_tb)
+    traceback_str = '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
 
-    h = hashlib.sha256(traceback_str).hexdigest()[-8:]
+    h = hashlib.sha256(traceback_str.encode()).hexdigest()[-8:]
     os.makedirs(os.path.join('/srv/shakenfist/exceptions'), exist_ok=True)
     
     flags = os.O_RDWR | os.O_CREAT
@@ -40,7 +41,7 @@ def record_exception(exc_type, exc_value, exc_tb):
         if size > 0:
             d = os.read(fd, size)
             if d:
-                data = json.loads(d)
+                data = json.loads(d.decode())
             os.lseek(fd, 0, os.SEEK_SET)
 
         data['traceback'] = traceback_str
@@ -50,10 +51,12 @@ def record_exception(exc_type, exc_value, exc_tb):
             data['events'] = []
         data['events'].append(time.time())
 
-        os.write(fd, json.dumps(data, indent=4, sort_keys=True))
+        os.write(fd, json.dumps(data, indent=4, sort_keys=True).encode())
 
-    except:
+    except Exception:
         # Ignore the exception here because we're already on the error path
+        pass
+    finally:
         os.close(fd)
 
 
