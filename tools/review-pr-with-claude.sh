@@ -10,7 +10,7 @@
 #
 # Options:
 #   --pr NUMBER         PR number to review (required in CI, auto-detected locally)
-#   --max-turns N       Maximum Claude turns (default: 20)
+#   --max-turns N       Maximum Claude turns (default: 50)
 #   --interactive       Run Claude in interactive mode (default: headless)
 #   --ci                CI mode: output machine-readable status, no colors
 #   --dry-run           Don't post the review, just print it
@@ -43,7 +43,7 @@ cd "${topdir}"
 
 # Default options
 pr_number=""
-max_turns=20
+max_turns=50
 interactive=false
 ci_mode=false
 dry_run=false

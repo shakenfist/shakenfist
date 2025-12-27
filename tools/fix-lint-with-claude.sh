@@ -11,7 +11,7 @@
 # Options:
 #   --no-push           Fix and commit but don't push
 #   --no-commit         Fix but don't commit or push
-#   --max-turns N       Maximum Claude turns (default: 30)
+#   --max-turns N       Maximum Claude turns (default: 100)
 #   --interactive       Run Claude in interactive mode (default: headless)
 #   --ci                CI mode: output machine-readable status, no colors
 #   --output-dir DIR    Directory for output files (default: temp dir)
@@ -40,7 +40,7 @@ cd "${topdir}"
 # Default options
 do_push=true
 do_commit=true
-max_turns=30
+max_turns=100
 interactive=false
 ci_mode=false
 output_dir=""
