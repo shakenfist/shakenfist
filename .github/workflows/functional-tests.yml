@@ -580,7 +580,8 @@ jobs:
           FAILED_JOBS: ${{ steps.check_bot.outputs.failed_jobs }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p /srv/github/bundles
+          sudo mkdir -p /srv/github/bundles
+          sudo chown -R debian:debian /srv/gitlab/bundles
           for job in ${FAILED_JOBS}; do
             echo "Downloading bundle for failed job: ${job}"
             gh run download ${{ github.run_id }} \
