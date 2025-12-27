@@ -135,8 +135,8 @@ def _add_event_multi_inner(
 
             try:
                 eo = request.objects.add()
-                eo.object_type = object_type
-                eo.object_uuid = object_uuid
+                eo.object_type = str(object_type)
+                eo.object_uuid = str(object_uuid)
             except TypeError as e:
                 log.warning(
                     f'Failed to add event for {object_type} with uuid '
@@ -171,8 +171,8 @@ def _add_event_inner(
 
         for object_type, object_uuid in simpler_objects:
             request = event_pb2.EventRequest(
-                object_type=object_type,
-                object_uuid=object_uuid,
+                object_type=str(object_type),
+                object_uuid=str(object_uuid),
                 event_type=event_type,
                 timestamp=timestamp,
                 fqdn=config.NODE_NAME,
