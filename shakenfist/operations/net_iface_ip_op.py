@@ -6,7 +6,6 @@ from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import exceptions as util_exceptions
-from shakenfist.util import general as util_general
 
 
 LOG, HANDLER = logs.setup(__name__)

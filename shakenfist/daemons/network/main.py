@@ -15,7 +15,6 @@ from shakenfist import etcd
 from shakenfist.node import Node
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
-from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
 
 

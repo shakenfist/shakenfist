@@ -30,7 +30,6 @@ from shakenfist.node import Node
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.util import exceptions as util_exceptions
-from shakenfist.util import general as util_general
 from shakenfist.util import json as util_json
 
 
