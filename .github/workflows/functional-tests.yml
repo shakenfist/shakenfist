@@ -213,7 +213,7 @@ jobs:
       matrix:
         pr: [
           {
-            name: 'smoke',
+            name: 'Smoke tests',
             job_name: 'smoke',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
