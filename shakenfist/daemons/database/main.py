@@ -419,7 +419,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             success = mariadb._direct_reserve_address(reservation)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
-            util_general.ignore_exception('database ReserveAddress failed', e)
+            util_exceptions.ignore_exception('database ReserveAddress failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def ReleaseAddress(self, request, context):
@@ -441,7 +441,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 request.ipam_uuid, request.address, halo_reservation)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
-            util_general.ignore_exception('database ReleaseAddress failed', e)
+            util_exceptions.ignore_exception('database ReleaseAddress failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def GetReservation(self, request, context):
@@ -466,7 +466,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 )
             )
         except Exception as e:
-            util_general.ignore_exception('database GetReservation failed', e)
+            util_exceptions.ignore_exception('database GetReservation failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return database_pb2.GetReservationReply(found=False)
@@ -490,7 +490,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 ))
             return database_pb2.GetReservationsForIPAMReply(reservations=result)
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'database GetReservationsForIPAM failed', e)
             return database_pb2.GetReservationsForIPAMReply(reservations=[])
 
@@ -502,7 +502,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 request.ipam_uuid, request.address)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'database DeleteReservation failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
@@ -514,7 +514,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 request.ipam_uuid)
             return database_pb2.DeleteCountReply(count=count)
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'database DeleteReservationsForIPAM failed', e)
             return database_pb2.DeleteCountReply(count=0)
 
@@ -526,7 +526,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 request.ipam_uuid, request.older_than)
             return database_pb2.DeleteCountReply(count=count)
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'database ReleaseHaloedAddresses failed', e)
             return database_pb2.DeleteCountReply(count=0)
 
@@ -538,7 +538,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetAddressesInUseReply(
                 addresses=list(addresses))
         except Exception as e:
-            util_general.ignore_exception(
+            util_exceptions.ignore_exception(
                 'database GetAddressesInUse failed', e)
             return database_pb2.GetAddressesInUseReply(addresses=[])
 
