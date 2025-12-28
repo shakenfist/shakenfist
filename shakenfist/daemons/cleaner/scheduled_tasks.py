@@ -39,9 +39,9 @@ def _delete_with_virsh(instance_uuid, inst):
     try:
         log_ctx.warning('Destroying instance using virsh')
         util_concurrency.execute(
-            'virsh destroy "sf:%s"' % instance_uuid)
+            f'virsh destroy "sf:{instance_uuid}"')
         util_concurrency.execute(
-            'virsh undefine --nvram "sf:%s"' % instance_uuid)
+            f'virsh undefine --nvram "sf:{instance_uuid}"')
         _delete_instance_files(instance_uuid)
         log_ctx.warning('Destroying instance using virsh succeeded')
         if inst:
@@ -63,14 +63,14 @@ def _delete_with_kill(instance_uuid, inst):
         log_ctx.warning('Destroying instance using SIGKILL')
         stdout, _ = util_concurrency.execute('aa-status --json')
         status = json.loads(stdout)
-        profile = 'libvirt-%s' % instance_uuid
+        profile = f'libvirt-{instance_uuid}'
         for proc in status['processes']['/usr/bin/qemu-system-x86_64']:
             if proc['profile'] == profile:
                 os.kill(int(proc['pid']), signal.SIGKILL)
 
         try:
             util_concurrency.execute(
-                'virsh undefine --nvram "sf:%s"' % instance_uuid)
+                f'virsh undefine --nvram "sf:{instance_uuid}"')
         except ProcessExecutionError:
             pass
 
@@ -140,13 +140,13 @@ def update_power_states():
                 if state == 'crashed':
                     if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
                         util_concurrency.execute(
-                            'virsh undefine --nvram "sf:%s"' % instance_uuid)
+                            f'virsh undefine --nvram "sf:{instance_uuid}"')
                         inst.state.value = dbo.STATE_DELETED
                     else:
                         inst.state = inst.state.value + '-error'
 
         except lc.libvirt.libvirtError as e:
-            LOG.debug('Failed to lookup running domains: %s' % e)
+            LOG.debug(f'Failed to lookup running domains: {e}')
 
         try:
             # Inactive VMs just have a name, and are powered off
@@ -176,7 +176,7 @@ def update_power_states():
                             domain.undefine()
                         except lc.libvirt.libvirtError:
                             util_concurrency.execute(
-                                'virsh undefine --nvram "sf:%s"' % instance_uuid)
+                                f'virsh undefine --nvram "sf:{instance_uuid}"')
                         continue
 
                     db_state = inst.state
@@ -194,7 +194,7 @@ def update_power_states():
                             domain.undefine()
                         except lc.libvirt.libvirtError:
                             util_concurrency.execute(
-                                'virsh undefine --nvram "sf:%s"' % instance_uuid)
+                                f'virsh undefine --nvram "sf:{instance_uuid}"')
 
                         inst.add_event(EVENT_TYPE_AUDIT,
                                        'deleted stray instance')
@@ -206,7 +206,7 @@ def update_power_states():
 
                     db_power = inst.power_state
                     log_ctx.debug(
-                        'Instance expected power state %s, actually off' % db_power)
+                        f'Instance expected power state {db_power}, actually off')
                     if not os.path.exists(inst.instance_path):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
@@ -222,7 +222,7 @@ def update_power_states():
                         inst.add_event(EVENT_TYPE_AUDIT, 'detected poweroff')
 
         except lc.libvirt.libvirtError as e:
-            LOG.debug('Failed to lookup all domains: %s' % e)
+            LOG.debug(f'Failed to lookup all domains: {e}')
 
         # libvirt on Debian 11 fails to clean up apparmor profiles for VMs
         # which are no longer running, so we do that here. Note that this list
@@ -251,7 +251,7 @@ def update_power_states():
                     else:
                         os.unlink(entpath)
                     LOG.info(
-                        'Removed old libvirt apparmor path %s' % entpath)
+                        f'Removed old libvirt apparmor path {entpath}')
 
 
 @util_general.recorded_method
@@ -275,5 +275,5 @@ def clear_old_libvirt_logs():
         if uuid in all_instances:
             continue
 
-        LOG.debug('Removing stale libvirt log %s' % ent)
+        LOG.debug(f'Removing stale libvirt log {ent}')
         os.unlink(os.path.join(config.LIBVIRT_LOG_PATH, ent))

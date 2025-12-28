@@ -477,7 +477,7 @@ def record_exception(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            util_exceptions.record_exception(sys.exc_info())
+            util_exceptions.record_exception(*sys.exc_info())
             raise e
 
     return wrapper
