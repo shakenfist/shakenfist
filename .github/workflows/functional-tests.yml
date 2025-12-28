@@ -435,7 +435,11 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo find /srv/shakenfist/exceptions -type f -ls"
+
+          script="sudo mkdir /srv/shakenfist/exceptions;"
+          script="${script} sudo find /srv/shakenfist/exceptions -type f -ls;"
+          tools/run_remote ${primary} "${script}"
+          echo
 
           # Check if any exception files exist and set output
           EXCEPTION_COUNT=$(ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
