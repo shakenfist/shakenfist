@@ -1,11 +1,13 @@
 import json
 
 import flask
+import flask_restful
 import requests
 from flask_jwt_extended import verify_jwt_in_request
 from flask_jwt_extended.exceptions import NoAuthorizationError
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
+import sys
 
 from shakenfist import exceptions
 from shakenfist.network import network
@@ -18,6 +20,7 @@ from shakenfist.namespace import get_api_token
 from shakenfist.namespace import Namespace
 from shakenfist.upload import Upload
 from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -467,3 +470,24 @@ def redirect_to_eventlog_node(func):
 
         return func(*args, **kwargs)
     return wrapper
+
+
+def record_exception(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            util_exceptions.record_exception(sys.exc_info())
+            raise e
+
+    return wrapper
+
+
+class Resource(flask_restful.Resource):
+    # Remember that order here matters, the record_exception
+    # wrapper deliberately reraises the exception so that
+    # generic_wrapper can handle the response after logging.
+    method_decorators = [
+        sf_api.generic_wrapper,
+        record_exception
+        ]

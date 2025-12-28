@@ -144,6 +144,46 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetObjectsByStateRequest.SerializeToString,
                 response_deserializer=database__pb2.GetObjectsByStateReply.FromString,
                 _registered_method=True)
+        self.ReserveAddress = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ReserveAddress',
+                request_serializer=database__pb2.ReserveAddressRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.ReleaseAddress = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ReleaseAddress',
+                request_serializer=database__pb2.ReleaseAddressRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetReservation = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetReservation',
+                request_serializer=database__pb2.GetReservationRequest.SerializeToString,
+                response_deserializer=database__pb2.GetReservationReply.FromString,
+                _registered_method=True)
+        self.GetReservationsForIPAM = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetReservationsForIPAM',
+                request_serializer=database__pb2.GetReservationsForIPAMRequest.SerializeToString,
+                response_deserializer=database__pb2.GetReservationsForIPAMReply.FromString,
+                _registered_method=True)
+        self.DeleteReservation = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteReservation',
+                request_serializer=database__pb2.DeleteReservationRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteReservationsForIPAM = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteReservationsForIPAM',
+                request_serializer=database__pb2.DeleteReservationsForIPAMRequest.SerializeToString,
+                response_deserializer=database__pb2.DeleteCountReply.FromString,
+                _registered_method=True)
+        self.ReleaseHaloedAddresses = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ReleaseHaloedAddresses',
+                request_serializer=database__pb2.ReleaseHaloedAddressesRequest.SerializeToString,
+                response_deserializer=database__pb2.DeleteCountReply.FromString,
+                _registered_method=True)
+        self.GetAddressesInUse = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAddressesInUse',
+                request_serializer=database__pb2.GetAddressesInUseRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAddressesInUseReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -286,6 +326,55 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ReserveAddress(self, request, context):
+        """IPAM Reservation Operations (MariaDB)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReleaseAddress(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetReservation(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetReservationsForIPAM(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteReservation(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteReservationsForIPAM(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReleaseHaloedAddresses(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAddressesInUse(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -398,6 +487,46 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetObjectsByState,
                     request_deserializer=database__pb2.GetObjectsByStateRequest.FromString,
                     response_serializer=database__pb2.GetObjectsByStateReply.SerializeToString,
+            ),
+            'ReserveAddress': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReserveAddress,
+                    request_deserializer=database__pb2.ReserveAddressRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'ReleaseAddress': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReleaseAddress,
+                    request_deserializer=database__pb2.ReleaseAddressRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetReservation': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetReservation,
+                    request_deserializer=database__pb2.GetReservationRequest.FromString,
+                    response_serializer=database__pb2.GetReservationReply.SerializeToString,
+            ),
+            'GetReservationsForIPAM': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetReservationsForIPAM,
+                    request_deserializer=database__pb2.GetReservationsForIPAMRequest.FromString,
+                    response_serializer=database__pb2.GetReservationsForIPAMReply.SerializeToString,
+            ),
+            'DeleteReservation': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteReservation,
+                    request_deserializer=database__pb2.DeleteReservationRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteReservationsForIPAM': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteReservationsForIPAM,
+                    request_deserializer=database__pb2.DeleteReservationsForIPAMRequest.FromString,
+                    response_serializer=database__pb2.DeleteCountReply.SerializeToString,
+            ),
+            'ReleaseHaloedAddresses': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReleaseHaloedAddresses,
+                    request_deserializer=database__pb2.ReleaseHaloedAddressesRequest.FromString,
+                    response_serializer=database__pb2.DeleteCountReply.SerializeToString,
+            ),
+            'GetAddressesInUse': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAddressesInUse,
+                    request_deserializer=database__pb2.GetAddressesInUseRequest.FromString,
+                    response_serializer=database__pb2.GetAddressesInUseReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -994,6 +1123,222 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetObjectsByState',
             database__pb2.GetObjectsByStateRequest.SerializeToString,
             database__pb2.GetObjectsByStateReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReserveAddress(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ReserveAddress',
+            database__pb2.ReserveAddressRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReleaseAddress(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ReleaseAddress',
+            database__pb2.ReleaseAddressRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetReservation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetReservation',
+            database__pb2.GetReservationRequest.SerializeToString,
+            database__pb2.GetReservationReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetReservationsForIPAM(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetReservationsForIPAM',
+            database__pb2.GetReservationsForIPAMRequest.SerializeToString,
+            database__pb2.GetReservationsForIPAMReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteReservation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteReservation',
+            database__pb2.DeleteReservationRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteReservationsForIPAM(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteReservationsForIPAM',
+            database__pb2.DeleteReservationsForIPAMRequest.SerializeToString,
+            database__pb2.DeleteCountReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReleaseHaloedAddresses(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ReleaseHaloedAddresses',
+            database__pb2.ReleaseHaloedAddressesRequest.SerializeToString,
+            database__pb2.DeleteCountReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAddressesInUse(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAddressesInUse',
+            database__pb2.GetAddressesInUseRequest.SerializeToString,
+            database__pb2.GetAddressesInUseReply.FromString,
             options,
             channel_credentials,
             insecure,

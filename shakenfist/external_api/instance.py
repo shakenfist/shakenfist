@@ -45,8 +45,8 @@ from shakenfist.schema.operations.node_inst_netdesc_op \
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import ipam
 from shakenfist.network import network as sfnet
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist import scheduler
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.artifact import Artifact
@@ -187,7 +187,7 @@ instance_get_example_deleted = """{
 }"""
 
 
-class InstanceEndpoint(sf_api.Resource):
+class InstanceEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get instance information.',
         [('instance_ref', 'query', 'uuidorname',
@@ -319,12 +319,12 @@ def _netdesc_allocate_address(inst, netdesc, order):
         else:
             if 'address' not in netdesc or not netdesc['address']:
                 netdesc['address'] = n.ipam.reserve_random_free_address(
-                    inst.unique_label(), ipam.RESERVATION_TYPE_INSTANCE, '')
+                    inst.unique_label(), ReservationType.INSTANCE, '')
                 inst.add_event(
                     EVENT_TYPE_AUDIT, 'allocated ip address', extra=netdesc)
             else:
                 if not n.ipam.reserve(netdesc['address'], inst.unique_label(),
-                                      ipam.RESERVATION_TYPE_INSTANCE, ''):
+                                      ReservationType.INSTANCE, ''):
                     inst.enqueue_delete_due_error(
                         'failed to reserve an IP on network %s'
                         % netdesc['network_uuid'])
@@ -390,7 +390,7 @@ instances_get_example = """[
 VALID_SIDE_CHANNELS = ['sf-agent', 'sf-agent2']
 
 
-class InstancesEndpoint(sf_api.Resource):
+class InstancesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get all instances visible to the currently '
                      'authenticated namespace.',
@@ -901,7 +901,7 @@ instance_interface_create_example = """{
 }"""
 
 
-class InstanceInterfacesEndpoint(sf_api.Resource):
+class InstanceInterfacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'List network interfaces for an instance.',
         [('instance_ref', 'query', 'uuidorname',
@@ -1042,7 +1042,7 @@ instance_events_example = """[
 ]"""
 
 
-class InstanceEventsEndpoint(sf_api.Resource):
+class InstanceEventsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get instance event information.',
         [
@@ -1064,7 +1064,7 @@ class InstanceEventsEndpoint(sf_api.Resource):
             return list(eventdb.read_events(limit=limit, event_type=event_type))
 
 
-class InstanceRebootSoftEndpoint(sf_api.Resource):
+class InstanceRebootSoftEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Soft (ACPI) reboot an instance.',
         [('instance_ref', 'query', 'uuidorname',
@@ -1088,7 +1088,7 @@ class InstanceRebootSoftEndpoint(sf_api.Resource):
             return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
-class InstanceRebootHardEndpoint(sf_api.Resource):
+class InstanceRebootHardEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Hard (reset switch) reboot an instance.',
         [('instance_ref', 'query', 'uuidorname',
@@ -1112,7 +1112,7 @@ class InstanceRebootHardEndpoint(sf_api.Resource):
             return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
-class InstancePowerOffEndpoint(sf_api.Resource):
+class InstancePowerOffEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Power off an instance.',
         [('instance_ref', 'query', 'uuidorname',
@@ -1136,7 +1136,7 @@ class InstancePowerOffEndpoint(sf_api.Resource):
             return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
-class InstancePowerOnEndpoint(sf_api.Resource):
+class InstancePowerOnEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Power on an instance.',
         [('instance_ref', 'query', 'uuidorname',
@@ -1160,7 +1160,7 @@ class InstancePowerOnEndpoint(sf_api.Resource):
             return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
-class InstancePauseEndpoint(sf_api.Resource):
+class InstancePauseEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Pause an instance.',
         [('instance_ref', 'query', 'uuidorname',
@@ -1184,7 +1184,7 @@ class InstancePauseEndpoint(sf_api.Resource):
             return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
-class InstanceUnpauseEndpoint(sf_api.Resource):
+class InstanceUnpauseEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Unpause an instance.',
         [('instance_ref', 'query', 'uuidorname',
@@ -1208,7 +1208,7 @@ class InstanceUnpauseEndpoint(sf_api.Resource):
             return sf_api.error(409, f'Invalid lifecycle state: {e}')
 
 
-class InstanceMetadatasEndpoint(sf_api.Resource):
+class InstanceMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Fetch metadata for an instance.',
         [('instance_ref', 'query', 'uuidorname',
@@ -1273,7 +1273,7 @@ def _validate_instance_metadata(key, value):
                 return sf_api.error(400, 'affinity dictionary values should be integers')
 
 
-class InstanceMetadataEndpoint(sf_api.Resource):
+class InstanceMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Update a metadata key for an instance.',
         [
@@ -1321,7 +1321,7 @@ class InstanceMetadataEndpoint(sf_api.Resource):
         instance_from_db.remove_metadata_key(key)
 
 
-class InstanceConsoleDataEndpoint(sf_api.Resource):
+class InstanceConsoleDataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Fetch console data from an instance.',
         [
@@ -1402,7 +1402,7 @@ delete-this-file=1
 ca=-----BEGIN CERTIFICATE-----\nMIIEF...16br/Fw==\n-----END CERTIFICATE-----\n"""
 
 
-class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
+class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances',
         ('Fetch a virt-viewer .vv file describing how to connect to the VDI console '
@@ -1449,7 +1449,7 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
         return resp
 
 
-class InstanceAgentPutEndpoint(sf_api.Resource):
+class InstanceAgentPutEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Upload a file to an instance via the Shaken Fist agent.',
         [
@@ -1518,7 +1518,7 @@ class InstanceAgentPutEndpoint(sf_api.Resource):
         return o.external_view()
 
 
-class InstanceAgentGetEndpoint(sf_api.Resource):
+class InstanceAgentGetEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Download a file from an instance via the Shaken Fist agent.',
         [
@@ -1558,7 +1558,7 @@ class InstanceAgentGetEndpoint(sf_api.Resource):
         return o.external_view()
 
 
-class InstanceAgentExecuteEndpoint(sf_api.Resource):
+class InstanceAgentExecuteEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Execute a command within an instance via the Shaken Fist agent.',
         [
@@ -1598,7 +1598,7 @@ class InstanceAgentExecuteEndpoint(sf_api.Resource):
         return o.external_view()
 
 
-class InstanceScreenshotEndpoint(sf_api.Resource):
+class InstanceScreenshotEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Collect a screenshot of an instance.',
         [
@@ -1657,7 +1657,7 @@ instance_outstanding_operations_example = """[
 ]"""
 
 
-class InstanceOutstandingOperationsEndpoint(sf_api.Resource):
+class InstanceOutstandingOperationsEndpoint(api_base.Resource):
     # NOTE(mikal): note that arguments from URL routes (object uuid for example),
     # are not included in the webargs schema because webargs doesn't appear to
     # know how to find them.

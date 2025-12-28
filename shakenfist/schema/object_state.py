@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.sqlalchemy import SQLIndex
 
 
@@ -84,7 +85,7 @@ class ObjectState(BaseModel):
 
     Attributes:
         object_uuid: The UUID of the object this state belongs to.
-        object_type: The type of object (e.g., 'blob', 'instance', 'network').
+        object_type: The type of object (uses ObjectType enum).
         state_value: The current state value (e.g., 'created', 'deleted').
         update_time: Unix timestamp when the state was last updated.
         message: Optional message explaining the state change.
@@ -103,7 +104,8 @@ class ObjectState(BaseModel):
     object_uuid: Annotated[str, Field(max_length=36)]
 
     # Part of composite primary key (object_type, object_uuid)
-    object_type: Annotated[str, SQLIndex(), Field(max_length=32)]
+    # Uses ObjectType enum for type safety and efficient storage
+    object_type: Annotated[ObjectType, SQLIndex()]
 
     # The actual state value - validated per-type in Python code
     state_value: Annotated[str, SQLIndex(), Field(max_length=32)]

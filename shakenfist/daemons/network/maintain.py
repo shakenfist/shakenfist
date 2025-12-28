@@ -11,8 +11,8 @@ from shakenfist.exceptions import LockException
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
-from shakenfist import ipam
 from shakenfist.network import network
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.network import interface
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
@@ -100,9 +100,8 @@ class Job(util_concurrency.Job):
                 # a startup race.
                 for addr in fn.ipam.in_use:
                     resv = fn.ipam.get_reservation(addr)
-                    if resv and resv['type'] == ipam.RESERVATION_TYPE_ROUTED:
-                        network_uuid = resv['user'][1]
-                        routed_by_network[network_uuid].append(addr)
+                    if resv and resv.reservation_type == ReservationType.ROUTED:
+                        routed_by_network[resv.user_uuid].append(addr)
 
             # Ensure we are on every network we have a host for
             for network_uuid in host_networks:

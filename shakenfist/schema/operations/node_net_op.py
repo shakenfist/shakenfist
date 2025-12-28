@@ -1,8 +1,6 @@
 from enum import Enum
 from typing import List
-from typing import Literal
 from typing import Optional
-from typing import Union
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -38,7 +36,7 @@ class model(BaseModel):
     uuid: UUID4
     # This should be a UUID, but there's some history...
     node_uuid: str
-    network_uuid: Union[UUID4, Literal['floating']]
+    network_uuid: UUID4
     priority: PRIORITY
     request_id: Optional[str]
     tasks: List[model_tasks]

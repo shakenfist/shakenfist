@@ -34,6 +34,16 @@ service DatabaseService {
   rpc SetObjectState (SetObjectStateRequest) returns (StatusReply) {}
   rpc DeleteObjectState (DeleteObjectStateRequest) returns (StatusReply) {}
   rpc GetObjectsByState (GetObjectsByStateRequest) returns (GetObjectsByStateReply) {}
+
+  // IPAM Reservation Operations (MariaDB)
+  rpc ReserveAddress (ReserveAddressRequest) returns (StatusReply) {}
+  rpc ReleaseAddress (ReleaseAddressRequest) returns (StatusReply) {}
+  rpc GetReservation (GetReservationRequest) returns (GetReservationReply) {}
+  rpc GetReservationsForIPAM (GetReservationsForIPAMRequest) returns (GetReservationsForIPAMReply) {}
+  rpc DeleteReservation (DeleteReservationRequest) returns (StatusReply) {}
+  rpc DeleteReservationsForIPAM (DeleteReservationsForIPAMRequest) returns (DeleteCountReply) {}
+  rpc ReleaseHaloedAddresses (ReleaseHaloedAddressesRequest) returns (DeleteCountReply) {}
+  rpc GetAddressesInUse (GetAddressesInUseRequest) returns (GetAddressesInUseReply) {}
 }
 
 // Generic status reply
@@ -245,4 +255,72 @@ message GetObjectsByStateRequest {
 
 message GetObjectsByStateReply {
   repeated string object_uuids = 1;
+}
+
+// IPAM Reservation Operations (MariaDB)
+// These operations manage IP address reservations in MariaDB for atomic
+// address allocation and efficient queries.
+
+message IPAMReservationData {
+  string ipam_uuid = 1;
+  string address = 2;
+  string reservation_type = 3;  // e.g., 'instance', 'gateway', 'deletion-halo'
+  string user_type = 4;         // Object type using this address (optional)
+  string user_uuid = 5;         // UUID of object using this address (optional)
+  double reserved_at = 6;       // Unix timestamp when reserved
+  string comment = 7;           // Optional description
+}
+
+message ReserveAddressRequest {
+  IPAMReservationData reservation = 1;
+}
+
+message ReleaseAddressRequest {
+  string ipam_uuid = 1;
+  string address = 2;
+  IPAMReservationData halo_reservation = 3;  // The deletion-halo data to set
+}
+
+message GetReservationRequest {
+  string ipam_uuid = 1;
+  string address = 2;
+}
+
+message GetReservationReply {
+  bool found = 1;
+  IPAMReservationData reservation = 2;
+}
+
+message GetReservationsForIPAMRequest {
+  string ipam_uuid = 1;
+}
+
+message GetReservationsForIPAMReply {
+  repeated IPAMReservationData reservations = 1;
+}
+
+message DeleteReservationRequest {
+  string ipam_uuid = 1;
+  string address = 2;
+}
+
+message DeleteReservationsForIPAMRequest {
+  string ipam_uuid = 1;
+}
+
+message DeleteCountReply {
+  int64 count = 1;
+}
+
+message ReleaseHaloedAddressesRequest {
+  string ipam_uuid = 1;
+  double older_than = 2;  // Unix timestamp - delete halos reserved before this
+}
+
+message GetAddressesInUseRequest {
+  string ipam_uuid = 1;
+}
+
+message GetAddressesInUseReply {
+  repeated string addresses = 1;
 }

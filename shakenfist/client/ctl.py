@@ -310,8 +310,173 @@ def migrate_state_to_mariadb(dry_run):
         click.echo('\nMigration complete. You can now start Shaken Fist services.')
 
 
+@click.command()
+@click.option('--dry-run', is_flag=True, default=False,
+              help='Show what would be migrated without making changes')
+def migrate_ipam_to_mariadb(dry_run):
+    """Migrate all IPAM reservations from etcd to MariaDB.
+
+    This command should be run once during an upgrade to move IPAM reservation
+    data from etcd to the MariaDB ipam_reservations table. All Shaken Fist
+    services should be stopped before running this command.
+
+    After migration, the reservation entries are removed from etcd.
+    """
+    from shakenfist.schema.ipam_reservation import IPAMReservation
+
+    # Ensure the MariaDB schema exists
+    if not dry_run:
+        click.echo('Ensuring MariaDB schema exists...')
+        mariadb.ensure_schema()
+
+    total_migrated = 0
+    total_skipped = 0
+    total_errors = 0
+
+    click.echo('\nScanning for IPAM reservations in etcd...')
+
+    # Get all IPAM reservation paths from etcd
+    # The path format is /sf/ipam_reservations/{ipam_uuid}/{address}
+    for key, data in etcd.get_prefix_raw('/sf/ipam_reservations/'):
+        # Parse the key to extract ipam_uuid and address
+        # Key format: /sf/ipam_reservations/{ipam_uuid}/{address}
+        parts = key.split('/')
+        if len(parts) < 5:
+            click.echo(f'  Skipping invalid key: {key}')
+            total_skipped += 1
+            continue
+
+        ipam_uuid = parts[3]
+        address = parts[4]
+
+        if dry_run:
+            res_type = data.get('type', 'unknown')
+            click.echo(f'  Would migrate {ipam_uuid}/{address}: {res_type}')
+            total_migrated += 1
+            continue
+
+        try:
+            # Convert legacy data to IPAMReservation
+            reservation = IPAMReservation.from_legacy_dict(ipam_uuid, data)
+
+            # Write to MariaDB - use direct access since we're in ctl
+            success = mariadb._direct_reserve_address(reservation)
+            if success:
+                # Remove from etcd
+                etcd.delete_raw(key)
+                total_migrated += 1
+            else:
+                # Address already exists in MariaDB
+                click.echo(f'  Skipping {ipam_uuid}/{address}: already in MariaDB')
+                # Still remove from etcd since the data is in MariaDB
+                etcd.delete_raw(key)
+                total_skipped += 1
+        except Exception as e:
+            click.echo(f'  Error migrating {ipam_uuid}/{address}: {e}')
+            total_errors += 1
+
+        # Show progress every 100 reservations
+        if (total_migrated + total_skipped + total_errors) % 100 == 0:
+            click.echo(
+                f'  ... {total_migrated + total_skipped + total_errors} '
+                'reservations processed')
+
+    click.echo(f'\nTotal: {total_migrated} migrated, {total_skipped} skipped, '
+               f'{total_errors} errors')
+
+    if dry_run:
+        click.echo('\nThis was a dry run. No changes were made.')
+    else:
+        click.echo('\nMigration complete. You can now start Shaken Fist services.')
+
+
+@click.command()
+@click.option('--dry-run', is_flag=True, default=False,
+              help='Show what would be migrated without making changes')
+def migrate_floating_network_uuid(dry_run):
+    """Migrate the floating network from legacy UUID to well-known UUID.
+
+    The floating network previously used the string "floating" as its UUID,
+    which is not a valid UUID4. This command migrates it to use the well-known
+    UUID f10a7f10-a7f1-4a7f-a10a-7f10a7f10a7f (containing "F10A7" = FLOAT).
+
+    This command should be run once during an upgrade. All Shaken Fist
+    services should be stopped before running this command.
+    """
+    from shakenfist.constants import FLOATING_NETWORK_UUID
+
+    # Check if legacy floating network exists
+    legacy_network = etcd.get('network', None, 'floating')
+    if not legacy_network:
+        click.echo('No legacy floating network found (UUID "floating").')
+        click.echo('Either already migrated or never created.')
+        return
+
+    # Check if new UUID already exists
+    new_network = etcd.get('network', None, FLOATING_NETWORK_UUID)
+    if new_network:
+        click.echo(f'Network with new UUID {FLOATING_NETWORK_UUID} already exists.')
+        click.echo('Cannot migrate - would overwrite existing network.')
+        return
+
+    click.echo('Found legacy floating network with UUID "floating"')
+    click.echo(f'Will migrate to UUID: {FLOATING_NETWORK_UUID}')
+
+    if dry_run:
+        click.echo('\nDry run - no changes made.')
+        return
+
+    # Migrate the network object
+    click.echo('\nMigrating network object...')
+    legacy_network['uuid'] = FLOATING_NETWORK_UUID
+    etcd.put('network', None, FLOATING_NETWORK_UUID, legacy_network)
+    etcd.delete('network', None, 'floating')
+    click.echo('  Network object migrated.')
+
+    # Migrate the IPAM object
+    click.echo('Migrating IPAM object...')
+    legacy_ipam = etcd.get('ipam', None, 'floating')
+    if legacy_ipam:
+        legacy_ipam['uuid'] = FLOATING_NETWORK_UUID
+        etcd.put('ipam', None, FLOATING_NETWORK_UUID, legacy_ipam)
+        etcd.delete('ipam', None, 'floating')
+        click.echo('  IPAM object migrated.')
+    else:
+        click.echo('  No legacy IPAM object found.')
+
+    # Migrate network state in MariaDB if it exists
+    click.echo('Migrating state in MariaDB...')
+    try:
+        state_data = mariadb.get_state('network', 'floating')
+        if state_data:
+            mariadb.set_state('network', FLOATING_NETWORK_UUID, state_data)
+            mariadb.delete_state('network', 'floating')
+            click.echo('  Network state migrated.')
+        else:
+            click.echo('  No network state found in MariaDB.')
+    except Exception as e:
+        click.echo(f'  Could not migrate MariaDB state: {e}')
+
+    # Migrate IPAM state in MariaDB if it exists
+    try:
+        ipam_state = mariadb.get_state('ipam', 'floating')
+        if ipam_state:
+            mariadb.set_state('ipam', FLOATING_NETWORK_UUID, ipam_state)
+            mariadb.delete_state('ipam', 'floating')
+            click.echo('  IPAM state migrated.')
+        else:
+            click.echo('  No IPAM state found in MariaDB.')
+    except Exception as e:
+        click.echo(f'  Could not migrate IPAM MariaDB state: {e}')
+
+    click.echo('\nMigration complete.')
+    click.echo('You can now start Shaken Fist services.')
+
+
 cli.add_command(bootstrap_system_key)
+cli.add_command(migrate_floating_network_uuid)
 cli.add_command(migrate_state_to_mariadb)
+cli.add_command(migrate_ipam_to_mariadb)
 cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
 cli.add_command(verify_config)

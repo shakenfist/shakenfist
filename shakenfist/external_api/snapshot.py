@@ -25,7 +25,7 @@ LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
-class InstanceSnapshotEndpoint(sf_api.Resource):
+class InstanceSnapshotEndpoint(api_base.Resource):
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

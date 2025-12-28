@@ -511,7 +511,7 @@ class Instance(dbowo):
 
     @property
     def instance_path(self):
-        return os.path.join(config.STORAGE_PATH, 'instances', self.uuid)
+        return os.path.join(config.STORAGE_PATH, 'instances', str(self.uuid))
 
     # Calculated properties
     @property
@@ -1115,7 +1115,7 @@ class Instance(dbowo):
         # meta_data.json -- note that limits on hostname are imposed at the API layer
         md = json.dumps({
             'random_seed': base64.b64encode(os.urandom(512)).decode('ascii'),
-            'uuid': self.uuid,
+            'uuid': str(self.uuid),
             'availability_zone': config.ZONE,
             'hostname': '%s.local' % self.name,
             'launch_index': 0,
@@ -1170,7 +1170,7 @@ class Instance(dbowo):
                         'name': devname,
                         'mtu': config.MAX_HYPERVISOR_MTU - 50,
                         'type': 'vif',
-                        'vif_id': iface.uuid
+                        'vif_id': str(iface.uuid)
                     }
                 )
 
@@ -1180,7 +1180,7 @@ class Instance(dbowo):
                         'id': f'{iface.network_uuid}-{iface.order}',
                         'link': devname,
                         'type': 'ipv4',
-                        'network_id': iface.network_uuid
+                        'network_id': str(iface.network_uuid)
                     }
                 )
 
@@ -1769,12 +1769,12 @@ class Instance(dbowo):
                 artifacts.append(artifact.Artifact.new(
                     artifact.Artifact.TYPE_OTHER,
                     f'{artifact.INSTANCE_URL}{self.uuid}/console',
-                    name='%s/console' % self.uuid, max_versions=1,
+                    name=f'{self.uuid}/console', max_versions=1,
                     namespace='system'))
             artifacts.append(artifact.Artifact.new(
                     artifact.Artifact.TYPE_OTHER,
                     f'{artifact.INSTANCE_URL}{self.uuid}/console',
-                    name='%s/console' % self.uuid, max_versions=1,
+                    name=f'{self.uuid}/console', max_versions=1,
                     namespace=self.namespace))
 
             blob_uuid = str(uuid4())

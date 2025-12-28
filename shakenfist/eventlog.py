@@ -135,8 +135,8 @@ def _add_event_multi_inner(
 
             try:
                 eo = request.objects.add()
-                eo.object_type = object_type
-                eo.object_uuid = object_uuid
+                eo.object_type = str(object_type)
+                eo.object_uuid = str(object_uuid)
             except TypeError as e:
                 log.warning(
                     f'Failed to add event for {object_type} with uuid '
@@ -158,37 +158,6 @@ def _add_event_multi_inner(
                      'trying single events: %s' % e)
 
         raise e
-
-
-def _add_event_inner(
-        event_type, log, timestamp, simpler_objects, message, duration=None,
-        extra=None):
-    # Attempt to send with the older EventRequest
-    failed = simpler_objects
-    try:
-        channel = get_eventlog_client()
-        stub = event_pb2_grpc.EventServiceStub(channel)
-
-        for object_type, object_uuid in simpler_objects:
-            request = event_pb2.EventRequest(
-                object_type=object_type,
-                object_uuid=object_uuid,
-                event_type=event_type,
-                timestamp=timestamp,
-                fqdn=config.NODE_NAME,
-                duration=duration,
-                message=message,
-                extra=util_json.json_dump(extra)
-            )
-            response = stub.RecordEvent(request)
-
-            if not response.ack:
-                del failed[(object_type, object_uuid)]
-
-    except grpc._channel._InactiveRpcError as e:
-        log.info('Failed to send event with gRPC, adding to dead letter queue: %s' % e)
-
-    return failed
 
 
 def _add_event_dlq_inner(
@@ -381,7 +350,8 @@ def upgrade_data_store():
 
 
 def _shard_db_path(objtype, objuuid):
-    path = os.path.join(config.STORAGE_PATH, 'events', objtype, objuuid[0:2])
+    objuuid_str = str(objuuid)
+    path = os.path.join(config.STORAGE_PATH, 'events', objtype, objuuid_str[0:2])
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -577,7 +547,7 @@ class EventLogChunk:
             })
 
         self.dbdir = _shard_db_path(self.objtype, self.objuuid)
-        self.dbpath = os.path.join(self.dbdir, self.objuuid + '.' + self.chunk)
+        self.dbpath = os.path.join(self.dbdir, f'{self.objuuid}.{self.chunk}')
         self.bootstrapped = False
 
         self.lock = util_concurrency.NodeLock(

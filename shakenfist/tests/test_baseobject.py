@@ -15,7 +15,7 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
                     State(value=DatabaseBackedObject.STATE_CREATED, update_time=10),
                 ])
     def test_state(self, mock_mariadb_get_state):
-        d = DatabaseBackedObject('uuid')
+        d = DatabaseBackedObject('12345678-1234-4321-8234-123456789012')
         self.assertEqual(d.state, State(value=None, update_time=2))
         self.assertEqual(d.state,
                          State(value=DatabaseBackedObject.STATE_INITIAL,
@@ -54,7 +54,7 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
                 ])
     def test_property_error_msg(self, mock_get_attribute, mock_mariadb_get_state,
                                 mock_set_attribute, mock_add_event):
-        d = DatabaseBackedObject('uuid')
+        d = DatabaseBackedObject('12345678-1234-4321-8234-123456789012')
         self.assertEqual(d.error, None)
         self.assertEqual(d.error, 'bad error')
 

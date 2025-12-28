@@ -41,7 +41,7 @@ class LibvirtConnection():
 
     def get_domain_from_sf_uuid(self, u):
         try:
-            return self.conn.lookupByName('sf:' + u)
+            return self.conn.lookupByName(f'sf:{u}')
         except self.libvirt.libvirtError as e:
             LOG.debug(f'SF libvirt domain {u} not found: {e}')
             return None

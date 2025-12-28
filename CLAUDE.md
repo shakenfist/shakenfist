@@ -37,8 +37,20 @@ cd shakenfist/protos
 ../../protos/_make_stubs.sh
 ```
 
-**Note:** Requires `grpcio-tools` installed. The script works on both macOS and
-Linux.
+**IMPORTANT:** Always use `_make_stubs.sh` - never run `grpc_tools.protoc` directly.
+The script performs essential post-processing to fix import statements in the
+generated code. Without this fix, the generated `*_grpc.py` files will have
+incorrect imports (e.g., `import foo_pb2` instead of
+`from shakenfist.protos import foo_pb2`) and will fail at runtime with
+`ModuleNotFoundError`.
+
+**IMPORTANT:** You must use the exact versions of gRPC dependencies specified in
+`pyproject.toml` when generating stubs. The generated code includes version checks
+that will fail at runtime if there's a mismatch. Check pyproject.toml for the
+current pinned versions (e.g., `grpcio==1.70.0`, `grpcio-tools==1.70.0`,
+`protobuf==5.29.5`).
+
+**Note:** The script works on both macOS and Linux.
 
 ## Code Style and Conventions
 
