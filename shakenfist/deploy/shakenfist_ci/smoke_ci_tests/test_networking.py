@@ -133,7 +133,8 @@ class TestNetworking(base.BaseNamespacedTestCase):
         # Ensure that interfaces are now marked as deleted
         for iface in nics:
             self.assertEqual(
-                'deleted', self.test_client.get_interface(iface['uuid'])['state'])
+                'deleted', self.test_client.get_interface(iface['uuid'])['state'],
+                f'Interface {iface["uuid"]} did not delete')
 
     def test_extraneous_network_duplicates(self):
         dupnet = self.test_client.allocate_network(
