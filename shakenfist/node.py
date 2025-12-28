@@ -285,10 +285,10 @@ class Node(dbo):
         self._db_set_attribute('instances', {'instances': value})
 
     def add_instance(self, instance_uuid):
-        self._add_item_in_attribute_list('instances', instance_uuid)
+        self._add_item_in_attribute_list('instances', str(instance_uuid))
 
     def remove_instance(self, instance_uuid):
-        self._remove_item_in_attribute_list('instances', instance_uuid)
+        self._remove_item_in_attribute_list('instances', str(instance_uuid))
 
     @property
     def dependency_versions(self):

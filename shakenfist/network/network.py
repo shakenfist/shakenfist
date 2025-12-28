@@ -290,12 +290,12 @@ class Network(dbowo):
         return nis.get('networkinterfaces', [])
 
     def add_networkinterface(self, ni):
-        self._add_item_in_attribute_list('networkinterfaces', ni.uuid)
+        self._add_item_in_attribute_list('networkinterfaces', str(ni.uuid))
 
     def remove_networkinterface(self, ni):
         if ni.ipv4:
             self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
-        self._remove_item_in_attribute_list('networkinterfaces', ni.uuid)
+        self._remove_item_in_attribute_list('networkinterfaces', str(ni.uuid))
 
     def _update_floating_gateway(self, gateway):
         original_routing = self.routing
