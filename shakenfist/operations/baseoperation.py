@@ -169,7 +169,7 @@ class BaseClusterOperation(BaseOperation):
 
         return {
             'operation_type': self.object_type,
-            'uuid': self.uuid,
+            'uuid': str(self.uuid),
             'state': self.state.value,
             'tasks': tasks
         }
