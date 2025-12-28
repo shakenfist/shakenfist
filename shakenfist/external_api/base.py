@@ -488,6 +488,6 @@ class Resource(flask_restful.Resource):
     # wrapper deliberately reraises the exception so that
     # generic_wrapper can handle the response after logging.
     method_decorators = [
-        sf_api.generic_wrapper,
-        record_exception
+        record_exception,
+        sf_api.generic_wrapper
         ]
