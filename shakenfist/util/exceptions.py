@@ -81,3 +81,4 @@ def _thread_excepthook(args):
 def install_exception_tracking():
     sys.excepthook = _tracking_excepthook
     threading.excepthook = _thread_excepthook
+    LOG.info('Installed exception tracking')

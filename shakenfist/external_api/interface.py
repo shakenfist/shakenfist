@@ -51,7 +51,7 @@ interface_get_example = """{
 }"""
 
 
-class InterfaceEndpoint(sf_api.Resource):
+class InterfaceEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Fetch details for an interface.',
         [('interface_uuid', 'body', 'uuid', 'The interface to fetch details for.', True)],
@@ -68,7 +68,7 @@ class InterfaceEndpoint(sf_api.Resource):
         return ni.external_view()
 
 
-class InterfaceFloatEndpoint(sf_api.Resource):
+class InterfaceFloatEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Float (make publicly available via a floating IP) an interface.',
         [('interface_uuid', 'body', 'uuid', 'The interface to float.', True)],
@@ -99,7 +99,7 @@ class InterfaceFloatEndpoint(sf_api.Resource):
             n.set_last_cluster_operation(op_type, op_uuid)
 
 
-class InterfaceDefloatEndpoint(sf_api.Resource):
+class InterfaceDefloatEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Defloat an interface.',
         [('interface_uuid', 'body', 'uuid', 'The interface to defloat.', True)],
@@ -127,7 +127,7 @@ class InterfaceDefloatEndpoint(sf_api.Resource):
             n.set_last_cluster_operation(op_type, op_uuid)
 
 
-class InterfaceMetadatasEndpoint(sf_api.Resource):
+class InterfaceMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Fetch metadata for an interface.',
         [('interface_uuid', 'query', 'uuid', 'The interface to add a key to.', True)],
@@ -169,7 +169,7 @@ class InterfaceMetadatasEndpoint(sf_api.Resource):
         ni.add_metadata_key(key, value)
 
 
-class InterfaceMetadataEndpoint(sf_api.Resource):
+class InterfaceMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'interfaces', 'Update a metadata key for an interface.',
         [

@@ -46,7 +46,7 @@ node_delete_example = """{
 }"""
 
 
-class NodeEndpoint(sf_api.Resource):
+class NodeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Get information for a node.',
         [('node_name', 'query', 'node', 'The name of a node.', True)],
@@ -97,7 +97,7 @@ node_list_example = """[
 ]"""
 
 
-class NodesEndpoint(sf_api.Resource):
+class NodesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'List all nodes.',
         [],
@@ -140,7 +140,7 @@ node_events_example = """[
 ]"""
 
 
-class NodeEventsEndpoint(sf_api.Resource):
+class NodeEventsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Get nodes event information.',
         [
@@ -166,7 +166,7 @@ node_process_metrics_example = """[
 ]"""
 
 
-class NodeProcessMetricsEndpoint(sf_api.Resource):
+class NodeProcessMetricsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Get process metrics for a given node.',
         [
@@ -184,7 +184,7 @@ class NodeProcessMetricsEndpoint(sf_api.Resource):
         return n.process_metrics
 
 
-class NodeMetadatasEndpoint(sf_api.Resource):
+class NodeMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Fetch metadata for a node.',
         [('node', 'query', 'node', 'The node to fetch metadata for.', True)],
@@ -228,7 +228,7 @@ class NodeMetadatasEndpoint(sf_api.Resource):
         n.add_metadata_key(key, value)
 
 
-class NodeMetadataEndpoint(sf_api.Resource):
+class NodeMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'nodes', 'Update a metadata key for a node.',
         [

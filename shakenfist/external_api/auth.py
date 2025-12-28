@@ -71,7 +71,7 @@ auth_token_example = """{
 """
 
 
-class AuthEndpoint(sf_api.Resource):
+class AuthEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Authenticate and create access token.',
         [
@@ -133,7 +133,7 @@ namespace_list_example = """[
 ]"""
 
 
-class AuthNamespacesEndpoint(sf_api.Resource):
+class AuthNamespacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Create a namespace.',
         [
@@ -212,7 +212,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
         return retval
 
 
-class AuthNamespaceEndpoint(sf_api.Resource):
+class AuthNamespaceEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Delete a namespace.',
         [
@@ -288,7 +288,7 @@ def _namespace_keys_putpost(ns=None, key_name=None, key=None):
     return key_name
 
 
-class AuthNamespaceKeysEndpoint(sf_api.Resource):
+class AuthNamespaceKeysEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Get the authentication keys for a namespace.',
         [
@@ -328,7 +328,7 @@ class AuthNamespaceKeysEndpoint(sf_api.Resource):
         return _namespace_keys_putpost(namespace_from_db, key_name, key)
 
 
-class AuthNamespaceKeyEndpoint(sf_api.Resource):
+class AuthNamespaceKeyEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Update an authentication key for a namespace.',
         [
@@ -377,7 +377,7 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
             return sf_api.error(404, 'key name not found in namespace')
 
 
-class AuthMetadatasEndpoint(sf_api.Resource):
+class AuthMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Fetch metadata for a namespace.',
         [
@@ -418,7 +418,7 @@ class AuthMetadatasEndpoint(sf_api.Resource):
         namespace_from_db.add_metadata_key(key, value)
 
 
-class AuthMetadataEndpoint(sf_api.Resource):
+class AuthMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Update a metadata key for a namespace.',
         [
@@ -466,7 +466,7 @@ class AuthMetadataEndpoint(sf_api.Resource):
         namespace_from_db.remove_metadata_key(key)
 
 
-class AuthNamespaceTrustsEndpoint(sf_api.Resource):
+class AuthNamespaceTrustsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Trust an external namespace.',
         [
@@ -494,7 +494,7 @@ class AuthNamespaceTrustsEndpoint(sf_api.Resource):
         return namespace_from_db.external_view()
 
 
-class AuthNamespaceTrustEndpoint(sf_api.Resource):
+class AuthNamespaceTrustEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Remove trust from an external namespace.',
         [

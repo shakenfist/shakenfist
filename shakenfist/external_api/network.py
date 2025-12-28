@@ -112,7 +112,7 @@ network_delete_example = """
 """
 
 
-class NetworkEndpoint(sf_api.Resource):
+class NetworkEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network information.',
         [('artifact_ref', 'query', 'uuidorname',
@@ -178,7 +178,7 @@ networks_get_example = """[
 ]"""
 
 
-class NetworksEndpoint(sf_api.Resource):
+class NetworksEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get a list of all networks visible to the authenticated namespace.',
         [('all', 'body', 'boolean', 'Include deleted networks.', False)],
@@ -342,7 +342,7 @@ network_events_example = """    [
 ]"""
 
 
-class NetworkEventsEndpoint(sf_api.Resource):
+class NetworkEventsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network event information.',
         [
@@ -392,7 +392,7 @@ network_interfaces_example = """{
 }"""
 
 
-class NetworkInterfacesEndpoint(sf_api.Resource):
+class NetworkInterfacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network interface information.',
         [('network_ref', 'query', 'uuidorname',
@@ -414,7 +414,7 @@ class NetworkInterfacesEndpoint(sf_api.Resource):
         return out
 
 
-class NetworkMetadatasEndpoint(sf_api.Resource):
+class NetworkMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Fetch metadata for a network.',
         [('network_ref', 'query', 'uuidorname',
@@ -455,7 +455,7 @@ class NetworkMetadatasEndpoint(sf_api.Resource):
         network_from_db.add_metadata_key(key, value)
 
 
-class NetworkMetadataEndpoint(sf_api.Resource):
+class NetworkMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Update a metadata key for a network.',
         [
@@ -529,7 +529,7 @@ network_ping_example = """{
 }"""
 
 
-class NetworkPingEndpoint(sf_api.Resource):
+class NetworkPingEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Send ICMP ping traffic to an address on a network.',
         [
@@ -571,7 +571,7 @@ class NetworkPingEndpoint(sf_api.Resource):
 network_allocations_example = ''
 
 
-class NetworkAddressesEndpoint(sf_api.Resource):
+class NetworkAddressesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Return information about the address reservations in a network.',
         [
@@ -593,7 +593,7 @@ class NetworkAddressesEndpoint(sf_api.Resource):
         return out
 
 
-class NetworkRouteAddressEndpoint(sf_api.Resource):
+class NetworkRouteAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Route a floating address to this network, with no DNAT.',
         [
@@ -627,7 +627,7 @@ class NetworkRouteAddressEndpoint(sf_api.Resource):
         return address
 
 
-class NetworkUnrouteAddressEndpoint(sf_api.Resource):
+class NetworkUnrouteAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Remove routing for a floating address to this network.',
         [
@@ -665,7 +665,7 @@ class NetworkUnrouteAddressEndpoint(sf_api.Resource):
             network_from_db.set_last_cluster_operation(op_type, op_uuid)
 
 
-class NetworkDNSAddressEndpoint(sf_api.Resource):
+class NetworkDNSAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Add a custom DNS entry for this network.',
         [
@@ -740,7 +740,7 @@ network_outstanding_operations_example = """[
 ]"""
 
 
-class NetworkOutstandingOperationsEndpoint(sf_api.Resource):
+class NetworkOutstandingOperationsEndpoint(api_base.Resource):
     # NOTE(mikal): note that arguments from URL routes (object uuid for example),
     # are not included in the webargs schema because webargs doesn't appear to
     # know how to find them.

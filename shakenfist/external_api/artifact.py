@@ -179,7 +179,7 @@ artifact_delete_example = """{
 }"""
 
 
-class ArtifactEndpoint(sf_api.Resource):
+class ArtifactEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Get artifact information.',
         [('artifact_ref', 'query', 'uuidorname',
@@ -251,7 +251,7 @@ artifact_uuid_list_example = """[
 ]"""
 
 
-class ArtifactsEndpoint(sf_api.Resource):
+class ArtifactsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', ('Get all artifacts visible to the currently '
                       'authenticated namespace.'),
@@ -375,7 +375,7 @@ class ArtifactsEndpoint(sf_api.Resource):
         return deleted
 
 
-class ArtifactUploadEndpoint(sf_api.Resource):
+class ArtifactUploadEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Convert an upload into an artifact.',
         [
@@ -520,7 +520,7 @@ artifact_events_example = """[
 ]"""
 
 
-class ArtifactEventsEndpoint(sf_api.Resource):
+class ArtifactEventsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Get artifact event information.',
         [
@@ -578,7 +578,7 @@ artifact_versions_example = """[
 ]"""
 
 
-class ArtifactVersionsEndpoint(sf_api.Resource):
+class ArtifactVersionsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Get artifact version information.',
         [('artifact_ref', 'query', 'uuidorname',
@@ -627,7 +627,7 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
         artifact_from_db.max_versions = mv
 
 
-class ArtifactVersionEndpoint(sf_api.Resource):
+class ArtifactVersionEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts',
         ('Delete the specified artifact version. Note that this will only '
@@ -664,7 +664,7 @@ class ArtifactVersionEndpoint(sf_api.Resource):
         return sf_api.error(404, 'artifact index not found')
 
 
-class ArtifactShareEndpoint(sf_api.Resource):
+class ArtifactShareEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Share the specified artifact with all namespaces.',
         [('artifact_ref', 'query', 'uuidorname',
@@ -686,7 +686,7 @@ class ArtifactShareEndpoint(sf_api.Resource):
         return artifact_from_db.external_view()
 
 
-class ArtifactUnshareEndpoint(sf_api.Resource):
+class ArtifactUnshareEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Unshare the specified artifact with all namespaces.',
         [('artifact_ref', 'query', 'uuidorname',
@@ -707,7 +707,7 @@ class ArtifactUnshareEndpoint(sf_api.Resource):
         return artifact_from_db.external_view()
 
 
-class ArtifactMetadatasEndpoint(sf_api.Resource):
+class ArtifactMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Fetch metadata for an artifact.',
         [('artifact_ref', 'qeury', 'uuidorname',
@@ -748,7 +748,7 @@ class ArtifactMetadatasEndpoint(sf_api.Resource):
         artifact_from_db.add_metadata_key(key, value)
 
 
-class ArtifactMetadataEndpoint(sf_api.Resource):
+class ArtifactMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Update a metadata key for an artifact.',
         [
@@ -814,7 +814,7 @@ artifact_outstanding_operations_example = """[
 ]"""
 
 
-class ArtifactOutstandingOperationsEndpoint(sf_api.Resource):
+class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
     # NOTE(mikal): note that arguments from URL routes (object uuid for example),
     # are not included in the webargs schema because webargs doesn't appear to
     # know how to find them.
