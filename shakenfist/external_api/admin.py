@@ -9,7 +9,6 @@ import os
 
 import flask
 from flasgger import swag_from
-from shakenfist_utilities import api as sf_api  # noreorder
 
 from shakenfist import etcd
 from shakenfist import scheduler

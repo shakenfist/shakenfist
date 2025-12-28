@@ -8,7 +8,6 @@
 #   - Has complete CI coverage:
 from functools import partial
 
-from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact

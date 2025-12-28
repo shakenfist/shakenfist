@@ -11,7 +11,6 @@ import uuid
 
 import flask
 from flasgger import swag_from
-from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
