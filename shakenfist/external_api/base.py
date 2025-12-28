@@ -1,13 +1,24 @@
 import json
+import sys
 
 import flask
 import flask_restful
-import requests
+from flask_jwt_extended import decode_token
+from flask_jwt_extended import unset_jwt_cookies
 from flask_jwt_extended import verify_jwt_in_request
+from flask_jwt_extended.exceptions import CSRFError
+from flask_jwt_extended.exceptions import FreshTokenRequired
+from flask_jwt_extended.exceptions import InvalidHeaderError
+from flask_jwt_extended.exceptions import JWTDecodeError
 from flask_jwt_extended.exceptions import NoAuthorizationError
+from flask_jwt_extended.exceptions import RevokedTokenError
+from flask_jwt_extended.exceptions import WrongTokenError
+from jwt.exceptions import PyJWTError
+from jwt.exceptions import DecodeError
+from jwt.exceptions import ExpiredSignatureError
+import requests
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
-import sys
 
 from shakenfist import exceptions
 from shakenfist.network import network
@@ -472,6 +483,115 @@ def redirect_to_eventlog_node(func):
     return wrapper
 
 
+def log_request(func):
+    def wrapper(*args, **kwargs):
+        j = sf_api.flask_get_post_body()
+
+        if j:
+            for key in j:
+                if key == 'uuid':
+                    destkey = 'passed_uuid'
+                else:
+                    destkey = key
+                kwargs[destkey] = j[key]
+
+        formatted_headers = []
+        for header in flask.request.headers:
+            formatted_headers.append(str(header))
+
+        # Ensure key does not appear in logs
+        kwargs_log = kwargs.copy()
+        if 'key' in kwargs_log:
+            kwargs_log['key'] = '*****'
+
+        # Redact a password if any
+        if 'password' in kwargs_log:
+            kwargs_log['password'] = '*****'
+
+        # Redact the JWT auth token in headers as well
+        headers_log = dict(flask.request.headers)
+        if 'Authorization' in headers_log:
+            headers_log = 'Bearer *****'
+
+        # Attempt to lookup the identity from JWT token. This doesn't use
+        # the usual get_jwt_identity() because that requires that the
+        # require_jwt() decorator has been run, and that is not the case
+        # for all paths this wrapper covers. Its ok for there to be no
+        # identity here, for example unprotected paths.
+        identity = None
+        try:
+            auth = flask.request.headers.get('Authorization')
+            if auth:
+                token = auth.split(' ')[1]
+                dt = decode_token(token)
+                identity = dt.get('identity')
+        except Exception:
+            pass
+
+        log = LOG.with_fields({
+            'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
+            'identity': identity,
+            'method': flask.request.method,
+            'url': flask.request.url,
+            'path': flask.request.path,
+            'args': args,
+            'kwargs': kwargs_log,
+            'headers': headers_log
+        })
+        if flask.request.path == '/':
+            # This is likely a load balancer health check
+            log.debug('API request parsed')
+        else:
+            log.info('API request parsed')
+
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def handle_authorization_exceptions(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+
+        except TypeError as e:
+            return sf_api.error(400, str(e), suppress_traceback=False)
+
+        except DecodeError:
+            # Send a more informative message than 'Not enough segments'. If this
+            # is a web browser, redirect them back to the root URL. Otherwise just
+            # return a 401.
+            if flask.request.headers.get('Accept', 'text/html').find('text/html') != -1:
+                resp = flask.redirect('/', code=302)
+                unset_jwt_cookies(resp)
+                return resp
+            return sf_api.error(401, 'invalid JWT in Authorization header',
+                                suppress_traceback=True)
+
+        except ExpiredSignatureError as e:
+            # The JWT looked valid, except it has expired. If this is a web
+            # browser, redirect them back to the root URL. Otherwise just return
+            # a 401.
+            if flask.request.headers.get('Accept', 'text/html').find('text/html') != -1:
+                resp = flask.redirect('/', code=302)
+                unset_jwt_cookies(resp)
+                return resp
+            return sf_api.error(401, str(e), suppress_traceback=True)
+
+        except (JWTDecodeError,
+                NoAuthorizationError,
+                InvalidHeaderError,
+                WrongTokenError,
+                RevokedTokenError,
+                FreshTokenRequired,
+                CSRFError,
+                PyJWTError,
+                ) as e:
+            return sf_api.error(401, str(e), suppress_traceback=True)
+
+    return wrapper
+
+
 def record_exception(func):
     def wrapper(*args, **kwargs):
         try:
@@ -483,11 +603,25 @@ def record_exception(func):
     return wrapper
 
 
+def suppress_exceptions_to_client(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            LOG.exception('Server error')
+            return sf_api.error(500, 'server error: %s' % repr(e),
+                                suppress_traceback=True)
+
+    return wrapper
+
+
 class Resource(flask_restful.Resource):
     # Remember that order here matters, the record_exception
     # wrapper deliberately reraises the exception so that
     # generic_wrapper can handle the response after logging.
     method_decorators = [
+        log_request,
+        handle_authorization_exceptions,
         record_exception,
-        sf_api.generic_wrapper
+        suppress_exceptions_to_client
         ]
