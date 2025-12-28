@@ -438,7 +438,8 @@ jobs:
           tools/run_remote ${primary} "sudo find /srv/shakenfist/exceptions -type f -ls"
 
           # Check if any exception files exist and set output
-          EXCEPTION_COUNT=$(tools/run_remote ${primary} \
+          EXCEPTION_COUNT=$(ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.pr.base_image_user }}@${primary} \
               "sudo find /srv/shakenfist/exceptions -type f 2>/dev/null | wc -l")
           echo "Exception files found: ${EXCEPTION_COUNT}"
           if [ "${EXCEPTION_COUNT}" -gt 0 ]; then
