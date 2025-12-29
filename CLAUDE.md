@@ -20,6 +20,19 @@ tox -eflake8 -- -HEAD            # Style check on changed files only
 tox -ecover                      # Generate coverage report
 ```
 
+### Pre-commit Hooks
+
+```bash
+pip install pre-commit           # Install pre-commit
+pre-commit install               # Set up git hooks
+pre-commit run --all-files       # Run all hooks manually
+```
+
+The repository uses `actionlint` to validate GitHub Actions workflow files.
+Install `actionlint`:
+- macOS: `brew install actionlint`
+- Linux: Download from https://github.com/rhysd/actionlint/releases
+
 ### Key Entry Points (CLI Tools)
 
 - `sf-ctl` - Control CLI

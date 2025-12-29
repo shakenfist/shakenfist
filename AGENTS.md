@@ -81,6 +81,19 @@ tox -ecover                      # Coverage report
 stestr run {test_name}           # Run specific test
 ```
 
+### Pre-commit Hooks
+
+The repository uses pre-commit hooks to validate code before commits:
+
+```bash
+pip install pre-commit           # Install pre-commit
+pre-commit install               # Set up git hooks
+pre-commit run --all-files       # Run all hooks manually
+```
+
+Current hooks:
+- `actionlint` - Validates GitHub Actions workflow files
+
 ### Key Directories
 
 - `shakenfist/` - Core package
