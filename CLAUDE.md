@@ -51,10 +51,14 @@ cd shakenfist/protos
 ```
 
 **IMPORTANT:** Always use `_make_stubs.sh` - never run `grpc_tools.protoc` directly.
-The script performs essential post-processing to fix import statements in the
-generated code. Without this fix, the generated `*_grpc.py` files will have
-incorrect imports (e.g., `import foo_pb2` instead of
-`from shakenfist.protos import foo_pb2`) and will fail at runtime with
+The script:
+1. Generates protobuf enum definitions from Python source files (using AST parsing
+   of `schema/object_types.py` and `schema/ipam_reservation.py`)
+2. Compiles all `.proto` files to Python code and type stubs
+3. Fixes import statements in generated code (e.g., `import foo_pb2` becomes
+   `from shakenfist.protos import foo_pb2`)
+
+Without this fix, the generated `*_grpc.py` files will fail at runtime with
 `ModuleNotFoundError`.
 
 **IMPORTANT:** You must use the exact versions of gRPC dependencies specified in

@@ -8,6 +8,7 @@ import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
+from shakenfist.protos import shakenfist_enums_pb2
 import typing
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
@@ -635,13 +636,13 @@ class GetObjectStateRequest(google.protobuf.message.Message):
 
     OBJECT_TYPE_FIELD_NUMBER: builtins.int
     OBJECT_UUID_FIELD_NUMBER: builtins.int
-    object_type: builtins.str
-    """e.g., 'blob', 'instance', 'network'"""
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    """The type of object"""
     object_uuid: builtins.str
     def __init__(
         self,
         *,
-        object_type: builtins.str = ...,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
         object_uuid: builtins.str = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
@@ -684,7 +685,7 @@ class SetObjectStateRequest(google.protobuf.message.Message):
     STATE_VALUE_FIELD_NUMBER: builtins.int
     UPDATE_TIME_FIELD_NUMBER: builtins.int
     MESSAGE_FIELD_NUMBER: builtins.int
-    object_type: builtins.str
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
     object_uuid: builtins.str
     state_value: builtins.str
     update_time: builtins.float
@@ -693,7 +694,7 @@ class SetObjectStateRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        object_type: builtins.str = ...,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
         object_uuid: builtins.str = ...,
         state_value: builtins.str = ...,
         update_time: builtins.float = ...,
@@ -709,12 +710,12 @@ class DeleteObjectStateRequest(google.protobuf.message.Message):
 
     OBJECT_TYPE_FIELD_NUMBER: builtins.int
     OBJECT_UUID_FIELD_NUMBER: builtins.int
-    object_type: builtins.str
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
     object_uuid: builtins.str
     def __init__(
         self,
         *,
-        object_type: builtins.str = ...,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
         object_uuid: builtins.str = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
@@ -727,7 +728,7 @@ class GetObjectsByStateRequest(google.protobuf.message.Message):
 
     OBJECT_TYPE_FIELD_NUMBER: builtins.int
     STATE_VALUES_FIELD_NUMBER: builtins.int
-    object_type: builtins.str
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
     @property
     def state_values(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """List of states to match"""
@@ -735,7 +736,7 @@ class GetObjectsByStateRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        object_type: builtins.str = ...,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
         state_values: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["object_type", b"object_type", "state_values", b"state_values"]) -> None: ...
@@ -776,12 +777,12 @@ class IPAMReservationData(google.protobuf.message.Message):
     COMMENT_FIELD_NUMBER: builtins.int
     ipam_uuid: builtins.str
     address: builtins.str
-    reservation_type: builtins.str
-    """e.g., 'instance', 'gateway', 'deletion-halo'"""
-    user_type: builtins.str
-    """Object type using this address (optional)"""
+    reservation_type: shakenfist_enums_pb2.ReservationType.ValueType
+    """How this address is being used"""
+    user_type: shakenfist_enums_pb2.ObjectType.ValueType
+    """Object type using this address"""
     user_uuid: builtins.str
-    """UUID of object using this address (optional)"""
+    """UUID of object using this address"""
     reserved_at: builtins.float
     """Unix timestamp when reserved"""
     comment: builtins.str
@@ -791,8 +792,8 @@ class IPAMReservationData(google.protobuf.message.Message):
         *,
         ipam_uuid: builtins.str = ...,
         address: builtins.str = ...,
-        reservation_type: builtins.str = ...,
-        user_type: builtins.str = ...,
+        reservation_type: shakenfist_enums_pb2.ReservationType.ValueType = ...,
+        user_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
         user_uuid: builtins.str = ...,
         reserved_at: builtins.float = ...,
         comment: builtins.str = ...,

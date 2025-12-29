@@ -21,7 +21,7 @@
 from ipaddress import IPv4Address
 import time
 import threading
-from typing import Any, Optional
+from typing import Any, cast, Optional
 from uuid import UUID
 
 import grpc
@@ -34,6 +34,7 @@ from shakenfist_utilities import logs
 from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
+from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_state import State
@@ -633,7 +634,8 @@ def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State
     try:
         stub = _get_database_stub()
         request = database_pb2.GetObjectStateRequest(
-            object_type=object_type,
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             object_uuid=object_uuid
         )
         reply = stub.GetObjectState(request)
@@ -655,7 +657,8 @@ def _grpc_set_state(object_type: ObjectType, object_uuid: str, state: State) -> 
     try:
         stub = _get_database_stub()
         request = database_pb2.SetObjectStateRequest(
-            object_type=object_type,
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             object_uuid=object_uuid,
             state_value=state.value or '',
             update_time=state.update_time,
@@ -674,7 +677,8 @@ def _grpc_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteObjectStateRequest(
-            object_type=object_type,
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             object_uuid=object_uuid
         )
         reply = stub.DeleteObjectState(request)
@@ -691,7 +695,8 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
     try:
         stub = _get_database_stub()
         request = database_pb2.GetObjectsByStateRequest(
-            object_type=object_type,
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             state_values=state_values
         )
         reply = stub.GetObjectsByState(request)
@@ -702,25 +707,8 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
         return []
 
 
-# =============================================================================
-# Helper functions for ObjectType conversion
-# =============================================================================
-
-def _string_to_object_type(s: Optional[str]) -> Optional[ObjectType]:
-    """Convert a string to an ObjectType enum, returning None if invalid."""
-    if not s:
-        return None
-    try:
-        return ObjectType(s)
-    except ValueError:
-        return None
-
-
-def _object_type_to_string(ot: Optional[ObjectType]) -> str:
-    """Convert an ObjectType enum to a string for gRPC, empty string if None."""
-    if ot is None:
-        return ''
-    return str(ot)
+# Note: ObjectType and ReservationType now have proto_id attributes and
+# from_proto_id() methods for efficient gRPC enum conversion.
 
 
 # =============================================================================
@@ -736,9 +724,15 @@ def _grpc_reserve_address(reservation: IPAMReservation) -> bool:
             reservation=database_pb2.IPAMReservationData(
                 ipam_uuid=str(reservation.ipam_uuid),
                 address=str(reservation.address),
-                reservation_type=reservation.reservation_type,
-                user_type=_object_type_to_string(reservation.user_type),
-                user_uuid=str(reservation.user_uuid) if reservation.user_uuid else '',
+                reservation_type=cast(
+                    shakenfist_enums_pb2.ReservationType.ValueType,
+                    reservation.reservation_type.proto_id),
+                user_type=cast(
+                    shakenfist_enums_pb2.ObjectType.ValueType,
+                    reservation.user_type.proto_id if reservation.user_type else 0
+                ),
+                user_uuid=(str(reservation.user_uuid)
+                           if reservation.user_uuid else ''),
                 reserved_at=reservation.reserved_at,
                 comment=reservation.comment or ''
             )
@@ -763,9 +757,16 @@ def _grpc_release_address(ipam_uuid: str, address: str,
             halo_reservation=database_pb2.IPAMReservationData(
                 ipam_uuid=str(halo_reservation.ipam_uuid),
                 address=str(halo_reservation.address),
-                reservation_type=halo_reservation.reservation_type,
-                user_type=_object_type_to_string(halo_reservation.user_type),
-                user_uuid=str(halo_reservation.user_uuid) if halo_reservation.user_uuid else '',
+                reservation_type=cast(
+                    shakenfist_enums_pb2.ReservationType.ValueType,
+                    halo_reservation.reservation_type.proto_id),
+                user_type=cast(
+                    shakenfist_enums_pb2.ObjectType.ValueType,
+                    halo_reservation.user_type.proto_id
+                    if halo_reservation.user_type else 0
+                ),
+                user_uuid=(str(halo_reservation.user_uuid)
+                           if halo_reservation.user_uuid else ''),
                 reserved_at=halo_reservation.reserved_at,
                 comment=halo_reservation.comment or ''
             )
@@ -789,11 +790,15 @@ def _grpc_get_reservation(ipam_uuid: str,
         reply = stub.GetReservation(request)
         if not reply.found:
             return None
+        res_type = ReservationType.from_proto_id(
+            reply.reservation.reservation_type)
+        if res_type is None:
+            res_type = ReservationType.UNKNOWN
         return IPAMReservation(
             ipam_uuid=reply.reservation.ipam_uuid,
             address=IPv4Address(reply.reservation.address),
-            reservation_type=reply.reservation.reservation_type,
-            user_type=_string_to_object_type(reply.reservation.user_type),
+            reservation_type=res_type,
+            user_type=ObjectType.from_proto_id(reply.reservation.user_type),
             user_uuid=reply.reservation.user_uuid or None,
             reserved_at=reply.reservation.reserved_at,
             comment=reply.reservation.comment or None
@@ -812,11 +817,14 @@ def _grpc_get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
         reply = stub.GetReservationsForIPAM(request)
         result = []
         for res in reply.reservations:
+            res_type = ReservationType.from_proto_id(res.reservation_type)
+            if res_type is None:
+                res_type = ReservationType.UNKNOWN
             result.append(IPAMReservation(
                 ipam_uuid=res.ipam_uuid,
                 address=IPv4Address(res.address),
-                reservation_type=res.reservation_type,
-                user_type=_string_to_object_type(res.user_type),
+                reservation_type=res_type,
+                user_type=ObjectType.from_proto_id(res.user_type),
                 user_uuid=res.user_uuid or None,
                 reserved_at=res.reserved_at,
                 comment=res.comment or None

@@ -11,7 +11,7 @@ enable future migration to other database backends.
 from concurrent import futures
 from ipaddress import IPv4Address
 import json
-from typing import Any
+from typing import cast
 from uuid import UUID
 
 import grpc
@@ -32,6 +32,7 @@ from shakenfist.exceptions import InvalidStateException
 from shakenfist.node import Node
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
+from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import exceptions as util_exceptions
@@ -423,7 +424,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get state for an object from MariaDB."""
         try:
             self.monitor.counters['get_object_state'].inc()
-            object_type = ObjectType(request.object_type)
+            object_type = ObjectType.from_proto_id(request.object_type)
+            if object_type is None:
+                return database_pb2.GetObjectStateReply(found=False)
             state = mariadb.get_state(object_type, request.object_uuid)
             if state is None:
                 return database_pb2.GetObjectStateReply(found=False)
@@ -448,7 +451,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['set_object_state'].inc()
             from shakenfist.schema.object_state import State
-            object_type = ObjectType(request.object_type)
+            object_type = ObjectType.from_proto_id(request.object_type)
+            if object_type is None:
+                return database_pb2.StatusReply(
+                    success=False, error='Invalid object_type')
             state = State(
                 value=request.state_value,
                 update_time=request.update_time,
@@ -468,7 +474,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Delete state for an object from MariaDB."""
         try:
             self.monitor.counters['delete_object_state'].inc()
-            object_type = ObjectType(request.object_type)
+            object_type = ObjectType.from_proto_id(request.object_type)
+            if object_type is None:
+                return database_pb2.StatusReply(
+                    success=False, error='Invalid object_type')
             success = mariadb.delete_state(object_type, request.object_uuid)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
@@ -484,7 +493,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get all object UUIDs of a given type in specified states."""
         try:
             self.monitor.counters['get_objects_by_state'].inc()
-            object_type = ObjectType(request.object_type)
+            object_type = ObjectType.from_proto_id(request.object_type)
+            if object_type is None:
+                return database_pb2.GetObjectsByStateReply(object_uuids=[])
             uuids = mariadb.get_objects_by_state(
                 object_type, list(request.state_values))
             return database_pb2.GetObjectsByStateReply(object_uuids=uuids)
@@ -505,16 +516,21 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['reserve_address'].inc()
             from shakenfist.schema.ipam_reservation import IPAMReservation
-            # Convert string user_uuid to UUID if present
+            # Convert protobuf enums to Python enums
+            res_type = ReservationType.from_proto_id(
+                request.reservation.reservation_type)
+            if res_type is None:
+                return database_pb2.StatusReply(
+                    success=False, error='Invalid reservation_type')
+            user_type = ObjectType.from_proto_id(
+                request.reservation.user_type)  # None is valid here
             user_uuid = (UUID(request.reservation.user_uuid)
                          if request.reservation.user_uuid else None)
             reservation = IPAMReservation(
                 ipam_uuid=UUID(request.reservation.ipam_uuid),
                 address=IPv4Address(request.reservation.address),
-                reservation_type=ReservationType(
-                    request.reservation.reservation_type),
-                user_type=mariadb._string_to_object_type(
-                    request.reservation.user_type),
+                reservation_type=res_type,
+                user_type=user_type,
                 user_uuid=user_uuid,
                 reserved_at=request.reservation.reserved_at,
                 comment=request.reservation.comment or None
@@ -534,16 +550,21 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['release_address'].inc()
             from shakenfist.schema.ipam_reservation import IPAMReservation
-            # Convert string user_uuid to UUID if present
+            # Convert protobuf enums to Python enums
+            res_type = ReservationType.from_proto_id(
+                request.halo_reservation.reservation_type)
+            if res_type is None:
+                return database_pb2.StatusReply(
+                    success=False, error='Invalid reservation_type')
+            user_type = ObjectType.from_proto_id(
+                request.halo_reservation.user_type)  # None is valid here
             user_uuid = (UUID(request.halo_reservation.user_uuid)
                          if request.halo_reservation.user_uuid else None)
             halo_reservation = IPAMReservation(
                 ipam_uuid=UUID(request.halo_reservation.ipam_uuid),
                 address=IPv4Address(request.halo_reservation.address),
-                reservation_type=ReservationType(
-                    request.halo_reservation.reservation_type),
-                user_type=mariadb._string_to_object_type(
-                    request.halo_reservation.user_type),
+                reservation_type=res_type,
+                user_type=user_type,
                 user_uuid=user_uuid,
                 reserved_at=request.halo_reservation.reserved_at,
                 comment=request.halo_reservation.comment or None
@@ -572,10 +593,16 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 reservation=database_pb2.IPAMReservationData(
                     ipam_uuid=str(reservation.ipam_uuid),
                     address=str(reservation.address),
-                    reservation_type=str(reservation.reservation_type),
-                    user_type=mariadb._object_type_to_string(
-                        reservation.user_type),
-                    user_uuid=str(reservation.user_uuid) if reservation.user_uuid else '',
+                    reservation_type=cast(
+                        shakenfist_enums_pb2.ReservationType.ValueType,
+                        reservation.reservation_type.proto_id),
+                    user_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        reservation.user_type.proto_id
+                        if reservation.user_type else 0
+                    ),
+                    user_uuid=(str(reservation.user_uuid)
+                               if reservation.user_uuid else ''),
                     reserved_at=reservation.reserved_at,
                     comment=reservation.comment or ''
                 )
@@ -601,8 +628,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 result.append(database_pb2.IPAMReservationData(
                     ipam_uuid=str(res.ipam_uuid),
                     address=str(res.address),
-                    reservation_type=str(res.reservation_type),
-                    user_type=mariadb._object_type_to_string(res.user_type),
+                    reservation_type=cast(
+                        shakenfist_enums_pb2.ReservationType.ValueType,
+                        res.reservation_type.proto_id),
+                    user_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        res.user_type.proto_id if res.user_type else 0
+                    ),
                     user_uuid=str(res.user_uuid) if res.user_uuid else '',
                     reserved_at=res.reserved_at,
                     comment=res.comment or ''

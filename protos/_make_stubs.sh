@@ -3,6 +3,10 @@
 # Run this from directory containing the generated gRPC code
 # Requires: pip install grpcio-tools mypy-protobuf
 
+# First, regenerate the enum definitions from Python source
+echo "Generating protobuf enums from Python schemas..."
+python3 ../../protos/_generate_enums.py > ../../protos/shakenfist_enums.proto
+
 # Generate Python code, type stubs (.pyi), and gRPC stubs
 # --mypy_out generates proper type stubs via mypy-protobuf plugin
 # --mypy_grpc_out generates typed stubs for gRPC service definitions
@@ -23,11 +27,12 @@ else
     SED_INPLACE="sed -i"
 fi
 
-# Fix imports in .py files - common_pb2 is imported by all files
+# Fix imports in .py files - common_pb2 and shakenfist_enums_pb2 are imported
 for item in *.py; do
-    importname="common_pb2"
-    echo "Correcting ${importname} import in ${item}..."
-    $SED_INPLACE "s/import ${importname}/from shakenfist.protos import ${importname}/g" ${item}
+    for importname in common_pb2 shakenfist_enums_pb2; do
+        echo "Correcting ${importname} import in ${item}..."
+        $SED_INPLACE "s/import ${importname}/from shakenfist.protos import ${importname}/g" ${item}
+    done
 done
 
 # Fix imports in *_grpc.py files - they also import their corresponding *_pb2
@@ -39,9 +44,10 @@ done
 
 # Fix imports in .pyi stub files for mypy
 for item in *.pyi; do
-    importname="common_pb2"
-    echo "Correcting ${importname} import in ${item}..."
-    $SED_INPLACE "s/import ${importname}/from shakenfist.protos import ${importname}/g" ${item}
+    for importname in common_pb2 shakenfist_enums_pb2; do
+        echo "Correcting ${importname} import in ${item}..."
+        $SED_INPLACE "s/import ${importname}/from shakenfist.protos import ${importname}/g" ${item}
+    done
 done
 
 for item in *_grpc.pyi; do
