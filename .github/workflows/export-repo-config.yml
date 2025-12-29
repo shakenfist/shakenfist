@@ -1,0 +1,167 @@
+# Export GitHub repository configuration to version control.
+#
+# This workflow exports repository settings, rulesets, and branch protection
+# configuration to a JSON file. If the configuration has changed since the last
+# export, it creates a PR to update the tracked configuration.
+#
+# This provides an audit trail for changes made in the GitHub UI, helping to
+# catch accidental or unintended configuration changes.
+
+name: Export repository configuration
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 00 * * *'        # 00:30 UTC daily (after pin-indirect-dependencies)
+
+jobs:
+  export-config:
+    runs-on: [self-hosted, vm]
+    timeout-minutes: 10
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout shakenfist
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Export repository settings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .github/exported-config
+
+          # Export repository-level settings
+          echo "Exporting repository settings..."
+          gh api repos/${{ github.repository }} --jq '{
+            allow_auto_merge,
+            allow_merge_commit,
+            allow_rebase_merge,
+            allow_squash_merge,
+            delete_branch_on_merge,
+            has_issues,
+            has_projects,
+            has_wiki,
+            has_discussions,
+            merge_commit_message,
+            merge_commit_title,
+            squash_merge_commit_message,
+            squash_merge_commit_title,
+            web_commit_signoff_required
+          }' > .github/exported-config/repository-settings.json
+
+          # Export all rulesets
+          echo "Exporting rulesets..."
+          gh api repos/${{ github.repository }}/rulesets --jq '[.[] | {
+            id,
+            name,
+            enforcement,
+            target
+          }]' > .github/exported-config/rulesets-summary.json
+
+          # Remove old ruleset files before exporting (to detect deletions)
+          rm -f .github/exported-config/ruleset-*.json
+
+          # Export full details for each ruleset
+          for ruleset_id in $(gh api repos/${{ github.repository }}/rulesets --jq '.[].id'); do
+            ruleset_name=$(gh api repos/${{ github.repository }}/rulesets/${ruleset_id} --jq '.name' | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
+            echo "Exporting ruleset: ${ruleset_name} (${ruleset_id})..."
+
+            gh api repos/${{ github.repository }}/rulesets/${ruleset_id} --jq '{
+              name,
+              enforcement,
+              target,
+              conditions,
+              rules: [.rules[] | {
+                type,
+                parameters: (if .parameters then .parameters else null end)
+              }],
+              bypass_actors: [.bypass_actors[]? | {
+                actor_id,
+                actor_type,
+                bypass_mode
+              }]
+            }' > ".github/exported-config/ruleset-${ruleset_name}.json"
+          done
+
+          # Pretty-print all JSON files for better diffs
+          for f in .github/exported-config/*.json; do
+            python3 -m json.tool "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+          done
+
+          echo
+          echo "Exported configuration files:"
+          ls -la .github/exported-config/
+
+      - name: Check for changes and create PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN }}
+        run: |
+          datestamp=$(date "+%Y%m%d")
+
+          # Check if there are any changes
+          if [ $(git diff .github/exported-config/ | wc -l) -eq 0 ] && \
+             [ $(git status --porcelain .github/exported-config/ | wc -l) -eq 0 ]; then
+            echo "No configuration changes detected."
+            exit 0
+          fi
+
+          echo "Configuration changes detected:"
+          git diff .github/exported-config/
+          git status --porcelain .github/exported-config/
+          echo
+
+          git config --global user.name "shakenfist-bot"
+          git config --global user.email "bot@shakenfist.com"
+
+          # Check if a branch already exists for today
+          branch_name="export-repo-config-${datestamp}"
+          if git ls-remote --heads origin "${branch_name}" | grep -q "${branch_name}"; then
+            echo "Branch ${branch_name} already exists, updating it..."
+            git fetch origin "${branch_name}"
+            git checkout "${branch_name}"
+            git merge origin/develop --no-edit || true
+          else
+            git checkout -b "${branch_name}"
+          fi
+
+          git add .github/exported-config/
+          git commit -m "Update exported repository configuration."
+          git push -f origin "${branch_name}"
+
+          # Check if a PR already exists
+          existing_pr=$(gh pr list --head "${branch_name}" --json number --jq '.[0].number')
+          if [ -n "${existing_pr}" ]; then
+            echo "PR #${existing_pr} already exists for this branch."
+          else
+            echo
+            # Write PR body to a temp file to avoid YAML parsing issues with heredocs
+            cat > /tmp/pr-body.md << 'PRBODY'
+          ## Repository Configuration Change Detected
+
+          This PR was automatically created because the GitHub repository configuration
+          (settings, rulesets, branch protection) has changed since the last export.
+
+          **Please review the changes carefully** to ensure they were intentional.
+
+          Common causes of configuration drift:
+          - Manual changes in the GitHub UI
+          - Changes to required status check names in workflows
+          - Updates to merge queue settings
+
+          If these changes were intentional, merge this PR to update the tracked
+          configuration. If not, you may need to revert the changes in the GitHub UI.
+          PRBODY
+
+            gh pr create \
+                --assignee mikalstill \
+                --reviewer mikalstill \
+                --title "Repository configuration changed" \
+                --body-file /tmp/pr-body.md \
+                --label dependencies
+            echo
+            echo "Pull request created."
+          fi
