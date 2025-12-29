@@ -26,7 +26,15 @@ jobs:
                 'baseuser': 'debian',
                 'outputlabel': 'ci-images/debian-12',
                 'scheduled': True,
-                'runs_on': 'debian-11'
+                'runs_on': 'debian-12'
+            },
+            {
+                'name': 'debian-13',
+                'baseimage': 'debian:13',
+                'baseuser': 'debian',
+                'outputlabel': 'ci-images/debian-13',
+                'scheduled': True,
+                'runs_on': 'debian-12'
             },
             {
                 'name': 'rocky-9',
@@ -66,7 +74,7 @@ jobs:
                 'baseuser': 'ubuntu',
                 'outputlabel': 'ci-images/ubuntu-2404',
                 'scheduled': True,
-                'runs_on': 'debian-11'
+                'runs_on': 'debian-12'
             },
         ]
     runs-on: [self-hosted, vm, '${{ matrix.os.runs_on }}']
