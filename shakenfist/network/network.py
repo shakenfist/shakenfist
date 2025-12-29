@@ -9,11 +9,13 @@ from uuid import uuid4
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
+from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist.network import interface
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations as dbowo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
@@ -288,12 +290,12 @@ class Network(dbowo):
         return nis.get('networkinterfaces', [])
 
     def add_networkinterface(self, ni):
-        self._add_item_in_attribute_list('networkinterfaces', ni.uuid)
+        self._add_item_in_attribute_list('networkinterfaces', str(ni.uuid))
 
     def remove_networkinterface(self, ni):
         if ni.ipv4:
             self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
-        self._remove_item_in_attribute_list('networkinterfaces', ni.uuid)
+        self._remove_item_in_attribute_list('networkinterfaces', str(ni.uuid))
 
     def _update_floating_gateway(self, gateway):
         original_routing = self.routing
@@ -318,7 +320,7 @@ class Network(dbowo):
     def assign_floating_gateway(self):
         fn = floating_network()
         floating_gateway = fn.ipam.reserve_random_free_address(
-            self.unique_label(), ipam.RESERVATION_TYPE_GATEWAY, '')
+            self.unique_label(), ReservationType.GATEWAY, '')
         if self._update_floating_gateway(floating_gateway):
             return
         fn.ipam.release(floating_gateway)
@@ -355,7 +357,7 @@ class Network(dbowo):
             'egress_veth_outer': 'egr-%06x-o' % self.vxid,
             'egress_veth_inner': 'egr-%06x-i' % self.vxid,
 
-            'netns': self.uuid,
+            'netns': str(self.uuid),
 
             'ipblock': self.ipblock,
             'netmask': self.netmask,
@@ -408,7 +410,7 @@ class Network(dbowo):
 
         # The floating network always exists, and would fail the vx_bridge
         # test we apply to other networks.
-        if self.uuid == 'floating':
+        if self.uuid == FLOATING_NETWORK_UUID:
             return True
 
         subst = self.subst_dict()
@@ -434,7 +436,7 @@ class Network(dbowo):
         # Some calls don't make sense on the floating network and are ignored
         def wrapper(*args, **kwargs):
             # The first argument is "self"
-            if args[0].uuid == 'floating':
+            if args[0].uuid == FLOATING_NETWORK_UUID:
                 return
             return func(*args, **kwargs)
         return wrapper
@@ -485,7 +487,7 @@ class Network(dbowo):
                     'ip link set %(vx_veth_outer)s up' % subst)
                 util_concurrency.execute(
                     'ip link set %(vx_veth_inner)s up' % subst,
-                    namespace=self.uuid)
+                    netns=self.uuid)
                 util_network.add_address_to_interface(
                     self.uuid, subst['router'], subst['netmask'],
                     subst['vx_veth_inner'])
@@ -530,7 +532,7 @@ class Network(dbowo):
                     return
 
                 addresses = list(util_network.get_interface_addresses(
-                    subst['egress_veth_inner'], namespace=subst['netns']))
+                    subst['egress_veth_inner'], netns=subst['netns']))
                 self.log.with_fields({
                     'addresses': addresses,
                     'current_address': subst['floating_gateway']}).debug(
@@ -592,8 +594,8 @@ class Network(dbowo):
                 util_concurrency.execute(
                     'ip link delete %(egress_veth_outer)s' % subst)
 
-            if os.path.exists('/var/run/netns/%s' % self.uuid):
-                util_concurrency.execute('ip netns del %s' % self.uuid)
+            if os.path.exists('/var/run/netns/%s' % str(self.uuid)):
+                util_concurrency.execute('ip netns del %s' % str(self.uuid))
 
             self.ipam.state = self.ipam.STATE_DELETED
             self.state = self.STATE_DELETED
@@ -782,7 +784,7 @@ class Network(dbowo):
     # server redirects there.
     def add_floating_ip(self, floating_address, inner_address, affected_objects):
         affected_objects.append(self)
-        affected_objects.append(('network', 'floating'))
+        affected_objects.append(('network', FLOATING_NETWORK_UUID))
         add_event_multi(
             EVENT_TYPE_AUDIT, affected_objects, 'adding floating ip',
             extra={
@@ -790,20 +792,20 @@ class Network(dbowo):
                 'inner': inner_address
             })
         util_concurrency.add_floating_ip(
-            self.uuid, floating_address, inner_address)
+            str(self.uuid), floating_address, inner_address)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
     def remove_floating_ip(self, floating_address, inner_address, affected_objects):
         affected_objects.append(self)
-        affected_objects.append(('network', 'floating'))
+        affected_objects.append(('network', FLOATING_NETWORK_UUID))
         add_event_multi(
             EVENT_TYPE_AUDIT, affected_objects, 'remove floating ip',
             extra={
                 'floating': floating_address,
                 'inner': inner_address
             })
-        util_concurrency.remove_floating_ip(self.uuid, floating_address)
+        util_concurrency.remove_floating_ip(str(self.uuid), floating_address)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
@@ -832,11 +834,11 @@ class Networks(dbo_iter):
     base_object = Network
 
     def __iter__(self):
-        for _, n in self.get_iterator():
-            if n['uuid'] == 'floating':
+        for _, static_values in self.get_iterator():
+            if static_values['uuid'] == str(FLOATING_NETWORK_UUID):
                 continue
 
-            n = Network(n)
+            n = Network(static_values)
             if not n:
                 continue
 
@@ -851,9 +853,9 @@ def networks_in_namespace(namespace):
 
 
 def floating_network():
-    floating_network = Network.from_db('floating', suppress_failure_audit=True)
-    if not floating_network:
-        Network.new(network_uuid='floating',
+    fn = Network.from_db(FLOATING_NETWORK_UUID, suppress_failure_audit=True)
+    if not fn:
+        Network.new(network_uuid=FLOATING_NETWORK_UUID,
                     vxid=0,
                     netblock=config.FLOATING_NETWORK,
                     provide_dhcp=False,
@@ -861,4 +863,5 @@ def floating_network():
                     provide_dns=False,
                     namespace=None,
                     name='floating')
-    return floating_network
+        fn = Network.from_db(FLOATING_NETWORK_UUID)
+    return fn

@@ -23,6 +23,7 @@ from shakenfist.network import network
 from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
@@ -111,7 +112,7 @@ network_delete_example = """
 """
 
 
-class NetworkEndpoint(sf_api.Resource):
+class NetworkEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network information.',
         [('artifact_ref', 'query', 'uuidorname',
@@ -142,7 +143,7 @@ class NetworkEndpoint(sf_api.Resource):
     @api_base.redirect_to_network_node
     @api_base.log_token_use
     def delete(self, network_ref=None, network_from_db=None, namespace=None):
-        if network_ref == 'floating':
+        if network_ref == str(FLOATING_NETWORK_UUID):
             return sf_api.error(403, 'you cannot delete the floating network')
 
         # If a namespace is specified, ensure the network is in it
@@ -177,7 +178,7 @@ networks_get_example = """[
 ]"""
 
 
-class NetworksEndpoint(sf_api.Resource):
+class NetworksEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get a list of all networks visible to the authenticated namespace.',
         [('all', 'body', 'boolean', 'Include deleted networks.', False)],
@@ -298,10 +299,10 @@ class NetworksEndpoint(sf_api.Resource):
                 else:
                     LOG.with_fields({'network': n}).warning(
                         'Network in use, cannot be deleted by delete-all')
-                    networks_unable.append(n.uuid)
+                    networks_unable.append(str(n.uuid))
                     continue
 
-            networks_del.append(n.uuid)
+            networks_del.append(str(n.uuid))
 
         if networks_unable:
             return sf_api.error(403, {'deleted': networks_del,
@@ -341,7 +342,7 @@ network_events_example = """    [
 ]"""
 
 
-class NetworkEventsEndpoint(sf_api.Resource):
+class NetworkEventsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network event information.',
         [
@@ -391,7 +392,7 @@ network_interfaces_example = """{
 }"""
 
 
-class NetworkInterfacesEndpoint(sf_api.Resource):
+class NetworkInterfacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network interface information.',
         [('network_ref', 'query', 'uuidorname',
@@ -413,7 +414,7 @@ class NetworkInterfacesEndpoint(sf_api.Resource):
         return out
 
 
-class NetworkMetadatasEndpoint(sf_api.Resource):
+class NetworkMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Fetch metadata for a network.',
         [('network_ref', 'query', 'uuidorname',
@@ -454,7 +455,7 @@ class NetworkMetadatasEndpoint(sf_api.Resource):
         network_from_db.add_metadata_key(key, value)
 
 
-class NetworkMetadataEndpoint(sf_api.Resource):
+class NetworkMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Update a metadata key for a network.',
         [
@@ -528,7 +529,7 @@ network_ping_example = """{
 }"""
 
 
-class NetworkPingEndpoint(sf_api.Resource):
+class NetworkPingEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Send ICMP ping traffic to an address on a network.',
         [
@@ -570,7 +571,7 @@ class NetworkPingEndpoint(sf_api.Resource):
 network_allocations_example = ''
 
 
-class NetworkAddressesEndpoint(sf_api.Resource):
+class NetworkAddressesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Return information about the address reservations in a network.',
         [
@@ -586,11 +587,13 @@ class NetworkAddressesEndpoint(sf_api.Resource):
     def get(self, network_ref=None, network_from_db=None):
         out = []
         for addr in network_from_db.ipam.in_use:
-            out.append(network_from_db.ipam.get_reservation(addr))
+            reservation = network_from_db.ipam.get_reservation(addr)
+            if reservation:
+                out.append(reservation.model_dump(mode='json'))
         return out
 
 
-class NetworkRouteAddressEndpoint(sf_api.Resource):
+class NetworkRouteAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Route a floating address to this network, with no DNAT.',
         [
@@ -624,7 +627,7 @@ class NetworkRouteAddressEndpoint(sf_api.Resource):
         return address
 
 
-class NetworkUnrouteAddressEndpoint(sf_api.Resource):
+class NetworkUnrouteAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Remove routing for a floating address to this network.',
         [
@@ -645,7 +648,9 @@ class NetworkUnrouteAddressEndpoint(sf_api.Resource):
         reservation = fn.ipam.get_reservation(address)
         if not reservation:
             return sf_api.error(404, 'address not routed')
-        if reservation['user'] != network_from_db.unique_label():
+        # Compare with str(user_uuid) since unique_label() returns a string UUID
+        res_label = (reservation.user_type, str(reservation.user_uuid) if reservation.user_uuid else None)
+        if res_label != network_from_db.unique_label():
             return sf_api.error(403, 'address not routed by this network')
 
         network_from_db.add_event(EVENT_TYPE_AUDIT, 'unroute request from REST API')
@@ -660,7 +665,7 @@ class NetworkUnrouteAddressEndpoint(sf_api.Resource):
             network_from_db.set_last_cluster_operation(op_type, op_uuid)
 
 
-class NetworkDNSAddressEndpoint(sf_api.Resource):
+class NetworkDNSAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Add a custom DNS entry for this network.',
         [
@@ -735,7 +740,7 @@ network_outstanding_operations_example = """[
 ]"""
 
 
-class NetworkOutstandingOperationsEndpoint(sf_api.Resource):
+class NetworkOutstandingOperationsEndpoint(api_base.Resource):
     # NOTE(mikal): note that arguments from URL routes (object uuid for example),
     # are not included in the webargs schema because webargs doesn't appear to
     # know how to find them.

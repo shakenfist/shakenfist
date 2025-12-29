@@ -8,7 +8,6 @@
 #   - Has complete CI coverage:
 from functools import partial
 
-from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
@@ -25,7 +24,7 @@ LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
-class InstanceSnapshotEndpoint(sf_api.Resource):
+class InstanceSnapshotEndpoint(api_base.Resource):
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

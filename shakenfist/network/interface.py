@@ -101,8 +101,8 @@ class NetworkInterface(dbo):
         # expect
         n = self._external_view()
         n.update({
-            'network_uuid': self.network_uuid,
-            'instance_uuid': self.instance_uuid,
+            'network_uuid': str(self.network_uuid),
+            'instance_uuid': str(self.instance_uuid),
             'macaddr': self.macaddr,
             'ipv4': self.ipv4,
             'order': self.order,
@@ -183,8 +183,8 @@ class NetworkInterfaces(dbo_iter):
     base_object = NetworkInterface
 
     def __iter__(self):
-        for _, ni in self.get_iterator():
-            ni = NetworkInterface(ni)
+        for _, static_values in self.get_iterator():
+            ni = NetworkInterface(static_values)
             if not ni:
                 continue
 
@@ -194,15 +194,15 @@ class NetworkInterfaces(dbo_iter):
 
 
 def instance_filter(inst, ni):
-    return inst.uuid == ni.instance_uuid
+    return str(inst.uuid) == str(ni.instance_uuid)
 
 
 def network_filter(network, ni):
-    return network.uuid == ni.network_uuid
+    return str(network.uuid) == str(ni.network_uuid)
 
 
 def network_uuid_filter(network_uuid, ni):
-    return network_uuid == ni.network_uuid
+    return str(network_uuid) == str(ni.network_uuid)
 
 
 # Convenience helpers

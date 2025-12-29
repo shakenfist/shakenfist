@@ -1,10 +1,12 @@
 import json
 import time
+import uuid
 from collections import defaultdict
 from functools import partial
 from math import inf
 import re
 from typing import ClassVar
+from typing import Union
 
 from etcd3gw.lock import Lock
 from shakenfist_utilities import logs  # noreorder
@@ -145,15 +147,22 @@ class DatabaseBackedObject:
 
     VALID_OBJECT_TYPE_RE = re.compile(r'^[a-z_]+$')
 
-    def __init__(self, object_uuid, version=None, in_memory_only=False):
-        self.__uuid = object_uuid
+    def __init__(self, object_uuid: Union[str, uuid.UUID], version=None,
+                 in_memory_only=False):
+        # Store UUID as a uuid.UUID object for type safety. Subclasses like
+        # Node that use non-UUID identifiers (e.g., hostnames) should override
+        # the uuid property to return a string.
+        if isinstance(object_uuid, uuid.UUID):
+            self.__uuid = object_uuid
+        else:
+            self.__uuid = uuid.UUID(object_uuid)
         self.__version = version
 
         self.__in_memory_only = in_memory_only
         if self.__in_memory_only:
             self.__in_memory_values = {}
 
-        self.log = LOG.with_fields({self.object_type: self.__uuid})
+        self.log = LOG.with_fields({self.object_type: str(self.__uuid)})
 
         # Not very good schema rule enforcement for object naming...
         m = self.VALID_OBJECT_TYPE_RE.match(self.object_type)
@@ -205,7 +214,7 @@ class DatabaseBackedObject:
                         'Not committing online upgrade, as not all nodes are updated')
 
     @property
-    def uuid(self):
+    def uuid(self) -> uuid.UUID:
         return self.__uuid
 
     @property
@@ -326,7 +335,7 @@ class DatabaseBackedObject:
             retval = json.loads(self.__in_memory_values.get(attribute, 'null'))
         else:
             retval = etcd.get(f'attribute/{self.object_type}',
-                              self.__uuid, attribute)
+                              str(self.__uuid), attribute)
         if not retval:
             if default is None:
                 return {}
@@ -340,7 +349,7 @@ class DatabaseBackedObject:
                     yield key, json.loads(self.__in_memory_values[key])
         else:
             for key, data in etcd.get_all('attribute/%s' % self.object_type,
-                                          self.__uuid, prefix=attribute_prefix):
+                                          str(self.__uuid), prefix=attribute_prefix):
                 yield key, data
 
     def _db_set_attribute(self, attribute, value):
@@ -367,14 +376,14 @@ class DatabaseBackedObject:
             self.__in_memory_values[attribute] = util_json.json_dump(value)
         else:
             etcd.put('attribute/%s' % self.object_type,
-                     self.__uuid, attribute, value)
+                     str(self.__uuid), attribute, value)
 
     def _db_delete_attribute(self, attribute):
         if self.__in_memory_only and attribute in self.__in_memory_values:
             del self.__in_memory_values[attribute]
         else:
             etcd.delete(
-                'attribute/%s' % self.object_type, self.__uuid, attribute)
+                'attribute/%s' % self.object_type, str(self.__uuid), attribute)
 
     def _add_item_in_attribute_list(self, listname, item):
         with self.get_lock_attr(listname, 'Add %s' % listname):
@@ -406,7 +415,7 @@ class DatabaseBackedObject:
             return util_concurrency.NodeLock(f'{self.object_type}-{self.uuid}')
 
         return etcd.ClusterLock(
-            self.object_type, subtype, self.uuid, log_ctx=self.log, op=op,
+            self.object_type, subtype, str(self.uuid), log_ctx=self.log, op=op,
             timeout=timeout)
 
     def get_lock_attr(self, name, op, global_scope=True, timeout=10):
@@ -419,7 +428,7 @@ class DatabaseBackedObject:
                 f'{self.object_type}-{self.uuid}-{name}')
 
         return etcd.ClusterLock(
-            'attribute/%s' % self.object_type, self.__uuid, name, op=op,
+            'attribute/%s' % self.object_type, str(self.__uuid), name, op=op,
             timeout=timeout, log_ctx=self.log)
 
     # Properties common to all objects which are routed to attributes
@@ -430,7 +439,7 @@ class DatabaseBackedObject:
     def _state_read(self, state_attribute_name='state'):
         # Primary state is stored in MariaDB
         if state_attribute_name == 'state':
-            state = mariadb.get_state(self.object_type, self.uuid)
+            state = mariadb.get_state(self.object_type, str(self.uuid))
             if state is not None:
                 return state
             return State(value=None, update_time=0)
@@ -479,7 +488,7 @@ class DatabaseBackedObject:
 
         # Primary state is stored in MariaDB
         if state_attribute_name == 'state':
-            mariadb.set_state(self.object_type, self.uuid, new_state)
+            mariadb.set_state(self.object_type, str(self.uuid), new_state)
         else:
             # Secondary state attributes (like 'power_state') go to etcd
             self._db_set_attribute(state_attribute_name, new_state)
@@ -540,9 +549,9 @@ class DatabaseBackedObject:
         return out
 
     def hard_delete(self):
-        etcd.delete(self.object_type, None, self.uuid)
-        etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
-        mariadb.delete_state(self.object_type, self.uuid)
+        etcd.delete(self.object_type, None, str(self.uuid))
+        etcd.delete_all('attribute/%s' % self.object_type, str(self.uuid))
+        mariadb.delete_state(self.object_type, str(self.uuid))
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
 
 

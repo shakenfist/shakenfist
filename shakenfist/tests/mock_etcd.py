@@ -17,7 +17,9 @@ from shakenfist.namespace import Namespace
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
+from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.object_state import State
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import json as util_json
 
 
@@ -33,6 +35,7 @@ class MockEtcd():
         self.test_obj = test_obj
         self.db = {}
         self.mariadb_states = {}  # Mock MariaDB state storage
+        self.ipam_reservations = {}  # Mock MariaDB IPAM reservations storage
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -126,6 +129,55 @@ class MockEtcd():
         self.mariadb_get_objects_by_state.start()
         self.test_obj.addCleanup(self.mariadb_get_objects_by_state.stop)
 
+        # Mock MariaDB functions for IPAM reservations
+        self.mariadb_reserve_address = mock.patch(
+            'shakenfist.mariadb.reserve_address',
+            side_effect=self._mariadb_reserve_address)
+        self.mariadb_reserve_address.start()
+        self.test_obj.addCleanup(self.mariadb_reserve_address.stop)
+
+        self.mariadb_release_address = mock.patch(
+            'shakenfist.mariadb.release_address',
+            side_effect=self._mariadb_release_address)
+        self.mariadb_release_address.start()
+        self.test_obj.addCleanup(self.mariadb_release_address.stop)
+
+        self.mariadb_get_reservation = mock.patch(
+            'shakenfist.mariadb.get_reservation',
+            side_effect=self._mariadb_get_reservation)
+        self.mariadb_get_reservation.start()
+        self.test_obj.addCleanup(self.mariadb_get_reservation.stop)
+
+        self.mariadb_get_reservations_for_ipam = mock.patch(
+            'shakenfist.mariadb.get_reservations_for_ipam',
+            side_effect=self._mariadb_get_reservations_for_ipam)
+        self.mariadb_get_reservations_for_ipam.start()
+        self.test_obj.addCleanup(self.mariadb_get_reservations_for_ipam.stop)
+
+        self.mariadb_delete_reservation = mock.patch(
+            'shakenfist.mariadb.delete_reservation',
+            side_effect=self._mariadb_delete_reservation)
+        self.mariadb_delete_reservation.start()
+        self.test_obj.addCleanup(self.mariadb_delete_reservation.stop)
+
+        self.mariadb_delete_reservations_for_ipam = mock.patch(
+            'shakenfist.mariadb.delete_reservations_for_ipam',
+            side_effect=self._mariadb_delete_reservations_for_ipam)
+        self.mariadb_delete_reservations_for_ipam.start()
+        self.test_obj.addCleanup(self.mariadb_delete_reservations_for_ipam.stop)
+
+        self.mariadb_release_haloed_addresses = mock.patch(
+            'shakenfist.mariadb.release_haloed_addresses',
+            side_effect=self._mariadb_release_haloed_addresses)
+        self.mariadb_release_haloed_addresses.start()
+        self.test_obj.addCleanup(self.mariadb_release_haloed_addresses.stop)
+
+        self.mariadb_get_addresses_in_use = mock.patch(
+            'shakenfist.mariadb.get_addresses_in_use',
+            side_effect=self._mariadb_get_addresses_in_use)
+        self.mariadb_get_addresses_in_use.start()
+        self.test_obj.addCleanup(self.mariadb_get_addresses_in_use.stop)
+
         # Setup basic DB data
         for n in self.nodes:
             Node.new(n[0], n[1])
@@ -146,7 +198,7 @@ class MockEtcd():
     # MariaDB mock operations
     #
 
-    def _mariadb_get_state(self, object_type: str,
+    def _mariadb_get_state(self, object_type: ObjectType,
                            object_uuid: str) -> Optional[State]:
         """Mock implementation of mariadb.get_state()"""
         # Key by object_type and object_uuid to avoid collisions between
@@ -163,7 +215,7 @@ class MockEtcd():
         self._trace(f'MockMariaDB.get_state({key}): None')
         return None
 
-    def _mariadb_set_state(self, object_type: str, object_uuid: str,
+    def _mariadb_set_state(self, object_type: ObjectType, object_uuid: str,
                            state: State) -> bool:
         """Mock implementation of mariadb.set_state()"""
         key = f'{object_type}/{object_uuid}'
@@ -178,7 +230,8 @@ class MockEtcd():
             f'MockMariaDB.set_state({key}): {state.value}')
         return True
 
-    def _mariadb_delete_state(self, object_type: str, object_uuid: str) -> bool:
+    def _mariadb_delete_state(self, object_type: ObjectType,
+                              object_uuid: str) -> bool:
         """Mock implementation of mariadb.delete_state()"""
         key = f'{object_type}/{object_uuid}'
         if key in self.mariadb_states:
@@ -188,7 +241,7 @@ class MockEtcd():
             self._trace(f'MockMariaDB.delete_state({key}): not found')
         return True
 
-    def _mariadb_get_objects_by_state(self, object_type: str,
+    def _mariadb_get_objects_by_state(self, object_type: ObjectType,
                                       state_values: list[str]) -> list[str]:
         """Mock implementation of mariadb.get_objects_by_state()"""
         result = []
@@ -201,7 +254,7 @@ class MockEtcd():
             f'{state_values}): {result}')
         return result
 
-    def get_mariadb_state(self, object_type: str,
+    def get_mariadb_state(self, object_type: ObjectType,
                           object_uuid: str) -> Optional[dict]:
         """Get state from the mock MariaDB store for test assertions.
 
@@ -216,6 +269,113 @@ class MockEtcd():
                 'update_time': data['update_time']
             }
         return None
+
+    #
+    # MariaDB IPAM mock operations
+    #
+
+    def _ipam_key(self, ipam_uuid: str, address: str) -> str:
+        """Generate a unique key for an IPAM reservation.
+
+        The address can be either a string or an IPv4Address object.
+        """
+        return f'{ipam_uuid}/{address}'
+
+    def _mariadb_reserve_address(self, reservation: IPAMReservation) -> bool:
+        """Mock implementation of mariadb.reserve_address()"""
+        key = self._ipam_key(reservation.ipam_uuid, str(reservation.address))
+        if key in self.ipam_reservations:
+            self._trace(f'MockMariaDB.reserve_address({key}): already exists')
+            return False
+        self.ipam_reservations[key] = reservation
+        self._trace(f'MockMariaDB.reserve_address({key}): success')
+        return True
+
+    def _mariadb_release_address(self, ipam_uuid: str, address: str,
+                                 halo_reservation: IPAMReservation) -> bool:
+        """Mock implementation of mariadb.release_address()"""
+        key = self._ipam_key(ipam_uuid, address)
+        if key not in self.ipam_reservations:
+            self._trace(f'MockMariaDB.release_address({key}): not found')
+            return False
+        self.ipam_reservations[key] = halo_reservation
+        self._trace(f'MockMariaDB.release_address({key}): updated to halo')
+        return True
+
+    def _mariadb_get_reservation(self, ipam_uuid: str,
+                                 address: str) -> Optional[IPAMReservation]:
+        """Mock implementation of mariadb.get_reservation()"""
+        key = self._ipam_key(ipam_uuid, address)
+        reservation = self.ipam_reservations.get(key)
+        self._trace(f'MockMariaDB.get_reservation({key}): {reservation}')
+        return reservation
+
+    def _mariadb_get_reservations_for_ipam(
+            self, ipam_uuid: str) -> list[IPAMReservation]:
+        """Mock implementation of mariadb.get_reservations_for_ipam()"""
+        result = []
+        prefix = f'{ipam_uuid}/'
+        for key, reservation in self.ipam_reservations.items():
+            if key.startswith(prefix):
+                result.append(reservation)
+        self._trace(
+            f'MockMariaDB.get_reservations_for_ipam({ipam_uuid}): '
+            f'{len(result)} reservations')
+        return result
+
+    def _mariadb_delete_reservation(self, ipam_uuid: str, address: str) -> bool:
+        """Mock implementation of mariadb.delete_reservation()"""
+        key = self._ipam_key(ipam_uuid, address)
+        if key in self.ipam_reservations:
+            del self.ipam_reservations[key]
+            self._trace(f'MockMariaDB.delete_reservation({key}): deleted')
+            return True
+        self._trace(f'MockMariaDB.delete_reservation({key}): not found')
+        return False
+
+    def _mariadb_delete_reservations_for_ipam(self, ipam_uuid: str) -> int:
+        """Mock implementation of mariadb.delete_reservations_for_ipam()"""
+        prefix = f'{ipam_uuid}/'
+        to_delete = [k for k in self.ipam_reservations if k.startswith(prefix)]
+        for key in to_delete:
+            del self.ipam_reservations[key]
+        self._trace(
+            f'MockMariaDB.delete_reservations_for_ipam({ipam_uuid}): '
+            f'deleted {len(to_delete)}')
+        return len(to_delete)
+
+    def _mariadb_release_haloed_addresses(self, ipam_uuid: str,
+                                          older_than: float) -> int:
+        """Mock implementation of mariadb.release_haloed_addresses()"""
+        from shakenfist.schema.ipam_reservation import ReservationType
+
+        prefix = f'{ipam_uuid}/'
+        to_delete = []
+        for key, reservation in self.ipam_reservations.items():
+            if (key.startswith(prefix) and
+                    reservation.reservation_type == ReservationType.DELETION_HALO
+                    and reservation.reserved_at < older_than):
+                to_delete.append(key)
+        for key in to_delete:
+            del self.ipam_reservations[key]
+        self._trace(
+            f'MockMariaDB.release_haloed_addresses({ipam_uuid}, '
+            f'{older_than}): deleted {len(to_delete)}')
+        return len(to_delete)
+
+    def _mariadb_get_addresses_in_use(self, ipam_uuid: str) -> set[str]:
+        """Mock implementation of mariadb.get_addresses_in_use()"""
+        result = set()
+        prefix = f'{ipam_uuid}/'
+        for key in self.ipam_reservations:
+            if key.startswith(prefix):
+                # Extract address from key (format: ipam_uuid/address)
+                address = key[len(prefix):]
+                result.add(address)
+        self._trace(
+            f'MockMariaDB.get_addresses_in_use({ipam_uuid}): {len(result)} '
+            f'addresses')
+        return result
 
     #
     # DB operations - Low level

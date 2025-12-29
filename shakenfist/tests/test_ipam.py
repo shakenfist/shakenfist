@@ -1,11 +1,19 @@
 import time
 import uuid
+from ipaddress import IPv4Address
 from unittest import mock
 
 from shakenfist import exceptions
 from shakenfist import ipam
+from shakenfist.schema.ipam_reservation import IPAMReservation
+from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
+
+
+# Fixed UUID4 for use in tests where a consistent user_uuid is needed
+TEST_USER_UUID = '8a8496df-9b86-4e94-8c26-c179632e084e'
 
 
 class IPAMTestCase(base.ShakenFistTestCase):
@@ -20,28 +28,41 @@ class IPAMTestCase(base.ShakenFistTestCase):
         ipam_uuid = str(uuid.uuid4())
         ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
 
-        self.assertEqual(['192.168.1.0', '192.168.1.1', '192.168.1.255'], ipm.in_use)
-        self.assertEqual({
-                             'address': '192.168.1.0',
-                             'user': ['network', ipam_uuid],
-                             'when': 1632261535.027476,
-                             'type': ipam.RESERVATION_TYPE_NETWORK,
-                             'comment': ''
-                         }, ipm.get_reservation('192.168.1.0'))
-        self.assertEqual({
-                             'address': '192.168.1.1',
-                             'user': ['network', ipam_uuid],
-                             'when': 1632261535.027476,
-                             'type': ipam.RESERVATION_TYPE_GATEWAY,
-                             'comment': ''
-                         }, ipm.get_reservation('192.168.1.1'))
-        self.assertEqual({
-                             'address': '192.168.1.255',
-                             'user': ['network', ipam_uuid],
-                             'when': 1632261535.027476,
-                             'type': ipam.RESERVATION_TYPE_BROADCAST,
-                             'comment': ''
-                         }, ipm.get_reservation('192.168.1.255'))
+        self.assertEqual({'192.168.1.0', '192.168.1.1', '192.168.1.255'}, ipm.in_use)
+        # Verify reservations using IPAMReservation objects
+        self.assertEqual(
+            IPAMReservation(
+                ipam_uuid=ipam_uuid,
+                address=IPv4Address('192.168.1.0'),
+                reservation_type=ReservationType.NETWORK,
+                user_type=ObjectType.NETWORK,
+                user_uuid=ipam_uuid,
+                reserved_at=1632261535.027476,
+                comment=None
+            ),
+            ipm.get_reservation('192.168.1.0'))
+        self.assertEqual(
+            IPAMReservation(
+                ipam_uuid=ipam_uuid,
+                address=IPv4Address('192.168.1.1'),
+                reservation_type=ReservationType.GATEWAY,
+                user_type=ObjectType.NETWORK,
+                user_uuid=ipam_uuid,
+                reserved_at=1632261535.027476,
+                comment=None
+            ),
+            ipm.get_reservation('192.168.1.1'))
+        self.assertEqual(
+            IPAMReservation(
+                ipam_uuid=ipam_uuid,
+                address=IPv4Address('192.168.1.255'),
+                reservation_type=ReservationType.BROADCAST,
+                user_type=ObjectType.NETWORK,
+                user_uuid=ipam_uuid,
+                reserved_at=1632261535.027476,
+                comment=None
+            ),
+            ipm.get_reservation('192.168.1.255'))
         self.assertIsNone(ipm.get_reservation('192.168.1.2'))
 
     def test_get_address_at_index(self):
@@ -62,8 +83,8 @@ class IPAMTestCase(base.ShakenFistTestCase):
 
         self.assertNotIn('192.168.1.10', ipm.in_use)
         self.assertTrue(
-            ipm.reserve('192.168.1.10', ('test', '123'),
-                        ipam.RESERVATION_TYPE_FLOATING, ''))
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.FLOATING, ''))
         self.assertIn('192.168.1.10', ipm.in_use)
 
         # Check for halo
@@ -80,17 +101,17 @@ class IPAMTestCase(base.ShakenFistTestCase):
         ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
 
         self.assertEqual(True, ipm.is_free('192.168.1.24'))
-        ipm.reserve('192.168.1.24', ('test', '123'),
-                    ipam.RESERVATION_TYPE_FLOATING, '')
+        ipm.reserve('192.168.1.24', (ObjectType.INSTANCE, TEST_USER_UUID),
+                    ReservationType.FLOATING, '')
         self.assertEqual(False, ipm.is_free('192.168.1.24'))
         self.assertEqual(
-            False, ipm.reserve('192.168.1.24', ('test', '123'),
-                               ipam.RESERVATION_TYPE_FLOATING, ''))
+            False, ipm.reserve('192.168.1.24', (ObjectType.INSTANCE, TEST_USER_UUID),
+                               ReservationType.FLOATING, ''))
 
         self.assertEqual(True, ipm.is_free('192.168.1.42'))
         self.assertEqual(
-            True, ipm.reserve('192.168.1.42', ('test', '123'),
-                              ipam.RESERVATION_TYPE_FLOATING, ''))
+            True, ipm.reserve('192.168.1.42', (ObjectType.INSTANCE, TEST_USER_UUID),
+                              ReservationType.FLOATING, ''))
         self.assertEqual(False, ipm.is_free('192.168.1.42'))
 
     def test_get_free_random_ip(self):
@@ -99,7 +120,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
 
         for _ in range(800):
             ipm.reserve_random_free_address(
-                ('test', '123'), ipam.RESERVATION_TYPE_FLOATING, '')
+                (ObjectType.INSTANCE, TEST_USER_UUID), ReservationType.FLOATING, '')
 
         # The extra three are the reserved network, broadcast, and gateway
         # addresses
@@ -112,7 +133,7 @@ class IPAMTestCase(base.ShakenFistTestCase):
         try:
             for _ in range(65025):
                 ipm.reserve_random_free_address(
-                    ('test', '123'), ipam.RESERVATION_TYPE_FLOATING, '')
+                    (ObjectType.INSTANCE, TEST_USER_UUID), ReservationType.FLOATING, '')
 
         except exceptions.CongestedNetwork:
             pass

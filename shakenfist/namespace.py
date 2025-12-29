@@ -33,8 +33,24 @@ class Namespace(dbo):
     def __init__(self, static_values):
         self.upgrade(static_values)
 
-        # We treat a namespace name as a UUID here for historical reasons
-        super().__init__(static_values['uuid'], static_values['version'])
+        # Namespace uses the namespace name as its identifier for historical
+        # reasons instead of a proper UUID. We store it directly to avoid UUID
+        # conversion. The uuid property is overridden to return a string.
+        self.__namespace_name = static_values['uuid']
+        self._DatabaseBackedObject__uuid = self.__namespace_name  # type: ignore
+        self._DatabaseBackedObject__version = static_values.get('version')
+        self._DatabaseBackedObject__in_memory_only = False
+        self.log = LOG.with_fields({self.object_type: self.__namespace_name})
+
+    @property
+    def uuid(self) -> str:
+        """Return the Namespace's identifier (name) as a string.
+
+        This overrides the base class to return a string instead of uuid.UUID
+        because namespaces use their name as their identifier for historical
+        reasons.
+        """
+        return self.__namespace_name
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values):
@@ -191,10 +207,10 @@ class Namespaces(dbo_iter):
     base_object = Namespace
 
     def __iter__(self):
-        for _, n in self.get_iterator():
-            uniq = n.get('uuid')
+        for _, static_values in self.get_iterator():
+            uniq = static_values.get('uuid')
             if not uniq:
-                uniq = n.get('name')
+                uniq = static_values.get('name')
             if not uniq:
                 continue
 

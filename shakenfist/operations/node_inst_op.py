@@ -199,6 +199,10 @@ class NodeInstOp(BaseClusterOperation):
                     interfaces.append(ni)
                     if ni.network_uuid not in instance_networks:
                         instance_networks.append(ni.network_uuid)
+            self.log.with_fields({
+                'interfaces': interfaces,
+                'networks': instance_networks
+            }).debug('Instance networking before delete')
 
             # Stop the instance
             inst.power_off()

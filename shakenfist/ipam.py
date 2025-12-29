@@ -1,15 +1,20 @@
 import ipaddress
 import random
 import time
+from collections.abc import Iterator
+from ipaddress import IPv4Address
+from typing import Any, Optional, Union
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.schema.ipam_reservation import IPAMReservation
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 
 
@@ -19,15 +24,8 @@ from shakenfist.schema.object_types import ObjectType
 
 LOG, _ = logs.setup(__name__)
 
+# Legacy etcd path - only used for migration
 IPAM_RESERVATIONS_PATH = '/sf/ipam_reservations/%s/'
-RESERVATION_TYPE_NETWORK = 'network'
-RESERVATION_TYPE_BROADCAST = 'broadcast'
-RESERVATION_TYPE_GATEWAY = 'gateway'
-RESERVATION_TYPE_FLOATING = 'floating'
-RESERVATION_TYPE_ROUTED = 'routed'
-RESERVATION_TYPE_INSTANCE = 'instance'
-RESERVATION_TYPE_DELETION_HALO = 'deletion-halo'
-RESERVATION_TYPE_UNKNOWN = 'unknown'
 
 
 class IPAM(dbo):
@@ -44,35 +42,38 @@ class IPAM(dbo):
     }
 
     @classmethod
-    def _upgrade_step_7_to_8(cls, static_values):
+    def _upgrade_step_7_to_8(cls, static_values: dict[str, Any]) -> None:
         # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
 
-    def __init__(self, static_values):
-        self._in_memory_only = static_values.get('in_memory_only', False)
+    def __init__(self, static_values: dict[str, Any]) -> None:
+        self._in_memory_only: bool = static_values.get('in_memory_only', False)
 
         super().__init__(static_values['uuid'],
                          static_values.get('version'),
                          self._in_memory_only)
 
-        self.__namespace = static_values['namespace']
-        self.__network_uuid = static_values['network_uuid']
-        self.__ipblock = static_values['ipblock']
+        self.__namespace: str = static_values['namespace']
+        self.__network_uuid: str = static_values['network_uuid']
+        self.__ipblock: str = static_values['ipblock']
 
-        self.cached_ipblock_object = None
-        self.reservations_path = IPAM_RESERVATIONS_PATH % self.uuid
+        self.cached_ipblock_object: Optional[ipaddress.IPv4Network] = None
+        self.reservations_path: str = IPAM_RESERVATIONS_PATH % str(self.uuid)
 
         if self._in_memory_only:
-            self.__in_memory_store = {}
+            # In-memory store now uses IPAMReservation objects directly
+            self.__in_memory_store: dict[str, IPAMReservation] = {}
 
-    def _ensure_ipblock_object(self):
+    def _ensure_ipblock_object(self) -> ipaddress.IPv4Network:
         if not self.cached_ipblock_object:
-            self.cached_ipblock_object = ipaddress.ip_network(self.__ipblock, strict=False)
+            self.cached_ipblock_object = ipaddress.ip_network(
+                self.__ipblock, strict=False)
         return self.cached_ipblock_object
 
     @classmethod
-    def new(cls, ipam_uuid, namespace, network_uuid, ipblock, in_memory_only=False):
-        static_values = {
+    def new(cls, ipam_uuid: str, namespace: Optional[str], network_uuid: str,
+            ipblock: str, in_memory_only: bool = False) -> 'IPAM':
+        static_values: dict[str, Any] = {
                 'uuid': ipam_uuid,
                 'namespace': namespace,
                 'network_uuid': network_uuid,
@@ -89,83 +90,95 @@ class IPAM(dbo):
             o = IPAM.from_db(ipam_uuid)
 
         o.state = cls.STATE_CREATED
-        o.reserve(o.network_address, ('network', network_uuid), RESERVATION_TYPE_NETWORK, '')
-        o.reserve(o.broadcast_address, ('network', network_uuid), RESERVATION_TYPE_BROADCAST, '')
-        o.reserve(o.get_address_at_index(1), ('network', network_uuid), RESERVATION_TYPE_GATEWAY, '')
+        o.reserve(o.network_address, (ObjectType.NETWORK, network_uuid),
+                  ReservationType.NETWORK, '')
+        o.reserve(o.broadcast_address, (ObjectType.NETWORK, network_uuid),
+                  ReservationType.BROADCAST, '')
+        o.reserve(o.get_address_at_index(1), (ObjectType.NETWORK, network_uuid),
+                  ReservationType.GATEWAY, '')
         return o
 
     # Static values
     @property
-    def namespace(self):
+    def namespace(self) -> str:
         return self.__namespace
 
     @property
-    def network_uuid(self):
+    def network_uuid(self) -> str:
         return self.__network_uuid
 
     @property
-    def ipblock(self):
+    def ipblock(self) -> ipaddress.IPv4Network:
         return self._ensure_ipblock_object()
 
     @property
-    def netmask(self):
+    def netmask(self) -> str:
         return str(self._ensure_ipblock_object().netmask)
 
     @property
-    def broadcast_address(self):
+    def broadcast_address(self) -> str:
         return str(self._ensure_ipblock_object().broadcast_address)
 
     @property
-    def network_address(self):
+    def network_address(self) -> str:
         return str(self._ensure_ipblock_object().network_address)
 
     @property
-    def num_addresses(self):
+    def num_addresses(self) -> int:
         return self._ensure_ipblock_object().num_addresses
 
     @property
-    def in_use(self):
+    def in_use(self) -> set[str]:
         if self._in_memory_only:
-            return self.__in_memory_store.keys()
+            return set(self.__in_memory_store.keys())
 
-        reservations = []
-        for _, data in etcd.get_prefix_raw(self.reservations_path):
-            reservations.append(data['address'])
-        return reservations
+        return mariadb.get_addresses_in_use(self.uuid)
 
     @property
-    def in_use_counter(self):
+    def in_use_counter(self) -> int:
         return len(self.in_use)
 
-    def get_address_at_index(self, idx):
+    def get_address_at_index(self, idx: int) -> str:
         return str(self.ipblock[idx])
 
-    def is_in_range(self, address):
+    def is_in_range(self, address: Optional[str]) -> bool:
         if not address:
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
 
         return ipaddress.ip_address(address) in self.ipblock
 
-    def is_free(self, address):
+    def is_free(self, address: Optional[str]) -> bool:
         if not address:
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
 
         return address not in self.in_use
 
-    def reserve(self, address, user, reservation_type, comment):
+    def reserve(self, address: Optional[str],
+                user: Optional[Union[tuple[ObjectType, str], str]],
+                reservation_type: ReservationType, comment: str) -> bool:
         if not address:
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
 
-        reservation = {
-            'address': address,
-            'user': user,
-            'when': time.time(),
-            'type': reservation_type,
-            'comment': comment
-        }
+        user_type: Optional[ObjectType] = None
+        user_uuid: Optional[str] = None
+        if user:
+            if isinstance(user, (list, tuple)) and len(user) == 2:
+                user_type, user_uuid = user
+            elif isinstance(user, str):
+                user_uuid = user
+
+        reservation = IPAMReservation(
+            ipam_uuid=self.uuid,
+            address=IPv4Address(address),
+            reservation_type=reservation_type,
+            user_type=user_type,
+            user_uuid=user_uuid,
+            reserved_at=time.time(),
+            comment=comment or None
+        )
 
         self.release_haloed(config.IP_DELETION_HALO_DURATION)
 
@@ -175,12 +188,14 @@ class IPAM(dbo):
             self.__in_memory_store[address] = reservation
             return True
 
-        if not etcd.create_raw(self.reservations_path + address, reservation):
+        if not mariadb.reserve_address(reservation):
             return False
-        self.add_event(EVENT_TYPE_AUDIT, 'reserved address', extra=reservation)
+        self.add_event(
+            EVENT_TYPE_AUDIT, 'reserved address',
+            extra=reservation.to_legacy_dict())
         return True
 
-    def release(self, address):
+    def release(self, address: Optional[str]) -> bool:
         if not address:
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
@@ -195,69 +210,66 @@ class IPAM(dbo):
         if not original_reservation:
             return False
 
-        halo_reservation = {
-            'address': address,
-            'user': None,
-            'when': time.time(),
-            'type': RESERVATION_TYPE_DELETION_HALO,
-            'comment': ''
-        }
+        halo_reservation = IPAMReservation(
+            ipam_uuid=self.uuid,
+            address=IPv4Address(address),
+            reservation_type=ReservationType.DELETION_HALO,
+            user_type=None,
+            user_uuid=None,
+            reserved_at=time.time(),
+            comment=None
+        )
 
-        reservation_path = self.reservations_path + address
-        if not etcd.replace_raw(
-                reservation_path, original_reservation, halo_reservation):
+        if not mariadb.release_address(self.uuid, address, halo_reservation):
             return False
 
         self.add_event(
             EVENT_TYPE_AUDIT, 'released address to deletion-halo',
-            extra=original_reservation)
+            extra=original_reservation.to_legacy_dict())
         return True
 
     @staticmethod
-    def _should_free(data, duration):
-        if (data['type'] == RESERVATION_TYPE_DELETION_HALO and
-                time.time() - data['when'] > duration):
+    def _should_free(reservation: IPAMReservation, duration: float | int) -> bool:
+        if (reservation.reservation_type == ReservationType.DELETION_HALO and
+                time.time() - reservation.reserved_at > duration):
             return True
         return False
 
-    def release_haloed(self, duration):
+    def release_haloed(self, duration: float | int) -> int:
         freed = 0
 
         if self._in_memory_only:
             for address in list(self.__in_memory_store.keys()):
-                data = self.__in_memory_store[address]
-                if self._should_free(data, duration):
+                reservation = self.__in_memory_store[address]
+                if self._should_free(reservation, duration):
                     del self.__in_memory_store[address]
                     freed += 1
             return freed
 
-        # Handle the possible allocation race here where something's halo is
-        # removed and its immediately allocated, but at the same time we
-        # remove its halo by using a transactional_delete_raw.
-        for key, data in etcd.get_prefix_raw(self.reservations_path):
-            if self._should_free(data, duration):
-                if etcd.transactional_delete_raw(key, data):
-                    freed += 1
-        return freed
+        # Calculate the cutoff time for deletion-halo expiry
+        older_than = time.time() - duration
+        return mariadb.release_haloed_addresses(self.uuid, older_than)
 
-    def get_haloed_addresses(self):
+    def get_haloed_addresses(self) -> Iterator[str]:
         if self._in_memory_only:
             for address in self.__in_memory_store:
-                if self.__in_memory_store[address]['type'] == \
-                        RESERVATION_TYPE_DELETION_HALO:
+                if self.__in_memory_store[address].reservation_type == \
+                        ReservationType.DELETION_HALO:
                     yield address
             return
 
-        for _, data in etcd.get_prefix_raw(self.reservations_path):
-            if data['type'] == RESERVATION_TYPE_DELETION_HALO:
-                yield data['address']
+        for res in mariadb.get_reservations_for_ipam(self.uuid):
+            if res.reservation_type == ReservationType.DELETION_HALO:
+                yield str(res.address)
 
-    def get_random_address(self):
+    def get_random_address(self) -> str:
         bits = random.getrandbits(
             self.ipblock.max_prefixlen - self.ipblock.prefixlen)
         return str(ipaddress.IPv4Address(self.ipblock.network_address + bits))
 
-    def reserve_random_free_address(self, unique_label_tuple, address_type, comment):
+    def reserve_random_free_address(self, unique_label_tuple: tuple[ObjectType, str],
+                                    address_type: ReservationType,
+                                    comment: str) -> str:
         # Fast path give up for full networks
         if self.in_use_counter == self.num_addresses:
             raise exceptions.CongestedNetwork('No free addresses on network')
@@ -301,7 +313,18 @@ class IPAM(dbo):
         # Give up
         raise exceptions.CongestedNetwork('No free addresses on network')
 
-    def get_reservation(self, address):
+    def get_reservation(self, address: Optional[str]) -> Optional[IPAMReservation]:
+        """Get the reservation for a specific address.
+
+        Args:
+            address: The IP address to look up.
+
+        Returns:
+            The IPAMReservation if found, None otherwise.
+
+        Raises:
+            InvalidIPAMAddress: If address is None or empty.
+        """
         if not address:
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
@@ -309,9 +332,9 @@ class IPAM(dbo):
         if self._in_memory_only:
             return self.__in_memory_store.get(address)
 
-        return etcd.get_raw(self.reservations_path + address)
+        return mariadb.get_reservation(self.uuid, address)
 
-    def get_allocation_age(self, address):
+    def get_allocation_age(self, address: Optional[str]) -> Optional[float]:
         if not address:
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
@@ -319,26 +342,26 @@ class IPAM(dbo):
         r = self.get_reservation(address)
         if not r:
             return None
-        return r.get('when', time.time())
+        return r.reserved_at
 
-    def hard_delete(self):
+    def hard_delete(self) -> None:
         if self._in_memory_only:
             return
 
-        etcd.delete_prefix(self.reservations_path)
+        mariadb.delete_reservations_for_ipam(self.uuid)
         super().hard_delete()
 
 
 class IPAMs(dbo_iter):
     base_object = IPAM
 
-    def __iter__(self):
-        for _, o in self.get_iterator():
-            ipam_uuid = o.get('uuid')
-            o = IPAM.from_db(ipam_uuid)
-            if not o:
+    def __iter__(self) -> Iterator[IPAM]:
+        for _, static_values in self.get_iterator():
+            ipam_uuid = static_values.get('uuid')
+            ipam_obj = IPAM.from_db(ipam_uuid)
+            if not ipam_obj:
                 continue
 
-            out = self.apply_filters(o)
+            out = self.apply_filters(ipam_obj)
             if out:
                 yield out

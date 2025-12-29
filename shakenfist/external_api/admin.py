@@ -9,7 +9,6 @@ import os
 
 import flask
 from flasgger import swag_from
-from shakenfist_utilities import api as sf_api  # noreorder
 
 from shakenfist import etcd
 from shakenfist import scheduler
@@ -25,7 +24,7 @@ admin_locks_get_example = """{
 }"""
 
 
-class AdminLocksEndpoint(sf_api.Resource):
+class AdminLocksEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'admin', 'List locks currently held in the cluster.', [],
         [(200, 'All locks currently held in the cluster.',
@@ -45,7 +44,7 @@ LFPuUi9WNH611ybJLriyFIN4a8v67CX0VJ8G9yIyYGrDlY6jBWu16br/Fw==
 -----END CERTIFICATE-----"""
 
 
-class AdminClusterCaCertificateEndpoint(sf_api.Resource):
+class AdminClusterCaCertificateEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'admin', 'Retrieve the CA certificate used for TLS in this cluster.', [],
         [(200, 'A PEM encoded CA certificate.',
@@ -68,7 +67,7 @@ admin_resources_get_example = """{
 }"""
 
 
-class AdminREsourcesEndpoint(sf_api.Resource):
+class AdminREsourcesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'admin', 'List resources currently available in the cluster.', [],
         [(200, 'All summary of resource usage and availability in the cluster.',

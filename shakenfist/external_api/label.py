@@ -69,7 +69,7 @@ label_example = """{
 }"""
 
 
-class LabelEndpoint(sf_api.Resource):
+class LabelEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'label', 'Update a label artifact with a new blob.',
         [

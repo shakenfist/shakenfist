@@ -135,7 +135,7 @@ blob_get_example = """{
 }"""
 
 
-class BlobEndpoint(sf_api.Resource):
+class BlobEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Get blob information.',
         [('blob_uuid', 'query', 'uuid', 'The UUID of the blob.', True)],
@@ -150,7 +150,7 @@ class BlobEndpoint(sf_api.Resource):
         return out
 
 
-class BlobDataEndpoint(sf_api.Resource):
+class BlobDataEndpoint(api_base.Resource):
     # NOTE(mikal): note that arguments from URL routes (blob_uuid for example),
     # are not included in the webargs schema because webargs doesn't appear to
     # know how to find them.
@@ -213,7 +213,7 @@ blobs_get_example = """[
 ]"""
 
 
-class BlobsEndpoint(sf_api.Resource):
+class BlobsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', ('Get all blobs.'),
         [('node', 'body', 'node',
@@ -251,7 +251,7 @@ blob_events_example = """[
 ]"""
 
 
-class BlobEventsEndpoint(sf_api.Resource):
+class BlobEventsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Get blob event information.',
         [
@@ -270,7 +270,7 @@ class BlobEventsEndpoint(sf_api.Resource):
             return list(eventdb.read_events(limit=limit, event_type=event_type))
 
 
-class BlobChecksumEndpoint(sf_api.Resource):
+class BlobChecksumEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Get a checksum for a blob.',
         [
@@ -302,7 +302,7 @@ class BlobChecksumEndpoint(sf_api.Resource):
             PRIORITY.user_waiting)
 
 
-class BlobChecksumsEndpoint(sf_api.Resource):
+class BlobChecksumsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Search for a blob by sha512 hash.',
         [
@@ -341,7 +341,7 @@ class BlobChecksumsEndpoint(sf_api.Resource):
         return None
 
 
-class BlobMetadatasEndpoint(sf_api.Resource):
+class BlobMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Fetch metadata for a blob.',
         [
@@ -381,7 +381,7 @@ class BlobMetadatasEndpoint(sf_api.Resource):
         blob_from_db.add_metadata_key(key, value)
 
 
-class BlobMetadataEndpoint(sf_api.Resource):
+class BlobMetadataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Update a metadata key for an blob.',
         [

@@ -9,6 +9,8 @@ the codebase.
 Type checking is enforced for:
 
 - `shakenfist/schema/sqlalchemy.py` - Pydantic to SQLAlchemy conversion
+- `shakenfist/schema/ipam_reservation.py` - IPAM reservation Pydantic schema
+- `shakenfist/ipam.py` - IPAM (IP Address Manager) class
 
 Additional modules will be added over time as they are annotated.
 
@@ -38,6 +40,14 @@ ignore_missing_imports = true
 # Strict checking for typed modules
 [[tool.mypy.overrides]]
 module = "shakenfist.schema.sqlalchemy"
+strict = true
+
+[[tool.mypy.overrides]]
+module = "shakenfist.schema.ipam_reservation"
+strict = true
+
+[[tool.mypy.overrides]]
+module = "shakenfist.ipam"
 strict = true
 ```
 

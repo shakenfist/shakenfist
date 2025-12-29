@@ -76,7 +76,7 @@ agentoperation_get_example = """{
 }"""
 
 
-class AgentOperationEndpoint(sf_api.Resource):
+class AgentOperationEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'agentoperations', 'Get information for an agent operation.',
         [('operation_uuid', 'query', 'uuid', 'The UUID of an agent operation.', True)],
@@ -161,7 +161,7 @@ agentoperation_instance_example = """[
 ]"""
 
 
-class InstanceAgentOperationsEndpoint(sf_api.Resource):
+class InstanceAgentOperationsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'List agent operations for an instance.',
         [('instance_ref', 'query', 'uuidorname',

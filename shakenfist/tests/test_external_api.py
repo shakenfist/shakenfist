@@ -477,8 +477,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
 class ExternalApiNetworkInterfaceTestCase(ExternalApiTestCase):
     def test_get_network_interface(self):
-        id1 = str(uuid4)
-        id2 = str(uuid4)
+        id1 = str(uuid4())
+        id2 = str(uuid4())
 
         net = self.mock_etcd.create_network('barrynet')
         nd = self.mock_etcd.generate_netdesc(net.uuid)

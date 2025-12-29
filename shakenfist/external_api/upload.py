@@ -11,7 +11,6 @@ import uuid
 
 import flask
 from flasgger import swag_from
-from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
@@ -32,7 +31,7 @@ upload_create_example = """{
 }"""
 
 
-class UploadCreateEndpoint(sf_api.Resource):
+class UploadCreateEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'upload', 'Create a new upload.', [],
         [(200, 'Information about the upload.', upload_create_example)]))
@@ -44,7 +43,7 @@ class UploadCreateEndpoint(sf_api.Resource):
         return u.external_view()
 
 
-class UploadDataEndpoint(sf_api.Resource):
+class UploadDataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'upload', 'Append data to an upload.',
         [('upload_uuid', 'query', 'uuid', 'The upload UUID.', True),
@@ -60,7 +59,7 @@ class UploadDataEndpoint(sf_api.Resource):
         upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
         os.makedirs(upload_dir, exist_ok=True)
 
-        upload_path = os.path.join(upload_dir, upload_from_db.uuid)
+        upload_path = os.path.join(upload_dir, str(upload_from_db.uuid))
         with open(upload_path, 'ab') as f:
             f.write(flask.request.get_data(cache=False, as_text=False,
                                            parse_form_data=False))
@@ -69,7 +68,7 @@ class UploadDataEndpoint(sf_api.Resource):
         return st.st_size
 
 
-class UploadTruncateEndpoint(sf_api.Resource):
+class UploadTruncateEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'upload', 'Truncate an upload object to a specified size.',
         [('upload_uuid', 'query', 'uuid', 'The upload UUID.', True),
@@ -84,5 +83,5 @@ class UploadTruncateEndpoint(sf_api.Resource):
         upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
         os.makedirs(upload_dir, exist_ok=True)
 
-        upload_path = os.path.join(upload_dir, upload_from_db.uuid)
+        upload_path = os.path.join(upload_dir, str(upload_from_db.uuid))
         os.truncate(upload_path, int(offset))

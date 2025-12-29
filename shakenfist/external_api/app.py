@@ -19,7 +19,6 @@ import flask
 import flask_restful
 from flask_jwt_extended import JWTManager
 from flask_request_id import RequestID
-from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import constants
@@ -39,14 +38,13 @@ from shakenfist.external_api import label as api_label
 from shakenfist.external_api import network as api_network
 from shakenfist.external_api import node as api_node
 from shakenfist.external_api import snapshot as api_snapshot
+from shakenfist.external_api import base as api_base
 from shakenfist.external_api import upload as api_upload
-from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
 LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
-util_exceptions.install_exception_tracking()
 
 
 app = flask.Flask(__name__)
@@ -123,7 +121,7 @@ def log_response_info(response):
     return response
 
 
-class Root(sf_api.Resource):
+class Root(api_base.Resource):
     def get(self):
         resp = flask.Response(
             ('<html><head><title>Shaken Fist REST API service</title></head>'

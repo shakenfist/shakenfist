@@ -24,7 +24,7 @@ clusteroperation_get_example = """{
 }"""
 
 
-class ClusterOperationEndpoint(sf_api.Resource):
+class ClusterOperationEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'clusteroperations', 'Get information for a cluster operation.',
         [

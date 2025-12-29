@@ -116,8 +116,8 @@ class AgentOperations(dbo_iter):
     base_object = AgentOperation
 
     def __iter__(self):
-        for _, o in self.get_iterator():
-            operation_uuid = o.get('uuid')
+        for _, static_values in self.get_iterator():
+            operation_uuid = static_values.get('uuid')
             o = AgentOperation.from_db(
                 operation_uuid, suppress_failure_audit=self.suppress_failure_audit)
             if not o:
@@ -129,4 +129,4 @@ class AgentOperations(dbo_iter):
 
 
 def instance_filter(instance, o):
-    return o.instance_uuid == instance.uuid
+    return str(o.instance_uuid) == str(instance.uuid)

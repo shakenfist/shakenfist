@@ -33,10 +33,12 @@ def record_exception(exc_type, exc_value, exc_tb):
     flags = os.O_RDWR | os.O_CREAT
     fd = os.open(f'/srv/shakenfist/exceptions/{h}.json', flags, 0o644)
 
+    data = {}
     try:
+        # One writer at a time
         fcntl.flock(fd, fcntl.LOCK_EX)
-        data = {}
 
+        # Read previous data, if any
         size = os.fstat(fd).st_size
         if size > 0:
             d = os.read(fd, size)
@@ -44,18 +46,22 @@ def record_exception(exc_type, exc_value, exc_tb):
                 data = json.loads(d.decode())
             os.lseek(fd, 0, os.SEEK_SET)
 
+        # Add new data
         data['traceback'] = traceback_str
         data['count'] = data.get('count', 0) + 1
-
         if 'events' not in data:
             data['events'] = []
         data['events'].append(time.time())
 
+        # Persist
         os.write(fd, json.dumps(data, indent=4, sort_keys=True).encode())
+        LOG.with_fields(data).debug('Recorded exception')
 
-    except Exception:
+    except Exception as e:
         # Ignore the exception here because we're already on the error path
-        pass
+        LOG.with_fields(data).with_fields({
+            'recording_exception': str(e)
+        }).error('Failed to record exception')
     finally:
         os.close(fd)
 
@@ -75,3 +81,4 @@ def _thread_excepthook(args):
 def install_exception_tracking():
     sys.excepthook = _tracking_excepthook
     threading.excepthook = _thread_excepthook
+    LOG.info('Installed exception tracking')

@@ -776,12 +776,14 @@ class Blob(dbo):
 
     @staticmethod
     def filedir(blob_uuid):
+        blob_uuid = str(blob_uuid)
         path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid[0:2])
         os.makedirs(path, exist_ok=True)
         return path
 
     @staticmethod
     def filepath(blob_uuid):
+        blob_uuid = str(blob_uuid)
         return os.path.join(Blob.filedir(blob_uuid), blob_uuid)
 
     @property
@@ -983,8 +985,8 @@ class Blobs(dbo_iter):
     base_object = Blob
 
     def __iter__(self):
-        for _, b in self.get_iterator():
-            b = Blob(b)
+        for _, static_values in self.get_iterator():
+            b = Blob(static_values)
             if not b:
                 continue
 

@@ -77,11 +77,26 @@ class Node(dbo):
     def __init__(self, static_values):
         self.upgrade(static_values)
 
-        # We treat a node name as a UUID here for historical reasons
-        super().__init__(static_values['fqdn'], static_values.get('version'))
+        # Node uses the FQDN as its identifier for historical reasons instead
+        # of a proper UUID. We store it directly to avoid UUID conversion.
+        # The uuid property is overridden to return a string.
+        self.__node_fqdn = static_values['fqdn']
+        self._DatabaseBackedObject__uuid = self.__node_fqdn  # type: ignore
+        self._DatabaseBackedObject__version = static_values.get('version')
+        self._DatabaseBackedObject__in_memory_only = False
+        self.log = LOG.with_fields({self.object_type: self.__node_fqdn})
 
         self.__ip = static_values['ip']
         self.__fqdn = static_values['fqdn']
+
+    @property
+    def uuid(self) -> str:
+        """Return the Node's identifier (FQDN) as a string.
+
+        This overrides the base class to return a string instead of uuid.UUID
+        because nodes use their FQDN as their identifier for historical reasons.
+        """
+        return self.__node_fqdn
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values):
@@ -270,10 +285,10 @@ class Node(dbo):
         self._db_set_attribute('instances', {'instances': value})
 
     def add_instance(self, instance_uuid):
-        self._add_item_in_attribute_list('instances', instance_uuid)
+        self._add_item_in_attribute_list('instances', str(instance_uuid))
 
     def remove_instance(self, instance_uuid):
-        self._remove_item_in_attribute_list('instances', instance_uuid)
+        self._remove_item_in_attribute_list('instances', str(instance_uuid))
 
     @property
     def dependency_versions(self):
@@ -352,10 +367,10 @@ class Nodes(dbo_iter):
     base_object = Node
 
     def __iter__(self):
-        for _, n in self.get_iterator():
-            uniq = n.get('uuid')
+        for _, static_values in self.get_iterator():
+            uniq = static_values.get('uuid')
             if not uniq:
-                uniq = n.get('fqdn')
+                uniq = static_values.get('fqdn')
             if not uniq:
                 continue
 
