@@ -10,6 +10,7 @@ enable future migration to other database backends.
 
 from concurrent import futures
 import json
+from uuid import UUID
 
 import grpc
 from prometheus_client import Counter
@@ -438,7 +439,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 comment=request.halo_reservation.comment or None
             )
             success = mariadb._direct_release_address(
-                request.ipam_uuid, request.address, halo_reservation)
+                UUID(request.ipam_uuid), request.address, halo_reservation)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database ReleaseAddress failed', e)
@@ -449,7 +450,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['get_reservation'].inc()
             reservation = mariadb._direct_get_reservation(
-                request.ipam_uuid, request.address)
+                UUID(request.ipam_uuid), request.address)
             if reservation is None:
                 return database_pb2.GetReservationReply(found=False)
             return database_pb2.GetReservationReply(
@@ -476,7 +477,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['get_reservations_for_ipam'].inc()
             reservations = mariadb._direct_get_reservations_for_ipam(
-                request.ipam_uuid)
+                UUID(request.ipam_uuid))
             result = []
             for res in reservations:
                 result.append(database_pb2.IPAMReservationData(
@@ -499,7 +500,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['delete_reservation'].inc()
             success = mariadb._direct_delete_reservation(
-                request.ipam_uuid, request.address)
+                UUID(request.ipam_uuid), request.address)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -511,7 +512,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['delete_reservations_for_ipam'].inc()
             count = mariadb._direct_delete_reservations_for_ipam(
-                request.ipam_uuid)
+                UUID(request.ipam_uuid))
             return database_pb2.DeleteCountReply(count=count)
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -523,7 +524,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['release_haloed_addresses'].inc()
             count = mariadb._direct_release_haloed_addresses(
-                request.ipam_uuid, request.older_than)
+                UUID(request.ipam_uuid), request.older_than)
             return database_pb2.DeleteCountReply(count=count)
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -534,7 +535,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get all addresses in use for an IPAM."""
         try:
             self.monitor.counters['get_addresses_in_use'].inc()
-            addresses = mariadb._direct_get_addresses_in_use(request.ipam_uuid)
+            addresses = mariadb._direct_get_addresses_in_use(
+                UUID(request.ipam_uuid))
             return database_pb2.GetAddressesInUseReply(
                 addresses=list(addresses))
         except Exception as e:
