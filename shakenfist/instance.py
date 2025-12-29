@@ -11,6 +11,7 @@ import random
 import shutil
 import socket
 import time
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 from functools import partial
 from uuid import uuid4
@@ -1370,6 +1371,14 @@ class Instance(dbowo):
             extra={
                 'xml': x
             })
+
+        # Validate domain XML syntax before passing to libvirt
+        try:
+            ET.fromstring(x)
+        except ET.ParseError as e:
+            self.enqueue_delete_due_error('invalid domain XML generated')
+            raise exceptions.InvalidDomainXML(
+                f'Generated domain XML is malformed: {e}')
 
         return x
 

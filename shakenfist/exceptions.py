@@ -116,6 +116,10 @@ class NoDomainException(VirtException):
     ...
 
 
+class InvalidDomainXML(VirtException):
+    ...
+
+
 # Config
 class FlagException(Exception):
     ...
