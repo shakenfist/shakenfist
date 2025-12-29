@@ -1,0 +1,75 @@
+{
+    "bypass_actors": [
+        {
+            "actor_id": 11722172,
+            "actor_type": "Team",
+            "bypass_mode": "always"
+        }
+    ],
+    "conditions": {
+        "ref_name": {
+            "exclude": [],
+            "include": [
+                "refs/heads/develop"
+            ]
+        }
+    },
+    "enforcement": "active",
+    "name": "Develop branch",
+    "rules": [
+        {
+            "parameters": null,
+            "type": "deletion"
+        },
+        {
+            "parameters": {
+                "check_response_timeout_minutes": 360,
+                "grouping_strategy": "ALLGREEN",
+                "max_entries_to_build": 5,
+                "max_entries_to_merge": 5,
+                "merge_method": "MERGE",
+                "min_entries_to_merge": 1,
+                "min_entries_to_merge_wait_minutes": 30
+            },
+            "type": "merge_queue"
+        },
+        {
+            "parameters": {
+                "allowed_merge_methods": [
+                    "merge",
+                    "squash",
+                    "rebase"
+                ],
+                "dismiss_stale_reviews_on_push": true,
+                "require_code_owner_review": false,
+                "require_last_push_approval": false,
+                "required_approving_review_count": 0,
+                "required_review_thread_resolution": false,
+                "required_reviewers": []
+            },
+            "type": "pull_request"
+        },
+        {
+            "parameters": {
+                "do_not_enforce_on_create": false,
+                "required_status_checks": [
+                    {
+                        "context": "Can see status",
+                        "integration_id": 15368
+                    },
+                    {
+                        "context": "Can enqueue",
+                        "integration_id": 15368
+                    }
+                ],
+                "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+        },
+        {
+            "parameters": null,
+            "type": "non_fast_forward"
+        }
+    ],
+    "target": "branch"
+}

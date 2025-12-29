@@ -20,6 +20,19 @@ tox -eflake8 -- -HEAD            # Style check on changed files only
 tox -ecover                      # Generate coverage report
 ```
 
+### Pre-commit Hooks
+
+```bash
+pip install pre-commit           # Install pre-commit
+pre-commit install               # Set up git hooks
+pre-commit run --all-files       # Run all hooks manually
+```
+
+The repository uses `actionlint` to validate GitHub Actions workflow files.
+Install `actionlint`:
+- macOS: `brew install actionlint`
+- Linux: Download from https://github.com/rhysd/actionlint/releases
+
 ### Key Entry Points (CLI Tools)
 
 - `sf-ctl` - Control CLI
@@ -389,10 +402,35 @@ state = State(value='created', update_time=123.0, message='optional')
 
 Use keyword arguments and float for `update_time` (not int).
 
+## CI/CD and Repository Configuration
+
+### Merge Queue Pattern
+
+The CI uses a two-stage merge queue pattern:
+- **`Can enqueue`** - Runs on `pull_request` events, gates entry to merge queue
+- **`Can merge`** - Runs on `merge_group` events, gates the actual merge
+
+Only `Can see status` and `Can enqueue` are required status checks in branch
+protection. `Can merge` is evaluated by the merge queue itself.
+
+### Exported Repository Configuration
+
+GitHub repository settings (rulesets, branch protection, merge queue config)
+are exported daily to `.github/exported-config/` for version control:
+
+- `repository-settings.json` - Repo-level settings
+- `rulesets-summary.json` - List of all rulesets
+- `ruleset-*.json` - Full details for each ruleset
+
+If settings change in the GitHub UI, the `export-repo-config` workflow creates
+a PR to track the change. This provides an audit trail for configuration drift.
+
 ## Documentation
 
 - MkDocs site: `mkdocs serve` from project root
 - Key docs:
+  - `ARCHITECTURE.md` - System architecture overview
+  - `AGENTS.md` - Instructions for AI agents
   - `docs/manifesto.md` - Design philosophy
   - `docs/developer_guide/` - Development guidance
   - `docs/components/` - Architecture docs

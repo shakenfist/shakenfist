@@ -91,7 +91,7 @@ jobs:
           with:
             repository: shakenfist/shakenfist
             path: shakenfist
-            force-depth: 2
+            fetch-depth: 2
 
         - name: Build image
           run: |

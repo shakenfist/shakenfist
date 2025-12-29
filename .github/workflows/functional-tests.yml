@@ -1430,7 +1430,6 @@ jobs:
       pull-requests: write
     outputs:
       ts: "${{ steps.slack.outputs.ts }}"
-      commit: "${{ steps.commit_message.outputs.commit }}"
     steps:
       - name: Log the github event
         run: |
