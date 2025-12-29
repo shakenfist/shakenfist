@@ -11,6 +11,7 @@ import random
 import shutil
 import socket
 import time
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 from functools import partial
 from uuid import uuid4
@@ -83,7 +84,7 @@ def _get_disk_device(bus, index):
         'nvme': ('nvme', NUMBERS),
     }
     if bus not in bases:
-        raise exceptions.InstanceBadDiskSpecification('Unknown bus %s' % bus)
+        raise exceptions.InstanceBadDiskSpecification(f'Unknown bus {bus}')
     prefix, index_scheme = bases.get(bus)
     return f'{prefix}{index_scheme[index]}'
 
@@ -724,10 +725,9 @@ class Instance(dbowo):
             if d['bus'] == 'nvme':
                 nvme_counter += 1
                 block_devices['extracommands'].extend([
-                    '-drive', ('file=%s,format=%s,if=none,id=NVME%d'
-                               % (d['path'], d['type'], nvme_counter)),
-                    '-device', ('nvme,drive=NVME%d,serial=nvme-%d'
-                                % (nvme_counter, nvme_counter))
+                    '-drive',
+                    f'file={d["path"]},format={d["type"]},if=none,id=NVME{nvme_counter}',
+                    '-device', f'nvme,drive=NVME{nvme_counter},serial=nvme-{nvme_counter}'
                 ])
 
         nvram_template = self.nvram_template
@@ -854,7 +854,7 @@ class Instance(dbowo):
                     inst.undefine()
         except Exception as e:
             util_exceptions.ignore_exception(
-                'instance delete domain %s' % self, e)
+                f'instance delete domain {self}', e)
 
         with util_general.RecordedOperation('delete disks', self):
             try:
@@ -862,7 +862,7 @@ class Instance(dbowo):
                     shutil.rmtree(self.instance_path)
             except Exception as e:
                 util_exceptions.ignore_exception(
-                    'instance delete disks %s' % self, e)
+                    f'instance delete disks {self}', e)
 
     def _delete_globally(self):
         blob_refs = self.blob_references
@@ -886,7 +886,7 @@ class Instance(dbowo):
                 suppress_failure_audit=True):
             agentop.delete()
 
-        if self.state.value.endswith('-%s' % self.STATE_ERROR):
+        if self.state.value.endswith(f'-{self.STATE_ERROR}'):
             self.state = self.STATE_ERROR
         else:
             self.state = self.STATE_DELETED
@@ -920,7 +920,7 @@ class Instance(dbowo):
                     return port
             except OSError:
                 LOG.with_fields({'instance': self.uuid}).info(
-                    'Collided with in use port %d, selecting another' % port)
+                    f'Collided with in use port {port}, selecting another')
                 consumed.append(port)
             finally:
                 s.close()
@@ -976,7 +976,7 @@ class Instance(dbowo):
                     # if an image had to be fetched from outside the cluster.
                     disk_base = None
                     if disk.get('blob_uuid'):
-                        disk_base = '{}{}'.format(artifact.BLOB_URL, disk['blob_uuid'])
+                        disk_base = f'{artifact.BLOB_URL}{disk["blob_uuid"]}'
                     elif disk.get('base') and not util_general.noneish(disk.get('base')):
                         a = artifact.Artifact.from_url(
                             artifact.Artifact.TYPE_IMAGE, disk['base'],
@@ -985,11 +985,11 @@ class Instance(dbowo):
 
                         if 'blob_uuid' not in mri:
                             raise exceptions.ArtifactHasNoBlobs(
-                                'Artifact %s of type %s has no versions'
-                                % (a.uuid, a.artifact_type))
+                                f'Artifact {a.uuid} of type {a.artifact_type} '
+                                'has no versions')
 
                         disk['blob_uuid'] = mri['blob_uuid']
-                        disk_base = '{}{}'.format(artifact.BLOB_URL, disk['blob_uuid'])
+                        disk_base = f'{artifact.BLOB_URL}{disk["blob_uuid"]}'
 
                     if disk_base:
                         cached_image_path = util_general.file_permutation_exists(
@@ -998,7 +998,7 @@ class Instance(dbowo):
                             ['iso', 'qcow2'])
                         if not cached_image_path:
                             raise exceptions.ImageMissingFromCache(
-                                'Image %s is missing' % disk['blob_uuid'])
+                                f'Image {disk["blob_uuid"]} is missing')
 
                         try:
                             cd = pycdlib.PyCdlib()
@@ -1037,7 +1037,7 @@ class Instance(dbowo):
                                 util_image.create_cow(
                                     cached_image_path, disk['path'], disk['size'])
                             self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
-                                'COW layer %s created' % disk['path'])
+                                f'COW layer {disk["path"]} created')
 
                             # Record the backing store for modern libvirt. This requires
                             # walking the chain of dependencies. Backing chains only work
@@ -1050,12 +1050,13 @@ class Instance(dbowo):
                                     'backing_uuid': backing_uuid
                                 }).info('traversing backing blob')
                                 backing_path = os.path.join(
-                                    config.STORAGE_PATH, 'image_cache', backing_uuid + '.qcow2')
+                                    config.STORAGE_PATH, 'image_cache',
+                                    f'{backing_uuid}.qcow2')
                                 backing_chain.append(backing_path)
                                 backing_blob = blob.Blob.from_db(backing_uuid)
                                 if not backing_blob:
                                     raise exceptions.BlobMissing(
-                                        'Backing blob %s is missing' % backing_uuid)
+                                        f'Backing blob {backing_uuid} is missing')
                                 backing_uuid = backing_blob.depends_on
 
                             indent = '      '
@@ -1066,17 +1067,14 @@ class Instance(dbowo):
                                 }).info('resolved backing chain')
 
                             for backing_path in backing_chain:
+                                chain = disk['backing']
                                 disk['backing'] = (
-                                    '%(indent)s<backingStore type=\'file\'>'
-                                    '%(indent)s  <format type=\'qcow2\'/>'
-                                    '%(indent)s  <source file=\'%(path)s\'/>\n'
-                                    '%(indent)s  %(chain)s\n'
-                                    '%(indent)s</backingStore>\n'
-                                    % {
-                                        'chain': disk['backing'],
-                                        'path': backing_path,
-                                        'indent': indent
-                                    })
+                                    f'{indent}<backingStore type="file">\n'
+                                    f'{indent}  <format type="qcow2"/>\n'
+                                    f'{indent}  <source file="{backing_path}"/>\n'
+                                    f'{indent}  {chain}\n'
+                                    f'{indent}</backingStore>\n'
+                                )
                                 indent += '  '
 
                             disk['backing'] = disk['backing'].lstrip()
@@ -1117,7 +1115,7 @@ class Instance(dbowo):
             'random_seed': base64.b64encode(os.urandom(512)).decode('ascii'),
             'uuid': str(self.uuid),
             'availability_zone': config.ZONE,
-            'hostname': '%s.local' % self.name,
+            'hostname': f'{self.name}.local',
             'launch_index': 0,
             'devices': [],
             'project_id': None,
@@ -1162,7 +1160,7 @@ class Instance(dbowo):
         for iface_uuid in self.interfaces:
             iface = interface.NetworkInterface.from_db(iface_uuid)
             if iface.ipv4:
-                devname = 'eth%d' % iface.order
+                devname = f'eth{iface.order}'
                 nd['links'].append(
                     {
                         'ethernet_mac_address': iface.macaddr,
@@ -1300,7 +1298,7 @@ class Instance(dbowo):
                 b = blob.Blob.from_db(self.nvram_template)
                 if not b:
                     raise exceptions.NVRAMTemplateMissing(
-                        'Blob %s does not exist' % self.nvram_template)
+                        f'Blob {self.nvram_template} does not exist')
                 b.ensure_local(instance_object=self)
                 b.add_event(EVENT_TYPE_AUDIT, 'instance is using blob',
                             extra={'instance_uuid': self.uuid})
@@ -1327,7 +1325,7 @@ class Instance(dbowo):
                     extradevices.append(
                         f"  <source mode='bind' path='{self.instance_path}/sc-{channel}'/>")
                     extradevices.append(
-                        "  <target type='virtio' name='%s' state='connected'/>" % channel)
+                        f'  <target type="virtio" name="{channel}" state="connected"/>')
                     extradevices.append("</channel>")
                 elif channel == 'sf-agent2':
                     cid = self._allocate_vsock_cid(channel)
@@ -1373,6 +1371,14 @@ class Instance(dbowo):
             extra={
                 'xml': x
             })
+
+        # Validate domain XML syntax before passing to libvirt
+        try:
+            ET.fromstring(x)
+        except ET.ParseError as e:
+            self.enqueue_delete_due_error('invalid domain XML generated')
+            raise exceptions.InvalidDomainXML(
+                f'Generated domain XML is malformed: {e}')
 
         return x
 
@@ -1553,7 +1559,7 @@ class Instance(dbowo):
                 if attempts > 2:
                     self.add_event(EVENT_TYPE_AUDIT, 'pause failed')
                     raise exceptions.InvalidLifecycleState(
-                        'pause failed after %d attempts' % attempts)
+                        f'pause failed after {attempts} attempts')
 
                 time.sleep(1)
                 attempts += 1
@@ -1580,7 +1586,7 @@ class Instance(dbowo):
                 if attempts > 2:
                     self.add_event(EVENT_TYPE_AUDIT, 'unpause failed')
                     raise exceptions.InvalidLifecycleState(
-                        'unpause failed after %d attempts' % attempts)
+                        f'unpause failed after {attempts} attempts')
 
                 time.sleep(1)
                 attempts += 1
@@ -1661,7 +1667,7 @@ class Instance(dbowo):
             return
 
         try:
-            self.state = '%s-error' % self.state.value
+            self.state = f'{self.state.value}-error'
         except Exception:
             # We can land here if there is a serious database error.
             self.state = self.STATE_ERROR
@@ -1706,8 +1712,8 @@ class Instance(dbowo):
 
             a = artifact.Artifact.from_url(
                 artifact.Artifact.TYPE_SNAPSHOT,
-                '{}{}/{}'.format(artifact.INSTANCE_URL, self.uuid, disk['device']),
-                name='{}/{}'.format(self.uuid, disk['device']),
+                f'{artifact.INSTANCE_URL}{self.uuid}/{disk["device"]}',
+                name=f'{self.uuid}/{disk["device"]}',
                 max_versions=max_versions, namespace=self.namespace,
                 create_if_new=True)
 
@@ -1876,18 +1882,15 @@ class Instance(dbowo):
         n.ensure_mesh()
 
         with util_libvirt.LibvirtConnection() as lc:
-            device_xml = """    <interface type='bridge'>
-      <mac address='{macaddr}'/>
-      <source bridge='{bridge}'/>
-      <model type='{model}'/>
-      <mtu size='{mtu}'/>
+            bridge = n.subst_dict()['vx_bridge']
+            mtu = config.MAX_HYPERVISOR_MTU - 50
+            device_xml = f'''    <interface type="bridge">
+      <mac address="{ni.macaddr}"/>
+      <source bridge="{bridge}"/>
+      <model type="{ni.model}"/>
+      <mtu size="{mtu}"/>
       </interface>
-      """.format(
-                macaddr=ni.macaddr,
-                bridge=n.subst_dict()['vx_bridge'],
-                model=ni.model,
-                mtu=config.MAX_HYPERVISOR_MTU - 50
-            )
+      '''
 
             flags = (lc.libvirt.VIR_DOMAIN_AFFECT_CONFIG |
                      lc.libvirt.VIR_DOMAIN_AFFECT_LIVE)

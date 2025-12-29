@@ -12,6 +12,7 @@ from enum import Enum
 from ipaddress import IPv4Address
 from typing import Annotated
 from typing import Any
+from typing import NamedTuple
 from typing import Optional
 
 from pydantic import BaseModel
@@ -27,10 +28,35 @@ from shakenfist.schema.sqlalchemy import SQLIndex
 LOG, _ = logs.setup(__name__)
 
 
+# Lookup table for proto_id -> ReservationType (module-level to avoid Enum issues)
+_RESERVATION_TYPE_PROTO_MAP: dict[int, 'ReservationType'] = {}
+
+
+class ReservationTypeValue(NamedTuple):
+    """Value type for ReservationType enum members.
+
+    Each ReservationType has both a string value (for database/API use) and a
+    protobuf ID (for gRPC communication). This NamedTuple makes both values
+    explicit and self-documenting.
+
+    Attributes:
+        string: The string value used in databases and APIs.
+        proto_id: The integer ID used in protobuf messages. These values are
+            stable and must never be changed or reused once assigned.
+    """
+    string: str
+    proto_id: int
+
+
 class ReservationType(str, Enum):
     """Enum of valid IPAM reservation types.
 
     These describe how an IP address is being used within a network.
+
+    Each member also has a proto_id attribute containing the protobuf integer
+    value. This ensures protobuf enum values remain stable even if the Python
+    enum is reordered. Use ReservationType.from_proto_id() to convert from
+    protobuf.
 
     Attributes:
         NETWORK: The network address (e.g., 10.0.0.0 for a /24).
@@ -43,18 +69,51 @@ class ReservationType(str, Enum):
         UNKNOWN: An unknown or legacy reservation type.
     """
 
+    _proto_id: int
+
+    def __new__(cls, val: ReservationTypeValue) -> 'ReservationType':
+        """Create a ReservationType with both string and protobuf values."""
+        obj = str.__new__(cls, val.string)
+        obj._value_ = val.string
+        obj._proto_id = val.proto_id
+        return obj
+
     def __str__(self) -> str:
         """Return the enum value as a string."""
-        return self.value
+        return str(self.value)
 
-    NETWORK = 'network'
-    BROADCAST = 'broadcast'
-    GATEWAY = 'gateway'
-    FLOATING = 'floating'
-    ROUTED = 'routed'
-    INSTANCE = 'instance'
-    DELETION_HALO = 'deletion-halo'
-    UNKNOWN = 'unknown'
+    @property
+    def proto_id(self) -> int:
+        """Return the protobuf integer ID for this type."""
+        return self._proto_id
+
+    @classmethod
+    def from_proto_id(cls, proto_id: int) -> Optional['ReservationType']:
+        """Get a ReservationType from its protobuf ID.
+
+        Args:
+            proto_id: The protobuf enum integer value.
+
+        Returns:
+            The corresponding ReservationType, or None if proto_id is 0
+            (UNSPECIFIED) or unknown.
+        """
+        global _RESERVATION_TYPE_PROTO_MAP
+        if proto_id == 0:
+            return None
+        if not _RESERVATION_TYPE_PROTO_MAP:
+            _RESERVATION_TYPE_PROTO_MAP = {m.proto_id: m for m in cls}
+        return _RESERVATION_TYPE_PROTO_MAP.get(proto_id)
+
+    # Reservation types (proto_id values are stable - never reorder or change!)
+    NETWORK = ReservationTypeValue(string='network', proto_id=1)
+    BROADCAST = ReservationTypeValue(string='broadcast', proto_id=2)
+    GATEWAY = ReservationTypeValue(string='gateway', proto_id=3)
+    FLOATING = ReservationTypeValue(string='floating', proto_id=4)
+    ROUTED = ReservationTypeValue(string='routed', proto_id=5)
+    INSTANCE = ReservationTypeValue(string='instance', proto_id=6)
+    DELETION_HALO = ReservationTypeValue(string='deletion-halo', proto_id=7)
+    UNKNOWN = ReservationTypeValue(string='unknown', proto_id=8)
 
 
 class IPAMReservation(BaseModel):

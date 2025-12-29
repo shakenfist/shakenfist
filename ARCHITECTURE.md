@@ -57,6 +57,42 @@ The database microservice (`sf-database`) centralizes all database access:
 - All other daemons use the gRPC interface
 - Provides Prometheus metrics for database operations
 
+### Protocol Buffers and gRPC
+
+The gRPC interface is defined in `protos/*.proto` files. Generated Python code
+and type stubs are stored in `shakenfist/protos/`.
+
+To regenerate after modifying `.proto` files or Python enum definitions:
+
+```bash
+tox -e genprotos
+```
+
+This tox environment ensures the correct versions of `grpcio-tools` and
+`mypy-protobuf` are used, matching the versions in `pyproject.toml`.
+
+#### Enum Generation
+
+Protobuf enums are auto-generated from Python enum definitions to avoid
+duplication. The Python enums in `shakenfist/schema/` are the source of truth:
+
+- `schema/object_types.py` defines `ObjectType` with both string values and
+  stable protobuf integer IDs
+- `schema/ipam_reservation.py` defines `ReservationType` similarly
+
+Each enum member uses a `NamedTuple` value type containing:
+- `string`: The string value used in databases and APIs
+- `proto_id`: The stable integer ID used in protobuf messages (never reordered)
+
+The `protos/_generate_enums.py` script uses AST parsing to extract these values
+and generates `shakenfist_enums.proto`. This is run automatically by
+`_make_stubs.sh` before compiling the proto files.
+
+To add a new enum value:
+1. Add the member to the Python enum with the next available `proto_id`
+2. Run `tox -e genprotos` to regenerate the protobuf definitions
+3. Never change or reuse existing `proto_id` values
+
 ### Networking
 
 Shaken Fist uses VXLAN mesh networking:
