@@ -1069,8 +1069,8 @@ class Instance(dbowo):
                             for backing_path in backing_chain:
                                 chain = disk['backing']
                                 disk['backing'] = (
-                                    f'{indent}<backingStore type="file">'
-                                    f'{indent}  <format type="qcow2"/>'
+                                    f'{indent}<backingStore type="file">\n'
+                                    f'{indent}  <format type="qcow2"/>\n'
                                     f'{indent}  <source file="{backing_path}"/>\n'
                                     f'{indent}  {chain}\n'
                                     f'{indent}</backingStore>\n'
