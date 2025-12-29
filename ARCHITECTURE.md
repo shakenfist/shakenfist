@@ -62,14 +62,14 @@ The database microservice (`sf-database`) centralizes all database access:
 The gRPC interface is defined in `protos/*.proto` files. Generated Python code
 and type stubs are stored in `shakenfist/protos/`.
 
-To regenerate after modifying `.proto` files:
+To regenerate after modifying `.proto` files or Python enum definitions:
 
 ```bash
-cd shakenfist/protos
-bash ../../protos/_make_stubs.sh
+tox -e genprotos
 ```
 
-The script uses `mypy-protobuf` to generate typed stubs for mypy compatibility.
+This tox environment ensures the correct versions of `grpcio-tools` and
+`mypy-protobuf` are used, matching the versions in `pyproject.toml`.
 
 #### Enum Generation
 
@@ -90,7 +90,7 @@ and generates `shakenfist_enums.proto`. This is run automatically by
 
 To add a new enum value:
 1. Add the member to the Python enum with the next available `proto_id`
-2. Run `_make_stubs.sh` to regenerate the protobuf definitions
+2. Run `tox -e genprotos` to regenerate the protobuf definitions
 3. Never change or reuse existing `proto_id` values
 
 ### Networking

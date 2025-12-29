@@ -43,31 +43,26 @@ Install `actionlint`:
 ### Generating gRPC Stubs from Proto Files
 
 Proto files are in `protos/` and generated Python stubs go to `shakenfist/protos/`.
-To regenerate after modifying `.proto` files:
+To regenerate after modifying `.proto` files or Python enum definitions:
 
 ```bash
-cd shakenfist/protos
-../../protos/_make_stubs.sh
+tox -e genprotos
 ```
 
-**IMPORTANT:** Always use `_make_stubs.sh` - never run `grpc_tools.protoc` directly.
-The script:
-1. Generates protobuf enum definitions from Python source files (using AST parsing
+This tox environment:
+1. Uses the exact library versions from `pyproject.toml` (avoiding version mismatch
+   errors at runtime)
+2. Generates protobuf enum definitions from Python source files (using AST parsing
    of `schema/object_types.py` and `schema/ipam_reservation.py`)
-2. Compiles all `.proto` files to Python code and type stubs
-3. Fixes import statements in generated code (e.g., `import foo_pb2` becomes
+3. Compiles all `.proto` files to Python code and type stubs
+4. Fixes import statements in generated code (e.g., `import foo_pb2` becomes
    `from shakenfist.protos import foo_pb2`)
 
-Without this fix, the generated `*_grpc.py` files will fail at runtime with
-`ModuleNotFoundError`.
+**IMPORTANT:** Always use `tox -e genprotos` - never run `grpc_tools.protoc`
+directly. The tox environment ensures correct versions and the underlying script
+performs essential post-processing.
 
-**IMPORTANT:** You must use the exact versions of gRPC dependencies specified in
-`pyproject.toml` when generating stubs. The generated code includes version checks
-that will fail at runtime if there's a mismatch. Check pyproject.toml for the
-current pinned versions (e.g., `grpcio==1.70.0`, `grpcio-tools==1.70.0`,
-`protobuf==5.29.5`).
-
-**Note:** The script works on both macOS and Linux.
+**Note:** The underlying script works on both macOS and Linux.
 
 ## Code Style and Conventions
 
