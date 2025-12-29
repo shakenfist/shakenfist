@@ -77,6 +77,7 @@ the PR changes.
 ```bash
 tox                              # Run all tests
 tox -eflake8                     # Lint check
+tox -emypy                       # Type checking
 tox -ecover                      # Coverage report
 stestr run {test_name}           # Run specific test
 ```
@@ -93,6 +94,8 @@ pre-commit run --all-files       # Run all hooks manually
 
 Current hooks:
 - `actionlint` - Validates GitHub Actions workflow files
+- `ansible-lint` - Validates Ansible playbooks in the deployer
+- `mypy` - Type checking via tox (incremental rollout)
 
 ### Key Directories
 

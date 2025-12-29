@@ -9,6 +9,7 @@ enable future migration to other database backends.
 """
 
 from concurrent import futures
+from ipaddress import IPv4Address
 import json
 from typing import Any
 from uuid import UUID
@@ -31,6 +32,8 @@ from shakenfist.exceptions import InvalidStateException
 from shakenfist.node import Node
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
+from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
 
@@ -420,7 +423,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get state for an object from MariaDB."""
         try:
             self.monitor.counters['get_object_state'].inc()
-            state = mariadb.get_state(request.object_type, request.object_uuid)
+            object_type = ObjectType(request.object_type)
+            state = mariadb.get_state(object_type, request.object_uuid)
             if state is None:
                 return database_pb2.GetObjectStateReply(found=False)
             return database_pb2.GetObjectStateReply(
@@ -444,13 +448,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['set_object_state'].inc()
             from shakenfist.schema.object_state import State
+            object_type = ObjectType(request.object_type)
             state = State(
                 value=request.state_value,
                 update_time=request.update_time,
                 message=request.message if request.message else None
             )
-            success = mariadb.set_state(
-                request.object_type, request.object_uuid, state)
+            success = mariadb.set_state(object_type, request.object_uuid, state)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database SetObjectState failed', e)
@@ -464,8 +468,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Delete state for an object from MariaDB."""
         try:
             self.monitor.counters['delete_object_state'].inc()
-            success = mariadb.delete_state(
-                request.object_type, request.object_uuid)
+            object_type = ObjectType(request.object_type)
+            success = mariadb.delete_state(object_type, request.object_uuid)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -480,8 +484,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get all object UUIDs of a given type in specified states."""
         try:
             self.monitor.counters['get_objects_by_state'].inc()
+            object_type = ObjectType(request.object_type)
             uuids = mariadb.get_objects_by_state(
-                request.object_type, list(request.state_values))
+                object_type, list(request.state_values))
             return database_pb2.GetObjectsByStateReply(object_uuids=uuids)
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -500,13 +505,17 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['reserve_address'].inc()
             from shakenfist.schema.ipam_reservation import IPAMReservation
+            # Convert string user_uuid to UUID if present
+            user_uuid = (UUID(request.reservation.user_uuid)
+                         if request.reservation.user_uuid else None)
             reservation = IPAMReservation(
-                ipam_uuid=request.reservation.ipam_uuid,
-                address=request.reservation.address,
-                reservation_type=request.reservation.reservation_type,
+                ipam_uuid=UUID(request.reservation.ipam_uuid),
+                address=IPv4Address(request.reservation.address),
+                reservation_type=ReservationType(
+                    request.reservation.reservation_type),
                 user_type=mariadb._string_to_object_type(
                     request.reservation.user_type),
-                user_uuid=request.reservation.user_uuid or None,
+                user_uuid=user_uuid,
                 reserved_at=request.reservation.reserved_at,
                 comment=request.reservation.comment or None
             )
@@ -525,13 +534,17 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['release_address'].inc()
             from shakenfist.schema.ipam_reservation import IPAMReservation
+            # Convert string user_uuid to UUID if present
+            user_uuid = (UUID(request.halo_reservation.user_uuid)
+                         if request.halo_reservation.user_uuid else None)
             halo_reservation = IPAMReservation(
-                ipam_uuid=request.halo_reservation.ipam_uuid,
-                address=request.halo_reservation.address,
-                reservation_type=request.halo_reservation.reservation_type,
+                ipam_uuid=UUID(request.halo_reservation.ipam_uuid),
+                address=IPv4Address(request.halo_reservation.address),
+                reservation_type=ReservationType(
+                    request.halo_reservation.reservation_type),
                 user_type=mariadb._string_to_object_type(
                     request.halo_reservation.user_type),
-                user_uuid=request.halo_reservation.user_uuid or None,
+                user_uuid=user_uuid,
                 reserved_at=request.halo_reservation.reserved_at,
                 comment=request.halo_reservation.comment or None
             )
@@ -557,12 +570,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetReservationReply(
                 found=True,
                 reservation=database_pb2.IPAMReservationData(
-                    ipam_uuid=reservation.ipam_uuid,
-                    address=reservation.address,
-                    reservation_type=reservation.reservation_type,
+                    ipam_uuid=str(reservation.ipam_uuid),
+                    address=str(reservation.address),
+                    reservation_type=str(reservation.reservation_type),
                     user_type=mariadb._object_type_to_string(
                         reservation.user_type),
-                    user_uuid=reservation.user_uuid or '',
+                    user_uuid=str(reservation.user_uuid) if reservation.user_uuid else '',
                     reserved_at=reservation.reserved_at,
                     comment=reservation.comment or ''
                 )
@@ -586,11 +599,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             result = []
             for res in reservations:
                 result.append(database_pb2.IPAMReservationData(
-                    ipam_uuid=res.ipam_uuid,
-                    address=res.address,
-                    reservation_type=res.reservation_type,
+                    ipam_uuid=str(res.ipam_uuid),
+                    address=str(res.address),
+                    reservation_type=str(res.reservation_type),
                     user_type=mariadb._object_type_to_string(res.user_type),
-                    user_uuid=res.user_uuid or '',
+                    user_uuid=str(res.user_uuid) if res.user_uuid else '',
                     reserved_at=res.reserved_at,
                     comment=res.comment or ''
                 ))

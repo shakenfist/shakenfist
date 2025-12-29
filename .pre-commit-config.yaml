@@ -30,3 +30,16 @@ repos:
         language: system
         files: ^shakenfist/deploy/ansible/
         pass_filenames: false
+
+  # Type checking with mypy (incremental rollout via tox)
+  # Requires: pip install tox mypy
+  - repo: local
+    hooks:
+      - id: mypy
+        name: Type check with mypy
+        description: Run mypy type checking on selected files (incremental rollout)
+        entry: tox -e mypy
+        language: system
+        files: ^shakenfist/(schema/|mariadb\.py|daemons/database/)
+        pass_filenames: false
+        types: [python]

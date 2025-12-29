@@ -57,6 +57,20 @@ The database microservice (`sf-database`) centralizes all database access:
 - All other daemons use the gRPC interface
 - Provides Prometheus metrics for database operations
 
+### Protocol Buffers and gRPC
+
+The gRPC interface is defined in `protos/*.proto` files. Generated Python code
+and type stubs are stored in `shakenfist/protos/`.
+
+To regenerate after modifying `.proto` files:
+
+```bash
+cd shakenfist/protos
+bash ../../protos/_make_stubs.sh
+```
+
+The script uses `mypy-protobuf` to generate typed stubs for mypy compatibility.
+
 ### Networking
 
 Shaken Fist uses VXLAN mesh networking:
