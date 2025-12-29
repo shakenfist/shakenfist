@@ -85,6 +85,16 @@ jobs:
           . /tmp/venv-test/bin/activate
           tox -emypy
 
+      - name: Lint Ansible playbooks
+        timeout-minutes: 5
+        run: |
+          . /tmp/venv-test/bin/activate
+          uv pip install ansible-lint
+          # Install external role dependency required by deploy.yml
+          ansible-galaxy install andrewrothstein.etcd-cluster
+          ansible-lint --config-file shakenfist/deploy/ansible/.ansible-lint \
+              shakenfist/deploy/ansible/
+
       - name: Attempt to install requirements
         timeout-minutes: 5
         run: |
