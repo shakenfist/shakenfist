@@ -129,4 +129,4 @@ class AgentOperations(dbo_iter):
 
 
 def instance_filter(instance, o):
-    return o.instance_uuid == instance.uuid
+    return str(o.instance_uuid) == str(instance.uuid)

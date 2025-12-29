@@ -194,15 +194,15 @@ class NetworkInterfaces(dbo_iter):
 
 
 def instance_filter(inst, ni):
-    return inst.uuid == ni.instance_uuid
+    return str(inst.uuid) == str(ni.instance_uuid)
 
 
 def network_filter(network, ni):
-    return network.uuid == ni.network_uuid
+    return str(network.uuid) == str(ni.network_uuid)
 
 
 def network_uuid_filter(network_uuid, ni):
-    return network_uuid == ni.network_uuid
+    return str(network_uuid) == str(ni.network_uuid)
 
 
 # Convenience helpers
