@@ -389,8 +389,8 @@ class BaseTestCase(testtools.TestCase):
         self._log_console(instance_uuid)
         self._log_instance_events(instance_uuid)
         raise TimeoutException(
-            'After time {}, instance {} had no event "{}:{}"'.format(
-                after, instance_uuid, operation, message))
+            f'After time {after}, instance {instance_uuid} had no event '
+            f'"{operation}:{message}"')
 
     def _await_instance_operations_complete(self, instance_uuid):
         start_time = time.time()
