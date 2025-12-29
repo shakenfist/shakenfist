@@ -367,10 +367,10 @@ class Nodes(dbo_iter):
     base_object = Node
 
     def __iter__(self):
-        for _, n in self.get_iterator():
-            uniq = n.get('uuid')
+        for _, static_values in self.get_iterator():
+            uniq = static_values.get('uuid')
             if not uniq:
-                uniq = n.get('fqdn')
+                uniq = static_values.get('fqdn')
             if not uniq:
                 continue
 

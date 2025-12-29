@@ -356,8 +356,8 @@ class IPAMs(dbo_iter):
     base_object = IPAM
 
     def __iter__(self) -> Iterator[IPAM]:
-        for _, o in self.get_iterator():
-            ipam_uuid = o.get('uuid')
+        for _, static_values in self.get_iterator():
+            ipam_uuid = static_values.get('uuid')
             ipam_obj = IPAM.from_db(ipam_uuid)
             if not ipam_obj:
                 continue

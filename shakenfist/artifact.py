@@ -376,8 +376,8 @@ class Artifacts(dbo_iter):
     base_object = Artifact
 
     def __iter__(self):
-        for _, a in self.get_iterator():
-            a = Artifact(a)
+        for _, static_values in self.get_iterator():
+            a = Artifact(static_values)
             if not a:
                 continue
 

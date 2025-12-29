@@ -207,10 +207,10 @@ class Namespaces(dbo_iter):
     base_object = Namespace
 
     def __iter__(self):
-        for _, n in self.get_iterator():
-            uniq = n.get('uuid')
+        for _, static_values in self.get_iterator():
+            uniq = static_values.get('uuid')
             if not uniq:
-                uniq = n.get('name')
+                uniq = static_values.get('name')
             if not uniq:
                 continue
 

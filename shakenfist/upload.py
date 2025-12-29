@@ -77,8 +77,8 @@ class Uploads(dbo_iter):
     base_object = Upload
 
     def __iter__(self):
-        for _, u in self.get_iterator():
-            u = Upload(u)
+        for _, static_values in self.get_iterator():
+            u = Upload(static_values)
             if not u:
                 continue
 

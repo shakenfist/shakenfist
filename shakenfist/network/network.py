@@ -834,11 +834,11 @@ class Networks(dbo_iter):
     base_object = Network
 
     def __iter__(self):
-        for _, n in self.get_iterator():
-            if n['uuid'] == str(FLOATING_NETWORK_UUID):
+        for _, static_values in self.get_iterator():
+            if static_values['uuid'] == str(FLOATING_NETWORK_UUID):
                 continue
 
-            n = Network(n)
+            n = Network(static_values)
             if not n:
                 continue
 

@@ -1909,8 +1909,8 @@ class Instances(dbo_iter):
     base_object = Instance
 
     def __iter__(self):
-        for _, i in self.get_iterator():
-            i = Instance(i)
+        for _, static_values in self.get_iterator():
+            i = Instance(static_values)
             if not i:
                 continue
 

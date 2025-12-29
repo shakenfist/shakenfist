@@ -183,8 +183,8 @@ class NetworkInterfaces(dbo_iter):
     base_object = NetworkInterface
 
     def __iter__(self):
-        for _, ni in self.get_iterator():
-            ni = NetworkInterface(ni)
+        for _, static_values in self.get_iterator():
+            ni = NetworkInterface(static_values)
             if not ni:
                 continue
 

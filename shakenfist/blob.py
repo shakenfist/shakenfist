@@ -985,8 +985,8 @@ class Blobs(dbo_iter):
     base_object = Blob
 
     def __iter__(self):
-        for _, b in self.get_iterator():
-            b = Blob(b)
+        for _, static_values in self.get_iterator():
+            b = Blob(static_values)
             if not b:
                 continue
 
