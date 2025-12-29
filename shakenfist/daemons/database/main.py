@@ -10,6 +10,7 @@ enable future migration to other database backends.
 
 from concurrent import futures
 import json
+from typing import Any
 from uuid import UUID
 
 import grpc
@@ -40,13 +41,17 @@ LOG, _ = logs.setup(__name__)
 class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
     """gRPC service implementation for database operations."""
 
-    def __init__(self, monitor):
+    def __init__(self, monitor: 'Monitor') -> None:
         super().__init__()
-        self.monitor = monitor
+        self.monitor: Monitor = monitor
 
     # Key-Value Operations
 
-    def Get(self, request, context):
+    def Get(
+        self,
+        request: database_pb2.GetRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetReply:
         """Get a single value by key."""
         try:
             self.monitor.counters['get'].inc()
@@ -63,7 +68,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.GetReply(found=False, value='')
 
-    def GetPrefix(self, request, context):
+    def GetPrefix(
+        self,
+        request: database_pb2.GetPrefixRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetPrefixReply:
         """Get all values matching a prefix."""
         try:
             self.monitor.counters['get_prefix'].inc()
@@ -83,7 +92,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.GetPrefixReply(results=[])
 
-    def Put(self, request, context):
+    def Put(
+        self,
+        request: database_pb2.PutRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Store a value."""
         try:
             self.monitor.counters['put'].inc()
@@ -94,7 +107,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database Put failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def Create(self, request, context):
+    def Create(
+        self,
+        request: database_pb2.CreateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Create a new value (fails if exists)."""
         try:
             self.monitor.counters['create'].inc()
@@ -106,7 +123,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database Create failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def Delete(self, request, context):
+    def Delete(
+        self,
+        request: database_pb2.DeleteRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Delete a value."""
         try:
             self.monitor.counters['delete'].inc()
@@ -116,7 +137,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database Delete failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def DeletePrefix(self, request, context):
+    def DeletePrefix(
+        self,
+        request: database_pb2.DeletePrefixRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Delete all keys with a given prefix."""
         try:
             self.monitor.counters['delete_prefix'].inc()
@@ -126,7 +151,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database DeletePrefix failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def ReplaceMany(self, request, context):
+    def ReplaceMany(
+        self,
+        request: database_pb2.ReplaceManyRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ReplaceManyReply:
         """Atomic multi-key compare-and-swap operation."""
         try:
             self.monitor.counters['replace_many'].inc()
@@ -177,7 +206,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
 
     # Queue Operations
 
-    def Enqueue(self, request, context):
+    def Enqueue(
+        self,
+        request: database_pb2.EnqueueRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Add a work item to a queue."""
         try:
             self.monitor.counters['enqueue'].inc()
@@ -188,7 +221,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database Enqueue failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def Dequeue(self, request, context):
+    def Dequeue(
+        self,
+        request: database_pb2.DequeueRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DequeueReply:
         """Claim the next available job from a queue."""
         try:
             self.monitor.counters['dequeue'].inc()
@@ -207,7 +244,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.DequeueReply(
                 found=False, job_name='', work_item='')
 
-    def Resolve(self, request, context):
+    def Resolve(
+        self,
+        request: database_pb2.ResolveRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Mark a job as complete."""
         try:
             self.monitor.counters['resolve'].inc()
@@ -217,7 +258,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database Resolve failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def GetQueueLength(self, request, context):
+    def GetQueueLength(
+        self,
+        request: database_pb2.QueueLengthRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.QueueLengthReply:
         """Get queue statistics."""
         try:
             self.monitor.counters['get_queue_length'].inc()
@@ -233,7 +278,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.QueueLengthReply(
                 processing=0, queued=0, deferred=0)
 
-    def RestartQueue(self, request, context):
+    def RestartQueue(
+        self,
+        request: database_pb2.RestartQueueRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Move jobs from processing back to queue."""
         try:
             self.monitor.counters['restart_queue'].inc()
@@ -245,7 +294,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
 
     # Lock Operations
 
-    def AcquireLock(self, request, context):
+    def AcquireLock(
+        self,
+        request: database_pb2.ClusterLockRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ClusterLockReply:
         """Attempt to acquire a distributed lock."""
         try:
             self.monitor.counters['acquire_lock'].inc()
@@ -260,7 +313,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database AcquireLock failed', e)
             return database_pb2.ClusterLockReply(acquired=False)
 
-    def ReleaseLock(self, request, context):
+    def ReleaseLock(
+        self,
+        request: database_pb2.ClusterReleaseLockRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Release a distributed lock."""
         try:
             self.monitor.counters['release_lock'].inc()
@@ -275,7 +332,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database ReleaseLock failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def GetLockHolder(self, request, context):
+    def GetLockHolder(
+        self,
+        request: database_pb2.ClusterGetLockHolderRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ClusterLockHolderReply:
         """Get the current holder of a lock."""
         try:
             self.monitor.counters['get_lock_holder'].inc()
@@ -294,7 +355,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database GetLockHolder failed', e)
             return database_pb2.ClusterLockHolderReply(held=False, holder='')
 
-    def ClearStaleLocks(self, request, context):
+    def ClearStaleLocks(
+        self,
+        request: database_pb2.ClusterClearStaleLocksRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Clear locks held by dead processes on a node."""
         try:
             self.monitor.counters['clear_stale_locks'].inc()
@@ -305,7 +370,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database ClearStaleLocks failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def GetExistingLocks(self, request, context):
+    def GetExistingLocks(
+        self,
+        request: database_pb2.ClusterGetExistingLocksRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ClusterGetExistingLocksReply:
         """Get all existing locks in the cluster."""
         try:
             self.monitor.counters['get_existing_locks'].inc()
@@ -324,7 +393,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
 
     # Maintenance Operations
 
-    def Compact(self, request, context):
+    def Compact(
+        self,
+        request: database_pb2.CompactRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Compact the etcd database."""
         try:
             self.monitor.counters['compact'].inc()
@@ -339,7 +412,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
     # The database service uses direct MariaDB access; all other daemons call
     # these gRPC methods.
 
-    def GetObjectState(self, request, context):
+    def GetObjectState(
+        self,
+        request: database_pb2.GetObjectStateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetObjectStateReply:
         """Get state for an object from MariaDB."""
         try:
             self.monitor.counters['get_object_state'].inc()
@@ -358,7 +435,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.GetObjectStateReply(found=False)
 
-    def SetObjectState(self, request, context):
+    def SetObjectState(
+        self,
+        request: database_pb2.SetObjectStateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Set state for an object in MariaDB."""
         try:
             self.monitor.counters['set_object_state'].inc()
@@ -375,7 +456,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database SetObjectState failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def DeleteObjectState(self, request, context):
+    def DeleteObjectState(
+        self,
+        request: database_pb2.DeleteObjectStateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Delete state for an object from MariaDB."""
         try:
             self.monitor.counters['delete_object_state'].inc()
@@ -387,7 +472,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteObjectState failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def GetObjectsByState(self, request, context):
+    def GetObjectsByState(
+        self,
+        request: database_pb2.GetObjectsByStateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetObjectsByStateReply:
         """Get all object UUIDs of a given type in specified states."""
         try:
             self.monitor.counters['get_objects_by_state'].inc()
@@ -402,7 +491,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
     # IPAM Reservation Operations (MariaDB)
     # These operations provide atomic IP address reservation and management.
 
-    def ReserveAddress(self, request, context):
+    def ReserveAddress(
+        self,
+        request: database_pb2.ReserveAddressRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Atomically reserve an IP address."""
         try:
             self.monitor.counters['reserve_address'].inc()
@@ -423,7 +516,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database ReserveAddress failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def ReleaseAddress(self, request, context):
+    def ReleaseAddress(
+        self,
+        request: database_pb2.ReleaseAddressRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Release an IP address (convert to deletion-halo)."""
         try:
             self.monitor.counters['release_address'].inc()
@@ -445,7 +542,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database ReleaseAddress failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def GetReservation(self, request, context):
+    def GetReservation(
+        self,
+        request: database_pb2.GetReservationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetReservationReply:
         """Get a single reservation."""
         try:
             self.monitor.counters['get_reservation'].inc()
@@ -472,7 +573,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.GetReservationReply(found=False)
 
-    def GetReservationsForIPAM(self, request, context):
+    def GetReservationsForIPAM(
+        self,
+        request: database_pb2.GetReservationsForIPAMRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetReservationsForIPAMReply:
         """Get all reservations for an IPAM."""
         try:
             self.monitor.counters['get_reservations_for_ipam'].inc()
@@ -495,7 +600,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetReservationsForIPAM failed', e)
             return database_pb2.GetReservationsForIPAMReply(reservations=[])
 
-    def DeleteReservation(self, request, context):
+    def DeleteReservation(
+        self,
+        request: database_pb2.DeleteReservationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
         """Delete a single reservation."""
         try:
             self.monitor.counters['delete_reservation'].inc()
@@ -507,7 +616,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteReservation failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
-    def DeleteReservationsForIPAM(self, request, context):
+    def DeleteReservationsForIPAM(
+        self,
+        request: database_pb2.DeleteReservationsForIPAMRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DeleteCountReply:
         """Delete all reservations for an IPAM."""
         try:
             self.monitor.counters['delete_reservations_for_ipam'].inc()
@@ -519,7 +632,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteReservationsForIPAM failed', e)
             return database_pb2.DeleteCountReply(count=0)
 
-    def ReleaseHaloedAddresses(self, request, context):
+    def ReleaseHaloedAddresses(
+        self,
+        request: database_pb2.ReleaseHaloedAddressesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DeleteCountReply:
         """Release expired deletion-halo addresses."""
         try:
             self.monitor.counters['release_haloed_addresses'].inc()
@@ -531,7 +648,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database ReleaseHaloedAddresses failed', e)
             return database_pb2.DeleteCountReply(count=0)
 
-    def GetAddressesInUse(self, request, context):
+    def GetAddressesInUse(
+        self,
+        request: database_pb2.GetAddressesInUseRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAddressesInUseReply:
         """Get all addresses in use for an IPAM."""
         try:
             self.monitor.counters['get_addresses_in_use'].inc()
@@ -553,9 +674,9 @@ class Monitor(daemon.WorkerPoolDaemon):
     shutdown recording, otherwise we'd have a chicken-and-egg problem.
     """
 
-    def __init__(self, id):
+    def __init__(self, id: str) -> None:
         super().__init__(id)
-        self.counters = {}
+        self.counters: dict[str, Counter] = {}
 
         # Create counters for all operations
         operations = [
@@ -580,7 +701,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         start_http_server(config.DATABASE_METRICS_PORT)
 
-    def record_start(self):
+    def record_start(self) -> None:
         # Override to use direct etcd access. The database daemon can't use
         # the database service for its own startup recording because WE ARE
         # the database service. We also force events to the dead letter queue
@@ -597,7 +718,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             eventlog.set_force_event_dlq(False)
         send_systemd_ready()
 
-    def record_exit(self):
+    def record_exit(self) -> None:
         # Override to use direct etcd access and force events to the dead
         # letter queue (eventlog daemon may have already stopped).
         set_force_direct_etcd(True)
@@ -616,7 +737,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             eventlog.set_force_event_dlq(False)
         send_systemd_status('Terminated')
 
-    def _run_inner(self):
+    def _run_inner(self) -> None:
         while daemon.check_abort_path(self.abort_path):
             try:
                 # The database daemon doesn't have background work to do,
@@ -628,7 +749,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             self.check_daemon_state()
 
 
-def main():
+def main() -> None:
     util_exceptions.install_exception_tracking()
     daemon.write_pid_file('database')
 
