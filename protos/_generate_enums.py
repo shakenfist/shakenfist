@@ -17,6 +17,7 @@ to use these enum types.
 """
 
 import ast
+import sys
 from pathlib import Path
 from typing import NamedTuple
 
@@ -50,9 +51,14 @@ def parse_enum_from_file(
 
     Raises:
         ValueError: If the enum class is not found in the file
+        SystemExit: If the file cannot be parsed
     """
     with open(file_path, 'r') as f:
-        tree = ast.parse(f.read())
+        try:
+            tree = ast.parse(f.read())
+        except SyntaxError as e:
+            print(f'Failed to parse {file_path}: {e}', file=sys.stderr)
+            sys.exit(1)
 
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef) and node.name == enum_name:
