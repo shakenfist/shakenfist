@@ -1720,7 +1720,7 @@ class Instance(dbowo):
             blob_uuid = str(uuid4())
             out[disk['device']] = {
                 'source_url': a.source_url,
-                'artifact_uuid': a.uuid,
+                'artifact_uuid': str(a.uuid),
                 'blob_uuid': blob_uuid
             }
 
