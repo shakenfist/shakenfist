@@ -1,0 +1,106 @@
+# Ansible-lint configuration for Shaken Fist deployer
+#
+# This configuration allows the current ansible to pass while documenting
+# which checks have been disabled. The goal is to progressively enable
+# these checks over time as the codebase is cleaned up.
+#
+# Run manually: ansible-lint shakenfist/deploy/ansible/
+# Violation count at time of creation: ~52 (with basic profile)
+
+# Use a permissive profile as a starting point
+profile: basic
+
+# Exclude external roles that we don't control
+exclude_paths:
+  - .cache/
+
+# Skip rules that would require significant refactoring
+# Each rule is documented with why it's skipped and approximate violation count
+skip_list:
+  # =========================================================================
+  # HIGH EFFORT - Skip for now, enable incrementally
+  # =========================================================================
+
+  # ~200+ violations: Requires adding 'ansible.builtin.' prefix to all modules
+  # Example: 'template' -> 'ansible.builtin.template'
+  # This is a best practice for Ansible 2.10+ but requires touching every task
+  - fqcn[action-core]
+
+  # ~80+ violations: Role variables should be prefixed with role name
+  # Example: 'system_key' in base role -> 'base_system_key'
+  # This would require updating all variable references across playbooks
+  - var-naming[no-role-prefix]
+
+  # =========================================================================
+  # MEDIUM EFFORT - Good candidates for near-term fixes
+  # =========================================================================
+
+  # ~30+ violations: Use 'true'/'false' instead of 'yes'/'no'
+  # Easy to fix but touches many files
+  - yaml[truthy]
+
+  # ~20+ violations: Jinja2 spacing ({{ var }} not {{var}})
+  # Mostly cosmetic, can be fixed incrementally
+  - jinja[spacing]
+
+  # ~10+ violations: Missing newline at end of file
+  # Easy fix, can be done in a single PR
+  - yaml[new-line-at-end-of-file]
+
+  # ~10+ violations: Tasks should have descriptive names
+  # Important for readability, medium effort to fix
+  - name[missing]
+
+  # ~10+ violations: File permissions should be explicitly set
+  # Security best practice, should be addressed
+  - risky-file-permissions
+
+  # =========================================================================
+  # LOW EFFORT - Should be fixed soon
+  # =========================================================================
+
+  # ~5+ violations: Commands should specify changed_when
+  # Helps with idempotency reporting
+  - no-changed-when
+
+  # ~5+ violations: Use failed_when instead of ignore_errors
+  # Better error handling practice
+  - ignore-errors
+
+  # ~5+ violations: Don't use 'state: latest' for packages
+  # Can cause non-reproducible builds
+  - package-latest
+
+  # ~10+ violations: Empty lines at end of file or between sections
+  - yaml[empty-lines]
+
+  # =========================================================================
+  # ADDITIONAL RULES - Found during initial ansible-lint run
+  # =========================================================================
+
+  # ~3 violations: Use ansible modules instead of command/shell for common tasks
+  # Example: Use systemd module instead of 'systemctl' command
+  - command-instead-of-module
+
+  # ~8 violations: Use command module instead of shell when shell features
+  # aren't needed (pipes, redirects, etc.)
+  - command-instead-of-shell
+
+  # ~1 violation: Avoid free-form syntax in module calls
+  # Example: Use proper YAML dict syntax for apt_key module
+  - no-free-form
+
+  # ~15 violations: Schema validation errors
+  # Includes issues like become_method values needing FQCN
+  - schema
+
+  # ~17 violations: Various naming convention issues (plays, tasks)
+  # Covered partially by name[missing] but includes other name-related checks
+  - name
+
+  # ~8 violations: Variable naming pattern issues (camelCase vs snake_case)
+  - var-naming
+
+# Warn but don't fail on these rules (for gradual adoption)
+warn_list:
+  - experimental

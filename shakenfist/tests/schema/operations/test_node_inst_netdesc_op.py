@@ -12,8 +12,7 @@ from shakenfist.schema.operations.node_inst_netdesc_op \
 from shakenfist.schema.operations.node_inst_netdesc_op import current_version
 from shakenfist.schema.operations.node_inst_netdesc_op import model
 from shakenfist.schema.operations.node_inst_netdesc_op import model_tasks
-from shakenfist.schema.operations.baseclusteroperation \
-    import CLUSTER_OPERATIONS
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.node_inst_netdesc_op import NodeInstNetdescOp
 from shakenfist.tests import base
@@ -153,7 +152,7 @@ class NodeInstNetdescOpTestCase(base.ShakenFistTestCase):
             ],
             PRIORITY.user_waiting
         )
-        self.assertEqual(CLUSTER_OPERATIONS.node_inst_netdesc_op, op_type)
+        self.assertEqual(ObjectType.NODE_INST_NETDESC_OP, op_type)
 
         self.assertEqual(
             {

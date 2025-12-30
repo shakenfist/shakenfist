@@ -10,8 +10,7 @@ from shakenfist.schema.operations.net_op import create_and_enqueue
 from shakenfist.schema.operations.net_op import current_version
 from shakenfist.schema.operations.net_op import model
 from shakenfist.schema.operations.net_op import model_tasks
-from shakenfist.schema.operations.baseclusteroperation \
-    import CLUSTER_OPERATIONS
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.net_op import NetOp
 from shakenfist.tests import base
@@ -113,7 +112,7 @@ class NetOpTestCase(base.ShakenFistTestCase):
             priority=PRIORITY.user_waiting
         )
 
-        self.assertEqual(CLUSTER_OPERATIONS.net_op, op_type)
+        self.assertEqual(ObjectType.NET_OP, op_type)
 
         self.assertEqual(
             {

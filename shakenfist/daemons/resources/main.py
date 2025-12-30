@@ -99,11 +99,19 @@ class Monitor(daemon.Daemon):
                 'memory_available_libvirt': memory_stats['free'] // 1024,
             })
 
-            # Kernel Shared Memory (KSM) information
+            # Kernel Shared Memory (KSM) information. The kernels before Debian 13 and
+            # Ubuntu 24.04 (so about 6.8) just had files with numeric values in them.
+            # So, we only include files with single line numeric values in them here.
             ksm_details = {}
             for ent in os.listdir('/sys/kernel/mm/ksm'):
                 with open('/sys/kernel/mm/ksm/%s' % ent) as f:
-                    ksm_details['memory_ksm_%s' % ent] = int(f.read().rstrip())
+                    d = f.read()
+                    if '\n' in d:
+                        continue
+                    try:
+                        ksm_details['memory_ksm_{ent}'] = int(f.read().rstrip())
+                    except ValueError:
+                        pass
             retval.update(ksm_details)
 
             # Disk info. There could be more than one filesystem here, so we track

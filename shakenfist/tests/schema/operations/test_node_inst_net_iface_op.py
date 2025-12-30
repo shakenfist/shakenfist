@@ -12,8 +12,7 @@ from shakenfist.schema.operations.node_inst_net_iface_op \
 from shakenfist.schema.operations.node_inst_net_iface_op import model
 from shakenfist.schema.operations.node_inst_net_iface_op \
     import model_tasks
-from shakenfist.schema.operations.baseclusteroperation \
-    import CLUSTER_OPERATIONS
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.node_inst_net_iface_op import NodeInstNetIfaceOp
 from shakenfist.tests import base
@@ -105,7 +104,7 @@ class NodeInstNetIfaceOpTestCase(base.ShakenFistTestCase):
             ],
             PRIORITY.user_waiting
         )
-        self.assertEqual(CLUSTER_OPERATIONS.node_inst_net_iface_op, op_type)
+        self.assertEqual(ObjectType.NODE_INST_NET_IFACE_OP, op_type)
 
         self.assertEqual(
             {
