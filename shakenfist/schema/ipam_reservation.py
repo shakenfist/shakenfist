@@ -71,11 +71,19 @@ class ReservationType(str, Enum):
 
     _proto_id: int
 
-    def __new__(cls, val: ReservationTypeValue) -> 'ReservationType':
-        """Create a ReservationType with both string and protobuf values."""
-        obj = str.__new__(cls, val.string)
-        obj._value_ = val.string
-        obj._proto_id = val.proto_id
+    def __new__(cls, string: str, proto_id: int) -> 'ReservationType':
+        """Create a ReservationType with both string and protobuf values.
+
+        Args:
+            string: The string value for database/API use.
+            proto_id: The stable integer ID for protobuf messages.
+
+        Note: When defining enum members with ReservationTypeValue(...), Python's
+        enum machinery unpacks the NamedTuple as positional arguments.
+        """
+        obj = str.__new__(cls, string)
+        obj._value_ = string
+        obj._proto_id = proto_id
         return obj
 
     def __str__(self) -> str:
