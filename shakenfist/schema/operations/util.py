@@ -9,7 +9,6 @@ from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.schema.object_state import State
-from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import ClusterOperation
 
 
