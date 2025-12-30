@@ -794,11 +794,14 @@ def _grpc_get_reservation(ipam_uuid: str,
             reply.reservation.reservation_type)
         if res_type is None:
             res_type = ReservationType.UNKNOWN
+        user_type = ObjectType.from_proto_id(reply.reservation.user_type)
+        if user_type is None:
+            user_type = ObjectType.UNKNOWN
         return IPAMReservation(
             ipam_uuid=reply.reservation.ipam_uuid,
             address=IPv4Address(reply.reservation.address),
             reservation_type=res_type,
-            user_type=ObjectType.from_proto_id(reply.reservation.user_type),
+            user_type=user_type,
             user_uuid=reply.reservation.user_uuid or None,
             reserved_at=reply.reservation.reserved_at,
             comment=reply.reservation.comment or None
@@ -820,11 +823,14 @@ def _grpc_get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
             res_type = ReservationType.from_proto_id(res.reservation_type)
             if res_type is None:
                 res_type = ReservationType.UNKNOWN
+            user_type = ObjectType.from_proto_id(res.user_type)
+            if user_type is None:
+                user_type = ObjectType.UNKNOWN
             result.append(IPAMReservation(
                 ipam_uuid=res.ipam_uuid,
                 address=IPv4Address(res.address),
                 reservation_type=res_type,
-                user_type=ObjectType.from_proto_id(res.user_type),
+                user_type=user_type,
                 user_uuid=res.user_uuid or None,
                 reserved_at=res.reserved_at,
                 comment=res.comment or None
