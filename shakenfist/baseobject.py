@@ -6,6 +6,7 @@ from functools import partial
 from math import inf
 import re
 from typing import ClassVar
+from typing import Optional
 from typing import Union
 
 from etcd3gw.lock import Lock
