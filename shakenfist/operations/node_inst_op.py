@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import psutil
 from shakenfist_utilities import logs  # noreorder
@@ -101,7 +102,7 @@ class NodeInstOp(BaseClusterOperation):
         with util_libvirt.LibvirtConnection() as lc:
             try:
                 # The basic structure
-                statistics = {
+                statistics: dict[str, Any] = {
                     'cpu usage': {},
                     'disk usage': {},
                     'network usage': {}

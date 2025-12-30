@@ -127,9 +127,9 @@ def get_maximum_object_version(objname, max_cache_age=300):
 
 class DatabaseBackedObject:
     object_type: ClassVar[ObjectType] = ObjectType.UNKNOWN
-    initial_version = 1
-    current_version = None
-    upgrade_supported = True
+    initial_version: ClassVar[int] = 1
+    current_version: ClassVar[Optional[int]] = None
+    upgrade_supported: ClassVar[bool] = True
     state_targets = None
 
     STATE_INITIAL = 'initial'
