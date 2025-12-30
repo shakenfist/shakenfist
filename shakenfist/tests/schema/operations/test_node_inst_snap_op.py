@@ -12,8 +12,7 @@ from shakenfist.schema.operations.node_inst_snap_op \
 from shakenfist.schema.operations.node_inst_snap_op import model
 from shakenfist.schema.operations.node_inst_snap_op import model_tasks
 from shakenfist.schema.operations.node_inst_snap_op import snapshot
-from shakenfist.schema.operations.baseclusteroperation \
-    import CLUSTER_OPERATIONS
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.node_inst_snap_op import NodeInstSnapOp
 from shakenfist.tests import base
@@ -126,7 +125,7 @@ class NodeInstSnapOpTestCase(base.ShakenFistTestCase):
             [model_tasks.instance_snapshot],
             PRIORITY.user_waiting
         )
-        self.assertEqual(CLUSTER_OPERATIONS.node_inst_snap_op, op_type)
+        self.assertEqual(ObjectType.NODE_INST_SNAP_OP, op_type)
 
         self.assertEqual(
             {

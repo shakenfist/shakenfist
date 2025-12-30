@@ -12,10 +12,8 @@ from pydantic_extra_types.mac_address import MacAddress
 from pydantic.networks import IPvAnyAddress
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.schema.operations.baseclusteroperation \
-    import CLUSTER_OPERATIONS
-from shakenfist.schema.operations.baseclusteroperation \
-    import _convert_deps
+from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.operations.baseclusteroperation import _convert_deps
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.schema.operations.util import base_mutations
@@ -25,7 +23,7 @@ from shakenfist.schema.operations.util import enqueue
 LOG, HANDLER = logs.setup(__name__)
 
 
-object_type = CLUSTER_OPERATIONS.net_macaddr_ip_op
+object_type = ObjectType.NET_MACADDR_IP_OP
 initial_version = 1
 current_version = 1
 

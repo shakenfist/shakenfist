@@ -10,8 +10,7 @@ from shakenfist.schema.operations.net_macaddr_ip_op import create_and_enqueue
 from shakenfist.schema.operations.net_macaddr_ip_op import current_version
 from shakenfist.schema.operations.net_macaddr_ip_op import model
 from shakenfist.schema.operations.net_macaddr_ip_op import model_tasks
-from shakenfist.schema.operations.baseclusteroperation \
-    import CLUSTER_OPERATIONS
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.net_macaddr_ip_op import NetMacaddrIPOp
 from shakenfist.tests import base
@@ -125,7 +124,7 @@ class NetMacaddrIPOpTestCase(base.ShakenFistTestCase):
             priority=PRIORITY.user_facing
         )
 
-        self.assertEqual(CLUSTER_OPERATIONS.net_macaddr_ip_op, op_type)
+        self.assertEqual(ObjectType.NET_MACADDR_IP_OP, op_type)
 
         self.assertEqual(
             {

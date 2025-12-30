@@ -1,5 +1,6 @@
 import copy
 import time
+from typing import Any, Optional
 
 from shakenfist_utilities import logs                 # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
@@ -9,12 +10,17 @@ from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.operations.baseclusteroperation import ClusterOperation
 
 
 LOG, _ = logs.setup(__name__)
 
 
-def base_mutations(object_type: ObjectType, metadata, target=None):
+def base_mutations(
+        object_type: ClusterOperation,
+        metadata: dict[str, Any],
+        target: Optional[str] = None
+) -> tuple[list[dict[str, Any]], str, str, dict[str, str]]:
     if not target:
         target = metadata['node_uuid']
 
@@ -85,7 +91,12 @@ def base_mutations(object_type: ObjectType, metadata, target=None):
     return mutations, job_name, queue_name, work_item
 
 
-def enqueue(mutations, job_name, queue_name, work_item):
+def enqueue(
+        mutations: list[dict[str, Any]],
+        job_name: str,
+        queue_name: str,
+        work_item: dict[str, str]
+) -> None:
     success, _ = etcd.replace_many_raw(mutations)
     if success:
         msg = 'Enqueued cluster operation'
