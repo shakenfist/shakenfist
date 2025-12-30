@@ -8,14 +8,17 @@ from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.schema.object_state import State
+from shakenfist.schema.object_types import ObjectType
 
 
 LOG, _ = logs.setup(__name__)
 
 
-def base_mutations(object_type, metadata, target=None):
+def base_mutations(object_type: ObjectType, metadata, target=None):
     if not target:
         target = metadata['node_uuid']
+
+    object_type_str = object_type.name.lower()
 
     creation_time = time.time()
     job_name = f'{creation_time}-{sf_random.random_id()}'
@@ -23,7 +26,7 @@ def base_mutations(object_type, metadata, target=None):
         f'/sf/queue/{target}-clusteroperation-{metadata["priority"]}'
     )
     work_item = {
-        'operation_type': object_type,
+        'operation_type': object_type_str,
         'operation_uuid': metadata['uuid']
     }
 
@@ -31,7 +34,7 @@ def base_mutations(object_type, metadata, target=None):
     # State is stored in MariaDB separately.
     mutations = [
         {
-            'path': f'/sf/{object_type}/{metadata["uuid"]}',
+            'path': f'/sf/{object_type_str}/{metadata["uuid"]}',
             'original_data': None,
             'new_data': metadata
         },
@@ -48,9 +51,9 @@ def base_mutations(object_type, metadata, target=None):
 
     correlation_id = sf_random.random_id()
     tasks_str = ', '.join(metadata['tasks'])
-    msg = f'{object_type} operation created with tasks {tasks_str}'
+    msg = f'{object_type_str} operation created with tasks {tasks_str}'
 
-    objs = [(object_type, metadata['uuid'])]
+    objs = [(object_type_str, metadata['uuid'])]
     for key in metadata:
         if key.endswith('_uuid'):
             objs.append((key.replace('_uuid', ''), metadata[key]))
@@ -58,7 +61,7 @@ def base_mutations(object_type, metadata, target=None):
     extra = copy.deepcopy(metadata)
     extra['op_uuid'] = extra['uuid']
     del extra['uuid']
-    extra['op_type'] = object_type
+    extra['op_type'] = object_type_str
 
     for ot, ou in objs:
         mutations.append(
