@@ -10,10 +10,8 @@ from pydantic import UUID4
 from pydantic import ValidationError
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.schema.operations.baseclusteroperation \
-    import CLUSTER_OPERATIONS
-from shakenfist.schema.operations.baseclusteroperation \
-    import _convert_deps
+from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.operations.baseclusteroperation import _convert_deps
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.schema.operations.util import base_mutations
@@ -23,7 +21,7 @@ from shakenfist.schema.operations.util import enqueue
 LOG, HANDLER = logs.setup(__name__)
 
 
-object_type = CLUSTER_OPERATIONS.node_aop_op
+object_type = ObjectType.NODE_AOP_OP
 initial_version = 1
 current_version = 1
 
@@ -85,6 +83,6 @@ def create_and_enqueue(node_uuid, agentoperation_uuid, tasks, priority,
         raise exc
 
     mutations, job_name, queue_name, work_item = \
-        base_mutations(object_type.name.lower(), m.model_dump(mode='json'))
+        base_mutations(object_type, m.model_dump(mode='json'))
     enqueue(mutations, job_name, queue_name, work_item)
     return object_type, operation_uuid

@@ -1,5 +1,6 @@
 import copy
 import time
+from typing import Any, Optional
 
 from shakenfist_utilities import logs                 # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
@@ -8,14 +9,21 @@ from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.schema.object_state import State
+from shakenfist.schema.operations.baseclusteroperation import ClusterOperation
 
 
 LOG, _ = logs.setup(__name__)
 
 
-def base_mutations(object_type, metadata, target=None):
+def base_mutations(
+        object_type: ClusterOperation,
+        metadata: dict[str, Any],
+        target: Optional[str] = None
+) -> tuple[list[dict[str, Any]], str, str, dict[str, str]]:
     if not target:
         target = metadata['node_uuid']
+
+    object_type_str = object_type.name.lower()
 
     creation_time = time.time()
     job_name = f'{creation_time}-{sf_random.random_id()}'
@@ -23,7 +31,7 @@ def base_mutations(object_type, metadata, target=None):
         f'/sf/queue/{target}-clusteroperation-{metadata["priority"]}'
     )
     work_item = {
-        'operation_type': object_type,
+        'operation_type': object_type_str,
         'operation_uuid': metadata['uuid']
     }
 
@@ -31,7 +39,7 @@ def base_mutations(object_type, metadata, target=None):
     # State is stored in MariaDB separately.
     mutations = [
         {
-            'path': f'/sf/{object_type}/{metadata["uuid"]}',
+            'path': f'/sf/{object_type_str}/{metadata["uuid"]}',
             'original_data': None,
             'new_data': metadata
         },
@@ -48,9 +56,9 @@ def base_mutations(object_type, metadata, target=None):
 
     correlation_id = sf_random.random_id()
     tasks_str = ', '.join(metadata['tasks'])
-    msg = f'{object_type} operation created with tasks {tasks_str}'
+    msg = f'{object_type_str} operation created with tasks {tasks_str}'
 
-    objs = [(object_type, metadata['uuid'])]
+    objs = [(object_type_str, metadata['uuid'])]
     for key in metadata:
         if key.endswith('_uuid'):
             objs.append((key.replace('_uuid', ''), metadata[key]))
@@ -58,7 +66,7 @@ def base_mutations(object_type, metadata, target=None):
     extra = copy.deepcopy(metadata)
     extra['op_uuid'] = extra['uuid']
     del extra['uuid']
-    extra['op_type'] = object_type
+    extra['op_type'] = object_type_str
 
     for ot, ou in objs:
         mutations.append(
@@ -82,7 +90,12 @@ def base_mutations(object_type, metadata, target=None):
     return mutations, job_name, queue_name, work_item
 
 
-def enqueue(mutations, job_name, queue_name, work_item):
+def enqueue(
+        mutations: list[dict[str, Any]],
+        job_name: str,
+        queue_name: str,
+        work_item: dict[str, str]
+) -> None:
     success, _ = etcd.replace_many_raw(mutations)
     if success:
         msg = 'Enqueued cluster operation'

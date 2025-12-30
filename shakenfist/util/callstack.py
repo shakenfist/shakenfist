@@ -11,9 +11,8 @@ def get_caller(offset=-2):
     f_match = FILENAME_RE.match(filename)
     if f_match:
         filename = f_match.group(1)
-    return '{}:{}:{}()'.format(filename,
-                               traceback.extract_stack()[offset].lineno,
-                               traceback.extract_stack()[offset].name)
+    stack = traceback.extract_stack()[offset]
+    return f'{filename}:{stack.lineno}:{stack.name}()'
 
 
 def generate_traceback(offset=-2):

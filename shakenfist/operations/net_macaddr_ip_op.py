@@ -36,7 +36,7 @@ class InvalidStateForTask(NetMacaddrIPOpException):
 
 
 class NetMacaddrIPOp(BaseClusterOperation):
-    object_type = schema.object_type.name.lower()
+    object_type = schema.object_type
     initial_version = schema.initial_version
     current_version = schema.current_version
 
@@ -99,6 +99,6 @@ class NetMacaddrIPOp(BaseClusterOperation):
 
     def _remove_dhcp_lease(self, n):
         if n.is_dead():
-            raise InvalidStateForTask()
+            raise InvalidStateForTask(self)
 
         n.remove_dhcp_lease(self.ip, self.mac_address)

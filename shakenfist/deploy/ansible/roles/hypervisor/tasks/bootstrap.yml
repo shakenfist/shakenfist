@@ -41,43 +41,7 @@
     mode: ugo+r
   when: is_intel.rc == 0
 
-- name: Configure KSM to run on boot
-  copy:
-    content: |
-      w /sys/kernel/mm/ksm/run - - - - 1
-      w /sys/kernel/mm/ksm/pages_to_scan - - - - 1000000
-      w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
-    dest: /etc/tmpfiles.d/sf-ksm.conf
-    owner: root
-    mode: ugo+r
-  when: ksm_enabled == "1"
-
-# merge_across_nodes requires a reboot, so is skipped below
-- name: Configure KSM to run now
-  shell: |
-    echo "1" > /sys/kernel/mm/ksm/run
-    echo "100000" > /sys/kernel/mm/ksm/pages_to_scan
-  ignore_errors: True
-  when: ksm_enabled == "1"
-
-- name: Configure KSM to not run on boot
-  copy:
-    content: |
-      w /sys/kernel/mm/ksm/run - - - - 0
-      w /sys/kernel/mm/ksm/pages_to_scan - - - - 0
-      w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
-    dest: /etc/tmpfiles.d/sf-ksm.conf
-    owner: root
-    mode: ugo+r
-  when: ksm_enabled != "1"
-
-# merge_across_nodes requires a reboot, so is skipped below
-- name: Configure KSM to not run now
-  shell: |
-    echo "0" > /sys/kernel/mm/ksm/run
-    echo "0" > /sys/kernel/mm/ksm/pages_to_scan
-  ignore_errors: True
-  when: ksm_enabled != "1"
+- include_tasks: ksm.yml
 
 - name: Enable SPICE TLS
   lineinfile:

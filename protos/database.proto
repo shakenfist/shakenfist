@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package shakenfist.protos;
 
+import "shakenfist_enums.proto";
+
 service DatabaseService {
   // Key-Value Operations
   rpc Get (GetRequest) returns (GetReply) {}
@@ -224,7 +226,7 @@ message CompactRequest {
 // efficient state queries and persistence.
 
 message GetObjectStateRequest {
-  string object_type = 1;  // e.g., 'blob', 'instance', 'network'
+  ObjectType object_type = 1;  // The type of object
   string object_uuid = 2;
 }
 
@@ -236,7 +238,7 @@ message GetObjectStateReply {
 }
 
 message SetObjectStateRequest {
-  string object_type = 1;
+  ObjectType object_type = 1;
   string object_uuid = 2;
   string state_value = 3;
   double update_time = 4;
@@ -244,12 +246,12 @@ message SetObjectStateRequest {
 }
 
 message DeleteObjectStateRequest {
-  string object_type = 1;
+  ObjectType object_type = 1;
   string object_uuid = 2;
 }
 
 message GetObjectsByStateRequest {
-  string object_type = 1;
+  ObjectType object_type = 1;
   repeated string state_values = 2;  // List of states to match
 }
 
@@ -264,11 +266,11 @@ message GetObjectsByStateReply {
 message IPAMReservationData {
   string ipam_uuid = 1;
   string address = 2;
-  string reservation_type = 3;  // e.g., 'instance', 'gateway', 'deletion-halo'
-  string user_type = 4;         // Object type using this address (optional)
-  string user_uuid = 5;         // UUID of object using this address (optional)
-  double reserved_at = 6;       // Unix timestamp when reserved
-  string comment = 7;           // Optional description
+  ReservationType reservation_type = 3;  // How this address is being used
+  ObjectType user_type = 4;              // Object type using this address
+  string user_uuid = 5;                  // UUID of object using this address
+  double reserved_at = 6;                // Unix timestamp when reserved
+  string comment = 7;                    // Optional description
 }
 
 message ReserveAddressRequest {

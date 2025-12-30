@@ -190,6 +190,9 @@ test = [
     "mkdocs-material==9.7.1",   # mit
     "testscenarios==0.5.0",     # bsd
     "mypy==1.14.1",             # mit
+    "mypy-protobuf==3.6.0",     # apache2
+    "grpc-stubs==1.53.0.6",     # mit
+    "types-protobuf==5.29.1.20250403",    # apache2
     "types-PyYAML==6.0.12.20250516",      # apache2
     "types-requests==2.32.0.20250602",    # apache2
 ]
@@ -202,12 +205,6 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
-
-# Ignore generated protobuf/gRPC code - these files are auto-generated and
-# have type issues that we can't fix without modifying the generator.
-[[tool.mypy.overrides]]
-module = "shakenfist.protos.*"
-ignore_errors = true
 
 # Strict checking for new/typed modules
 [[tool.mypy.overrides]]

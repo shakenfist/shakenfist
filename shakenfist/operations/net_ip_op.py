@@ -35,7 +35,7 @@ class InvalidStateForTask(NetIPOpException):
 
 
 class NetIPOp(BaseClusterOperation):
-    object_type = schema.object_type.name.lower()
+    object_type = schema.object_type
     initial_version = schema.initial_version
     current_version = schema.current_version
 
@@ -91,7 +91,7 @@ class NetIPOp(BaseClusterOperation):
 
     def _route_address(self, n):
         if n.is_dead():
-            raise InvalidStateForTask()
+            raise InvalidStateForTask(self)
 
         n.route_address(self.ip)
 

@@ -9,10 +9,8 @@ from shakenfist.schema.operations.artifact_fetch_op import create_and_enqueue
 from shakenfist.schema.operations.artifact_fetch_op import current_version
 from shakenfist.schema.operations.artifact_fetch_op import model
 from shakenfist.schema.operations.artifact_fetch_op import model_tasks
-from shakenfist.schema.operations.baseclusteroperation \
-    import CLUSTER_OPERATIONS
-from shakenfist.schema.operations.baseclusteroperation \
-    import dependency
+from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.artifact_fetch_op import ArtifactFetchOp
 from shakenfist.tests import base
@@ -41,13 +39,13 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
             tasks=[model_tasks.image_fetch],
             depends_on=[
                 dependency(
-                    op_type=CLUSTER_OPERATIONS.node_blob_op,
+                    op_type=ObjectType.NODE_BLOB_OP,
                     op_uuid=u2
                 )
             ],
             runs_after=[
                 dependency(
-                    op_type=CLUSTER_OPERATIONS.node_blob_op,
+                    op_type=ObjectType.NODE_BLOB_OP,
                     op_uuid=u3
                 )
             ],
@@ -99,13 +97,13 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
             tasks=[model_tasks.image_fetch],
             depends_on=[
                 dependency(
-                    op_type=CLUSTER_OPERATIONS.node_blob_op,
+                    op_type=ObjectType.NODE_BLOB_OP,
                     op_uuid=u2
                 )
             ],
             runs_after=[
                 dependency(
-                    op_type=CLUSTER_OPERATIONS.node_blob_op,
+                    op_type=ObjectType.NODE_BLOB_OP,
                     op_uuid=u3
                 )
             ],
@@ -126,7 +124,7 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
             PRIORITY.user_facing
         )
 
-        self.assertEqual(CLUSTER_OPERATIONS.artifact_fetch_op, op_type)
+        self.assertEqual(ObjectType.ARTIFACT_FETCH_OP, op_type)
 
         self.assertEqual(
             {

@@ -21,7 +21,7 @@
 from ipaddress import IPv4Address
 import time
 import threading
-from typing import Any, Optional
+from typing import Any, cast, Optional
 from uuid import UUID
 
 import grpc
@@ -34,6 +34,7 @@ from shakenfist_utilities import logs
 from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
+from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_state import State
@@ -98,9 +99,8 @@ def _get_database_stub() -> Any:
     if not hasattr(_local, 'database_channel') or _local.database_channel is None:
         _local.database_channel = grpc.insecure_channel(
             f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
-        # DatabaseServiceStub is generated untyped code
         _local.database_stub = database_pb2_grpc.DatabaseServiceStub(
-            _local.database_channel)  # type: ignore[no-untyped-call]
+            _local.database_channel)
     return _local.database_stub
 
 
@@ -634,7 +634,8 @@ def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State
     try:
         stub = _get_database_stub()
         request = database_pb2.GetObjectStateRequest(
-            object_type=object_type,
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             object_uuid=object_uuid
         )
         reply = stub.GetObjectState(request)
@@ -656,7 +657,8 @@ def _grpc_set_state(object_type: ObjectType, object_uuid: str, state: State) -> 
     try:
         stub = _get_database_stub()
         request = database_pb2.SetObjectStateRequest(
-            object_type=object_type,
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             object_uuid=object_uuid,
             state_value=state.value or '',
             update_time=state.update_time,
@@ -675,7 +677,8 @@ def _grpc_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteObjectStateRequest(
-            object_type=object_type,
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             object_uuid=object_uuid
         )
         reply = stub.DeleteObjectState(request)
@@ -692,7 +695,8 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
     try:
         stub = _get_database_stub()
         request = database_pb2.GetObjectsByStateRequest(
-            object_type=object_type,
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             state_values=state_values
         )
         reply = stub.GetObjectsByState(request)
@@ -703,25 +707,8 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
         return []
 
 
-# =============================================================================
-# Helper functions for ObjectType conversion
-# =============================================================================
-
-def _string_to_object_type(s: Optional[str]) -> Optional[ObjectType]:
-    """Convert a string to an ObjectType enum, returning None if invalid."""
-    if not s:
-        return None
-    try:
-        return ObjectType(s)
-    except ValueError:
-        return None
-
-
-def _object_type_to_string(ot: Optional[ObjectType]) -> str:
-    """Convert an ObjectType enum to a string for gRPC, empty string if None."""
-    if ot is None:
-        return ''
-    return str(ot)
+# Note: ObjectType and ReservationType now have proto_id attributes and
+# from_proto_id() methods for efficient gRPC enum conversion.
 
 
 # =============================================================================
@@ -733,13 +720,19 @@ def _grpc_reserve_address(reservation: IPAMReservation) -> bool:
     """Atomically reserve an IP address via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.ReserveAddressRequest(  # type: ignore[attr-defined]
-            reservation=database_pb2.IPAMReservationData(  # type: ignore[attr-defined]
+        request = database_pb2.ReserveAddressRequest(
+            reservation=database_pb2.IPAMReservationData(
                 ipam_uuid=str(reservation.ipam_uuid),
                 address=str(reservation.address),
-                reservation_type=reservation.reservation_type,
-                user_type=_object_type_to_string(reservation.user_type),
-                user_uuid=str(reservation.user_uuid) if reservation.user_uuid else '',
+                reservation_type=cast(
+                    shakenfist_enums_pb2.ReservationType.ValueType,
+                    reservation.reservation_type.proto_id),
+                user_type=cast(
+                    shakenfist_enums_pb2.ObjectType.ValueType,
+                    reservation.user_type.proto_id if reservation.user_type else 0
+                ),
+                user_uuid=(str(reservation.user_uuid)
+                           if reservation.user_uuid else ''),
                 reserved_at=reservation.reserved_at,
                 comment=reservation.comment or ''
             )
@@ -758,15 +751,22 @@ def _grpc_release_address(ipam_uuid: str, address: str,
     """Release an IP address via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.ReleaseAddressRequest(  # type: ignore[attr-defined]
+        request = database_pb2.ReleaseAddressRequest(
             ipam_uuid=ipam_uuid,
             address=address,
-            halo_reservation=database_pb2.IPAMReservationData(  # type: ignore[attr-defined]
+            halo_reservation=database_pb2.IPAMReservationData(
                 ipam_uuid=str(halo_reservation.ipam_uuid),
                 address=str(halo_reservation.address),
-                reservation_type=halo_reservation.reservation_type,
-                user_type=_object_type_to_string(halo_reservation.user_type),
-                user_uuid=str(halo_reservation.user_uuid) if halo_reservation.user_uuid else '',
+                reservation_type=cast(
+                    shakenfist_enums_pb2.ReservationType.ValueType,
+                    halo_reservation.reservation_type.proto_id),
+                user_type=cast(
+                    shakenfist_enums_pb2.ObjectType.ValueType,
+                    halo_reservation.user_type.proto_id
+                    if halo_reservation.user_type else 0
+                ),
+                user_uuid=(str(halo_reservation.user_uuid)
+                           if halo_reservation.user_uuid else ''),
                 reserved_at=halo_reservation.reserved_at,
                 comment=halo_reservation.comment or ''
             )
@@ -783,18 +783,25 @@ def _grpc_get_reservation(ipam_uuid: str,
     """Get a single reservation via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.GetReservationRequest(  # type: ignore[attr-defined]
+        request = database_pb2.GetReservationRequest(
             ipam_uuid=ipam_uuid,
             address=address
         )
         reply = stub.GetReservation(request)
         if not reply.found:
             return None
+        res_type = ReservationType.from_proto_id(
+            reply.reservation.reservation_type)
+        if res_type is None:
+            res_type = ReservationType.UNKNOWN
+        user_type = ObjectType.from_proto_id(reply.reservation.user_type)
+        if user_type is None:
+            user_type = ObjectType.UNKNOWN
         return IPAMReservation(
             ipam_uuid=reply.reservation.ipam_uuid,
             address=IPv4Address(reply.reservation.address),
-            reservation_type=reply.reservation.reservation_type,
-            user_type=_string_to_object_type(reply.reservation.user_type),
+            reservation_type=res_type,
+            user_type=user_type,
             user_uuid=reply.reservation.user_uuid or None,
             reserved_at=reply.reservation.reserved_at,
             comment=reply.reservation.comment or None
@@ -808,16 +815,22 @@ def _grpc_get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
     """Get all reservations for an IPAM via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.GetReservationsForIPAMRequest(  # type: ignore[attr-defined]
+        request = database_pb2.GetReservationsForIPAMRequest(
             ipam_uuid=ipam_uuid)
         reply = stub.GetReservationsForIPAM(request)
         result = []
         for res in reply.reservations:
+            res_type = ReservationType.from_proto_id(res.reservation_type)
+            if res_type is None:
+                res_type = ReservationType.UNKNOWN
+            user_type = ObjectType.from_proto_id(res.user_type)
+            if user_type is None:
+                user_type = ObjectType.UNKNOWN
             result.append(IPAMReservation(
                 ipam_uuid=res.ipam_uuid,
                 address=IPv4Address(res.address),
-                reservation_type=res.reservation_type,
-                user_type=_string_to_object_type(res.user_type),
+                reservation_type=res_type,
+                user_type=user_type,
                 user_uuid=res.user_uuid or None,
                 reserved_at=res.reserved_at,
                 comment=res.comment or None
@@ -832,7 +845,7 @@ def _grpc_delete_reservation(ipam_uuid: str, address: str) -> bool:
     """Delete a single reservation via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.DeleteReservationRequest(  # type: ignore[attr-defined]
+        request = database_pb2.DeleteReservationRequest(
             ipam_uuid=ipam_uuid,
             address=address
         )
@@ -848,7 +861,7 @@ def _grpc_delete_reservations_for_ipam(ipam_uuid: str) -> int:
     """Delete all reservations for an IPAM via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.DeleteReservationsForIPAMRequest(  # type: ignore[attr-defined]
+        request = database_pb2.DeleteReservationsForIPAMRequest(
             ipam_uuid=ipam_uuid)
         reply = stub.DeleteReservationsForIPAM(request)
         return int(reply.count)
@@ -862,7 +875,7 @@ def _grpc_release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
     """Release expired deletion-halo addresses via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.ReleaseHaloedAddressesRequest(  # type: ignore[attr-defined]
+        request = database_pb2.ReleaseHaloedAddressesRequest(
             ipam_uuid=ipam_uuid,
             older_than=older_than
         )
@@ -878,7 +891,7 @@ def _grpc_get_addresses_in_use(ipam_uuid: str) -> set[str]:
     """Get all addresses in use for an IPAM via the database microservice."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.GetAddressesInUseRequest(  # type: ignore[attr-defined]
+        request = database_pb2.GetAddressesInUseRequest(
             ipam_uuid=ipam_uuid)
         reply = stub.GetAddressesInUse(request)
         return set(reply.addresses)

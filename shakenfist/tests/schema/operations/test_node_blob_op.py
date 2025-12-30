@@ -9,8 +9,7 @@ from shakenfist.schema.operations.node_blob_op import create_and_enqueue
 from shakenfist.schema.operations.node_blob_op import current_version
 from shakenfist.schema.operations.node_blob_op import model
 from shakenfist.schema.operations.node_blob_op import model_tasks
-from shakenfist.schema.operations.baseclusteroperation \
-    import CLUSTER_OPERATIONS
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.node_blob_op import NodeBlobOp
 from shakenfist.tests import base
@@ -95,7 +94,7 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
             ],
             PRIORITY.background_high_io
         )
-        self.assertEqual(CLUSTER_OPERATIONS.node_blob_op, op_type)
+        self.assertEqual(ObjectType.NODE_BLOB_OP, op_type)
 
         self.assertEqual(
             {

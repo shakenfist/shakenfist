@@ -9,8 +9,7 @@ from shakenfist.schema.operations.node_aop_op import create_and_enqueue
 from shakenfist.schema.operations.node_aop_op import current_version
 from shakenfist.schema.operations.node_aop_op import model
 from shakenfist.schema.operations.node_aop_op import model_tasks
-from shakenfist.schema.operations.baseclusteroperation \
-    import CLUSTER_OPERATIONS
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.node_aop_op import NodeAgentopOp
 from shakenfist.tests import base
@@ -83,7 +82,7 @@ class NodeAgentopOpTestCase(base.ShakenFistTestCase):
             node_uuid, agentoperation_uuid, [model_tasks.preflight],
             PRIORITY.background
         )
-        self.assertEqual(CLUSTER_OPERATIONS.node_aop_op, op_type)
+        self.assertEqual(ObjectType.NODE_AOP_OP, op_type)
 
         self.assertEqual(
             {

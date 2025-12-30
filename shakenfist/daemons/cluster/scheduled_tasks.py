@@ -9,6 +9,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import FINAL_OBJECT_STATES
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.blob import Blob
 from shakenfist import etcd
 from shakenfist import mariadb
@@ -224,7 +225,7 @@ def _fill_per_deleted_object_queue():
     for objtype in OBJECT_NAMES_TO_CLASSES:
         for objkey, _ in etcd.get_all(objtype, None):
             obj_uuid = objkey.split('/')[-1]
-            state = mariadb.get_state(objtype, obj_uuid)
+            state = mariadb.get_state(ObjectType(objtype), obj_uuid)
             state_value = state.value if state else None
             if state_value not in FINAL_OBJECT_STATES:
                 continue
