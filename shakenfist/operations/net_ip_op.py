@@ -91,7 +91,7 @@ class NetIPOp(BaseClusterOperation):
 
     def _route_address(self, n):
         if n.is_dead():
-            raise InvalidStateForTask()
+            raise InvalidStateForTask(self)
 
         n.route_address(self.ip)
 

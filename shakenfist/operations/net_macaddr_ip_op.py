@@ -99,6 +99,6 @@ class NetMacaddrIPOp(BaseClusterOperation):
 
     def _remove_dhcp_lease(self, n):
         if n.is_dead():
-            raise InvalidStateForTask()
+            raise InvalidStateForTask(self)
 
         n.remove_dhcp_lease(self.ip, self.mac_address)

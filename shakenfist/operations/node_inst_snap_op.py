@@ -176,7 +176,7 @@ class NodeInstSnapOp(BaseClusterOperation):
             except BlobDeleted:
                 if a.state.value != Artifact.STATE_DELETED:
                     a.state = Artifact.STATE_ERROR
-                raise AbortSnapshot()
+                raise AbortSnapshot(self, 'blob was deleted during snapshot')
             except InvalidStateException:
                 b.ref_count_dec(a)
-                raise AbortSnapshot()
+                raise AbortSnapshot(self, 'invalid state during snapshot')

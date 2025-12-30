@@ -108,7 +108,7 @@ class NetIfaceOp(BaseClusterOperation):
 
     def _interface_float(self, n, ni):
         if n.is_dead():
-            raise InvalidStateForTask()
+            raise InvalidStateForTask(self)
 
         floating = ni.floating.get('floating_address')
         if not floating:
