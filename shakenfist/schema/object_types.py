@@ -74,6 +74,10 @@ class ObjectType(str, Enum):
         'EnumName.MEMBER_NAME' rather than the value. Since we want to use
         these values in etcd paths, error messages, and other string contexts,
         we override __str__ to return the value directly.
+
+        Note: self.value is the string (e.g., 'instance'), not the
+        ObjectTypeValue NamedTuple. The NamedTuple is unpacked by Python's
+        enum machinery in __new__, which sets _value_ to just the string.
         """
         return str(self.value)
 
