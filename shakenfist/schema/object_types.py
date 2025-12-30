@@ -8,7 +8,6 @@
 # integer identifiers. The protobuf enum generator reads these values.
 
 from enum import Enum
-from typing import ClassVar
 from typing import NamedTuple
 from typing import Optional
 
