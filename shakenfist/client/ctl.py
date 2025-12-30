@@ -287,7 +287,7 @@ def migrate_state_to_mariadb(dry_run):
             else:
                 # Write to MariaDB
                 state = State(**state_data)
-                mariadb.set_state(object_type, objuuid, state)
+                mariadb.set_state(ObjectType(object_type), objuuid, state)
 
                 # Remove from etcd
                 etcd.delete(f'attribute/{object_type}', objuuid, 'state')
@@ -450,7 +450,8 @@ def migrate_floating_network_uuid(dry_run):
     try:
         state_data = mariadb.get_state(ObjectType.NETWORK, 'floating')
         if state_data:
-            mariadb.set_state(ObjectType.NETWORK, FLOATING_NETWORK_UUID, state_data)
+            mariadb.set_state(
+                ObjectType.NETWORK, str(FLOATING_NETWORK_UUID), state_data)
             mariadb.delete_state(ObjectType.NETWORK, 'floating')
             click.echo('  Network state migrated.')
         else:
@@ -462,7 +463,8 @@ def migrate_floating_network_uuid(dry_run):
     try:
         ipam_state = mariadb.get_state(ObjectType.IPAM, 'floating')
         if ipam_state:
-            mariadb.set_state(ObjectType.IPAM, FLOATING_NETWORK_UUID, ipam_state)
+            mariadb.set_state(
+                ObjectType.IPAM, str(FLOATING_NETWORK_UUID), ipam_state)
             mariadb.delete_state(ObjectType.IPAM, 'floating')
             click.echo('  IPAM state migrated.')
         else:
