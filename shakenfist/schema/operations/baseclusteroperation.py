@@ -107,8 +107,8 @@ class dependency(BaseModel):
         return v
 
     @field_serializer('op_type')
-    def serialize_op_type(self, op_type: ObjectType, _info) -> str:
-        return op_type.value
+    def serialize_op_type(self, op_type: ObjectType, _info: Any) -> str:
+        return str(op_type.value)
 
 
 def _convert_deps(

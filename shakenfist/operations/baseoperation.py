@@ -97,7 +97,7 @@ class BaseClusterOperation(BaseOperation):
     # Note that cluster operations are created in etcd transactions and don't
     # have .new() methods. They therefore jump straight to queued as an initial
     # state.
-    state_targets: dict[Optional[str], Optional[tuple[str, ...]]] = {
+    state_targets: dict[Optional[str], Optional[tuple[str, ...]]] = {  # type: ignore[assignment]
         None: (BaseOperation.STATE_QUEUED,),
         BaseOperation.STATE_QUEUED: (BaseOperation.STATE_EXECUTING,
                                      dbo.STATE_DELETED, dbo.STATE_ERROR,
@@ -188,7 +188,7 @@ class BaseClusterOperation(BaseOperation):
         self.state = BaseClusterOperation.STATE_EXECUTING  # type: ignore[misc]
         for t in self.tasks:
             self.dispatch_task(t)  # type: ignore[attr-defined]
-            if self.state.value in [BaseClusterOperation.STATE_ABORT,
+            if self.state.value in [BaseClusterOperation.STATE_ABORT,  # type: ignore[attr-defined]
                                     BaseClusterOperation.STATE_DELETED,
                                     BaseClusterOperation.STATE_ERROR,
                                     BaseClusterOperation.STATE_QUEUED]:
