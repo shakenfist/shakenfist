@@ -12,6 +12,10 @@ from shakenfist.util import exceptions as util_exceptions
 class RecordExceptionTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
+        # Stop the global mock of record_exception so we can test the real
+        # function
+        self.mock_record_exception.stop()
+
         # Create a temporary directory for exception files
         self.temp_dir = tempfile.mkdtemp()
         self.exceptions_path = os.path.join(self.temp_dir, 'exceptions')
@@ -217,6 +221,10 @@ class IntegrationTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
+        # Stop the global mock of record_exception so we can test the real
+        # function
+        self.mock_record_exception.stop()
+
         self.temp_dir = tempfile.mkdtemp()
         self.exceptions_path = os.path.join(self.temp_dir, 'exceptions')
         os.makedirs(self.exceptions_path, exist_ok=True)

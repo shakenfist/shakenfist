@@ -14,3 +14,9 @@ class ShakenFistTestCase(testtools.TestCase):
             'shakenfist.eventlog.add_event_multi')
         self.mock_add_event_multi.start()
         self.addCleanup(self.mock_add_event_multi.stop)
+
+        # Mock exception recording to avoid filesystem access during tests
+        self.mock_record_exception = mock.patch(
+            'shakenfist.util.exceptions.record_exception')
+        self.mock_record_exception.start()
+        self.addCleanup(self.mock_record_exception.stop)

@@ -76,8 +76,15 @@ app.logger.handlers = [HANDLER]
 # decorators in base.Resource catch exceptions raised during method execution,
 # but exceptions during Flask-RESTful's JSON response serialization happen
 # after the method returns and need to be caught here.
+#
+# We only record non-HTTP exceptions (actual errors), not expected HTTP
+# responses like 404 Not Found or 401 Unauthorized.
 @app.errorhandler(Exception)
 def handle_exception(e):
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        # Let Flask handle HTTP exceptions normally
+        return e
     util_exceptions.record_exception(*sys.exc_info())
     # Re-raise to let Flask/Flask-RESTful handle the response
     raise e
