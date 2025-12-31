@@ -184,6 +184,26 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetAddressesInUseRequest.SerializeToString,
                 response_deserializer=database__pb2.GetAddressesInUseReply.FromString,
                 _registered_method=True)
+        self.CreateUpload = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateUpload',
+                request_serializer=database__pb2.CreateUploadRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetUpload = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetUpload',
+                request_serializer=database__pb2.GetUploadRequest.SerializeToString,
+                response_deserializer=database__pb2.GetUploadReply.FromString,
+                _registered_method=True)
+        self.GetAllUploads = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllUploads',
+                request_serializer=database__pb2.GetAllUploadsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAllUploadsReply.FromString,
+                _registered_method=True)
+        self.DeleteUpload = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteUpload',
+                request_serializer=database__pb2.DeleteUploadRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -375,6 +395,31 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateUpload(self, request, context):
+        """Upload Operations (MariaDB)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetUpload(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAllUploads(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteUpload(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -527,6 +572,26 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetAddressesInUse,
                     request_deserializer=database__pb2.GetAddressesInUseRequest.FromString,
                     response_serializer=database__pb2.GetAddressesInUseReply.SerializeToString,
+            ),
+            'CreateUpload': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateUpload,
+                    request_deserializer=database__pb2.CreateUploadRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetUpload': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetUpload,
+                    request_deserializer=database__pb2.GetUploadRequest.FromString,
+                    response_serializer=database__pb2.GetUploadReply.SerializeToString,
+            ),
+            'GetAllUploads': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllUploads,
+                    request_deserializer=database__pb2.GetAllUploadsRequest.FromString,
+                    response_serializer=database__pb2.GetAllUploadsReply.SerializeToString,
+            ),
+            'DeleteUpload': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteUpload,
+                    request_deserializer=database__pb2.DeleteUploadRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1339,6 +1404,114 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetAddressesInUse',
             database__pb2.GetAddressesInUseRequest.SerializeToString,
             database__pb2.GetAddressesInUseReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateUpload(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateUpload',
+            database__pb2.CreateUploadRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetUpload(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetUpload',
+            database__pb2.GetUploadRequest.SerializeToString,
+            database__pb2.GetUploadReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAllUploads(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllUploads',
+            database__pb2.GetAllUploadsRequest.SerializeToString,
+            database__pb2.GetAllUploadsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteUpload(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteUpload',
+            database__pb2.DeleteUploadRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
             insecure,

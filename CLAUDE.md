@@ -373,22 +373,32 @@ Queue priorities (per-node and global):
 4. **State machine transitions** - Follow documented state machines in
    `docs/developer_guide/state_machine.md`
 
-## MariaDB State Storage
+## MariaDB Storage
 
-Object state (e.g., "created", "deleted", "error") is stored in MariaDB in the
-`object_states` table. This is required for all deployments - MariaDB must be
-configured.
+Several object types have their data stored in MariaDB for improved query
+performance. This is required for all deployments - MariaDB must be configured.
+
+### Data Stored in MariaDB
+
+- **Object state** (`object_states` table): State values like "created", "deleted",
+  "error" for all object types
+- **IPAM reservations** (`ipam_reservations` table): IP address allocations
+- **Uploads** (`uploads` table): Upload object static values (uuid, node,
+  created_at, version)
 
 ### Migrating Existing Deployments
 
-When upgrading an existing deployment to use MariaDB for state storage:
+When upgrading an existing deployment to use MariaDB:
 
 1. Stop all Shaken Fist services on all nodes
-2. Run `sf-ctl migrate-state-to-mariadb` to migrate state data from etcd
+2. Run the appropriate migration commands:
+   - `sf-ctl migrate-state-to-mariadb` - Migrate object state from etcd
+   - `sf-ctl migrate-ipam-to-mariadb` - Migrate IPAM reservations from etcd
+   - `sf-ctl migrate-uploads-to-mariadb` - Migrate upload objects from etcd
 3. Start services via getsf
 
-The migration command copies all state from etcd attributes to MariaDB and
-removes the old etcd entries.
+Each migration command copies data from etcd to MariaDB and removes the old
+etcd entries. Use `--dry-run` to preview what would be migrated.
 
 ### State Class
 

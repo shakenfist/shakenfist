@@ -476,10 +476,84 @@ def migrate_floating_network_uuid(dry_run):
     click.echo('You can now start Shaken Fist services.')
 
 
+@click.command()
+@click.option('--dry-run', is_flag=True, default=False,
+              help='Show what would be migrated without making changes')
+def migrate_uploads_to_mariadb(dry_run):
+    """Migrate all upload objects from etcd to MariaDB.
+
+    This command should be run once during an upgrade to move upload static
+    values from etcd to the MariaDB uploads table. All Shaken Fist services
+    should be stopped before running this command.
+
+    After migration, the upload entries are removed from etcd.
+    """
+    import uuid as uuid_module
+    from shakenfist.upload import Upload
+
+    # Ensure the MariaDB schema exists
+    if not dry_run:
+        click.echo('Ensuring MariaDB schema exists...')
+        mariadb.ensure_schema()
+
+    total_migrated = 0
+    total_skipped = 0
+    total_errors = 0
+
+    click.echo('\nScanning for upload objects in etcd...')
+
+    # Iterate through all upload objects in etcd
+    for objkey, data in etcd.get_all('upload', None):
+        # Extract UUID from the etcd key
+        upload_uuid = objkey.split('/')[-1]
+
+        if dry_run:
+            click.echo(f'  Would migrate {upload_uuid}: node={data.get("node")}')
+            total_migrated += 1
+            continue
+
+        try:
+            # Write to MariaDB
+            success = mariadb.create_upload(
+                uuid_module.UUID(upload_uuid),
+                data['node'],
+                data['created_at'],
+                data.get('version', Upload.current_version)
+            )
+            if success:
+                # Remove from etcd
+                etcd.delete('upload', None, upload_uuid)
+                total_migrated += 1
+            else:
+                # Upload already exists in MariaDB
+                click.echo(f'  Skipping {upload_uuid}: already in MariaDB')
+                # Still remove from etcd since the data is in MariaDB
+                etcd.delete('upload', None, upload_uuid)
+                total_skipped += 1
+        except Exception as e:
+            click.echo(f'  Error migrating {upload_uuid}: {e}')
+            total_errors += 1
+
+        # Show progress every 100 uploads
+        if (total_migrated + total_skipped + total_errors) % 100 == 0:
+            click.echo(
+                f'  ... {total_migrated + total_skipped + total_errors} '
+                'uploads processed')
+
+    click.echo(f'\nTotal: {total_migrated} migrated, {total_skipped} skipped, '
+               f'{total_errors} errors')
+
+    if dry_run:
+        click.echo('\nThis was a dry run. No changes were made.')
+    else:
+        click.echo('\nMigration complete. You can now start Shaken Fist services.')
+
+
 cli.add_command(bootstrap_system_key)
 cli.add_command(migrate_floating_network_uuid)
 cli.add_command(migrate_state_to_mariadb)
 cli.add_command(migrate_ipam_to_mariadb)
+cli.add_command(migrate_uploads_to_mariadb)
 cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
 cli.add_command(verify_config)

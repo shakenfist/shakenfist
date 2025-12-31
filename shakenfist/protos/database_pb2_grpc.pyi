@@ -175,6 +175,27 @@ class DatabaseServiceStub:
         database_pb2.GetAddressesInUseReply,
     ]
 
+    CreateUpload: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateUploadRequest,
+        database_pb2.StatusReply,
+    ]
+    """Upload Operations (MariaDB)"""
+
+    GetUpload: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetUploadRequest,
+        database_pb2.GetUploadReply,
+    ]
+
+    GetAllUploads: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllUploadsRequest,
+        database_pb2.GetAllUploadsReply,
+    ]
+
+    DeleteUpload: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteUploadRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -330,6 +351,27 @@ class DatabaseServiceAsyncStub:
     GetAddressesInUse: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetAddressesInUseRequest,
         database_pb2.GetAddressesInUseReply,
+    ]
+
+    CreateUpload: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateUploadRequest,
+        database_pb2.StatusReply,
+    ]
+    """Upload Operations (MariaDB)"""
+
+    GetUpload: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetUploadRequest,
+        database_pb2.GetUploadReply,
+    ]
+
+    GetAllUploads: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllUploadsRequest,
+        database_pb2.GetAllUploadsReply,
+    ]
+
+    DeleteUpload: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteUploadRequest,
+        database_pb2.StatusReply,
     ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
@@ -548,5 +590,34 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.GetAddressesInUseRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetAddressesInUseReply, collections.abc.Awaitable[database_pb2.GetAddressesInUseReply]]: ...
+
+    @abc.abstractmethod
+    def CreateUpload(
+        self,
+        request: database_pb2.CreateUploadRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Upload Operations (MariaDB)"""
+
+    @abc.abstractmethod
+    def GetUpload(
+        self,
+        request: database_pb2.GetUploadRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetUploadReply, collections.abc.Awaitable[database_pb2.GetUploadReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllUploads(
+        self,
+        request: database_pb2.GetAllUploadsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllUploadsReply, collections.abc.Awaitable[database_pb2.GetAllUploadsReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteUpload(
+        self,
+        request: database_pb2.DeleteUploadRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

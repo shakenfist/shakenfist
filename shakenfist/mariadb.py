@@ -51,6 +51,7 @@ _metadata: Optional[sa.MetaData] = None
 _schema_versions_table: Optional[sa.Table] = None
 _object_states_table: Optional[sa.Table] = None
 _ipam_reservations_table: Optional[sa.Table] = None
+_uploads_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -63,8 +64,10 @@ _ipam_reservations_table: Optional[sa.Table] = None
 #   ipam_reservations v3: Changed address from VARCHAR(45) to INET4
 #   ipam_reservations v4: Changed user_type from VARCHAR(32) to ENUM(ObjectType)
 #   ipam_reservations v5: Changed ipam_uuid and user_uuid from VARCHAR(36) to UUID
+#   uploads v1: Initial schema for upload objects
 OBJECT_STATES_VERSION = 2
 IPAM_RESERVATIONS_VERSION = 5
+UPLOADS_VERSION = 1
 
 
 def _use_database_service() -> bool:
@@ -471,6 +474,74 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _get_uploads_table() -> sa.Table:
+    """Get or create the uploads table definition.
+
+    This table stores static values for upload objects. Uploads are temporary
+    objects used during artifact creation - they receive streamed data before
+    being converted to artifacts.
+
+    The uuid is the primary key since each upload is unique. We index on node
+    for efficient routing of upload requests to the node holding the data,
+    and on created_at for cleanup of old/stale uploads.
+    """
+    global _uploads_table
+    if _uploads_table is None:
+        metadata = _get_metadata()
+        _uploads_table = sa.Table(
+            'uploads',
+            metadata,
+            sa.Column('uuid', sa.Uuid(), primary_key=True),
+            sa.Column('node', sa.String(255), nullable=False),
+            sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Column('version', sa.Integer(), nullable=False),
+            # Index for efficient queries by node
+            sa.Index('idx_uploads_node', 'node'),
+            # Index for finding old uploads for cleanup
+            sa.Index('idx_uploads_created_at', 'created_at'),
+        )
+    return _uploads_table
+
+
+def _ensure_uploads_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the uploads table schema is up to date.
+
+    Applies any necessary migrations based on the current version.
+    Returns a dict with migration status information.
+    """
+    table_name = 'uploads'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_uploads_table()
+
+    # Version 0 or -1 means table doesn't exist yet - create it with current
+    # schema
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version {UPLOADS_VERSION})')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        # Create indexes
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = UPLOADS_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    # Future migrations would go here (if current_ver == 1: ...)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': UPLOADS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def ensure_schema() -> list[dict[str, Any]]:
     """Ensure all MariaDB tables exist with current schema versions.
 
@@ -499,6 +570,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     # Then ensure each application table is up to date
     results.append(_ensure_object_states_schema(engine))
     results.append(_ensure_ipam_reservations_schema(engine))
+    results.append(_ensure_uploads_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -1396,3 +1468,263 @@ def get_addresses_in_use(ipam_uuid: UUID) -> set[str]:
     if _use_database_service():
         return _grpc_get_addresses_in_use(str(ipam_uuid))
     return _direct_get_addresses_in_use(ipam_uuid)
+
+
+# =============================================================================
+# Upload Direct Access Functions
+# These are used by the database daemon for upload object storage.
+# =============================================================================
+
+def _direct_create_upload(upload_uuid: UUID, node: str, created_at: float,
+                          version: int) -> bool:
+    """Create an upload record in MariaDB.
+
+    Args:
+        upload_uuid: The UUID of the upload.
+        node: The node where the upload data is stored.
+        created_at: Unix timestamp when the upload was created.
+        version: The object version number.
+
+    Returns:
+        True if the record was created, False if it already exists or error.
+    """
+    engine = _get_engine()
+    table = _get_uploads_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=upload_uuid,
+                node=node,
+                created_at=created_at,
+                version=version
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        # Upload already exists
+        return False
+    except OperationalError as e:
+        LOG.warning(f'MariaDB create failed for upload {upload_uuid}: {e}')
+        return False
+
+
+def _direct_get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
+    """Get upload static values from MariaDB.
+
+    Args:
+        upload_uuid: The UUID of the upload.
+
+    Returns:
+        A dict with uuid, node, created_at, and version, or None if not found.
+    """
+    engine = _get_engine()
+    table = _get_uploads_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == upload_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return {
+                'uuid': str(result.uuid),
+                'node': result.node,
+                'created_at': result.created_at,
+                'version': result.version
+            }
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get failed for upload {upload_uuid}: {e}')
+        return None
+
+
+def _direct_get_all_uploads() -> list[dict[str, Any]]:
+    """Get all uploads from MariaDB.
+
+    Returns:
+        List of dicts with uuid, node, created_at, and version for each upload.
+    """
+    engine = _get_engine()
+    table = _get_uploads_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table)
+            result = conn.execute(stmt).fetchall()
+
+            return [
+                {
+                    'uuid': str(row.uuid),
+                    'node': row.node,
+                    'created_at': row.created_at,
+                    'version': row.version
+                }
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for all uploads: {e}')
+        return []
+
+
+def _direct_delete_upload(upload_uuid: UUID) -> bool:
+    """Delete an upload record from MariaDB.
+
+    Args:
+        upload_uuid: The UUID of the upload.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_uploads_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == upload_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for upload {upload_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Upload gRPC Client Functions
+# These call the database microservice for upload operations.
+# =============================================================================
+
+def _grpc_create_upload(upload_uuid: UUID, node: str, created_at: float,
+                        version: int) -> bool:
+    """Create an upload record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateUploadRequest(
+            upload=database_pb2.UploadData(
+                uuid=str(upload_uuid),
+                node=node,
+                created_at=created_at,
+                version=version
+            )
+        )
+        reply = stub.CreateUpload(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC CreateUpload failed for {upload_uuid}: {e}')
+        return False
+
+
+def _grpc_get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
+    """Get upload static values via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetUploadRequest(uuid=str(upload_uuid))
+        reply = stub.GetUpload(request)
+        if not reply.found:
+            return None
+        return {
+            'uuid': reply.upload.uuid,
+            'node': reply.upload.node,
+            'created_at': reply.upload.created_at,
+            'version': reply.upload.version
+        }
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetUpload failed for {upload_uuid}: {e}')
+        return None
+
+
+def _grpc_get_all_uploads() -> list[dict[str, Any]]:
+    """Get all uploads via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllUploadsRequest()
+        reply = stub.GetAllUploads(request)
+        return [
+            {
+                'uuid': u.uuid,
+                'node': u.node,
+                'created_at': u.created_at,
+                'version': u.version
+            }
+            for u in reply.uploads
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetAllUploads failed: {e}')
+        return []
+
+
+def _grpc_delete_upload(upload_uuid: UUID) -> bool:
+    """Delete an upload record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteUploadRequest(uuid=str(upload_uuid))
+        reply = stub.DeleteUpload(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC DeleteUpload failed for {upload_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Upload Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def create_upload(upload_uuid: UUID, node: str, created_at: float,
+                  version: int) -> bool:
+    """Create an upload record.
+
+    Args:
+        upload_uuid: The UUID of the upload.
+        node: The node where the upload data is stored.
+        created_at: Unix timestamp when the upload was created.
+        version: The object version number.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_upload(upload_uuid, node, created_at, version)
+    return _direct_create_upload(upload_uuid, node, created_at, version)
+
+
+def get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
+    """Get upload static values.
+
+    Args:
+        upload_uuid: The UUID of the upload.
+
+    Returns:
+        A dict with uuid, node, created_at, and version, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_upload(upload_uuid)
+    return _direct_get_upload(upload_uuid)
+
+
+def get_all_uploads() -> list[dict[str, Any]]:
+    """Get all uploads.
+
+    Returns:
+        List of dicts with uuid, node, created_at, and version for each upload.
+    """
+    if _use_database_service():
+        return _grpc_get_all_uploads()
+    return _direct_get_all_uploads()
+
+
+def delete_upload(upload_uuid: UUID) -> bool:
+    """Delete an upload record.
+
+    Args:
+        upload_uuid: The UUID of the upload.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_upload(upload_uuid)
+    return _direct_delete_upload(upload_uuid)
