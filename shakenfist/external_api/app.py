@@ -13,6 +13,7 @@
 #     --debug run
 import base64
 import json
+import sys
 
 import flasgger
 import flask
@@ -40,6 +41,7 @@ from shakenfist.external_api import node as api_node
 from shakenfist.external_api import snapshot as api_snapshot
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import upload as api_upload
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -68,6 +70,17 @@ swagger = flasgger.Swagger(app, template={
 
 # Use our handler to get SF log format (instead of gunicorn's handlers)
 app.logger.handlers = [HANDLER]
+
+
+# Record exceptions that occur during response serialization. The method
+# decorators in base.Resource catch exceptions raised during method execution,
+# but exceptions during Flask-RESTful's JSON response serialization happen
+# after the method returns and need to be caught here.
+@app.errorhandler(Exception)
+def handle_exception(e):
+    util_exceptions.record_exception(*sys.exc_info())
+    # Re-raise to let Flask/Flask-RESTful handle the response
+    raise e
 
 
 @app.before_request
