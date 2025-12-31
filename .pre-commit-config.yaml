@@ -31,6 +31,32 @@ repos:
         files: ^shakenfist/deploy/ansible/
         pass_filenames: false
 
+  # Flake8 style checking via tox
+  # Requires: pip install tox flake8
+  - repo: local
+    hooks:
+      - id: flake8
+        name: Style check with flake8
+        description: Run flake8 style checks on changes since HEAD~
+        entry: tox -e flake8
+        language: system
+        files: ^shakenfist/
+        pass_filenames: false
+        types: [python]
+
+  # Unit tests via tox
+  # Requires: pip install tox
+  - repo: local
+    hooks:
+      - id: py3
+        name: Run unit tests
+        description: Run Python 3 unit tests with stestr
+        entry: tox -e py3
+        language: system
+        files: ^shakenfist/
+        pass_filenames: false
+        types: [python]
+
   # Type checking with mypy (incremental rollout via tox)
   # Requires: pip install tox mypy
   - repo: local
