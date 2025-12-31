@@ -1964,7 +1964,7 @@ def instance_usage_for_blob_uuid(blob_uuid, node=None):
 
             # This blob is in direct use
             if d['blob_uuid'] == blob_uuid:
-                instance_uuids.append(inst.uuid)
+                instance_uuids.append(str(inst.uuid))
                 continue
 
             # The blob is deleted
@@ -1976,7 +1976,7 @@ def instance_usage_for_blob_uuid(blob_uuid, node=None):
             while disk_blob.depends_on:
                 disk_blob = blob.Blob.from_db(disk_blob.depends_on)
                 if disk_blob and disk_blob.uuid == blob_uuid:
-                    instance_uuids.append(inst.uuid)
+                    instance_uuids.append(str(inst.uuid))
                     break
 
     return instance_uuids
