@@ -18,6 +18,7 @@ import sys
 import flasgger
 import flask
 import flask_restful
+from flask import got_request_exception
 from flask_jwt_extended import JWTManager
 from flask_request_id import RequestID
 from shakenfist_utilities import logs  # noreorder
@@ -72,22 +73,23 @@ swagger = flasgger.Swagger(app, template={
 app.logger.handlers = [HANDLER]
 
 
-# Record exceptions that occur during response serialization. The method
-# decorators in base.Resource catch exceptions raised during method execution,
-# but exceptions during Flask-RESTful's JSON response serialization happen
-# after the method returns and need to be caught here.
+# Record exceptions that occur during request handling. The method decorators
+# in base.Resource catch exceptions raised during method execution, but
+# exceptions during Flask-RESTful's JSON response serialization happen after
+# the method returns. Flask-RESTful has its own error handling that bypasses
+# Flask's @app.errorhandler decorator, so we use the got_request_exception
+# signal instead, which fires for all unhandled exceptions.
 #
 # We only record non-HTTP exceptions (actual errors), not expected HTTP
 # responses like 404 Not Found or 401 Unauthorized.
-@app.errorhandler(Exception)
-def handle_exception(e):
+def _record_exception(sender, exception, **extra):
     from werkzeug.exceptions import HTTPException
-    if isinstance(e, HTTPException):
-        # Let Flask handle HTTP exceptions normally
-        return e
+    if isinstance(exception, HTTPException):
+        return
     util_exceptions.record_exception(*sys.exc_info())
-    # Re-raise to let Flask/Flask-RESTful handle the response
-    raise e
+
+
+got_request_exception.connect(_record_exception, app)
 
 
 @app.before_request

@@ -16,7 +16,7 @@ class ShakenFistTestCase(testtools.TestCase):
         self.addCleanup(self.mock_add_event_multi.stop)
 
         # Mock exception recording to avoid filesystem access during tests
-        self.mock_record_exception = mock.patch(
+        self.mock_record_exception_patcher = mock.patch(
             'shakenfist.util.exceptions.record_exception')
-        self.mock_record_exception.start()
-        self.addCleanup(self.mock_record_exception.stop)
+        self.mock_record_exception = self.mock_record_exception_patcher.start()
+        self.addCleanup(self.mock_record_exception_patcher.stop)

@@ -14,7 +14,7 @@ class RecordExceptionTestCase(base.ShakenFistTestCase):
         super().setUp()
         # Stop the global mock of record_exception so we can test the real
         # function
-        self.mock_record_exception.stop()
+        self.mock_record_exception_patcher.stop()
 
         # Create a temporary directory for exception files
         self.temp_dir = tempfile.mkdtemp()
@@ -223,7 +223,7 @@ class IntegrationTestCase(base.ShakenFistTestCase):
         super().setUp()
         # Stop the global mock of record_exception so we can test the real
         # function
-        self.mock_record_exception.stop()
+        self.mock_record_exception_patcher.stop()
 
         self.temp_dir = tempfile.mkdtemp()
         self.exceptions_path = os.path.join(self.temp_dir, 'exceptions')

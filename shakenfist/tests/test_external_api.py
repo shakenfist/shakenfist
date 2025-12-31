@@ -682,3 +682,46 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.assertEqual(
             'multiple networks have the name "betsy" in namespace "two"',
             resp.get_json().get('error'))
+
+
+class ExternalApiExceptionRecordingTestCase(ExternalApiTestCase):
+    """Test that exceptions during JSON serialization are recorded."""
+
+    def test_json_serialization_error_recorded(self):
+        """Test that UUID serialization errors are caught by the signal handler.
+
+        Flask-RESTful has its own error handling that bypasses Flask's
+        @app.errorhandler decorator. We use the got_request_exception signal
+        to record exceptions that occur during JSON response serialization.
+        """
+        from uuid import UUID
+
+        self.mock_etcd.create_instance('barry')
+
+        # Mock external_view to return an unserializable UUID
+        def bad_external_view(namespace=None, **kwargs):
+            return {'uuid': UUID('12345678-1234-5678-1234-567812345678')}
+
+        # Disable testing/debug mode temporarily so exceptions don't propagate
+        # and we can verify the signal handler is called
+        external_api.app.testing = False
+        external_api.app.debug = False
+        external_api.app.config['PROPAGATE_EXCEPTIONS'] = False
+
+        try:
+            with mock.patch('shakenfist.instance.Instance.external_view',
+                            bad_external_view):
+                # Make request that will fail during JSON serialization
+                resp = self.client.get(
+                    '/instances/barry',
+                    headers={'Authorization': self.auth_token})
+
+                # The response should be a 500 error
+                self.assertEqual(500, resp.status_code)
+
+                # Verify that record_exception was called via the signal
+                # The mock is from base.ShakenFistTestCase
+                self.mock_record_exception.assert_called()
+        finally:
+            # Restore testing mode
+            external_api.app.testing = True
