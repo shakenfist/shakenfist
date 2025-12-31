@@ -46,7 +46,7 @@ class NoAllocatedFloatingAddress(NetIfaceOpException):
 
 
 class NetIfaceOp(BaseClusterOperation):
-    object_type = schema.object_type.name.lower()
+    object_type = schema.object_type
     initial_version = schema.initial_version
     current_version = schema.current_version
 
@@ -108,7 +108,7 @@ class NetIfaceOp(BaseClusterOperation):
 
     def _interface_float(self, n, ni):
         if n.is_dead():
-            raise InvalidStateForTask()
+            raise InvalidStateForTask(self)
 
         floating = ni.floating.get('floating_address')
         if not floating:

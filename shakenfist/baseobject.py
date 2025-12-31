@@ -6,6 +6,7 @@ from functools import partial
 from math import inf
 import re
 from typing import ClassVar
+from typing import Optional
 from typing import Union
 
 from etcd3gw.lock import Lock
@@ -70,7 +71,7 @@ def _maintain_version_cache(max_cache_age):
     for node_key, n in etcd.get_all('node', None):
         # node_key is the full etcd path, extract the node name (fqdn)
         node_name = node_key.split('/')[-1]
-        state = mariadb.get_state('node', node_name)
+        state = mariadb.get_state(ObjectType.NODE, node_name)
         if not state or state.value not in target_states:
             continue
         d = etcd.get('metrics', node_name, None)
@@ -127,9 +128,9 @@ def get_maximum_object_version(objname, max_cache_age=300):
 
 class DatabaseBackedObject:
     object_type: ClassVar[ObjectType] = ObjectType.UNKNOWN
-    initial_version = 1
-    current_version = None
-    upgrade_supported = True
+    initial_version: ClassVar[int] = 1
+    current_version: ClassVar[Optional[int]] = None
+    upgrade_supported: ClassVar[bool] = True
     state_targets = None
 
     STATE_INITIAL = 'initial'

@@ -34,7 +34,7 @@ class NoSuchTask(NodeBlobOpException):
 
 
 class ArtifactFetchOp(BaseClusterOperation):
-    object_type = schema.object_type.name.lower()
+    object_type = schema.object_type
     initial_version = schema.initial_version
     current_version = schema.current_version
 

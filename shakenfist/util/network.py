@@ -245,9 +245,10 @@ def discover_interfaces():
 
 
 def random_macaddr():
-    return '02:00:00:{:02x}:{:02x}:{:02x}'.format(random.randint(0, 255),
-                                                  random.randint(0, 255),
-                                                  random.randint(0, 255))
+    b1 = random.randint(0, 255)
+    b2 = random.randint(0, 255)
+    b3 = random.randint(0, 255)
+    return f'02:00:00:{b1:02x}:{b2:02x}:{b3:02x}'
 
 
 def add_address_to_interface(netns, address, netmask, device):
@@ -268,14 +269,10 @@ def add_address_to_interface(netns, address, netmask, device):
 
         try:
             concurrency.execute(
-                'ip addr add {address}/{netmask} dev {device}'.format(
-                    address=address,
-                    netmask=netmask,
-                    device=device
-                ),
+                f'ip addr add {address}/{netmask} dev {device}',
                 netns=netns)
             concurrency.execute(
-                'ip link set %s up' % device, netns=netns)
+                f'ip link set {device} up', netns=netns)
 
         except ProcessExecutionError as e:
             if e.stderr.rstrip() != 'RTNETLINK answers: File exists':

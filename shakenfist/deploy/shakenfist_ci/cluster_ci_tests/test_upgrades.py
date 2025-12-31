@@ -13,7 +13,7 @@ class TestUpgrades(base.BaseTestCase):
         networks_by_name = {}
         networks_by_uuid = {}
         for net in self.system_client.get_networks():
-            networks_by_name['{}/{}'.format(net['namespace'], net['name'])] = net
+            networks_by_name[f'{net["namespace"]}/{net["name"]}'] = net
             networks_by_uuid[net['uuid']] = net
 
         self.assertIn('upgrade/upgrade-fe', networks_by_name)
@@ -25,7 +25,7 @@ class TestUpgrades(base.BaseTestCase):
         # Collect instances and check
         instances = {}
         for inst in self.system_client.get_instances():
-            instances['{}/{}'.format(inst['namespace'], inst['name'])] = inst
+            instances[f'{inst["namespace"]}/{inst["name"]}'] = inst
 
         sys.stderr.write(
             'Discovered instances post upgrade: %s\n' % instances)

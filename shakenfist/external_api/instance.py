@@ -864,7 +864,7 @@ class InstancesEndpoint(api_base.Resource):
             inst.add_event(
                 EVENT_TYPE_AUDIT, 'delete request via delete all from REST API')
             inst.enqueue_delete()
-            waiting_for.append(inst.uuid)
+            waiting_for.append(str(inst.uuid))
 
         return waiting_for
 

@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import psutil
 from shakenfist_utilities import logs  # noreorder
@@ -41,7 +42,7 @@ class NoSuchInstance(NodeInstOpException):
 
 
 class NodeInstOp(BaseClusterOperation):
-    object_type = schema.object_type.name.lower()
+    object_type = schema.object_type
     initial_version = schema.initial_version
     current_version = schema.current_version
 
@@ -101,7 +102,7 @@ class NodeInstOp(BaseClusterOperation):
         with util_libvirt.LibvirtConnection() as lc:
             try:
                 # The basic structure
-                statistics = {
+                statistics: dict[str, Any] = {
                     'cpu usage': {},
                     'disk usage': {},
                     'network usage': {}

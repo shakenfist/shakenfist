@@ -146,7 +146,7 @@ class Monitor(daemon.Daemon):
         # Remove uploads which no longer exist in the database.
         uploads = []
         for u in upload.Uploads([]):
-            uploads.append(u.uuid)
+            uploads.append(str(u.uuid))
 
         upload_path = os.path.join(config.STORAGE_PATH, 'uploads')
         os.makedirs(upload_path, exist_ok=True)

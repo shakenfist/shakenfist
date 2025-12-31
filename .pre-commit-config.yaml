@@ -15,3 +15,57 @@ repos:
       - id: actionlint
         name: Lint GitHub Actions workflows
         description: Static checker for GitHub Actions workflow files
+
+  # Ansible linter for deployer playbooks
+  # Requires: pip install ansible-lint
+  #           ansible-galaxy install andrewrothstein.etcd-cluster
+  # Note: Uses 'local' repo because the upstream pre-commit hook has Python 3.13
+  # compatibility issues. This requires ansible-lint to be installed in PATH.
+  - repo: local
+    hooks:
+      - id: ansible-lint
+        name: Lint Ansible playbooks
+        description: Checks playbooks for practices and behavior that could be improved
+        entry: ansible-lint --config-file=shakenfist/deploy/ansible/.ansible-lint shakenfist/deploy/ansible/
+        language: system
+        files: ^shakenfist/deploy/ansible/
+        pass_filenames: false
+
+  # Flake8 style checking via tox
+  # Requires: pip install tox flake8
+  - repo: local
+    hooks:
+      - id: flake8
+        name: Style check with flake8
+        description: Run flake8 style checks on changes since HEAD~
+        entry: tox -e flake8
+        language: system
+        files: ^shakenfist/
+        pass_filenames: false
+        types: [python]
+
+  # Unit tests via tox
+  # Requires: pip install tox
+  - repo: local
+    hooks:
+      - id: py3
+        name: Run unit tests
+        description: Run Python 3 unit tests with stestr
+        entry: tox -e py3
+        language: system
+        files: ^shakenfist/
+        pass_filenames: false
+        types: [python]
+
+  # Type checking with mypy (incremental rollout via tox)
+  # Requires: pip install tox mypy
+  - repo: local
+    hooks:
+      - id: mypy
+        name: Type check with mypy
+        description: Run mypy type checking on selected files (incremental rollout)
+        entry: tox -e mypy
+        language: system
+        files: ^shakenfist/(schema/|mariadb\.py|daemons/database/|operations/)
+        pass_filenames: false
+        types: [python]

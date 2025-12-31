@@ -85,6 +85,16 @@ jobs:
           . /tmp/venv-test/bin/activate
           tox -emypy
 
+      - name: Lint Ansible playbooks
+        timeout-minutes: 5
+        run: |
+          . /tmp/venv-test/bin/activate
+          uv pip install ansible-lint
+          # Install external role dependency required by deploy.yml
+          ansible-galaxy install andrewrothstein.etcd-cluster
+          ansible-lint --config-file shakenfist/deploy/ansible/.ansible-lint \
+              shakenfist/deploy/ansible/
+
       - name: Attempt to install requirements
         timeout-minutes: 5
         run: |
@@ -672,6 +682,8 @@ jobs:
     name: "${{ matrix.merge.name }}"
     if: github.event_name == 'merge_group'
     needs: merge_pr_comment
+    outputs:
+      exceptions_found: ${{ toJSON(steps.set_exceptions_output.outputs) }}
     strategy:
       fail-fast: false
       matrix:
@@ -926,12 +938,41 @@ jobs:
           echo "GITHUB_OUTPUT is:"
           cat ${GITHUB_OUTPUT}
 
+      - name: Check for exceptions on disk
+        id: check_exceptions
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+
+          script="sudo mkdir /srv/shakenfist/exceptions;"
+          script="${script} sudo find /srv/shakenfist/exceptions -type f -ls;"
+          tools/run_remote ${primary} "${script}"
+          echo
+
+          # Check if any exception files exist and set output
+          EXCEPTION_COUNT=$(ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.merge.base_image_user }}@${primary} \
+              "sudo find /srv/shakenfist/exceptions -type f 2>/dev/null | wc -l")
+          echo "Exception files found: ${EXCEPTION_COUNT}"
+          if [ "${EXCEPTION_COUNT}" -gt 0 ]; then
+            echo "exceptions_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "exceptions_found=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check logs
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.merge.job_name }}"
+
+      - name: Set exceptions output for matrix aggregation
+        id: set_exceptions_output
+        if: always()
+        run: |
+          echo "${{ matrix.merge.job_name }}=${{ steps.check_exceptions.outputs.exceptions_found }}" >> $GITHUB_OUTPUT
 
       - name: Check SF process CPU usage
         if: always()
@@ -1037,6 +1078,152 @@ jobs:
       # - uses: andymckay/cancel-action@0.5
       #   if: failure()
       #   name: Cancel entire workflow on failure
+
+  # Display the most common exception found in merge queue tests.
+  # This job does NOT attempt to fix the exception - it only displays it for
+  # visibility. Fixes should be made in the PR stage, not the merge queue.
+  display_merge_exceptions:
+    name: "Display merge exceptions"
+    runs-on: [self-hosted, vm, debian-12]
+    needs: [functional_matrix_merge]
+    if: >-
+      ${{ !cancelled() &&
+          contains(needs.functional_matrix_merge.outputs.exceptions_found, 'true') }}
+    steps:
+      - name: List failed jobs from matrix
+        id: failed_jobs
+        run: |
+          # Parse the JSON output to find which matrix jobs had exceptions
+          # The output is like: {"debian-12-slim-primary": "true", "other": "false"}
+          EXCEPTIONS_OUTPUT='${{ needs.functional_matrix_merge.outputs.exceptions_found }}'
+          echo "Raw exceptions_found output: $EXCEPTIONS_OUTPUT"
+
+          FAILED_JOBS=$(echo "$EXCEPTIONS_OUTPUT" | jq -r 'to_entries | .[] | select(.value == "true") | .key' | tr '\n' ' ')
+          echo "Matrix jobs with exceptions: $FAILED_JOBS"
+          echo "failed_jobs=$FAILED_JOBS" >> $GITHUB_OUTPUT
+
+      - name: Download bundles for failed jobs
+        env:
+          FAILED_JOBS: ${{ steps.failed_jobs.outputs.failed_jobs }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir bundles
+          for job in ${FAILED_JOBS}; do
+            echo "Downloading bundle for failed job: ${job}"
+            gh run download ${{ github.run_id }} \
+              --name "bundle-functional-cluster-${job}" \
+              --dir "bundles/${job}"
+          done
+
+          echo
+          echo "Downloaded bundles:"
+          ls -lh bundles
+
+      - name: Extract and display most common exception
+        run: |
+          echo "========================================"
+          echo "Extracting exceptions from bundles..."
+          echo "========================================"
+          echo
+
+          # Create working directory for exceptions
+          mkdir -p exceptions
+
+          for job_dir in bundles/*/; do
+            job_name=$(basename "$job_dir")
+            echo "Processing bundle for job: $job_name"
+
+            if [ -f "${job_dir}/bundle.zip" ]; then
+              unzip -q "${job_dir}/bundle.zip" -d "${job_dir}"
+
+              # Copy exception files from srv/shakenfist/exceptions if they exist
+              # The bundle structure is: bundle/<node_name>/srv/shakenfist/exceptions/
+              for node_dir in "${job_dir}"/bundle/*/; do
+                exc_dir="${node_dir}srv/shakenfist/exceptions"
+                if [ -d "$exc_dir" ]; then
+                  node_name=$(basename "$node_dir")
+                  echo "  Found exceptions in node: $node_name"
+                  # Copy files - same traceback hash from different nodes will
+                  # have same filename, we'll aggregate counts later
+                  for f in "$exc_dir"/*.json; do
+                    if [ -f "$f" ]; then
+                      base=$(basename "$f")
+                      # If file already exists, we need to merge counts
+                      if [ -f "exceptions/${base}" ]; then
+                        # Merge events arrays and update count
+                        jq -s '.[0] * {count: (.[0].count + .[1].count), events: (.[0].events + .[1].events)}' \
+                            "exceptions/${base}" "$f" > "exceptions/${base}.tmp"
+                        mv "exceptions/${base}.tmp" "exceptions/${base}"
+                      else
+                        cp "$f" "exceptions/${base}"
+                      fi
+                    fi
+                  done
+                fi
+              done
+            else
+              echo "  Warning: No bundle.zip found in ${job_dir}"
+            fi
+          done
+
+          echo
+          exception_count=$(find exceptions -name "*.json" 2>/dev/null | wc -l)
+          echo "Unique tracebacks found: ${exception_count}"
+
+          if [ "${exception_count}" -eq 0 ]; then
+            echo "No exception files found in bundles (unexpected)"
+            exit 0
+          fi
+
+          echo
+          echo "========================================"
+          echo "Exception frequency (by traceback hash):"
+          echo "========================================"
+          for f in exceptions/*.json; do
+            if [ -f "$f" ]; then
+              hash=$(basename "$f" .json)
+              count=$(jq -r '.count' "$f")
+              echo "  ${hash}: ${count} occurrences"
+            fi
+          done | sort -t: -k2 -rn | head -10
+
+          echo
+
+          # Find the file with the highest count
+          most_frequent_file=""
+          highest_count=0
+
+          for f in exceptions/*.json; do
+            if [ -f "$f" ]; then
+              count=$(jq -r '.count' "$f")
+              if [ "${count}" -gt "${highest_count}" ]; then
+                highest_count="${count}"
+                most_frequent_file="$f"
+              fi
+            fi
+          done
+
+          if [ -z "${most_frequent_file}" ]; then
+            echo "Error: Could not determine most frequent exception"
+            exit 1
+          fi
+
+          traceback_hash=$(basename "${most_frequent_file}" .json)
+
+          echo "========================================"
+          echo "MOST COMMON EXCEPTION"
+          echo "========================================"
+          echo
+          echo "Traceback hash: ${traceback_hash}"
+          echo "Occurrences: ${highest_count}"
+          echo
+          echo "Traceback:"
+          echo "----------------------------------------"
+          jq -r '.traceback' "${most_frequent_file}"
+          echo "----------------------------------------"
+          echo
+          echo "NOTE: This exception was detected during merge queue testing."
+          echo "      Fixes should be applied via a new PR, not in the merge queue."
 
   ansible_modules:
     name: "Ansible modules"

@@ -13,10 +13,12 @@
 #     --debug run
 import base64
 import json
+import sys
 
 import flasgger
 import flask
 import flask_restful
+from flask import got_request_exception
 from flask_jwt_extended import JWTManager
 from flask_request_id import RequestID
 from shakenfist_utilities import logs  # noreorder
@@ -40,6 +42,7 @@ from shakenfist.external_api import node as api_node
 from shakenfist.external_api import snapshot as api_snapshot
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import upload as api_upload
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -68,6 +71,25 @@ swagger = flasgger.Swagger(app, template={
 
 # Use our handler to get SF log format (instead of gunicorn's handlers)
 app.logger.handlers = [HANDLER]
+
+
+# Record exceptions that occur during request handling. The method decorators
+# in base.Resource catch exceptions raised during method execution, but
+# exceptions during Flask-RESTful's JSON response serialization happen after
+# the method returns. Flask-RESTful has its own error handling that bypasses
+# Flask's @app.errorhandler decorator, so we use the got_request_exception
+# signal instead, which fires for all unhandled exceptions.
+#
+# We only record non-HTTP exceptions (actual errors), not expected HTTP
+# responses like 404 Not Found or 401 Unauthorized.
+def _record_exception(sender, exception, **extra):
+    from werkzeug.exceptions import HTTPException
+    if isinstance(exception, HTTPException):
+        return
+    util_exceptions.record_exception(*sys.exc_info())
+
+
+got_request_exception.connect(_record_exception, app)
 
 
 @app.before_request
