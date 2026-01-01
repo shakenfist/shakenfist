@@ -35,6 +35,7 @@ from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
 
@@ -747,10 +748,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetUploadReply(
                 found=True,
                 upload=database_pb2.UploadData(
-                    uuid=data['uuid'],
-                    node=data['node'],
-                    created_at=data['created_at'],
-                    version=data['version']
+                    uuid=str(data.uuid),
+                    node=data.node,
+                    created_at=data.created_at,
+                    version=data.version
                 )
             )
         except Exception as e:
@@ -773,10 +774,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             uploads_data = mariadb._direct_get_uploads(node, created_before)
             uploads = [
                 database_pb2.UploadData(
-                    uuid=u['uuid'],
-                    node=u['node'],
-                    created_at=u['created_at'],
-                    version=u['version']
+                    uuid=str(u.uuid),
+                    node=u.node,
+                    created_at=u.created_at,
+                    version=u.version
                 )
                 for u in uploads_data
             ]
@@ -797,6 +798,26 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database DeleteUpload failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def UpdateUpload(
+        self,
+        request: database_pb2.UpdateUploadRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update an upload record in MariaDB."""
+        try:
+            self.monitor.counters['update_upload'].inc()
+            data = UploadData(
+                uuid=UUID(request.upload.uuid),
+                node=request.upload.node,
+                created_at=request.upload.created_at,
+                version=request.upload.version
+            )
+            success = mariadb._direct_update_upload(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database UpdateUpload failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
 
@@ -827,7 +848,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             'delete_reservations_for_ipam', 'release_haloed_addresses',
             'get_addresses_in_use',
             # MariaDB upload operations
-            'create_upload', 'get_upload', 'get_uploads', 'delete_upload'
+            'create_upload', 'get_upload', 'get_uploads', 'delete_upload',
+            'update_upload'
         ]
         for op in operations:
             self.counters[op] = Counter(

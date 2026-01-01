@@ -39,6 +39,8 @@ from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
+from shakenfist.schema.upload import UploadData
 
 
 LOG, _ = logs.setup(__name__)
@@ -481,24 +483,19 @@ def _get_uploads_table() -> sa.Table:
     objects used during artifact creation - they receive streamed data before
     being converted to artifacts.
 
-    The uuid is the primary key since each upload is unique. We index on node
-    for efficient routing of upload requests to the node holding the data,
-    and on created_at for cleanup of old/stale uploads.
+    The table schema is generated from the UploadData Pydantic model in
+    schema/upload.py. The uuid is the primary key, with indexes on node
+    (for routing) and created_at (for cleanup).
     """
     global _uploads_table
     if _uploads_table is None:
         metadata = _get_metadata()
-        _uploads_table = sa.Table(
+        _uploads_table = pydantic_to_sqlalchemy_table(
+            UploadData,
             'uploads',
             metadata,
-            sa.Column('uuid', sa.Uuid(), primary_key=True),
-            sa.Column('node', sa.String(255), nullable=False),
-            sa.Column('created_at', sa.Double(), nullable=False),
-            sa.Column('version', sa.Integer(), nullable=False),
-            # Index for efficient queries by node
-            sa.Index('idx_uploads_node', 'node'),
-            # Index for finding old uploads for cleanup
-            sa.Index('idx_uploads_created_at', 'created_at'),
+            primary_key_field='uuid',
+            include_id_column=False
         )
     return _uploads_table
 
@@ -1510,14 +1507,14 @@ def _direct_create_upload(upload_uuid: UUID, node: str, created_at: float,
         return False
 
 
-def _direct_get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
+def _direct_get_upload(upload_uuid: UUID) -> Optional[UploadData]:
     """Get upload static values from MariaDB.
 
     Args:
         upload_uuid: The UUID of the upload.
 
     Returns:
-        A dict with uuid, node, created_at, and version, or None if not found.
+        An UploadData object, or None if not found.
     """
     engine = _get_engine()
     table = _get_uploads_table()
@@ -1530,12 +1527,12 @@ def _direct_get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
             if result is None:
                 return None
 
-            return {
-                'uuid': str(result.uuid),
-                'node': result.node,
-                'created_at': result.created_at,
-                'version': result.version
-            }
+            return UploadData(
+                uuid=result.uuid,
+                node=result.node,
+                created_at=result.created_at,
+                version=result.version
+            )
     except OperationalError as e:
         LOG.warning(f'MariaDB get failed for upload {upload_uuid}: {e}')
         return None
@@ -1544,7 +1541,7 @@ def _direct_get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
 def _direct_get_uploads(
     node: Optional[str] = None,
     created_before: Optional[float] = None
-) -> list[dict[str, Any]]:
+) -> list[UploadData]:
     """Get uploads from MariaDB with optional filters.
 
     Args:
@@ -1553,7 +1550,7 @@ def _direct_get_uploads(
             Unix timestamp.
 
     Returns:
-        List of dicts with uuid, node, created_at, and version for each upload.
+        List of UploadData objects.
     """
     engine = _get_engine()
     table = _get_uploads_table()
@@ -1571,12 +1568,12 @@ def _direct_get_uploads(
             result = conn.execute(stmt).fetchall()
 
             return [
-                {
-                    'uuid': str(row.uuid),
-                    'node': row.node,
-                    'created_at': row.created_at,
-                    'version': row.version
-                }
+                UploadData(
+                    uuid=row.uuid,
+                    node=row.node,
+                    created_at=row.created_at,
+                    version=row.version
+                )
                 for row in result
             ]
     except OperationalError as e:
@@ -1607,6 +1604,37 @@ def _direct_delete_upload(upload_uuid: UUID) -> bool:
         return False
 
 
+def _direct_update_upload(data: UploadData) -> bool:
+    """Update an upload record in MariaDB.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The UploadData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_uploads_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                node=data.node,
+                created_at=data.created_at,
+                version=data.version
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB update failed for upload {data.uuid}: {e}')
+        return False
+
+
 # =============================================================================
 # Upload gRPC Client Functions
 # These call the database microservice for upload operations.
@@ -1632,7 +1660,7 @@ def _grpc_create_upload(upload_uuid: UUID, node: str, created_at: float,
         return False
 
 
-def _grpc_get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
+def _grpc_get_upload(upload_uuid: UUID) -> Optional[UploadData]:
     """Get upload static values via the database microservice."""
     try:
         stub = _get_database_stub()
@@ -1640,12 +1668,12 @@ def _grpc_get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
         reply = stub.GetUpload(request)
         if not reply.found:
             return None
-        return {
-            'uuid': reply.upload.uuid,
-            'node': reply.upload.node,
-            'created_at': reply.upload.created_at,
-            'version': reply.upload.version
-        }
+        return UploadData(
+            uuid=reply.upload.uuid,
+            node=reply.upload.node,
+            created_at=reply.upload.created_at,
+            version=reply.upload.version
+        )
     except grpc.RpcError as e:
         LOG.warning(f'gRPC GetUpload failed for {upload_uuid}: {e}')
         return None
@@ -1654,7 +1682,7 @@ def _grpc_get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
 def _grpc_get_uploads(
     node: Optional[str] = None,
     created_before: Optional[float] = None
-) -> list[dict[str, Any]]:
+) -> list[UploadData]:
     """Get uploads via the database microservice with optional filters."""
     try:
         stub = _get_database_stub()
@@ -1664,16 +1692,16 @@ def _grpc_get_uploads(
         )
         reply = stub.GetUploads(request)
         return [
-            {
-                'uuid': u.uuid,
-                'node': u.node,
-                'created_at': u.created_at,
-                'version': u.version
-            }
+            UploadData(
+                uuid=u.uuid,
+                node=u.node,
+                created_at=u.created_at,
+                version=u.version
+            )
             for u in reply.uploads
         ]
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetAllUploads failed: {e}')
+        LOG.warning(f'gRPC GetUploads failed: {e}')
         return []
 
 
@@ -1686,6 +1714,25 @@ def _grpc_delete_upload(upload_uuid: UUID) -> bool:
         return bool(reply.success)
     except grpc.RpcError as e:
         LOG.warning(f'gRPC DeleteUpload failed for {upload_uuid}: {e}')
+        return False
+
+
+def _grpc_update_upload(data: UploadData) -> bool:
+    """Update an upload record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateUploadRequest(
+            upload=database_pb2.UploadData(
+                uuid=str(data.uuid),
+                node=data.node,
+                created_at=data.created_at,
+                version=data.version
+            )
+        )
+        reply = stub.UpdateUpload(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC UpdateUpload failed for {data.uuid}: {e}')
         return False
 
 
@@ -1712,14 +1759,14 @@ def create_upload(upload_uuid: UUID, node: str, created_at: float,
     return _direct_create_upload(upload_uuid, node, created_at, version)
 
 
-def get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
+def get_upload(upload_uuid: UUID) -> Optional[UploadData]:
     """Get upload static values.
 
     Args:
         upload_uuid: The UUID of the upload.
 
     Returns:
-        A dict with uuid, node, created_at, and version, or None if not found.
+        An UploadData object, or None if not found.
     """
     if _use_database_service():
         return _grpc_get_upload(upload_uuid)
@@ -1729,7 +1776,7 @@ def get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
 def get_uploads(
     node: Optional[str] = None,
     created_before: Optional[float] = None
-) -> list[dict[str, Any]]:
+) -> list[UploadData]:
     """Get uploads with optional filters.
 
     Args:
@@ -1738,7 +1785,7 @@ def get_uploads(
             Unix timestamp.
 
     Returns:
-        List of dicts with uuid, node, created_at, and version for each upload.
+        List of UploadData objects.
     """
     if _use_database_service():
         return _grpc_get_uploads(node, created_before)
@@ -1757,3 +1804,19 @@ def delete_upload(upload_uuid: UUID) -> bool:
     if _use_database_service():
         return _grpc_delete_upload(upload_uuid)
     return _direct_delete_upload(upload_uuid)
+
+
+def update_upload(data: UploadData) -> bool:
+    """Update an upload record.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The UploadData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_upload(data)
+    return _direct_update_upload(data)

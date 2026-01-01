@@ -52,6 +52,7 @@ service DatabaseService {
   rpc GetUpload (GetUploadRequest) returns (GetUploadReply) {}
   rpc GetUploads (GetUploadsRequest) returns (GetUploadsReply) {}
   rpc DeleteUpload (DeleteUploadRequest) returns (StatusReply) {}
+  rpc UpdateUpload (UpdateUploadRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -369,4 +370,8 @@ message GetUploadsReply {
 
 message DeleteUploadRequest {
   string uuid = 1;
+}
+
+message UpdateUploadRequest {
+  UploadData upload = 1;
 }

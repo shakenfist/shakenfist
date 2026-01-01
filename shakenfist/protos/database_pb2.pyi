@@ -1148,3 +1148,20 @@ class DeleteUploadRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
 
 global___DeleteUploadRequest = DeleteUploadRequest
+
+@typing.final
+class UpdateUploadRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UPLOAD_FIELD_NUMBER: builtins.int
+    @property
+    def upload(self) -> global___UploadData: ...
+    def __init__(
+        self,
+        *,
+        upload: global___UploadData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["upload", b"upload"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["upload", b"upload"]) -> None: ...
+
+global___UpdateUploadRequest = UpdateUploadRequest

@@ -196,6 +196,11 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    UpdateUpload: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateUploadRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -371,6 +376,11 @@ class DatabaseServiceAsyncStub:
 
     DeleteUpload: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteUploadRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateUpload: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateUploadRequest,
         database_pb2.StatusReply,
     ]
 
@@ -617,6 +627,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def DeleteUpload(
         self,
         request: database_pb2.DeleteUploadRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateUpload(
+        self,
+        request: database_pb2.UpdateUploadRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

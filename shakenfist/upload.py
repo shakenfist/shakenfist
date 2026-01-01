@@ -14,6 +14,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import eventlog
 from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.upload import UploadData
 
 
 LOG, _ = logs.setup(__name__)
@@ -33,15 +34,13 @@ class Upload(dbo):
 
     ACTIVE_STATES = {dbo.STATE_CREATED}
 
-    def __init__(self, static_values: dict[str, Any]) -> None:
-        self.upgrade(static_values)
+    def __init__(self, data: UploadData) -> None:
+        # Apply lazy upgrades to the immutable Pydantic model if needed
+        data = self.upgrade_pydantic_data(data, UploadData)
 
-        super().__init__(
-            static_values.get('uuid'),  # type: ignore[arg-type]
-            static_values.get('version')
-        )
-        self.__node: str = static_values['node']
-        self.__created_at: float = static_values['created_at']
+        super().__init__(data.uuid, data.version)
+        self.__node: str = data.node
+        self.__created_at: float = data.created_at
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values: dict[str, Any]) -> None:
@@ -59,6 +58,12 @@ class Upload(dbo):
         ...
 
     @classmethod
+    def _persist_pydantic_upgrade(  # type: ignore[override]
+            cls, data: UploadData) -> None:
+        """Persist an upgraded UploadData to MariaDB."""
+        mariadb.update_upload(data)
+
+    @classmethod
     def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
         """Create an upload record in MariaDB instead of etcd."""
         mariadb.create_upload(
@@ -71,13 +76,13 @@ class Upload(dbo):
                            'db record created', extra=metadata)
 
     @classmethod
-    def _db_get(cls, object_uuid: str) -> dict[str, Any] | None:
+    def _db_get(cls, object_uuid: str) -> UploadData | None:
         """Get upload static values from MariaDB instead of etcd."""
         data = mariadb.get_upload(uuid.UUID(object_uuid))
         if not data:
             return None
 
-        if data.get('version', 0) != cls.current_version:
+        if data.version != cls.current_version:
             if not cls.upgrade_supported:
                 from shakenfist import exceptions
                 raise exceptions.BadObjectVersion(
@@ -86,15 +91,23 @@ class Upload(dbo):
 
     @classmethod
     def new(cls, upload_uuid: str, node: str) -> Upload:
-        static_values: dict[str, Any] = {
+        created_at = time.time()
+        metadata: dict[str, Any] = {
             'uuid': upload_uuid,
             'node': node,
-            'created_at': time.time(),
-
+            'created_at': created_at,
             'version': cls.current_version
         }
-        Upload._db_create(upload_uuid, static_values)
-        u = Upload(static_values)
+        Upload._db_create(upload_uuid, metadata)
+
+        # Create UploadData for the new object
+        data = UploadData(
+            uuid=upload_uuid,  # type: ignore[arg-type]
+            node=node,
+            created_at=created_at,
+            version=cls.current_version
+        )
+        u = Upload(data)
         u.state = Upload.STATE_CREATED  # type: ignore[misc]
         return u
 
@@ -125,7 +138,7 @@ def remove_stale_uploads_for_this_node() -> None:
     """
     # Get all upload UUIDs that should be on this node from the database
     uploads_on_this_node: set[str] = {
-        u['uuid'] for u in mariadb.get_uploads(node=config.NODE_NAME)
+        str(u.uuid) for u in mariadb.get_uploads(node=config.NODE_NAME)
     }
 
     upload_path = os.path.join(config.STORAGE_PATH, 'uploads')

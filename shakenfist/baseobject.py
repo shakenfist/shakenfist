@@ -5,9 +5,13 @@ from collections import defaultdict
 from functools import partial
 from math import inf
 import re
+from typing import Any
 from typing import ClassVar
 from typing import Optional
+from typing import TypeVar
 from typing import Union
+
+from pydantic import BaseModel
 
 from etcd3gw.lock import Lock
 from shakenfist_utilities import logs  # noreorder
@@ -28,6 +32,9 @@ from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
+
+# Type variable for Pydantic data models used by MariaDB-backed objects
+DataT = TypeVar('DataT', bound=BaseModel)
 
 
 class NoopLock(Lock):
@@ -213,6 +220,100 @@ class DatabaseBackedObject:
                 else:
                     upgrade_log.info(
                         'Not committing online upgrade, as not all nodes are updated')
+
+    @classmethod
+    def upgrade_pydantic_data(cls, data: DataT, data_class: type[DataT]) -> DataT:
+        """Apply version upgrades to a Pydantic data model from MariaDB.
+
+        This method handles lazy upgrades for objects stored in MariaDB using
+        immutable Pydantic models. Unlike the etcd upgrade() method which mutates
+        a dict in place, this method works with immutable Pydantic models by:
+
+        1. Converting the model to a mutable dict
+        2. Applying upgrade steps sequentially (each step mutates the dict)
+        3. Creating a new Pydantic model with the upgraded values
+        4. Persisting the upgrade if the cluster is ready
+
+        Upgrade steps are defined as class methods named:
+            _upgrade_step_N_to_M(cls, values: dict[str, Any]) -> None
+
+        Each step receives a mutable dict and modifies it in place. The step
+        should NOT update the 'version' key - that is done automatically.
+
+        Persistence: When the cluster minimum version equals the current version,
+        the upgraded data is persisted to MariaDB via _persist_pydantic_upgrade().
+        Subclasses must override _persist_pydantic_upgrade() to enable this.
+
+        Args:
+            data: The Pydantic model instance to upgrade.
+            data_class: The Pydantic model class to construct the result.
+
+        Returns:
+            A new Pydantic model instance with upgraded values, or the original
+            if no upgrade was needed.
+
+        Raises:
+            UpgradeException: If an upgrade step is missing.
+        """
+        # Check if upgrade is needed
+        current_version = getattr(data, 'version', cls.initial_version)
+        if current_version == cls.current_version:
+            return data
+
+        # Convert immutable Pydantic model to mutable dict for upgrade steps
+        values: dict[str, Any] = data.model_dump()
+
+        # Track starting version for logging
+        starting_version = values.get('version', cls.initial_version)
+        if 'version' not in values:
+            values['version'] = cls.initial_version
+
+        # Apply upgrade steps sequentially
+        while values['version'] != cls.current_version:
+            step_name = '_upgrade_step_%d_to_%d' % (
+                values['version'], values['version'] + 1)
+            step_func = getattr(cls, step_name, None)
+            if step_func is None:
+                raise exceptions.UpgradeException(
+                    'Upgrade step %s is missing for object %s'
+                    % (step_name, cls.object_type))
+            step_func(values)
+            values['version'] += 1
+
+        # Create the upgraded Pydantic model
+        upgraded_data = data_class(**values)
+
+        # Persist the upgrade if the cluster is ready (all nodes at current version)
+        cluster_minimum = get_minimum_object_version(cls.object_type)
+        upgrade_log = LOG.with_fields({
+            cls.object_type: values.get('uuid'),
+            'start_version': starting_version,
+            'final_version': values['version'],
+            'current_version': cls.current_version,
+            'cluster_minimum_version': cluster_minimum
+        })
+
+        if cluster_minimum == cls.current_version:
+            cls._persist_pydantic_upgrade(upgraded_data)
+            upgrade_log.debug('Online upgrade committed to MariaDB')
+        else:
+            upgrade_log.info(
+                'Not committing online upgrade, as not all nodes are updated')
+
+        return upgraded_data
+
+    @classmethod
+    def _persist_pydantic_upgrade(cls, _data: DataT) -> None:
+        """Persist an upgraded Pydantic model to MariaDB.
+
+        Subclasses that use upgrade_pydantic_data() must override this method
+        to persist their upgraded data to MariaDB.
+
+        Args:
+            _data: The upgraded Pydantic model to persist.
+        """
+        # Default implementation does nothing. Subclasses override this.
+        pass
 
     @property
     def uuid(self) -> uuid.UUID:
