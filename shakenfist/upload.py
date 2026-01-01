@@ -15,6 +15,7 @@ from shakenfist import eventlog
 from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.upload import UploadData
+from shakenfist.util import callstack as util_callstack
 
 
 LOG, _ = logs.setup(__name__)
@@ -88,6 +89,30 @@ class Upload(dbo):
                 raise exceptions.BadObjectVersion(
                     f'Unsupported object version - {cls.object_type}: {data}')
         return data
+
+    @classmethod
+    def from_db(cls, object_uuid: str,
+                suppress_failure_audit: bool = False) -> 'Upload | None':
+        """Load an Upload from the database.
+
+        Override the base class from_db because _db_get returns a Pydantic
+        UploadData model, not a dictionary. The base class from_db uses
+        dict methods (get, in) that don't work with Pydantic models.
+        """
+        if not object_uuid:
+            return None
+
+        data = cls._db_get(object_uuid)
+        if not data:
+            if not suppress_failure_audit:
+                eventlog.add_event(
+                    EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
+                    'attempt to lookup non-existent object',
+                    extra={'caller': util_callstack.get_caller(offset=-3)},
+                    log_as_error=True)
+            return None
+
+        return cls(data)
 
     @classmethod
     def new(cls, upload_uuid: str, node: str) -> Upload:
