@@ -212,7 +212,7 @@ class Monitor(daemon.Daemon):
             if time.time() - last_stale_upload_check > 300:
                 with util_general.RecordedOperation('remove stale uploads', n,
                                                     threshold=1):
-                    self._remove_stale_uploads()
+                    upload.remove_stale_uploads_for_this_node()
                     last_stale_upload_check = time.time()
 
             # Perform etcd maintenance, if we are an etcd master
