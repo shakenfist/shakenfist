@@ -509,3 +509,195 @@ During rolling upgrades where nodes may run different versions:
 - Keep JSON/LONGTEXT fields for data that doesn't need indexing
 - Use MariaDB for data requiring complex queries; etcd for simple key-value
   lookups
+
+## etcd to MariaDB Migration Strategy
+
+Shaken Fist is progressively migrating data from etcd to MariaDB. This section
+documents the overall strategy and table architecture for developers and
+operators.
+
+### Why Migrate?
+
+etcd is excellent for distributed coordination but has limitations for object
+storage:
+
+- **Scan performance**: etcd is optimized for key lookups, not range scans
+- **Query flexibility**: No support for filtering, sorting, or aggregation
+- **Storage efficiency**: JSON serialization is less efficient than native types
+- **Index support**: No secondary indexes for efficient lookups by attribute
+
+MariaDB addresses these limitations while maintaining the distributed nature
+of the cluster through Galera replication.
+
+### Migration Phases
+
+The migration is happening in phases:
+
+| Phase | Data | Status |
+|-------|------|--------|
+| 1 | Object state | Complete - `object_states` table |
+| 2 | IPAM reservations | Complete - `ipam_reservations` table |
+| 3 | Upload objects | Complete - `uploads` table |
+| 4 | DnsMasq objects | Planned |
+| 5 | Other object types | Future |
+| 6 | Object attributes | Future |
+
+### Table Architecture
+
+The MariaDB schema uses different table patterns depending on the data
+characteristics:
+
+#### Shared Tables (DatabaseBackedObject level)
+
+Data that has the same schema across all object types is stored in shared
+tables with `(object_type, object_uuid)` keys:
+
+| Table | Purpose |
+|-------|---------|
+| `object_states` | State value, update time, message for all objects |
+
+These tables are efficient for cross-type queries (e.g., "find all objects
+in error state").
+
+#### High-Churn Dedicated Tables
+
+Some data has high write frequency or requires atomic operations with database
+constraints. These get dedicated tables optimized for their access patterns:
+
+| Table | Purpose |
+|-------|---------|
+| `ipam_reservations` | IP address allocations with uniqueness constraints |
+
+IPAM reservations are stored separately because:
+
+- **Atomic allocation**: Database uniqueness constraints prevent race conditions
+- **High churn**: Addresses are frequently reserved and released
+- **Cross-object queries**: Need to find all addresses for an IPAM, not just
+  one object
+
+#### Per-Type Static Value Tables
+
+Each concrete object type that is migrated gets its own table for static
+values (immutable data set at creation time):
+
+| Table | Object Type | Fields |
+|-------|-------------|--------|
+| `uploads` | Upload | uuid, node, created_at, version |
+| `dnsmasq` | DnsMasq | uuid, namespace, owner_type, owner_uuid, provide_dhcp, provide_dns, version |
+
+These tables use the object's UUID as the primary key.
+
+#### Per-Type Attribute Tables (Future)
+
+Mutable attributes that are specific to an object type will be stored in
+dedicated attribute tables:
+
+```sql
+-- Example: instance_attributes (future)
+CREATE TABLE instance_attributes (
+    instance_uuid UUID PRIMARY KEY,
+    kvm_pid INT,
+    power_state VARCHAR(32),
+    power_state_previous VARCHAR(32),
+    console_port INT,
+    vdi_port INT,
+    -- Complex structures as JSON
+    placement JSON,
+    block_devices JSON,
+    interfaces JSON
+);
+```
+
+This approach:
+
+- **Avoids wide generic tables**: Each type has exactly the columns it needs
+- **Enables proper typing**: Native SQL types instead of JSON everywhere
+- **Supports efficient indexes**: Can index frequently-queried columns
+- **Keeps queries simple**: No joins needed for common operations
+
+### Abstract Base Classes
+
+Abstract base classes like `DatabaseBackedObject` and `ManagedExecutable` do
+not get their own tables. Only concrete classes that are actually instantiated
+have tables. For example:
+
+- `ManagedExecutable` (abstract) - no table
+- `DnsMasq` (concrete, inherits ManagedExecutable) - gets `dnsmasq` table
+
+### Pydantic Models as Schema Source
+
+Each table is defined by a Pydantic model that serves as the single source of
+truth:
+
+```python
+from typing import Annotated
+from pydantic import BaseModel, ConfigDict, UUID4
+from shakenfist.schema.sqlalchemy import SQLIndex, SQLNativeUUID
+
+class DnsMasqData(BaseModel):
+    """Schema for DnsMasq static values in MariaDB."""
+    model_config = ConfigDict(frozen=True)
+
+    uuid: Annotated[UUID4, SQLNativeUUID()]
+    namespace: Annotated[str, SQLIndex()]
+    owner_type: Annotated[str, SQLIndex()]
+    owner_uuid: Annotated[str, SQLIndex()]
+    version: int
+    provide_dhcp: bool
+    provide_dns: bool
+```
+
+The table is then generated from this model:
+
+```python
+from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
+
+table = pydantic_to_sqlalchemy_table(
+    DnsMasqData, 'dnsmasq', metadata,
+    primary_key_field='uuid', include_id_column=False
+)
+```
+
+### Adding New Attributes
+
+When adding a new attribute to an object type:
+
+**For shared attributes (DatabaseBackedObject level):**
+
+1. Consider if it belongs in an existing shared table (like `object_states`)
+2. If it's a new shared concept, create a new shared table
+
+**For type-specific attributes:**
+
+1. Add the field to the Pydantic model
+2. `ALTER TABLE` to add the column (with default if needed)
+3. Bump the object's version number
+4. Add an upgrade step (can be no-op if column has a DB default)
+
+### Object Version Upgrades
+
+Objects have version numbers that track schema changes. When an object is
+read from the database with an older version:
+
+1. **Lazy upgrade**: The `upgrade_pydantic_data()` method applies upgrade steps
+2. **Persistence**: If the cluster minimum version equals current version, the
+   upgraded data is written back to MariaDB
+3. **Background migration**: A future background worker will upgrade objects
+   that are never read
+
+This allows rolling upgrades without requiring all objects to be migrated
+immediately.
+
+### Migration Commands
+
+Each migration has a corresponding `sf-ctl` command:
+
+```bash
+# Preview what would be migrated
+sf-ctl migrate-{type}-to-mariadb --dry-run
+
+# Perform the migration
+sf-ctl migrate-{type}-to-mariadb
+```
+
+Migrations are idempotent - running them multiple times is safe.
