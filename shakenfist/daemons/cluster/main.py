@@ -34,7 +34,7 @@ from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_all_node_queues
-from shakenfist.upload import Uploads
+from shakenfist.upload import remove_abandoned_uploads
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
@@ -174,13 +174,7 @@ class Monitor(daemon.Daemon):
                         [fn.ipam, (reservation.user_type, reservation.user_uuid)],
                         'cleaned up an address which refers to a deleted object')
 
-        # Cleanup old uploads which were never completed
-        for upload in Uploads([]):
-            if time.time() - upload.created_at > 7 * 24 * 3600:
-                LOG.with_fields({
-                    'upload': upload.uuid
-                }).warning('Cleaning up stale upload')
-                upload.hard_delete()
+        remove_abandoned_uploads()
 
         # Cleanup orphan artifacts, delete old versions, and record blobs used
         # by artifacts

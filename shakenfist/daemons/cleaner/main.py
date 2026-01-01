@@ -142,20 +142,6 @@ class Monitor(daemon.Daemon):
                         'blob': blob_uuid}).warning('Blob missing from node')
                     b.drop_node_location(config.NODE_NAME)
 
-    def _remove_stale_uploads(self):
-        # Remove uploads which no longer exist in the database.
-        uploads = []
-        for u in upload.Uploads([]):
-            uploads.append(str(u.uuid))
-
-        upload_path = os.path.join(config.STORAGE_PATH, 'uploads')
-        os.makedirs(upload_path, exist_ok=True)
-        for upload_uuid in os.listdir(upload_path):
-            if upload_uuid not in uploads:
-                LOG.with_fields({
-                    'upload': upload_uuid}).info('Removing stale upload')
-                os.unlink(os.path.join(upload_path, upload_uuid))
-
     def _compact_etcd(self):
         try:
             # We need to determine what revision to compact to, so we keep a
@@ -209,7 +195,7 @@ class Monitor(daemon.Daemon):
             # Update power state of all instances on this hypervisor
             with util_general.RecordedOperation('update power states', n,
                                                 threshold=1):
-                self._remove_stale_uploads
+                upload.remove_stale_uploads_for_this_node()
 
             with util_general.RecordedOperation('maintain blobs', n,
                                                 threshold=1):

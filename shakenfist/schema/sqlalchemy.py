@@ -5,14 +5,20 @@
 # just need to introspect them to generate corresponding SQL tables. This keeps
 # the schema definition in one place (Python) and avoids hand-writing SQL.
 #
-# Index annotations:
-#   Use Annotated types to mark fields that should be indexed:
+# Field annotations:
+#   Use Annotated types to add SQL-specific markers to fields:
 #
-#   from shakenfist.schema.sqlalchemy import SQLIndex, SQLUniqueIndex
+#   from shakenfist.schema.sqlalchemy import SQLIndex, SQLUniqueIndex, SQLNativeUUID
 #
 #   class MyModel(BaseModel):
-#       uuid: Annotated[str, SQLIndex()]
+#       # Regular index
+#       name: Annotated[str, SQLIndex()]
+#
+#       # Unique index
 #       email: Annotated[str, SQLUniqueIndex()]
+#
+#       # Native UUID storage (MariaDB 10.7+) - more efficient than CHAR(36)
+#       uuid: Annotated[UUID4, SQLNativeUUID()]
 #
 #   For compound indexes spanning multiple columns, use model_config:
 #
@@ -42,7 +48,7 @@ from shakenfist_utilities import logs
 LOG, _ = logs.setup(__name__)
 
 
-# Index marker classes for use with Annotated types
+# Marker classes for use with Annotated types
 class SQLIndex:
     """Marker to indicate this field should have a database index.
 
@@ -61,6 +67,21 @@ class SQLUniqueIndex:
     pass
 
 
+class SQLNativeUUID:
+    """Marker to indicate this UUID field should use native MariaDB UUID type.
+
+    By default, UUID fields are stored as CHAR(36) strings. Use this marker
+    to store them using MariaDB's native UUID type instead, which provides
+    better storage efficiency (16 bytes vs 36 bytes) and indexing performance.
+
+    Usage:
+        uuid: Annotated[UUID4, SQLNativeUUID()]
+
+    Note: This requires MariaDB 10.7+ which has native UUID support.
+    """
+    pass
+
+
 def _get_index_markers_from_metadata(
         metadata: list[Any]) -> tuple[bool, bool]:
     """Extract index markers from Pydantic field metadata.
@@ -73,6 +94,14 @@ def _get_index_markers_from_metadata(
         if isinstance(item, SQLIndex):
             return True, False
     return False, False
+
+
+def _has_native_uuid_marker(metadata: list[Any]) -> bool:
+    """Check if field metadata contains a SQLNativeUUID marker."""
+    for item in metadata:
+        if isinstance(item, SQLNativeUUID):
+            return True
+    return False
 
 
 def _get_index_markers(annotation: Any) -> tuple[bool, bool]:
@@ -180,8 +209,19 @@ def _is_complex_type(annotation: Any) -> bool:
     return False
 
 
-def _get_sqlalchemy_type(annotation: Any) -> sa.types.TypeEngine[Any]:
-    """Convert a Python type annotation to a SQLAlchemy column type."""
+def _get_sqlalchemy_type(
+        annotation: Any,
+        field_metadata: Optional[list[Any]] = None) -> sa.types.TypeEngine[Any]:
+    """Convert a Python type annotation to a SQLAlchemy column type.
+
+    Args:
+        annotation: The Python type annotation.
+        field_metadata: Optional list of Pydantic field metadata (from
+            Annotated types). Used to check for markers like SQLNativeUUID.
+
+    Returns:
+        A SQLAlchemy column type.
+    """
     # Unwrap Annotated types first
     annotation = _unwrap_annotated(annotation)
 
@@ -190,8 +230,10 @@ def _get_sqlalchemy_type(annotation: Any) -> sa.types.TypeEngine[Any]:
     if is_optional:
         annotation = inner_type
 
-    # UUID fields -> CHAR(36)
+    # UUID fields - check for native UUID marker first
     if _is_uuid_type(annotation):
+        if field_metadata and _has_native_uuid_marker(field_metadata):
+            return sa.Uuid()
         return sa.String(36)
 
     # Enum fields -> VARCHAR to store the name
@@ -255,7 +297,8 @@ def pydantic_to_sqlalchemy_table(
         annotation = field_info.annotation
         is_optional, _ = _is_optional(annotation)
 
-        col_type = _get_sqlalchemy_type(annotation)
+        # Pass field metadata to get correct SQL type (e.g., native UUID)
+        col_type = _get_sqlalchemy_type(annotation, field_info.metadata)
         is_pk = (field_name == primary_key_field)
 
         columns.append(
