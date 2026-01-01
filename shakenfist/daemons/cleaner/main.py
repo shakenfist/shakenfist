@@ -4,13 +4,12 @@ import pathlib
 import random
 import time
 
-
+import schedule
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import node
-from shakenfist import upload
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist.config import config
@@ -171,12 +170,16 @@ class Monitor(daemon.Daemon):
             util_exceptions.ignore_exception('etcd compaction', e)
 
     def _run_inner(self):
+        schedule.every(1).minutes.do(
+            scheduled_tasks.update_power_states)
+        schedule.every(5).minutes.do(
+            scheduled_tasks.remove_stale_uploads_for_this_node)
+
         last_defer_message = 0
 
         # Delay first compaction until system startup load has reduced
         last_compaction = time.time() - random.randint(1, 20*60)
         last_missing_blob_check = 0
-        last_stale_upload_check = time.time() + 150
         last_libvirt_log_clean = 0
 
         n = node.Node.from_db(config.NODE_NAME)
@@ -192,28 +195,22 @@ class Monitor(daemon.Daemon):
                     last_defer_message = time.time()
                 continue
 
-            # Update power state of all instances on this hypervisor
-            with util_general.RecordedOperation('update power states', n,
-                                                threshold=1):
-                upload.remove_stale_uploads_for_this_node()
+            try:
+                with util_general.RecordedOperation(
+                        'scheduled node operations', None, threshold=10):
+                    schedule.run_pending()
+            except Exception as e:
+                util_exceptions.ignore_exception('node', e)
 
             with util_general.RecordedOperation('maintain blobs', n,
                                                 threshold=1):
                 self._maintain_blobs()
-
-            scheduled_tasks.update_power_states()
 
             if time.time() - last_missing_blob_check > 300:
                 with util_general.RecordedOperation('find missing blobs', n,
                                                     threshold=1):
                     self._find_missing_blobs()
                     last_missing_blob_check = time.time()
-
-            if time.time() - last_stale_upload_check > 300:
-                with util_general.RecordedOperation('remove stale uploads', n,
-                                                    threshold=1):
-                    upload.remove_stale_uploads_for_this_node()
-                    last_stale_upload_check = time.time()
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:
