@@ -136,6 +136,10 @@ class Upload(dbo):
         u.state = Upload.STATE_CREATED  # type: ignore[misc]
         return u
 
+    def hard_delete(self):
+        mariadb.delete_upload(self.uuid)
+        super().hard_delete()
+
     # Static values
     @property
     def node(self) -> str:
