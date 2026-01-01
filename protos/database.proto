@@ -50,7 +50,7 @@ service DatabaseService {
   // Upload Operations (MariaDB)
   rpc CreateUpload (CreateUploadRequest) returns (StatusReply) {}
   rpc GetUpload (GetUploadRequest) returns (GetUploadReply) {}
-  rpc GetAllUploads (GetAllUploadsRequest) returns (GetAllUploadsReply) {}
+  rpc GetUploads (GetUploadsRequest) returns (GetUploadsReply) {}
   rpc DeleteUpload (DeleteUploadRequest) returns (StatusReply) {}
 }
 
@@ -357,9 +357,13 @@ message GetUploadReply {
   UploadData upload = 2;
 }
 
-message GetAllUploadsRequest {}
+message GetUploadsRequest {
+  // Optional filters - if not set, returns all uploads
+  string node = 1;              // Filter by node name (empty = all nodes)
+  double created_before = 2;    // Filter by creation time (0 = no filter)
+}
 
-message GetAllUploadsReply {
+message GetUploadsReply {
   repeated UploadData uploads = 1;
 }
 

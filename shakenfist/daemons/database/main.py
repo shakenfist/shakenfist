@@ -759,15 +759,18 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.GetUploadReply(found=False)
 
-    def GetAllUploads(
+    def GetUploads(
         self,
-        request: database_pb2.GetAllUploadsRequest,
+        request: database_pb2.GetUploadsRequest,
         context: grpc.ServicerContext
-    ) -> database_pb2.GetAllUploadsReply:
-        """Get all uploads from MariaDB."""
+    ) -> database_pb2.GetUploadsReply:
+        """Get uploads from MariaDB with optional filters."""
         try:
-            self.monitor.counters['get_all_uploads'].inc()
-            uploads_data = mariadb._direct_get_all_uploads()
+            self.monitor.counters['get_uploads'].inc()
+            # Convert empty string/zero to None for optional filters
+            node = request.node if request.node else None
+            created_before = request.created_before if request.created_before else None
+            uploads_data = mariadb._direct_get_uploads(node, created_before)
             uploads = [
                 database_pb2.UploadData(
                     uuid=u['uuid'],
@@ -777,10 +780,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 )
                 for u in uploads_data
             ]
-            return database_pb2.GetAllUploadsReply(uploads=uploads)
+            return database_pb2.GetUploadsReply(uploads=uploads)
         except Exception as e:
-            util_exceptions.ignore_exception('database GetAllUploads failed', e)
-            return database_pb2.GetAllUploadsReply(uploads=[])
+            util_exceptions.ignore_exception('database GetUploads failed', e)
+            return database_pb2.GetUploadsReply(uploads=[])
 
     def DeleteUpload(
         self,
@@ -824,7 +827,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'delete_reservations_for_ipam', 'release_haloed_addresses',
             'get_addresses_in_use',
             # MariaDB upload operations
-            'create_upload', 'get_upload', 'get_all_uploads', 'delete_upload'
+            'create_upload', 'get_upload', 'get_uploads', 'delete_upload'
         ]
         for op in operations:
             self.counters[op] = Counter(

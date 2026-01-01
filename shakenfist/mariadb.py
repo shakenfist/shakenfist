@@ -1541,8 +1541,16 @@ def _direct_get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
         return None
 
 
-def _direct_get_all_uploads() -> list[dict[str, Any]]:
-    """Get all uploads from MariaDB.
+def _direct_get_uploads(
+    node: Optional[str] = None,
+    created_before: Optional[float] = None
+) -> list[dict[str, Any]]:
+    """Get uploads from MariaDB with optional filters.
+
+    Args:
+        node: If provided, only return uploads on this node.
+        created_before: If provided, only return uploads created before this
+            Unix timestamp.
 
     Returns:
         List of dicts with uuid, node, created_at, and version for each upload.
@@ -1553,6 +1561,13 @@ def _direct_get_all_uploads() -> list[dict[str, Any]]:
     try:
         with engine.connect() as conn:
             stmt = sa.select(table)
+
+            # Apply optional filters
+            if node:
+                stmt = stmt.where(table.c.node == node)
+            if created_before:
+                stmt = stmt.where(table.c.created_at < created_before)
+
             result = conn.execute(stmt).fetchall()
 
             return [
@@ -1565,7 +1580,7 @@ def _direct_get_all_uploads() -> list[dict[str, Any]]:
                 for row in result
             ]
     except OperationalError as e:
-        LOG.warning(f'MariaDB query failed for all uploads: {e}')
+        LOG.warning(f'MariaDB query failed for uploads: {e}')
         return []
 
 
@@ -1636,12 +1651,18 @@ def _grpc_get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
         return None
 
 
-def _grpc_get_all_uploads() -> list[dict[str, Any]]:
-    """Get all uploads via the database microservice."""
+def _grpc_get_uploads(
+    node: Optional[str] = None,
+    created_before: Optional[float] = None
+) -> list[dict[str, Any]]:
+    """Get uploads via the database microservice with optional filters."""
     try:
         stub = _get_database_stub()
-        request = database_pb2.GetAllUploadsRequest()
-        reply = stub.GetAllUploads(request)
+        request = database_pb2.GetUploadsRequest(
+            node=node or '',
+            created_before=created_before or 0.0
+        )
+        reply = stub.GetUploads(request)
         return [
             {
                 'uuid': u.uuid,
@@ -1705,15 +1726,23 @@ def get_upload(upload_uuid: UUID) -> Optional[dict[str, Any]]:
     return _direct_get_upload(upload_uuid)
 
 
-def get_all_uploads() -> list[dict[str, Any]]:
-    """Get all uploads.
+def get_uploads(
+    node: Optional[str] = None,
+    created_before: Optional[float] = None
+) -> list[dict[str, Any]]:
+    """Get uploads with optional filters.
+
+    Args:
+        node: If provided, only return uploads on this node.
+        created_before: If provided, only return uploads created before this
+            Unix timestamp.
 
     Returns:
         List of dicts with uuid, node, created_at, and version for each upload.
     """
     if _use_database_service():
-        return _grpc_get_all_uploads()
-    return _direct_get_all_uploads()
+        return _grpc_get_uploads(node, created_before)
+    return _direct_get_uploads(node, created_before)
 
 
 def delete_upload(upload_uuid: UUID) -> bool:

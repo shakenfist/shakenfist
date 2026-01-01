@@ -1,11 +1,12 @@
 # Copyright 2021 Michael Still
+import os
 import time
 import uuid
 
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import eventlog
 from shakenfist import mariadb
@@ -109,16 +110,38 @@ class Upload(dbo):
         return retval
 
 
-class Uploads(dbo_iter):
-    base_object = Upload
+def remove_stale_uploads_for_this_node():
+    """Remove upload files on disk that no longer exist in the database.
 
-    def __iter__(self):
-        # Use MariaDB for iteration instead of etcd
-        for u_data in mariadb.get_all_uploads():
-            u = Upload(u_data)
-            if not u:
-                continue
+    This function compares the upload files on disk for this node against
+    the uploads recorded in the database. Any files that don't have a
+    corresponding database record are deleted.
+    """
+    # Get all upload UUIDs that should be on this node from the database
+    uploads_on_this_node = {
+        u['uuid'] for u in mariadb.get_uploads(node=config.NODE_NAME)
+    }
 
-            out = self.apply_filters(u)
-            if out:
-                yield out
+    upload_path = os.path.join(config.STORAGE_PATH, 'uploads')
+    os.makedirs(upload_path, exist_ok=True)
+
+    for upload_uuid in os.listdir(upload_path):
+        if upload_uuid not in uploads_on_this_node:
+            LOG.with_fields({
+                'upload': upload_uuid
+            }).info('Removing stale upload file')
+            os.unlink(os.path.join(upload_path, upload_uuid))
+
+
+def remove_abandoned_uploads():
+    """Cleanup old uploads which were never completed.
+
+    Uploads older than 7 days are considered abandoned and are deleted
+    from both the database and disk.
+    """
+    cutoff = time.time() - 7 * 24 * 3600
+
+    for upload_data in mariadb.get_uploads(created_before=cutoff):
+        upload = Upload(upload_data)
+        upload.add_event('cleaning up abandoned upload')
+        upload.hard_delete()

@@ -186,9 +186,9 @@ class DatabaseServiceStub:
         database_pb2.GetUploadReply,
     ]
 
-    GetAllUploads: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllUploadsRequest,
-        database_pb2.GetAllUploadsReply,
+    GetUploads: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetUploadsRequest,
+        database_pb2.GetUploadsReply,
     ]
 
     DeleteUpload: grpc.UnaryUnaryMultiCallable[
@@ -364,9 +364,9 @@ class DatabaseServiceAsyncStub:
         database_pb2.GetUploadReply,
     ]
 
-    GetAllUploads: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllUploadsRequest,
-        database_pb2.GetAllUploadsReply,
+    GetUploads: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetUploadsRequest,
+        database_pb2.GetUploadsReply,
     ]
 
     DeleteUpload: grpc.aio.UnaryUnaryMultiCallable[
@@ -607,11 +607,11 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     ) -> typing.Union[database_pb2.GetUploadReply, collections.abc.Awaitable[database_pb2.GetUploadReply]]: ...
 
     @abc.abstractmethod
-    def GetAllUploads(
+    def GetUploads(
         self,
-        request: database_pb2.GetAllUploadsRequest,
+        request: database_pb2.GetUploadsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAllUploadsReply, collections.abc.Awaitable[database_pb2.GetAllUploadsReply]]: ...
+    ) -> typing.Union[database_pb2.GetUploadsReply, collections.abc.Awaitable[database_pb2.GetUploadsReply]]: ...
 
     @abc.abstractmethod
     def DeleteUpload(

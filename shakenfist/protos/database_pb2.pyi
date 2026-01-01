@@ -1097,17 +1097,29 @@ class GetUploadReply(google.protobuf.message.Message):
 global___GetUploadReply = GetUploadReply
 
 @typing.final
-class GetAllUploadsRequest(google.protobuf.message.Message):
+class GetUploadsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    NODE_FIELD_NUMBER: builtins.int
+    CREATED_BEFORE_FIELD_NUMBER: builtins.int
+    node: builtins.str
+    """Optional filters - if not set, returns all uploads
+    Filter by node name (empty = all nodes)
+    """
+    created_before: builtins.float
+    """Filter by creation time (0 = no filter)"""
     def __init__(
         self,
+        *,
+        node: builtins.str = ...,
+        created_before: builtins.float = ...,
     ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_before", b"created_before", "node", b"node"]) -> None: ...
 
-global___GetAllUploadsRequest = GetAllUploadsRequest
+global___GetUploadsRequest = GetUploadsRequest
 
 @typing.final
-class GetAllUploadsReply(google.protobuf.message.Message):
+class GetUploadsReply(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     UPLOADS_FIELD_NUMBER: builtins.int
@@ -1120,7 +1132,7 @@ class GetAllUploadsReply(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["uploads", b"uploads"]) -> None: ...
 
-global___GetAllUploadsReply = GetAllUploadsReply
+global___GetUploadsReply = GetUploadsReply
 
 @typing.final
 class DeleteUploadRequest(google.protobuf.message.Message):
