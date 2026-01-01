@@ -1,7 +1,10 @@
 # Copyright 2021 Michael Still
+from __future__ import annotations
+
 import os
 import time
 import uuid
+from typing import Any
 
 from shakenfist_utilities import logs  # noreorder
 
@@ -22,38 +25,41 @@ class Upload(dbo):
     current_version = 5
 
     # docs/developer_guide/state_machine.md has a description of these states.
-    state_targets = {
-        None: (dbo.STATE_CREATED),
-        dbo.STATE_CREATED: (dbo.STATE_DELETED),
+    state_targets: dict[str | None, tuple[str, ...]] = {  # type: ignore[assignment]
+        None: (dbo.STATE_CREATED,),
+        dbo.STATE_CREATED: (dbo.STATE_DELETED,),
         dbo.STATE_DELETED: (),
     }
 
     ACTIVE_STATES = {dbo.STATE_CREATED}
 
-    def __init__(self, static_values):
+    def __init__(self, static_values: dict[str, Any]) -> None:
         self.upgrade(static_values)
 
-        super().__init__(static_values.get('uuid'), static_values.get('version'))
-        self.__node = static_values['node']
-        self.__created_at = static_values['created_at']
+        super().__init__(
+            static_values.get('uuid'),  # type: ignore[arg-type]
+            static_values.get('version')
+        )
+        self.__node: str = static_values['node']
+        self.__created_at: float = static_values['created_at']
 
     @classmethod
-    def _upgrade_step_2_to_3(cls, static_values):
+    def _upgrade_step_2_to_3(cls, static_values: dict[str, Any]) -> None:
         cls._upgrade_metadata_to_attribute(static_values['uuid'])
 
     @classmethod
-    def _upgrade_step_3_to_4(cls, static_values):
+    def _upgrade_step_3_to_4(cls, static_values: dict[str, Any]) -> None:
         # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
 
     @classmethod
-    def _upgrade_step_4_to_5(cls, static_values):
+    def _upgrade_step_4_to_5(cls, static_values: dict[str, Any]) -> None:
         # Static values migration to MariaDB is handled by
         # sf-ctl migrate-uploads-to-mariadb
         ...
 
     @classmethod
-    def _db_create(cls, object_uuid, metadata):
+    def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
         """Create an upload record in MariaDB instead of etcd."""
         mariadb.create_upload(
             uuid.UUID(object_uuid),
@@ -65,7 +71,7 @@ class Upload(dbo):
                            'db record created', extra=metadata)
 
     @classmethod
-    def _db_get(cls, object_uuid):
+    def _db_get(cls, object_uuid: str) -> dict[str, Any] | None:
         """Get upload static values from MariaDB instead of etcd."""
         data = mariadb.get_upload(uuid.UUID(object_uuid))
         if not data:
@@ -79,8 +85,8 @@ class Upload(dbo):
         return data
 
     @classmethod
-    def new(cls, upload_uuid, node):
-        static_values = {
+    def new(cls, upload_uuid: str, node: str) -> Upload:
+        static_values: dict[str, Any] = {
             'uuid': upload_uuid,
             'node': node,
             'created_at': time.time(),
@@ -89,20 +95,20 @@ class Upload(dbo):
         }
         Upload._db_create(upload_uuid, static_values)
         u = Upload(static_values)
-        u.state = Upload.STATE_CREATED
+        u.state = Upload.STATE_CREATED  # type: ignore[misc]
         return u
 
     # Static values
     @property
-    def node(self):
+    def node(self) -> str:
         return self.__node
 
     @property
-    def created_at(self):
+    def created_at(self) -> float:
         return self.__created_at
 
-    def external_view(self):
-        retval = self._external_view()
+    def external_view(self) -> dict[str, Any]:
+        retval: dict[str, Any] = self._external_view()
         retval.update({
             'node': self.node,
             'created_at': self.created_at
@@ -110,7 +116,7 @@ class Upload(dbo):
         return retval
 
 
-def remove_stale_uploads_for_this_node():
+def remove_stale_uploads_for_this_node() -> None:
     """Remove upload files on disk that no longer exist in the database.
 
     This function compares the upload files on disk for this node against
@@ -118,7 +124,7 @@ def remove_stale_uploads_for_this_node():
     corresponding database record are deleted.
     """
     # Get all upload UUIDs that should be on this node from the database
-    uploads_on_this_node = {
+    uploads_on_this_node: set[str] = {
         u['uuid'] for u in mariadb.get_uploads(node=config.NODE_NAME)
     }
 
@@ -133,15 +139,15 @@ def remove_stale_uploads_for_this_node():
             os.unlink(os.path.join(upload_path, upload_uuid))
 
 
-def remove_abandoned_uploads():
+def remove_abandoned_uploads() -> None:
     """Cleanup old uploads which were never completed.
 
     Uploads older than 7 days are considered abandoned and are deleted
     from both the database and disk.
     """
-    cutoff = time.time() - 7 * 24 * 3600
+    cutoff: float = time.time() - 7 * 24 * 3600
 
     for upload_data in mariadb.get_uploads(created_before=cutoff):
         upload = Upload(upload_data)
-        upload.add_event('cleaning up abandoned upload')
+        upload.add_event(EVENT_TYPE_AUDIT, 'cleaning up abandoned upload')
         upload.hard_delete()
