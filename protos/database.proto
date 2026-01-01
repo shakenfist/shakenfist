@@ -46,6 +46,13 @@ service DatabaseService {
   rpc DeleteReservationsForIPAM (DeleteReservationsForIPAMRequest) returns (DeleteCountReply) {}
   rpc ReleaseHaloedAddresses (ReleaseHaloedAddressesRequest) returns (DeleteCountReply) {}
   rpc GetAddressesInUse (GetAddressesInUseRequest) returns (GetAddressesInUseReply) {}
+
+  // Upload Operations (MariaDB)
+  rpc CreateUpload (CreateUploadRequest) returns (StatusReply) {}
+  rpc GetUpload (GetUploadRequest) returns (GetUploadReply) {}
+  rpc GetUploads (GetUploadsRequest) returns (GetUploadsReply) {}
+  rpc DeleteUpload (DeleteUploadRequest) returns (StatusReply) {}
+  rpc UpdateUpload (UpdateUploadRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -325,4 +332,46 @@ message GetAddressesInUseRequest {
 
 message GetAddressesInUseReply {
   repeated string addresses = 1;
+}
+
+// Upload Operations (MariaDB)
+// These operations manage upload objects in MariaDB. Uploads are temporary
+// objects that receive streamed data before being converted to artifacts.
+
+message UploadData {
+  string uuid = 1;        // UUID as string (consistent with other messages)
+  string node = 2;        // Node name where the upload data is stored
+  double created_at = 3;  // Unix timestamp when upload was created
+  int32 version = 4;      // Object version number
+}
+
+message CreateUploadRequest {
+  UploadData upload = 1;
+}
+
+message GetUploadRequest {
+  string uuid = 1;
+}
+
+message GetUploadReply {
+  bool found = 1;
+  UploadData upload = 2;
+}
+
+message GetUploadsRequest {
+  // Optional filters - if not set, returns all uploads
+  string node = 1;              // Filter by node name (empty = all nodes)
+  double created_before = 2;    // Filter by creation time (0 = no filter)
+}
+
+message GetUploadsReply {
+  repeated UploadData uploads = 1;
+}
+
+message DeleteUploadRequest {
+  string uuid = 1;
+}
+
+message UpdateUploadRequest {
+  UploadData upload = 1;
 }
