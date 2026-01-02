@@ -201,6 +201,32 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateDnsMasq: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateDnsMasqRequest,
+        database_pb2.StatusReply,
+    ]
+    """DnsMasq Operations (MariaDB)"""
+
+    GetDnsMasq: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetDnsMasqRequest,
+        database_pb2.GetDnsMasqReply,
+    ]
+
+    GetDnsMasqs: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetDnsMasqsRequest,
+        database_pb2.GetDnsMasqsReply,
+    ]
+
+    DeleteDnsMasq: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteDnsMasqRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateDnsMasq: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateDnsMasqRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -381,6 +407,32 @@ class DatabaseServiceAsyncStub:
 
     UpdateUpload: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.UpdateUploadRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateDnsMasq: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateDnsMasqRequest,
+        database_pb2.StatusReply,
+    ]
+    """DnsMasq Operations (MariaDB)"""
+
+    GetDnsMasq: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetDnsMasqRequest,
+        database_pb2.GetDnsMasqReply,
+    ]
+
+    GetDnsMasqs: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetDnsMasqsRequest,
+        database_pb2.GetDnsMasqsReply,
+    ]
+
+    DeleteDnsMasq: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteDnsMasqRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateDnsMasq: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateDnsMasqRequest,
         database_pb2.StatusReply,
     ]
 
@@ -634,6 +686,42 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def UpdateUpload(
         self,
         request: database_pb2.UpdateUploadRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateDnsMasq(
+        self,
+        request: database_pb2.CreateDnsMasqRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """DnsMasq Operations (MariaDB)"""
+
+    @abc.abstractmethod
+    def GetDnsMasq(
+        self,
+        request: database_pb2.GetDnsMasqRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetDnsMasqReply, collections.abc.Awaitable[database_pb2.GetDnsMasqReply]]: ...
+
+    @abc.abstractmethod
+    def GetDnsMasqs(
+        self,
+        request: database_pb2.GetDnsMasqsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetDnsMasqsReply, collections.abc.Awaitable[database_pb2.GetDnsMasqsReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteDnsMasq(
+        self,
+        request: database_pb2.DeleteDnsMasqRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateDnsMasq(
+        self,
+        request: database_pb2.UpdateDnsMasqRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

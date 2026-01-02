@@ -549,11 +549,113 @@ def migrate_uploads_to_mariadb(dry_run):
         click.echo('\nMigration complete. You can now start Shaken Fist services.')
 
 
+@cli.command(name='migrate-dnsmasq-to-mariadb')
+@click.option('--dry-run', is_flag=True, default=False,
+              help='Show what would be migrated without making changes')
+def migrate_dnsmasq_to_mariadb(dry_run):
+    """Migrate all DnsMasq objects from etcd to MariaDB.
+
+    This command should be run once during an upgrade to move DnsMasq static
+    values from etcd to the MariaDB dnsmasq table. All Shaken Fist services
+    should be stopped before running this command.
+
+    After migration, the DnsMasq entries are removed from etcd.
+    """
+    from shakenfist.managed_executables.dnsmasq import DnsMasq
+    from shakenfist.schema.dnsmasq import DnsMasqData
+    from shakenfist.schema.object_types import ObjectType
+
+    # Ensure the MariaDB schema exists
+    if not dry_run:
+        click.echo('Ensuring MariaDB schema exists...')
+        mariadb.ensure_schema()
+
+    total_migrated = 0
+    total_skipped = 0
+    total_errors = 0
+
+    click.echo('\nScanning for DnsMasq objects in etcd...')
+
+    # Iterate through all DnsMasq objects in etcd
+    # DnsMasq uses ObjectType.DHCP for historical reasons
+    for objkey, data in etcd.get_all('dhcp', None):
+        # Extract UUID from the etcd key
+        dnsmasq_uuid = objkey.split('/')[-1]
+
+        # Apply upgrades to legacy data
+        version = data.get('version', DnsMasq.initial_version)
+        while version < DnsMasq.current_version:
+            step_name = f'_upgrade_step_{version}_to_{version + 1}'
+            step_func = getattr(DnsMasq, step_name, None)
+            if step_func:
+                step_func(data)
+            version += 1
+            data['version'] = version
+
+        # Convert owner_type to ObjectType if it's a string
+        owner_type = data.get('owner_type')
+        if isinstance(owner_type, str):
+            owner_type = ObjectType(owner_type)
+        else:
+            owner_type = ObjectType.UNKNOWN
+
+        if dry_run:
+            click.echo(
+                f'  Would migrate {dnsmasq_uuid}: '
+                f'namespace={data.get("namespace")}, '
+                f'owner={owner_type}({data.get("owner_uuid")}), '
+                f'dhcp={data.get("provide_dhcp")}, '
+                f'dns={data.get("provide_dns")}')
+            total_migrated += 1
+            continue
+
+        try:
+            # Create DnsMasqData and write to MariaDB
+            dnsmasq_data = DnsMasqData(
+                uuid=dnsmasq_uuid,
+                namespace=data.get('namespace', 'unknown'),
+                owner_type=owner_type,
+                owner_uuid=data.get('owner_uuid', dnsmasq_uuid),
+                version=DnsMasq.current_version,
+                provide_dhcp=data.get('provide_dhcp', True),
+                provide_dns=data.get('provide_dns', False)
+            )
+            success = mariadb.create_dnsmasq(dnsmasq_data)
+            if success:
+                # Remove from etcd
+                etcd.delete('dhcp', None, dnsmasq_uuid)
+                total_migrated += 1
+            else:
+                # DnsMasq already exists in MariaDB
+                click.echo(f'  Skipping {dnsmasq_uuid}: already in MariaDB')
+                # Still remove from etcd since the data is in MariaDB
+                etcd.delete('dhcp', None, dnsmasq_uuid)
+                total_skipped += 1
+        except Exception as e:
+            click.echo(f'  Error migrating {dnsmasq_uuid}: {e}')
+            total_errors += 1
+
+        # Show progress every 100 DnsMasq objects
+        if (total_migrated + total_skipped + total_errors) % 100 == 0:
+            click.echo(
+                f'  ... {total_migrated + total_skipped + total_errors} '
+                'DnsMasq objects processed')
+
+    click.echo(f'\nTotal: {total_migrated} migrated, {total_skipped} skipped, '
+               f'{total_errors} errors')
+
+    if dry_run:
+        click.echo('\nThis was a dry run. No changes were made.')
+    else:
+        click.echo('\nMigration complete. You can now start Shaken Fist services.')
+
+
 cli.add_command(bootstrap_system_key)
 cli.add_command(migrate_floating_network_uuid)
 cli.add_command(migrate_state_to_mariadb)
 cli.add_command(migrate_ipam_to_mariadb)
 cli.add_command(migrate_uploads_to_mariadb)
+cli.add_command(migrate_dnsmasq_to_mariadb)
 cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
 cli.add_command(verify_config)

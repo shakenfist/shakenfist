@@ -1165,3 +1165,171 @@ class UpdateUploadRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["upload", b"upload"]) -> None: ...
 
 global___UpdateUploadRequest = UpdateUploadRequest
+
+@typing.final
+class DnsMasqData(google.protobuf.message.Message):
+    """DnsMasq Operations (MariaDB)
+    These operations manage DnsMasq objects in MariaDB. DnsMasq objects
+    represent running dnsmasq processes that provide DHCP and/or DNS
+    services for virtual networks.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    OWNER_TYPE_FIELD_NUMBER: builtins.int
+    OWNER_UUID_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    PROVIDE_DHCP_FIELD_NUMBER: builtins.int
+    PROVIDE_DNS_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """UUID as string (same as owning network)"""
+    namespace: builtins.str
+    """Namespace the DnsMasq belongs to"""
+    owner_type: shakenfist_enums_pb2.ObjectType.ValueType
+    """Type of the owning object (e.g., NETWORK)"""
+    owner_uuid: builtins.str
+    """UUID of the owning object"""
+    version: builtins.int
+    """Object version number"""
+    provide_dhcp: builtins.bool
+    """Whether DHCP services are provided"""
+    provide_dns: builtins.bool
+    """Whether DNS services are provided"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        namespace: builtins.str = ...,
+        owner_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        owner_uuid: builtins.str = ...,
+        version: builtins.int = ...,
+        provide_dhcp: builtins.bool = ...,
+        provide_dns: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["namespace", b"namespace", "owner_type", b"owner_type", "owner_uuid", b"owner_uuid", "provide_dhcp", b"provide_dhcp", "provide_dns", b"provide_dns", "uuid", b"uuid", "version", b"version"]) -> None: ...
+
+global___DnsMasqData = DnsMasqData
+
+@typing.final
+class CreateDnsMasqRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DNSMASQ_FIELD_NUMBER: builtins.int
+    @property
+    def dnsmasq(self) -> global___DnsMasqData: ...
+    def __init__(
+        self,
+        *,
+        dnsmasq: global___DnsMasqData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["dnsmasq", b"dnsmasq"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["dnsmasq", b"dnsmasq"]) -> None: ...
+
+global___CreateDnsMasqRequest = CreateDnsMasqRequest
+
+@typing.final
+class GetDnsMasqRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetDnsMasqRequest = GetDnsMasqRequest
+
+@typing.final
+class GetDnsMasqReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DNSMASQ_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def dnsmasq(self) -> global___DnsMasqData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        dnsmasq: global___DnsMasqData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["dnsmasq", b"dnsmasq"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["dnsmasq", b"dnsmasq", "found", b"found"]) -> None: ...
+
+global___GetDnsMasqReply = GetDnsMasqReply
+
+@typing.final
+class GetDnsMasqsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    OWNER_UUID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Optional filters - if not set, returns all DnsMasq objects
+    Filter by namespace (empty = all)
+    """
+    owner_uuid: builtins.str
+    """Filter by owner UUID (empty = all)"""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        owner_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["namespace", b"namespace", "owner_uuid", b"owner_uuid"]) -> None: ...
+
+global___GetDnsMasqsRequest = GetDnsMasqsRequest
+
+@typing.final
+class GetDnsMasqsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DNSMASQS_FIELD_NUMBER: builtins.int
+    @property
+    def dnsmasqs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DnsMasqData]: ...
+    def __init__(
+        self,
+        *,
+        dnsmasqs: collections.abc.Iterable[global___DnsMasqData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["dnsmasqs", b"dnsmasqs"]) -> None: ...
+
+global___GetDnsMasqsReply = GetDnsMasqsReply
+
+@typing.final
+class DeleteDnsMasqRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteDnsMasqRequest = DeleteDnsMasqRequest
+
+@typing.final
+class UpdateDnsMasqRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DNSMASQ_FIELD_NUMBER: builtins.int
+    @property
+    def dnsmasq(self) -> global___DnsMasqData: ...
+    def __init__(
+        self,
+        *,
+        dnsmasq: global___DnsMasqData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["dnsmasq", b"dnsmasq"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["dnsmasq", b"dnsmasq"]) -> None: ...
+
+global___UpdateDnsMasqRequest = UpdateDnsMasqRequest
