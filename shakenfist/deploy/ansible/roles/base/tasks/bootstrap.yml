@@ -77,6 +77,17 @@
       retries: 100
       until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
+# Ubuntu 24.04 requires qemu-system-modules-spice for SPICE support, otherwise
+# instances fail to start.
+- name: Install SPICE modules for Ubuntu 24.04
+  apt:
+    name: qemu-system-modules-spice
+    state: latest
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+  when: ansible_distribution | lower == "ubuntu" and ansible_distribution_version == "24.04"
+
 # We install libvirt, even on non-hypervisors, because we use it to track
 # the CPU topology and load of the node.
 - name: Install shared dependencies
