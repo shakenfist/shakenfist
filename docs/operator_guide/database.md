@@ -483,6 +483,46 @@ This command scans all `/sf/ipam_reservations/` entries in etcd, converts them
 to the new IPAMReservation format, writes them to MariaDB, and removes the
 original entries from etcd.
 
+### migrate-uploads-to-mariadb
+
+Migrates upload objects from etcd to MariaDB for existing deployments:
+
+```bash
+# Preview what would be migrated
+sf-ctl migrate-uploads-to-mariadb --dry-run
+
+# Perform the migration
+sf-ctl migrate-uploads-to-mariadb
+```
+
+This command scans all upload objects in etcd, writes them to the MariaDB
+uploads table, and removes the original entries from etcd. Uploads are
+temporary objects used during artifact creation.
+
+## Upload Object Storage
+
+Upload objects (temporary objects that receive streamed data during artifact
+creation) are stored in MariaDB. This provides:
+
+- **Efficient iteration**: Fast queries for cleanup of stale uploads
+- **Node-based lookups**: Indexed queries to find uploads by node for routing
+
+### The uploads Table
+
+The `uploads` table stores static values for upload objects:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| uuid | UUID | Primary key - the upload's unique identifier |
+| node | VARCHAR(255) | The node where the upload data is stored |
+| created_at | DOUBLE | Unix timestamp when the upload was created |
+| version | INTEGER | Object version number |
+
+Indexes:
+- Primary key on `uuid`
+- Index on `node` for efficient routing of upload requests
+- Index on `created_at` for finding old uploads during cleanup
+
 ## Best Practices
 
 ### Schema Evolution

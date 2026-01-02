@@ -1010,3 +1010,158 @@ class GetAddressesInUseReply(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["addresses", b"addresses"]) -> None: ...
 
 global___GetAddressesInUseReply = GetAddressesInUseReply
+
+@typing.final
+class UploadData(google.protobuf.message.Message):
+    """Upload Operations (MariaDB)
+    These operations manage upload objects in MariaDB. Uploads are temporary
+    objects that receive streamed data before being converted to artifacts.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    NODE_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """UUID as string (consistent with other messages)"""
+    node: builtins.str
+    """Node name where the upload data is stored"""
+    created_at: builtins.float
+    """Unix timestamp when upload was created"""
+    version: builtins.int
+    """Object version number"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        node: builtins.str = ...,
+        created_at: builtins.float = ...,
+        version: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "node", b"node", "uuid", b"uuid", "version", b"version"]) -> None: ...
+
+global___UploadData = UploadData
+
+@typing.final
+class CreateUploadRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UPLOAD_FIELD_NUMBER: builtins.int
+    @property
+    def upload(self) -> global___UploadData: ...
+    def __init__(
+        self,
+        *,
+        upload: global___UploadData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["upload", b"upload"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["upload", b"upload"]) -> None: ...
+
+global___CreateUploadRequest = CreateUploadRequest
+
+@typing.final
+class GetUploadRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetUploadRequest = GetUploadRequest
+
+@typing.final
+class GetUploadReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    UPLOAD_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def upload(self) -> global___UploadData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        upload: global___UploadData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["upload", b"upload"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["found", b"found", "upload", b"upload"]) -> None: ...
+
+global___GetUploadReply = GetUploadReply
+
+@typing.final
+class GetUploadsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_FIELD_NUMBER: builtins.int
+    CREATED_BEFORE_FIELD_NUMBER: builtins.int
+    node: builtins.str
+    """Optional filters - if not set, returns all uploads
+    Filter by node name (empty = all nodes)
+    """
+    created_before: builtins.float
+    """Filter by creation time (0 = no filter)"""
+    def __init__(
+        self,
+        *,
+        node: builtins.str = ...,
+        created_before: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_before", b"created_before", "node", b"node"]) -> None: ...
+
+global___GetUploadsRequest = GetUploadsRequest
+
+@typing.final
+class GetUploadsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UPLOADS_FIELD_NUMBER: builtins.int
+    @property
+    def uploads(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___UploadData]: ...
+    def __init__(
+        self,
+        *,
+        uploads: collections.abc.Iterable[global___UploadData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uploads", b"uploads"]) -> None: ...
+
+global___GetUploadsReply = GetUploadsReply
+
+@typing.final
+class DeleteUploadRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteUploadRequest = DeleteUploadRequest
+
+@typing.final
+class UpdateUploadRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UPLOAD_FIELD_NUMBER: builtins.int
+    @property
+    def upload(self) -> global___UploadData: ...
+    def __init__(
+        self,
+        *,
+        upload: global___UploadData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["upload", b"upload"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["upload", b"upload"]) -> None: ...
+
+global___UpdateUploadRequest = UpdateUploadRequest

@@ -11,6 +11,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
+from shakenfist import upload
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
@@ -277,3 +278,8 @@ def clear_old_libvirt_logs():
 
         LOG.debug(f'Removing stale libvirt log {ent}')
         os.unlink(os.path.join(config.LIBVIRT_LOG_PATH, ent))
+
+
+@util_general.recorded_method
+def remove_stale_uploads_for_this_node():
+    upload.remove_stale_uploads_for_this_node()
