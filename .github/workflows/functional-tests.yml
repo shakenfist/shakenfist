@@ -1528,8 +1528,10 @@ jobs:
         run: |
           set -x
           . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
           for node in ${sf1_uuid} ${sf2_uuid} ${sf3_uuid} ${sf4_uuid} ${sf5_uuid}; do
-              /srv/shakenfist/venv/bin/sf-client instance reboot --hard ${node}
+              tools/run_remote ${primary} \
+                  ". /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client instance reboot --hard ${node}"
           done
           sleep 90
 

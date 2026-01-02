@@ -43,6 +43,22 @@
 
 - include_tasks: ksm.yml
 
+# Load vhost_vsock kernel module for vsock communication with guest agents.
+# This module is required for the sf-agent2 side channel to work. On some
+# distributions (notably Ubuntu 24.04), this module is not automatically
+# loaded when vsock sockets are created.
+- name: Load vhost_vsock kernel module
+  community.general.modprobe:
+    name: vhost_vsock
+    state: present
+
+- name: Ensure vhost_vsock is loaded on boot
+  copy:
+    content: vhost_vsock
+    dest: /etc/modules-load.d/sf-vhost-vsock.conf
+    owner: root
+    mode: '0644'
+
 - name: Enable SPICE TLS
   lineinfile:
     path: /etc/libvirt/qemu.conf
@@ -130,6 +146,36 @@
     path: /etc/apparmor.d/abstractions/libvirt-qemu
     regexp: "/dev/vhost-net rw,"
     line: '/dev/vhost-net rw,'
+  when: not stat_result.stat.exists
+
+# For vsock communication with guest agents (sf-agent2 side channel), we need
+# access to /dev/vhost-vsock and /dev/vsock. This is similar to vhost-net above.
+- name: Add an apparmor rule to always allow vhost-vsock access
+  lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    regexp: "/dev/vhost-vsock rw,"
+    line: '/dev/vhost-vsock rw,'
+  when: stat_result.stat.exists
+
+- name: Add an apparmor rule to always allow vhost-vsock access
+  lineinfile:
+    path: /etc/apparmor.d/abstractions/libvirt-qemu
+    regexp: "/dev/vhost-vsock rw,"
+    line: '/dev/vhost-vsock rw,'
+  when: not stat_result.stat.exists
+
+- name: Add an apparmor rule to always allow vsock access
+  lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    regexp: "/dev/vsock rw,"
+    line: '/dev/vsock rw,'
+  when: stat_result.stat.exists
+
+- name: Add an apparmor rule to always allow vsock access
+  lineinfile:
+    path: /etc/apparmor.d/abstractions/libvirt-qemu
+    regexp: "/dev/vsock rw,"
+    line: '/dev/vsock rw,'
   when: not stat_result.stat.exists
 
 - name: Restart apparmor

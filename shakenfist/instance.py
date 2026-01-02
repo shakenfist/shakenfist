@@ -1082,6 +1082,16 @@ class Instance(dbowo):
                     elif not os.path.exists(disk['path']):
                         util_image.create_blank(disk['path'], disk['size'])
 
+                    # qemu does not support removable media on virtio buses.
+                    # This check handles empty CDROMs (no base image). CDROMs
+                    # with base images are handled earlier in the disk_base
+                    # block.
+                    if (disk.get('present_as') == 'cdrom'
+                            and disk['bus'] == 'virtio'):
+                        disk['bus'] = 'usb'
+                        disk['device'] = _get_disk_device(
+                            disk['bus'], LETTERS.find(disk['device'][-1]))
+
                     shutil.chown(disk['path'], 'libvirt-qemu', 'libvirt-qemu')
                     modified_disks.append(disk)
 
