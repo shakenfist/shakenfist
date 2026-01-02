@@ -46,10 +46,11 @@ Shaken Fist runs several daemons on each cluster node:
               |                                 |
        +------+------+                   +------+------+
        |    etcd     |                   |   MariaDB   |
-       | (objects,   |                   | (state      |
-       |  locks,     |                   |  queries)   |
-       |  queues)    |                   |             |
-       +-------------+                   +-------------+
+       | (objects,   |                   | (state,     |
+       |  locks,     |                   |  IPAM,      |
+       |  queues)    |                   |  uploads,   |
+       +-------------+                   |  dnsmasq)   |
+                                         +-------------+
 ```
 
 The database microservice (`sf-database`) centralizes all database access:

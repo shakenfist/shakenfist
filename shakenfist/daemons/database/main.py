@@ -33,6 +33,7 @@ from shakenfist.node import Node
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.upload import UploadData
@@ -820,6 +821,138 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database UpdateUpload failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
+    # =========================================================================
+    # DnsMasq Operations (MariaDB)
+    # =========================================================================
+
+    def CreateDnsMasq(
+        self,
+        request: database_pb2.CreateDnsMasqRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create a DnsMasq record in MariaDB."""
+        try:
+            self.monitor.counters['create_dnsmasq'].inc()
+            owner_type = ObjectType.from_proto_id(request.dnsmasq.owner_type)
+            if owner_type is None:
+                owner_type = ObjectType.UNKNOWN
+            data = DnsMasqData(
+                uuid=UUID(request.dnsmasq.uuid),
+                namespace=request.dnsmasq.namespace,
+                owner_type=owner_type,
+                owner_uuid=UUID(request.dnsmasq.owner_uuid),
+                version=request.dnsmasq.version,
+                provide_dhcp=request.dnsmasq.provide_dhcp,
+                provide_dns=request.dnsmasq.provide_dns
+            )
+            success = mariadb._direct_create_dnsmasq(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database CreateDnsMasq failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetDnsMasq(
+        self,
+        request: database_pb2.GetDnsMasqRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetDnsMasqReply:
+        """Get DnsMasq static values from MariaDB."""
+        try:
+            self.monitor.counters['get_dnsmasq'].inc()
+            data = mariadb._direct_get_dnsmasq(UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetDnsMasqReply(found=False)
+            return database_pb2.GetDnsMasqReply(
+                found=True,
+                dnsmasq=database_pb2.DnsMasqData(
+                    uuid=str(data.uuid),
+                    namespace=data.namespace,
+                    owner_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        data.owner_type.proto_id),
+                    owner_uuid=str(data.owner_uuid),
+                    version=data.version,
+                    provide_dhcp=data.provide_dhcp,
+                    provide_dns=data.provide_dns
+                )
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception('database GetDnsMasq failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetDnsMasqReply(found=False)
+
+    def GetDnsMasqs(
+        self,
+        request: database_pb2.GetDnsMasqsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetDnsMasqsReply:
+        """Get DnsMasq objects from MariaDB with optional filters."""
+        try:
+            self.monitor.counters['get_dnsmasqs'].inc()
+            # Convert empty string to None for optional filters
+            namespace = request.namespace if request.namespace else None
+            owner_uuid = UUID(request.owner_uuid) if request.owner_uuid else None
+            dnsmasqs_data = mariadb._direct_get_dnsmasqs(namespace, owner_uuid)
+            dnsmasqs = [
+                database_pb2.DnsMasqData(
+                    uuid=str(d.uuid),
+                    namespace=d.namespace,
+                    owner_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        d.owner_type.proto_id),
+                    owner_uuid=str(d.owner_uuid),
+                    version=d.version,
+                    provide_dhcp=d.provide_dhcp,
+                    provide_dns=d.provide_dns
+                )
+                for d in dnsmasqs_data
+            ]
+            return database_pb2.GetDnsMasqsReply(dnsmasqs=dnsmasqs)
+        except Exception as e:
+            util_exceptions.ignore_exception('database GetDnsMasqs failed', e)
+            return database_pb2.GetDnsMasqsReply(dnsmasqs=[])
+
+    def DeleteDnsMasq(
+        self,
+        request: database_pb2.DeleteDnsMasqRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a DnsMasq record from MariaDB."""
+        try:
+            self.monitor.counters['delete_dnsmasq'].inc()
+            success = mariadb._direct_delete_dnsmasq(UUID(request.uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database DeleteDnsMasq failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def UpdateDnsMasq(
+        self,
+        request: database_pb2.UpdateDnsMasqRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update a DnsMasq record in MariaDB."""
+        try:
+            self.monitor.counters['update_dnsmasq'].inc()
+            owner_type = ObjectType.from_proto_id(request.dnsmasq.owner_type)
+            if owner_type is None:
+                owner_type = ObjectType.UNKNOWN
+            data = DnsMasqData(
+                uuid=UUID(request.dnsmasq.uuid),
+                namespace=request.dnsmasq.namespace,
+                owner_type=owner_type,
+                owner_uuid=UUID(request.dnsmasq.owner_uuid),
+                version=request.dnsmasq.version,
+                provide_dhcp=request.dnsmasq.provide_dhcp,
+                provide_dns=request.dnsmasq.provide_dns
+            )
+            success = mariadb._direct_update_dnsmasq(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database UpdateDnsMasq failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -849,7 +982,10 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_addresses_in_use',
             # MariaDB upload operations
             'create_upload', 'get_upload', 'get_uploads', 'delete_upload',
-            'update_upload'
+            'update_upload',
+            # MariaDB DnsMasq operations
+            'create_dnsmasq', 'get_dnsmasq', 'get_dnsmasqs', 'delete_dnsmasq',
+            'update_dnsmasq'
         ]
         for op in operations:
             self.counters[op] = Counter(
