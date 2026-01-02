@@ -17,6 +17,7 @@ from shakenfist.namespace import Namespace
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
+from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
@@ -36,6 +37,7 @@ class MockEtcd():
         self.db = {}
         self.mariadb_states = {}  # Mock MariaDB state storage
         self.ipam_reservations = {}  # Mock MariaDB IPAM reservations storage
+        self.dnsmasq_objects = {}  # Mock MariaDB DnsMasq object storage
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -177,6 +179,37 @@ class MockEtcd():
             side_effect=self._mariadb_get_addresses_in_use)
         self.mariadb_get_addresses_in_use.start()
         self.test_obj.addCleanup(self.mariadb_get_addresses_in_use.stop)
+
+        # Mock MariaDB DnsMasq operations
+        self.mariadb_create_dnsmasq = mock.patch(
+            'shakenfist.mariadb.create_dnsmasq',
+            side_effect=self._mariadb_create_dnsmasq)
+        self.mariadb_create_dnsmasq.start()
+        self.test_obj.addCleanup(self.mariadb_create_dnsmasq.stop)
+
+        self.mariadb_get_dnsmasq = mock.patch(
+            'shakenfist.mariadb.get_dnsmasq',
+            side_effect=self._mariadb_get_dnsmasq)
+        self.mariadb_get_dnsmasq.start()
+        self.test_obj.addCleanup(self.mariadb_get_dnsmasq.stop)
+
+        self.mariadb_get_dnsmasqs = mock.patch(
+            'shakenfist.mariadb.get_dnsmasqs',
+            side_effect=self._mariadb_get_dnsmasqs)
+        self.mariadb_get_dnsmasqs.start()
+        self.test_obj.addCleanup(self.mariadb_get_dnsmasqs.stop)
+
+        self.mariadb_delete_dnsmasq = mock.patch(
+            'shakenfist.mariadb.delete_dnsmasq',
+            side_effect=self._mariadb_delete_dnsmasq)
+        self.mariadb_delete_dnsmasq.start()
+        self.test_obj.addCleanup(self.mariadb_delete_dnsmasq.stop)
+
+        self.mariadb_update_dnsmasq = mock.patch(
+            'shakenfist.mariadb.update_dnsmasq',
+            side_effect=self._mariadb_update_dnsmasq)
+        self.mariadb_update_dnsmasq.start()
+        self.test_obj.addCleanup(self.mariadb_update_dnsmasq.stop)
 
         # Setup basic DB data
         for n in self.nodes:
@@ -376,6 +409,59 @@ class MockEtcd():
             f'MockMariaDB.get_addresses_in_use({ipam_uuid}): {len(result)} '
             f'addresses')
         return result
+
+    def _mariadb_create_dnsmasq(self, data: DnsMasqData) -> bool:
+        """Mock implementation of mariadb.create_dnsmasq()"""
+        key = str(data.uuid)
+        if key in self.dnsmasq_objects:
+            self._trace(f'MockMariaDB.create_dnsmasq({key}): already exists')
+            return False
+        self.dnsmasq_objects[key] = data
+        self._trace(f'MockMariaDB.create_dnsmasq({key}): created')
+        return True
+
+    def _mariadb_get_dnsmasq(self, dnsmasq_uuid) -> Optional[DnsMasqData]:
+        """Mock implementation of mariadb.get_dnsmasq()"""
+        key = str(dnsmasq_uuid)
+        data = self.dnsmasq_objects.get(key)
+        self._trace(f'MockMariaDB.get_dnsmasq({key}): {data}')
+        return data
+
+    def _mariadb_get_dnsmasqs(
+            self, namespace: Optional[str] = None,
+            owner_uuid=None) -> list[DnsMasqData]:
+        """Mock implementation of mariadb.get_dnsmasqs()"""
+        result = []
+        for data in self.dnsmasq_objects.values():
+            if namespace and data.namespace != namespace:
+                continue
+            if owner_uuid and str(data.owner_uuid) != str(owner_uuid):
+                continue
+            result.append(data)
+        self._trace(
+            f'MockMariaDB.get_dnsmasqs(namespace={namespace}, '
+            f'owner_uuid={owner_uuid}): {len(result)}')
+        return result
+
+    def _mariadb_delete_dnsmasq(self, dnsmasq_uuid) -> bool:
+        """Mock implementation of mariadb.delete_dnsmasq()"""
+        key = str(dnsmasq_uuid)
+        if key in self.dnsmasq_objects:
+            del self.dnsmasq_objects[key]
+            self._trace(f'MockMariaDB.delete_dnsmasq({key}): deleted')
+            return True
+        self._trace(f'MockMariaDB.delete_dnsmasq({key}): not found')
+        return False
+
+    def _mariadb_update_dnsmasq(self, data: DnsMasqData) -> bool:
+        """Mock implementation of mariadb.update_dnsmasq()"""
+        key = str(data.uuid)
+        if key in self.dnsmasq_objects:
+            self.dnsmasq_objects[key] = data
+            self._trace(f'MockMariaDB.update_dnsmasq({key}): updated')
+            return True
+        self._trace(f'MockMariaDB.update_dnsmasq({key}): not found')
+        return False
 
     #
     # DB operations - Low level

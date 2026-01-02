@@ -35,6 +35,7 @@ from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_state import State
@@ -54,6 +55,7 @@ _schema_versions_table: Optional[sa.Table] = None
 _object_states_table: Optional[sa.Table] = None
 _ipam_reservations_table: Optional[sa.Table] = None
 _uploads_table: Optional[sa.Table] = None
+_dnsmasq_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -67,9 +69,11 @@ _uploads_table: Optional[sa.Table] = None
 #   ipam_reservations v4: Changed user_type from VARCHAR(32) to ENUM(ObjectType)
 #   ipam_reservations v5: Changed ipam_uuid and user_uuid from VARCHAR(36) to UUID
 #   uploads v1: Initial schema for upload objects
+#   dnsmasq v1: Initial schema for DnsMasq objects
 OBJECT_STATES_VERSION = 2
 IPAM_RESERVATIONS_VERSION = 5
 UPLOADS_VERSION = 1
+DNSMASQ_VERSION = 1
 
 
 def _use_database_service() -> bool:
@@ -539,6 +543,69 @@ def _ensure_uploads_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _get_dnsmasq_table() -> sa.Table:
+    """Get or create the dnsmasq table definition.
+
+    This table stores static values for DnsMasq objects. DnsMasq objects
+    represent running dnsmasq processes that provide DHCP and/or DNS
+    services for virtual networks.
+
+    The table schema is generated from the DnsMasqData Pydantic model in
+    schema/dnsmasq.py. The uuid is the primary key (same as the owning
+    network's UUID), with indexes on namespace and owner_uuid.
+    """
+    global _dnsmasq_table
+    if _dnsmasq_table is None:
+        metadata = _get_metadata()
+        _dnsmasq_table = pydantic_to_sqlalchemy_table(
+            DnsMasqData,
+            'dnsmasq',
+            metadata,
+            primary_key_field='uuid',
+            include_id_column=False
+        )
+    return _dnsmasq_table
+
+
+def _ensure_dnsmasq_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the dnsmasq table schema is up to date.
+
+    Applies any necessary migrations based on the current version.
+    Returns a dict with migration status information.
+    """
+    table_name = 'dnsmasq'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_dnsmasq_table()
+
+    # Version 0 or -1 means table doesn't exist yet - create it with current
+    # schema
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version {DNSMASQ_VERSION})')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        # Create indexes
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = DNSMASQ_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    # Future migrations would go here (if current_ver == 1: ...)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': DNSMASQ_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def ensure_schema() -> list[dict[str, Any]]:
     """Ensure all MariaDB tables exist with current schema versions.
 
@@ -568,6 +635,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_object_states_schema(engine))
     results.append(_ensure_ipam_reservations_schema(engine))
     results.append(_ensure_uploads_schema(engine))
+    results.append(_ensure_dnsmasq_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -1820,3 +1888,385 @@ def update_upload(data: UploadData) -> bool:
     if _use_database_service():
         return _grpc_update_upload(data)
     return _direct_update_upload(data)
+
+
+# =============================================================================
+# DnsMasq Direct Access Functions
+# These are used by the database daemon for DnsMasq object storage.
+# =============================================================================
+
+def _direct_create_dnsmasq(data: DnsMasqData) -> bool:
+    """Create a DnsMasq record in MariaDB.
+
+    Args:
+        data: The DnsMasqData to insert.
+
+    Returns:
+        True if the record was created, False if it already exists or error.
+    """
+    engine = _get_engine()
+    table = _get_dnsmasq_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                namespace=data.namespace,
+                owner_type=str(data.owner_type),
+                owner_uuid=data.owner_uuid,
+                version=data.version,
+                provide_dhcp=data.provide_dhcp,
+                provide_dns=data.provide_dns
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        # DnsMasq already exists
+        return False
+    except OperationalError as e:
+        LOG.warning(f'MariaDB create failed for dnsmasq {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_dnsmasq(dnsmasq_uuid: UUID) -> Optional[DnsMasqData]:
+    """Get DnsMasq static values from MariaDB.
+
+    Args:
+        dnsmasq_uuid: The UUID of the DnsMasq.
+
+    Returns:
+        A DnsMasqData object, or None if not found.
+    """
+    engine = _get_engine()
+    table = _get_dnsmasq_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == dnsmasq_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            # ObjectType is a str enum so we can construct from the string value
+            # stored in the database. Mypy doesn't understand this pattern.
+            return DnsMasqData(
+                uuid=result.uuid,
+                namespace=result.namespace,
+                owner_type=ObjectType(result.owner_type),  # type: ignore[call-arg]
+                owner_uuid=result.owner_uuid,
+                version=result.version,
+                provide_dhcp=result.provide_dhcp,
+                provide_dns=result.provide_dns
+            )
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get failed for dnsmasq {dnsmasq_uuid}: {e}')
+        return None
+
+
+def _direct_get_dnsmasqs(
+    namespace: Optional[str] = None,
+    owner_uuid: Optional[UUID] = None
+) -> list[DnsMasqData]:
+    """Get DnsMasq objects from MariaDB with optional filters.
+
+    Args:
+        namespace: If provided, only return DnsMasq objects in this namespace.
+        owner_uuid: If provided, only return DnsMasq objects owned by this UUID.
+
+    Returns:
+        List of DnsMasqData objects.
+    """
+    engine = _get_engine()
+    table = _get_dnsmasq_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table)
+
+            # Apply optional filters
+            if namespace:
+                stmt = stmt.where(table.c.namespace == namespace)
+            if owner_uuid:
+                stmt = stmt.where(table.c.owner_uuid == owner_uuid)
+
+            result = conn.execute(stmt).fetchall()
+
+            # ObjectType is a str enum so we can construct from the string value
+            return [
+                DnsMasqData(
+                    uuid=row.uuid,
+                    namespace=row.namespace,
+                    owner_type=ObjectType(row.owner_type),  # type: ignore[call-arg]
+                    owner_uuid=row.owner_uuid,
+                    version=row.version,
+                    provide_dhcp=row.provide_dhcp,
+                    provide_dns=row.provide_dns
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for dnsmasqs: {e}')
+        return []
+
+
+def _direct_delete_dnsmasq(dnsmasq_uuid: UUID) -> bool:
+    """Delete a DnsMasq record from MariaDB.
+
+    Args:
+        dnsmasq_uuid: The UUID of the DnsMasq.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_dnsmasq_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == dnsmasq_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for dnsmasq {dnsmasq_uuid}: {e}')
+        return False
+
+
+def _direct_update_dnsmasq(data: DnsMasqData) -> bool:
+    """Update a DnsMasq record in MariaDB.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The DnsMasqData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_dnsmasq_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                namespace=data.namespace,
+                owner_type=str(data.owner_type),
+                owner_uuid=data.owner_uuid,
+                version=data.version,
+                provide_dhcp=data.provide_dhcp,
+                provide_dns=data.provide_dns
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB update failed for dnsmasq {data.uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# DnsMasq gRPC Client Functions
+# These call the database microservice for DnsMasq operations.
+# =============================================================================
+
+def _grpc_create_dnsmasq(data: DnsMasqData) -> bool:
+    """Create a DnsMasq record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateDnsMasqRequest(
+            dnsmasq=database_pb2.DnsMasqData(
+                uuid=str(data.uuid),
+                namespace=data.namespace,
+                owner_type=cast(
+                    shakenfist_enums_pb2.ObjectType.ValueType,
+                    data.owner_type.proto_id),
+                owner_uuid=str(data.owner_uuid),
+                version=data.version,
+                provide_dhcp=data.provide_dhcp,
+                provide_dns=data.provide_dns
+            )
+        )
+        reply = stub.CreateDnsMasq(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC CreateDnsMasq failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_dnsmasq(dnsmasq_uuid: UUID) -> Optional[DnsMasqData]:
+    """Get DnsMasq static values via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetDnsMasqRequest(uuid=str(dnsmasq_uuid))
+        reply = stub.GetDnsMasq(request)
+        if not reply.found:
+            return None
+        owner_type = ObjectType.from_proto_id(reply.dnsmasq.owner_type)
+        if owner_type is None:
+            owner_type = ObjectType.UNKNOWN
+        return DnsMasqData(
+            uuid=reply.dnsmasq.uuid,
+            namespace=reply.dnsmasq.namespace,
+            owner_type=owner_type,
+            owner_uuid=reply.dnsmasq.owner_uuid,
+            version=reply.dnsmasq.version,
+            provide_dhcp=reply.dnsmasq.provide_dhcp,
+            provide_dns=reply.dnsmasq.provide_dns
+        )
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetDnsMasq failed for {dnsmasq_uuid}: {e}')
+        return None
+
+
+def _grpc_get_dnsmasqs(
+    namespace: Optional[str] = None,
+    owner_uuid: Optional[UUID] = None
+) -> list[DnsMasqData]:
+    """Get DnsMasq objects via the database microservice with optional filters.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetDnsMasqsRequest(
+            namespace=namespace or '',
+            owner_uuid=str(owner_uuid) if owner_uuid else ''
+        )
+        reply = stub.GetDnsMasqs(request)
+        results = []
+        for d in reply.dnsmasqs:
+            owner_type = ObjectType.from_proto_id(d.owner_type)
+            if owner_type is None:
+                owner_type = ObjectType.UNKNOWN
+            results.append(DnsMasqData(
+                uuid=d.uuid,
+                namespace=d.namespace,
+                owner_type=owner_type,
+                owner_uuid=d.owner_uuid,
+                version=d.version,
+                provide_dhcp=d.provide_dhcp,
+                provide_dns=d.provide_dns
+            ))
+        return results
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetDnsMasqs failed: {e}')
+        return []
+
+
+def _grpc_delete_dnsmasq(dnsmasq_uuid: UUID) -> bool:
+    """Delete a DnsMasq record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteDnsMasqRequest(uuid=str(dnsmasq_uuid))
+        reply = stub.DeleteDnsMasq(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC DeleteDnsMasq failed for {dnsmasq_uuid}: {e}')
+        return False
+
+
+def _grpc_update_dnsmasq(data: DnsMasqData) -> bool:
+    """Update a DnsMasq record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateDnsMasqRequest(
+            dnsmasq=database_pb2.DnsMasqData(
+                uuid=str(data.uuid),
+                namespace=data.namespace,
+                owner_type=cast(
+                    shakenfist_enums_pb2.ObjectType.ValueType,
+                    data.owner_type.proto_id),
+                owner_uuid=str(data.owner_uuid),
+                version=data.version,
+                provide_dhcp=data.provide_dhcp,
+                provide_dns=data.provide_dns
+            )
+        )
+        reply = stub.UpdateDnsMasq(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC UpdateDnsMasq failed for {data.uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# DnsMasq Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def create_dnsmasq(data: DnsMasqData) -> bool:
+    """Create a DnsMasq record.
+
+    Args:
+        data: The DnsMasqData to insert.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_dnsmasq(data)
+    return _direct_create_dnsmasq(data)
+
+
+def get_dnsmasq(dnsmasq_uuid: UUID) -> Optional[DnsMasqData]:
+    """Get DnsMasq static values.
+
+    Args:
+        dnsmasq_uuid: The UUID of the DnsMasq.
+
+    Returns:
+        A DnsMasqData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_dnsmasq(dnsmasq_uuid)
+    return _direct_get_dnsmasq(dnsmasq_uuid)
+
+
+def get_dnsmasqs(
+    namespace: Optional[str] = None,
+    owner_uuid: Optional[UUID] = None
+) -> list[DnsMasqData]:
+    """Get DnsMasq objects with optional filters.
+
+    Args:
+        namespace: If provided, only return DnsMasq objects in this namespace.
+        owner_uuid: If provided, only return DnsMasq objects owned by this UUID.
+
+    Returns:
+        List of DnsMasqData objects.
+    """
+    if _use_database_service():
+        return _grpc_get_dnsmasqs(namespace, owner_uuid)
+    return _direct_get_dnsmasqs(namespace, owner_uuid)
+
+
+def delete_dnsmasq(dnsmasq_uuid: UUID) -> bool:
+    """Delete a DnsMasq record.
+
+    Args:
+        dnsmasq_uuid: The UUID of the DnsMasq.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_dnsmasq(dnsmasq_uuid)
+    return _direct_delete_dnsmasq(dnsmasq_uuid)
+
+
+def update_dnsmasq(data: DnsMasqData) -> bool:
+    """Update a DnsMasq record.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The DnsMasqData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_dnsmasq(data)
+    return _direct_update_dnsmasq(data)

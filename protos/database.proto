@@ -53,6 +53,13 @@ service DatabaseService {
   rpc GetUploads (GetUploadsRequest) returns (GetUploadsReply) {}
   rpc DeleteUpload (DeleteUploadRequest) returns (StatusReply) {}
   rpc UpdateUpload (UpdateUploadRequest) returns (StatusReply) {}
+
+  // DnsMasq Operations (MariaDB)
+  rpc CreateDnsMasq (CreateDnsMasqRequest) returns (StatusReply) {}
+  rpc GetDnsMasq (GetDnsMasqRequest) returns (GetDnsMasqReply) {}
+  rpc GetDnsMasqs (GetDnsMasqsRequest) returns (GetDnsMasqsReply) {}
+  rpc DeleteDnsMasq (DeleteDnsMasqRequest) returns (StatusReply) {}
+  rpc UpdateDnsMasq (UpdateDnsMasqRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -374,4 +381,50 @@ message DeleteUploadRequest {
 
 message UpdateUploadRequest {
   UploadData upload = 1;
+}
+
+// DnsMasq Operations (MariaDB)
+// These operations manage DnsMasq objects in MariaDB. DnsMasq objects
+// represent running dnsmasq processes that provide DHCP and/or DNS
+// services for virtual networks.
+
+message DnsMasqData {
+  string uuid = 1;                // UUID as string (same as owning network)
+  string namespace = 2;           // Namespace the DnsMasq belongs to
+  ObjectType owner_type = 3;      // Type of the owning object (e.g., NETWORK)
+  string owner_uuid = 4;          // UUID of the owning object
+  int32 version = 5;              // Object version number
+  bool provide_dhcp = 6;          // Whether DHCP services are provided
+  bool provide_dns = 7;           // Whether DNS services are provided
+}
+
+message CreateDnsMasqRequest {
+  DnsMasqData dnsmasq = 1;
+}
+
+message GetDnsMasqRequest {
+  string uuid = 1;
+}
+
+message GetDnsMasqReply {
+  bool found = 1;
+  DnsMasqData dnsmasq = 2;
+}
+
+message GetDnsMasqsRequest {
+  // Optional filters - if not set, returns all DnsMasq objects
+  string namespace = 1;           // Filter by namespace (empty = all)
+  string owner_uuid = 2;          // Filter by owner UUID (empty = all)
+}
+
+message GetDnsMasqsReply {
+  repeated DnsMasqData dnsmasqs = 1;
+}
+
+message DeleteDnsMasqRequest {
+  string uuid = 1;
+}
+
+message UpdateDnsMasqRequest {
+  DnsMasqData dnsmasq = 1;
 }

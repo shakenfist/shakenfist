@@ -209,6 +209,31 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.UpdateUploadRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.CreateDnsMasq = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateDnsMasq',
+                request_serializer=database__pb2.CreateDnsMasqRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetDnsMasq = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetDnsMasq',
+                request_serializer=database__pb2.GetDnsMasqRequest.SerializeToString,
+                response_deserializer=database__pb2.GetDnsMasqReply.FromString,
+                _registered_method=True)
+        self.GetDnsMasqs = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetDnsMasqs',
+                request_serializer=database__pb2.GetDnsMasqsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetDnsMasqsReply.FromString,
+                _registered_method=True)
+        self.DeleteDnsMasq = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteDnsMasq',
+                request_serializer=database__pb2.DeleteDnsMasqRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.UpdateDnsMasq = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateDnsMasq',
+                request_serializer=database__pb2.UpdateDnsMasqRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -431,6 +456,37 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateDnsMasq(self, request, context):
+        """DnsMasq Operations (MariaDB)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetDnsMasq(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetDnsMasqs(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteDnsMasq(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateDnsMasq(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -607,6 +663,31 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'UpdateUpload': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateUpload,
                     request_deserializer=database__pb2.UpdateUploadRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateDnsMasq': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateDnsMasq,
+                    request_deserializer=database__pb2.CreateDnsMasqRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetDnsMasq': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetDnsMasq,
+                    request_deserializer=database__pb2.GetDnsMasqRequest.FromString,
+                    response_serializer=database__pb2.GetDnsMasqReply.SerializeToString,
+            ),
+            'GetDnsMasqs': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetDnsMasqs,
+                    request_deserializer=database__pb2.GetDnsMasqsRequest.FromString,
+                    response_serializer=database__pb2.GetDnsMasqsReply.SerializeToString,
+            ),
+            'DeleteDnsMasq': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteDnsMasq,
+                    request_deserializer=database__pb2.DeleteDnsMasqRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'UpdateDnsMasq': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateDnsMasq,
+                    request_deserializer=database__pb2.UpdateDnsMasqRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
@@ -1554,6 +1635,141 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/UpdateUpload',
             database__pb2.UpdateUploadRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateDnsMasq(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateDnsMasq',
+            database__pb2.CreateDnsMasqRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetDnsMasq(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetDnsMasq',
+            database__pb2.GetDnsMasqRequest.SerializeToString,
+            database__pb2.GetDnsMasqReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetDnsMasqs(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetDnsMasqs',
+            database__pb2.GetDnsMasqsRequest.SerializeToString,
+            database__pb2.GetDnsMasqsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteDnsMasq(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteDnsMasq',
+            database__pb2.DeleteDnsMasqRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateDnsMasq(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateDnsMasq',
+            database__pb2.UpdateDnsMasqRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
