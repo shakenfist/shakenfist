@@ -18,12 +18,10 @@ from shakenfist.artifact import LABEL_URL
 from shakenfist.artifact import type_filter
 from shakenfist.artifact import url_filter
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import LabelHierarchyTooDeep
 from shakenfist.external_api import base as api_base
-from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.util.access_tokens import parse_jwt_identity
 
 
@@ -132,11 +130,6 @@ class LabelEndpoint(api_base.Resource):
 
         for a in artifacts:
             a.add_event(EVENT_TYPE_AUDIT, 'delete request from REST API')
-            a.state = dbo.STATE_DELETED
-            for blob_index in a.get_all_indexes():
-                b = Blob.from_db(blob_index['blob_uuid'])
-                b.ref_count_dec(a)
+            a.delete()
 
-        ev = a.external_view()
-        ev['instances']: instance_usage_for_blob_uuid(b.uuid)
-        return ev
+        return a.external_view()

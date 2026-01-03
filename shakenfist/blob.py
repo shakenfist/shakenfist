@@ -16,6 +16,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
 from shakenfist.schema.operations.node_blob_op \
@@ -27,14 +28,13 @@ from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import GiB
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
-from shakenfist.exceptions import BlobDeleted
 from shakenfist.exceptions import BlobDependencyMissing
 from shakenfist.exceptions import BlobFetchFailed
 from shakenfist.exceptions import BlobMissing
@@ -45,7 +45,6 @@ from shakenfist.exceptions import LocklessUpdateFailed
 from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
-from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import concurrency as util_concurrency
@@ -226,14 +225,30 @@ class Blob(dbo):
 
     @property
     def locations(self):
-        locs = self._db_get_attribute('locations', {'locations': []})
-        return locs['locations']
+        """Return list of node names where this blob is fully present.
+
+        This queries the object_references table for BLOB_LOCATION relationships
+        where nodes reference this blob.
+        """
+        refs = mariadb.get_references_to(ObjectType.BLOB, self.uuid)
+        return [
+            ref.source_uuid for ref in refs
+            if ref.relationship == RelationshipType.BLOB_LOCATION
+        ]
 
     def add_location(self, location):
-        self._add_item_in_attribute_list('locations', location)
+        """Record that this blob is present on the given node."""
+        mariadb.record_relationship(
+            ObjectType.NODE, location,
+            RelationshipType.BLOB_LOCATION, None,
+            ObjectType.BLOB, self.uuid)
 
     def remove_location(self, location):
-        self._remove_item_in_attribute_list('locations', location)
+        """Remove the record that this blob is present on the given node."""
+        mariadb.remove_relationship(
+            ObjectType.NODE, location,
+            RelationshipType.BLOB_LOCATION, None,
+            ObjectType.BLOB, self.uuid)
 
     @property
     def incomplete_locations(self):
@@ -323,36 +338,42 @@ class Blob(dbo):
 
     @property
     def ref_count(self):
-        return int(self.ref_count_with_age['ref_count'])
-
-    @property
-    def ref_count_with_age(self):
-        count = self._db_get_attribute('ref_count', {
-            'ref_count': 0
-        })
-        if 'update_time' not in count:
-            count['update_time'] = time.time()
-        return count
+        """Return the number of references to this blob from object_references."""
+        return mariadb.count_references_to(ObjectType.BLOB, self.uuid)
 
     @property
     def transcoded(self):
-        return self._db_get_attribute('transcoded')
+        """Return a dict of {style: blob_uuid} for all transcodes of this blob."""
+        refs = mariadb.get_references_from(ObjectType.BLOB, self.uuid)
+        result = {}
+        for ref in refs:
+            if ref.relationship == RelationshipType.TRANSCODE:
+                result[ref.relationship_value] = ref.target_uuid
+        return result
 
     def add_transcode(self, style, blob_uuid):
-        self.record_usage()
-        with self.get_lock(op='Update transcoded versions'):
-            transcoded = self.transcoded
-            if style in transcoded:
-                # This is a duplicate transcode
-                return False
+        """Record a transcode relationship from this blob to a transcoded blob.
 
-            transcoded[style] = blob_uuid
-            self._db_set_attribute('transcoded', transcoded)
-            return True
+        Returns True if the transcode was recorded, False if it already exists.
+        """
+        self.record_usage()
+        # Check if this transcode already exists
+        transcoded = self.transcoded
+        if style in transcoded:
+            # This is a duplicate transcode
+            return False
+
+        # Record the relationship in MariaDB
+        mariadb.record_relationship(
+            ObjectType.BLOB, self.uuid,
+            RelationshipType.TRANSCODE, style,
+            ObjectType.BLOB, blob_uuid)
+        return True
 
     def remove_transcodes(self):
-        with self.get_lock(op='Remove transcoded versions'):
-            self._db_set_attribute('transcoded', {})
+        """Remove all transcode relationships from this blob."""
+        mariadb.remove_all_references_from(
+            ObjectType.BLOB, self.uuid, RelationshipType.TRANSCODE)
 
     @property
     def last_used(self):
@@ -406,76 +427,15 @@ class Blob(dbo):
             info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
             self._db_set_attribute('info', info)
 
-    def ref_count_inc(self, baseobject, count=1):
-        with self.get_lock_attr('ref_count', 'Increase reference count'):
-            if self.state.value == self.STATE_DELETED:
-                add_event_multi(
-                    EVENT_TYPE_AUDIT, [baseobject, self],
-                    'attempt to use a deleted blob',
-                    extra={
-                        'blob_uuid': self.uuid,
-                        f'{baseobject.object_type}_uuid': baseobject.uuid
-                    })
-                raise BlobDeleted(self.uuid)
-
-            old_count = self.ref_count
-            new_count = old_count + count
-            self._db_set_attribute('ref_count', {
-                'ref_count': new_count,
-                'update_time': time.time()
-            })
-            self.add_event(
-                EVENT_TYPE_MUTATE, 'incremented reference count',
-                extra={
-                    baseobject.object_type: baseobject.uuid,
-                    'increment': count,
-                    'reference_count': new_count,
-                    'caller': util_callstack.get_caller(offset=-3)
-                    })
-            return new_count
-
-    def ref_count_dec(self, baseobject, count=1):
-        with self.get_lock_attr('ref_count', 'Decrease reference count'):
-            old_count = self.ref_count
-            new_count = old_count - count
-
-            if new_count < 0:
-                new_count = 0
-                self.add_event(
-                    EVENT_TYPE_MUTATE, 'decremented reference count below zero',
-                    extra={
-                        baseobject.object_type: baseobject.uuid,
-                        'decrement': count,
-                        'reference_count': new_count
-                        })
-            else:
-                self.add_event(
-                    EVENT_TYPE_MUTATE, 'decremented reference count',
-                    extra={
-                        baseobject.object_type: baseobject.uuid,
-                        'decrement': count,
-                        'reference_count': new_count
-                        })
-
-            self._db_set_attribute('ref_count', {
-                'ref_count': new_count,
-                'update_time': time.time()
-            })
-            return new_count
-
     def cascading_delete(self):
         self.state = self.STATE_DELETED
 
-        for transcoded_blob_uuid in self.transcoded.values():
-            transcoded_blob = Blob.from_db(transcoded_blob_uuid)
-            if transcoded_blob:
-                transcoded_blob.ref_count_dec(self)
+        # Remove all transcode references from this blob
+        self.remove_transcodes()
 
-        depends_on = self.depends_on
-        if depends_on:
-            dep_blob = Blob.from_db(depends_on)
-            if dep_blob:
-                dep_blob.ref_count_dec(self)
+        # Remove depends_on reference from this blob to its dependency
+        mariadb.remove_all_references_from(
+            ObjectType.BLOB, self.uuid, RelationshipType.DEPENDS_ON)
 
     def ensure_local(self, instance_object=None, wait_for_other_transfers=True):
         affected_objects = [self]
@@ -894,7 +854,6 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
 
     # Check that the dependency (if any) actually exists. This test can fail when
     # the blob used to start an instance has been deleted already.
-    dep_blob = None
     if depends_on:
         dep_blob = Blob.from_db(depends_on)
         if not dep_blob or dep_blob.state.value != Blob.STATE_CREATED:
@@ -905,8 +864,14 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     # snapshot checksum here, as this makes large snapshots even slower for users.
     # The checksum will "catch up" when the scheduled verification occurs.
     b = Blob.new(blob_uuid, time.time(), time.time(), depends_on=depends_on)
-    if dep_blob:
-        dep_blob.ref_count_inc(b)
+
+    # Record the depends_on reference in the object_references table
+    if depends_on:
+        mariadb.record_relationship(
+            ObjectType.BLOB, blob_uuid,
+            RelationshipType.DEPENDS_ON, None,
+            ObjectType.BLOB, depends_on)
+
     b.register()
     return b
 
@@ -997,3 +962,50 @@ class Blobs(dbo_iter):
 
 def placement_filter(node, b):
     return node in b.locations
+
+
+def observe_local_blobs():
+    """Observe all blob files on this node to update BLOB_LOCATION references.
+
+    This function scans the local blob storage directory and calls observe()
+    on each valid blob. This updates:
+    1. The BLOB_LOCATION reference in MariaDB (with last_active timestamp)
+    2. The node.blobs cache in etcd
+
+    This replaces the cluster daemon's periodic cache rebuild, making each
+    node authoritative for its own blob locations.
+
+    Returns:
+        int: The number of blobs observed.
+    """
+    import pathlib  # Local import to avoid circular dependency
+
+    blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
+    if not os.path.exists(blob_path):
+        return 0
+
+    observed_count = 0
+    try:
+        p = pathlib.Path(blob_path)
+        for entpath in p.glob('**/*'):
+            entpath = str(entpath)
+
+            # Skip version files and partial transfers
+            if entpath.endswith('/_version') or entpath.endswith('.partial'):
+                continue
+
+            if not os.path.isfile(entpath):
+                continue
+
+            blob_uuid = entpath.split('/')[-1]
+            b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
+            if b and b.state.value == Blob.STATE_CREATED:
+                # Calling observe() updates the BLOB_LOCATION reference
+                # (with last_active timestamp) and the node.blobs cache
+                b.observe()
+                observed_count += 1
+
+    except FileNotFoundError:
+        ...
+
+    return observed_count

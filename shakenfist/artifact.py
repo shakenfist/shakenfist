@@ -8,14 +8,15 @@ from shakenfist import baseobject
 from shakenfist import blob
 from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations as dbowo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
-from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 
 
 LOG, _ = logs.setup(__name__)
@@ -307,9 +308,10 @@ class Artifact(dbowo):
             }
             self._db_set_attribute('index_%012d' % index, entry)
             if not self.in_memory_only:
-                new_blob.ref_count_inc(self)
-            self.add_event(EVENT_TYPE_AUDIT, 'added index to artifact',
-                           extra={'index': index})
+                mariadb.record_relationship(
+                    ObjectType.ARTIFACT, self.uuid,
+                    RelationshipType.ARTIFACT_INDEX, str(index).zfill(12),
+                    ObjectType.BLOB, blob_uuid)
 
             # There is an implied billing update in delete_old_versions, so we
             # don't need one of our own here.
@@ -332,22 +334,21 @@ class Artifact(dbowo):
             return
 
         self._db_delete_attribute('index_%012d' % index)
-        b = blob.Blob.from_db(index_data['blob_uuid'])
-        if b and not self.in_memory_only:
-            b.ref_count_dec(self)
+        if not self.in_memory_only:
+            mariadb.remove_relationship(
+                ObjectType.ARTIFACT, self.uuid,
+                RelationshipType.ARTIFACT_INDEX, str(index).zfill(12),
+                ObjectType.BLOB, index_data['blob_uuid'])
 
-        self.add_event(EVENT_TYPE_AUDIT, 'deleted index from artifact',
-                       extra={'index': index})
         if update_billing:
             self.update_billing()
 
     def delete(self):
         self.state = self.STATE_DELETED
 
-        for blob_index in self.get_all_indexes():
-            b = blob.Blob.from_db(blob_index['blob_uuid'])
-            if b and not self.in_memory_only:
-                b.ref_count_dec(self)
+        # Remove all artifact index references from this artifact
+        if not self.in_memory_only:
+            mariadb.remove_all_references_from(ObjectType.ARTIFACT, self.uuid)
 
     def resolve_to_blob(self):
         mri = self.most_recent_index

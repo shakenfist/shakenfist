@@ -11,6 +11,7 @@ shakenfist/schema/. To regenerate:
 
 Source of truth: schema/object_types.py
                  schema/ipam_reservation.py
+                 schema/relationship_types.py
 """
 
 import abc

@@ -11,6 +11,7 @@ shakenfist/schema/. To regenerate:
 
 Source of truth: schema/object_types.py
                  schema/ipam_reservation.py
+                 schema/relationship_types.py
 """
 
 import builtins
@@ -201,3 +202,47 @@ RESERVATION_TYPE_DELETION_HALO: ReservationType.ValueType  # 7
 RESERVATION_TYPE_UNKNOWN: ReservationType.ValueType  # 8
 """"unknown" """
 global___ReservationType = ReservationType
+
+class _RelationshipType:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _RelationshipTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_RelationshipType.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    RELATIONSHIP_TYPE_UNSPECIFIED: _RelationshipType.ValueType  # 0
+    RELATIONSHIP_TYPE_DISK: _RelationshipType.ValueType  # 1
+    """"disk" """
+    RELATIONSHIP_TYPE_NVRAM_TEMPLATE: _RelationshipType.ValueType  # 2
+    """"nvram_template" """
+    RELATIONSHIP_TYPE_ARTIFACT_INDEX: _RelationshipType.ValueType  # 3
+    """"artifact_index" """
+    RELATIONSHIP_TYPE_DEPENDS_ON: _RelationshipType.ValueType  # 4
+    """"depends_on" """
+    RELATIONSHIP_TYPE_TRANSCODE: _RelationshipType.ValueType  # 5
+    """"transcode" """
+    RELATIONSHIP_TYPE_AGENT_OUTPUT: _RelationshipType.ValueType  # 6
+    """"agent_output" """
+    RELATIONSHIP_TYPE_BLOB_LOCATION: _RelationshipType.ValueType  # 7
+    """"blob_location" """
+
+class RelationshipType(_RelationshipType, metaclass=_RelationshipTypeEnumTypeWrapper):
+    """RelationshipType enum - object reference relationship types
+    Maps to Python: shakenfist.schema.relationship_types.RelationshipType
+    """
+
+RELATIONSHIP_TYPE_UNSPECIFIED: RelationshipType.ValueType  # 0
+RELATIONSHIP_TYPE_DISK: RelationshipType.ValueType  # 1
+""""disk" """
+RELATIONSHIP_TYPE_NVRAM_TEMPLATE: RelationshipType.ValueType  # 2
+""""nvram_template" """
+RELATIONSHIP_TYPE_ARTIFACT_INDEX: RelationshipType.ValueType  # 3
+""""artifact_index" """
+RELATIONSHIP_TYPE_DEPENDS_ON: RelationshipType.ValueType  # 4
+""""depends_on" """
+RELATIONSHIP_TYPE_TRANSCODE: RelationshipType.ValueType  # 5
+""""transcode" """
+RELATIONSHIP_TYPE_AGENT_OUTPUT: RelationshipType.ValueType  # 6
+""""agent_output" """
+RELATIONSHIP_TYPE_BLOB_LOCATION: RelationshipType.ValueType  # 7
+""""blob_location" """
+global___RelationshipType = RelationshipType

@@ -68,20 +68,10 @@ class Monitor(daemon.Daemon):
     def _cluster_wide_cleanup(self, last_loop_run):
         LOG.info('Running cluster maintenance')
 
-        # Recompute our cache of what blobs are on what nodes every 30 minutes
-        if time.time() - last_loop_run > 1800:
-            per_node = defaultdict(list)
-            for b in Blobs([], prefilter='active'):
-                if not b.locations:
-                    b.add_event(EVENT_TYPE_AUDIT,
-                                'no locations for this blob, hard deleting.')
-                    b.hard_delete()
-
-                for node in b.locations:
-                    per_node[node].append(b.uuid)
-
-            for node in Nodes([]):
-                node.blobs = per_node.get(node.uuid, [])
+        # NOTE: The per-node blob cache is now maintained by each node's
+        # cleaner daemon calling observe() on local blobs. The cleaner also
+        # handles hard-deleting blobs with no locations. This is more accurate
+        # since each node knows definitively what files exist on its local disk.
 
         # Cleanup vxids which specify a missing network. We ignore allocations
         # less than five minutes old to let the network setup complete.
@@ -215,17 +205,15 @@ class Monitor(daemon.Daemon):
             if instances:
                 in_use_blobs[b.uuid] += 1
 
-            # If the blob's reference count has been zero for a while, we can
-            # reap it
-            ref_count = b.ref_count_with_age
-            if time.time() - ref_count['update_time'] > 300:
-                if ref_count['ref_count'] < 1:
-                    b.add_event(
-                        EVENT_TYPE_AUDIT,
-                        'reference count has been zero or below for at least '
-                        'five minutes, cascading delete initiated')
-                    b.cascading_delete()
-                    continue
+            # If the blob's reference count is zero, we can reap it. With the
+            # MariaDB-based object_references table, ref_count is computed
+            # dynamically from actual relationships, so there's no drift.
+            if b.ref_count < 1:
+                b.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'reference count is zero, cascading delete initiated')
+                b.cascading_delete()
+                continue
 
             locations = b.locations + b.incomplete_healthy_locations
             delta = len(locations) - config.BLOB_REPLICATION_FACTOR
@@ -315,11 +303,7 @@ class Monitor(daemon.Daemon):
                 continue
 
             if time.time() - b.last_used > config.BLOB_TRANSCODE_MAXIMUM_IDLE_TIME:
-                transcoded = b.transcoded
                 b.remove_transcodes()
-                for transcode in transcoded:
-                    tb = Blob.from_db(transcoded[transcode])
-                    tb.ref_count_dec(b)
 
         # Node management
         for n in Nodes([]):

@@ -135,7 +135,6 @@ class ImageCacheOp(BaseClusterOperation):
                         'description': self.transcode_description
                     }
                 )
-                transcode_blob.ref_count_inc(b)
             else:
                 # We get a false back if someone else beat us and
                 # has already recorded the same transcoding. In

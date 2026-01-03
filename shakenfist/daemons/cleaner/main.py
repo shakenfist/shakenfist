@@ -12,6 +12,7 @@ from shakenfist import instance
 from shakenfist import node
 from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
+from shakenfist.blob import observe_local_blobs
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons.cleaner import scheduled_tasks
@@ -170,10 +171,10 @@ class Monitor(daemon.Daemon):
             util_exceptions.ignore_exception('etcd compaction', e)
 
     def _run_inner(self):
-        schedule.every(1).minutes.do(
-            scheduled_tasks.update_power_states)
+        schedule.every(1).minutes.do(scheduled_tasks.update_power_states)
         schedule.every(5).minutes.do(
             scheduled_tasks.remove_stale_uploads_for_this_node)
+        schedule.every(5).minutes.do(observe_local_blobs)
 
         last_defer_message = 0
 

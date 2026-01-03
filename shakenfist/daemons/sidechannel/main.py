@@ -16,6 +16,7 @@ import symbolicmode
 
 from shakenfist import blob
 from shakenfist import constants
+from shakenfist import mariadb
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
@@ -26,6 +27,8 @@ from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import NoSuchChannel
 from shakenfist import instance
 from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.protos import agent_pb2
 from shakenfist.protos import common_pb2
 from shakenfist.util import concurrency as util_concurrency
@@ -357,7 +360,10 @@ class SideChannelExecutorJob(SideChannelJob):
         stdout = reply.execute_reply.stdout
         if len(stdout) > 10 * constants.KiB:
             b = blob.from_memory(stdout.encode('utf-8'))
-            b.ref_count_inc(self.agentop)
+            mariadb.record_relationship(
+                ObjectType.AGENTOPERATION, self.agentop.uuid,
+                RelationshipType.AGENT_OUTPUT, 'stdout',
+                ObjectType.BLOB, b.uuid)
             result['stdout_blob'] = str(b.uuid)
         else:
             result['stdout'] = stdout
@@ -365,7 +371,10 @@ class SideChannelExecutorJob(SideChannelJob):
         stderr = reply.execute_reply.stderr
         if len(stderr) > 10 * constants.KiB:
             b = blob.from_memory(stderr.encode('utf-8'))
-            b.ref_count_inc(self.agentop)
+            mariadb.record_relationship(
+                ObjectType.AGENTOPERATION, self.agentop.uuid,
+                RelationshipType.AGENT_OUTPUT, 'stderr',
+                ObjectType.BLOB, b.uuid)
             result['stderr_blob'] = str(b.uuid)
         else:
             result['stderr'] = stderr

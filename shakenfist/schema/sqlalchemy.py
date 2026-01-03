@@ -257,7 +257,7 @@ def pydantic_to_sqlalchemy_table(
         model: type[BaseModel],
         table_name: str,
         metadata: sa.MetaData,
-        primary_key_field: Optional[str] = None,
+        primary_key_fields: Optional[list[str]] = None,
         indexes: Optional[list[tuple[str, ...]]] = None,
         include_id_column: bool = True) -> sa.Table:
     """Convert a Pydantic model to a SQLAlchemy Table.
@@ -271,12 +271,14 @@ def pydantic_to_sqlalchemy_table(
         model: The Pydantic model class to convert.
         table_name: Name for the SQL table.
         metadata: SQLAlchemy MetaData to attach the table to.
-        primary_key_field: If set, use this field as the primary key instead
-            of adding an auto-increment id column.
+        primary_key_fields: If set, use these fields as the primary key instead
+            of adding an auto-increment id column. For single-column primary
+            keys, pass a list with one element: ['uuid']. For compound primary
+            keys, pass all columns: ['source_uuid', 'target_uuid'].
         indexes: List of tuples defining indexes. Each tuple contains column
             names to index together. For example: [('object_type', 'state')]
             These are merged with indexes from model annotations.
-        include_id_column: If True and no primary_key_field is set, add an
+        include_id_column: If True and no primary_key_fields is set, add an
             auto-increment id column.
 
     Returns:
@@ -285,8 +287,11 @@ def pydantic_to_sqlalchemy_table(
     columns: list[sa.Column[Any]] = []
     table_indexes: list[tuple[str, bool]] = []
 
-    # Add auto-increment id column unless we're using a field as primary key
-    if include_id_column and not primary_key_field:
+    # Normalize primary key specification
+    pk_fields: set[str] = set(primary_key_fields) if primary_key_fields else set()
+
+    # Add auto-increment id column unless we're using field(s) as primary key
+    if include_id_column and not pk_fields:
         columns.append(
             sa.Column('id', sa.BigInteger(), primary_key=True,
                       autoincrement=True)
@@ -299,7 +304,7 @@ def pydantic_to_sqlalchemy_table(
 
         # Pass field metadata to get correct SQL type (e.g., native UUID)
         col_type = _get_sqlalchemy_type(annotation, field_info.metadata)
-        is_pk = (field_name == primary_key_field)
+        is_pk = field_name in pk_fields
 
         columns.append(
             sa.Column(

@@ -3,12 +3,97 @@ import importlib
 import json
 import logging
 import os
+import uuid as uuid_module
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Optional
 
 import click
 from shakenfist_utilities import logs  # noreorder
 
 
 LOG = logs.setup_console(__name__)
+
+
+@dataclass
+class MigrationStats:
+    """Track statistics during migration operations."""
+    migrated: int = 0
+    skipped: int = 0
+    errors: int = 0
+    categories: dict = field(default_factory=dict)
+    progress_interval: int = 100
+
+    def add_category(self, name: str):
+        """Add a category to track separately."""
+        self.categories[name] = 0
+
+    def record_migrated(self, category: Optional[str] = None):
+        """Record a successful migration."""
+        self.migrated += 1
+        if category and category in self.categories:
+            self.categories[category] += 1
+
+    def record_skipped(self):
+        """Record a skipped item (already exists)."""
+        self.skipped += 1
+
+    def record_error(self, message: str):
+        """Record an error."""
+        self.errors += 1
+        click.echo(f'  {message}')
+
+    @property
+    def total_processed(self) -> int:
+        """Total items processed (migrated + skipped + errors)."""
+        return self.migrated + self.skipped + self.errors
+
+    def should_show_progress(self) -> bool:
+        """Check if we should show progress update."""
+        return (self.total_processed > 0 and
+                self.total_processed % self.progress_interval == 0)
+
+    def show_progress(self, object_type: str = 'items'):
+        """Show progress if interval reached."""
+        if self.should_show_progress():
+            click.echo(f'  ... {self.total_processed} {object_type} processed')
+
+    def print_summary(self):
+        """Print migration summary."""
+        if self.categories:
+            click.echo('\n--- Migration Summary ---')
+            for name, count in self.categories.items():
+                click.echo(f'  {name}: {count}')
+            total = sum(self.categories.values())
+            click.echo(f'\nTotal: {total}')
+        else:
+            click.echo(f'\nTotal: {self.migrated} migrated')
+        click.echo(f'Skipped (already exist): {self.skipped}')
+        click.echo(f'Errors: {self.errors}')
+
+
+def parse_uuid(uuid_str: str, description: str = 'UUID') -> Optional[uuid_module.UUID]:
+    """Parse a UUID string, returning None if invalid."""
+    try:
+        return uuid_module.UUID(uuid_str)
+    except (ValueError, AttributeError):
+        return None
+
+
+def migration_precheck(dry_run: bool) -> bool:
+    """Common pre-migration setup. Returns True if setup succeeded."""
+    if not dry_run:
+        click.echo('Ensuring MariaDB schema exists...')
+        mariadb.ensure_schema()
+    return True
+
+
+def migration_postcheck(dry_run: bool):
+    """Common post-migration message."""
+    if dry_run:
+        click.echo('\nThis was a dry run. No changes were made.')
+    else:
+        click.echo('\nMigration complete. You can now start Shaken Fist services.')
 
 
 # Utilities not started by systemd need to load /etc/sf/config to ensure
@@ -257,58 +342,40 @@ def migrate_state_to_mariadb(dry_run):
 
     After migration, the state entries are removed from etcd.
     """
-    # Ensure the MariaDB schema exists. This will raise an error if MariaDB
-    # is not configured.
-    if not dry_run:
-        click.echo('Ensuring MariaDB schema exists...')
-        mariadb.ensure_schema()
-
-    total_migrated = 0
-    total_skipped = 0
+    migration_precheck(dry_run)
+    stats = MigrationStats()
 
     for object_type in OBJECT_TYPES_WITH_STATE:
         click.echo(f'\nMigrating {object_type} objects...')
-        migrated = 0
-        skipped = 0
+        type_migrated = 0
+        type_skipped = 0
 
-        # Iterate through all objects of this type
         for objkey, _ in etcd.get_all(object_type, None):
-            # Extract UUID from the etcd key
             objuuid = objkey.split('/')[-1]
-
-            # Get state from etcd
             state_data = etcd.get(f'attribute/{object_type}', objuuid, 'state')
             if not state_data:
-                skipped += 1
+                type_skipped += 1
                 continue
 
             if dry_run:
                 click.echo(f'  Would migrate {objuuid}: {state_data.get("value")}')
             else:
-                # Write to MariaDB
                 state = State(**state_data)
                 mariadb.set_state(ObjectType(object_type), objuuid, state)
-
-                # Remove from etcd
                 etcd.delete(f'attribute/{object_type}', objuuid, 'state')
 
-            migrated += 1
+            type_migrated += 1
+            if type_migrated % 100 == 0:
+                click.echo(f'  ... {type_migrated} objects processed')
 
-            # Show progress every 100 objects
-            if migrated % 100 == 0:
-                click.echo(f'  ... {migrated} objects processed')
+        click.echo(f'  {object_type}: {type_migrated} migrated, '
+                   f'{type_skipped} skipped')
+        stats.migrated += type_migrated
+        stats.skipped += type_skipped
 
-        click.echo(f'  {object_type}: {migrated} migrated, {skipped} skipped')
-        total_migrated += migrated
-        total_skipped += skipped
-
-    click.echo(f'\nTotal: {total_migrated} objects migrated, '
-               f'{total_skipped} objects skipped (no state)')
-
-    if dry_run:
-        click.echo('\nThis was a dry run. No changes were made.')
-    else:
-        click.echo('\nMigration complete. You can now start Shaken Fist services.')
+    click.echo(f'\nTotal: {stats.migrated} objects migrated, '
+               f'{stats.skipped} objects skipped (no state)')
+    migration_postcheck(dry_run)
 
 
 @click.command()
@@ -325,26 +392,15 @@ def migrate_ipam_to_mariadb(dry_run):
     """
     from shakenfist.schema.ipam_reservation import IPAMReservation
 
-    # Ensure the MariaDB schema exists
-    if not dry_run:
-        click.echo('Ensuring MariaDB schema exists...')
-        mariadb.ensure_schema()
-
-    total_migrated = 0
-    total_skipped = 0
-    total_errors = 0
+    migration_precheck(dry_run)
+    stats = MigrationStats()
 
     click.echo('\nScanning for IPAM reservations in etcd...')
 
-    # Get all IPAM reservation paths from etcd
-    # The path format is /sf/ipam_reservations/{ipam_uuid}/{address}
     for key, data in etcd.get_prefix_raw('/sf/ipam_reservations/'):
-        # Parse the key to extract ipam_uuid and address
-        # Key format: /sf/ipam_reservations/{ipam_uuid}/{address}
         parts = key.split('/')
         if len(parts) < 5:
-            click.echo(f'  Skipping invalid key: {key}')
-            total_skipped += 1
+            stats.record_error(f'Skipping invalid key: {key}')
             continue
 
         ipam_uuid = parts[3]
@@ -353,42 +409,26 @@ def migrate_ipam_to_mariadb(dry_run):
         if dry_run:
             res_type = data.get('type', 'unknown')
             click.echo(f'  Would migrate {ipam_uuid}/{address}: {res_type}')
-            total_migrated += 1
+            stats.record_migrated()
             continue
 
         try:
-            # Convert legacy data to IPAMReservation
             reservation = IPAMReservation.from_legacy_dict(ipam_uuid, data)
-
-            # Write to MariaDB - use direct access since we're in ctl
             success = mariadb._direct_reserve_address(reservation)
             if success:
-                # Remove from etcd
                 etcd.delete_raw(key)
-                total_migrated += 1
+                stats.record_migrated()
             else:
-                # Address already exists in MariaDB
                 click.echo(f'  Skipping {ipam_uuid}/{address}: already in MariaDB')
-                # Still remove from etcd since the data is in MariaDB
                 etcd.delete_raw(key)
-                total_skipped += 1
+                stats.record_skipped()
         except Exception as e:
-            click.echo(f'  Error migrating {ipam_uuid}/{address}: {e}')
-            total_errors += 1
+            stats.record_error(f'Error migrating {ipam_uuid}/{address}: {e}')
 
-        # Show progress every 100 reservations
-        if (total_migrated + total_skipped + total_errors) % 100 == 0:
-            click.echo(
-                f'  ... {total_migrated + total_skipped + total_errors} '
-                'reservations processed')
+        stats.show_progress('reservations')
 
-    click.echo(f'\nTotal: {total_migrated} migrated, {total_skipped} skipped, '
-               f'{total_errors} errors')
-
-    if dry_run:
-        click.echo('\nThis was a dry run. No changes were made.')
-    else:
-        click.echo('\nMigration complete. You can now start Shaken Fist services.')
+    stats.print_summary()
+    migration_postcheck(dry_run)
 
 
 @click.command()
@@ -488,65 +528,47 @@ def migrate_uploads_to_mariadb(dry_run):
 
     After migration, the upload entries are removed from etcd.
     """
-    import uuid as uuid_module
     from shakenfist.upload import Upload
 
-    # Ensure the MariaDB schema exists
-    if not dry_run:
-        click.echo('Ensuring MariaDB schema exists...')
-        mariadb.ensure_schema()
-
-    total_migrated = 0
-    total_skipped = 0
-    total_errors = 0
+    migration_precheck(dry_run)
+    stats = MigrationStats()
 
     click.echo('\nScanning for upload objects in etcd...')
 
-    # Iterate through all upload objects in etcd
     for objkey, data in etcd.get_all('upload', None):
-        # Extract UUID from the etcd key
         upload_uuid = objkey.split('/')[-1]
 
         if dry_run:
             click.echo(f'  Would migrate {upload_uuid}: node={data.get("node")}')
-            total_migrated += 1
+            stats.record_migrated()
             continue
 
         try:
-            # Write to MariaDB
+            upload_uuid_obj = parse_uuid(upload_uuid, 'upload UUID')
+            if not upload_uuid_obj:
+                stats.record_error(f'Invalid UUID: {upload_uuid}')
+                continue
+
             success = mariadb.create_upload(
-                uuid_module.UUID(upload_uuid),
+                upload_uuid_obj,
                 data['node'],
                 data['created_at'],
                 data.get('version', Upload.current_version)
             )
             if success:
-                # Remove from etcd
                 etcd.delete('upload', None, upload_uuid)
-                total_migrated += 1
+                stats.record_migrated()
             else:
-                # Upload already exists in MariaDB
                 click.echo(f'  Skipping {upload_uuid}: already in MariaDB')
-                # Still remove from etcd since the data is in MariaDB
                 etcd.delete('upload', None, upload_uuid)
-                total_skipped += 1
+                stats.record_skipped()
         except Exception as e:
-            click.echo(f'  Error migrating {upload_uuid}: {e}')
-            total_errors += 1
+            stats.record_error(f'Error migrating {upload_uuid}: {e}')
 
-        # Show progress every 100 uploads
-        if (total_migrated + total_skipped + total_errors) % 100 == 0:
-            click.echo(
-                f'  ... {total_migrated + total_skipped + total_errors} '
-                'uploads processed')
+        stats.show_progress('uploads')
 
-    click.echo(f'\nTotal: {total_migrated} migrated, {total_skipped} skipped, '
-               f'{total_errors} errors')
-
-    if dry_run:
-        click.echo('\nThis was a dry run. No changes were made.')
-    else:
-        click.echo('\nMigration complete. You can now start Shaken Fist services.')
+    stats.print_summary()
+    migration_postcheck(dry_run)
 
 
 @cli.command(name='migrate-dnsmasq-to-mariadb')
@@ -563,23 +585,14 @@ def migrate_dnsmasq_to_mariadb(dry_run):
     """
     from shakenfist.managed_executables.dnsmasq import DnsMasq
     from shakenfist.schema.dnsmasq import DnsMasqData
-    from shakenfist.schema.object_types import ObjectType
 
-    # Ensure the MariaDB schema exists
-    if not dry_run:
-        click.echo('Ensuring MariaDB schema exists...')
-        mariadb.ensure_schema()
-
-    total_migrated = 0
-    total_skipped = 0
-    total_errors = 0
+    migration_precheck(dry_run)
+    stats = MigrationStats()
 
     click.echo('\nScanning for DnsMasq objects in etcd...')
 
-    # Iterate through all DnsMasq objects in etcd
     # DnsMasq uses ObjectType.DHCP for historical reasons
     for objkey, data in etcd.get_all('dhcp', None):
-        # Extract UUID from the etcd key
         dnsmasq_uuid = objkey.split('/')[-1]
 
         # Apply upgrades to legacy data
@@ -606,11 +619,10 @@ def migrate_dnsmasq_to_mariadb(dry_run):
                 f'owner={owner_type}({data.get("owner_uuid")}), '
                 f'dhcp={data.get("provide_dhcp")}, '
                 f'dns={data.get("provide_dns")}')
-            total_migrated += 1
+            stats.record_migrated()
             continue
 
         try:
-            # Create DnsMasqData and write to MariaDB
             dnsmasq_data = DnsMasqData(
                 uuid=dnsmasq_uuid,
                 namespace=data.get('namespace', 'unknown'),
@@ -622,32 +634,314 @@ def migrate_dnsmasq_to_mariadb(dry_run):
             )
             success = mariadb.create_dnsmasq(dnsmasq_data)
             if success:
-                # Remove from etcd
                 etcd.delete('dhcp', None, dnsmasq_uuid)
-                total_migrated += 1
+                stats.record_migrated()
             else:
-                # DnsMasq already exists in MariaDB
                 click.echo(f'  Skipping {dnsmasq_uuid}: already in MariaDB')
-                # Still remove from etcd since the data is in MariaDB
                 etcd.delete('dhcp', None, dnsmasq_uuid)
-                total_skipped += 1
+                stats.record_skipped()
         except Exception as e:
-            click.echo(f'  Error migrating {dnsmasq_uuid}: {e}')
-            total_errors += 1
+            stats.record_error(f'Error migrating {dnsmasq_uuid}: {e}')
 
-        # Show progress every 100 DnsMasq objects
-        if (total_migrated + total_skipped + total_errors) % 100 == 0:
-            click.echo(
-                f'  ... {total_migrated + total_skipped + total_errors} '
-                'DnsMasq objects processed')
+        stats.show_progress('DnsMasq objects')
 
-    click.echo(f'\nTotal: {total_migrated} migrated, {total_skipped} skipped, '
-               f'{total_errors} errors')
+    stats.print_summary()
+    migration_postcheck(dry_run)
 
-    if dry_run:
-        click.echo('\nThis was a dry run. No changes were made.')
-    else:
-        click.echo('\nMigration complete. You can now start Shaken Fist services.')
+
+@click.command()
+@click.option('--dry-run', is_flag=True, default=False,
+              help='Show what would be migrated without making changes')
+def migrate_references_to_mariadb(dry_run):
+    """Migrate blob references to the MariaDB object_references table.
+
+    This command scans all objects that reference blobs and creates
+    relationship records in the MariaDB object_references table. This
+    replaces the manual ref_count attribute previously stored on blobs.
+
+    After migration, the old blob_references attributes are removed from
+    instances and the ref_count attributes are removed from blobs.
+
+    All Shaken Fist services should be stopped before running this command.
+    """
+    import time
+    from shakenfist.schema.relationship_types import RelationshipType
+
+    migration_precheck(dry_run)
+    stats = MigrationStats()
+    stats.add_category('DISK')
+    stats.add_category('NVRAM_TEMPLATE')
+    stats.add_category('ARTIFACT_INDEX')
+    stats.add_category('DEPENDS_ON')
+    stats.add_category('TRANSCODE')
+    stats.add_category('AGENT_OUTPUT')
+    now = time.time()
+
+    # --- Instances: disk references and nvram_template ---
+    click.echo('\nScanning instances for blob references...')
+    for objkey, data in etcd.get_all('instance', None):
+        instance_uuid = objkey.split('/')[-1]
+        instance_uuid_obj = parse_uuid(instance_uuid, 'instance UUID')
+        if not instance_uuid_obj:
+            stats.record_error(f'Invalid instance UUID: {instance_uuid}')
+            continue
+
+        disk_spec = data.get('disk_spec', [])
+
+        # Create DISK references for each disk with a blob_uuid
+        for disk_idx, disk in enumerate(disk_spec):
+            blob_uuid = disk.get('blob_uuid')
+            if not blob_uuid:
+                continue
+
+            blob_uuid_obj = parse_uuid(blob_uuid, 'blob UUID')
+            if not blob_uuid_obj:
+                stats.record_error(f'Invalid blob UUID: {blob_uuid}')
+                continue
+
+            if dry_run:
+                click.echo(
+                    f'  Would create DISK reference: instance {instance_uuid} '
+                    f'disk {disk_idx} -> blob {blob_uuid}')
+                stats.record_migrated('DISK')
+            else:
+                success = mariadb.record_relationship(
+                    ObjectType.INSTANCE, instance_uuid_obj,
+                    RelationshipType.DISK, str(disk_idx),
+                    ObjectType.BLOB, blob_uuid_obj,
+                    now)
+                if success:
+                    stats.record_migrated('DISK')
+                else:
+                    stats.record_skipped()
+
+        # Handle nvram_template
+        nvram_template = data.get('nvram_template')
+        if nvram_template:
+            nvram_uuid_obj = parse_uuid(nvram_template, 'nvram UUID')
+            if not nvram_uuid_obj:
+                stats.record_error(f'Invalid nvram UUID: {nvram_template}')
+            elif dry_run:
+                click.echo(
+                    f'  Would create NVRAM_TEMPLATE reference: '
+                    f'instance {instance_uuid} -> blob {nvram_template}')
+                stats.record_migrated('NVRAM_TEMPLATE')
+            else:
+                success = mariadb.record_relationship(
+                    ObjectType.INSTANCE, instance_uuid_obj,
+                    RelationshipType.NVRAM_TEMPLATE, None,
+                    ObjectType.BLOB, nvram_uuid_obj,
+                    now)
+                if success:
+                    stats.record_migrated('NVRAM_TEMPLATE')
+                else:
+                    stats.record_skipped()
+
+        # Remove old blob_references attribute if not dry run
+        if not dry_run:
+            etcd.delete('attribute/instance', instance_uuid, 'blob_references')
+
+        stats.show_progress('instance references')
+
+    # --- Artifacts: index_* references ---
+    click.echo('\nScanning artifacts for index references...')
+    for objkey, _ in etcd.get_all('artifact', None):
+        artifact_uuid = objkey.split('/')[-1]
+        artifact_uuid_obj = parse_uuid(artifact_uuid, 'artifact UUID')
+        if not artifact_uuid_obj:
+            stats.record_error(f'Invalid artifact UUID: {artifact_uuid}')
+            continue
+
+        # Get all index_* attributes
+        for attrkey, index_data in etcd.get_all(
+                'attribute/artifact', artifact_uuid, prefix='index_'):
+            if not index_data:
+                continue
+
+            # Extract index number from attribute key
+            index_str = attrkey.split('/')[-1].replace('index_', '')
+            blob_uuid = index_data.get('blob_uuid')
+            if not blob_uuid:
+                continue
+
+            blob_uuid_obj = parse_uuid(blob_uuid, 'blob UUID')
+            if not blob_uuid_obj:
+                stats.record_error(f'Invalid blob UUID: {blob_uuid}')
+                continue
+
+            if dry_run:
+                click.echo(
+                    f'  Would create ARTIFACT_INDEX reference: '
+                    f'artifact {artifact_uuid} index {index_str} -> '
+                    f'blob {blob_uuid}')
+                stats.record_migrated('ARTIFACT_INDEX')
+            else:
+                success = mariadb.record_relationship(
+                    ObjectType.ARTIFACT, artifact_uuid_obj,
+                    RelationshipType.ARTIFACT_INDEX, index_str,
+                    ObjectType.BLOB, blob_uuid_obj,
+                    now)
+                if success:
+                    stats.record_migrated('ARTIFACT_INDEX')
+                else:
+                    stats.record_skipped()
+
+        stats.show_progress('artifact references')
+
+    # --- Blobs: depends_on and transcoded references ---
+    click.echo('\nScanning blobs for depends_on and transcoded references...')
+    for objkey, data in etcd.get_all('blob', None):
+        blob_uuid = objkey.split('/')[-1]
+        blob_uuid_obj = parse_uuid(blob_uuid, 'blob UUID')
+        if not blob_uuid_obj:
+            stats.record_error(f'Invalid blob UUID: {blob_uuid}')
+            continue
+
+        # Handle depends_on (stored in static values)
+        depends_on = data.get('depends_on')
+        if depends_on:
+            dep_uuid_obj = parse_uuid(depends_on, 'depends_on UUID')
+            if not dep_uuid_obj:
+                stats.record_error(f'Invalid depends_on UUID: {depends_on}')
+            elif dry_run:
+                click.echo(
+                    f'  Would create DEPENDS_ON reference: '
+                    f'blob {blob_uuid} -> blob {depends_on}')
+                stats.record_migrated('DEPENDS_ON')
+            else:
+                success = mariadb.record_relationship(
+                    ObjectType.BLOB, blob_uuid_obj,
+                    RelationshipType.DEPENDS_ON, None,
+                    ObjectType.BLOB, dep_uuid_obj,
+                    now)
+                if success:
+                    stats.record_migrated('DEPENDS_ON')
+                else:
+                    stats.record_skipped()
+
+        # Handle transcoded (stored as attribute)
+        transcoded = etcd.get('attribute/blob', blob_uuid, 'transcoded')
+        if transcoded:
+            for style, transcoded_blob_uuid in transcoded.items():
+                trans_uuid_obj = parse_uuid(transcoded_blob_uuid,
+                                            'transcoded UUID')
+                if not trans_uuid_obj:
+                    stats.record_error(
+                        f'Invalid transcoded UUID: {transcoded_blob_uuid}')
+                    continue
+
+                if dry_run:
+                    click.echo(
+                        f'  Would create TRANSCODE reference: '
+                        f'blob {blob_uuid} style {style} -> '
+                        f'blob {transcoded_blob_uuid}')
+                    stats.record_migrated('TRANSCODE')
+                else:
+                    success = mariadb.record_relationship(
+                        ObjectType.BLOB, blob_uuid_obj,
+                        RelationshipType.TRANSCODE, style,
+                        ObjectType.BLOB, trans_uuid_obj,
+                        now)
+                    if success:
+                        stats.record_migrated('TRANSCODE')
+                    else:
+                        stats.record_skipped()
+
+        # Remove old attributes if not dry run
+        if not dry_run:
+            etcd.delete('attribute/blob', blob_uuid, 'ref_count')
+            etcd.delete('attribute/blob', blob_uuid, 'transcoded')
+
+        stats.show_progress('blob references')
+
+    # --- AgentOperations: *_blob references ---
+    click.echo('\nScanning agent operations for blob references...')
+    for objkey, _ in etcd.get_all('agentoperation', None):
+        aop_uuid = objkey.split('/')[-1]
+        aop_uuid_obj = parse_uuid(aop_uuid, 'agentoperation UUID')
+        if not aop_uuid_obj:
+            stats.record_error(f'Invalid agentoperation UUID: {aop_uuid}')
+            continue
+
+        results_data = etcd.get('attribute/agentoperation', aop_uuid, 'results')
+        if not results_data:
+            continue
+
+        results = results_data.get('results', {})
+        for result_idx, result in results.items():
+            if not isinstance(result, dict):
+                continue
+            for key, value in result.items():
+                if not key.endswith('_blob'):
+                    continue
+                output_type = key.replace('_blob', '')
+
+                result_blob_uuid_obj = parse_uuid(value, 'result blob UUID')
+                if not result_blob_uuid_obj:
+                    stats.record_error(f'Invalid blob UUID: {value}')
+                    continue
+
+                if dry_run:
+                    click.echo(
+                        f'  Would create AGENT_OUTPUT reference: '
+                        f'agentoperation {aop_uuid} {output_type} -> '
+                        f'blob {value}')
+                    stats.record_migrated('AGENT_OUTPUT')
+                else:
+                    success = mariadb.record_relationship(
+                        ObjectType.AGENTOPERATION, aop_uuid_obj,
+                        RelationshipType.AGENT_OUTPUT, output_type,
+                        ObjectType.BLOB, result_blob_uuid_obj,
+                        now)
+                    if success:
+                        stats.record_migrated('AGENT_OUTPUT')
+                    else:
+                        stats.record_skipped()
+
+        stats.show_progress('agent operation references')
+
+    # --- Blobs: locations -> BLOB_LOCATION ---
+    stats.add_category('BLOB_LOCATION')
+    click.echo('\nScanning blobs for location references...')
+    for objkey, _ in etcd.get_all('blob', None):
+        blob_uuid = objkey.split('/')[-1]
+        blob_uuid_obj = parse_uuid(blob_uuid, 'blob UUID')
+        if not blob_uuid_obj:
+            stats.record_error(f'Invalid blob UUID: {blob_uuid}')
+            continue
+
+        # Get locations attribute
+        locations_data = etcd.get('attribute/blob', blob_uuid, 'locations')
+        if not locations_data:
+            continue
+
+        locations = locations_data.get('locations', [])
+        for node_name in locations:
+            if dry_run:
+                click.echo(
+                    f'  Would create BLOB_LOCATION reference: '
+                    f'node {node_name} -> blob {blob_uuid}')
+                stats.record_migrated('BLOB_LOCATION')
+            else:
+                # Node UUIDs are node names (strings like "sf-1"), not UUIDs
+                success = mariadb.record_relationship(
+                    ObjectType.NODE, node_name,
+                    RelationshipType.BLOB_LOCATION, None,
+                    ObjectType.BLOB, blob_uuid_obj,
+                    now)
+                if success:
+                    stats.record_migrated('BLOB_LOCATION')
+                else:
+                    stats.record_skipped()
+
+        # Remove old locations attribute if not dry run
+        if not dry_run:
+            etcd.delete('attribute/blob', blob_uuid, 'locations')
+
+        stats.show_progress('blob location references')
+
+    stats.print_summary()
+    migration_postcheck(dry_run)
 
 
 cli.add_command(bootstrap_system_key)
@@ -656,6 +950,7 @@ cli.add_command(migrate_state_to_mariadb)
 cli.add_command(migrate_ipam_to_mariadb)
 cli.add_command(migrate_uploads_to_mariadb)
 cli.add_command(migrate_dnsmasq_to_mariadb)
+cli.add_command(migrate_references_to_mariadb)
 cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
 cli.add_command(verify_config)

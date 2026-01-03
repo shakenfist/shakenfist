@@ -1333,3 +1333,269 @@ class UpdateDnsMasqRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["dnsmasq", b"dnsmasq"]) -> None: ...
 
 global___UpdateDnsMasqRequest = UpdateDnsMasqRequest
+
+@typing.final
+class ObjectReferenceData(google.protobuf.message.Message):
+    """Object Reference Operations (MariaDB)
+    These operations manage references between objects, replacing the manual
+    ref_count attribute on blobs. Enables queries like "which instances use
+    this blob?" and "what does this instance reference?"
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_TYPE_FIELD_NUMBER: builtins.int
+    SOURCE_UUID_FIELD_NUMBER: builtins.int
+    RELATIONSHIP_FIELD_NUMBER: builtins.int
+    RELATIONSHIP_VALUE_FIELD_NUMBER: builtins.int
+    TARGET_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    CREATED_FIELD_NUMBER: builtins.int
+    LAST_ACTIVE_FIELD_NUMBER: builtins.int
+    source_type: shakenfist_enums_pb2.ObjectType.ValueType
+    """Type of the source object"""
+    source_uuid: builtins.str
+    """UUID of the source object"""
+    relationship: shakenfist_enums_pb2.RelationshipType.ValueType
+    """Type of relationship"""
+    relationship_value: builtins.str
+    """Optional value (e.g., disk index)"""
+    target_type: shakenfist_enums_pb2.ObjectType.ValueType
+    """Type of the target object"""
+    target_uuid: builtins.str
+    """UUID of the target object"""
+    created: builtins.float
+    """Unix timestamp when created"""
+    last_active: builtins.float
+    """Unix timestamp, updated by cleaner"""
+    def __init__(
+        self,
+        *,
+        source_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        source_uuid: builtins.str = ...,
+        relationship: shakenfist_enums_pb2.RelationshipType.ValueType = ...,
+        relationship_value: builtins.str = ...,
+        target_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+        created: builtins.float = ...,
+        last_active: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created", b"created", "last_active", b"last_active", "relationship", b"relationship", "relationship_value", b"relationship_value", "source_type", b"source_type", "source_uuid", b"source_uuid", "target_type", b"target_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___ObjectReferenceData = ObjectReferenceData
+
+@typing.final
+class RecordRelationshipRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_TYPE_FIELD_NUMBER: builtins.int
+    SOURCE_UUID_FIELD_NUMBER: builtins.int
+    RELATIONSHIP_FIELD_NUMBER: builtins.int
+    RELATIONSHIP_VALUE_FIELD_NUMBER: builtins.int
+    TARGET_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    source_type: shakenfist_enums_pb2.ObjectType.ValueType
+    source_uuid: builtins.str
+    relationship: shakenfist_enums_pb2.RelationshipType.ValueType
+    relationship_value: builtins.str
+    """Empty string for NULL"""
+    target_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        source_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        source_uuid: builtins.str = ...,
+        relationship: shakenfist_enums_pb2.RelationshipType.ValueType = ...,
+        relationship_value: builtins.str = ...,
+        target_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["relationship", b"relationship", "relationship_value", b"relationship_value", "source_type", b"source_type", "source_uuid", b"source_uuid", "target_type", b"target_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___RecordRelationshipRequest = RecordRelationshipRequest
+
+@typing.final
+class RemoveRelationshipRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_TYPE_FIELD_NUMBER: builtins.int
+    SOURCE_UUID_FIELD_NUMBER: builtins.int
+    RELATIONSHIP_FIELD_NUMBER: builtins.int
+    RELATIONSHIP_VALUE_FIELD_NUMBER: builtins.int
+    TARGET_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    source_type: shakenfist_enums_pb2.ObjectType.ValueType
+    source_uuid: builtins.str
+    relationship: shakenfist_enums_pb2.RelationshipType.ValueType
+    relationship_value: builtins.str
+    """Empty string for NULL"""
+    target_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        source_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        source_uuid: builtins.str = ...,
+        relationship: shakenfist_enums_pb2.RelationshipType.ValueType = ...,
+        relationship_value: builtins.str = ...,
+        target_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["relationship", b"relationship", "relationship_value", b"relationship_value", "source_type", b"source_type", "source_uuid", b"source_uuid", "target_type", b"target_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___RemoveRelationshipRequest = RemoveRelationshipRequest
+
+@typing.final
+class GetReferencesToRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    target_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        target_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["target_type", b"target_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___GetReferencesToRequest = GetReferencesToRequest
+
+@typing.final
+class GetReferencesFromRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_TYPE_FIELD_NUMBER: builtins.int
+    SOURCE_UUID_FIELD_NUMBER: builtins.int
+    source_type: shakenfist_enums_pb2.ObjectType.ValueType
+    source_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        source_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        source_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["source_type", b"source_type", "source_uuid", b"source_uuid"]) -> None: ...
+
+global___GetReferencesFromRequest = GetReferencesFromRequest
+
+@typing.final
+class GetReferencesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REFERENCES_FIELD_NUMBER: builtins.int
+    @property
+    def references(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ObjectReferenceData]: ...
+    def __init__(
+        self,
+        *,
+        references: collections.abc.Iterable[global___ObjectReferenceData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["references", b"references"]) -> None: ...
+
+global___GetReferencesReply = GetReferencesReply
+
+@typing.final
+class CountReferencesToRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    target_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        target_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["target_type", b"target_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___CountReferencesToRequest = CountReferencesToRequest
+
+@typing.final
+class CountReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    COUNT_FIELD_NUMBER: builtins.int
+    count: builtins.int
+    def __init__(
+        self,
+        *,
+        count: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["count", b"count"]) -> None: ...
+
+global___CountReply = CountReply
+
+@typing.final
+class RemoveAllReferencesFromRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_TYPE_FIELD_NUMBER: builtins.int
+    SOURCE_UUID_FIELD_NUMBER: builtins.int
+    RELATIONSHIP_FIELD_NUMBER: builtins.int
+    source_type: shakenfist_enums_pb2.ObjectType.ValueType
+    source_uuid: builtins.str
+    relationship: shakenfist_enums_pb2.RelationshipType.ValueType
+    """Optional: 0 (UNSPECIFIED) means all"""
+    def __init__(
+        self,
+        *,
+        source_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        source_uuid: builtins.str = ...,
+        relationship: shakenfist_enums_pb2.RelationshipType.ValueType = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["relationship", b"relationship", "source_type", b"source_type", "source_uuid", b"source_uuid"]) -> None: ...
+
+global___RemoveAllReferencesFromRequest = RemoveAllReferencesFromRequest
+
+@typing.final
+class UpdateLastActiveRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_TYPE_FIELD_NUMBER: builtins.int
+    SOURCE_UUID_FIELD_NUMBER: builtins.int
+    RELATIONSHIP_FIELD_NUMBER: builtins.int
+    RELATIONSHIP_VALUE_FIELD_NUMBER: builtins.int
+    TARGET_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    source_type: shakenfist_enums_pb2.ObjectType.ValueType
+    source_uuid: builtins.str
+    relationship: shakenfist_enums_pb2.RelationshipType.ValueType
+    relationship_value: builtins.str
+    """Empty string for NULL"""
+    target_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        source_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        source_uuid: builtins.str = ...,
+        relationship: shakenfist_enums_pb2.RelationshipType.ValueType = ...,
+        relationship_value: builtins.str = ...,
+        target_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["relationship", b"relationship", "relationship_value", b"relationship_value", "source_type", b"source_type", "source_uuid", b"source_uuid", "target_type", b"target_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___UpdateLastActiveRequest = UpdateLastActiveRequest
+
+@typing.final
+class GetStaleReferencesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OLDER_THAN_FIELD_NUMBER: builtins.int
+    older_than: builtins.float
+    """Unix timestamp - return refs with last_active < this"""
+    def __init__(
+        self,
+        *,
+        older_than: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["older_than", b"older_than"]) -> None: ...
+
+global___GetStaleReferencesRequest = GetStaleReferencesRequest

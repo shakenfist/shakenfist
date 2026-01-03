@@ -10,6 +10,7 @@ import time
 import flask
 import grpc
 from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import constants
 from shakenfist import etcd
@@ -114,8 +115,10 @@ def add_event(
 
 def _add_event_multi_inner(
         event_type, log, timestamp, simpler_objects, message, duration=None,
-        extra=None):
+        extra=None, correlation_id=None):
     # Attempt to send with the newer EventMultiRequest
+    # NOTE: correlation_id is not yet supported via gRPC - it will be written
+    # directly to sqlite when the eventlog daemon processes the request.
     try:
         channel = get_eventlog_client()
         stub = event_pb2_grpc.EventServiceStub(channel)
@@ -162,7 +165,7 @@ def _add_event_multi_inner(
 
 def _add_event_dlq_inner(
         event_type, log, timestamp, simpler_objects, message, duration=None,
-        extra=None):
+        extra=None, correlation_id=None):
     # We use the old eventlog mechanism as a queueing system to get the logs
     # to the eventlog node.
     for object_type, object_uuid in simpler_objects:
@@ -176,7 +179,8 @@ def _add_event_dlq_inner(
                 'fqdn': config.NODE_NAME,
                 'duration': duration,
                 'message': message,
-                'extra': extra
+                'extra': extra,
+                'correlation_id': correlation_id
             })
 
 
@@ -206,6 +210,11 @@ def add_event_multi(
         extra = {}
     else:
         extra = copy.deepcopy(extra)
+
+    # Add correlation_id for multi-object events to link them during debugging
+    correlation_id = None
+    if len(simpler_objects) > 1:
+        correlation_id = sf_random.random_id()
 
     # If this event was created in the context of a request from our API, then
     # we should record the request id that caused this event.
@@ -257,7 +266,7 @@ def add_event_multi(
         try:
             _add_event_multi_inner(
                 event_type, log, timestamp, simpler_objects, message,
-                duration=duration, extra=extra)
+                duration=duration, extra=extra, correlation_id=correlation_id)
             return
         except grpc.RpcError as e:
             log.info('Failed to send event with gRPC, marking eventlog service '
@@ -268,7 +277,7 @@ def add_event_multi(
     # And then the dead letter queue for the remainders
     _add_event_dlq_inner(
         event_type, log, timestamp, simpler_objects, message,
-        duration=duration, extra=extra)
+        duration=duration, extra=extra, correlation_id=correlation_id)
 
 
 def upgrade_data_store():

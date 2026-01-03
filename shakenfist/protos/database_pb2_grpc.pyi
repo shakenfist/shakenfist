@@ -227,6 +227,47 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    RecordRelationship: grpc.UnaryUnaryMultiCallable[
+        database_pb2.RecordRelationshipRequest,
+        database_pb2.StatusReply,
+    ]
+    """Object Reference Operations (MariaDB)"""
+
+    RemoveRelationship: grpc.UnaryUnaryMultiCallable[
+        database_pb2.RemoveRelationshipRequest,
+        database_pb2.StatusReply,
+    ]
+
+    GetReferencesTo: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetReferencesToRequest,
+        database_pb2.GetReferencesReply,
+    ]
+
+    GetReferencesFrom: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetReferencesFromRequest,
+        database_pb2.GetReferencesReply,
+    ]
+
+    CountReferencesTo: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CountReferencesToRequest,
+        database_pb2.CountReply,
+    ]
+
+    RemoveAllReferencesFrom: grpc.UnaryUnaryMultiCallable[
+        database_pb2.RemoveAllReferencesFromRequest,
+        database_pb2.CountReply,
+    ]
+
+    UpdateLastActive: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateLastActiveRequest,
+        database_pb2.StatusReply,
+    ]
+
+    GetStaleReferences: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetStaleReferencesRequest,
+        database_pb2.GetReferencesReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -434,6 +475,47 @@ class DatabaseServiceAsyncStub:
     UpdateDnsMasq: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.UpdateDnsMasqRequest,
         database_pb2.StatusReply,
+    ]
+
+    RecordRelationship: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.RecordRelationshipRequest,
+        database_pb2.StatusReply,
+    ]
+    """Object Reference Operations (MariaDB)"""
+
+    RemoveRelationship: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.RemoveRelationshipRequest,
+        database_pb2.StatusReply,
+    ]
+
+    GetReferencesTo: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetReferencesToRequest,
+        database_pb2.GetReferencesReply,
+    ]
+
+    GetReferencesFrom: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetReferencesFromRequest,
+        database_pb2.GetReferencesReply,
+    ]
+
+    CountReferencesTo: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CountReferencesToRequest,
+        database_pb2.CountReply,
+    ]
+
+    RemoveAllReferencesFrom: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.RemoveAllReferencesFromRequest,
+        database_pb2.CountReply,
+    ]
+
+    UpdateLastActive: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateLastActiveRequest,
+        database_pb2.StatusReply,
+    ]
+
+    GetStaleReferences: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetStaleReferencesRequest,
+        database_pb2.GetReferencesReply,
     ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
@@ -724,5 +806,62 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.UpdateDnsMasqRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def RecordRelationship(
+        self,
+        request: database_pb2.RecordRelationshipRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Object Reference Operations (MariaDB)"""
+
+    @abc.abstractmethod
+    def RemoveRelationship(
+        self,
+        request: database_pb2.RemoveRelationshipRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def GetReferencesTo(
+        self,
+        request: database_pb2.GetReferencesToRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetReferencesReply, collections.abc.Awaitable[database_pb2.GetReferencesReply]]: ...
+
+    @abc.abstractmethod
+    def GetReferencesFrom(
+        self,
+        request: database_pb2.GetReferencesFromRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetReferencesReply, collections.abc.Awaitable[database_pb2.GetReferencesReply]]: ...
+
+    @abc.abstractmethod
+    def CountReferencesTo(
+        self,
+        request: database_pb2.CountReferencesToRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.CountReply, collections.abc.Awaitable[database_pb2.CountReply]]: ...
+
+    @abc.abstractmethod
+    def RemoveAllReferencesFrom(
+        self,
+        request: database_pb2.RemoveAllReferencesFromRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.CountReply, collections.abc.Awaitable[database_pb2.CountReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateLastActive(
+        self,
+        request: database_pb2.UpdateLastActiveRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def GetStaleReferences(
+        self,
+        request: database_pb2.GetStaleReferencesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetReferencesReply, collections.abc.Awaitable[database_pb2.GetReferencesReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

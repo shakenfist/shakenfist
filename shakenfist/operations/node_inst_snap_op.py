@@ -1,7 +1,10 @@
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mariadb
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.schema.operations import node_inst_snap_op as schema
+from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.artifact import Artifact
 from shakenfist.blob import Blob
 from shakenfist.blob import snapshot_disk
@@ -178,5 +181,14 @@ class NodeInstSnapOp(BaseClusterOperation):
                     a.state = Artifact.STATE_ERROR
                 raise AbortSnapshot(self, 'blob was deleted during snapshot')
             except InvalidStateException:
-                b.ref_count_dec(a)
+                # Remove any reference that might have been created during
+                # the failed add_index. We look up the highest index to
+                # determine what index was attempted.
+                highest_idx = a._db_get_attribute('highest_index', {'index': 0})
+                idx = highest_idx['index']
+                if idx > 0:
+                    mariadb.remove_relationship(
+                        ObjectType.ARTIFACT, a.uuid,
+                        RelationshipType.ARTIFACT_INDEX, str(idx).zfill(12),
+                        ObjectType.BLOB, b.uuid)
                 raise AbortSnapshot(self, 'invalid state during snapshot')
