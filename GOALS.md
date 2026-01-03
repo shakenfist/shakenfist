@@ -6,6 +6,7 @@
 * Add mypy type hints
 * Use shakenfist.schema for all data storage requiring a schema -- etcd while it lasts, generation of mariadb schemas, REST API outputs
 * REST API input schema validation
+* Use the schedule library, not manual timer loops
 
 ## Partial, but not currently being progressed
 
