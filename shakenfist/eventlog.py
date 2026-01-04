@@ -631,7 +631,7 @@ class EventLogChunk:
                 self.con.execute(
                     'DELETE FROM events WHERE timestamp < %d AND '
                     'message = "Updated node resources"'
-                    % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
+                    % (time.time() - config.MAX_RESOURCES_EVENT_AGE))
 
             self.con.execute(
                 'INSERT INTO events(timestamp, message) '
@@ -645,7 +645,7 @@ class EventLogChunk:
                 self.con.execute(
                     'DELETE FROM events WHERE timestamp < %d AND '
                     'message = "Updated node resources and package versions";'
-                    % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
+                    % (time.time() - config.MAX_RESOURCES_EVENT_AGE))
 
             self.con.execute(
                 'INSERT INTO events(timestamp, message) '
@@ -792,7 +792,7 @@ class EventLogChunk:
         self.close()
         if os.path.exists(self.dbpath):
             os.unlink(self.dbpath)
-        if os.path.exist(self.lock.path):
+        if os.path.exists(self.lock.path):
             os.unlink(self.lock.path)
         self.log.info('Removed event log chunk')
 
