@@ -40,6 +40,7 @@
 * Convert the iptables rule generation we use for virtual networks to the more modern nftables. nftables also has a stable JSON API and python bindings (`nftables` on pypi), so this should clean up a fair bit of command line generation code.
 * Provide network traffic flow exporters for analysis by operators.
 * Drop generic methods on the database service which mimic etcd calls -- `get`, `put`, etc. Instead the database service should own all of the business logic around accessing the database tier, and calls to the database service should in the form of coherent requests -- list all uploads on this node for example.
+* Stop converting UUIDs to strings all the time.
 
 ## Wider structural things
 
