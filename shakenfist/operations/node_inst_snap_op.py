@@ -159,6 +159,8 @@ class NodeInstSnapOp(BaseClusterOperation):
             # The blob UUID has been allocated, but the blob object has not yet
             # been created.
             b = snapshot_disk(s['disk'], s['blob_uuid'], thin=s['thin'])
+            if not b:
+                raise AbortSnapshot(self, f'disk path {s["disk"]["path"]} does not exist')
             self.accumulated_blobs.append(b)
 
             if a.state.value == Artifact.STATE_DELETED:
