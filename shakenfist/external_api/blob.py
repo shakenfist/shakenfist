@@ -294,9 +294,11 @@ class BlobChecksumEndpoint(api_base.Resource):
             return cs[algorithm]
 
         # Otherwise, request a hashing of this blob and return None
-        loc = blob_from_db.locations[0]
+        locations = blob_from_db.locations
+        if not locations:
+            return None
         nbo_create_and_enqueue(
-            loc,
+            locations[0],
             blob_from_db.uuid,
             [nbo_tasks.verify_size_and_checksum],
             PRIORITY.user_waiting)

@@ -2256,11 +2256,11 @@ def _direct_remove_relationship(
             stmt = sa.delete(table).where(
                 sa.and_(
                     table.c.source_object_type == str(source_type),
-                    table.c.source_uuid == source_uuid,
+                    table.c.source_uuid == str(source_uuid),
                     table.c.relationship == str(relationship),
                     table.c.relationship_value == relationship_value,
                     table.c.target_object_type == str(target_type),
-                    table.c.target_uuid == target_uuid
+                    table.c.target_uuid == str(target_uuid)
                 )
             )
             conn.execute(stmt)
@@ -2292,7 +2292,7 @@ def _direct_get_references_to(
             stmt = sa.select(table).where(
                 sa.and_(
                     table.c.target_object_type == str(target_type),
-                    table.c.target_uuid == target_uuid
+                    table.c.target_uuid == str(target_uuid)
                 )
             )
             result = conn.execute(stmt)
@@ -2339,7 +2339,7 @@ def _direct_get_references_from(
             stmt = sa.select(table).where(
                 sa.and_(
                     table.c.source_object_type == str(source_type),
-                    table.c.source_uuid == source_uuid
+                    table.c.source_uuid == str(source_uuid)
                 )
             )
             result = conn.execute(stmt)
@@ -2389,7 +2389,7 @@ def _direct_count_references_to(
             stmt = sa.select(sa.func.count()).where(
                 sa.and_(
                     table.c.target_object_type == str(target_type),
-                    table.c.target_uuid == target_uuid
+                    table.c.target_uuid == str(target_uuid)
                 )
             )
             result = conn.execute(stmt)
@@ -2426,7 +2426,7 @@ def _direct_remove_all_references_from(
         with engine.connect() as conn:
             conditions = [
                 table.c.source_object_type == str(source_type),
-                table.c.source_uuid == source_uuid
+                table.c.source_uuid == str(source_uuid)
             ]
             if relationship is not None:
                 conditions.append(table.c.relationship == str(relationship))
@@ -2472,11 +2472,11 @@ def _direct_update_last_active(
             stmt = sa.update(table).where(
                 sa.and_(
                     table.c.source_object_type == str(source_type),
-                    table.c.source_uuid == source_uuid,
+                    table.c.source_uuid == str(source_uuid),
                     table.c.relationship == str(relationship),
                     table.c.relationship_value == relationship_value,
                     table.c.target_object_type == str(target_type),
-                    table.c.target_uuid == target_uuid
+                    table.c.target_uuid == str(target_uuid)
                 )
             ).values(last_active=time.time())
             result = conn.execute(stmt)
