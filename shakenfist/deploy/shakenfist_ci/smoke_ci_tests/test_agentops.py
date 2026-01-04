@@ -168,22 +168,28 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        # Create a blob to use for the test by uploading a file
+        upl = self.test_client.create_upload()
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        with open('%s/files/fibonacci.py' % test_dir, 'rb') as f:
+            self.test_client.send_upload_file(upl['uuid'], f)
+        artifact = self.test_client.upload_artifact(
+            'test-blob', upl['uuid'], artifact_type='other')
+        blob_uuid = artifact['blob_uuid']
+
+        # Wait for the blob's sha512 checksum to be calculated
+        start_time = time.time()
+        cluster_hash = self.test_client.get_blob_hash(blob_uuid, 'sha512')
+        while not cluster_hash:
+            if time.time() - start_time > 60:
+                self.fail(
+                    f'Checksum for blob {blob_uuid} not available after 60 '
+                    'seconds')
+            time.sleep(5)
+            cluster_hash = self.test_client.get_blob_hash(blob_uuid, 'sha512')
+
         # Wait for the instance agent to report in
         self._await_instance_ready(inst['uuid'])
-
-        # Pick a blob and send it to the instance
-        blobs = self.system_client.get_blobs()
-        self.assertNotEqual(0, len(blobs))
-
-        blob_uuid = None
-        for blob in blobs:
-            if blob['checksums'].get('sha512'):
-                blob_uuid = blob['uuid']
-                cluster_hash = blob['checksums']['sha512']
-                break
-
-        self.assertNotEqual(
-            None, blob_uuid, 'Failed to find a blob with a hash')
 
         start_time = time.time()
         aop = self.test_client.instance_put_blob(
