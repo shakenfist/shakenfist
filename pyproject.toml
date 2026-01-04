@@ -14,7 +14,7 @@ dynamic = ["version"]
 
 description = "An opinionated minimal cloud"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
     # A bit vague because we expect this to come from an OS package
     "psutil>=5.9.0",                      # bsd
@@ -47,7 +47,7 @@ dependencies = [
     "semver==3.0.4",                      # bsd
     "SQLAlchemy==2.0.45",                 # mit
 
-    "greenlet==3.2.3",                    # mit
+    "greenlet==3.3.0",                    # mit
     "gunicorn==23.0.0",                   # mit
     "gevent==25.5.1",                     # mit
     "gunicorn[gevent]==23.0.0",           # mit
