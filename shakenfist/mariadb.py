@@ -2167,11 +2167,11 @@ def _direct_update_dnsmasq(data: DnsMasqData) -> bool:
 
 def _direct_record_relationship(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: RelationshipType,
     relationship_value: Optional[str],
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> bool:
     """Record a relationship between objects directly in MariaDB.
 
@@ -2229,11 +2229,11 @@ def _direct_record_relationship(
 
 def _direct_remove_relationship(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: RelationshipType,
     relationship_value: Optional[str],
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> bool:
     """Remove a relationship between objects directly from MariaDB.
 
@@ -2273,7 +2273,7 @@ def _direct_remove_relationship(
 
 def _direct_get_references_to(
     target_type: ObjectType,
-    target_uuid: UUID,
+    target_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get all references to an object directly from MariaDB.
@@ -2323,7 +2323,7 @@ def _direct_get_references_to(
 
 def _direct_get_references_from(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get all references from an object directly from MariaDB.
@@ -2373,7 +2373,7 @@ def _direct_get_references_from(
 
 def _direct_count_references_to(
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> int:
     """Count references to an object directly from MariaDB.
 
@@ -2408,7 +2408,7 @@ def _direct_count_references_to(
 
 def _direct_remove_all_references_from(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
 ) -> int:
     """Remove all references from an object directly from MariaDB.
@@ -2448,11 +2448,11 @@ def _direct_remove_all_references_from(
 
 def _direct_update_last_active(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: RelationshipType,
     relationship_value: Optional[str],
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> bool:
     """Update the last_active timestamp for a reference.
 
@@ -2665,11 +2665,11 @@ def _grpc_update_dnsmasq(data: DnsMasqData) -> bool:
 
 def _grpc_record_relationship(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: RelationshipType,
     relationship_value: Optional[str],
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> bool:
     """Record a relationship via the database microservice."""
     try:
@@ -2697,11 +2697,11 @@ def _grpc_record_relationship(
 
 def _grpc_remove_relationship(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: RelationshipType,
     relationship_value: Optional[str],
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> bool:
     """Remove a relationship via the database microservice."""
     try:
@@ -2729,7 +2729,7 @@ def _grpc_remove_relationship(
 
 def _grpc_get_references_to(
     target_type: ObjectType,
-    target_uuid: UUID,
+    target_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get references to an object via the database microservice."""
@@ -2771,7 +2771,7 @@ def _grpc_get_references_to(
 
 def _grpc_get_references_from(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get references from an object via the database microservice."""
@@ -2813,7 +2813,7 @@ def _grpc_get_references_from(
 
 def _grpc_count_references_to(
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> int:
     """Count references to an object via the database microservice."""
     try:
@@ -2833,7 +2833,7 @@ def _grpc_count_references_to(
 
 def _grpc_remove_all_references_from(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
 ) -> int:
     """Remove all references from an object via the database microservice."""
@@ -2858,11 +2858,11 @@ def _grpc_remove_all_references_from(
 
 def _grpc_update_last_active(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: RelationshipType,
     relationship_value: Optional[str],
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> bool:
     """Update last_active timestamp via the database microservice."""
     try:
@@ -3005,11 +3005,11 @@ def update_dnsmasq(data: DnsMasqData) -> bool:
 
 def record_relationship(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: RelationshipType,
     relationship_value: Optional[str],
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> bool:
     """Record a relationship between objects.
 
@@ -3039,11 +3039,11 @@ def record_relationship(
 
 def remove_relationship(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: RelationshipType,
     relationship_value: Optional[str],
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> bool:
     """Remove a relationship between objects.
 
@@ -3069,7 +3069,7 @@ def remove_relationship(
 
 def get_references_to(
     target_type: ObjectType,
-    target_uuid: UUID,
+    target_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get all references to an object.
@@ -3089,7 +3089,7 @@ def get_references_to(
 
 def get_references_from(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get all references from an object.
@@ -3109,7 +3109,7 @@ def get_references_from(
 
 def count_references_to(
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> int:
     """Count references to an object.
 
@@ -3130,7 +3130,7 @@ def count_references_to(
 
 def remove_all_references_from(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: Optional[RelationshipType] = None
 ) -> int:
     """Remove all references from an object.
@@ -3156,11 +3156,11 @@ def remove_all_references_from(
 
 def update_last_active(
     source_type: ObjectType,
-    source_uuid: UUID,
+    source_uuid: str | UUID,
     relationship: RelationshipType,
     relationship_value: Optional[str],
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: str | UUID
 ) -> bool:
     """Update the last_active timestamp for a reference.
 

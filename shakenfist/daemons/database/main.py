@@ -975,8 +975,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     success=False, error='Invalid type or relationship')
             rel_value = request.relationship_value if request.relationship_value else None
             success = mariadb._direct_record_relationship(
-                source_type, UUID(request.source_uuid), relationship, rel_value,
-                target_type, UUID(request.target_uuid))
+                source_type, request.source_uuid, relationship, rel_value,
+                target_type, request.target_uuid)
             if success:
                 # Emit structured event for audit trail on both ends of the
                 # relationship. add_event_multi automatically adds a
@@ -1012,8 +1012,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     success=False, error='Invalid type or relationship')
             rel_value = request.relationship_value if request.relationship_value else None
             success = mariadb._direct_remove_relationship(
-                source_type, UUID(request.source_uuid), relationship, rel_value,
-                target_type, UUID(request.target_uuid))
+                source_type, request.source_uuid, relationship, rel_value,
+                target_type, request.target_uuid)
             if success:
                 # Emit structured event for audit trail on both ends of the
                 # relationship. add_event_multi automatically adds a
@@ -1049,7 +1049,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 relationship = RelationshipType.from_proto_id(
                     request.relationship)
             refs = mariadb._direct_get_references_to(
-                target_type, UUID(request.target_uuid), relationship)
+                target_type, request.target_uuid, relationship)
             result = []
             for ref in refs:
                 result.append(database_pb2.ObjectReferenceData(
@@ -1090,7 +1090,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 relationship = RelationshipType.from_proto_id(
                     request.relationship)
             refs = mariadb._direct_get_references_from(
-                source_type, UUID(request.source_uuid), relationship)
+                source_type, request.source_uuid, relationship)
             result = []
             for ref in refs:
                 result.append(database_pb2.ObjectReferenceData(
@@ -1127,7 +1127,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             if target_type is None:
                 return database_pb2.CountReply(count=0)
             count = mariadb._direct_count_references_to(
-                target_type, UUID(request.target_uuid))
+                target_type, request.target_uuid)
             return database_pb2.CountReply(count=count)
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -1151,7 +1151,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 relationship = RelationshipType.from_proto_id(
                     request.relationship)
             count = mariadb._direct_remove_all_references_from(
-                source_type, UUID(request.source_uuid), relationship)
+                source_type, request.source_uuid, relationship)
             if count > 0:
                 # Emit structured event for audit trail
                 eventlog.add_event(
@@ -1184,8 +1184,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     success=False, error='Invalid type or relationship')
             rel_value = request.relationship_value if request.relationship_value else None
             success = mariadb._direct_update_last_active(
-                source_type, UUID(request.source_uuid), relationship, rel_value,
-                target_type, UUID(request.target_uuid))
+                source_type, request.source_uuid, relationship, rel_value,
+                target_type, request.target_uuid)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception(
