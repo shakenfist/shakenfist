@@ -6,6 +6,7 @@ import copy
 import hashlib
 import numbers
 import os
+import pathlib
 import random
 import socket
 import time
@@ -1006,7 +1007,6 @@ def observe_local_blobs() -> int:
     Returns:
         int: The number of blobs observed.
     """
-    import pathlib  # Local import to avoid circular dependency
 
     blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
     if not os.path.exists(blob_path):
