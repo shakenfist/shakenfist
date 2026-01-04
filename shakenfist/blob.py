@@ -243,11 +243,9 @@ class Blob(dbo):
         This queries the object_references table for BLOB_LOCATION relationships
         where nodes reference this blob.
         """
-        refs = mariadb.get_references_to(ObjectType.BLOB, self.uuid)
-        return [
-            str(ref.source_uuid) for ref in refs
-            if ref.relationship == RelationshipType.BLOB_LOCATION
-        ]
+        refs = mariadb.get_references_to(
+            ObjectType.BLOB, self.uuid, RelationshipType.BLOB_LOCATION)
+        return [str(ref.source_uuid) for ref in refs]
 
     def add_location(self, location: str) -> None:
         """Record that this blob is present on the given node."""
@@ -362,11 +360,11 @@ class Blob(dbo):
     @property
     def transcoded(self) -> dict[str, str]:
         """Return a dict of {style: blob_uuid} for all transcodes of this blob."""
-        refs = mariadb.get_references_from(ObjectType.BLOB, self.uuid)
+        refs = mariadb.get_references_from(
+            ObjectType.BLOB, self.uuid, RelationshipType.TRANSCODE)
         result: dict[str, str] = {}
         for ref in refs:
-            if (ref.relationship == RelationshipType.TRANSCODE
-                    and ref.relationship_value is not None):
+            if ref.relationship_value is not None:
                 result[ref.relationship_value] = str(ref.target_uuid)
         return result
 

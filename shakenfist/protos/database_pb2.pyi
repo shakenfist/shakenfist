@@ -1452,15 +1452,20 @@ class GetReferencesToRequest(google.protobuf.message.Message):
 
     TARGET_TYPE_FIELD_NUMBER: builtins.int
     TARGET_UUID_FIELD_NUMBER: builtins.int
+    RELATIONSHIP_FIELD_NUMBER: builtins.int
     target_type: shakenfist_enums_pb2.ObjectType.ValueType
     target_uuid: builtins.str
+    relationship: shakenfist_enums_pb2.RelationshipType.ValueType
     def __init__(
         self,
         *,
         target_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
         target_uuid: builtins.str = ...,
+        relationship: shakenfist_enums_pb2.RelationshipType.ValueType | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["target_type", b"target_type", "target_uuid", b"target_uuid"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_relationship", b"_relationship", "relationship", b"relationship"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_relationship", b"_relationship", "relationship", b"relationship", "target_type", b"target_type", "target_uuid", b"target_uuid"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_relationship", b"_relationship"]) -> typing.Literal["relationship"] | None: ...
 
 global___GetReferencesToRequest = GetReferencesToRequest
 
@@ -1470,15 +1475,20 @@ class GetReferencesFromRequest(google.protobuf.message.Message):
 
     SOURCE_TYPE_FIELD_NUMBER: builtins.int
     SOURCE_UUID_FIELD_NUMBER: builtins.int
+    RELATIONSHIP_FIELD_NUMBER: builtins.int
     source_type: shakenfist_enums_pb2.ObjectType.ValueType
     source_uuid: builtins.str
+    relationship: shakenfist_enums_pb2.RelationshipType.ValueType
     def __init__(
         self,
         *,
         source_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
         source_uuid: builtins.str = ...,
+        relationship: shakenfist_enums_pb2.RelationshipType.ValueType | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["source_type", b"source_type", "source_uuid", b"source_uuid"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_relationship", b"_relationship", "relationship", b"relationship"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_relationship", b"_relationship", "relationship", b"relationship", "source_type", b"source_type", "source_uuid", b"source_uuid"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_relationship", b"_relationship"]) -> typing.Literal["relationship"] | None: ...
 
 global___GetReferencesFromRequest = GetReferencesFromRequest
 

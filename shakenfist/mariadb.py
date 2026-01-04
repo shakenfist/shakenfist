@@ -2273,13 +2273,15 @@ def _direct_remove_relationship(
 
 def _direct_get_references_to(
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: UUID,
+    relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get all references to an object directly from MariaDB.
 
     Args:
         target_type: The type of the target object.
         target_uuid: The UUID of the target object.
+        relationship: Optional filter by relationship type.
 
     Returns:
         List of ObjectReference objects referencing the target.
@@ -2289,12 +2291,13 @@ def _direct_get_references_to(
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(table).where(
-                sa.and_(
-                    table.c.target_object_type == str(target_type),
-                    table.c.target_uuid == str(target_uuid)
-                )
-            )
+            conditions = [
+                table.c.target_object_type == str(target_type),
+                table.c.target_uuid == str(target_uuid)
+            ]
+            if relationship is not None:
+                conditions.append(table.c.relationship == str(relationship))
+            stmt = sa.select(table).where(sa.and_(*conditions))
             result = conn.execute(stmt)
             refs = []
             for row in result:
@@ -2320,13 +2323,15 @@ def _direct_get_references_to(
 
 def _direct_get_references_from(
     source_type: ObjectType,
-    source_uuid: UUID
+    source_uuid: UUID,
+    relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get all references from an object directly from MariaDB.
 
     Args:
         source_type: The type of the source object.
         source_uuid: The UUID of the source object.
+        relationship: Optional filter by relationship type.
 
     Returns:
         List of ObjectReference objects the source references.
@@ -2336,12 +2341,13 @@ def _direct_get_references_from(
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(table).where(
-                sa.and_(
-                    table.c.source_object_type == str(source_type),
-                    table.c.source_uuid == str(source_uuid)
-                )
-            )
+            conditions = [
+                table.c.source_object_type == str(source_type),
+                table.c.source_uuid == str(source_uuid)
+            ]
+            if relationship is not None:
+                conditions.append(table.c.relationship == str(relationship))
+            stmt = sa.select(table).where(sa.and_(*conditions))
             result = conn.execute(stmt)
             refs = []
             for row in result:
@@ -2723,7 +2729,8 @@ def _grpc_remove_relationship(
 
 def _grpc_get_references_to(
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: UUID,
+    relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get references to an object via the database microservice."""
     try:
@@ -2734,6 +2741,10 @@ def _grpc_get_references_to(
                 target_type.proto_id),
             target_uuid=str(target_uuid)
         )
+        if relationship is not None:
+            request.relationship = cast(
+                shakenfist_enums_pb2.RelationshipType.ValueType,
+                relationship.proto_id)
         reply = stub.GetReferencesTo(request)
         refs = []
         for ref in reply.references:
@@ -2760,7 +2771,8 @@ def _grpc_get_references_to(
 
 def _grpc_get_references_from(
     source_type: ObjectType,
-    source_uuid: UUID
+    source_uuid: UUID,
+    relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get references from an object via the database microservice."""
     try:
@@ -2771,6 +2783,10 @@ def _grpc_get_references_from(
                 source_type.proto_id),
             source_uuid=str(source_uuid)
         )
+        if relationship is not None:
+            request.relationship = cast(
+                shakenfist_enums_pb2.RelationshipType.ValueType,
+                relationship.proto_id)
         reply = stub.GetReferencesFrom(request)
         refs = []
         for ref in reply.references:
@@ -3053,38 +3069,42 @@ def remove_relationship(
 
 def get_references_to(
     target_type: ObjectType,
-    target_uuid: UUID
+    target_uuid: UUID,
+    relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get all references to an object.
 
     Args:
         target_type: The type of the target object.
         target_uuid: The UUID of the target object.
+        relationship: Optional filter by relationship type.
 
     Returns:
         List of ObjectReference objects referencing the target.
     """
     if _use_database_service():
-        return _grpc_get_references_to(target_type, target_uuid)
-    return _direct_get_references_to(target_type, target_uuid)
+        return _grpc_get_references_to(target_type, target_uuid, relationship)
+    return _direct_get_references_to(target_type, target_uuid, relationship)
 
 
 def get_references_from(
     source_type: ObjectType,
-    source_uuid: UUID
+    source_uuid: UUID,
+    relationship: Optional[RelationshipType] = None
 ) -> list[ObjectReference]:
     """Get all references from an object.
 
     Args:
         source_type: The type of the source object.
         source_uuid: The UUID of the source object.
+        relationship: Optional filter by relationship type.
 
     Returns:
         List of ObjectReference objects the source references.
     """
     if _use_database_service():
-        return _grpc_get_references_from(source_type, source_uuid)
-    return _direct_get_references_from(source_type, source_uuid)
+        return _grpc_get_references_from(source_type, source_uuid, relationship)
+    return _direct_get_references_from(source_type, source_uuid, relationship)
 
 
 def count_references_to(

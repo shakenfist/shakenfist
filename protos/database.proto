@@ -476,11 +476,13 @@ message RemoveRelationshipRequest {
 message GetReferencesToRequest {
   ObjectType target_type = 1;
   string target_uuid = 2;
+  optional RelationshipType relationship = 3;
 }
 
 message GetReferencesFromRequest {
   ObjectType source_type = 1;
   string source_uuid = 2;
+  optional RelationshipType relationship = 3;
 }
 
 message GetReferencesReply {

@@ -1044,8 +1044,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             target_type = ObjectType.from_proto_id(request.target_type)
             if target_type is None:
                 return database_pb2.GetReferencesReply(references=[])
+            relationship = None
+            if request.HasField('relationship'):
+                relationship = RelationshipType.from_proto_id(
+                    request.relationship)
             refs = mariadb._direct_get_references_to(
-                target_type, UUID(request.target_uuid))
+                target_type, UUID(request.target_uuid), relationship)
             result = []
             for ref in refs:
                 result.append(database_pb2.ObjectReferenceData(
@@ -1081,8 +1085,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             source_type = ObjectType.from_proto_id(request.source_type)
             if source_type is None:
                 return database_pb2.GetReferencesReply(references=[])
+            relationship = None
+            if request.HasField('relationship'):
+                relationship = RelationshipType.from_proto_id(
+                    request.relationship)
             refs = mariadb._direct_get_references_from(
-                source_type, UUID(request.source_uuid))
+                source_type, UUID(request.source_uuid), relationship)
             result = []
             for ref in refs:
                 result.append(database_pb2.ObjectReferenceData(

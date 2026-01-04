@@ -178,6 +178,35 @@ class GetReferencesToTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(len(result), 0)
 
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_get_references_to_with_relationship_filter(self, mock_get_stub):
+        mock_stub = mock.MagicMock()
+        ref_data = database_pb2.ObjectReferenceData(
+            source_type=shakenfist_enums_pb2.ObjectType.OBJECT_TYPE_INSTANCE,
+            source_uuid=str(SOURCE_UUID),
+            relationship=shakenfist_enums_pb2.RelationshipType.RELATIONSHIP_TYPE_DISK,
+            relationship_value='0',
+            target_type=shakenfist_enums_pb2.ObjectType.OBJECT_TYPE_BLOB,
+            target_uuid=str(TARGET_UUID),
+            created=1234567890.0,
+            last_active=1234567890.0
+        )
+        mock_stub.GetReferencesTo.return_value = database_pb2.GetReferencesReply(
+            references=[ref_data])
+        mock_get_stub.return_value = mock_stub
+
+        result = mariadb.get_references_to(
+            ObjectType.BLOB, TARGET_UUID, RelationshipType.DISK)
+
+        self.assertEqual(len(result), 1)
+        # Verify the relationship filter was passed to gRPC
+        call_args = mock_stub.GetReferencesTo.call_args
+        request = call_args[0][0]
+        self.assertTrue(request.HasField('relationship'))
+        self.assertEqual(
+            request.relationship,
+            shakenfist_enums_pb2.RelationshipType.RELATIONSHIP_TYPE_DISK)
+
 
 class GetReferencesFromTestCase(base.ShakenFistTestCase):
     """Tests for get_references_from() gRPC client function."""
@@ -240,6 +269,35 @@ class GetReferencesFromTestCase(base.ShakenFistTestCase):
         result = mariadb.get_references_from(ObjectType.INSTANCE, SOURCE_UUID)
 
         self.assertEqual(len(result), 2)
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_get_references_from_with_relationship_filter(self, mock_get_stub):
+        mock_stub = mock.MagicMock()
+        ref_data = database_pb2.ObjectReferenceData(
+            source_type=shakenfist_enums_pb2.ObjectType.OBJECT_TYPE_BLOB,
+            source_uuid=str(SOURCE_UUID),
+            relationship=shakenfist_enums_pb2.RelationshipType.RELATIONSHIP_TYPE_TRANSCODE,
+            relationship_value='qcow2',
+            target_type=shakenfist_enums_pb2.ObjectType.OBJECT_TYPE_BLOB,
+            target_uuid=str(TARGET_UUID),
+            created=1234567890.0,
+            last_active=1234567890.0
+        )
+        mock_stub.GetReferencesFrom.return_value = database_pb2.GetReferencesReply(
+            references=[ref_data])
+        mock_get_stub.return_value = mock_stub
+
+        result = mariadb.get_references_from(
+            ObjectType.BLOB, SOURCE_UUID, RelationshipType.TRANSCODE)
+
+        self.assertEqual(len(result), 1)
+        # Verify the relationship filter was passed to gRPC
+        call_args = mock_stub.GetReferencesFrom.call_args
+        request = call_args[0][0]
+        self.assertTrue(request.HasField('relationship'))
+        self.assertEqual(
+            request.relationship,
+            shakenfist_enums_pb2.RelationshipType.RELATIONSHIP_TYPE_TRANSCODE)
 
 
 class CountReferencesToTestCase(base.ShakenFistTestCase):
