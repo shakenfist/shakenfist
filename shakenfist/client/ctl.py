@@ -6,6 +6,7 @@ import os
 import uuid as uuid_module
 from dataclasses import dataclass
 from dataclasses import field
+from typing import Any
 from typing import Optional
 
 import click
@@ -21,24 +22,24 @@ class MigrationStats:
     migrated: int = 0
     skipped: int = 0
     errors: int = 0
-    categories: dict = field(default_factory=dict)
+    categories: dict[str, int] = field(default_factory=dict)
     progress_interval: int = 100
 
-    def add_category(self, name: str):
+    def add_category(self, name: str) -> None:
         """Add a category to track separately."""
         self.categories[name] = 0
 
-    def record_migrated(self, category: Optional[str] = None):
+    def record_migrated(self, category: Optional[str] = None) -> None:
         """Record a successful migration."""
         self.migrated += 1
         if category and category in self.categories:
             self.categories[category] += 1
 
-    def record_skipped(self):
+    def record_skipped(self) -> None:
         """Record a skipped item (already exists)."""
         self.skipped += 1
 
-    def record_error(self, message: str):
+    def record_error(self, message: str) -> None:
         """Record an error."""
         self.errors += 1
         click.echo(f'  {message}')
@@ -53,12 +54,12 @@ class MigrationStats:
         return (self.total_processed > 0 and
                 self.total_processed % self.progress_interval == 0)
 
-    def show_progress(self, object_type: str = 'items'):
+    def show_progress(self, object_type: str = 'items') -> None:
         """Show progress if interval reached."""
         if self.should_show_progress():
             click.echo(f'  ... {self.total_processed} {object_type} processed')
 
-    def print_summary(self):
+    def print_summary(self) -> None:
         """Print migration summary."""
         if self.categories:
             click.echo('\n--- Migration Summary ---')
@@ -88,7 +89,7 @@ def migration_precheck(dry_run: bool) -> bool:
     return True
 
 
-def migration_postcheck(dry_run: bool):
+def migration_postcheck(dry_run: bool) -> None:
     """Common post-migration message."""
     if dry_run:
         click.echo('\nThis was a dry run. No changes were made.')
@@ -133,7 +134,7 @@ from shakenfist.schema.object_types import ObjectType      # noqa
 @click.group()
 @click.option('--verbose/--no-verbose', default=False)
 @click.pass_context
-def cli(ctx, verbose=None):
+def cli(ctx: click.Context, verbose: Optional[bool] = None) -> None:
     if verbose:
         LOG.setLevel(logging.DEBUG)
 
@@ -141,7 +142,7 @@ def cli(ctx, verbose=None):
 @click.command()
 @click.argument('keyname')
 @click.argument('key')
-def bootstrap_system_key(keyname, key):
+def bootstrap_system_key(keyname: str, key: str) -> None:
     click.echo('Creating key %s' % keyname)
     ns = Namespace.new('system')
     ns.add_key(keyname, key)
@@ -149,7 +150,7 @@ def bootstrap_system_key(keyname, key):
 
 
 @click.command()
-def show_etcd_config():
+def show_etcd_config() -> None:
     value = etcd.get_etcd_client().get('/sf/config', metadata=True)
     if value is None or len(value) == 0:
         click.echo('{}')
@@ -161,42 +162,43 @@ def show_etcd_config():
 @click.command()
 @click.argument('flag')
 @click.argument('value')
-def set_etcd_config(flag, value):
+def set_etcd_config(flag: str, value: str) -> None:
     client = etcd.get_etcd_client()
-    config = {}
+    etcd_config: dict[str, Any] = {}
     current_config = client.get('/sf/config', metadata=True)
     if current_config is None or len(current_config) == 0:
-        config = {}
+        etcd_config = {}
     else:
-        config = json.loads(current_config[0][0])
+        etcd_config = json.loads(current_config[0][0])
 
     # Convert values if possible
+    converted_value: Any = value
     if value in ['t', 'true', 'True']:
-        value = True
+        converted_value = True
     elif value in ['f', 'false', 'False']:
-        value = False
+        converted_value = False
     else:
         try:
             if value.find('.') != -1:
-                value = float(value)
+                converted_value = float(value)
             else:
-                value = int(value)
+                converted_value = int(value)
         except ValueError:
             pass
 
-    click.echo(f'Setting {flag} to {type(value)}({value})')
-    config[flag] = value
-    client.put('/sf/config', json.dumps(config, indent=4, sort_keys=True))
+    click.echo(f'Setting {flag} to {type(converted_value)}({converted_value})')
+    etcd_config[flag] = converted_value
+    client.put('/sf/config', json.dumps(etcd_config, indent=4, sort_keys=True))
 
 
 @click.command()
-def verify_config():
+def verify_config() -> None:
     sf_config.verify_config()
     click.echo('Configuration is ok')
 
 
 @click.command()
-def ensure_mariadb_schema():
+def ensure_mariadb_schema() -> None:
     """Ensure the MariaDB schema exists and is up to date.
 
     This command should be run on a database node (etcd_master) before
@@ -232,7 +234,7 @@ def ensure_mariadb_schema():
               help='Node name to initialize (defaults to NODE_NAME from config)')
 @click.option('--node-mesh-ip', default=None,
               help='Node mesh IP (defaults to NODE_MESH_IP from config)')
-def initialise_node(node_name, node_mesh_ip):
+def initialise_node(node_name: Optional[str], node_mesh_ip: Optional[str]) -> None:
     """Initialize a node in the database.
 
     When run without arguments, initializes the local node using NODE_NAME
@@ -253,7 +255,7 @@ def initialise_node(node_name, node_mesh_ip):
 @click.argument('daemon', nargs=-1)
 @click.option('--node-name', default=None,
               help='Node name to register daemons on (defaults to NODE_NAME)')
-def register_daemon(daemon, node_name):
+def register_daemon(daemon: tuple[str, ...], node_name: Optional[str]) -> None:
     """Register one or more daemons on a node.
 
     When run without --node-name, registers daemons on the local node.
@@ -275,7 +277,7 @@ def register_daemon(daemon, node_name):
 
 @click.command()
 @click.argument('daemon', nargs=-1)
-def deregister_daemon(daemon):
+def deregister_daemon(daemon: tuple[str, ...]) -> None:
     n = Node.from_db(config.NODE_NAME)
     for d in daemon:
         click.echo(f'Deregistering {d} on node...')
@@ -285,7 +287,7 @@ def deregister_daemon(daemon):
 
 @click.command()
 @click.argument('daemon')
-def stop(daemon):
+def stop(daemon: str) -> None:
     click.echo(
         f'Gracefully stopping Shaken Fist {daemon} daemon on this node...')
     n = Node.from_db(config.NODE_NAME)
@@ -333,7 +335,7 @@ OBJECT_TYPES_WITH_STATE = [
 @click.command()
 @click.option('--dry-run', is_flag=True, default=False,
               help='Show what would be migrated without making changes')
-def migrate_state_to_mariadb(dry_run):
+def migrate_state_to_mariadb(dry_run: bool) -> None:
     """Migrate all object state from etcd to MariaDB.
 
     This command should be run once during an upgrade to move state data
@@ -361,7 +363,9 @@ def migrate_state_to_mariadb(dry_run):
                 click.echo(f'  Would migrate {objuuid}: {state_data.get("value")}')
             else:
                 state = State(**state_data)
-                mariadb.set_state(ObjectType(object_type), objuuid, state)
+                mariadb.set_state(
+                    ObjectType(object_type),  # type: ignore[call-arg]
+                    objuuid, state)
                 etcd.delete(f'attribute/{object_type}', objuuid, 'state')
 
             type_migrated += 1
@@ -381,7 +385,7 @@ def migrate_state_to_mariadb(dry_run):
 @click.command()
 @click.option('--dry-run', is_flag=True, default=False,
               help='Show what would be migrated without making changes')
-def migrate_ipam_to_mariadb(dry_run):
+def migrate_ipam_to_mariadb(dry_run: bool) -> None:
     """Migrate all IPAM reservations from etcd to MariaDB.
 
     This command should be run once during an upgrade to move IPAM reservation
@@ -434,7 +438,7 @@ def migrate_ipam_to_mariadb(dry_run):
 @click.command()
 @click.option('--dry-run', is_flag=True, default=False,
               help='Show what would be migrated without making changes')
-def migrate_floating_network_uuid(dry_run):
+def migrate_floating_network_uuid(dry_run: bool) -> None:
     """Migrate the floating network from legacy UUID to well-known UUID.
 
     The floating network previously used the string "floating" as its UUID,
@@ -519,7 +523,7 @@ def migrate_floating_network_uuid(dry_run):
 @click.command()
 @click.option('--dry-run', is_flag=True, default=False,
               help='Show what would be migrated without making changes')
-def migrate_uploads_to_mariadb(dry_run):
+def migrate_uploads_to_mariadb(dry_run: bool) -> None:
     """Migrate all upload objects from etcd to MariaDB.
 
     This command should be run once during an upgrade to move upload static
@@ -574,7 +578,7 @@ def migrate_uploads_to_mariadb(dry_run):
 @cli.command(name='migrate-dnsmasq-to-mariadb')
 @click.option('--dry-run', is_flag=True, default=False,
               help='Show what would be migrated without making changes')
-def migrate_dnsmasq_to_mariadb(dry_run):
+def migrate_dnsmasq_to_mariadb(dry_run: bool) -> None:
     """Migrate all DnsMasq objects from etcd to MariaDB.
 
     This command should be run once during an upgrade to move DnsMasq static
@@ -606,9 +610,9 @@ def migrate_dnsmasq_to_mariadb(dry_run):
             data['version'] = version
 
         # Convert owner_type to ObjectType if it's a string
-        owner_type = data.get('owner_type')
-        if isinstance(owner_type, str):
-            owner_type = ObjectType(owner_type)
+        owner_type_value = data.get('owner_type')
+        if isinstance(owner_type_value, str):
+            owner_type = ObjectType(owner_type_value)  # type: ignore[call-arg]
         else:
             owner_type = ObjectType.UNKNOWN
 
@@ -652,7 +656,7 @@ def migrate_dnsmasq_to_mariadb(dry_run):
 @click.command()
 @click.option('--dry-run', is_flag=True, default=False,
               help='Show what would be migrated without making changes')
-def migrate_references_to_mariadb(dry_run):
+def migrate_references_to_mariadb(dry_run: bool) -> None:
     """Migrate blob references to the MariaDB object_references table.
 
     This command scans all objects that reference blobs and creates
@@ -664,7 +668,6 @@ def migrate_references_to_mariadb(dry_run):
 
     All Shaken Fist services should be stopped before running this command.
     """
-    import time
     from shakenfist.schema.relationship_types import RelationshipType
 
     migration_precheck(dry_run)
@@ -675,7 +678,6 @@ def migrate_references_to_mariadb(dry_run):
     stats.add_category('DEPENDS_ON')
     stats.add_category('TRANSCODE')
     stats.add_category('AGENT_OUTPUT')
-    now = time.time()
 
     # --- Instances: disk references and nvram_template ---
     click.echo('\nScanning instances for blob references...')
@@ -708,8 +710,7 @@ def migrate_references_to_mariadb(dry_run):
                 success = mariadb.record_relationship(
                     ObjectType.INSTANCE, instance_uuid_obj,
                     RelationshipType.DISK, str(disk_idx),
-                    ObjectType.BLOB, blob_uuid_obj,
-                    now)
+                    ObjectType.BLOB, blob_uuid_obj)
                 if success:
                     stats.record_migrated('DISK')
                 else:
@@ -730,8 +731,7 @@ def migrate_references_to_mariadb(dry_run):
                 success = mariadb.record_relationship(
                     ObjectType.INSTANCE, instance_uuid_obj,
                     RelationshipType.NVRAM_TEMPLATE, None,
-                    ObjectType.BLOB, nvram_uuid_obj,
-                    now)
+                    ObjectType.BLOB, nvram_uuid_obj)
                 if success:
                     stats.record_migrated('NVRAM_TEMPLATE')
                 else:
@@ -779,8 +779,7 @@ def migrate_references_to_mariadb(dry_run):
                 success = mariadb.record_relationship(
                     ObjectType.ARTIFACT, artifact_uuid_obj,
                     RelationshipType.ARTIFACT_INDEX, index_str,
-                    ObjectType.BLOB, blob_uuid_obj,
-                    now)
+                    ObjectType.BLOB, blob_uuid_obj)
                 if success:
                     stats.record_migrated('ARTIFACT_INDEX')
                 else:
@@ -812,8 +811,7 @@ def migrate_references_to_mariadb(dry_run):
                 success = mariadb.record_relationship(
                     ObjectType.BLOB, blob_uuid_obj,
                     RelationshipType.DEPENDS_ON, None,
-                    ObjectType.BLOB, dep_uuid_obj,
-                    now)
+                    ObjectType.BLOB, dep_uuid_obj)
                 if success:
                     stats.record_migrated('DEPENDS_ON')
                 else:
@@ -840,8 +838,7 @@ def migrate_references_to_mariadb(dry_run):
                     success = mariadb.record_relationship(
                         ObjectType.BLOB, blob_uuid_obj,
                         RelationshipType.TRANSCODE, style,
-                        ObjectType.BLOB, trans_uuid_obj,
-                        now)
+                        ObjectType.BLOB, trans_uuid_obj)
                     if success:
                         stats.record_migrated('TRANSCODE')
                     else:
@@ -891,8 +888,7 @@ def migrate_references_to_mariadb(dry_run):
                     success = mariadb.record_relationship(
                         ObjectType.AGENTOPERATION, aop_uuid_obj,
                         RelationshipType.AGENT_OUTPUT, output_type,
-                        ObjectType.BLOB, result_blob_uuid_obj,
-                        now)
+                        ObjectType.BLOB, result_blob_uuid_obj)
                     if success:
                         stats.record_migrated('AGENT_OUTPUT')
                     else:
@@ -927,8 +923,7 @@ def migrate_references_to_mariadb(dry_run):
                 success = mariadb.record_relationship(
                     ObjectType.NODE, node_name,
                     RelationshipType.BLOB_LOCATION, None,
-                    ObjectType.BLOB, blob_uuid_obj,
-                    now)
+                    ObjectType.BLOB, blob_uuid_obj)
                 if success:
                     stats.record_migrated('BLOB_LOCATION')
                 else:
