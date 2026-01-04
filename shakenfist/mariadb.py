@@ -74,11 +74,14 @@ _object_references_table: Optional[sa.Table] = None
 #   uploads v1: Initial schema for upload objects
 #   dnsmasq v1: Initial schema for DnsMasq objects
 #   object_references v1: Initial schema for object reference tracking
+#   object_references v2: Changed source_uuid and target_uuid from UUID to
+#                         VARCHAR(255) to support Node objects which use FQDN
+#                         as their identifier instead of UUID
 OBJECT_STATES_VERSION = 2
 IPAM_RESERVATIONS_VERSION = 5
 UPLOADS_VERSION = 1
 DNSMASQ_VERSION = 1
-OBJECT_REFERENCES_VERSION = 1
+OBJECT_REFERENCES_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -668,7 +671,22 @@ def _ensure_object_references_schema(engine: sa.Engine) -> dict[str, Any]:
         current_ver = OBJECT_REFERENCES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
-    # Future migrations would go here (if current_ver == 1: ...)
+    # Migration from v1 to v2: Convert source_uuid and target_uuid from UUID to
+    # VARCHAR(255) to support Node objects which use FQDN as their identifier
+    if current_ver == 1:
+        LOG.info('Upgrading object_references from v1 to v2: '
+                 'converting UUID columns to VARCHAR(255)')
+        with engine.connect() as conn:
+            # ALTER TABLE to change column types from UUID to VARCHAR(255)
+            # MariaDB will automatically convert existing UUID values to strings
+            conn.execute(sa.text(
+                'ALTER TABLE object_references '
+                'MODIFY COLUMN source_uuid VARCHAR(255) NOT NULL, '
+                'MODIFY COLUMN target_uuid VARCHAR(255) NOT NULL'
+            ))
+            conn.commit()
+        current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
 
     return {
         'table': table_name,

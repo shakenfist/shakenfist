@@ -14,11 +14,9 @@ from typing import Optional
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
-from pydantic import UUID4
 
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
-from shakenfist.schema.sqlalchemy import SQLNativeUUID
 
 
 class ObjectReference(BaseModel):
@@ -36,12 +34,14 @@ class ObjectReference(BaseModel):
 
     Attributes:
         source_object_type: The type of the object that holds the reference.
-        source_uuid: The UUID of the source object.
+        source_uuid: The identifier of the source object (UUID string or FQDN
+            for nodes).
         relationship: The type of relationship (disk, artifact_index, etc.).
         relationship_value: Optional value for the relationship (e.g., disk
             index "0", transcode style "qcow2").
         target_object_type: The type of the referenced object.
-        target_uuid: The UUID of the referenced object.
+        target_uuid: The identifier of the referenced object (UUID string or
+            FQDN for nodes).
         created: Unix timestamp when reference was created.
         last_active: Unix timestamp, updated by cleaner daemon when it
             observes the reference is still valid/in-use.
@@ -64,8 +64,10 @@ class ObjectReference(BaseModel):
     )
 
     # Source object (the one holding the reference)
+    # Note: source_uuid is a string (max 255 chars) rather than UUID because
+    # Node objects use their FQDN as identifier, not a UUID.
     source_object_type: ObjectType
-    source_uuid: Annotated[UUID4, SQLNativeUUID()]
+    source_uuid: Annotated[str, Field(max_length=255)]
 
     # Relationship type and optional value
     relationship: RelationshipType
@@ -74,8 +76,10 @@ class ObjectReference(BaseModel):
     ] = None
 
     # Target object (the one being referenced)
+    # Note: target_uuid is a string (max 255 chars) rather than UUID because
+    # Node objects use their FQDN as identifier, not a UUID.
     target_object_type: ObjectType
-    target_uuid: Annotated[UUID4, SQLNativeUUID()]
+    target_uuid: Annotated[str, Field(max_length=255)]
 
     # Timestamps
     created: float  # Unix timestamp when reference was created

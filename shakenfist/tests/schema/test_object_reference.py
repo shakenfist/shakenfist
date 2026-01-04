@@ -16,9 +16,10 @@ from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
 from shakenfist.tests import base
 
 
-# Generate valid UUID4 values for tests
-SOURCE_UUID = uuid4()
-TARGET_UUID = uuid4()
+# Generate valid identifier values for tests (strings since the schema uses
+# strings to accommodate both UUIDs and Node FQDNs)
+SOURCE_UUID = str(uuid4())
+TARGET_UUID = str(uuid4())
 
 
 class RelationshipTypeEnumTestCase(base.ShakenFistTestCase):
@@ -144,6 +145,43 @@ class ObjectReferenceModelTestCase(base.ShakenFistTestCase):
         self.assertEqual(ref.created, created)
         self.assertEqual(ref.last_active, last_active)
 
+    def test_node_fqdn_as_source(self):
+        """Test that Node FQDNs work as source identifiers.
+
+        Nodes use their FQDN (e.g., 'localhost', 'node1.example.com') as
+        their identifier rather than a UUID. This is the use case that
+        requires source_uuid to be a string rather than UUID.
+        """
+        node_fqdn = 'node1.example.com'
+        ref = ObjectReference(
+            source_object_type=ObjectType.NODE,
+            source_uuid=node_fqdn,
+            relationship=RelationshipType.BLOB_LOCATION,
+            relationship_value=None,
+            target_object_type=ObjectType.BLOB,
+            target_uuid=TARGET_UUID,
+            created=1234567890.0,
+            last_active=1234567890.0
+        )
+        self.assertEqual(ref.source_uuid, node_fqdn)
+        self.assertEqual(ref.source_object_type, ObjectType.NODE)
+
+    def test_long_fqdn_as_source(self):
+        """Test that long FQDNs (up to 255 chars) work as identifiers."""
+        # DNS names can be up to 253 characters
+        long_fqdn = 'a' * 200 + '.example.com'
+        ref = ObjectReference(
+            source_object_type=ObjectType.NODE,
+            source_uuid=long_fqdn,
+            relationship=RelationshipType.BLOB_LOCATION,
+            relationship_value=None,
+            target_object_type=ObjectType.BLOB,
+            target_uuid=TARGET_UUID,
+            created=1234567890.0,
+            last_active=1234567890.0
+        )
+        self.assertEqual(ref.source_uuid, long_fqdn)
+
 
 class ObjectReferenceTableGenerationTestCase(base.ShakenFistTestCase):
     """Tests for generating the object_references table."""
@@ -187,8 +225,12 @@ class ObjectReferenceTableGenerationTestCase(base.ShakenFistTestCase):
         self.assertIn('target_object_type', pk_cols)
         self.assertIn('target_uuid', pk_cols)
 
-    def test_uuid_columns_are_native(self):
-        """Test that UUID columns use native UUID type."""
+    def test_uuid_columns_are_strings(self):
+        """Test that identifier columns use String type.
+
+        The columns are named 'uuid' for historical reasons, but they store
+        strings (VARCHAR 255) to accommodate both UUIDs and Node FQDNs.
+        """
         metadata = sa.MetaData()
         table = pydantic_to_sqlalchemy_table(
             ObjectReference, 'object_references', metadata,
@@ -198,9 +240,12 @@ class ObjectReferenceTableGenerationTestCase(base.ShakenFistTestCase):
             ],
             include_id_column=False)
 
-        # Both UUID columns should use native UUID type
-        self.assertIsInstance(table.c.source_uuid.type, sa.Uuid)
-        self.assertIsInstance(table.c.target_uuid.type, sa.Uuid)
+        # Both identifier columns should use String type
+        self.assertIsInstance(table.c.source_uuid.type, sa.String)
+        self.assertIsInstance(table.c.target_uuid.type, sa.String)
+        # Check the max length is 255 (for FQDNs)
+        self.assertEqual(table.c.source_uuid.type.length, 255)
+        self.assertEqual(table.c.target_uuid.type.length, 255)
 
     def test_indexes_exist(self):
         """Test that expected indexes are created."""
