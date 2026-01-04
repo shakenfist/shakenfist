@@ -14,7 +14,7 @@ dynamic = ["version"]
 
 description = "An opinionated minimal cloud"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
     # A bit vague because we expect this to come from an OS package
     "psutil>=5.9.0",                      # bsd
