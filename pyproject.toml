@@ -119,7 +119,7 @@ dependencies = [
     "charset-normalizer==3.4.4",
     "debtcollector==3.0.0",
     "fasteners==0.20",
-    "idna==3.10",
+    "idna==3.11",
     "jsonschema==4.25.1",
     "jsonschema-specifications==2025.9.1",
     "netaddr==1.3.0",
