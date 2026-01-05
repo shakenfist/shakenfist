@@ -126,7 +126,7 @@ dependencies = [
     "oslo.concurrency==7.2.0",
     "oslo.config==10.1.0",
     "oslo.i18n==6.7.1",
-    "oslo.utils==9.1.0",
+    "oslo.utils==9.2.0",
     "packaging==25.0",
     "prometheus_client==0.22.1",
     "pydantic_core==2.27.2",
