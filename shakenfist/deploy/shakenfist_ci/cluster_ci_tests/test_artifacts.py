@@ -1,5 +1,8 @@
+import json
 import random
 import time
+
+from testtools import content
 
 from shakenfist_ci import base
 from shakenfist_client import apiclient
@@ -25,6 +28,8 @@ class TestImages(base.BaseNamespacedTestCase):
         image_urls = []
         for image in self.system_client.get_artifacts():
             image_urls.append(image['source_url'])
+        self.addDetail('image_urls', content.text_content(json.dumps(
+            image_urls, indent=4, sort_keys=True)))
         self.assertIn(url, image_urls)
 
         # And then just lookup the single artifact
@@ -35,6 +40,8 @@ class TestImages(base.BaseNamespacedTestCase):
                 return
             time.sleep(5)
 
+        self.addDetail('img', content.text_content(json.dumps(
+            img, indent=4, sort_keys=True)))
         self.fail('Image was not downloaded after seven minutes: %s'
                   % img['uuid'])
 
@@ -50,6 +57,8 @@ class TestImages(base.BaseNamespacedTestCase):
                 return
             time.sleep(5)
 
+        self.addDetail('img', content.text_content(json.dumps(
+            img, indent=4, sort_keys=True)))
         self.fail('Image was not placed into an error state after seven minutes: %s'
                   % img['uuid'])
 
@@ -70,9 +79,13 @@ class TestImages(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        self.addDetail('inst', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
         self.assertRaises(base.StartException,
                           self._await_instance_ready, inst['uuid'])
         i = self.test_client.get_instance(inst['uuid'])
+        self.addDetail('i', content.text_content(json.dumps(
+            i, indent=4, sort_keys=True)))
         self.assertEqual('error', i['state'])
 
     def test_resize_image_too_small(self):
@@ -87,12 +100,16 @@ class TestImages(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        self.addDetail('inst', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst['uuid'])
 
         while inst['state'] in ['initial', 'preflight', 'creating']:
             time.sleep(1)
             inst = self.test_client.get_instance(inst['uuid'])
 
+        self.addDetail('inst_final', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
         self.assertTrue(inst['state'] in ['creating-error', 'error'])
 
     def test_artifact_ref_count_label(self):
@@ -105,12 +122,16 @@ class TestImages(base.BaseNamespacedTestCase):
         image_urls = []
         for image in self.test_client.get_artifacts():
             image_urls.append(image['source_url'])
+        self.addDetail('image_urls', content.text_content(json.dumps(
+            image_urls, indent=4, sort_keys=True)))
         self.assertIn(url, image_urls)
 
         # Ensure the artifact is ready
         results = self._await_artifacts_ready([img['uuid']])
         img = results[0]
 
+        self.addDetail('img', content.text_content(json.dumps(
+            img, indent=4, sort_keys=True)))
         self.assertIn('blobs', img)
         self.assertEqual(1, len(img['blobs']))
         self.assertIn(1, img['blobs'])
@@ -123,6 +144,8 @@ class TestImages(base.BaseNamespacedTestCase):
         # Create a label artifact pointing at the blob
         label_name1 = 'test_label_01'
         lbl = self.test_client.update_label(label_name1, blob_uuid)
+        self.addDetail('lbl', content.text_content(json.dumps(
+            lbl, indent=4, sort_keys=True)))
         self.assertIn('blobs', lbl)
         self.assertEqual(1, len(lbl['blobs']))
         self.assertIn(1, lbl['blobs'])
@@ -132,6 +155,8 @@ class TestImages(base.BaseNamespacedTestCase):
         # Create second label also pointing at the blob
         label_name2 = 'test_label_02'
         lbl2 = self.test_client.update_label(label_name2, blob_uuid)
+        self.addDetail('lbl2', content.text_content(json.dumps(
+            lbl2, indent=4, sort_keys=True)))
         self.assertIn('blobs', lbl2)
         self.assertEqual(3, lbl2['blobs'][1]['reference_count'])
 
@@ -139,12 +164,16 @@ class TestImages(base.BaseNamespacedTestCase):
         self.assertIn('uuid', lbl)
         self.test_client.delete_artifact(lbl['uuid'])
         lbl_del = self.test_client.get_artifact(img['uuid'])
+        self.addDetail('lbl_del_first', content.text_content(json.dumps(
+            lbl_del, indent=4, sort_keys=True)))
         self.assertEqual(2, lbl_del['blobs'][1]['reference_count'])
 
         # Delete the second label
         self.assertIn('uuid', lbl2)
         self.test_client.delete_artifact(lbl2['uuid'])
         lbl_del = self.test_client.get_artifact(img['uuid'])
+        self.addDetail('lbl_del_second', content.text_content(json.dumps(
+            lbl_del, indent=4, sort_keys=True)))
         self.assertEqual(1, lbl_del['blobs'][1]['reference_count'])
 
         # Delete image artifact
@@ -152,12 +181,16 @@ class TestImages(base.BaseNamespacedTestCase):
 
         # Check reference count is now zero
         img_del = self.test_client.get_artifact(img['uuid'])
+        self.addDetail('img_del', content.text_content(json.dumps(
+            img_del, indent=4, sort_keys=True)))
         self.assertEqual(0, img_del['blobs'][1]['reference_count'])
         self.assertEqual('deleted', img_del['state'])
 
         # Delete image artifact again (this is idempotent)
         self.test_client.delete_artifact(img['uuid'])
         img_del = self.test_client.get_artifact(img['uuid'])
+        self.addDetail('img_del_idempotent', content.text_content(json.dumps(
+            img_del, indent=4, sort_keys=True)))
         self.assertEqual(0, img_del['blobs'][1]['reference_count'])
 
     def test_artifact_ignores_duplicate_blobs(self):
@@ -165,6 +198,8 @@ class TestImages(base.BaseNamespacedTestCase):
 
         img = self.system_client.cache_artifact(url)
         results = self._await_artifacts_ready([img['uuid']])
+        self.addDetail('results', content.text_content(json.dumps(
+            results, indent=4, sort_keys=True)))
         self.assertEqual('created', results[0].get('state'))
 
         self.assertIn('blob_uuid', results[0])
@@ -175,6 +210,8 @@ class TestImages(base.BaseNamespacedTestCase):
         label_name = 'test_duplicate_blobs'
         lbl = self.test_client.update_label(label_name, blob_uuid)
         lbl = self.test_client.update_label(label_name, blob_uuid)
+        self.addDetail('lbl', content.text_content(json.dumps(
+            lbl, indent=4, sort_keys=True)))
         self.assertEqual(1, len(lbl.get('blobs')))
 
     def test_artifact_max_versions(self):
@@ -183,6 +220,8 @@ class TestImages(base.BaseNamespacedTestCase):
                 'https://sfcbr.shakenfist.com/cgi-bin/uuid.cgi?uniq=%06d'
                 % random.randint(-999999, 999999))
             results = self._await_artifacts_ready([img['uuid']])
+            self.addDetail('fetch_results', content.text_content(json.dumps(
+                results, indent=4, sort_keys=True)))
             self.assertEqual('created', results[0].get('state'))
             self.assertIn('blob_uuid', results[0])
             return results[0]['blob_uuid']
@@ -190,6 +229,8 @@ class TestImages(base.BaseNamespacedTestCase):
         # Create a label artifact pointing at the blob
         label_name = 'test_label_max_versions'
         lbl = self.test_client.update_label(label_name, _fetch_to_blob())
+        self.addDetail('lbl_initial', content.text_content(json.dumps(
+            lbl, indent=4, sort_keys=True)))
         self.assertIsNot(
             0, lbl.get('max_versions'),
             'Artifact uuid %s should have a version' % lbl['uuid'])
@@ -197,10 +238,14 @@ class TestImages(base.BaseNamespacedTestCase):
         expected_versions = lbl.get('max_versions')
         for i in range(expected_versions - 1):
             lbl = self.test_client.update_label(label_name, _fetch_to_blob())
+            self.addDetail('lbl_iter_%d' % i, content.text_content(json.dumps(
+                lbl, indent=4, sort_keys=True)))
             self.assertEqual(
                 i + 2, len(lbl.get('blobs')),
                 'Artifact uuid %s should have %d versions' % (lbl['uuid'], i + 2))
 
+        self.addDetail('lbl_after_loop', content.text_content(json.dumps(
+            lbl, indent=4, sort_keys=True)))
         self.assertEqual(expected_versions, len(lbl.get('blobs')))
         for i in range(expected_versions):
             self.assertIn(
@@ -209,6 +254,8 @@ class TestImages(base.BaseNamespacedTestCase):
 
         # Check that the blob count remains static
         lbl = self.test_client.update_label(label_name, _fetch_to_blob())
+        self.addDetail('lbl_static_check1', content.text_content(json.dumps(
+            lbl, indent=4, sort_keys=True)))
         self.assertEqual(expected_versions, len(lbl.get('blobs')))
         for i in range(expected_versions):
             self.assertIn(i + 2, lbl['blobs'])
@@ -216,6 +263,8 @@ class TestImages(base.BaseNamespacedTestCase):
 
         # Again, check that the blob count remains static
         lbl = self.test_client.update_label(label_name, _fetch_to_blob())
+        self.addDetail('lbl_static_check2', content.text_content(json.dumps(
+            lbl, indent=4, sort_keys=True)))
         self.assertEqual(expected_versions, len(lbl.get('blobs')))
         for i in range(expected_versions):
             self.assertIn(i + 3, lbl['blobs'])
@@ -227,10 +276,14 @@ class TestImages(base.BaseNamespacedTestCase):
             self.test_client.delete_artifact_version(lbl['uuid'], '4')
 
             img = self.system_client.get_artifact(lbl['uuid'])
+            self.addDetail('img_after_delete', content.text_content(json.dumps(
+                img, indent=4, sort_keys=True)))
             self.assertEqual(expected_versions-1, len(img['blobs']))
 
             # Add extra version
             lbl = self.test_client.update_label(label_name, _fetch_to_blob())
+            self.addDetail('lbl_final', content.text_content(json.dumps(
+                lbl, indent=4, sort_keys=True)))
             self.assertEqual(expected_versions, len(lbl.get('blobs')))
             self.assertIn(3, lbl['blobs'])
 
@@ -249,6 +302,8 @@ class TestSharedImages(base.BaseNamespacedTestCase):
         image_urls = []
         for image in self.test_client.get_artifacts():
             image_urls.append(image['source_url'])
+        self.addDetail('image_urls_non_shared', content.text_content(json.dumps(
+            image_urls, indent=4, sort_keys=True)))
         self.assertNotIn(url, image_urls)
 
         # Cache a shared version of the image
@@ -257,6 +312,8 @@ class TestSharedImages(base.BaseNamespacedTestCase):
         image_urls = []
         for image in self.test_client.get_artifacts():
             image_urls.append(image['source_url'])
+        self.addDetail('image_urls_shared', content.text_content(json.dumps(
+            image_urls, indent=4, sort_keys=True)))
         self.assertIn(url, image_urls)
 
         # Try to cache a shared version when not admin
@@ -284,6 +341,8 @@ class TestTrusts(base.BaseNamespacedTestCase):
         image_urls = []
         for image in self.test_client_two.get_artifacts():
             image_urls.append(image['source_url'])
+        self.addDetail('image_urls_before_trust', content.text_content(
+            json.dumps(image_urls, indent=4, sort_keys=True)))
         self.assertNotIn(url, image_urls)
 
         # Add a trust
@@ -293,6 +352,8 @@ class TestTrusts(base.BaseNamespacedTestCase):
         image_urls = []
         for image in self.test_client_two.get_artifacts():
             image_urls.append(image['source_url'])
+        self.addDetail('image_urls_after_trust', content.text_content(
+            json.dumps(image_urls, indent=4, sort_keys=True)))
         self.assertIn(url, image_urls)
 
         # Remove trust
@@ -302,6 +363,8 @@ class TestTrusts(base.BaseNamespacedTestCase):
         image_urls = []
         for image in self.test_client_two.get_artifacts():
             image_urls.append(image['source_url'])
+        self.addDetail('image_urls_after_remove', content.text_content(
+            json.dumps(image_urls, indent=4, sort_keys=True)))
         self.assertNotIn(url, image_urls)
 
         self.system_client.delete_namespace(self.namespace + '-1')

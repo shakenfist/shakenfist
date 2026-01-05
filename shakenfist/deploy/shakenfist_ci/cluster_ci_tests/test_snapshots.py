@@ -1,4 +1,7 @@
+import json
 import time
+
+from testtools import content
 
 from shakenfist_ci import base
 
@@ -30,6 +33,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        self.addDetail('inst1', content.text_content(json.dumps(
+            inst1, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
         self._await_instance_ready(inst1['uuid'])
@@ -39,6 +44,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             'msg': 'Start snapshot'
         })
         snap1 = self.test_client.snapshot_instance(inst1['uuid'])
+        self.addDetail('snap1', content.text_content(json.dumps(
+            snap1, indent=4, sort_keys=True)))
         self.assertIsNotNone(snap1)
         self._emit_tracing_event({
             'msg': 'Finished snapshot',
@@ -54,6 +61,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
+        self.addDetail('snapshots', content.text_content(json.dumps(
+            snapshots, indent=4, sort_keys=True)))
         self.assertEqual(1, len(snapshots))
         self.assertEqual(
             'created', snapshots[0]['state'],
@@ -74,6 +83,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
+        self.addDetail('snap1_info', content.text_content(json.dumps(
+            snap1_info, indent=4, sort_keys=True)))
         self.assertEqual('created', snap1_info['state'])
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
         self.assertEqual(1, snap1_info['blobs'][1]['reference_count'],
@@ -106,6 +117,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
+        self.addDetail('snapshots_after_snap2', content.text_content(json.dumps(
+            snapshots, indent=4, sort_keys=True)))
         self.assertEqual(2, len(snapshots))
         self.assertEqual('sf://instance/%s/vda'
                          % inst1['uuid'], snapshots[0]['source_url'])
@@ -134,6 +147,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             'instance_uuid': inst2['uuid']
         })
 
+        self.addDetail('inst2', content.text_content(json.dumps(
+            inst2, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst2['uuid'])
         self.assertIsNotNone(inst2['node'])
         self._await_instance_ready(inst2['uuid'])
@@ -158,16 +173,22 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             'instance_uuid': inst2['uuid']
         })
 
+        self.addDetail('inst3', content.text_content(json.dumps(
+            inst3, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst3['uuid'])
         self.assertIsNotNone(inst3['node'])
         self._await_instance_ready(inst3['uuid'])
 
         # Test deleting snapshot versions
         versions = self.test_client.get_artifact_versions(snapshot_uuid)
+        self.addDetail('versions', content.text_content(json.dumps(
+            versions, indent=4, sort_keys=True)))
         self.assertEqual(2, len(versions))
 
         self.test_client.delete_artifact_version(snapshot_uuid, 2)
         versions = self.test_client.get_artifact_versions(snapshot_uuid)
+        self.addDetail('versions_after_delete', content.text_content(json.dumps(
+            versions, indent=4, sort_keys=True)))
         self.assertEqual(1, len(versions))
         self._emit_tracing_event({
             'msg': 'Deleted a snapshot'
@@ -190,6 +211,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             if len(versions) == 2:
                 break
             time.sleep(5)
+        self.addDetail('versions_after_snap3', content.text_content(json.dumps(
+            versions, indent=4, sort_keys=True)))
         self.assertEqual(2, len(versions))
         self._emit_tracing_event({
             'msg': 'New snapshot is current snapshot',
@@ -203,9 +226,13 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Delete only version in artifact
         self.test_client.delete_artifact_version(snapshot_uuid, 1)
         versions = self.test_client.get_artifact_versions(snapshot_uuid)
+        self.addDetail('versions_final', content.text_content(json.dumps(
+            versions, indent=4, sort_keys=True)))
         self.assertEqual(0, len(versions))
 
         snap_info = self.test_client.get_artifact(snapshot_uuid)
+        self.addDetail('snap_info', content.text_content(json.dumps(
+            snap_info, indent=4, sort_keys=True)))
         self.assertEqual('deleted', snap_info['state'])
 
         self.test_client.delete_instance(inst1['uuid'])
@@ -237,17 +264,23 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        self.addDetail('inst', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst['uuid'])
         self.assertIsNotNone(inst['node'])
         self._await_instance_ready(inst['uuid'])
 
         snap1 = self.test_client.snapshot_instance(inst['uuid'], all=True)
+        self.addDetail('snap1', content.text_content(json.dumps(
+            snap1, indent=4, sort_keys=True)))
         self.assertIsNotNone(snap1)
 
         # Wait until all blob uuids in the returned snapshot are created
         waiting_for = []
         for device in snap1:
             waiting_for.append(snap1[device]['blob_uuid'])
+        self.addDetail('waiting_for', content.text_content(json.dumps(
+            waiting_for, indent=4, sort_keys=True)))
         self.assertEqual(2, len(waiting_for))
         self._await_blobs_ready(waiting_for)
 
@@ -262,11 +295,15 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         for s in snapshots:
             snapshot_blob_uuids.append(s['blob_uuid'])
 
+        self.addDetail('snapshots', content.text_content(json.dumps(
+            snapshots, indent=4, sort_keys=True)))
         self.assertTrue(snap1['vdc']['blob_uuid'] in snapshot_blob_uuids)
         self.assertEqual(
             2, len(snapshots), 'Snapshot list %s is incomplete' % snapshots)
 
         snap2 = self.test_client.snapshot_instance(inst['uuid'], all=True)
+        self.addDetail('snap2', content.text_content(json.dumps(
+            snap2, indent=4, sort_keys=True)))
         self.assertIsNotNone(snap2)
 
         # Wait until all blob uuids in the returned snapshot are created
@@ -281,6 +318,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             if len(snapshots) == 4:
                 break
             time.sleep(5)
+        self.addDetail('snapshots_final', content.text_content(json.dumps(
+            snapshots, indent=4, sort_keys=True)))
         self.assertEqual(4, len(snapshots))
 
         for snap in snapshots:
@@ -306,6 +345,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        self.addDetail('inst1', content.text_content(json.dumps(
+            inst1, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
 
@@ -314,6 +355,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Take a snapshot
         snap = self.test_client.snapshot_instance(
             inst1['uuid'], label_name='testlabel')
+        self.addDetail('snap', content.text_content(json.dumps(
+            snap, indent=4, sort_keys=True)))
         self.assertIsNotNone(snap)
 
         # Now attempt to boot the snapshot via snapshot uuid
@@ -332,6 +375,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        self.addDetail('inst2', content.text_content(json.dumps(
+            inst2, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst2['uuid'])
         self.assertIsNotNone(inst2['node'])
         self._await_instance_ready(inst2['uuid'])
@@ -355,6 +400,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        self.addDetail('inst1', content.text_content(json.dumps(
+            inst1, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
 
@@ -363,6 +410,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Take a snapshot
         snap = self.test_client.snapshot_instance(
             inst1['uuid'], label_name='anotherlabel', delete_snapshot_after_label=True)
+        self.addDetail('snap', content.text_content(json.dumps(
+            snap, indent=4, sort_keys=True)))
         self.assertIsNotNone(snap)
 
         # Wait for the label, we cannot use _await_artifacts_ready here because
@@ -412,11 +461,15 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        self.addDetail('inst', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst['uuid'])
         self.assertIsNotNone(inst['node'])
         self._await_instance_ready(inst['uuid'])
 
         snap1 = self.test_client.snapshot_instance(inst['uuid'], device='vdc')
+        self.addDetail('snap1', content.text_content(json.dumps(
+            snap1, indent=4, sort_keys=True)))
         self.assertIsNotNone(snap1)
 
         # Wait until the blob uuid specified above is the one used for the
@@ -428,10 +481,14 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
+        self.addDetail('snapshots', content.text_content(json.dumps(
+            snapshots, indent=4, sort_keys=True)))
         self.assertEqual(1, len(snapshots))
 
         snap2 = self.test_client.snapshot_instance(
             inst['uuid'], device='vdc', label_name='foo')
+        self.addDetail('snap2', content.text_content(json.dumps(
+            snap2, indent=4, sort_keys=True)))
         self.assertIsNotNone(snap2)
 
         # Wait until the blob uuid specified above is the one used for the
@@ -443,6 +500,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
+        self.addDetail('snapshots_final', content.text_content(json.dumps(
+            snapshots, indent=4, sort_keys=True)))
         self.assertEqual(2, len(snapshots))
 
         for snap in snapshots:
@@ -468,6 +527,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 }
             ], None, base.load_userdata('cluster_ci_tests', 'writedata'))
 
+        self.addDetail('inst1', content.text_content(json.dumps(
+            inst1, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
 
@@ -476,6 +537,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         # Take a snapshot
         snap1 = self.test_client.snapshot_instance(inst1['uuid'], thin=True)
+        self.addDetail('snap1', content.text_content(json.dumps(
+            snap1, indent=4, sort_keys=True)))
         self.assertIsNotNone(snap1)
 
         # Ensure the snapshot is ready
@@ -490,6 +553,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
+        self.addDetail('snapshots', content.text_content(json.dumps(
+            snapshots, indent=4, sort_keys=True)))
         self.assertEqual(1, len(snapshots))
         self.assertEqual('created', snapshots[0]['state'])
 
@@ -497,6 +562,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # blob
         snapshot_uuid = snapshots[-1]['uuid']
         snap1_info = self.test_client.get_artifact(snapshot_uuid)
+        self.addDetail('snap1_info', content.text_content(json.dumps(
+            snap1_info, indent=4, sort_keys=True)))
         self.assertEqual('created', snap1_info['state'])
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
         self.assertEqual(1, snap1_info['blobs'][1]['reference_count'])
@@ -504,11 +571,15 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         # Refresh our view of the instance
         inst1 = self.test_client.get_instance(inst1['uuid'])
+        self.addDetail('inst1_refreshed', content.text_content(json.dumps(
+            inst1, indent=4, sort_keys=True)))
 
         # We wrote 50mb of data in our boot script, but there will also be other
         # changes (disk resize, log files, etc). Let's just make sure the snapshot
         # is a lot smaller than the base image.
         b = self.test_client.get_blob(inst1['disks'][0]['blob_uuid'])
+        self.addDetail('blob', content.text_content(json.dumps(
+            b, indent=4, sort_keys=True)))
         self.assertNotEqual(None, b['size'])
         self.assertLess(snap1_info['blobs'][1]['size'], b['size'])
 
@@ -528,11 +599,15 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 }
             ], None, base.load_userdata('cluster_ci_tests', 'writedata'))
 
+        self.addDetail('inst2', content.text_content(json.dumps(
+            inst2, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst2['uuid'])
         self.assertIsNotNone(inst2['node'])
 
         self._await_instance_ready(inst2['uuid'])
         inst2 = self.test_client.get_instance(inst2['uuid'])
+        self.addDetail('inst2_refreshed', content.text_content(json.dumps(
+            inst2, indent=4, sort_keys=True)))
         self.assertNotIn(inst2['agent_system_boot_time'], [None, 0])
 
         # Cleanup
