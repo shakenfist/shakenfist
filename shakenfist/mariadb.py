@@ -34,7 +34,7 @@ from shakenfist_utilities import logs
 from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
-from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.protos from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
