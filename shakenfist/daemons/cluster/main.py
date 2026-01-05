@@ -205,14 +205,21 @@ class Monitor(daemon.Daemon):
             if instances:
                 in_use_blobs[b.uuid] += 1
 
-            # If the blob's reference count is zero, we can reap it. With the
-            # MariaDB-based object_references table, ref_count is computed
-            # dynamically from actual relationships, so there's no drift.
+            # If the blob's reference count is zero and it hasn't been used
+            # recently, we can reap it. The grace period prevents race
+            # conditions where a relationship is being created while the
+            # cleanup runs. With the MariaDB-based object_references table,
+            # ref_count is computed dynamically from actual relationships.
             if b.ref_count < 1:
-                b.add_event(
-                    EVENT_TYPE_AUDIT,
-                    'reference count is zero, cascading delete initiated')
-                b.cascading_delete()
+                last_used = b.last_used or 0
+                age = time.time() - last_used
+                if age > 300:
+                    b.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'reference count is zero and unused for >300s, '
+                        'cascading delete initiated',
+                        extra={'last_used': last_used, 'age': age})
+                    b.cascading_delete()
                 continue
 
             locations = b.locations + b.incomplete_healthy_locations

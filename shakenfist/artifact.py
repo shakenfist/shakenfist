@@ -16,7 +16,6 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.schema.object_types import ObjectType
-from shakenfist.schema.relationship_types import RelationshipType
 
 
 LOG, _ = logs.setup(__name__)
@@ -308,10 +307,9 @@ class Artifact(dbowo):
             }
             self._db_set_attribute('index_%012d' % index, entry)
             if not self.in_memory_only:
-                mariadb.record_relationship(
-                    ObjectType.ARTIFACT, self.uuid,
-                    RelationshipType.ARTIFACT_INDEX, str(index).zfill(12),
-                    ObjectType.BLOB, blob_uuid)
+                b = blob.Blob.from_db(blob_uuid)
+                if b:
+                    b.add_artifact_index_reference(self.uuid, index)
 
             # There is an implied billing update in delete_old_versions, so we
             # don't need one of our own here.
@@ -335,10 +333,9 @@ class Artifact(dbowo):
 
         self._db_delete_attribute('index_%012d' % index)
         if not self.in_memory_only:
-            mariadb.remove_relationship(
-                ObjectType.ARTIFACT, self.uuid,
-                RelationshipType.ARTIFACT_INDEX, str(index).zfill(12),
-                ObjectType.BLOB, index_data['blob_uuid'])
+            b = blob.Blob.from_db(index_data['blob_uuid'])
+            if b:
+                b.remove_artifact_index_reference(self.uuid, index)
 
         if update_billing:
             self.update_billing()

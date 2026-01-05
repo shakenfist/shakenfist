@@ -250,6 +250,7 @@ class Blob(dbo):
 
     def add_location(self, location: str) -> None:
         """Record that this blob is present on the given node."""
+        self.record_usage()
         mariadb.record_relationship(
             ObjectType.NODE, location,
             RelationshipType.BLOB_LOCATION, None,
@@ -392,6 +393,84 @@ class Blob(dbo):
         """Remove all transcode relationships from this blob."""
         mariadb.remove_all_references_from(
             ObjectType.BLOB, self.uuid, RelationshipType.TRANSCODE)
+
+    # =========================================================================
+    # Reference management methods
+    # These methods are the preferred way to record relationships to this blob.
+    # They ensure record_usage() is called to prevent premature cleanup.
+    # =========================================================================
+
+    def add_disk_reference(self, instance_uuid: str, disk_idx: int) -> None:
+        """Record that an instance uses this blob as a disk."""
+        self.record_usage()
+        mariadb.record_relationship(
+            ObjectType.INSTANCE, instance_uuid,
+            RelationshipType.DISK, str(disk_idx),
+            ObjectType.BLOB, self.uuid)
+
+    def remove_disk_reference(self, instance_uuid: str, disk_idx: int) -> None:
+        """Remove the record that an instance uses this blob as a disk."""
+        mariadb.remove_relationship(
+            ObjectType.INSTANCE, instance_uuid,
+            RelationshipType.DISK, str(disk_idx),
+            ObjectType.BLOB, self.uuid)
+
+    def add_nvram_template_reference(self, instance_uuid: str) -> None:
+        """Record that an instance uses this blob as an NVRAM template."""
+        self.record_usage()
+        mariadb.record_relationship(
+            ObjectType.INSTANCE, instance_uuid,
+            RelationshipType.NVRAM_TEMPLATE, None,
+            ObjectType.BLOB, self.uuid)
+
+    def remove_nvram_template_reference(self, instance_uuid: str) -> None:
+        """Remove the record that an instance uses this blob as NVRAM template."""
+        mariadb.remove_relationship(
+            ObjectType.INSTANCE, instance_uuid,
+            RelationshipType.NVRAM_TEMPLATE, None,
+            ObjectType.BLOB, self.uuid)
+
+    def add_artifact_index_reference(
+            self, artifact_uuid: str, index: int) -> None:
+        """Record that an artifact references this blob at the given index."""
+        self.record_usage()
+        mariadb.record_relationship(
+            ObjectType.ARTIFACT, artifact_uuid,
+            RelationshipType.ARTIFACT_INDEX, str(index).zfill(12),
+            ObjectType.BLOB, self.uuid)
+
+    def remove_artifact_index_reference(
+            self, artifact_uuid: str, index: int) -> None:
+        """Remove the record that an artifact references this blob."""
+        mariadb.remove_relationship(
+            ObjectType.ARTIFACT, artifact_uuid,
+            RelationshipType.ARTIFACT_INDEX, str(index).zfill(12),
+            ObjectType.BLOB, self.uuid)
+
+    def add_depends_on_reference(self, parent_blob_uuid: str) -> None:
+        """Record that this blob depends on another blob (e.g., snapshot)."""
+        self.record_usage()
+        mariadb.record_relationship(
+            ObjectType.BLOB, self.uuid,
+            RelationshipType.DEPENDS_ON, None,
+            ObjectType.BLOB, parent_blob_uuid)
+
+    def add_agent_output_reference(
+            self, agentop_uuid: str, output_type: str) -> None:
+        """Record that an agent operation produced this blob as output."""
+        self.record_usage()
+        mariadb.record_relationship(
+            ObjectType.AGENTOPERATION, agentop_uuid,
+            RelationshipType.AGENT_OUTPUT, output_type,
+            ObjectType.BLOB, self.uuid)
+
+    def remove_agent_output_reference(
+            self, agentop_uuid: str, output_type: str) -> None:
+        """Remove the record that an agent operation produced this blob."""
+        mariadb.remove_relationship(
+            ObjectType.AGENTOPERATION, agentop_uuid,
+            RelationshipType.AGENT_OUTPUT, output_type,
+            ObjectType.BLOB, self.uuid)
 
     @property
     def last_used(self) -> Optional[float]:
@@ -894,10 +973,7 @@ def snapshot_disk(
 
     # Record the depends_on reference in the object_references table
     if depends_on:
-        mariadb.record_relationship(
-            ObjectType.BLOB, blob_uuid,
-            RelationshipType.DEPENDS_ON, None,
-            ObjectType.BLOB, depends_on)
+        b.add_depends_on_reference(depends_on)
 
     b.register()
     return b

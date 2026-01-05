@@ -27,7 +27,6 @@ from shakenfist import constants
 from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import mariadb
-from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.operations.node_inst_op \
     import create_and_enqueue as nio_create_and_enqueue
@@ -728,17 +727,15 @@ class Instance(dbowo):
         for disk_idx, disk in enumerate(self.disk_spec):
             disk_blob_uuid = disk.get('blob_uuid')
             if disk_blob_uuid:
-                mariadb.record_relationship(
-                    ObjectType.INSTANCE, self.uuid,
-                    RelationshipType.DISK, str(disk_idx),
-                    ObjectType.BLOB, disk_blob_uuid)
+                disk_blob = blob.Blob.from_db(disk_blob_uuid)
+                if disk_blob:
+                    disk_blob.add_disk_reference(self.uuid, disk_idx)
 
         # Record nvram_template reference if present
         if nvram_template:
-            mariadb.record_relationship(
-                ObjectType.INSTANCE, self.uuid,
-                RelationshipType.NVRAM_TEMPLATE, None,
-                ObjectType.BLOB, nvram_template)
+            nvram_blob = blob.Blob.from_db(nvram_template)
+            if nvram_blob:
+                nvram_blob.add_nvram_template_reference(self.uuid)
 
         return block_devices
 
