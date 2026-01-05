@@ -48,6 +48,7 @@ from shakenfist.exceptions import BlobSizeCannotChange
 from shakenfist.exceptions import BlobTransferSetupFailed
 from shakenfist.exceptions import LocklessUpdateFailed
 from shakenfist.node import Node
+from shakenfist.util import callstack as util_callstack
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.util import general as util_general
@@ -398,8 +399,13 @@ class Blob(dbo):
     # Reference management methods
     # These methods are the preferred way to record relationships to this blob.
     # They ensure record_usage() is called to prevent premature cleanup.
+    #
+    # Each method is decorated with @restrict_caller to enforce that only the
+    # appropriate modules call them. This provides soft enforcement (warnings)
+    # to catch architectural violations during development.
     # =========================================================================
 
+    @util_callstack.restrict_caller('shakenfist.instance', 'shakenfist.tests')
     def add_disk_reference(self, instance_uuid: str, disk_idx: int) -> None:
         """Record that an instance uses this blob as a disk."""
         self.record_usage()
@@ -408,6 +414,7 @@ class Blob(dbo):
             RelationshipType.DISK, str(disk_idx),
             ObjectType.BLOB, self.uuid)
 
+    @util_callstack.restrict_caller('shakenfist.instance', 'shakenfist.tests')
     def remove_disk_reference(self, instance_uuid: str, disk_idx: int) -> None:
         """Remove the record that an instance uses this blob as a disk."""
         mariadb.remove_relationship(
@@ -415,6 +422,7 @@ class Blob(dbo):
             RelationshipType.DISK, str(disk_idx),
             ObjectType.BLOB, self.uuid)
 
+    @util_callstack.restrict_caller('shakenfist.instance', 'shakenfist.tests')
     def add_nvram_template_reference(self, instance_uuid: str) -> None:
         """Record that an instance uses this blob as an NVRAM template."""
         self.record_usage()
@@ -423,6 +431,7 @@ class Blob(dbo):
             RelationshipType.NVRAM_TEMPLATE, None,
             ObjectType.BLOB, self.uuid)
 
+    @util_callstack.restrict_caller('shakenfist.instance', 'shakenfist.tests')
     def remove_nvram_template_reference(self, instance_uuid: str) -> None:
         """Remove the record that an instance uses this blob as NVRAM template."""
         mariadb.remove_relationship(
@@ -430,6 +439,7 @@ class Blob(dbo):
             RelationshipType.NVRAM_TEMPLATE, None,
             ObjectType.BLOB, self.uuid)
 
+    @util_callstack.restrict_caller('shakenfist.artifact', 'shakenfist.tests')
     def add_artifact_index_reference(
             self, artifact_uuid: str, index: int) -> None:
         """Record that an artifact references this blob at the given index."""
@@ -439,6 +449,7 @@ class Blob(dbo):
             RelationshipType.ARTIFACT_INDEX, str(index).zfill(12),
             ObjectType.BLOB, self.uuid)
 
+    @util_callstack.restrict_caller('shakenfist.artifact', 'shakenfist.tests')
     def remove_artifact_index_reference(
             self, artifact_uuid: str, index: int) -> None:
         """Remove the record that an artifact references this blob."""
@@ -447,6 +458,7 @@ class Blob(dbo):
             RelationshipType.ARTIFACT_INDEX, str(index).zfill(12),
             ObjectType.BLOB, self.uuid)
 
+    @util_callstack.restrict_caller('shakenfist.blob', 'shakenfist.tests')
     def add_depends_on_reference(self, parent_blob_uuid: str) -> None:
         """Record that this blob depends on another blob (e.g., snapshot)."""
         self.record_usage()
@@ -455,6 +467,8 @@ class Blob(dbo):
             RelationshipType.DEPENDS_ON, None,
             ObjectType.BLOB, parent_blob_uuid)
 
+    @util_callstack.restrict_caller(
+        'shakenfist.daemons.sidechannel', 'shakenfist.tests')
     def add_agent_output_reference(
             self, agentop_uuid: str, output_type: str) -> None:
         """Record that an agent operation produced this blob as output."""
@@ -464,6 +478,8 @@ class Blob(dbo):
             RelationshipType.AGENT_OUTPUT, output_type,
             ObjectType.BLOB, self.uuid)
 
+    @util_callstack.restrict_caller(
+        'shakenfist.operations.agentoperation', 'shakenfist.tests')
     def remove_agent_output_reference(
             self, agentop_uuid: str, output_type: str) -> None:
         """Remove the record that an agent operation produced this blob."""
