@@ -1,3 +1,7 @@
+import json
+
+from testtools import content
+
 from shakenfist_ci import base
 
 
@@ -14,6 +18,8 @@ class TestAffinity(base.BaseNamespacedTestCase):
 
     def test_affinity(self):
         nodes = self.system_client.get_nodes()
+        self.addDetail('nodes', content.text_content(json.dumps(
+            nodes, indent=4, sort_keys=True)))
         if len(nodes) < 3:
             self.skipTest('Insufficient nodes for test')
 
@@ -84,6 +90,13 @@ class TestAffinity(base.BaseNamespacedTestCase):
         inst1 = self.test_client.get_instance(inst1['uuid'])
         inst2 = self.test_client.get_instance(inst2['uuid'])
         inst3 = self.test_client.get_instance(inst3['uuid'])
+
+        self.addDetail('inst1', content.text_content(json.dumps(
+            inst1, indent=4, sort_keys=True)))
+        self.addDetail('inst2', content.text_content(json.dumps(
+            inst2, indent=4, sort_keys=True)))
+        self.addDetail('inst3', content.text_content(json.dumps(
+            inst3, indent=4, sort_keys=True)))
 
         # inst1 and inst2 should share a node, inst3 should not
         self.assertEqual(

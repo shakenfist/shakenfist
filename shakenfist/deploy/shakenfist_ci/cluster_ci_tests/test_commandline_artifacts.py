@@ -3,6 +3,8 @@ import sys
 import time
 
 from oslo_concurrency import processutils
+from testtools import content
+
 from shakenfist_ci import base
 
 
@@ -38,7 +40,10 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         cirros_uuid = None
         self.assertRegex(
             self._exec_client('artifact list'), '.*cirros.*')
-        for a in json.loads(self._exec_client('--json artifact list')):
+        artifacts = json.loads(self._exec_client('--json artifact list'))
+        self.addDetail('artifacts', content.text_content(json.dumps(
+            artifacts, indent=4, sort_keys=True)))
+        for a in artifacts:
             if a['source_url'] == 'cirros':
                 cirros_uuid = a['uuid']
                 self.assertIn(a['state'], ['initial', 'created'])
@@ -59,11 +64,15 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
             a = json.loads(self._exec_client('--json artifact show %s'
                                              % cirros_uuid))
 
+        self.addDetail('a', content.text_content(json.dumps(
+            a, indent=4, sort_keys=True)))
         self.assertIn('blob_uuid', a)
 
         # Show artifact versions
         versions = json.loads(self._exec_client(
             'artifact versions %s' % cirros_uuid))
+        self.addDetail('versions', content.text_content(json.dumps(
+            versions, indent=4, sort_keys=True)))
         self.assertEqual(1, len(versions))
 
     def test_artifact_commands_multiple_versions(self):
@@ -81,7 +90,10 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         # Ensure that our download appears in the list of artifacts
         artifact_urls = []
         artifact_uuid = None
-        for a in json.loads(self._exec_client('--json artifact list')):
+        artifacts = json.loads(self._exec_client('--json artifact list'))
+        self.addDetail('artifacts', content.text_content(json.dumps(
+            artifacts, indent=4, sort_keys=True)))
+        for a in artifacts:
             artifact_urls.append(a['source_url'])
             if a['source_url'] == url:
                 artifact_uuid = a['uuid']
@@ -103,6 +115,8 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                 return
             time.sleep(30)
 
+        self.addDetail('versions', content.text_content(json.dumps(
+            versions, indent=4, sort_keys=True)))
         self.fail('Never received the correct number of versions. I have %d'
                   % len(versions))
 
@@ -120,11 +134,15 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self.addDetail('inst1', content.text_content(json.dumps(
+            inst1, indent=4, sort_keys=True)))
         self._await_instance_ready(inst1['uuid'])
 
         # Take a snapshot
         snap1 = json.loads(self._exec_client(
             '--json --async block instance snapshot %s' % inst1['uuid']))
+        self.addDetail('snap1', content.text_content(json.dumps(
+            snap1, indent=4, sort_keys=True)))
         self.assertIn('vda', snap1)
         self.assertIn('artifact_uuid', snap1['vda'])
         snap_uuid = snap1['vda']['artifact_uuid']
@@ -135,6 +153,8 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         # Check the blobs information for the first version
         show_info = json.loads(self._exec_client(
             '--json artifact show %s' % snap_uuid))
+        self.addDetail('show_info', content.text_content(json.dumps(
+            show_info, indent=4, sort_keys=True)))
         self.assertEqual('created', show_info['state'])
         self.assertIn('blobs', show_info)
         self.assertEqual(1, len(show_info['blobs']))
@@ -157,11 +177,15 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None, force_placement=inst1['node'])
+        self.addDetail('inst2', content.text_content(json.dumps(
+            inst2, indent=4, sort_keys=True)))
         self._await_instance_ready(inst2['uuid'])
 
         # Test instance is listed against blob in snapshot listing
         show_info = json.loads(self._exec_client(
             '--json artifact show %s' % snap_uuid))
+        self.addDetail('show_info_with_inst', content.text_content(json.dumps(
+            show_info, indent=4, sort_keys=True)))
         self.assertIn('blobs', show_info)
         self.assertEqual(1, len(show_info['blobs']))
 
@@ -177,6 +201,8 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         # Check the second snapshot is listed
         show_info = json.loads(self._exec_client(
             '--json artifact show %s' % snap_uuid))
+        self.addDetail('show_info_final', content.text_content(json.dumps(
+            show_info, indent=4, sort_keys=True)))
         self.assertIn('blobs', show_info)
         self.assertEqual(2, len(show_info['blobs']))
 
