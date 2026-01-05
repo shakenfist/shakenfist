@@ -2166,7 +2166,10 @@ def _direct_update_dnsmasq(data: DnsMasqData) -> bool:
 # These access the database directly and are used by the database daemon.
 # =============================================================================
 
-@util_callstack.restrict_caller('shakenfist.daemons.database')
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
 def _direct_record_relationship(
     source_type: ObjectType,
     source_uuid: str | UUID,
@@ -2229,7 +2232,10 @@ def _direct_record_relationship(
         return False
 
 
-@util_callstack.restrict_caller('shakenfist.daemons.database')
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
 def _direct_remove_relationship(
     source_type: ObjectType,
     source_uuid: str | UUID,
@@ -2274,7 +2280,10 @@ def _direct_remove_relationship(
         return False
 
 
-@util_callstack.restrict_caller('shakenfist.daemons.database')
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
 def _direct_get_references_to(
     target_type: ObjectType,
     target_uuid: str | UUID,
@@ -2325,7 +2334,10 @@ def _direct_get_references_to(
         return []
 
 
-@util_callstack.restrict_caller('shakenfist.daemons.database')
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
 def _direct_get_references_from(
     source_type: ObjectType,
     source_uuid: str | UUID,
@@ -2376,7 +2388,10 @@ def _direct_get_references_from(
         return []
 
 
-@util_callstack.restrict_caller('shakenfist.daemons.database')
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
 def _direct_count_references_to(
     target_type: ObjectType,
     target_uuid: str | UUID
@@ -2412,7 +2427,10 @@ def _direct_count_references_to(
         return 0
 
 
-@util_callstack.restrict_caller('shakenfist.daemons.database')
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
 def _direct_remove_all_references_from(
     source_type: ObjectType,
     source_uuid: str | UUID,
@@ -2453,7 +2471,10 @@ def _direct_remove_all_references_from(
         return 0
 
 
-@util_callstack.restrict_caller('shakenfist.daemons.database')
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
 def _direct_update_last_active(
     source_type: ObjectType,
     source_uuid: str | UUID,
@@ -2501,7 +2522,10 @@ def _direct_update_last_active(
         return False
 
 
-@util_callstack.restrict_caller('shakenfist.daemons.database')
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
 def _direct_get_stale_references(older_than: float) -> list[ObjectReference]:
     """Get references with last_active older than the specified timestamp.
 
