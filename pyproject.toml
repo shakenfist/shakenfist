@@ -128,7 +128,6 @@ dependencies = [
     "oslo.i18n==6.7.1",
     "oslo.utils==9.2.0",
     "packaging==25.0",
-    "prometheus_client==0.22.1",
     "pydantic_core==2.27.2",
     "pylogrus==0.4.0",
     "pyparsing==3.3.1",
