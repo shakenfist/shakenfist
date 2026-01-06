@@ -17,7 +17,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     # A bit vague because we expect this to come from an OS package
-    "psutil>=5.9.0",                      # bsd
+    #     Debian 12 shipped with psutil 5.9.4
+    #     Ubuntu 24.04 shiped with psutil 5.9.8
+    "psutil>=5.9.4",                      # bsd
     "uv>=0.8.0",                          # mit
 
     # Our requirements -- we specify exact versions here and let renovate update
