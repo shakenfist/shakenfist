@@ -122,6 +122,21 @@ instance_get_example = """{
         "memory": 16384,
         "model": "cirrus",
         "vdi": "spice"
+    },
+    "references_to": {},
+    "references_from": {
+        "disk": [
+            {
+                "source_object_type": "instance",
+                "source_uuid": "d51aa352-368c-484c-9e4c-4542927b4277",
+                "relationship": "disk",
+                "relationship_value": "0",
+                "target_object_type": "blob",
+                "target_uuid": "5117f778-b214-4184-8358-f2c7376b76db",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
     }
 }"""
 
@@ -183,6 +198,21 @@ instance_get_example_deleted = """{
         "memory": 16384,
         "model": "cirrus",
         "vdi": "spice"
+    },
+    "references_to": {},
+    "references_from": {
+        "disk": [
+            {
+                "source_object_type": "instance",
+                "source_uuid": "d51aa352-368c-484c-9e4c-4542927b4277",
+                "relationship": "disk",
+                "relationship_value": "0",
+                "target_object_type": "blob",
+                "target_uuid": "5117f778-b214-4184-8358-f2c7376b76db",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
     }
 }"""
 

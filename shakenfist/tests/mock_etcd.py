@@ -211,6 +211,25 @@ class MockEtcd():
         self.mariadb_update_dnsmasq.start()
         self.test_obj.addCleanup(self.mariadb_update_dnsmasq.stop)
 
+        # Mock MariaDB ObjectReference operations
+        self.mariadb_get_references_to = mock.patch(
+            'shakenfist.mariadb.get_references_to',
+            side_effect=self._mariadb_get_references_to)
+        self.mariadb_get_references_to.start()
+        self.test_obj.addCleanup(self.mariadb_get_references_to.stop)
+
+        self.mariadb_get_references_from = mock.patch(
+            'shakenfist.mariadb.get_references_from',
+            side_effect=self._mariadb_get_references_from)
+        self.mariadb_get_references_from.start()
+        self.test_obj.addCleanup(self.mariadb_get_references_from.stop)
+
+        self.mariadb_remove_all_references_from = mock.patch(
+            'shakenfist.mariadb.remove_all_references_from',
+            side_effect=self._mariadb_remove_all_references_from)
+        self.mariadb_remove_all_references_from.start()
+        self.test_obj.addCleanup(self.mariadb_remove_all_references_from.stop)
+
         # Setup basic DB data
         for n in self.nodes:
             Node.new(n[0], n[1])
@@ -462,6 +481,44 @@ class MockEtcd():
             return True
         self._trace(f'MockMariaDB.update_dnsmasq({key}): not found')
         return False
+
+    #
+    # MariaDB ObjectReference mock operations
+    #
+
+    def _mariadb_get_references_to(self, object_type: ObjectType,
+                                   object_uuid: str) -> list:
+        """Mock implementation of mariadb.get_references_to()
+
+        Returns an empty list since tests don't typically need actual
+        reference data.
+        """
+        self._trace(
+            f'MockMariaDB.get_references_to({object_type}, {object_uuid}): []')
+        return []
+
+    def _mariadb_get_references_from(self, object_type: ObjectType,
+                                     object_uuid: str) -> list:
+        """Mock implementation of mariadb.get_references_from()
+
+        Returns an empty list since tests don't typically need actual
+        reference data.
+        """
+        self._trace(
+            f'MockMariaDB.get_references_from({object_type}, {object_uuid}): '
+            '[]')
+        return []
+
+    def _mariadb_remove_all_references_from(self, object_type: ObjectType,
+                                            object_uuid: str) -> int:
+        """Mock implementation of mariadb.remove_all_references_from()
+
+        Returns 0 since tests don't typically have actual reference data.
+        """
+        self._trace(
+            f'MockMariaDB.remove_all_references_from({object_type}, '
+            f'{object_uuid}): 0')
+        return 0
 
     #
     # DB operations - Low level

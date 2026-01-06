@@ -139,7 +139,22 @@ artifact_get_example = """{
     "shared": true,
     "source_url": "debian:11",
     "state": "created",
-    "uuid": "69ff59a7-f6ac-4f64-a575-bb54a7ee8961"
+    "uuid": "69ff59a7-f6ac-4f64-a575-bb54a7ee8961",
+    "references_to": {},
+    "references_from": {
+        "artifact_index": [
+            {
+                "source_object_type": "artifact",
+                "source_uuid": "69ff59a7-f6ac-4f64-a575-bb54a7ee8961",
+                "relationship": "artifact_index",
+                "relationship_value": "000000000101",
+                "target_object_type": "blob",
+                "target_uuid": "25adc99e-369b-4959-a387-2ae046ee6ad4",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
+    }
 }"""
 
 
@@ -175,7 +190,9 @@ artifact_delete_example = """{
     "shared": true,
     "source_url": "debian:11",
     "state": "deleted",
-    "uuid": "69ff59a7-f6ac-4f64-a575-bb54a7ee8961"
+    "uuid": "69ff59a7-f6ac-4f64-a575-bb54a7ee8961",
+    "references_to": {},
+    "references_from": {}
 }"""
 
 

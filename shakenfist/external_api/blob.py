@@ -131,7 +131,22 @@ blob_get_example = """{
     },
     "uuid": "578da8b6-eb98-4e10-bb36-e4d4d763d312",
     "version": 6,
-    "virtual size": 32212254720.0
+    "virtual size": 32212254720.0,
+    "references_to": {
+        "disk": [
+            {
+                "source_object_type": "instance",
+                "source_uuid": "0a56ef2c-8331-4ed7-a443-267f53bfb24c",
+                "relationship": "disk",
+                "relationship_value": "0",
+                "target_object_type": "blob",
+                "target_uuid": "578da8b6-eb98-4e10-bb36-e4d4d763d312",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
+    },
+    "references_from": {}
 }"""
 
 

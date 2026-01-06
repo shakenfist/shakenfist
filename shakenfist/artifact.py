@@ -15,6 +15,7 @@ from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.namespace import namespace_is_trusted
+from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 
 
@@ -241,6 +242,20 @@ class Artifact(dbowo):
                     'depends_on': b.depends_on
                 }
         a['blobs'] = blobs
+
+        # Add object references (what references this artifact and what this
+        # artifact references). Skip for in_memory_only artifacts as they don't
+        # persist references.
+        if not self.in_memory_only:
+            refs_to = mariadb.get_references_to(ObjectType.ARTIFACT, self.uuid)
+            refs_from = mariadb.get_references_from(
+                ObjectType.ARTIFACT, self.uuid)
+            a['references_to'] = references_to_grouped_dict(refs_to)
+            a['references_from'] = references_to_grouped_dict(refs_from)
+        else:
+            a['references_to'] = {}
+            a['references_from'] = {}
+
         return a
 
     def get_all_indexes(self):

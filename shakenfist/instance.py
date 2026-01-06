@@ -54,6 +54,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
+from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.operations.baseoperation import BaseClusterOperation as bco
 from shakenfist.util import exceptions as util_exceptions
@@ -447,6 +448,13 @@ class Instance(dbowo):
             aop = AgentOperation.from_db(agentop_uuid)
             if aop:
                 i['agent_operations_queue'].append(aop.external_view())
+
+        # Add object references (what references this instance and what this
+        # instance references)
+        refs_to = mariadb.get_references_to(ObjectType.INSTANCE, self.uuid)
+        refs_from = mariadb.get_references_from(ObjectType.INSTANCE, self.uuid)
+        i['references_to'] = references_to_grouped_dict(refs_to)
+        i['references_from'] = references_to_grouped_dict(refs_from)
 
         return i
 

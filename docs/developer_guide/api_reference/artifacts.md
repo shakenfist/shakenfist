@@ -392,6 +392,34 @@ for commonly used "official" images which many users will want to use.
     sf_client.unshare_artifact('2d9c1d4c-3436-4ea8-9b60-833fe791eece')
     ```
 
+## Object References
+
+Artifact API responses include `references_to` and `references_from` fields that
+show the relationships between artifacts and blobs. The `references_from` field
+shows what blobs this artifact indexes (via `artifact_index` relationships).
+
+Note: In-memory-only artifacts (e.g., sf://blob/ URLs) do not have reference
+information as they don't persist references to the database.
+
+??? example "Example references_from output for an artifact"
+
+    ```json
+    "references_from": {
+        "artifact_index": [
+            {
+                "source_object_type": "artifact",
+                "source_uuid": "69ff59a7-f6ac-4f64-a575-bb54a7ee8961",
+                "relationship": "artifact_index",
+                "relationship_value": "000000000101",
+                "target_object_type": "blob",
+                "target_uuid": "25adc99e-369b-4959-a387-2ae046ee6ad4",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
+    }
+    ```
+
 ## Metadata
 
 All objects exposed by the REST API may have metadata associated with them. This

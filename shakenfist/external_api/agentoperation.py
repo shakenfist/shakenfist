@@ -72,7 +72,22 @@ agentoperation_get_example = """{
     },
     "state": "complete",
     "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
-    "version": 1
+    "version": 1,
+    "references_to": {},
+    "references_from": {
+        "agent_output": [
+            {
+                "source_object_type": "agentoperation",
+                "source_uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
+                "relationship": "agent_output",
+                "relationship_value": "stdout",
+                "target_object_type": "blob",
+                "target_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
+    }
 }"""
 
 

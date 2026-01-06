@@ -36,6 +36,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import GiB
+from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.eventlog import add_event_multi
@@ -207,6 +208,14 @@ class Blob(dbo):
 
         # Include information about the blob
         out.update(self.info)
+
+        # Add object references (what references this blob and what this blob
+        # references)
+        refs_to = mariadb.get_references_to(ObjectType.BLOB, self.uuid)
+        refs_from = mariadb.get_references_from(ObjectType.BLOB, self.uuid)
+        out['references_to'] = references_to_grouped_dict(refs_to)
+        out['references_from'] = references_to_grouped_dict(refs_from)
+
         return out
 
     # Static values

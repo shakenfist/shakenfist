@@ -4,6 +4,7 @@ from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.operations.baseoperation import BaseOperation
+from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 
 
@@ -68,6 +69,15 @@ class AgentOperation(BaseOperation):
             'commands': self.commands,
             'results': self.results
         })
+
+        # Add object references (what references this agent operation and what
+        # this agent operation references)
+        refs_to = mariadb.get_references_to(ObjectType.AGENTOPERATION, self.uuid)
+        refs_from = mariadb.get_references_from(
+            ObjectType.AGENTOPERATION, self.uuid)
+        retval['references_to'] = references_to_grouped_dict(refs_to)
+        retval['references_from'] = references_to_grouped_dict(refs_from)
+
         return retval
 
     # Static values

@@ -9,6 +9,7 @@
 # relationship is unique and can be queried from either direction.
 
 from typing import Annotated
+from typing import Any
 from typing import Optional
 
 from pydantic import BaseModel
@@ -84,3 +85,57 @@ class ObjectReference(BaseModel):
     # Timestamps
     created: float  # Unix timestamp when reference was created
     last_active: float  # Unix timestamp, updated by cleaner daemon
+
+    def external_view(self) -> dict[str, Any]:
+        """Serialize ObjectReference for JSON API responses.
+
+        Enum values are serialized as their string values (not proto_id) for
+        consistency with other API responses like state fields.
+
+        Returns:
+            A dictionary suitable for JSON serialization containing all fields
+            of the ObjectReference.
+        """
+        return {
+            'source_object_type': str(self.source_object_type),
+            'source_uuid': self.source_uuid,
+            'relationship': str(self.relationship),
+            'relationship_value': self.relationship_value,
+            'target_object_type': str(self.target_object_type),
+            'target_uuid': self.target_uuid,
+            'created': self.created,
+            'last_active': self.last_active
+        }
+
+
+def references_to_grouped_dict(
+    references: list[ObjectReference]
+) -> dict[str, list[dict[str, Any]]]:
+    """Group a list of ObjectReferences by relationship type for API responses.
+
+    This function takes a list of ObjectReference objects and groups them by
+    their relationship type, returning a dictionary where keys are relationship
+    type strings and values are lists of serialized reference dictionaries.
+
+    Args:
+        references: A list of ObjectReference objects to group.
+
+    Returns:
+        A dictionary mapping relationship type strings to lists of serialized
+        ObjectReference dictionaries.
+
+    Example:
+        >>> refs = [ref1, ref2, ref3]  # ref1, ref2 are 'disk', ref3 is 'nvram'
+        >>> references_to_grouped_dict(refs)
+        {
+            'disk': [ref1.external_view(), ref2.external_view()],
+            'nvram_template': [ref3.external_view()]
+        }
+    """
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for ref in references:
+        rel_key = str(ref.relationship)
+        if rel_key not in grouped:
+            grouped[rel_key] = []
+        grouped[rel_key].append(ref.external_view())
+    return grouped

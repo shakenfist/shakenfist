@@ -10,6 +10,7 @@ from uuid import uuid4
 import sqlalchemy as sa
 
 from shakenfist.schema.object_reference import ObjectReference
+from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
@@ -268,3 +269,147 @@ class ObjectReferenceTableGenerationTestCase(base.ShakenFistTestCase):
                       index_names)
         self.assertIn('idx_object_references_created', index_names)
         self.assertIn('idx_object_references_last_active', index_names)
+
+
+class ObjectReferenceSerializationTestCase(base.ShakenFistTestCase):
+    """Tests for ObjectReference serialization methods."""
+
+    def test_external_view_basic(self):
+        """Test that external_view() returns correct dictionary."""
+        ref = ObjectReference(
+            source_object_type=ObjectType.INSTANCE,
+            source_uuid=SOURCE_UUID,
+            relationship=RelationshipType.DISK,
+            relationship_value='0',
+            target_object_type=ObjectType.BLOB,
+            target_uuid=TARGET_UUID,
+            created=1234567890.0,
+            last_active=1234567891.0
+        )
+        result = ref.external_view()
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result['source_object_type'], 'instance')
+        self.assertEqual(result['source_uuid'], SOURCE_UUID)
+        self.assertEqual(result['relationship'], 'disk')
+        self.assertEqual(result['relationship_value'], '0')
+        self.assertEqual(result['target_object_type'], 'blob')
+        self.assertEqual(result['target_uuid'], TARGET_UUID)
+        self.assertEqual(result['created'], 1234567890.0)
+        self.assertEqual(result['last_active'], 1234567891.0)
+
+    def test_external_view_null_relationship_value(self):
+        """Test that external_view() handles null relationship_value."""
+        ref = ObjectReference(
+            source_object_type=ObjectType.NODE,
+            source_uuid='sf-1',
+            relationship=RelationshipType.BLOB_LOCATION,
+            relationship_value=None,
+            target_object_type=ObjectType.BLOB,
+            target_uuid=TARGET_UUID,
+            created=1234567890.0,
+            last_active=1234567890.0
+        )
+        result = ref.external_view()
+
+        self.assertIsNone(result['relationship_value'])
+
+    def test_external_view_enum_string_values(self):
+        """Test that enums serialize as string values, not proto_ids."""
+        ref = ObjectReference(
+            source_object_type=ObjectType.ARTIFACT,
+            source_uuid=SOURCE_UUID,
+            relationship=RelationshipType.ARTIFACT_INDEX,
+            relationship_value='000000000001',
+            target_object_type=ObjectType.BLOB,
+            target_uuid=TARGET_UUID,
+            created=1234567890.0,
+            last_active=1234567890.0
+        )
+        result = ref.external_view()
+
+        # Should be string values, not integers
+        self.assertEqual(result['source_object_type'], 'artifact')
+        self.assertEqual(result['relationship'], 'artifact_index')
+        self.assertEqual(result['target_object_type'], 'blob')
+
+    def test_references_to_grouped_dict_empty_list(self):
+        """Test references_to_grouped_dict with empty list."""
+        result = references_to_grouped_dict([])
+        self.assertEqual(result, {})
+
+    def test_references_to_grouped_dict_single_reference(self):
+        """Test references_to_grouped_dict with a single reference."""
+        ref = ObjectReference(
+            source_object_type=ObjectType.INSTANCE,
+            source_uuid=SOURCE_UUID,
+            relationship=RelationshipType.DISK,
+            relationship_value='0',
+            target_object_type=ObjectType.BLOB,
+            target_uuid=TARGET_UUID,
+            created=1234567890.0,
+            last_active=1234567890.0
+        )
+        result = references_to_grouped_dict([ref])
+
+        self.assertIn('disk', result)
+        self.assertEqual(len(result['disk']), 1)
+        self.assertEqual(result['disk'][0]['relationship'], 'disk')
+
+    def test_references_to_grouped_dict_multiple_same_type(self):
+        """Test grouping multiple references of same type."""
+        ref1 = ObjectReference(
+            source_object_type=ObjectType.INSTANCE,
+            source_uuid=SOURCE_UUID,
+            relationship=RelationshipType.DISK,
+            relationship_value='0',
+            target_object_type=ObjectType.BLOB,
+            target_uuid=TARGET_UUID,
+            created=1234567890.0,
+            last_active=1234567890.0
+        )
+        ref2 = ObjectReference(
+            source_object_type=ObjectType.INSTANCE,
+            source_uuid=SOURCE_UUID,
+            relationship=RelationshipType.DISK,
+            relationship_value='1',
+            target_object_type=ObjectType.BLOB,
+            target_uuid=str(uuid4()),
+            created=1234567891.0,
+            last_active=1234567891.0
+        )
+        result = references_to_grouped_dict([ref1, ref2])
+
+        self.assertEqual(len(result), 1)  # Only one relationship type
+        self.assertIn('disk', result)
+        self.assertEqual(len(result['disk']), 2)  # Two references
+
+    def test_references_to_grouped_dict_multiple_different_types(self):
+        """Test grouping references of different types."""
+        ref1 = ObjectReference(
+            source_object_type=ObjectType.INSTANCE,
+            source_uuid=SOURCE_UUID,
+            relationship=RelationshipType.DISK,
+            relationship_value='0',
+            target_object_type=ObjectType.BLOB,
+            target_uuid=TARGET_UUID,
+            created=1234567890.0,
+            last_active=1234567890.0
+        )
+        ref2 = ObjectReference(
+            source_object_type=ObjectType.INSTANCE,
+            source_uuid=SOURCE_UUID,
+            relationship=RelationshipType.NVRAM_TEMPLATE,
+            relationship_value=None,
+            target_object_type=ObjectType.BLOB,
+            target_uuid=str(uuid4()),
+            created=1234567890.0,
+            last_active=1234567890.0
+        )
+        result = references_to_grouped_dict([ref1, ref2])
+
+        self.assertEqual(len(result), 2)  # Two relationship types
+        self.assertIn('disk', result)
+        self.assertIn('nvram_template', result)
+        self.assertEqual(len(result['disk']), 1)
+        self.assertEqual(len(result['nvram_template']), 1)
