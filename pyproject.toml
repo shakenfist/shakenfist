@@ -130,7 +130,7 @@ dependencies = [
     "packaging==25.0",
     "pylogrus==0.4.0",
     "pyparsing==3.3.1",
-    "referencing==0.36.2",
+    "referencing==0.37.0",
     "rfc3986==2.0.0",
     "rpds-py==0.27.1",
     "six==1.17.0",
