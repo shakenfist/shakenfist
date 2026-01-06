@@ -1,4 +1,7 @@
 import base64
+import json
+
+from testtools import content
 
 from shakenfist_ci import base
 
@@ -12,8 +15,16 @@ class TestMultipleNics(base.BaseNamespacedTestCase):
         super().setUp()
         self.net_one = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace)
+        self.addDetail(
+            'net_one',
+            content.text_content(json.dumps(self.net_one, indent=4,
+                                            sort_keys=True)))
         self.net_two = self.test_client.allocate_network(
             '192.168.243.0/24', True, True, '%s-net-two' % self.namespace)
+        self.addDetail(
+            'net_two',
+            content.text_content(json.dumps(self.net_two, indent=4,
+                                            sort_keys=True)))
         self._await_networks_ready([self.net_one['uuid'],
                                     self.net_two['uuid']])
 

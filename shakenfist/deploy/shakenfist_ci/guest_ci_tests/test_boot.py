@@ -1,3 +1,7 @@
+import json
+
+from testtools import content
+
 from shakenfist_ci import base
 
 import testscenarios
@@ -29,6 +33,9 @@ class TestBoot(testscenarios.WithScenarios, base.BaseNamespacedTestCase):
         super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
         self._await_networks_ready([self.net['uuid']])
 
     def _boot_no_network(self):

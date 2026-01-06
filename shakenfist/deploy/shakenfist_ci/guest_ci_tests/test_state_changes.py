@@ -1,5 +1,8 @@
+import json
 import logging
 import time
+
+from testtools import content
 
 from shakenfist_ci import base
 
@@ -17,6 +20,9 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
         self._await_networks_ready([self.net['uuid']])
 
         # We need to start a spare instance on the same node / network so that
@@ -35,6 +41,9 @@ class TestStateChanges(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self.addDetail(
+            'keepalive inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
         self._emit_tracing_event({
             'msg': 'Started keep network alive instance'
         })

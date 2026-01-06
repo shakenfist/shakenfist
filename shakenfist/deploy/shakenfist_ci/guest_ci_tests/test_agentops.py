@@ -3,6 +3,7 @@ import os
 import time
 
 from shakenfist_client import apiclient
+from testtools import content
 
 from shakenfist_ci import base
 
@@ -17,6 +18,10 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self.net_one = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace,
             provide_dns=True)
+        self.addDetail(
+            'net_one',
+            content.text_content(json.dumps(self.net_one, indent=4,
+                                            sort_keys=True)))
         self._await_networks_ready([self.net_one['uuid']])
 
     def test_instance_execute_small(self):
