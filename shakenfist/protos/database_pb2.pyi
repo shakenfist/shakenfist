@@ -1514,15 +1514,21 @@ class CountReferencesToRequest(google.protobuf.message.Message):
 
     TARGET_TYPE_FIELD_NUMBER: builtins.int
     TARGET_UUID_FIELD_NUMBER: builtins.int
+    EXCLUDE_RELATIONSHIPS_FIELD_NUMBER: builtins.int
     target_type: shakenfist_enums_pb2.ObjectType.ValueType
     target_uuid: builtins.str
+    @property
+    def exclude_relationships(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[shakenfist_enums_pb2.RelationshipType.ValueType]:
+        """Relationships to exclude from count"""
+
     def __init__(
         self,
         *,
         target_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
         target_uuid: builtins.str = ...,
+        exclude_relationships: collections.abc.Iterable[shakenfist_enums_pb2.RelationshipType.ValueType] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["target_type", b"target_type", "target_uuid", b"target_uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["exclude_relationships", b"exclude_relationships", "target_type", b"target_type", "target_uuid", b"target_uuid"]) -> None: ...
 
 global___CountReferencesToRequest = CountReferencesToRequest
 

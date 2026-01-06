@@ -366,8 +366,16 @@ class Blob(dbo):
 
     @property
     def ref_count(self) -> int:
-        """Return the number of references to this blob from object_references."""
-        return mariadb.count_references_to(ObjectType.BLOB, self.uuid)
+        """Return the number of references to this blob from object_references.
+
+        Node location relationships are excluded from the count because they
+        represent where the blob is stored, not what uses it. Including
+        locations would prevent blobs from ever being considered unused and
+        reaped.
+        """
+        return mariadb.count_references_to(
+            ObjectType.BLOB, self.uuid,
+            exclude_relationships=[RelationshipType.BLOB_LOCATION])
 
     @property
     def transcoded(self) -> dict[str, str]:

@@ -492,6 +492,7 @@ message GetReferencesReply {
 message CountReferencesToRequest {
   ObjectType target_type = 1;
   string target_uuid = 2;
+  repeated RelationshipType exclude_relationships = 3;  // Relationships to exclude from count
 }
 
 message CountReply {

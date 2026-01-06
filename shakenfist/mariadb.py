@@ -2394,7 +2394,8 @@ def _direct_get_references_from(
     )
 def _direct_count_references_to(
     target_type: ObjectType,
-    target_uuid: str | UUID
+    target_uuid: str | UUID,
+    exclude_relationships: Optional[list[RelationshipType]] = None
 ) -> int:
     """Count references to an object directly from MariaDB.
 
@@ -2404,6 +2405,8 @@ def _direct_count_references_to(
     Args:
         target_type: The type of the target object.
         target_uuid: The UUID of the target object.
+        exclude_relationships: Optional list of relationship types to exclude
+            from the count.
 
     Returns:
         The count of references, or 0 on error.
@@ -2413,12 +2416,16 @@ def _direct_count_references_to(
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(sa.func.count()).where(
-                sa.and_(
-                    table.c.target_object_type == str(target_type),
-                    table.c.target_uuid == str(target_uuid)
+            conditions = [
+                table.c.target_object_type == str(target_type),
+                table.c.target_uuid == str(target_uuid)
+            ]
+            if exclude_relationships:
+                excluded = [str(r) for r in exclude_relationships]
+                conditions.append(
+                    table.c.relationship.notin_(excluded)
                 )
-            )
+            stmt = sa.select(sa.func.count()).where(sa.and_(*conditions))
             result = conn.execute(stmt)
             row = result.fetchone()
             return row[0] if row else 0
@@ -2846,16 +2853,26 @@ def _grpc_get_references_from(
 
 def _grpc_count_references_to(
     target_type: ObjectType,
-    target_uuid: str | UUID
+    target_uuid: str | UUID,
+    exclude_relationships: Optional[list[RelationshipType]] = None
 ) -> int:
     """Count references to an object via the database microservice."""
     try:
         stub = _get_database_stub()
+        excluded_proto = []
+        if exclude_relationships:
+            excluded_proto = [
+                cast(
+                    shakenfist_enums_pb2.RelationshipType.ValueType,
+                    r.proto_id)
+                for r in exclude_relationships
+            ]
         request = database_pb2.CountReferencesToRequest(
             target_type=cast(
                 shakenfist_enums_pb2.ObjectType.ValueType,
                 target_type.proto_id),
-            target_uuid=str(target_uuid)
+            target_uuid=str(target_uuid),
+            exclude_relationships=excluded_proto
         )
         reply = stub.CountReferencesTo(request)
         return int(reply.count)
@@ -3142,7 +3159,8 @@ def get_references_from(
 
 def count_references_to(
     target_type: ObjectType,
-    target_uuid: str | UUID
+    target_uuid: str | UUID,
+    exclude_relationships: Optional[list[RelationshipType]] = None
 ) -> int:
     """Count references to an object.
 
@@ -3152,13 +3170,17 @@ def count_references_to(
     Args:
         target_type: The type of the target object.
         target_uuid: The UUID of the target object.
+        exclude_relationships: Optional list of relationship types to exclude
+            from the count.
 
     Returns:
         The count of references, or 0 on error.
     """
     if _use_database_service():
-        return _grpc_count_references_to(target_type, target_uuid)
-    return _direct_count_references_to(target_type, target_uuid)
+        return _grpc_count_references_to(
+            target_type, target_uuid, exclude_relationships)
+    return _direct_count_references_to(
+        target_type, target_uuid, exclude_relationships)
 
 
 def remove_all_references_from(

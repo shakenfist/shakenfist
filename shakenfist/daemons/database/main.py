@@ -1126,8 +1126,16 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             target_type = ObjectType.from_proto_id(request.target_type)
             if target_type is None:
                 return database_pb2.CountReply(count=0)
+            exclude_relationships: list[RelationshipType] | None = None
+            if request.exclude_relationships:
+                converted = []
+                for r in request.exclude_relationships:
+                    rel = RelationshipType.from_proto_id(r)
+                    if rel is not None:
+                        converted.append(rel)
+                exclude_relationships = converted if converted else None
             count = mariadb._direct_count_references_to(
-                target_type, request.target_uuid)
+                target_type, request.target_uuid, exclude_relationships)
             return database_pb2.CountReply(count=count)
         except Exception as e:
             util_exceptions.ignore_exception(
