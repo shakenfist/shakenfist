@@ -134,7 +134,7 @@ dependencies = [
     "rfc3986==2.0.0",
     "rpds-py==0.27.1",
     "six==1.17.0",
-    "stevedore==5.5.0",
+    "stevedore==5.6.0",
     "tzdata==2025.2",
     "wrapt==1.17.3",
     # END_OF_INDIRECT_DEPS
