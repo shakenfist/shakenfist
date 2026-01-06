@@ -535,6 +535,9 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst1['uuid'])
         self.assertInstanceConsoleAfterBoot(inst1['uuid'], 'System booted ok')
 
+        # Determine the id of the blob backing the instance disk
+        backing_blob = inst1['disk_spec'][0]['blob_uuid']
+
         # Take a snapshot
         snap1 = self.test_client.snapshot_instance(inst1['uuid'], thin=True)
         self.addDetail('snap1', content.text_content(json.dumps(
@@ -567,7 +570,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertEqual('created', snap1_info['state'])
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
         self.assertEqual(1, snap1_info['blobs'][1]['reference_count'])
-        self.assertNotEqual(None, snap1_info['blobs'][1]['depends_on'])
+        self.assertNotEqual(backing_blob, snap1_info['blobs'][1]['depends_on'])
 
         # Refresh our view of the instance
         inst1 = self.test_client.get_instance(inst1['uuid'])
