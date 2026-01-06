@@ -132,7 +132,7 @@ dependencies = [
     "pyparsing==3.3.1",
     "referencing==0.36.2",
     "rfc3986==2.0.0",
-    "rpds-py==0.27.1",
+    "rpds-py==0.30.0",
     "six==1.17.0",
     "stevedore==5.5.0",
     "tzdata==2025.2",
