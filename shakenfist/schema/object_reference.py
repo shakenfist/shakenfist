@@ -18,6 +18,7 @@ from pydantic import Field
 
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
+from shakenfist.util.access_tokens import request_namespace
 
 
 class ObjectReference(BaseModel):
@@ -133,8 +134,19 @@ def references_to_grouped_dict(
         }
     """
     grouped: dict[str, list[dict[str, Any]]] = {}
+    requesting_namespace = request_namespace()
+
     for ref in references:
         rel_key = str(ref.relationship)
+
+        # Ensure that the requester can see this object
+        if hasattr(ref, 'namespace'):
+            ref_namespace = ref.namespace
+        else:
+            ref_namespace = 'system'
+        if requesting_namespace not in [ref_namespace, 'system']:
+            continue
+
         if rel_key not in grouped:
             grouped[rel_key] = []
         grouped[rel_key].append(ref.external_view())

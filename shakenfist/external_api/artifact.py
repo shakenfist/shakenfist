@@ -42,7 +42,7 @@ from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.upload import Upload
-from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import general as util_general
 
 
@@ -60,7 +60,7 @@ def arg_is_artifact_ref(func):
         else:
             try:
                 kwargs['artifact_from_db'] = Artifact.from_db_by_ref(
-                    kwargs.get('artifact_ref'), parse_jwt_identity()[0])
+                    kwargs.get('artifact_ref'), request_namespace())
             except exceptions.MultipleObjects as e:
                 return sf_api.error(400, str(e), suppress_traceback=True)
 
@@ -78,7 +78,7 @@ def requires_artifact_ownership(func):
             return sf_api.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
-        if not namespace_is_trusted(a.namespace, parse_jwt_identity()[0]):
+        if not namespace_is_trusted(a.namespace, request_namespace()):
             LOG.with_fields({'artifact': a}).info(
                 'Artifact not found, ownership test in decorator')
             return sf_api.error(404, 'artifact not found')
@@ -94,7 +94,7 @@ def requires_artifact_access(func):
             return sf_api.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
-        if (a.shared and parse_jwt_identity()[0] not in [a.namespace, 'system']):
+        if (a.shared and request_namespace() not in [a.namespace, 'system']):
             LOG.with_object(a).info(
                 'Artifact not found, ownership test in decorator')
             return sf_api.error(404, 'artifact not found')
@@ -282,7 +282,7 @@ class ArtifactsEndpoint(api_base.Resource):
     def get(self, node=None):
         retval = []
         for a in Artifacts(filters=[
-                partial(namespace_or_shared_filter, parse_jwt_identity()[0])],
+                partial(namespace_or_shared_filter, request_namespace())],
                 prefilter='active'):
             idx = a.most_recent_index
             ev = a.external_view()
@@ -322,9 +322,9 @@ class ArtifactsEndpoint(api_base.Resource):
         # in the database in an initial state here so that it will show up in
         # image list requests. The image is fetched by the queued job later.
         if not namespace:
-            namespace = parse_jwt_identity()[0]
+            namespace = request_namespace()
 
-        if not namespace_is_trusted(namespace, parse_jwt_identity()[0]):
+        if not namespace_is_trusted(namespace, request_namespace()):
             return sf_api.error(404, 'namespace not found')
 
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
@@ -333,7 +333,7 @@ class ArtifactsEndpoint(api_base.Resource):
 
         # Only admin can create shared artifacts
         if shared:
-            if parse_jwt_identity()[0] != 'system':
+            if request_namespace() != 'system':
                 return sf_api.error(
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True
@@ -371,7 +371,7 @@ class ArtifactsEndpoint(api_base.Resource):
         if confirm is not True:
             return sf_api.error(400, 'parameter confirm is not set true')
 
-        if parse_jwt_identity()[0] == 'system':
+        if request_namespace() == 'system':
             if not isinstance(namespace, str):
                 # A client using a system key must specify the namespace. This
                 # ensures that deleting all artifacts in the cluster (by
@@ -379,9 +379,9 @@ class ArtifactsEndpoint(api_base.Resource):
                 return sf_api.error(400, 'system user must specify parameter namespace')
 
         else:
-            if namespace and namespace != parse_jwt_identity()[0]:
+            if namespace and namespace != request_namespace():
                 return sf_api.error(401, 'you cannot delete other namespaces')
-            namespace = parse_jwt_identity()[0]
+            namespace = request_namespace()
 
         deleted = []
         for a in Artifacts([partial(namespace_exact_filter, namespace)]):
@@ -440,7 +440,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
                 path = flask.request.environ['PATH_INFO']
                 url = f'http://{u.node}:13000{path}'
                 api_token = get_api_token(
-                    f'http://{u.node}:13000', namespace=parse_jwt_identity()[0])
+                    f'http://{u.node}:13000', namespace=request_namespace())
                 r = requests.request(
                     flask.request.environ['REQUEST_METHOD'], url,
                     data=json.dumps(sf_api.flask_get_post_body()),
@@ -459,10 +459,10 @@ class ArtifactUploadEndpoint(api_base.Resource):
 
         if not source_url:
             source_url = ('%s%s/%s'
-                          % (UPLOAD_URL, parse_jwt_identity()[0], artifact_name))
+                          % (UPLOAD_URL, request_namespace(), artifact_name))
 
         if not namespace:
-            namespace = parse_jwt_identity()[0]
+            namespace = request_namespace()
 
         if artifact_type == 'image':
             artifact_type_value = Artifact.TYPE_IMAGE
@@ -475,12 +475,12 @@ class ArtifactUploadEndpoint(api_base.Resource):
                               namespace=namespace, create_if_new=True)
         a.add_event(EVENT_TYPE_AUDIT, 'convert upload to artifact from REST API')
 
-        if not namespace_is_trusted(a.namespace, parse_jwt_identity()[0]):
+        if not namespace_is_trusted(a.namespace, request_namespace()):
             return sf_api.error(404, 'namespace not found')
 
         # Only admin can create shared artifacts
         if shared:
-            if parse_jwt_identity()[0] != 'system':
+            if request_namespace() != 'system':
                 return sf_api.error(
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True

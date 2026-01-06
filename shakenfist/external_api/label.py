@@ -22,7 +22,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import LabelHierarchyTooDeep
 from shakenfist.external_api import base as api_base
-from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util.access_tokens import request_namespace
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -36,7 +36,7 @@ def _label_url(label_name):
             raise LabelHierarchyTooDeep()
         namespace, label = elems
     else:
-        namespace = parse_jwt_identity()[0]
+        namespace = request_namespace()
         label = label_name
     return (namespace, f'{LABEL_URL}{namespace}/{label}')
 

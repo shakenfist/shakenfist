@@ -88,10 +88,18 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertEqual('created', snap1_info['state'])
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
 
+        # The requester should not be able to see location information
         blob_uuid = snap1_info['blobs'][1]['uuid']
         blob1_info = self.test_client.get_blob(blob_uuid)
         self.addDetail('blob1_info', content.text_content(json.dumps(
             blob1_info, indent=4, sort_keys=True)))
+        self.assertFalse('blob_location' in blob1_info['references_to'])
+
+        # Admins _should_ be able to see location information
+        blob1_admin_info = self.test_client.get_blob(blob_uuid)
+        self.addDetail('blob1_admin_info', content.text_content(json.dumps(
+            blob1_admin_info, indent=4, sort_keys=True)))
+        self.assertTrue('blob_location' in blob1_info['references_to'])
 
         self.assertEqual(1, snap1_info['blobs'][1]['reference_count'],
                          'blob %s does not have a reference count of 1'

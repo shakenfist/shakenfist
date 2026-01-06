@@ -35,7 +35,7 @@ from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
-from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import general as util_general
 
 
@@ -60,7 +60,7 @@ def _read_file(filename, offset, limit=0):
 
 def _read_remote(target, blob_uuid, offset=0, limit=0):
     api_token = get_api_token(
-        f'http://{target}:13000', namespace=parse_jwt_identity()[0])
+        f'http://{target}:13000', namespace=request_namespace())
     url = (f'http://{target}:13000/blobs/{blob_uuid}/'
            f'data?offset={offset}&limit={limit}')
 

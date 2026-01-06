@@ -37,7 +37,7 @@ from shakenfist.schema.operations.net_ip_op \
     import create_and_enqueue as nip_create_and_enqueue
 from shakenfist.schema.operations.net_ip_op \
     import model_tasks as nip_tasks
-from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 
@@ -187,7 +187,7 @@ class NetworksEndpoint(api_base.Resource):
     @api_base.log_token_use
     def get(self, all=False):
         filters = [partial(baseobject.namespace_filter,
-                           parse_jwt_identity()[0])]
+                           request_namespace())]
         prefilter = None
         if not all:
             prefilter = 'active'
@@ -239,10 +239,10 @@ class NetworksEndpoint(api_base.Resource):
                 400, 'cannot parse netblock: %s' % e, suppress_traceback=True)
 
         if not namespace:
-            namespace = parse_jwt_identity()[0]
+            namespace = request_namespace()
 
         # If accessing a foreign name namespace, we need to be an admin
-        if parse_jwt_identity()[0] not in [namespace, 'system']:
+        if request_namespace() not in [namespace, 'system']:
             return sf_api.error(
                 401, 'only admins can create resources in a different namespace')
 
@@ -275,7 +275,7 @@ class NetworksEndpoint(api_base.Resource):
         if confirm is not True:
             return sf_api.error(400, 'parameter confirm is not set true')
 
-        if parse_jwt_identity()[0] == 'system':
+        if request_namespace() == 'system':
             if not isinstance(namespace, str):
                 # A client using a system key must specify the namespace. This
                 # ensures that deleting all networks in the cluster (by
@@ -283,9 +283,9 @@ class NetworksEndpoint(api_base.Resource):
                 return sf_api.error(400, 'system user must specify parameter namespace')
 
         else:
-            if namespace and namespace != parse_jwt_identity()[0]:
+            if namespace and namespace != request_namespace():
                 return sf_api.error(401, 'you cannot delete other namespaces')
-            namespace = parse_jwt_identity()[0]
+            namespace = request_namespace()
 
         networks_del = []
         networks_unable = []

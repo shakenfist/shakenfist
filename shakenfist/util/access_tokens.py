@@ -38,3 +38,7 @@ def parse_jwt_identity():
     if len(ident) != 2:
         raise CannotParseJWTIdentity(f'Cannot parse identity "{ident_string}"')
     return ident
+
+
+def request_namespace():
+    return parse_jwt_identity()[0]

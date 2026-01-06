@@ -14,7 +14,7 @@ from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
-from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util.access_tokens import request_namespace
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -42,7 +42,7 @@ def requires_operation_ownership(func):
             log.info('Operation not found, kwarg missing')
             return sf_api.error(404, 'agent operation not found')
 
-        if parse_jwt_identity()[0] not in [kwargs['operation_from_db'].namespace, 'system']:
+        if request_namespace() not in [kwargs['operation_from_db'].namespace, 'system']:
             log.info('Agent operation not found, ownership test in decorator')
             return sf_api.error(404, 'agent operation not found')
 

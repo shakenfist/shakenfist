@@ -31,6 +31,7 @@ from shakenfist.namespace import get_api_token
 from shakenfist.namespace import Namespace
 from shakenfist.upload import Upload
 from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
@@ -42,7 +43,7 @@ daemon.set_log_level(LOG, 'api')
 def caller_is_admin(func):
     # Ensure only users in the 'system' namespace can call this method
     def wrapper(*args, **kwargs):
-        if parse_jwt_identity()[0] != 'system':
+        if request_namespace() != 'system':
             return sf_api.error(401, 'unauthorized')
 
         return func(*args, **kwargs)
@@ -207,7 +208,7 @@ def arg_is_instance_ref(func):
     def wrapper(*args, **kwargs):
         try:
             inst = Instance.from_db_by_ref(
-                kwargs.get('instance_ref'), parse_jwt_identity()[0])
+                kwargs.get('instance_ref'), request_namespace())
         except exceptions.MultipleObjects as e:
             return sf_api.error(400, str(e), suppress_traceback=True)
 
@@ -239,7 +240,7 @@ def redirect_instance_request(func):
             url = f'http://{placement["node"]}:13000{path}'
             api_token = get_api_token(
                 f'http://{placement["node"]}:13000',
-                namespace=parse_jwt_identity()[0])
+                namespace=request_namespace())
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(sf_api.flask_get_post_body()),
@@ -272,7 +273,7 @@ def requires_instance_ownership(func):
             return sf_api.error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if parse_jwt_identity()[0] not in [i.namespace, 'system']:
+        if request_namespace() not in [i.namespace, 'system']:
             LOG.with_fields({'instance': i}).info(
                 'Instance not found, ownership test in decorator')
             return sf_api.error(404, 'instance not found')
@@ -304,7 +305,7 @@ def arg_is_network_ref(func):
     def wrapper(*args, **kwargs):
         try:
             n = network.Network.from_db_by_ref(
-                kwargs.get('network_ref'), parse_jwt_identity()[0])
+                kwargs.get('network_ref'), request_namespace())
         except exceptions.MultipleObjects as e:
             return sf_api.error(400, str(e), suppress_traceback=True)
 
@@ -358,7 +359,7 @@ def requires_network_ownership(func):
             log.info('Network not found, kwarg missing')
             return sf_api.error(404, 'network not found')
 
-        if parse_jwt_identity()[0] not in [kwargs['network_from_db'].namespace, 'system']:
+        if request_namespace() not in [kwargs['network_from_db'].namespace, 'system']:
             log.info('Network not found, ownership test in decorator')
             return sf_api.error(404, 'network not found')
 
@@ -427,7 +428,7 @@ def redirect_upload_request(func):
             path = flask.request.environ['PATH_INFO']
             url = f'http://{u.node}:13000{path}'
             api_token = get_api_token(
-                f'http://{u.node}:13000', namespace=parse_jwt_identity()[0])
+                f'http://{u.node}:13000', namespace=request_namespace())
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=flask.request.get_data(cache=False, as_text=False,

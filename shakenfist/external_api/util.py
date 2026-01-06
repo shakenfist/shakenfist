@@ -6,7 +6,7 @@ from shakenfist.daemons import daemon
 from shakenfist.instance import Instance
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.schema.ipam_reservation import ReservationType
-from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util.access_tokens import request_namespace
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -43,12 +43,12 @@ def safe_get_network_interface(interface_uuid):
         log.info('Network not found or deleted')
         return None, None, sf_api.error(404, 'interface network not found')
 
-    if parse_jwt_identity()[0] not in [n.namespace, 'system']:
+    if request_namespace() not in [n.namespace, 'system']:
         log.info('Interface not found, failed ownership test')
         return None, None, sf_api.error(404, 'interface not found')
 
     i = Instance.from_db(ni.instance_uuid)
-    if parse_jwt_identity()[0] not in [i.namespace, 'system']:
+    if request_namespace() not in [i.namespace, 'system']:
         log.with_fields({'instance': i}).info(
             'Instance not found, failed ownership test')
         return None, None, sf_api.error(404, 'interface not found')

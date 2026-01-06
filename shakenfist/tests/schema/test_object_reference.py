@@ -5,6 +5,7 @@
 # - ObjectReference Pydantic model validation
 # - SQL table generation from ObjectReference model
 
+from unittest import mock
 from uuid import uuid4
 
 import sqlalchemy as sa
@@ -335,81 +336,93 @@ class ObjectReferenceSerializationTestCase(base.ShakenFistTestCase):
 
     def test_references_to_grouped_dict_empty_list(self):
         """Test references_to_grouped_dict with empty list."""
-        result = references_to_grouped_dict([])
-        self.assertEqual(result, {})
+        with mock.patch(
+                'shakenfist.schema.object_reference.request_namespace',
+                return_value='system'):
+            result = references_to_grouped_dict([])
+            self.assertEqual(result, {})
 
     def test_references_to_grouped_dict_single_reference(self):
         """Test references_to_grouped_dict with a single reference."""
-        ref = ObjectReference(
-            source_object_type=ObjectType.INSTANCE,
-            source_uuid=SOURCE_UUID,
-            relationship=RelationshipType.DISK,
-            relationship_value='0',
-            target_object_type=ObjectType.BLOB,
-            target_uuid=TARGET_UUID,
-            created=1234567890.0,
-            last_active=1234567890.0
-        )
-        result = references_to_grouped_dict([ref])
+        with mock.patch(
+                'shakenfist.schema.object_reference.request_namespace',
+                return_value='system'):
+            ref = ObjectReference(
+                source_object_type=ObjectType.INSTANCE,
+                source_uuid=SOURCE_UUID,
+                relationship=RelationshipType.DISK,
+                relationship_value='0',
+                target_object_type=ObjectType.BLOB,
+                target_uuid=TARGET_UUID,
+                created=1234567890.0,
+                last_active=1234567890.0
+            )
+            result = references_to_grouped_dict([ref])
 
-        self.assertIn('disk', result)
-        self.assertEqual(len(result['disk']), 1)
-        self.assertEqual(result['disk'][0]['relationship'], 'disk')
+            self.assertIn('disk', result)
+            self.assertEqual(len(result['disk']), 1)
+            self.assertEqual(result['disk'][0]['relationship'], 'disk')
 
     def test_references_to_grouped_dict_multiple_same_type(self):
         """Test grouping multiple references of same type."""
-        ref1 = ObjectReference(
-            source_object_type=ObjectType.INSTANCE,
-            source_uuid=SOURCE_UUID,
-            relationship=RelationshipType.DISK,
-            relationship_value='0',
-            target_object_type=ObjectType.BLOB,
-            target_uuid=TARGET_UUID,
-            created=1234567890.0,
-            last_active=1234567890.0
-        )
-        ref2 = ObjectReference(
-            source_object_type=ObjectType.INSTANCE,
-            source_uuid=SOURCE_UUID,
-            relationship=RelationshipType.DISK,
-            relationship_value='1',
-            target_object_type=ObjectType.BLOB,
-            target_uuid=str(uuid4()),
-            created=1234567891.0,
-            last_active=1234567891.0
-        )
-        result = references_to_grouped_dict([ref1, ref2])
+        with mock.patch(
+                'shakenfist.schema.object_reference.request_namespace',
+                return_value='system'):
+            ref1 = ObjectReference(
+                source_object_type=ObjectType.INSTANCE,
+                source_uuid=SOURCE_UUID,
+                relationship=RelationshipType.DISK,
+                relationship_value='0',
+                target_object_type=ObjectType.BLOB,
+                target_uuid=TARGET_UUID,
+                created=1234567890.0,
+                last_active=1234567890.0
+            )
+            ref2 = ObjectReference(
+                source_object_type=ObjectType.INSTANCE,
+                source_uuid=SOURCE_UUID,
+                relationship=RelationshipType.DISK,
+                relationship_value='1',
+                target_object_type=ObjectType.BLOB,
+                target_uuid=str(uuid4()),
+                created=1234567891.0,
+                last_active=1234567891.0
+            )
+            result = references_to_grouped_dict([ref1, ref2])
 
-        self.assertEqual(len(result), 1)  # Only one relationship type
-        self.assertIn('disk', result)
-        self.assertEqual(len(result['disk']), 2)  # Two references
+            self.assertEqual(len(result), 1)  # Only one relationship type
+            self.assertIn('disk', result)
+            self.assertEqual(len(result['disk']), 2)  # Two references
 
     def test_references_to_grouped_dict_multiple_different_types(self):
         """Test grouping references of different types."""
-        ref1 = ObjectReference(
-            source_object_type=ObjectType.INSTANCE,
-            source_uuid=SOURCE_UUID,
-            relationship=RelationshipType.DISK,
-            relationship_value='0',
-            target_object_type=ObjectType.BLOB,
-            target_uuid=TARGET_UUID,
-            created=1234567890.0,
-            last_active=1234567890.0
-        )
-        ref2 = ObjectReference(
-            source_object_type=ObjectType.INSTANCE,
-            source_uuid=SOURCE_UUID,
-            relationship=RelationshipType.NVRAM_TEMPLATE,
-            relationship_value=None,
-            target_object_type=ObjectType.BLOB,
-            target_uuid=str(uuid4()),
-            created=1234567890.0,
-            last_active=1234567890.0
-        )
-        result = references_to_grouped_dict([ref1, ref2])
+        with mock.patch(
+                'shakenfist.schema.object_reference.request_namespace',
+                return_value='system'):
+            ref1 = ObjectReference(
+                source_object_type=ObjectType.INSTANCE,
+                source_uuid=SOURCE_UUID,
+                relationship=RelationshipType.DISK,
+                relationship_value='0',
+                target_object_type=ObjectType.BLOB,
+                target_uuid=TARGET_UUID,
+                created=1234567890.0,
+                last_active=1234567890.0
+            )
+            ref2 = ObjectReference(
+                source_object_type=ObjectType.INSTANCE,
+                source_uuid=SOURCE_UUID,
+                relationship=RelationshipType.NVRAM_TEMPLATE,
+                relationship_value=None,
+                target_object_type=ObjectType.BLOB,
+                target_uuid=str(uuid4()),
+                created=1234567890.0,
+                last_active=1234567890.0
+            )
+            result = references_to_grouped_dict([ref1, ref2])
 
-        self.assertEqual(len(result), 2)  # Two relationship types
-        self.assertIn('disk', result)
-        self.assertIn('nvram_template', result)
-        self.assertEqual(len(result['disk']), 1)
-        self.assertEqual(len(result['nvram_template']), 1)
+            self.assertEqual(len(result), 2)  # Two relationship types
+            self.assertIn('disk', result)
+            self.assertIn('nvram_template', result)
+            self.assertEqual(len(result['disk']), 1)
+            self.assertEqual(len(result['nvram_template']), 1)
