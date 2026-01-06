@@ -3,6 +3,8 @@ import sys
 import time
 
 from oslo_concurrency import processutils
+from testtools import content
+
 from shakenfist_ci import base
 
 
@@ -46,6 +48,9 @@ class TestNetworkCommandLine(base.BaseNamespacedTestCase):
         self.assertRegex(
             self._exec_client('network list'), '.*192.168.1.0/24.*')
         out = json.loads(self._exec_client('--json network list'))
+        self.addDetail(
+            'network list out',
+            content.text_content(json.dumps(out, indent=4, sort_keys=True)))
         net_uuid = out[0]['uuid']
         self.assertRegex(
             self._exec_client('--simple network list'),

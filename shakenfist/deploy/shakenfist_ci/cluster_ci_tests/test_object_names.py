@@ -1,3 +1,7 @@
+import json
+
+from testtools import content
+
 from shakenfist_ci import base
 
 
@@ -19,7 +23,13 @@ class TestObjectNames(base.BaseNamespacedTestCase):
         for i in ['barry', 'dave', 'alice']:
             n = self.test_client.allocate_network(
                 '192.168.242.0/24', True, True, i+'_net')
+            self.addDetail(
+                'net_%s' % i,
+                content.text_content(json.dumps(n, indent=4, sort_keys=True)))
             nets[i+'_net'] = n['uuid']
+        self.addDetail(
+            'nets',
+            content.text_content(json.dumps(nets, indent=4, sort_keys=True)))
 
         for name, uuid in nets.items():
             n = self.system_client.get_network(name)
@@ -43,9 +53,20 @@ class TestObjectNames(base.BaseNamespacedTestCase):
                         'type': 'disk'
                     }
                 ], None, None, namespace=self.namespace)
+            self.addDetail(
+                'new_inst_%s' % name,
+                content.text_content(json.dumps(new_inst, indent=4,
+                                                sort_keys=True)))
             inst_uuids[name] = new_inst['uuid']
+        self.addDetail(
+            'inst_uuids',
+            content.text_content(json.dumps(inst_uuids, indent=4,
+                                            sort_keys=True)))
 
         # Get instance by name
         for name, uuid in inst_uuids.items():
             inst = self.system_client.get_instance(name)
+            self.addDetail(
+                'inst_%s' % name,
+                content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
             self.assertEqual(uuid, inst['uuid'])

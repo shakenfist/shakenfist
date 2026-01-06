@@ -1,3 +1,7 @@
+import json
+
+from testtools import content
+
 from shakenfist_ci import base
 from shakenfist_client import apiclient
 
@@ -9,9 +13,15 @@ class TestSystemNamespace(base.BaseTestCase):
         net = self.system_client.allocate_network(
             '192.168.242.0/24', True, True,
             'ci-system-net')
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(net, indent=4, sort_keys=True)))
         nets = []
         for n in self.system_client.get_networks():
             nets.append(n['uuid'])
+        self.addDetail(
+            'nets',
+            content.text_content(json.dumps(nets, indent=4, sort_keys=True)))
         self.assertIn(net['uuid'], nets)
 
         inst = self.system_client.create_instance(
@@ -28,6 +38,9 @@ class TestSystemNamespace(base.BaseTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
 
         self.assertIsNotNone(inst['uuid'])
         self.assertIsNotNone(inst['node'])
@@ -35,6 +48,9 @@ class TestSystemNamespace(base.BaseTestCase):
         insts = []
         for i in self.system_client.get_instances():
             insts.append(i['uuid'])
+        self.addDetail(
+            'insts',
+            content.text_content(json.dumps(insts, indent=4, sort_keys=True)))
         self.assertIn(inst['uuid'], insts)
 
         self.system_client.delete_instance(inst['uuid'])

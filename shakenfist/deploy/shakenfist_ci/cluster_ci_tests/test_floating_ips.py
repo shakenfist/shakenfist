@@ -1,7 +1,10 @@
 import base64
+import json
 import time
 
 import requests
+from testtools import content
+
 from shakenfist_ci import base
 
 
@@ -14,6 +17,9 @@ class TestFloatingIPs(base.BaseNamespacedTestCase):
         super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
         self._await_networks_ready([self.net['uuid']])
 
     def test_simple(self):
@@ -43,6 +49,9 @@ echo 'Floating IPs work!' > /var/www/html/index.html
             ],
             None,
             str(base64.b64encode(ud.encode('utf-8')), 'utf-8'))
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
 
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
@@ -55,9 +64,15 @@ echo 'Floating IPs work!' > /var/www/html/index.html
         self.assertEqual('Floating IPs work!', out.rstrip())
 
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])
+        self.addDetail(
+            'ifaces',
+            content.text_content(json.dumps(ifaces, indent=4, sort_keys=True)))
         self.test_client.float_interface(ifaces[0]['uuid'])
 
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])
+        self.addDetail(
+            'ifaces after float',
+            content.text_content(json.dumps(ifaces, indent=4, sort_keys=True)))
         self.assertNotEqual(None, ifaces[0]['floating'])
 
         # Because the user data in this test does a dist-upgrade and installs

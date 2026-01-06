@@ -1,4 +1,7 @@
+import json
 import random
+
+from testtools import content
 
 from shakenfist_ci import base
 
@@ -12,6 +15,9 @@ class TestArtifactMetadata(base.BaseNamespacedTestCase):
         img = self.test_client.cache_artifact(
                 'https://sfcbr.shakenfist.com/cgi-bin/uuid.cgi?uniq=%06d'
                 % random.randint(-999999, 999999))
+        self.addDetail(
+            'img',
+            content.text_content(json.dumps(img, indent=4, sort_keys=True)))
 
         self.assertEqual({}, self.test_client.get_artifact_metadata(img['uuid']))
         self.test_client.set_artifact_metadata_item(img['uuid'], 'foo', 'bar')
@@ -30,7 +36,13 @@ class TestBlobMetadata(base.BaseNamespacedTestCase):
         img = self.test_client.cache_artifact(
                 'https://sfcbr.shakenfist.com/cgi-bin/uuid.cgi?uniq=%06d'
                 % random.randint(-999999, 999999))
+        self.addDetail(
+            'img initial',
+            content.text_content(json.dumps(img, indent=4, sort_keys=True)))
         results = self._await_artifacts_ready([img['uuid']])
+        self.addDetail(
+            'results',
+            content.text_content(json.dumps(results, indent=4, sort_keys=True)))
         img = results[0]
 
         self.assertIn('blobs', img)
@@ -55,6 +67,9 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
         super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
         self._await_networks_ready([self.net['uuid']])
 
     def test_simple(self):
@@ -72,6 +87,9 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
 
         self.assertIsNotNone(inst['uuid'])
 
@@ -106,6 +124,9 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
                 'tags': ['foo', 'bar']
             }
         )
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
 
         self.assertIsNotNone(inst['uuid'])
 
@@ -128,6 +149,9 @@ class TestInterfaceMetadata(base.BaseNamespacedTestCase):
         super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
         self._await_networks_ready([self.net['uuid']])
 
     def test_simple(self):
@@ -145,10 +169,16 @@ class TestInterfaceMetadata(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
 
         self.assertIsNotNone(inst['uuid'])
 
         iface = self.test_client.get_instance_interfaces(inst['uuid'])[0]
+        self.addDetail(
+            'iface',
+            content.text_content(json.dumps(iface, indent=4, sort_keys=True)))
 
         self.assertEqual({}, self.test_client.get_interface_metadata(iface['uuid']))
         self.test_client.set_interface_metadata_item(iface['uuid'], 'foo', 'bar')
@@ -185,6 +215,9 @@ class TestNetworkMetadata(base.BaseNamespacedTestCase):
         super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
         self._await_networks_ready([self.net['uuid']])
 
     def test_simple(self):
@@ -203,6 +236,9 @@ class TestNodeMetadata(base.BaseNamespacedTestCase):
 
     def test_simple(self):
         n = self.system_client.get_nodes()[0]
+        self.addDetail(
+            'node',
+            content.text_content(json.dumps(n, indent=4, sort_keys=True)))
 
         self.assertEqual({}, self.system_client.get_node_metadata(n['name']))
         self.system_client.set_node_metadata_item(n['name'], 'foo', 'bar')

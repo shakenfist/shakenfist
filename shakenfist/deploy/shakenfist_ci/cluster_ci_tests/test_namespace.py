@@ -1,5 +1,8 @@
 import copy
+import json
 import time
+
+from testtools import content
 
 from shakenfist_ci import base
 
@@ -13,6 +16,9 @@ class TestNamespace(base.BaseNamespacedTestCase):
         super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
         self._await_networks_ready([self.net['uuid']])
 
     def test_namespace_create_delete_and_list(self):
@@ -25,6 +31,10 @@ class TestNamespace(base.BaseNamespacedTestCase):
         namespaces = []
         for n in self.system_client.get_namespaces():
             namespaces.append(n['name'])
+        self.addDetail(
+            'namespaces',
+            content.text_content(json.dumps(namespaces, indent=4,
+                                            sort_keys=True)))
 
         self.assertIn('a', namespaces)
         self.assertIn('b', namespaces)
@@ -61,6 +71,10 @@ class TestNamespace(base.BaseNamespacedTestCase):
                         'type': 'disk'
                     }
                 ], None, None, namespace=self.namespace)
+            self.addDetail(
+                'new_inst_%s' % i,
+                content.text_content(json.dumps(new_inst, indent=4,
+                                                sort_keys=True)))
             inst_uuids.add(new_inst['uuid'])
 
         # Wait for all instances to start
@@ -91,6 +105,9 @@ class TestNamespace(base.BaseNamespacedTestCase):
             if test_net['state'] in ['deleted', 'error']:
                 break
             time.sleep(5)
+        self.addDetail(
+            'test_net',
+            content.text_content(json.dumps(test_net, indent=4, sort_keys=True)))
 
         self.assertEqual('deleted', test_net['state'],
                          'Network not deleted by delete_all_networks()')

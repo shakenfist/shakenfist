@@ -1,3 +1,7 @@
+import json
+
+from testtools import content
+
 from shakenfist_ci import base
 from shakenfist_client import apiclient
 
@@ -12,7 +16,11 @@ class TestNodes(base.BaseNamespacedTestCase):
         # the same name, but what its _really_ doing is ensuring the get_nodes()
         # call returns at all.
         nodes = self.system_client.get_nodes()
+        self.addDetail('nodes', content.text_content(json.dumps(
+            nodes, indent=4, sort_keys=True)))
         n = self.system_client.get_node(nodes[0]['name'])
+        self.addDetail('n', content.text_content(json.dumps(
+            n, indent=4, sort_keys=True)))
         self.assertEqual(nodes[0]['name'], n['name'])
 
     def test_get_missing_node(self):

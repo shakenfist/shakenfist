@@ -1,3 +1,7 @@
+import json
+
+from testtools import content
+
 from shakenfist_ci import base
 from shakenfist_client import apiclient
 
@@ -12,12 +16,28 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.net_one = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace,
             provide_dns=True)
+        self.addDetail(
+            'net_one',
+            content.text_content(json.dumps(self.net_one, indent=4,
+                                            sort_keys=True)))
         self.net_two = self.test_client.allocate_network(
             '192.168.243.0/24', True, True, '%s-net-two' % self.namespace)
+        self.addDetail(
+            'net_two',
+            content.text_content(json.dumps(self.net_two, indent=4,
+                                            sort_keys=True)))
         self.net_three = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-three' % self.namespace)
+        self.addDetail(
+            'net_three',
+            content.text_content(json.dumps(self.net_three, indent=4,
+                                            sort_keys=True)))
         self.net_four = self.test_client.allocate_network(
             '192.168.10.0/24', True, True, '%s-net-four' % self.namespace)
+        self.addDetail(
+            'net_four',
+            content.text_content(json.dumps(self.net_four, indent=4,
+                                            sort_keys=True)))
         self._await_networks_ready([self.net_one['uuid'],
                                     self.net_two['uuid'],
                                     self.net_three['uuid'],
@@ -39,10 +59,16 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
 
         self._await_instance_ready(inst['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst['uuid'])
+        self.addDetail(
+            'nics',
+            content.text_content(json.dumps(nics, indent=4, sort_keys=True)))
         self.assertEqual(1, len(nics))
         for iface in nics:
             self.assertEqual('created', iface['state'],
