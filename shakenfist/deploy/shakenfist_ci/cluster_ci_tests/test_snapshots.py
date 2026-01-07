@@ -99,7 +99,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         blob1_admin_info = self.test_client.get_blob(blob_uuid)
         self.addDetail('blob1_admin_info', content.text_content(json.dumps(
             blob1_admin_info, indent=4, sort_keys=True)))
-        self.assertTrue('blob_location' in blob1_info['references_to'])
+        self.assertTrue('blob_location' in blob1_admin_info['references_to'])
 
         self.assertEqual(1, snap1_info['blobs'][1]['reference_count'],
                          'blob %s does not have a reference count of 1'
@@ -584,7 +584,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertEqual('created', snap1_info['state'])
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
         self.assertEqual(1, snap1_info['blobs'][1]['reference_count'])
-        self.assertNotEqual(backing_blob, snap1_info['blobs'][1]['depends_on'])
+        self.assertEqual(backing_blob, snap1_info['blobs'][1]['depends_on'])
 
         # Refresh our view of the instance
         inst1 = self.test_client.get_instance(inst1['uuid'])
