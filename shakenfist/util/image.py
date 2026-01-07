@@ -1,6 +1,7 @@
 import os
 import re
 import shutil
+from typing import Any
 
 import semver
 from shakenfist_utilities import logs  # noreorder
@@ -22,12 +23,12 @@ VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
 QEMU_REQUIRES_BACKING_FORMAT = semver.Version(major=6, minor=0, patch=0)
 
 
-def _qemu_requires_backing_format(node_name):
+def _qemu_requires_backing_format(node_name: str) -> bool:
     qemu_version = Node.from_db(config.NODE_NAME).qemu_version
     return qemu_version >= QEMU_REQUIRES_BACKING_FORMAT
 
 
-def convert_numeric_qemu_value(qemu_value):
+def convert_numeric_qemu_value(qemu_value: str | float | int) -> float | str:
     if not isinstance(qemu_value, str):
         return qemu_value
 
@@ -48,7 +49,7 @@ def convert_numeric_qemu_value(qemu_value):
     return qemu_value
 
 
-def identify(path):
+def identify(path: str) -> dict[str, Any]:
     """Work out what an image is."""
 
     if not os.path.exists(path):
@@ -57,13 +58,13 @@ def identify(path):
     out, _ = util_concurrency.execute(
         'qemu-img info --force-share %s' % path, suppress_command_logging=True)
 
-    data = {}
+    data: dict[str, Any] = {}
     for line in out.split('\n'):
         line = line.lstrip().rstrip()
         elems = line.split(': ')
         if len(elems) > 1:
             key = elems[0]
-            value = ': '.join(elems[1:])
+            value: Any = ': '.join(elems[1:])
 
             m = VALUE_WITH_BRACKETS_RE.match(value)
             if m:
@@ -79,7 +80,9 @@ def identify(path):
     return data
 
 
-def create_cow(cache_file, disk_file, disk_size):
+def create_cow(
+    cache_file: str, disk_file: str, disk_size: int | float | None
+) -> None:
     """Create a COW layer on top of the image cache.
 
     disk_size is specified in GiBs.
@@ -127,7 +130,9 @@ def create_cow(cache_file, disk_file, disk_size):
             iopriority=util_concurrency.PRIORITY_LOW)
 
 
-def create_qcow2(cache_file, disk_file, disk_size=None):
+def create_qcow2(
+    cache_file: str, disk_file: str, disk_size: int | float | None = None
+) -> None:
     """Make a qcow2 copy of the disk from the image cache."""
 
     if os.path.exists(disk_file):
@@ -143,7 +148,7 @@ def create_qcow2(cache_file, disk_file, disk_size=None):
             iopriority=util_concurrency.PRIORITY_LOW)
 
 
-def create_blank(disk_file, disk_size):
+def create_blank(disk_file: str, disk_size: int | float) -> None:
     """Make an empty image."""
 
     if os.path.exists(disk_file):
@@ -155,7 +160,7 @@ def create_blank(disk_file, disk_size):
         iopriority=util_concurrency.PRIORITY_LOW)
 
 
-def snapshot(source, destination, thin=False):
+def snapshot(source: str, destination: str, thin: bool = False) -> str | None:
     """Convert a possibly COW layered disk file into a snapshot."""
     backing_file = identify(source).get('backing file')
     LOG.with_fields({

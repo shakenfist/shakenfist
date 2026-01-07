@@ -2,6 +2,8 @@ import os
 import pathlib
 import stat
 import time
+from types import TracebackType
+from typing import Any, Self
 import uuid
 
 import cpuinfo
@@ -21,16 +23,23 @@ LOG, _ = logs.setup(__name__)
 
 
 class RecordedOperation():
-    def __init__(self, operation, relatedobject, threshold=0):
+    def __init__(
+        self, operation: str, relatedobject: Any, threshold: float = 0
+    ) -> None:
         self.operation = operation
         self.object = relatedobject
         self.threshold = threshold
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self.start_time = time.time()
         return self
 
-    def __exit__(self, exc_type, exc_val, traceback):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        traceback: TracebackType | None
+    ) -> None:
         duration = round(time.time() - self.start_time, 2)
 
         if duration < self.threshold:
@@ -50,17 +59,17 @@ class RecordedOperation():
             }).info(message)
 
 
-def recorded_method(func):
-    def wrapper(*args, **kwargs):
+def recorded_method(func: Any) -> Any:
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         with RecordedOperation(f'{func} execution', None):
             return func(*args, **kwargs)
     return wrapper
 
 
-VERSION_CACHE = None
+VERSION_CACHE: str | None = None
 
 
-def get_version():
+def get_version() -> str:
     global VERSION_CACHE
 
     if not VERSION_CACHE:
@@ -75,7 +84,7 @@ def get_version():
     return sf_version
 
 
-def get_user_agent():
+def get_user_agent() -> str:
     architecture = cpuinfo.get_cpu_info()
     return ('Mozilla/5.0 (%(distribution)s; %(vendor)s %(architecture)s) '
             'Shaken Fist/%(version)s'
@@ -87,7 +96,7 @@ def get_user_agent():
             })
 
 
-def noneish(value):
+def noneish(value: Any) -> bool:
     if not value:
         return True
     if value.lower() == 'none':
@@ -95,7 +104,7 @@ def noneish(value):
     return False
 
 
-def stat_log_fields(path):
+def stat_log_fields(path: str) -> dict[str, int | str]:
     st = os.stat(path)
     return {
         'size': st.st_size,
@@ -105,7 +114,9 @@ def stat_log_fields(path):
     }
 
 
-def file_permutation_exists(basename, extensions):
+def file_permutation_exists(
+    basename: str, extensions: list[str]
+) -> str | None:
     """Find if any of the possible extensions exists. """
     for extn in extensions:
         filename = f'{basename}.{extn}'
@@ -114,7 +125,7 @@ def file_permutation_exists(basename, extensions):
     return None
 
 
-def link(source, destination):
+def link(source: str, destination: str) -> None:
     """Hard link a file, unless we have to symlink. """
     try:
         os.link(source, destination)
@@ -132,7 +143,7 @@ def link(source, destination):
     pathlib.Path(destination).touch(exist_ok=True)
 
 
-def link_or_copy(source, destination):
+def link_or_copy(source: str, destination: str) -> None:
     """Hard link a file, unless we have to copy it. """
     try:
         os.link(source, destination)
@@ -142,7 +153,7 @@ def link_or_copy(source, destination):
     pathlib.Path(destination).touch(exist_ok=True)
 
 
-def valid_uuid4(uuid_string):
+def valid_uuid4(uuid_string: str) -> bool:
     try:
         uuid.UUID(uuid_string, version=4)
     except ValueError:
@@ -150,7 +161,7 @@ def valid_uuid4(uuid_string):
     return True
 
 
-def get_request_id():
+def get_request_id() -> str | None:
     try:
         return flask.request.environ.get('FLASK_REQUEST_ID')
     except RuntimeError:
