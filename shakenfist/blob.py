@@ -49,6 +49,7 @@ from shakenfist.exceptions import BlobSizeCannotChange
 from shakenfist.exceptions import BlobTransferSetupFailed
 from shakenfist.exceptions import LocklessUpdateFailed
 from shakenfist.node import Node
+from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import callstack as util_callstack
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
@@ -203,8 +204,9 @@ class Blob(dbo):
         })
 
         # Locations and their incomplete counterparts
-        out['locations'] = self.locations
-        out['locations'].extend(self.incomplete_locations)
+        if request_namespace() == 'system':
+            out['locations'] = self.locations
+            out['locations'].extend(self.incomplete_locations)
 
         # Include information about the blob
         out.update(self.info)

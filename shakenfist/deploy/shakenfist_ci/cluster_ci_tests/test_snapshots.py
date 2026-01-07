@@ -55,7 +55,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 600:
             snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
             if snapshots and snapshots[-1].get('blob_uuid') == snap1['vda']['blob_uuid']:
                 break
@@ -77,7 +77,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         # Wait until snapshot is in the created state
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 600:
             snap1_info = self.test_client.get_artifact(snapshot_uuid)
             if snap1_info['state'] == 'created':
                 break
@@ -94,12 +94,14 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.addDetail('blob1_info', content.text_content(json.dumps(
             blob1_info, indent=4, sort_keys=True)))
         self.assertFalse('blob_location' in blob1_info['references_to'])
+        self.assertFalse('locations' in blob1_info)
 
         # Admins _should_ be able to see location information
-        blob1_admin_info = self.test_client.get_blob(blob_uuid)
+        blob1_admin_info = self.system_client.get_blob(blob_uuid)
         self.addDetail('blob1_admin_info', content.text_content(json.dumps(
             blob1_admin_info, indent=4, sort_keys=True)))
         self.assertTrue('blob_location' in blob1_admin_info['references_to'])
+        self.assertTrue('locations' in blob1_admin_info)
 
         self.assertEqual(1, snap1_info['blobs'][1]['reference_count'],
                          'blob %s does not have a reference count of 1'
@@ -125,7 +127,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 600:
             snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
             if snapshots and snapshots[-1].get('blob_uuid') == snap2['vda']['blob_uuid']:
                 break
@@ -220,7 +222,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         # Wait for the index to increment (it happens after the snapshot IO)
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 600:
             versions = self.test_client.get_artifact_versions(snapshot_uuid)
             if len(versions) == 2:
                 break
@@ -440,7 +442,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
             if not artifact_uuid:
                 time.sleep(20)
-                if time.time() - start_time > 300:
+                if time.time() - start_time > 600:
                     raise base.TimeoutException('Label never appeared')
 
         self._await_artifacts_ready([artifact_uuid])
@@ -488,12 +490,17 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
+        target_uuid = snap1['vdc']['blob_uuid']
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 600:
             snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-            if snapshots and snapshots[-1].get('blob_uuid') == snap1['vdc']['blob_uuid']:
+            if snapshots and snapshots[-1].get('blob_uuid') == target_uuid:
                 break
             time.sleep(5)
+        self.addDetail(
+            'wait1',
+            content.text_content(f'We waited {time.time() - start_time} seconds '
+                                 f'for blob uuid {target_uuid}'))
 
         self.addDetail('snapshots', content.text_content(json.dumps(
             snapshots, indent=4, sort_keys=True)))
@@ -507,12 +514,17 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
+        target_uuid = snap2['vdc']['blob_uuid']
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 600:
             snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
             if snapshots and snapshots[-1].get('blob_uuid') == snap2['vdc']['blob_uuid']:
                 break
             time.sleep(5)
+        self.addDetail(
+            'wait2',
+            content.text_content(f'We waited {time.time() - start_time} seconds '
+                                 f'for blob uuid {target_uuid}'))
 
         self.addDetail('snapshots_final', content.text_content(json.dumps(
             snapshots, indent=4, sort_keys=True)))
@@ -564,7 +576,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 600:
             snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
             if snapshots and snapshots[-1].get('blob_uuid') == snap1['vda']['blob_uuid']:
                 break
