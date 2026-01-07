@@ -1,5 +1,6 @@
 from enum import Enum
 import json
+from typing import Any
 import uuid
 
 from shakenfist import baseobject
@@ -10,7 +11,7 @@ from shakenfist import baseobject
 
 
 class JSONEncoderCustomTypes(json.JSONEncoder):
-    def default(self, obj):
+    def default(self, obj: Any) -> Any:
         if isinstance(obj, baseobject.State):
             return obj.obj_dict()
         if isinstance(obj, uuid.UUID):
@@ -20,6 +21,6 @@ class JSONEncoderCustomTypes(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-def json_dump(data):
+def json_dump(data: Any) -> str:
     return json.dumps(
         data, indent=4, sort_keys=True, cls=JSONEncoderCustomTypes)

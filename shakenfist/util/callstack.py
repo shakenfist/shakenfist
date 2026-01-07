@@ -3,7 +3,7 @@ import os
 import re
 import sys
 import traceback
-from typing import Callable, TypeVar
+from typing import Any, Callable, TypeVar
 
 from shakenfist_utilities import logs
 
@@ -13,14 +13,14 @@ LOG, _ = logs.setup(__name__)
 FILENAME_RE = re.compile('.*/dist-packages/shakenfist/(.*)')
 
 # Type variable for preserving function signatures
-F = TypeVar('F', bound=Callable)
+F = TypeVar('F', bound=Callable[..., Any])
 
 # Enable/disable caller restriction checks. Set SHAKENFIST_CHECK_CALLERS=0 to
 # disable. Uses sys._getframe() which adds ~0.1 microseconds per call.
 CHECK_CALLERS_ENABLED = os.environ.get('SHAKENFIST_CHECK_CALLERS', '1') != '0'
 
 
-def get_caller(offset=-2):
+def get_caller(offset: int = -2) -> str:
     """Get the caller's location as 'filename:lineno:name()'.
 
     Uses sys._getframe() for ~92x better performance than traceback.extract_stack().
@@ -40,7 +40,7 @@ def get_caller(offset=-2):
     return f'{filename}:{frame.f_lineno}:{frame.f_code.co_name}()'
 
 
-def generate_traceback(offset=-2):
+def generate_traceback(offset: int = -2) -> str:
     stack = traceback.extract_stack()
     formatted = traceback.format_list(stack[:-offset])
     return '\n%s'.join(formatted)
@@ -75,7 +75,7 @@ def restrict_caller(*allowed_modules: str) -> Callable[[F], F]:
             return func
 
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             # Get the caller's module name using fast frame inspection
             frame = sys._getframe(1)
             caller_module = frame.f_globals.get('__name__', 'unknown')
@@ -97,5 +97,5 @@ def restrict_caller(*allowed_modules: str) -> Callable[[F], F]:
                 )
 
             return func(*args, **kwargs)
-        return wrapper
+        return wrapper  # type: ignore[return-value]
     return decorator
