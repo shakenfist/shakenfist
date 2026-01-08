@@ -77,6 +77,9 @@ nav:
         - "State machine": developer_guide/state_machine.md
         - "Updating docs": developer_guide/updating_docs.md
         - "Workflow": developer_guide/workflow.md
+    - Plans:
+        - "Overview": plans/index.md
+        - "Blob Storage Roadmap": plans/blob-storage-roadmap.md
     - Operator Guide:
        - "Installation": operator_guide/installation.md
        - "Artifacts": operator_guide/artifacts.md
