@@ -49,7 +49,9 @@ Shaken Fist runs several daemons on each cluster node:
        | (objects,   |                   | (state,     |
        |  locks,     |                   |  IPAM,      |
        |  queues)    |                   |  uploads,   |
-       +-------------+                   |  dnsmasq)   |
+       +-------------+                   |  dnsmasq,   |
+                                         |  object_    |
+                                         |  references)|
                                          +-------------+
 ```
 
@@ -80,6 +82,8 @@ duplication. The Python enums in `shakenfist/schema/` are the source of truth:
 - `schema/object_types.py` defines `ObjectType` with both string values and
   stable protobuf integer IDs
 - `schema/ipam_reservation.py` defines `ReservationType` similarly
+- `schema/relationship_types.py` defines `RelationshipType` for object
+  references
 
 Each enum member uses a `NamedTuple` value type containing:
 - `string`: The string value used in databases and APIs
@@ -123,6 +127,44 @@ Content-addressable blob storage with replication:
 - Automatic deduplication
 - Configurable replication factor
 - Used for disk images, snapshots, etc.
+
+### Object References
+
+The `object_references` table in MariaDB tracks relationships between objects.
+This is used primarily for blob reference counting but is generic enough to
+track any object-to-object relationship.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| source_object_type | ObjectType | Type of the referencing object |
+| source_uuid | UUID | UUID of the referencing object |
+| relationship | RelationshipType | Type of relationship |
+| relationship_value | VARCHAR(64) | Optional relationship-specific value |
+| target_object_type | ObjectType | Type of the referenced object |
+| target_uuid | UUID | UUID of the referenced object |
+| created | FLOAT | When the reference was created |
+| last_active | FLOAT | Last time the reference was verified |
+
+#### Relationship Types
+
+| Type | Source | Target | Value |
+|------|--------|--------|-------|
+| `disk` | Instance | Blob | Disk index ("0", "1", ...) |
+| `nvram_template` | Instance | Blob | NULL |
+| `artifact_index` | Artifact | Blob | Index number ("000000000001") |
+| `depends_on` | Blob | Blob | NULL |
+| `transcode` | Blob | Blob | Style ("qcow2", "raw") |
+| `agent_output` | AgentOperation | Blob | Output type ("stdout", "stderr") |
+| `blob_location` | Node | Blob | NULL (blob is present on this node) |
+
+This replaces the legacy `ref_count` and `locations` blob attributes with a
+queryable, auditable reference system. Blob reference counts are computed
+dynamically from this table via `mariadb.count_references_to()`. Blob locations
+are queried via `mariadb.get_references_to()` filtered by `BLOB_LOCATION`.
+
+The `last_active` column is updated whenever a reference is observed to still
+be valid (e.g., when a node's cleaner daemon calls `observe()` on local blobs).
+This enables detection of stale references for cleanup.
 
 ## State Machines
 

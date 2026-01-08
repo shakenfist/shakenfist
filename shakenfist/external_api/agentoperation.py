@@ -14,7 +14,7 @@ from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
-from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util.access_tokens import request_namespace
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -42,7 +42,7 @@ def requires_operation_ownership(func):
             log.info('Operation not found, kwarg missing')
             return sf_api.error(404, 'agent operation not found')
 
-        if parse_jwt_identity()[0] not in [kwargs['operation_from_db'].namespace, 'system']:
+        if request_namespace() not in [kwargs['operation_from_db'].namespace, 'system']:
             log.info('Agent operation not found, ownership test in decorator')
             return sf_api.error(404, 'agent operation not found')
 
@@ -72,7 +72,22 @@ agentoperation_get_example = """{
     },
     "state": "complete",
     "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
-    "version": 1
+    "version": 1,
+    "references_to": {},
+    "references_from": {
+        "agent_output": [
+            {
+                "source_object_type": "agentoperation",
+                "source_uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
+                "relationship": "agent_output",
+                "relationship_value": "stdout",
+                "target_object_type": "blob",
+                "target_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
+    }
 }"""
 
 

@@ -78,7 +78,7 @@ class PydanticToSQLAlchemyTableTestCase(base.ShakenFistTestCase):
         metadata = sa.MetaData()
         table = pydantic_to_sqlalchemy_table(
             TestModel, 'test_table', metadata,
-            primary_key_field='uuid', include_id_column=False)
+            primary_key_fields=['uuid'], include_id_column=False)
 
         # Check that uuid column uses native UUID type
         uuid_col = table.c.uuid
@@ -94,7 +94,7 @@ class PydanticToSQLAlchemyTableTestCase(base.ShakenFistTestCase):
         metadata = sa.MetaData()
         table = pydantic_to_sqlalchemy_table(
             TestModel, 'test_table', metadata,
-            primary_key_field='uuid', include_id_column=False)
+            primary_key_fields=['uuid'], include_id_column=False)
 
         # Check that uuid column uses String(36)
         uuid_col = table.c.uuid
@@ -111,7 +111,7 @@ class PydanticToSQLAlchemyTableTestCase(base.ShakenFistTestCase):
         metadata = sa.MetaData()
         table = pydantic_to_sqlalchemy_table(
             TestModel, 'test_table', metadata,
-            primary_key_field='uuid', include_id_column=False)
+            primary_key_fields=['uuid'], include_id_column=False)
 
         # Both should be native UUID type
         self.assertIsInstance(table.c.uuid.type, sa.Uuid)
@@ -132,7 +132,7 @@ class UploadDataTableGenerationTestCase(base.ShakenFistTestCase):
         metadata = sa.MetaData()
         table = pydantic_to_sqlalchemy_table(
             UploadData, 'uploads', metadata,
-            primary_key_field='uuid', include_id_column=False)
+            primary_key_fields=['uuid'], include_id_column=False)
 
         # Check columns exist
         self.assertIn('uuid', table.c)

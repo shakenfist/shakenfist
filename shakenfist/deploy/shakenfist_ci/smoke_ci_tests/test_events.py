@@ -1,3 +1,7 @@
+import json
+
+from testtools import content
+
 from shakenfist_ci import base
 
 
@@ -12,6 +16,10 @@ class TestEvents(base.BaseNamespacedTestCase):
         self.net_one = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace,
             provide_dns=True)
+        self.addDetail(
+            'net_one',
+            content.text_content(json.dumps(self.net_one, indent=4,
+                                            sort_keys=True)))
         self._await_networks_ready([self.net_one['uuid']])
 
     # NOTE(mikal): needs ArtifactsUrlRefEndpoint implemented first
@@ -38,6 +46,9 @@ class TestEvents(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self.addDetail(
+            'inst1',
+            content.text_content(json.dumps(inst1, indent=4, sort_keys=True)))
 
         # Wait for the instance agent to report in
         self._await_instance_ready(inst1['uuid'])

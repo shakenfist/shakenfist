@@ -3,6 +3,7 @@ import os
 import random
 import re
 import time
+from typing import Any, Iterator
 
 from shakenfist_utilities import logs  # noreorder
 
@@ -19,7 +20,7 @@ from shakenfist.util import concurrency
 LOG, _ = logs.setup(__name__)
 
 
-def _clean_ip_json(data):
+def _clean_ip_json(data: str | None) -> list[dict[str, Any]]:
     # For reasons I can't explain, the ip command sometimes returns
     # slightly bogus JSON like this:
     #
@@ -58,7 +59,9 @@ def _clean_ip_json(data):
     return [x for x in j if x]
 
 
-def check_for_interface(name, netns=None, up=False):
+def check_for_interface(
+    name: str, netns: str | None = None, up: bool = False
+) -> bool:
     log = LOG.with_fields({
         'name': name,
         'netns': netns
@@ -87,7 +90,7 @@ def check_for_interface(name, netns=None, up=False):
     return True
 
 
-def get_interface_addresses(name, netns=None):
+def get_interface_addresses(name: str, netns: str | None = None) -> list[str]:
     stdout, _ = concurrency.execute(
         'ip -pretty -json addr show %s' % name,
         check_exit_code=[0, 1], netns=netns)
@@ -99,7 +102,9 @@ def get_interface_addresses(name, netns=None):
     return addresses
 
 
-def get_interface_statistics(name, netns=None):
+def get_interface_statistics(
+    name: str, netns: str | None = None
+) -> dict[str, Any] | None:
     stdout, stderr = concurrency.execute(
         'ip -s -pretty -json link show %s' % name,
         check_exit_code=[0, 1], netns=netns,
@@ -119,7 +124,9 @@ def get_interface_statistics(name, netns=None):
             % (name, netns, stderr))
 
 
-def get_interface_mtus(netns=None):
+def get_interface_mtus(
+    netns: str | None = None
+) -> Iterator[tuple[str, int]]:
     stdout, _ = concurrency.execute(
         'ip -pretty -json link show',
         check_exit_code=[0, 1], netns=netns,
@@ -129,7 +136,7 @@ def get_interface_mtus(netns=None):
         yield elem['ifname'], elem['mtu']
 
 
-def get_interface_mtu(interface, netns=None):
+def get_interface_mtu(interface: str, netns: str | None = None) -> int | None:
     stdout, _ = concurrency.execute(
         'ip -pretty -json link show %s' % interface,
         check_exit_code=[0, 1], netns=netns,
@@ -137,9 +144,10 @@ def get_interface_mtu(interface, netns=None):
 
     for elem in _clean_ip_json(stdout):
         return elem['mtu']
+    return None
 
 
-def get_default_routes(netns):
+def get_default_routes(netns: str | None) -> list[str]:
     stdout, _ = concurrency.execute(
         'ip route list default', netns=netns)
 
@@ -154,7 +162,7 @@ def get_default_routes(netns):
     return routes
 
 
-def add_default_route(netns, router):
+def add_default_route(netns: str, router: str) -> None:
     try:
         concurrency.execute(
             f'route add default gw {router}', netns=netns)
@@ -163,18 +171,20 @@ def add_default_route(netns, router):
             raise e
 
 
-def delete_default_route(netns, router):
+def delete_default_route(netns: str, router: str) -> None:
     concurrency.execute(
         f'route del default gw {router}', netns=netns)
 
 
-def get_safe_interface_name(interface):
+def get_safe_interface_name(interface: str) -> str:
     if len(interface) > 15:
         interface = interface[:15]
     return interface
 
 
-def _create_interface_inner(interface, interface_type, extra, mtu):
+def _create_interface_inner(
+    interface: str, interface_type: str, extra: str, mtu: int
+) -> bool:
     try:
         concurrency.execute(
             'ip link add %(interface)s mtu %(mtu)s '
@@ -196,7 +206,9 @@ def _create_interface_inner(interface, interface_type, extra, mtu):
     return False
 
 
-def create_interface(interface, interface_type, extra, mtu=None):
+def create_interface(
+    interface: str, interface_type: str, extra: str, mtu: int | None = None
+) -> None:
     if not mtu:
         mtu = config.MAX_HYPERVISOR_MTU - 50
 
@@ -209,7 +221,9 @@ def create_interface(interface, interface_type, extra, mtu=None):
         attempts += 1
 
 
-def discover_interfaces():
+def discover_interfaces() -> tuple[
+    dict[str, str | None], dict[str | None, str], dict[int, str]
+]:
     mac_to_iface = {
         '00:00:00:00:00:00': 'broadcast'
     }
@@ -244,14 +258,16 @@ def discover_interfaces():
     return mac_to_iface, iface_to_mac, vxid_to_mac
 
 
-def random_macaddr():
+def random_macaddr() -> str:
     b1 = random.randint(0, 255)
     b2 = random.randint(0, 255)
     b3 = random.randint(0, 255)
     return f'02:00:00:{b1:02x}:{b2:02x}:{b3:02x}'
 
 
-def add_address_to_interface(netns, address, netmask, device):
+def add_address_to_interface(
+    netns: str, address: str | None, netmask: int, device: str
+) -> None:
     # Adding an address to an interface can sometimes require waiting briefly
     # to ensure the address appears. This is a wrapper which does all that
     # for you. This used to error if repeated attempts fail, but that's so
@@ -263,7 +279,9 @@ def add_address_to_interface(netns, address, netmask, device):
         'device': device
     })
 
-    def _add_address(netns, address, netmask, device):
+    def _add_address(
+        netns: str, address: str | None, netmask: int, device: str
+    ) -> None:
         if not address:
             raise InvalidAddress(address)
 

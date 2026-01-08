@@ -26,6 +26,7 @@ from shakenfist.namespace import namespace_is_trusted
 from shakenfist.namespace import Namespaces
 from shakenfist.util import access_tokens
 from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util.access_tokens import request_namespace
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -55,7 +56,7 @@ def arg_is_namespace(func):
 def requires_namespace_ownership(func):
     def wrapper(*args, **kwargs):
         ns = kwargs.get('namespace')
-        if not namespace_is_trusted(ns, parse_jwt_identity()[0]):
+        if not namespace_is_trusted(ns, request_namespace()):
             LOG.info('Namespace not found, ownership test in decorator')
             return sf_api.error(404, 'namespace not found')
 
@@ -207,7 +208,7 @@ class AuthNamespacesEndpoint(api_base.Resource):
     def get(self):
         retval = []
         for ns in Namespaces(filters=[], prefilter='active'):
-            if namespace_is_trusted(ns.uuid, parse_jwt_identity()[0]):
+            if namespace_is_trusted(ns.uuid, request_namespace()):
                 retval.append(ns.external_view())
         return retval
 
@@ -483,7 +484,7 @@ class AuthNamespaceTrustsEndpoint(api_base.Resource):
         if not external_namespace:
             return sf_api.error(400, 'no external namespace specified')
 
-        if not namespace_is_trusted(namespace, parse_jwt_identity()[0]):
+        if not namespace_is_trusted(namespace, request_namespace()):
             LOG.with_fields({'namespace': namespace}).info(
                 'Namespace not found, trust test failed')
             return sf_api.error(404, 'namespace not found')
@@ -514,7 +515,7 @@ class AuthNamespaceTrustEndpoint(api_base.Resource):
         if not external_namespace:
             return sf_api.error(400, 'no external namespace specified')
 
-        if not namespace_is_trusted(namespace, parse_jwt_identity()[0]):
+        if not namespace_is_trusted(namespace, request_namespace()):
             LOG.with_fields({'namespace': namespace}).info(
                 'Namespace not found, trust test failed')
             return sf_api.error(404, 'namespace not found')

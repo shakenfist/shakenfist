@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Run this from directory containing the generated gRPC code
-# Requires: pip install grpcio-tools mypy-protobuf
+# *Always* run this script via tox, like this:
+#     tox -egenprotos
 
 # First, regenerate the enum definitions from Python source
 echo "Generating protobuf enums from Python schemas..."

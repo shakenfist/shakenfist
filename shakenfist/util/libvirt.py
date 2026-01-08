@@ -1,14 +1,16 @@
 import importlib
+from types import ModuleType
+from typing import Any, Iterator, Self
 from xml.etree import ElementTree
 
 from shakenfist_utilities import logs  # noreorder
 
 
 LOG, _ = logs.setup(__name__)
-LIBVIRT = None
+LIBVIRT: ModuleType | None = None
 
 
-def get_libvirt():
+def get_libvirt() -> ModuleType:
     global LIBVIRT
 
     if not LIBVIRT:
@@ -17,7 +19,7 @@ def get_libvirt():
     return LIBVIRT
 
 
-def get_cpu_count():
+def get_cpu_count() -> int:
     with LibvirtConnection() as lc:
         present_cpus, _, _ = lc.get_cpu_map()
 
@@ -25,28 +27,28 @@ def get_cpu_count():
 
 
 class LibvirtConnection():
-    def __init__(self):
-        self.libvirt = None
-        self.conn = None
+    def __init__(self) -> None:
+        self.libvirt: ModuleType | None = None
+        self.conn: Any = None
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self.libvirt = get_libvirt()
         self.conn = self.libvirt.open('qemu:///system')
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: Any) -> None:
         if self.conn:
             self.conn.close()
             self.conn = None
 
-    def get_domain_from_sf_uuid(self, u):
+    def get_domain_from_sf_uuid(self, u: str) -> Any:
         try:
             return self.conn.lookupByName(f'sf:{u}')
         except self.libvirt.libvirtError as e:
             LOG.debug(f'SF libvirt domain {u} not found: {e}')
             return None
 
-    def extract_power_state(self, domain):
+    def extract_power_state(self, domain: Any) -> str:
         state, _ = domain.state()
         if state == self.libvirt.VIR_DOMAIN_SHUTOFF:
             return 'off'
@@ -62,7 +64,7 @@ class LibvirtConnection():
         # RUNNING, SHUTDOWN
         return 'on'
 
-    def extract_power_state_pretty(self, domain):
+    def extract_power_state_pretty(self, domain: Any) -> str:
         # We skip the reason code because they don't look super useful. They're
         # in a series of enums with names like VirtDomainCrashedReason as
         # documented at https://libvirt.org/html/libvirt-libvirt-domain.html
@@ -82,10 +84,10 @@ class LibvirtConnection():
         }
         return libvirt_states_to_strings[state]
 
-    def define_xml(self, xml):
+    def define_xml(self, xml: str) -> Any:
         return self.conn.defineXML(xml)
 
-    def get_sf_domains(self):
+    def get_sf_domains(self) -> Iterator[Any]:
         for domain in self.get_all_domains():
             try:
                 if not domain.name().startswith('sf:'):
@@ -95,7 +97,7 @@ class LibvirtConnection():
             except self.libvirt.libvirtError:
                 pass
 
-    def get_all_domains(self):
+    def get_all_domains(self) -> Iterator[Any]:
         # Active VMs have an ID. Active means running in libvirt
         # land.
         for domain_id in self.conn.listDomainsID():
@@ -109,17 +111,17 @@ class LibvirtConnection():
             except self.libvirt.libvirtError:
                 pass
 
-    def get_cpu_map(self):
+    def get_cpu_map(self) -> tuple[int, int, list[bool]]:
         return self.conn.getCPUMap()
 
-    def get_max_vcpus(self):
+    def get_max_vcpus(self) -> int:
         return self.conn.getMaxVcpus(None)
 
-    def get_memory_stats(self):
+    def get_memory_stats(self) -> dict[str, int]:
         return self.conn.getMemoryStats(
             self.libvirt.VIR_NODE_MEMORY_STATS_ALL_CELLS)
 
-    def get_screenshot(self, instance_uuid, dest_path):
+    def get_screenshot(self, instance_uuid: str, dest_path: str) -> None:
         domain = self.get_domain_from_sf_uuid(instance_uuid)
         stream = self.conn.newStream()
 
@@ -134,8 +136,8 @@ class LibvirtConnection():
         stream.finish()
 
 
-def extract_hypervisor_devices(domain):
-    out = {
+def extract_hypervisor_devices(domain: Any) -> dict[str, list[Any]]:
+    out: dict[str, list[Any]] = {
         'disk': [],
         'network': [],
     }
@@ -166,11 +168,11 @@ def extract_hypervisor_devices(domain):
     return out
 
 
-def extract_statistics(domain):
+def extract_statistics(domain: Any) -> dict[str, Any]:
     devices = extract_hypervisor_devices(domain)
     raw_stats = domain.getCPUStats(True)
 
-    out = {
+    out: dict[str, Any] = {
         'cpu usage': {
             'cpu time ns': raw_stats[0]['cpu_time'],
             'system time ns': raw_stats[0]['system_time'],

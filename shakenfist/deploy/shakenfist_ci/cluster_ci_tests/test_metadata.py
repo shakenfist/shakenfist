@@ -1,4 +1,7 @@
+import json
 import random
+
+from testtools import content
 
 from shakenfist_ci import base
 
@@ -13,6 +16,8 @@ class TestArtifactMetadata(base.BaseNamespacedTestCase):
                 'https://sfcbr.shakenfist.com/cgi-bin/uuid.cgi?uniq=%06d'
                 % random.randint(-999999, 999999))
 
+        self.addDetail('img', content.text_content(json.dumps(
+            img, indent=4, sort_keys=True)))
         self.assertEqual({}, self.test_client.get_artifact_metadata(img['uuid']))
         self.test_client.set_artifact_metadata_item(img['uuid'], 'foo', 'bar')
         self.assertEqual(
@@ -33,11 +38,15 @@ class TestBlobMetadata(base.BaseNamespacedTestCase):
         results = self._await_artifacts_ready([img['uuid']])
         img = results[0]
 
+        self.addDetail('img', content.text_content(json.dumps(
+            img, indent=4, sort_keys=True)))
         self.assertIn('blobs', img)
         self.assertEqual(1, len(img['blobs']))
         self.assertIn(1, img['blobs'])
         b = img['blobs'][1]
 
+        self.addDetail('b', content.text_content(json.dumps(
+            b, indent=4, sort_keys=True)))
         self.assertEqual({}, self.test_client.get_blob_metadata(b['uuid']))
         self.test_client.set_blob_metadata_item(b['uuid'], 'foo', 'bar')
         self.assertEqual(
@@ -73,6 +82,8 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        self.addDetail('inst', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst['uuid'])
 
         self.assertEqual({}, self.test_client.get_instance_metadata(inst['uuid']))
@@ -107,8 +118,13 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
             }
         )
 
+        self.addDetail('inst', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst['uuid'])
 
+        metadata = self.test_client.get_instance_metadata(inst['uuid'])
+        self.addDetail('metadata', content.text_content(json.dumps(
+            metadata, indent=4, sort_keys=True)))
         self.assertEqual(
             {
                 'affinity': {
@@ -116,7 +132,7 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
                 },
                 'tags': ['foo', 'bar']
             },
-            self.test_client.get_instance_metadata(inst['uuid']))
+            metadata)
 
 
 class TestInterfaceMetadata(base.BaseNamespacedTestCase):
@@ -146,9 +162,13 @@ class TestInterfaceMetadata(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        self.addDetail('inst', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst['uuid'])
 
         iface = self.test_client.get_instance_interfaces(inst['uuid'])[0]
+        self.addDetail('iface', content.text_content(json.dumps(
+            iface, indent=4, sort_keys=True)))
 
         self.assertEqual({}, self.test_client.get_interface_metadata(iface['uuid']))
         self.test_client.set_interface_metadata_item(iface['uuid'], 'foo', 'bar')
@@ -203,6 +223,8 @@ class TestNodeMetadata(base.BaseNamespacedTestCase):
 
     def test_simple(self):
         n = self.system_client.get_nodes()[0]
+        self.addDetail('n', content.text_content(json.dumps(
+            n, indent=4, sort_keys=True)))
 
         self.assertEqual({}, self.system_client.get_node_metadata(n['name']))
         self.system_client.set_node_metadata_item(n['name'], 'foo', 'bar')

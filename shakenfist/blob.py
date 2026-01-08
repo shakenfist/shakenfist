@@ -6,16 +6,22 @@ import copy
 import hashlib
 import numbers
 import os
+import pathlib
 import random
 import socket
 import time
 import uuid
+from collections.abc import Generator
+from typing import Any
+from typing import Optional
+from typing import Union
 
 import magic
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
 from shakenfist.schema.operations.node_blob_op \
@@ -27,14 +33,14 @@ from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import GiB
+from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
-from shakenfist.exceptions import BlobDeleted
 from shakenfist.exceptions import BlobDependencyMissing
 from shakenfist.exceptions import BlobFetchFailed
 from shakenfist.exceptions import BlobMissing
@@ -43,9 +49,10 @@ from shakenfist.exceptions import BlobSizeCannotChange
 from shakenfist.exceptions import BlobTransferSetupFailed
 from shakenfist.exceptions import LocklessUpdateFailed
 from shakenfist.node import Node
+from shakenfist.util.access_tokens import request_namespace
+from shakenfist.util import callstack as util_callstack
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
-from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import concurrency as util_concurrency
@@ -72,26 +79,26 @@ class Blob(dbo):
         dbo.STATE_DELETED: (),
     }
 
-    def __init__(self, static_values):
+    def __init__(self, static_values: dict[str, Any]) -> None:
         self.upgrade(static_values)
 
         super().__init__(static_values.get('uuid'), static_values.get('version'))
 
-        self.__modified = static_values['modified']
-        self.__fetched_at = static_values['fetched_at']
-        self.__depends_on = static_values.get('depends_on')
+        self.__modified: float = static_values['modified']
+        self.__fetched_at: float = static_values['fetched_at']
+        self.__depends_on: Optional[str] = static_values.get('depends_on')
 
     @classmethod
-    def _upgrade_step_2_to_3(cls, static_values):
+    def _upgrade_step_2_to_3(cls, static_values: dict[str, Any]) -> None:
         static_values['depends_on'] = None
 
     @classmethod
-    def _upgrade_step_3_to_4(cls, static_values):
+    def _upgrade_step_3_to_4(cls, static_values: dict[str, Any]) -> None:
         static_values['modified'] = cls.normalize_timestamp(
                 static_values.get('modified'))
 
     @classmethod
-    def _upgrade_step_4_to_5(cls, static_values):
+    def _upgrade_step_4_to_5(cls, static_values: dict[str, Any]) -> None:
         try:
             cls._upgrade_metadata_to_attribute(static_values['uuid'])
         except KeyError as e:
@@ -101,7 +108,7 @@ class Blob(dbo):
                 'KeyError while upgrading metadata (v4 to v5): %s' % e)
 
     @classmethod
-    def _upgrade_step_5_to_6(cls, static_values):
+    def _upgrade_step_5_to_6(cls, static_values: dict[str, Any]) -> None:
         try:
             etcd.put('attribute/blob', static_values['uuid'], 'retention',
                      {'expires_at': 0})
@@ -112,7 +119,7 @@ class Blob(dbo):
                 'KeyError while upgrading retention (v5 to v6): %s' % e)
 
     @classmethod
-    def _upgrade_step_6_to_7(cls, static_values):
+    def _upgrade_step_6_to_7(cls, static_values: dict[str, Any]) -> None:
         try:
             etcd.put('attribute/blob', static_values['uuid'], 'size',
                      {'size': static_values['size']})
@@ -123,33 +130,42 @@ class Blob(dbo):
                 'KeyError while upgrading retention (v6 to v7): %s' % e)
 
     @classmethod
-    def _upgrade_step_7_to_8(cls, static_values):
+    def _upgrade_step_7_to_8(cls, static_values: dict[str, Any]) -> None:
         # We added the concept of "incomplete locations".
         ...
 
     @classmethod
-    def _upgrade_step_8_to_9(cls, static_values):
+    def _upgrade_step_8_to_9(cls, static_values: dict[str, Any]) -> None:
         # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
 
     @classmethod
-    def normalize_timestamp(cls, timestamp):
+    def normalize_timestamp(
+            cls, timestamp: Union[float, int, str, None]
+    ) -> float:
         # The timestamp is either a number (int or float, assumed to be epoch
         # seconds)...
         if isinstance(timestamp, numbers.Number):
-            return timestamp
+            return float(timestamp)
 
         # Or the timestamp could be empty, at which point we just default to now.
         if timestamp is None:
             return time.time()
 
         # Or a HTTP last-modified timestamp like "Sun, 09 Jan 2022 23:05:25 GMT"
-        # to be converted to epoch seconds.
+        # to be converted to epoch seconds. At this point, timestamp must be a str.
+        assert isinstance(timestamp, str)
         t = time.strptime(timestamp, '%a, %d %b %Y %H:%M:%S %Z')
         return time.mktime(t)
 
     @classmethod
-    def new(cls, blob_uuid, modified, fetched_at, depends_on=None):
+    def new(
+            cls,
+            blob_uuid: str,
+            modified: Union[float, int, str, None],
+            fetched_at: float,
+            depends_on: Optional[str] = None
+    ) -> 'Blob':
         Blob._db_create(
             blob_uuid,
             {
@@ -166,7 +182,7 @@ class Blob(dbo):
         b.state = Blob.STATE_INITIAL
         return b
 
-    def external_view(self):
+    def external_view(self) -> dict[str, Any]:
         # If this is an external view, then mix back in attributes that users
         # expect
         out = self._external_view()
@@ -188,34 +204,43 @@ class Blob(dbo):
         })
 
         # Locations and their incomplete counterparts
-        out['locations'] = self.locations
-        out['locations'].extend(self.incomplete_locations)
+        if request_namespace() == 'system':
+            out['locations'] = self.locations
+            out['locations'].extend(self.incomplete_locations)
 
         # Include information about the blob
         out.update(self.info)
+
+        # Add object references (what references this blob and what this blob
+        # references)
+        refs_to = mariadb.get_references_to(ObjectType.BLOB, self.uuid)
+        refs_from = mariadb.get_references_from(ObjectType.BLOB, self.uuid)
+        out['references_to'] = references_to_grouped_dict(refs_to)
+        out['references_from'] = references_to_grouped_dict(refs_from)
+
         return out
 
     # Static values
     @property
-    def modified(self):
+    def modified(self) -> float:
         return self.__modified
 
     @property
-    def fetched_at(self):
+    def fetched_at(self) -> float:
         return self.__fetched_at
 
     @property
-    def depends_on(self):
+    def depends_on(self) -> Optional[str]:
         return self.__depends_on
 
     # Values routed to attributes
     @property
-    def size(self):
+    def size(self) -> int:
         size = self._db_get_attribute('size', {'size': 0})
         return size['size']
 
     @size.setter
-    def size(self, new_size):
+    def size(self, new_size: int) -> None:
         if new_size < 1:
             raise BlobsMustHaveContent()
 
@@ -225,19 +250,34 @@ class Blob(dbo):
         self._db_set_attribute('size', {'size': new_size})
 
     @property
-    def locations(self):
-        locs = self._db_get_attribute('locations', {'locations': []})
-        return locs['locations']
+    def locations(self) -> list[str]:
+        """Return list of node names where this blob is fully present.
 
-    def add_location(self, location):
-        self._add_item_in_attribute_list('locations', location)
+        This queries the object_references table for BLOB_LOCATION relationships
+        where nodes reference this blob.
+        """
+        refs = mariadb.get_references_to(
+            ObjectType.BLOB, self.uuid, RelationshipType.BLOB_LOCATION)
+        return [str(ref.source_uuid) for ref in refs]
 
-    def remove_location(self, location):
-        self._remove_item_in_attribute_list('locations', location)
+    def add_location(self, location: str) -> None:
+        """Record that this blob is present on the given node."""
+        self.record_usage()
+        mariadb.record_relationship(
+            ObjectType.NODE, location,
+            RelationshipType.BLOB_LOCATION, None,
+            ObjectType.BLOB, self.uuid)
+
+    def remove_location(self, location: str) -> None:
+        """Remove the record that this blob is present on the given node."""
+        mariadb.remove_relationship(
+            ObjectType.NODE, location,
+            RelationshipType.BLOB_LOCATION, None,
+            ObjectType.BLOB, self.uuid)
 
     @property
-    def incomplete_locations(self):
-        out = []
+    def incomplete_locations(self) -> list[str]:
+        out: list[str] = []
         locs = self._db_get_attribute(
             'incomplete_locations', {'locations': {}})
         for loc in locs['locations']:
@@ -245,20 +285,23 @@ class Blob(dbo):
         return out
 
     @property
-    def incomplete_healthy_locations(self):
+    def incomplete_healthy_locations(self) -> list[str]:
         absent_nodes = Nodes([], prefilter='inactive')
-        out = []
+        out: list[str] = []
         for loc in self.incomplete_locations:
             if loc not in absent_nodes:
                 out.append(loc)
         return out
 
-    def _update_incomplete_location_inner(self, percentage, node=None):
+    def _update_incomplete_location_inner(
+            self, percentage: float, node: Optional[str] = None
+    ) -> bool:
         if not node:
             node = config.NODE_NAME
 
         original = etcd.get(f'attribute/{self.object_type}', self.uuid,
                             'incomplete_locations')
+        updated: dict[str, Any]
         if not original:
             updated = {'locations': {}}
         else:
@@ -278,7 +321,9 @@ class Blob(dbo):
 
         return True
 
-    def update_incomplete_location(self, percentage, node=None):
+    def update_incomplete_location(
+            self, percentage: float, node: Optional[str] = None
+    ) -> None:
         percentage = round(percentage, 1)
         attempts = 0
         while attempts < 3:
@@ -291,7 +336,7 @@ class Blob(dbo):
             f'Lockless update of incomplete locations for blob {self.uuid} '
             'failed.')
 
-    def _remove_incomplete_location_inner(self):
+    def _remove_incomplete_location_inner(self) -> bool:
         original = etcd.get(f'attribute/{self.object_type}', self.uuid,
                             'incomplete_locations')
         if not original:
@@ -305,7 +350,7 @@ class Blob(dbo):
 
         return True
 
-    def remove_incomplete_location(self):
+    def remove_incomplete_location(self) -> None:
         attempts = 0
         while attempts < 3:
             if self._remove_incomplete_location_inner():
@@ -318,73 +363,181 @@ class Blob(dbo):
             'failed.')
 
     @property
-    def info(self):
+    def info(self) -> dict[str, Any]:
         return self._db_get_attribute('info')
 
     @property
-    def ref_count(self):
-        return int(self.ref_count_with_age['ref_count'])
+    def ref_count(self) -> int:
+        """Return the number of references to this blob from object_references.
+
+        Node location relationships are excluded from the count because they
+        represent where the blob is stored, not what uses it. Including
+        locations would prevent blobs from ever being considered unused and
+        reaped.
+        """
+        return mariadb.count_references_to(
+            ObjectType.BLOB, self.uuid,
+            exclude_relationships=[RelationshipType.BLOB_LOCATION])
 
     @property
-    def ref_count_with_age(self):
-        count = self._db_get_attribute('ref_count', {
-            'ref_count': 0
-        })
-        if 'update_time' not in count:
-            count['update_time'] = time.time()
-        return count
+    def transcoded(self) -> dict[str, str]:
+        """Return a dict of {style: blob_uuid} for all transcodes of this blob."""
+        refs = mariadb.get_references_from(
+            ObjectType.BLOB, self.uuid, RelationshipType.TRANSCODE)
+        result: dict[str, str] = {}
+        for ref in refs:
+            if ref.relationship_value is not None:
+                result[ref.relationship_value] = str(ref.target_uuid)
+        return result
 
-    @property
-    def transcoded(self):
-        return self._db_get_attribute('transcoded')
+    def add_transcode(self, style: str, blob_uuid: str) -> bool:
+        """Record a transcode relationship from this blob to a transcoded blob.
 
-    def add_transcode(self, style, blob_uuid):
+        Returns True if the transcode was recorded, False if it already exists.
+        """
         self.record_usage()
-        with self.get_lock(op='Update transcoded versions'):
-            transcoded = self.transcoded
-            if style in transcoded:
-                # This is a duplicate transcode
-                return False
+        # Check if this transcode already exists
+        transcoded = self.transcoded
+        if style in transcoded:
+            # This is a duplicate transcode
+            return False
 
-            transcoded[style] = blob_uuid
-            self._db_set_attribute('transcoded', transcoded)
-            return True
+        # Record the relationship in MariaDB
+        mariadb.record_relationship(
+            ObjectType.BLOB, self.uuid,
+            RelationshipType.TRANSCODE, style,
+            ObjectType.BLOB, blob_uuid)
+        return True
 
-    def remove_transcodes(self):
-        with self.get_lock(op='Remove transcoded versions'):
-            self._db_set_attribute('transcoded', {})
+    def remove_transcodes(self) -> None:
+        """Remove all transcode relationships from this blob."""
+        mariadb.remove_all_references_from(
+            ObjectType.BLOB, self.uuid, RelationshipType.TRANSCODE)
+
+    # =========================================================================
+    # Reference management methods
+    # These methods are the preferred way to record relationships to this blob.
+    # They ensure record_usage() is called to prevent premature cleanup.
+    #
+    # Each method is decorated with @restrict_caller to enforce that only the
+    # appropriate modules call them. This provides soft enforcement (warnings)
+    # to catch architectural violations during development.
+    # =========================================================================
+
+    @util_callstack.restrict_caller('shakenfist.instance', 'shakenfist.tests')
+    def add_disk_reference(self, instance_uuid: str, disk_idx: int) -> None:
+        """Record that an instance uses this blob as a disk."""
+        self.record_usage()
+        mariadb.record_relationship(
+            ObjectType.INSTANCE, instance_uuid,
+            RelationshipType.DISK, str(disk_idx),
+            ObjectType.BLOB, self.uuid)
+
+    @util_callstack.restrict_caller('shakenfist.instance', 'shakenfist.tests')
+    def remove_disk_reference(self, instance_uuid: str, disk_idx: int) -> None:
+        """Remove the record that an instance uses this blob as a disk."""
+        mariadb.remove_relationship(
+            ObjectType.INSTANCE, instance_uuid,
+            RelationshipType.DISK, str(disk_idx),
+            ObjectType.BLOB, self.uuid)
+
+    @util_callstack.restrict_caller('shakenfist.instance', 'shakenfist.tests')
+    def add_nvram_template_reference(self, instance_uuid: str) -> None:
+        """Record that an instance uses this blob as an NVRAM template."""
+        self.record_usage()
+        mariadb.record_relationship(
+            ObjectType.INSTANCE, instance_uuid,
+            RelationshipType.NVRAM_TEMPLATE, None,
+            ObjectType.BLOB, self.uuid)
+
+    @util_callstack.restrict_caller('shakenfist.instance', 'shakenfist.tests')
+    def remove_nvram_template_reference(self, instance_uuid: str) -> None:
+        """Remove the record that an instance uses this blob as NVRAM template."""
+        mariadb.remove_relationship(
+            ObjectType.INSTANCE, instance_uuid,
+            RelationshipType.NVRAM_TEMPLATE, None,
+            ObjectType.BLOB, self.uuid)
+
+    @util_callstack.restrict_caller('shakenfist.artifact', 'shakenfist.tests')
+    def add_artifact_index_reference(
+            self, artifact_uuid: str, index: int) -> None:
+        """Record that an artifact references this blob at the given index."""
+        self.record_usage()
+        mariadb.record_relationship(
+            ObjectType.ARTIFACT, artifact_uuid,
+            RelationshipType.ARTIFACT_INDEX, str(index).zfill(12),
+            ObjectType.BLOB, self.uuid)
+
+    @util_callstack.restrict_caller('shakenfist.artifact', 'shakenfist.tests')
+    def remove_artifact_index_reference(
+            self, artifact_uuid: str, index: int) -> None:
+        """Remove the record that an artifact references this blob."""
+        mariadb.remove_relationship(
+            ObjectType.ARTIFACT, artifact_uuid,
+            RelationshipType.ARTIFACT_INDEX, str(index).zfill(12),
+            ObjectType.BLOB, self.uuid)
+
+    @util_callstack.restrict_caller('shakenfist.blob', 'shakenfist.tests')
+    def add_depends_on_reference(self, parent_blob_uuid: str) -> None:
+        """Record that this blob depends on another blob (e.g., snapshot)."""
+        self.record_usage()
+        mariadb.record_relationship(
+            ObjectType.BLOB, self.uuid,
+            RelationshipType.DEPENDS_ON, None,
+            ObjectType.BLOB, parent_blob_uuid)
+
+    @util_callstack.restrict_caller(
+        'shakenfist.daemons.sidechannel', 'shakenfist.tests')
+    def add_agent_output_reference(
+            self, agentop_uuid: str, output_type: str) -> None:
+        """Record that an agent operation produced this blob as output."""
+        self.record_usage()
+        mariadb.record_relationship(
+            ObjectType.AGENTOPERATION, agentop_uuid,
+            RelationshipType.AGENT_OUTPUT, output_type,
+            ObjectType.BLOB, self.uuid)
+
+    @util_callstack.restrict_caller(
+        'shakenfist.operations.agentoperation', 'shakenfist.tests')
+    def remove_agent_output_reference(
+            self, agentop_uuid: str, output_type: str) -> None:
+        """Remove the record that an agent operation produced this blob."""
+        mariadb.remove_relationship(
+            ObjectType.AGENTOPERATION, agentop_uuid,
+            RelationshipType.AGENT_OUTPUT, output_type,
+            ObjectType.BLOB, self.uuid)
 
     @property
-    def last_used(self):
+    def last_used(self) -> Optional[float]:
         last_used = self._db_get_attribute('last_used', {'last_used': None})
         return last_used['last_used']
 
-    def record_usage(self):
+    def record_usage(self) -> None:
         self._db_set_attribute('last_used', {'last_used': time.time()})
 
     @property
-    def expires_at(self):
+    def expires_at(self) -> float:
         retention = self._db_get_attribute('retention', {'expires_at': 0})
         return retention['expires_at']
 
-    def set_lifetime(self, seconds_from_now):
+    def set_lifetime(self, seconds_from_now: float) -> None:
         self._db_set_attribute('retention', {'expires_at': time.time() + seconds_from_now})
 
     # Operations
-    def add_node_location(self):
+    def add_node_location(self) -> None:
         self.add_location(config.NODE_NAME)
 
         n = Node.from_db(config.NODE_NAME)
         n.add_blob(self.uuid)
 
-    def drop_node_location(self, node=config.NODE_NAME):
+    def drop_node_location(self, node: str = config.NODE_NAME) -> None:
         self.remove_location(node)
 
         # Remove from cached node blob list
         n = Node.from_db(node)
         n.remove_blob(self.uuid)
 
-    def observe(self):
+    def observe(self) -> None:
         self.add_node_location()
 
         # Observing a blob can move it from initial to created, but it should not
@@ -406,78 +559,19 @@ class Blob(dbo):
             info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
             self._db_set_attribute('info', info)
 
-    def ref_count_inc(self, baseobject, count=1):
-        with self.get_lock_attr('ref_count', 'Increase reference count'):
-            if self.state.value == self.STATE_DELETED:
-                add_event_multi(
-                    EVENT_TYPE_AUDIT, [baseobject, self],
-                    'attempt to use a deleted blob',
-                    extra={
-                        'blob_uuid': self.uuid,
-                        f'{baseobject.object_type}_uuid': baseobject.uuid
-                    })
-                raise BlobDeleted(self.uuid)
-
-            old_count = self.ref_count
-            new_count = old_count + count
-            self._db_set_attribute('ref_count', {
-                'ref_count': new_count,
-                'update_time': time.time()
-            })
-            self.add_event(
-                EVENT_TYPE_MUTATE, 'incremented reference count',
-                extra={
-                    baseobject.object_type: baseobject.uuid,
-                    'increment': count,
-                    'reference_count': new_count,
-                    'caller': util_callstack.get_caller(offset=-3)
-                    })
-            return new_count
-
-    def ref_count_dec(self, baseobject, count=1):
-        with self.get_lock_attr('ref_count', 'Decrease reference count'):
-            old_count = self.ref_count
-            new_count = old_count - count
-
-            if new_count < 0:
-                new_count = 0
-                self.add_event(
-                    EVENT_TYPE_MUTATE, 'decremented reference count below zero',
-                    extra={
-                        baseobject.object_type: baseobject.uuid,
-                        'decrement': count,
-                        'reference_count': new_count
-                        })
-            else:
-                self.add_event(
-                    EVENT_TYPE_MUTATE, 'decremented reference count',
-                    extra={
-                        baseobject.object_type: baseobject.uuid,
-                        'decrement': count,
-                        'reference_count': new_count
-                        })
-
-            self._db_set_attribute('ref_count', {
-                'ref_count': new_count,
-                'update_time': time.time()
-            })
-            return new_count
-
-    def cascading_delete(self):
+    def cascading_delete(self) -> None:
         self.state = self.STATE_DELETED
 
-        for transcoded_blob_uuid in self.transcoded.values():
-            transcoded_blob = Blob.from_db(transcoded_blob_uuid)
-            if transcoded_blob:
-                transcoded_blob.ref_count_dec(self)
+        # Remove all transcode references from this blob
+        self.remove_transcodes()
 
-        depends_on = self.depends_on
-        if depends_on:
-            dep_blob = Blob.from_db(depends_on)
-            if dep_blob:
-                dep_blob.ref_count_dec(self)
+        # Remove depends_on reference from this blob to its dependency
+        mariadb.remove_all_references_from(
+            ObjectType.BLOB, self.uuid, RelationshipType.DEPENDS_ON)
 
-    def ensure_local(self, instance_object=None, wait_for_other_transfers=True):
+    def ensure_local(
+            self, instance_object: Any = None, wait_for_other_transfers: bool = True
+    ) -> None:
         affected_objects = [self]
         if instance_object:
             affected_objects.append(instance_object)
@@ -561,7 +655,9 @@ class Blob(dbo):
     # This method assumes the caller is holding the 'blob-{self.uuid}-transfer'
     # external lock. Luckily the only caller right now is the one directly
     # above here.
-    def _attempt_transfer(self, affected_objects, partial_path, blob_path):
+    def _attempt_transfer(
+            self, affected_objects: list[Any], partial_path: str, blob_path: str
+    ) -> None:
         add_event_multi(
             EVENT_TYPE_AUDIT, affected_objects, 'attempting transfer')
         with open(partial_path, 'wb') as f:
@@ -689,7 +785,7 @@ class Blob(dbo):
                 f'fetching required blob complete {direction_info}')
             self.observe()
 
-    def request_replication(self, allow_excess=0):
+    def request_replication(self, allow_excess: int = 0) -> None:
         present_nodes = list(Nodes([], prefilter='active'))
         present_nodes_len = len(present_nodes)
         absent_nodes = list(Nodes([], prefilter='inactive'))
@@ -749,7 +845,7 @@ class Blob(dbo):
                     self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
 
-    def register(self, request_checksums=True):
+    def register(self, request_checksums: bool = True) -> None:
         # We don't remove the partial file until we've finished registering the
         # blob to avoid deletion races. Note that this _must_ be a hard link,
         # which is why we don't use util_general.link().
@@ -775,22 +871,22 @@ class Blob(dbo):
         os.unlink(dest_path + '.partial')
 
     @staticmethod
-    def filedir(blob_uuid):
+    def filedir(blob_uuid: Union[str, uuid.UUID]) -> str:
         blob_uuid = str(blob_uuid)
         path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid[0:2])
         os.makedirs(path, exist_ok=True)
         return path
 
     @staticmethod
-    def filepath(blob_uuid):
+    def filepath(blob_uuid: Union[str, uuid.UUID]) -> str:
         blob_uuid = str(blob_uuid)
         return os.path.join(Blob.filedir(blob_uuid), blob_uuid)
 
     @property
-    def checksums(self):
+    def checksums(self) -> dict[str, Any]:
         return self._db_get_attribute('checksums')
 
-    def _remove_corrupt_blob(self):
+    def _remove_corrupt_blob(self) -> None:
         blob_path = Blob.filepath(self.uuid)
         if os.path.exists(blob_path):
             os.unlink(blob_path)
@@ -798,7 +894,7 @@ class Blob(dbo):
             os.unlink(blob_path + '.partial')
         self.drop_node_location(config.NODE_NAME)
 
-    def verify_size(self, partial=False):
+    def verify_size(self, partial: bool = False) -> bool:
         blob_path = Blob.filepath(self.uuid)
         if partial:
             blob_path += '.partial'
@@ -816,7 +912,7 @@ class Blob(dbo):
             return False
         return True
 
-    def verify_checksum(self, hash=None, urgent=True):
+    def verify_checksum(self, hash: Optional[str] = None, urgent: bool = True) -> bool:
         # This method is focussed on sha512 hashes at the moment, but I also
         # want it to be able to do other hash types later -- for example OVA
         # support needs sha1 or sha256, and xxhash is a lot faster. So for now
@@ -881,9 +977,14 @@ class Blob(dbo):
         return True
 
 
-def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
+def snapshot_disk(
+        disk: dict[str, Any],
+        blob_uuid: str,
+        related_object: Any = None,
+        thin: bool = False
+) -> Optional[Blob]:
     if not os.path.exists(disk['path']):
-        return
+        return None
     dest_path = Blob.filepath(blob_uuid)
 
     # Actually make the snapshot
@@ -894,7 +995,6 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
 
     # Check that the dependency (if any) actually exists. This test can fail when
     # the blob used to start an instance has been deleted already.
-    dep_blob = None
     if depends_on:
         dep_blob = Blob.from_db(depends_on)
         if not dep_blob or dep_blob.state.value != Blob.STATE_CREATED:
@@ -905,13 +1005,18 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     # snapshot checksum here, as this makes large snapshots even slower for users.
     # The checksum will "catch up" when the scheduled verification occurs.
     b = Blob.new(blob_uuid, time.time(), time.time(), depends_on=depends_on)
-    if dep_blob:
-        dep_blob.ref_count_inc(b)
+
+    # Record the depends_on reference in the object_references table
+    if depends_on:
+        b.add_depends_on_reference(depends_on)
+
     b.register()
     return b
 
 
-def http_fetch(url, resp, b, affected_objects):
+def http_fetch(
+        url: str, resp: Any, b: Blob, affected_objects: list[Any]
+) -> Blob:
     fetched = 0
 
     if resp.headers.get('Content-Length'):
@@ -924,8 +1029,8 @@ def http_fetch(url, resp, b, affected_objects):
     md5_hash = hashlib.md5()
     sha512_hash = hashlib.sha512()
 
-    percentage = 0
-    next_percentage = 10
+    percentage: float = 0
+    next_percentage: float = 10
     last_event = time.time()
     with open(dest_path + '.partial', 'wb') as f:
         for chunk in resp.iter_content(chunk_size=8192):
@@ -968,7 +1073,7 @@ def http_fetch(url, resp, b, affected_objects):
     return b
 
 
-def from_memory(content):
+def from_memory(content: bytes) -> Blob:
     blob_uuid = str(uuid.uuid4())
     with open(Blob.filepath(blob_uuid), 'wb') as f:
         f.write(content)
@@ -984,7 +1089,7 @@ def from_memory(content):
 class Blobs(dbo_iter):
     base_object = Blob
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[Blob, None, None]:
         for _, static_values in self.get_iterator():
             b = Blob(static_values)
             if not b:
@@ -995,5 +1100,51 @@ class Blobs(dbo_iter):
                 yield out
 
 
-def placement_filter(node, b):
+def placement_filter(node: str, b: Blob) -> bool:
     return node in b.locations
+
+
+def observe_local_blobs() -> int:
+    """Observe all blob files on this node to update BLOB_LOCATION references.
+
+    This function scans the local blob storage directory and calls observe()
+    on each valid blob. This updates:
+    1. The BLOB_LOCATION reference in MariaDB (with last_active timestamp)
+    2. The node.blobs cache in etcd
+
+    This replaces the cluster daemon's periodic cache rebuild, making each
+    node authoritative for its own blob locations.
+
+    Returns:
+        int: The number of blobs observed.
+    """
+
+    blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
+    if not os.path.exists(blob_path):
+        return 0
+
+    observed_count = 0
+    try:
+        p = pathlib.Path(blob_path)
+        for path_entry in p.glob('**/*'):
+            entpath = str(path_entry)
+
+            # Skip version files and partial transfers
+            if entpath.endswith('/_version') or entpath.endswith('.partial'):
+                continue
+
+            if not os.path.isfile(entpath):
+                continue
+
+            blob_uuid = entpath.split('/')[-1]
+            b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
+            if b and b.state.value == Blob.STATE_CREATED:
+                # Calling observe() updates the BLOB_LOCATION reference
+                # (with last_active timestamp) and the node.blobs cache
+                b.observe()
+                observed_count += 1
+
+    except FileNotFoundError:
+        ...
+
+    return observed_count

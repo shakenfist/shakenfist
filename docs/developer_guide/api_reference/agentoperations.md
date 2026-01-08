@@ -66,3 +66,29 @@ agent operations for a given instance, refer to the [instances API documentation
     sf_client = apiclient.Client()
     agentop = sf_client.delete_agent_operation('5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9')
     ```
+
+## Object References
+
+Agent operation API responses include `references_to` and `references_from` fields
+that show the relationships between agent operations and other objects. The
+`references_from` field shows what blobs this agent operation produced (e.g.,
+stdout and stderr output blobs via `agent_output` relationships).
+
+??? example "Example references_from output for an agent operation"
+
+    ```json
+    "references_from": {
+        "agent_output": [
+            {
+                "source_object_type": "agentoperation",
+                "source_uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
+                "relationship": "agent_output",
+                "relationship_value": "stdout",
+                "target_object_type": "blob",
+                "target_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
+    }
+    ```

@@ -60,6 +60,16 @@ service DatabaseService {
   rpc GetDnsMasqs (GetDnsMasqsRequest) returns (GetDnsMasqsReply) {}
   rpc DeleteDnsMasq (DeleteDnsMasqRequest) returns (StatusReply) {}
   rpc UpdateDnsMasq (UpdateDnsMasqRequest) returns (StatusReply) {}
+
+  // Object Reference Operations (MariaDB)
+  rpc RecordRelationship (RecordRelationshipRequest) returns (StatusReply) {}
+  rpc RemoveRelationship (RemoveRelationshipRequest) returns (StatusReply) {}
+  rpc GetReferencesTo (GetReferencesToRequest) returns (GetReferencesReply) {}
+  rpc GetReferencesFrom (GetReferencesFromRequest) returns (GetReferencesReply) {}
+  rpc CountReferencesTo (CountReferencesToRequest) returns (CountReply) {}
+  rpc RemoveAllReferencesFrom (RemoveAllReferencesFromRequest) returns (CountReply) {}
+  rpc UpdateLastActive (UpdateLastActiveRequest) returns (StatusReply) {}
+  rpc GetStaleReferences (GetStaleReferencesRequest) returns (GetReferencesReply) {}
 }
 
 // Generic status reply
@@ -427,4 +437,83 @@ message DeleteDnsMasqRequest {
 
 message UpdateDnsMasqRequest {
   DnsMasqData dnsmasq = 1;
+}
+
+// Object Reference Operations (MariaDB)
+// These operations manage references between objects, replacing the manual
+// ref_count attribute on blobs. Enables queries like "which instances use
+// this blob?" and "what does this instance reference?"
+
+message ObjectReferenceData {
+  ObjectType source_type = 1;      // Type of the source object
+  string source_uuid = 2;          // UUID of the source object
+  RelationshipType relationship = 3;  // Type of relationship
+  string relationship_value = 4;   // Optional value (e.g., disk index)
+  ObjectType target_type = 5;      // Type of the target object
+  string target_uuid = 6;          // UUID of the target object
+  double created = 7;              // Unix timestamp when created
+  double last_active = 8;          // Unix timestamp, updated by cleaner
+}
+
+message RecordRelationshipRequest {
+  ObjectType source_type = 1;
+  string source_uuid = 2;
+  RelationshipType relationship = 3;
+  string relationship_value = 4;   // Empty string for NULL
+  ObjectType target_type = 5;
+  string target_uuid = 6;
+}
+
+message RemoveRelationshipRequest {
+  ObjectType source_type = 1;
+  string source_uuid = 2;
+  RelationshipType relationship = 3;
+  string relationship_value = 4;   // Empty string for NULL
+  ObjectType target_type = 5;
+  string target_uuid = 6;
+}
+
+message GetReferencesToRequest {
+  ObjectType target_type = 1;
+  string target_uuid = 2;
+  optional RelationshipType relationship = 3;
+}
+
+message GetReferencesFromRequest {
+  ObjectType source_type = 1;
+  string source_uuid = 2;
+  optional RelationshipType relationship = 3;
+}
+
+message GetReferencesReply {
+  repeated ObjectReferenceData references = 1;
+}
+
+message CountReferencesToRequest {
+  ObjectType target_type = 1;
+  string target_uuid = 2;
+  repeated RelationshipType exclude_relationships = 3;  // Relationships to exclude from count
+}
+
+message CountReply {
+  int64 count = 1;
+}
+
+message RemoveAllReferencesFromRequest {
+  ObjectType source_type = 1;
+  string source_uuid = 2;
+  RelationshipType relationship = 3;  // Optional: 0 (UNSPECIFIED) means all
+}
+
+message UpdateLastActiveRequest {
+  ObjectType source_type = 1;
+  string source_uuid = 2;
+  RelationshipType relationship = 3;
+  string relationship_value = 4;   // Empty string for NULL
+  ObjectType target_type = 5;
+  string target_uuid = 6;
+}
+
+message GetStaleReferencesRequest {
+  double older_than = 1;  // Unix timestamp - return refs with last_active < this
 }

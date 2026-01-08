@@ -35,7 +35,7 @@ from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
-from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import general as util_general
 
 
@@ -60,7 +60,7 @@ def _read_file(filename, offset, limit=0):
 
 def _read_remote(target, blob_uuid, offset=0, limit=0):
     api_token = get_api_token(
-        f'http://{target}:13000', namespace=parse_jwt_identity()[0])
+        f'http://{target}:13000', namespace=request_namespace())
     url = (f'http://{target}:13000/blobs/{blob_uuid}/'
            f'data?offset={offset}&limit={limit}')
 
@@ -131,7 +131,22 @@ blob_get_example = """{
     },
     "uuid": "578da8b6-eb98-4e10-bb36-e4d4d763d312",
     "version": 6,
-    "virtual size": 32212254720.0
+    "virtual size": 32212254720.0,
+    "references_to": {
+        "disk": [
+            {
+                "source_object_type": "instance",
+                "source_uuid": "0a56ef2c-8331-4ed7-a443-267f53bfb24c",
+                "relationship": "disk",
+                "relationship_value": "0",
+                "target_object_type": "blob",
+                "target_uuid": "578da8b6-eb98-4e10-bb36-e4d4d763d312",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
+    },
+    "references_from": {}
 }"""
 
 
@@ -294,9 +309,11 @@ class BlobChecksumEndpoint(api_base.Resource):
             return cs[algorithm]
 
         # Otherwise, request a hashing of this blob and return None
-        loc = blob_from_db.locations[0]
+        locations = blob_from_db.locations
+        if not locations:
+            return None
         nbo_create_and_enqueue(
-            loc,
+            locations[0],
             blob_from_db.uuid,
             [nbo_tasks.verify_size_and_checksum],
             PRIORITY.user_waiting)

@@ -357,7 +357,7 @@ class SideChannelExecutorJob(SideChannelJob):
         stdout = reply.execute_reply.stdout
         if len(stdout) > 10 * constants.KiB:
             b = blob.from_memory(stdout.encode('utf-8'))
-            b.ref_count_inc(self.agentop)
+            b.add_agent_output_reference(self.agentop.uuid, 'stdout')
             result['stdout_blob'] = str(b.uuid)
         else:
             result['stdout'] = stdout
@@ -365,7 +365,7 @@ class SideChannelExecutorJob(SideChannelJob):
         stderr = reply.execute_reply.stderr
         if len(stderr) > 10 * constants.KiB:
             b = blob.from_memory(stderr.encode('utf-8'))
-            b.ref_count_inc(self.agentop)
+            b.add_agent_output_reference(self.agentop.uuid, 'stderr')
             result['stderr_blob'] = str(b.uuid)
         else:
             result['stderr'] = stderr

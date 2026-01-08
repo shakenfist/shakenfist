@@ -1,3 +1,7 @@
+import json
+
+from testtools import content
+
 from shakenfist_ci import base
 
 
@@ -20,8 +24,10 @@ class TestEvents(base.BaseNamespacedTestCase):
     #     self.assertNotEqual(0, len(self.test_client.get_artifact_events(a['uuid'])))
 
     def test_network_events(self):
-        self.assertNotEqual(
-            0, len(self.test_client.get_network_events(self.net_one['uuid'])))
+        events = self.test_client.get_network_events(self.net_one['uuid'])
+        self.addDetail('events', content.text_content(json.dumps(
+            events, indent=4, sort_keys=True)))
+        self.assertNotEqual(0, len(events))
 
     def test_instance_events(self):
         inst1 = self.test_client.create_instance(
@@ -39,8 +45,13 @@ class TestEvents(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
+        self.addDetail('inst1', content.text_content(json.dumps(
+            inst1, indent=4, sort_keys=True)))
+
         # Wait for the instance agent to report in
         self._await_instance_ready(inst1['uuid'])
 
-        self.assertNotEqual(
-            0, len(self.test_client.get_instance_events(inst1['uuid'])))
+        events = self.test_client.get_instance_events(inst1['uuid'])
+        self.addDetail('events', content.text_content(json.dumps(
+            events, indent=4, sort_keys=True)))
+        self.assertNotEqual(0, len(events))

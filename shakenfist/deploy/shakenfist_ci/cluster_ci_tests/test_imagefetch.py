@@ -1,5 +1,8 @@
+import json
 import subprocess
 import time
+
+from testtools import content
 
 from shakenfist_ci import base
 
@@ -32,6 +35,8 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
         image_urls = []
         for image in self.system_client.get_artifacts():
             image_urls.append(image['source_url'])
+        self.addDetail('image_urls', content.text_content(json.dumps(
+            image_urls, indent=4, sort_keys=True)))
         self.assertIn(url, image_urls)
 
         # And then just lookup the single artifact
@@ -42,6 +47,8 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
+        self.addDetail('img', content.text_content(json.dumps(
+            img, indent=4, sort_keys=True)))
         self.assertEqual('created', img['state'])
 
         # Remove the source image
@@ -56,10 +63,15 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
 
         # Ensure the image isn't in an error state
         img = self.system_client.get_artifact(img['uuid'])
+        self.addDetail('img_after_delete', content.text_content(json.dumps(
+            img, indent=4, sort_keys=True)))
         self.assertEqual('created', img['state'])
 
     def test_disappearing_source_instance(self):
-        for n in self.system_client.get_nodes():
+        nodes = self.system_client.get_nodes()
+        self.addDetail('nodes', content.text_content(json.dumps(
+            nodes, indent=4, sort_keys=True)))
+        for n in nodes:
             if n['is_hypervisor']:
                 break
         n = n['name']
@@ -83,6 +95,8 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None, force_placement=n)
+        self.addDetail('inst1', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
         self._await_instance_ready(inst['uuid'])
 
         # Remove the source image
@@ -103,4 +117,6 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None, force_placement=n)
+        self.addDetail('inst2', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
         self._await_instance_ready(inst['uuid'])

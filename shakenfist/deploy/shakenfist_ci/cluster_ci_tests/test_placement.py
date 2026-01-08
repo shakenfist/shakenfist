@@ -1,4 +1,7 @@
+import json
 import socket
+
+from testtools import content
 
 from shakenfist_ci import base
 from shakenfist_client import apiclient
@@ -13,6 +16,9 @@ class TestPlacement(base.BaseNamespacedTestCase):
         super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
         self._await_networks_ready([self.net['uuid']])
 
     def test_no_such_node(self):
@@ -54,6 +60,9 @@ class TestPlacement(base.BaseNamespacedTestCase):
         except apiclient.ResourceNotFoundException as e:
             self.skipTest('Target node does not exist. %s' % e)
             return
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
 
         self._await_instance_ready(inst['uuid'])
 
@@ -87,6 +96,9 @@ class TestPlacement(base.BaseNamespacedTestCase):
         except apiclient.ResourceNotFoundException as e:
             self.skipTest('Target node does not exist. %s' % e)
             return
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
 
         self._await_instance_ready(inst['uuid'])
 

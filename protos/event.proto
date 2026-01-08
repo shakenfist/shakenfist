@@ -30,7 +30,7 @@ message EventMultiRequest {
   repeated EventObject objects = 1;
   string event_type = 2;
   string fqdn = 3;
-  float duration = 4;
+  optional float duration = 4;
   string message = 5;
   string extra = 6;
   double timestamp = 7;

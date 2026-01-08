@@ -8,6 +8,7 @@
 //
 // Source of truth: schema/object_types.py
 //                  schema/ipam_reservation.py
+//                  schema/relationship_types.py
 
 syntax = "proto3";
 
@@ -59,5 +60,18 @@ enum ReservationType {
   RESERVATION_TYPE_INSTANCE = 6;  // "instance"
   RESERVATION_TYPE_DELETION_HALO = 7;  // "deletion-halo"
   RESERVATION_TYPE_UNKNOWN = 8;  // "unknown"
+}
+
+// RelationshipType enum - object reference relationship types
+// Maps to Python: shakenfist.schema.relationship_types.RelationshipType
+enum RelationshipType {
+  RELATIONSHIP_TYPE_UNSPECIFIED = 0;
+  RELATIONSHIP_TYPE_DISK = 1;  // "disk"
+  RELATIONSHIP_TYPE_NVRAM_TEMPLATE = 2;  // "nvram_template"
+  RELATIONSHIP_TYPE_ARTIFACT_INDEX = 3;  // "artifact_index"
+  RELATIONSHIP_TYPE_DEPENDS_ON = 4;  // "depends_on"
+  RELATIONSHIP_TYPE_TRANSCODE = 5;  // "transcode"
+  RELATIONSHIP_TYPE_AGENT_OUTPUT = 6;  // "agent_output"
+  RELATIONSHIP_TYPE_BLOB_LOCATION = 7;  // "blob_location"
 }
 

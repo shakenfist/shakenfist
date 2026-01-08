@@ -5,6 +5,7 @@ import semver
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
@@ -12,6 +13,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import GiB
 from shakenfist.exceptions import NoSuchDaemon
 from shakenfist.exceptions import NoSuchDaemonState
+from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import general as util_general
 
@@ -180,6 +182,13 @@ class Node(dbo):
         for daemon in self.VALID_DAEMONS:
             retval[f'daemon-{daemon}-state'] = \
                 self.get_daemon_state(daemon).value
+
+        # Add object references (what references this node and what this node
+        # references). Note: Node uuid is actually the FQDN.
+        refs_to = mariadb.get_references_to(ObjectType.NODE, self.uuid)
+        refs_from = mariadb.get_references_from(ObjectType.NODE, self.uuid)
+        retval['references_to'] = references_to_grouped_dict(refs_to)
+        retval['references_from'] = references_to_grouped_dict(refs_from)
 
         return retval
 

@@ -26,6 +26,7 @@ from shakenfist import blob
 from shakenfist import constants
 from shakenfist.constants import get_object_class
 from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.operations.node_inst_op \
     import create_and_enqueue as nio_create_and_enqueue
@@ -53,6 +54,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
+from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.operations.baseoperation import BaseClusterOperation as bco
 from shakenfist.util import exceptions as util_exceptions
@@ -447,6 +449,13 @@ class Instance(dbowo):
             if aop:
                 i['agent_operations_queue'].append(aop.external_view())
 
+        # Add object references (what references this instance and what this
+        # instance references)
+        refs_to = mariadb.get_references_to(ObjectType.INSTANCE, self.uuid)
+        refs_from = mariadb.get_references_from(ObjectType.INSTANCE, self.uuid)
+        i['references_to'] = references_to_grouped_dict(refs_to)
+        i['references_from'] = references_to_grouped_dict(refs_from)
+
         return i
 
     # Static values
@@ -626,14 +635,6 @@ class Instance(dbowo):
             self._db_set_attribute('agent_attributes', db_data)
 
     @property
-    def blob_references(self):
-        return self._db_get_attribute('blob_references')
-
-    @blob_references.setter
-    def blob_references(self, blob_refs):
-        self._db_set_attribute('blob_references', blob_refs)
-
-    @property
     def kvm_pid(self):
         return self._db_get_attribute('kvm_pid').get('pid')
 
@@ -651,7 +652,6 @@ class Instance(dbowo):
 
     # Implementation
     def _initialize_block_devices(self):
-        blob_refs = defaultdict(int)
         bus = _get_defaulted_disk_bus(self.disk_spec[0])
         root_device = _get_disk_device(bus, 0)
         config_device = _get_disk_device(bus, 1)
@@ -676,8 +676,6 @@ class Instance(dbowo):
             ],
             'extracommands': []
         }
-        if blob_uuid:
-            blob_refs[blob_uuid] += 1
 
         i = 1
         if self.configdrive == 'openstack-disk':
@@ -713,8 +711,6 @@ class Instance(dbowo):
                 'snapshot_ignores': False,
                 'cache_mode': constants.DISK_CACHE_MODE
             })
-            if blob_uuid:
-                blob_refs[blob_uuid] += 1
 
             i += 1
 
@@ -731,16 +727,23 @@ class Instance(dbowo):
                 ])
 
         nvram_template = self.nvram_template
-        if nvram_template:
-            blob_refs[nvram_template] += 1
 
         block_devices['finalized'] = False
 
-        # Increment blob references
-        self.blob_references = dict(blob_refs)
-        for blob_uuid in blob_refs:
-            b = blob.Blob.from_db(blob_uuid)
-            b.ref_count_inc(self, blob_refs[blob_uuid])
+        # Record blob references in the object_references table
+        # Each disk gets its own reference with the disk index as the value
+        for disk_idx, disk in enumerate(self.disk_spec):
+            disk_blob_uuid = disk.get('blob_uuid')
+            if disk_blob_uuid:
+                disk_blob = blob.Blob.from_db(disk_blob_uuid)
+                if disk_blob:
+                    disk_blob.add_disk_reference(self.uuid, disk_idx)
+
+        # Record nvram_template reference if present
+        if nvram_template:
+            nvram_blob = blob.Blob.from_db(nvram_template)
+            if nvram_blob:
+                nvram_blob.add_nvram_template_reference(self.uuid)
 
         return block_devices
 
@@ -865,12 +868,8 @@ class Instance(dbowo):
                     f'instance delete disks {self}', e)
 
     def _delete_globally(self):
-        blob_refs = self.blob_references
-        for blob_uuid in blob_refs:
-            b = blob.Blob.from_db(blob_uuid)
-            if b:
-                b.ref_count_dec(self, blob_refs[blob_uuid])
-        self.blob_references = {}
+        # Remove all blob references from this instance
+        mariadb.remove_all_references_from(ObjectType.INSTANCE, self.uuid)
 
         self.deallocate_instance_ports()
 

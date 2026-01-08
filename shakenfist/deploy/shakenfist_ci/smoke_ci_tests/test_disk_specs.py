@@ -1,3 +1,7 @@
+import json
+
+from testtools import content
+
 from shakenfist_ci import base
 
 
@@ -16,11 +20,17 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
 
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
 
         results = self._await_command(inst['uuid'], 'df -h')
+        self.addDetail(
+            'results',
+            content.text_content(json.dumps(results, indent=4, sort_keys=True)))
         self.assertEqual(0, results['return-code'])
         self.assertEqual('', results['stderr'])
         self.assertTrue('vda' in results['stdout'])

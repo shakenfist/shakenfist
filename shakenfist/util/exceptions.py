@@ -1,4 +1,3 @@
-
 import fcntl
 import hashlib
 import json
@@ -7,6 +6,7 @@ import sys
 import threading
 import time
 import traceback
+from types import TracebackType
 
 from shakenfist_utilities import logs  # noreorder
 
@@ -14,7 +14,7 @@ from shakenfist_utilities import logs  # noreorder
 LOG, _ = logs.setup(__name__)
 
 
-def ignore_exception(processname, e):
+def ignore_exception(processname: str, e: BaseException) -> None:
     msg = f'[Exception] Ignored error in {processname}: {e}'
     exc_type, exc_value, exc_tb = sys.exc_info()
     if exc_tb:
@@ -24,7 +24,11 @@ def ignore_exception(processname, e):
     LOG.error(msg)
 
 
-def record_exception(exc_type, exc_value, exc_tb):
+def record_exception(
+    exc_type: type[BaseException] | None,
+    exc_value: BaseException | None,
+    exc_tb: TracebackType | None
+) -> None:
     traceback_str = '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
 
     h = hashlib.sha256(traceback_str.encode()).hexdigest()[-8:]
@@ -69,16 +73,20 @@ def record_exception(exc_type, exc_value, exc_tb):
 _original_excepthook = sys.excepthook
 
 
-def _tracking_excepthook(exc_type, exc_value, exc_tb):
+def _tracking_excepthook(
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    exc_tb: TracebackType | None
+) -> None:
     record_exception(exc_type, exc_value, exc_tb)
     _original_excepthook(exc_type, exc_value, exc_tb)
 
 
-def _thread_excepthook(args):
+def _thread_excepthook(args: threading.ExceptHookArgs) -> None:
     record_exception(args.exc_type, args.exc_value, args.exc_traceback)
 
 
-def install_exception_tracking():
+def install_exception_tracking() -> None:
     sys.excepthook = _tracking_excepthook
     threading.excepthook = _thread_excepthook
     LOG.info('Installed exception tracking')

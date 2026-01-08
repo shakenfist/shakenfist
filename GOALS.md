@@ -3,9 +3,11 @@
 ## Currently under way
 
 * Convert from etcd to mariadb for persistent storage to take advantage of secondary indices
+* NEXT: finish converting blob's incomplete locations and the transfer tracking to mariadb -- this work was skipped when doing blob references because it was getting too big.
 * Add mypy type hints
 * Use shakenfist.schema for all data storage requiring a schema -- etcd while it lasts, generation of mariadb schemas, REST API outputs
 * REST API input schema validation
+* Use the schedule library, not manual timer loops
 
 ## Partial, but not currently being progressed
 
@@ -38,3 +40,9 @@
 * Convert the iptables rule generation we use for virtual networks to the more modern nftables. nftables also has a stable JSON API and python bindings (`nftables` on pypi), so this should clean up a fair bit of command line generation code.
 * Provide network traffic flow exporters for analysis by operators.
 * Drop generic methods on the database service which mimic etcd calls -- `get`, `put`, etc. Instead the database service should own all of the business logic around accessing the database tier, and calls to the database service should in the form of coherent requests -- list all uploads on this node for example.
+* Stop converting UUIDs to strings all the time.
+
+## Wider structural things
+
+* I think having code for a given object type spread out across the various daemons was a mistake. So for example, a Blob should be implemented in blob.py, and as much as is possible all object lifecycle management code should _also_ be in blob.py. If the cleaner daemon on each node needs to do a thing, then it should call into a method in blob.py to do that thing. This way, the implementation for a given object type is all together, and its easier to reason about the behaviour of that object. This is a transition which has not occurred, although some small steps have been made in that direction.
+* If all of an object's implementation are going to live together -- then should there be a standard interface for lifecycle tasks for objects? Should the cleaner daemon in the example above just be calling _all_ `local_maintenance()` routines on _all_ object types regularly? Perhaps the interface could let you specify the frequency for the call if you were keen. This would mean adding a new object type to the cluster would be relatively trivial to do. It would also mean we could have "plugin" object types later if we wanted which might be cool.

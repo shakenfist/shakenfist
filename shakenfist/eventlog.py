@@ -6,10 +6,16 @@ import pathlib
 import sqlite3
 import threading
 import time
+import uuid
+from typing import Any
+from typing import Generator
+from typing import Optional
+from typing import Union
 
 import flask
 import grpc
 from shakenfist_utilities import logs  # noreorder
+from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import constants
 from shakenfist import etcd
@@ -38,12 +44,12 @@ local.sf_force_event_dlq = False
 # Module-level state for tracking eventlog service availability. When the service
 # is unavailable, we skip gRPC attempts and go directly to the dead letter queue
 # for a cooldown period to avoid slow retries on every event.
-_eventlog_unavailable_until = 0
+_eventlog_unavailable_until: float = 0
 _eventlog_unavailable_lock = threading.Lock()
 EVENTLOG_UNAVAILABLE_COOLDOWN = 60  # seconds
 
 
-def set_force_event_dlq(value):
+def set_force_event_dlq(value: bool) -> None:
     """Force events to go directly to the dead letter queue (etcd).
 
     This is used during daemon startup when the eventlog daemon may not be
@@ -52,19 +58,19 @@ def set_force_event_dlq(value):
     local.sf_force_event_dlq = value
 
 
-def get_force_event_dlq():
+def get_force_event_dlq() -> bool:
     """Check if events should be forced to the dead letter queue."""
     return getattr(local, 'sf_force_event_dlq', False)
 
 
-def _mark_eventlog_unavailable():
+def _mark_eventlog_unavailable() -> None:
     """Mark the eventlog service as unavailable for a cooldown period."""
     global _eventlog_unavailable_until
     with _eventlog_unavailable_lock:
         _eventlog_unavailable_until = time.time() + EVENTLOG_UNAVAILABLE_COOLDOWN
 
 
-def _is_eventlog_available():
+def _is_eventlog_available() -> bool:
     """Check if the eventlog service should be considered available.
 
     Returns True if we should try gRPC, False if we should skip to DLQ.
@@ -75,7 +81,7 @@ def _is_eventlog_available():
         return True
 
 
-def get_eventlog_client():
+def get_eventlog_client() -> grpc.Channel:
     c = getattr(local, 'sf_eventlog_client', None)
     if c:
         # Ensure the channel is ready
@@ -101,11 +107,15 @@ def get_eventlog_client():
 
 
 def add_event(
-        event_type, object_type, object_uuid, message, duration=None,
-        extra=None, suppress_event_logging=False, log_as_error=False):
-    if not object_type or not object_uuid:
-        return
-
+        event_type: str,
+        object_type: str,
+        object_uuid: Union[str, uuid.UUID],
+        message: str,
+        duration: Optional[float] = None,
+        extra: Optional[dict[str, Any]] = None,
+        suppress_event_logging: bool = False,
+        log_as_error: bool = False
+) -> None:
     add_event_multi(
         event_type, [(object_type, object_uuid)], message, duration=duration,
         extra=extra, suppress_event_logging=suppress_event_logging,
@@ -113,9 +123,18 @@ def add_event(
 
 
 def _add_event_multi_inner(
-        event_type, log, timestamp, simpler_objects, message, duration=None,
-        extra=None):
+        event_type: str,
+        log: Any,
+        timestamp: float,
+        simpler_objects: list[tuple[str, Union[str, uuid.UUID]]],
+        message: str,
+        duration: Optional[float] = None,
+        extra: Optional[dict[str, Any]] = None,
+        correlation_id: Optional[str] = None
+) -> None:
     # Attempt to send with the newer EventMultiRequest
+    # NOTE: correlation_id is not yet supported via gRPC - it will be written
+    # directly to sqlite when the eventlog daemon processes the request.
     try:
         channel = get_eventlog_client()
         stub = event_pb2_grpc.EventServiceStub(channel)
@@ -146,7 +165,7 @@ def _add_event_multi_inner(
         if response.ack:
             return
 
-    except grpc._channel._InactiveRpcError as e:
+    except grpc.RpcError as e:
         if e.code().name == 'UNAVAILABLE':
             log.debug('Server unavailable')
 
@@ -161,8 +180,15 @@ def _add_event_multi_inner(
 
 
 def _add_event_dlq_inner(
-        event_type, log, timestamp, simpler_objects, message, duration=None,
-        extra=None):
+        event_type: str,
+        log: Any,
+        timestamp: float,
+        simpler_objects: list[tuple[str, Union[str, uuid.UUID]]],
+        message: str,
+        duration: Optional[float] = None,
+        extra: Optional[dict[str, Any]] = None,
+        correlation_id: Optional[str] = None
+) -> None:
     # We use the old eventlog mechanism as a queueing system to get the logs
     # to the eventlog node.
     for object_type, object_uuid in simpler_objects:
@@ -176,13 +202,20 @@ def _add_event_dlq_inner(
                 'fqdn': config.NODE_NAME,
                 'duration': duration,
                 'message': message,
-                'extra': extra
+                'extra': extra,
+                'correlation_id': correlation_id
             })
 
 
 def add_event_multi(
-        event_type, objects, message, duration=None, extra=None,
-        suppress_event_logging=False, log_as_error=False):
+        event_type: str,
+        objects: list[Any],
+        message: str,
+        duration: Optional[float] = None,
+        extra: Optional[dict[str, Any]] = None,
+        suppress_event_logging: bool = False,
+        log_as_error: bool = False
+) -> None:
     # Queue an event in etcd to get shuffled over to the long term data store
     timestamp = time.time()
 
@@ -206,6 +239,11 @@ def add_event_multi(
         extra = {}
     else:
         extra = copy.deepcopy(extra)
+
+    # Add correlation_id for multi-object events to link them during debugging
+    correlation_id = None
+    if len(simpler_objects) > 1:
+        correlation_id = sf_random.random_id()
 
     # If this event was created in the context of a request from our API, then
     # we should record the request id that caused this event.
@@ -257,7 +295,7 @@ def add_event_multi(
         try:
             _add_event_multi_inner(
                 event_type, log, timestamp, simpler_objects, message,
-                duration=duration, extra=extra)
+                duration=duration, extra=extra, correlation_id=correlation_id)
             return
         except grpc.RpcError as e:
             log.info('Failed to send event with gRPC, marking eventlog service '
@@ -268,10 +306,10 @@ def add_event_multi(
     # And then the dead letter queue for the remainders
     _add_event_dlq_inner(
         event_type, log, timestamp, simpler_objects, message,
-        duration=duration, extra=extra)
+        duration=duration, extra=extra, correlation_id=correlation_id)
 
 
-def upgrade_data_store():
+def upgrade_data_store() -> None:
     # Upgrades for the actual underlying data store
     version_path = os.path.join(config.STORAGE_PATH, 'events', '_version')
     if os.path.exists(version_path):
@@ -349,14 +387,14 @@ def upgrade_data_store():
                  % (time.time() - start_time))
 
 
-def _shard_db_path(objtype, objuuid):
+def _shard_db_path(objtype: str, objuuid: str) -> str:
     objuuid_str = str(objuuid)
     path = os.path.join(config.STORAGE_PATH, 'events', objtype, objuuid_str[0:2])
     os.makedirs(path, exist_ok=True)
     return path
 
 
-def _timestamp_to_year_month(timestamp):
+def _timestamp_to_year_month(timestamp: float) -> tuple[int, int]:
     dt = datetime.datetime.fromtimestamp(timestamp)
     return dt.year, dt.month
 
@@ -367,29 +405,45 @@ class EventLog:
     # database sizes manageable, and provide a form of simple log rotation.
     # Locking for a given object is handled at this level, as well as handling
     # corruption of a single chunk.
-    def __init__(self, objtype, objuuid):
+    def __init__(self, objtype: str, objuuid: str) -> None:
         self.objtype = objtype
         self.objuuid = objuuid
         self.log = LOG.with_fields({self.objtype: self.objuuid})
         self.dbdir = _shard_db_path(self.objtype, self.objuuid)
 
-        self.write_elc_cache = {}
+        self.write_elc_cache: dict[tuple[int, int], 'EventLogChunk'] = {}
 
-    def __enter__(self):
+    def __enter__(self) -> 'EventLog':
         return self
 
-    def __exit__(self, *_args):
+    def __exit__(self, *_args: Any) -> None:
         for (year, month) in self.write_elc_cache:
             self.write_elc_cache[(year, month)].close()
 
-    def write_event(self, event_type, timestamp, fqdn, duration, message,
-                    extra=None, correlation_id=None):
+    def write_event(
+            self,
+            event_type: str,
+            timestamp: float,
+            fqdn: str,
+            duration: float,
+            message: str,
+            extra: Optional[dict[str, Any]] = None,
+            correlation_id: Optional[str] = None
+    ) -> Optional[bool]:
         return self._write_event_inner(
             event_type, timestamp, fqdn, duration, message, extra=extra,
             correlation_id=correlation_id)
 
-    def _write_event_inner(self, event_type, timestamp, fqdn, duration, message,
-                           extra=None, correlation_id=None):
+    def _write_event_inner(
+            self,
+            event_type: str,
+            timestamp: float,
+            fqdn: str,
+            duration: float,
+            message: str,
+            extra: Optional[dict[str, Any]] = None,
+            correlation_id: Optional[str] = None
+    ) -> Optional[bool]:
         year, month = _timestamp_to_year_month(timestamp)
         if (year, month) in self.write_elc_cache:
             elc = self.write_elc_cache[(year, month)]
@@ -419,38 +473,47 @@ class EventLog:
                 try:
                     elc.write_event(event_type, timestamp, fqdn, duration, message,
                                     extra=extra)
+                    return True
                 except sqlite3.DatabaseError:
                     return False
 
-    def _get_all_chunks(self):
+    def _get_all_chunks(self) -> Generator[tuple[int, int], None, None]:
         p = pathlib.Path(self.dbdir)
-        yearmonths = []
+        yearmonths: list[str] = []
         for ent in p.glob('%s*' % self.objuuid):
-            ent = str(ent)
-            if ent.endswith('.lock'):
+            entpath = str(ent)
+            if entpath.endswith('.lock'):
                 continue
-            if ent.endswith('.corrupt'):
+            if entpath.endswith('.corrupt'):
                 continue
 
             try:
-                _, yearmonth = ent.split('/')[-1].split('.')
+                _, yearmonth = entpath.split('/')[-1].split('.')
                 if '-' in yearmonth:
                     # Entries like -journal, -wal, -shm that internals of sqlite
                     continue
                 yearmonths.append(yearmonth)
             except ValueError:
-                self.log.error('Could not parse yearmonth from chunk %s' % ent)
+                self.log.error('Could not parse yearmonth from chunk %s' % entpath)
 
         for yearmonth in sorted(yearmonths, reverse=True):
             year = int(yearmonth[0:4])
             month = int(yearmonth[4:])
             yield year, month
 
-    def read_events(self, limit=100, event_type=None):
+    def read_events(
+            self,
+            limit: int = 100,
+            event_type: Optional[str] = None
+    ) -> Generator[dict[str, Any], None, None]:
         yield from self._read_events_inner(limit=limit, event_type=event_type)
 
     # Use a negative limit to read everything
-    def _read_events_inner(self, limit=100, event_type=None):
+    def _read_events_inner(
+            self,
+            limit: int = 100,
+            event_type: Optional[str] = None
+    ) -> Generator[dict[str, Any], None, None]:
         count = 0
 
         for year, month in self._get_all_chunks():
@@ -471,16 +534,16 @@ class EventLog:
                 }).error('Chunk corrupt on read, moving aside: %s.' % e)
                 os.rename(elc.dbpath, elc.dbpath + '.corrupt')
 
-    def delete(self):
+    def delete(self) -> None:
         self._delete_inner()
 
-    def _delete_inner(self):
+    def _delete_inner(self) -> None:
         for year, month in self._get_all_chunks():
             elc = EventLogChunk(self.objtype, self.objuuid, year, month)
             elc.delete()
         self.log.info('Removed event log')
 
-    def prune_old_events(self, before_timestamp, event_type):
+    def prune_old_events(self, before_timestamp: float, event_type: str) -> int:
         removed = 0
 
         for year, month in self._get_all_chunks():
@@ -536,12 +599,12 @@ class EventLogChunk:
     # calendar month. Note that locking is done at the EventLog level, not the
     # EventLogChunk level to reduce the number of lock files we are storing
     # in the filesystem.
-    def __init__(self, objtype, objuuid, year, month):
+    def __init__(self, objtype: str, objuuid: str, year: int, month: int) -> None:
         self.objtype = objtype
         self.objuuid = objuuid
         self.chunk = '%04d%02d' % (year, month)
 
-        self.log = LOG.with_fields({
+        self.log: Any = LOG.with_fields({
             self.objtype: self.objuuid,
             'chunk': self.chunk
             })
@@ -549,17 +612,19 @@ class EventLogChunk:
         self.dbdir = _shard_db_path(self.objtype, self.objuuid)
         self.dbpath = os.path.join(self.dbdir, f'{self.objuuid}.{self.chunk}')
         self.bootstrapped = False
+        self.con: Optional[sqlite3.Connection] = None
 
         self.lock = util_concurrency.NodeLock(
             f'{self.objtype}-{self.objuuid}-events-{self.chunk}')
 
-    def _create_version_table(self, cur):
+    def _create_version_table(self, cur: sqlite3.Cursor) -> bool:
         # Check if we already have a version table with data
         cur.execute("SELECT count(name) FROM sqlite_master WHERE "
                     "type='table' AND name='version'")
         if cur.fetchone()['count(name)'] == 0:
             # We do not have a version table, skip to the latest version
             try:
+                assert self.con is not None
                 for statement in CREATE_EVENT_TABLE:
                     self.con.execute(statement)
                 self.con.execute(CREATE_VERSION_TABLE)
@@ -576,7 +641,7 @@ class EventLogChunk:
 
         return True
 
-    def _bootstrap(self):
+    def _bootstrap(self) -> None:
         sqlite_ver = sqlite3.sqlite_version_info
         os.makedirs(self.dbdir, exist_ok=True)
         if not os.path.exists(self.dbpath):
@@ -622,7 +687,7 @@ class EventLogChunk:
                 self.con.execute(
                     'DELETE FROM events WHERE timestamp < %d AND '
                     'message = "Updated node resources"'
-                    % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
+                    % (time.time() - config.MAX_RESOURCES_EVENT_AGE))
 
             self.con.execute(
                 'INSERT INTO events(timestamp, message) '
@@ -636,7 +701,7 @@ class EventLogChunk:
                 self.con.execute(
                     'DELETE FROM events WHERE timestamp < %d AND '
                     'message = "Updated node resources and package versions";'
-                    % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
+                    % (time.time() - config.MAX_RESOURCES_EVENT_AGE))
 
             self.con.execute(
                 'INSERT INTO events(timestamp, message) '
@@ -723,22 +788,39 @@ class EventLogChunk:
                     'VALUES ("audit", %f, "Compacted database")'
                     % time.time())
 
-    def close(self):
-        if self.bootstrapped:
+    def close(self) -> None:
+        if self.bootstrapped and self.con is not None:
             self.con.close()
 
-    def write_event(self, event_type, timestamp, fqdn, duration, message,
-                    extra=None, correlation_id=None):
+    def write_event(
+            self,
+            event_type: str,
+            timestamp: float,
+            fqdn: str,
+            duration: float,
+            message: str,
+            extra: Optional[dict[str, Any]] = None,
+            correlation_id: Optional[str] = None
+    ) -> None:
         with self.lock:
             self._write_event_inner(
                 event_type, timestamp, fqdn, duration, message, extra=extra,
                 correlation_id=correlation_id)
 
-    def _write_event_inner(self, event_type, timestamp, fqdn, duration, message,
-                           extra=None, correlation_id=None):
+    def _write_event_inner(
+            self,
+            event_type: str,
+            timestamp: float,
+            fqdn: str,
+            duration: float,
+            message: str,
+            extra: Optional[dict[str, Any]] = None,
+            correlation_id: Optional[str] = None
+    ) -> None:
         if not self.bootstrapped:
             self._bootstrap()
 
+        assert self.con is not None
         self.con.execute(
             'INSERT INTO events(type, timestamp, fqdn, duration, message, '
             'extra, correlation_id) '
@@ -747,7 +829,11 @@ class EventLogChunk:
              util_json.json_dump(extra), correlation_id))
         self.con.commit()
 
-    def read_events(self, limit=100, event_type=None):
+    def read_events(
+            self,
+            limit: int = 100,
+            event_type: Optional[str] = None
+    ) -> Generator[dict[str, Any], None, None]:
         with self.lock:
             if not self.bootstrapped:
                 self._bootstrap()
@@ -759,6 +845,7 @@ class EventLogChunk:
                 sql += 'WHERE type = "%s" ' % event_type
             sql += 'ORDER BY TIMESTAMP DESC LIMIT %d' % limit
 
+            assert self.con is not None
             cur = self.con.cursor()
             cur.execute(sql)
             for row in cur.fetchall():
@@ -770,24 +857,24 @@ class EventLogChunk:
                         pass
                 yield out
 
-    def count_events(self):
+    def count_events(self) -> int:
         with self.lock:
             if not self.bootstrapped:
                 self._bootstrap()
 
+            assert self.con is not None
             cur = self.con.cursor()
             cur.execute('SELECT COUNT(*) FROM events')
-            return cur.fetchone()[0]
+            count: int = cur.fetchone()[0]
+            return count
 
-    def delete(self):
+    def delete(self) -> None:
         self.close()
         if os.path.exists(self.dbpath):
             os.unlink(self.dbpath)
-        if os.path.exist(self.lock.path):
-            os.unlink(self.lock.path)
         self.log.info('Removed event log chunk')
 
-    def prune_old_events(self, before_timestamp, event_type):
+    def prune_old_events(self, before_timestamp: float, event_type: str) -> int:
         with self.lock:
             if not self.bootstrapped:
                 self._bootstrap()
@@ -795,11 +882,12 @@ class EventLogChunk:
             sql = ('DELETE FROM EVENTS WHERE timestamp < %s AND TYPE="%s"'
                    % (before_timestamp, event_type))
 
+            assert self.con is not None
             cur = self.con.cursor()
             cur.execute(sql)
 
             cur.execute('SELECT CHANGES()')
-            changes = cur.fetchone()[0]
+            changes: int = cur.fetchone()[0]
             if changes > 0:
                 self.log.with_fields({
                     'before_timestamp': before_timestamp,

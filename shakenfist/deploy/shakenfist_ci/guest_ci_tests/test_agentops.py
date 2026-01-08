@@ -3,6 +3,7 @@ import os
 import time
 
 from shakenfist_client import apiclient
+from testtools import content
 
 from shakenfist_ci import base
 
@@ -17,6 +18,10 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self.net_one = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace,
             provide_dns=True)
+        self.addDetail(
+            'net_one',
+            content.text_content(json.dumps(self.net_one, indent=4,
+                                            sort_keys=True)))
         self._await_networks_ready([self.net_one['uuid']])
 
     def test_instance_execute_small(self):
@@ -167,6 +172,26 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+
+        # Create a blob to use for the test by uploading a file
+        upl = self.test_client.create_upload()
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        with open('%s/files/fibonacci.py' % test_dir, 'rb') as f:
+            self.test_client.send_upload_file(upl['uuid'], f)
+        artifact = self.test_client.upload_artifact(
+            'test-blob', upl['uuid'], artifact_type='other')
+        blob_uuid = artifact['blob_uuid']
+
+        # Wait for the blob's sha512 checksum to be calculated
+        start_time = time.time()
+        cluster_hash = self.test_client.get_blob_hash(blob_uuid, 'sha512')
+        while not cluster_hash:
+            if time.time() - start_time > 60:
+                self.fail(
+                    f'Checksum for blob {blob_uuid} not available after 60 '
+                    'seconds')
+            time.sleep(5)
+            cluster_hash = self.test_client.get_blob_hash(blob_uuid, 'sha512')
 
         # Wait for the instance agent to report in
         self._await_instance_ready(inst['uuid'])

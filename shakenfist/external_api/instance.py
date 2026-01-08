@@ -65,7 +65,7 @@ from shakenfist.external_api import util as api_util
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
-from shakenfist.util.access_tokens import parse_jwt_identity
+from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import general as util_general
 
 
@@ -122,6 +122,21 @@ instance_get_example = """{
         "memory": 16384,
         "model": "cirrus",
         "vdi": "spice"
+    },
+    "references_to": {},
+    "references_from": {
+        "disk": [
+            {
+                "source_object_type": "instance",
+                "source_uuid": "d51aa352-368c-484c-9e4c-4542927b4277",
+                "relationship": "disk",
+                "relationship_value": "0",
+                "target_object_type": "blob",
+                "target_uuid": "5117f778-b214-4184-8358-f2c7376b76db",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
     }
 }"""
 
@@ -183,6 +198,21 @@ instance_get_example_deleted = """{
         "memory": 16384,
         "model": "cirrus",
         "vdi": "spice"
+    },
+    "references_to": {},
+    "references_from": {
+        "disk": [
+            {
+                "source_object_type": "instance",
+                "source_uuid": "d51aa352-368c-484c-9e4c-4542927b4277",
+                "relationship": "disk",
+                "relationship_value": "0",
+                "target_object_type": "blob",
+                "target_uuid": "5117f778-b214-4184-8358-f2c7376b76db",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
     }
 }"""
 
@@ -250,7 +280,7 @@ def _artifact_safety_checks(a, instance_uuid=None):
         return sf_api.error(
             404, 'artifact not ready (state=%s)' % a.state.value)
 
-    if namespace_is_trusted(a.namespace, parse_jwt_identity()[0]):
+    if namespace_is_trusted(a.namespace, request_namespace()):
         return
     if a.shared:
         return
@@ -272,7 +302,7 @@ def _netdesc_safety_checks(netdesc, namespace):
     # if not found)
     try:
         n = sfnet.Network.from_db_by_ref(netdesc['network_uuid'],
-                                         parse_jwt_identity()[0])
+                                         request_namespace())
     except exceptions.MultipleObjects as e:
         return sf_api.error(400, str(e), suppress_traceback=True)
 
@@ -403,7 +433,7 @@ class InstancesEndpoint(api_base.Resource):
     def get(self, all=False):
         prefilter = None
         filters = [partial(baseobject.namespace_filter,
-                           parse_jwt_identity()[0])]
+                           request_namespace())]
         if not all:
             prefilter = 'active'
 
@@ -504,10 +534,10 @@ class InstancesEndpoint(api_base.Resource):
         machine_type = 'pc'
 
         if not namespace:
-            namespace = parse_jwt_identity()[0]
+            namespace = request_namespace()
 
         # If accessing a foreign namespace, we need to be an admin
-        if not namespace_is_trusted(namespace, parse_jwt_identity()[0]):
+        if not namespace_is_trusted(namespace, request_namespace()):
             return sf_api.error(404, 'namespace not found')
 
         # Check that the instance name is safe for use as a DNS host name
@@ -575,7 +605,7 @@ class InstancesEndpoint(api_base.Resource):
                 label = disk_base[len('label:'):]
                 a = Artifact.from_url(
                     Artifact.TYPE_LABEL,
-                    f'{LABEL_URL}{parse_jwt_identity()[0]}/{label}',
+                    f'{LABEL_URL}{request_namespace()}/{label}',
                     name=label, namespace=namespace)
                 err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
                 if err:
@@ -639,7 +669,7 @@ class InstancesEndpoint(api_base.Resource):
             original_template = nvram_template
             if nvram_template.startswith('label:'):
                 label = nvram_template[len('label:'):]
-                url = f'{LABEL_URL}{parse_jwt_identity()[0]}/{label}'
+                url = f'{LABEL_URL}{request_namespace()}/{label}'
                 a = Artifact.from_url(Artifact.TYPE_LABEL, url, name=label,
                                       namespace=namespace)
                 err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
@@ -847,7 +877,7 @@ class InstancesEndpoint(api_base.Resource):
         if confirm is not True:
             return sf_api.error(400, 'parameter confirm is not set true')
 
-        if parse_jwt_identity()[0] == 'system':
+        if request_namespace() == 'system':
             if not isinstance(namespace, str):
                 # A client using a system key must specify the namespace. This
                 # ensures that deleting all instances in the cluster (by
@@ -855,9 +885,9 @@ class InstancesEndpoint(api_base.Resource):
                 return sf_api.error(400, 'system user must specify parameter namespace')
 
         else:
-            if namespace and namespace != parse_jwt_identity()[0]:
+            if namespace and namespace != request_namespace():
                 return sf_api.error(401, 'you cannot delete other namespaces')
-            namespace = parse_jwt_identity()[0]
+            namespace = request_namespace()
 
         waiting_for = []
         for inst in instance.Instances([partial(baseobject.namespace_filter, namespace)]):

@@ -1,4 +1,7 @@
+import json
 import time
+
+from testtools import content
 
 from shakenfist_ci import base
 from shakenfist_client import apiclient
@@ -13,6 +16,9 @@ class TestConsoleLog(base.BaseNamespacedTestCase):
         super().setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
         self._await_networks_ready([self.net['uuid']])
 
     def test_console_log(self):
@@ -31,6 +37,9 @@ class TestConsoleLog(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, base.load_userdata('cluster_ci_tests', 'console_scribbler'))
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
 
         # Wait for our test instance to boot
         self.assertIsNotNone(inst['uuid'])

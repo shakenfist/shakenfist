@@ -1,4 +1,7 @@
+import json
 import sys
+
+from testtools import content
 
 from shakenfist_ci import base
 
@@ -16,6 +19,11 @@ class TestUpgrades(base.BaseTestCase):
             networks_by_name[f'{net["namespace"]}/{net["name"]}'] = net
             networks_by_uuid[net['uuid']] = net
 
+        self.addDetail(
+            'networks_by_name',
+            content.text_content(json.dumps(
+                {k: v for k, v in networks_by_name.items()},
+                indent=4, sort_keys=True, default=str)))
         self.assertIn('upgrade/upgrade-fe', networks_by_name)
         self.assertIn('upgrade/upgrade-be', networks_by_name)
 
@@ -26,6 +34,11 @@ class TestUpgrades(base.BaseTestCase):
         instances = {}
         for inst in self.system_client.get_instances():
             instances[f'{inst["namespace"]}/{inst["name"]}'] = inst
+        self.addDetail(
+            'instances',
+            content.text_content(json.dumps(
+                {k: v for k, v in instances.items()},
+                indent=4, sort_keys=True, default=str)))
 
         sys.stderr.write(
             'Discovered instances post upgrade: %s\n' % instances)
@@ -41,6 +54,10 @@ class TestUpgrades(base.BaseTestCase):
                     iface['network_uuid'], {'name': 'unknown'})['name']
                 addresses[f'{name}/{net_name}'] = iface['ipv4']
 
+        self.addDetail(
+            'addresses',
+            content.text_content(json.dumps(addresses, indent=4,
+                                            sort_keys=True)))
         sys.stderr.write(
             'Discovered addresses post upgrade: %s\n' % addresses)
 

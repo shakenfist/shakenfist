@@ -169,6 +169,9 @@ def generate_proto_file() -> str:
     reservation_type = parse_enum_from_file(
         schema_dir / 'ipam_reservation.py', 'ReservationType',
         'ReservationTypeValue')
+    relationship_type = parse_enum_from_file(
+        schema_dir / 'relationship_types.py', 'RelationshipType',
+        'RelationshipTypeValue')
 
     lines = []
 
@@ -183,6 +186,7 @@ def generate_proto_file() -> str:
     lines.append('//')
     lines.append(f'// Source of truth: {object_type.source_file}')
     lines.append(f'//                  {reservation_type.source_file}')
+    lines.append(f'//                  {relationship_type.source_file}')
     lines.append('')
     lines.append('syntax = "proto3";')
     lines.append('')
@@ -191,15 +195,25 @@ def generate_proto_file() -> str:
 
     # Generate ObjectType enum
     lines.append('// ObjectType enum - all valid object types in Shaken Fist')
-    lines.append(f'// Maps to Python: shakenfist.schema.object_types.{object_type.name}')
+    lines.append(
+        f'// Maps to Python: shakenfist.schema.object_types.{object_type.name}')
     lines.extend(generate_proto_enum(object_type))
     lines.append('')
 
     # Generate ReservationType enum
     lines.append('// ReservationType enum - IPAM reservation types')
     lines.append(
-        f'// Maps to Python: shakenfist.schema.ipam_reservation.{reservation_type.name}')
+        f'// Maps to Python: shakenfist.schema.ipam_reservation.'
+        f'{reservation_type.name}')
     lines.extend(generate_proto_enum(reservation_type))
+    lines.append('')
+
+    # Generate RelationshipType enum
+    lines.append('// RelationshipType enum - object reference relationship types')
+    lines.append(
+        f'// Maps to Python: shakenfist.schema.relationship_types.'
+        f'{relationship_type.name}')
+    lines.extend(generate_proto_enum(relationship_type))
     lines.append('')
 
     return '\n'.join(lines)

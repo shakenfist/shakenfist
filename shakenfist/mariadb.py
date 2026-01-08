@@ -38,10 +38,13 @@ from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
 from shakenfist.schema.upload import UploadData
+from shakenfist.util import callstack as util_callstack
 
 
 LOG, _ = logs.setup(__name__)
@@ -56,6 +59,7 @@ _object_states_table: Optional[sa.Table] = None
 _ipam_reservations_table: Optional[sa.Table] = None
 _uploads_table: Optional[sa.Table] = None
 _dnsmasq_table: Optional[sa.Table] = None
+_object_references_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -70,10 +74,15 @@ _dnsmasq_table: Optional[sa.Table] = None
 #   ipam_reservations v5: Changed ipam_uuid and user_uuid from VARCHAR(36) to UUID
 #   uploads v1: Initial schema for upload objects
 #   dnsmasq v1: Initial schema for DnsMasq objects
+#   object_references v1: Initial schema for object reference tracking
+#   object_references v2: Changed source_uuid and target_uuid from UUID to
+#                         VARCHAR(255) to support Node objects which use FQDN
+#                         as their identifier instead of UUID
 OBJECT_STATES_VERSION = 2
 IPAM_RESERVATIONS_VERSION = 5
 UPLOADS_VERSION = 1
 DNSMASQ_VERSION = 1
+OBJECT_REFERENCES_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -498,7 +507,7 @@ def _get_uploads_table() -> sa.Table:
             UploadData,
             'uploads',
             metadata,
-            primary_key_field='uuid',
+            primary_key_fields=['uuid'],
             include_id_column=False
         )
     return _uploads_table
@@ -561,7 +570,7 @@ def _get_dnsmasq_table() -> sa.Table:
             DnsMasqData,
             'dnsmasq',
             metadata,
-            primary_key_field='uuid',
+            primary_key_fields=['uuid'],
             include_id_column=False
         )
     return _dnsmasq_table
@@ -606,6 +615,89 @@ def _ensure_dnsmasq_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _get_object_references_table() -> sa.Table:
+    """Get or create the object_references table definition.
+
+    This table tracks references between objects, replacing the manual ref_count
+    attribute on blobs. It enables queries like "which instances use this blob?"
+    and "what does this instance reference?"
+
+    The table has a compound primary key of (source_object_type, source_uuid,
+    relationship, target_object_type, target_uuid) to ensure uniqueness and
+    enable efficient lookups from either direction.
+    """
+    global _object_references_table
+    if _object_references_table is None:
+        metadata = _get_metadata()
+        _object_references_table = pydantic_to_sqlalchemy_table(
+            ObjectReference,
+            'object_references',
+            metadata,
+            primary_key_fields=[
+                'source_object_type', 'source_uuid', 'relationship',
+                'target_object_type', 'target_uuid'
+            ],
+            include_id_column=False
+        )
+    return _object_references_table
+
+
+def _ensure_object_references_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the object_references table schema is up to date.
+
+    Applies any necessary migrations based on the current version.
+    Returns a dict with migration status information.
+    """
+    table_name = 'object_references'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_object_references_table()
+
+    # Version 0 or -1 means table doesn't exist yet - create it with current
+    # schema
+    if current_ver <= 0:
+        LOG.info(
+            f'Creating {table_name} table (version {OBJECT_REFERENCES_VERSION})'
+        )
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        # Create indexes
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = OBJECT_REFERENCES_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    # Migration from v1 to v2: Convert source_uuid and target_uuid from UUID to
+    # VARCHAR(255) to support Node objects which use FQDN as their identifier
+    if current_ver == 1:
+        LOG.info('Upgrading object_references from v1 to v2: '
+                 'converting UUID columns to VARCHAR(255)')
+        with engine.connect() as conn:
+            # ALTER TABLE to change column types from UUID to VARCHAR(255)
+            # MariaDB will automatically convert existing UUID values to strings
+            conn.execute(sa.text(
+                'ALTER TABLE object_references '
+                'MODIFY COLUMN source_uuid VARCHAR(255) NOT NULL, '
+                'MODIFY COLUMN target_uuid VARCHAR(255) NOT NULL'
+            ))
+            conn.commit()
+        current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': OBJECT_REFERENCES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def ensure_schema() -> list[dict[str, Any]]:
     """Ensure all MariaDB tables exist with current schema versions.
 
@@ -636,6 +728,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_ipam_reservations_schema(engine))
     results.append(_ensure_uploads_schema(engine))
     results.append(_ensure_dnsmasq_schema(engine))
+    results.append(_ensure_object_references_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -2069,6 +2162,420 @@ def _direct_update_dnsmasq(data: DnsMasqData) -> bool:
 
 
 # =============================================================================
+# Object References Direct Access Functions
+# These access the database directly and are used by the database daemon.
+# =============================================================================
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_record_relationship(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: RelationshipType,
+    relationship_value: Optional[str],
+    target_type: ObjectType,
+    target_uuid: str | UUID
+) -> bool:
+    """Record a relationship between objects directly in MariaDB.
+
+    Creates a reference from source to target. If the reference already exists,
+    updates last_active to the current time. This makes repeated calls (like
+    observe() on blobs) idempotent while also refreshing the activity timestamp.
+
+    Args:
+        source_type: The type of the source object.
+        source_uuid: The UUID of the source object.
+        relationship: The type of relationship.
+        relationship_value: Optional value for the relationship.
+        target_type: The type of the target object.
+        target_uuid: The UUID of the target object.
+
+    Returns:
+        True if created or updated, False on error.
+    """
+    engine = _get_engine()
+    now = time.time()
+
+    try:
+        with engine.connect() as conn:
+            # Use INSERT ... ON DUPLICATE KEY UPDATE for idempotent upsert.
+            # If the row already exists (based on primary key), update
+            # last_active to the current time. This allows observe() to
+            # refresh the activity timestamp without needing separate logic.
+            stmt = sa.text('''
+                INSERT INTO object_references (
+                    source_object_type, source_uuid, relationship,
+                    relationship_value, target_object_type, target_uuid,
+                    created, last_active
+                ) VALUES (
+                    :source_type, :source_uuid, :relationship,
+                    :relationship_value, :target_type, :target_uuid,
+                    :created, :last_active
+                ) ON DUPLICATE KEY UPDATE last_active = VALUES(last_active)
+            ''')
+            conn.execute(stmt, {
+                'source_type': str(source_type),
+                'source_uuid': str(source_uuid),
+                'relationship': str(relationship),
+                'relationship_value': relationship_value,
+                'target_type': str(target_type),
+                'target_uuid': str(target_uuid),
+                'created': now,
+                'last_active': now
+            })
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(f'MariaDB record_relationship failed: {e}')
+        return False
+
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_remove_relationship(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: RelationshipType,
+    relationship_value: Optional[str],
+    target_type: ObjectType,
+    target_uuid: str | UUID
+) -> bool:
+    """Remove a relationship between objects directly from MariaDB.
+
+    Args:
+        source_type: The type of the source object.
+        source_uuid: The UUID of the source object.
+        relationship: The type of relationship.
+        relationship_value: Optional value for the relationship.
+        target_type: The type of the target object.
+        target_uuid: The UUID of the target object.
+
+    Returns:
+        True if removed (or didn't exist), False on error.
+    """
+    engine = _get_engine()
+    table = _get_object_references_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.source_object_type == str(source_type),
+                    table.c.source_uuid == str(source_uuid),
+                    table.c.relationship == str(relationship),
+                    table.c.relationship_value == relationship_value,
+                    table.c.target_object_type == str(target_type),
+                    table.c.target_uuid == str(target_uuid)
+                )
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(f'MariaDB remove_relationship failed: {e}')
+        return False
+
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_get_references_to(
+    target_type: ObjectType,
+    target_uuid: str | UUID,
+    relationship: Optional[RelationshipType] = None
+) -> list[ObjectReference]:
+    """Get all references to an object directly from MariaDB.
+
+    Args:
+        target_type: The type of the target object.
+        target_uuid: The UUID of the target object.
+        relationship: Optional filter by relationship type.
+
+    Returns:
+        List of ObjectReference objects referencing the target.
+    """
+    engine = _get_engine()
+    table = _get_object_references_table()
+
+    try:
+        with engine.connect() as conn:
+            conditions = [
+                table.c.target_object_type == str(target_type),
+                table.c.target_uuid == str(target_uuid)
+            ]
+            if relationship is not None:
+                conditions.append(table.c.relationship == str(relationship))
+            stmt = sa.select(table).where(sa.and_(*conditions))
+            result = conn.execute(stmt)
+            refs = []
+            for row in result:
+                # Enum __new__ expects (str, int) but lookup uses single arg
+                src_type = ObjectType(row.source_object_type)  # type: ignore
+                rel = RelationshipType(row.relationship)  # type: ignore
+                tgt_type = ObjectType(row.target_object_type)  # type: ignore
+                refs.append(ObjectReference(
+                    source_object_type=src_type,
+                    source_uuid=row.source_uuid,
+                    relationship=rel,
+                    relationship_value=row.relationship_value,
+                    target_object_type=tgt_type,
+                    target_uuid=row.target_uuid,
+                    created=row.created,
+                    last_active=row.last_active
+                ))
+            return refs
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get_references_to failed: {e}')
+        return []
+
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_get_references_from(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: Optional[RelationshipType] = None
+) -> list[ObjectReference]:
+    """Get all references from an object directly from MariaDB.
+
+    Args:
+        source_type: The type of the source object.
+        source_uuid: The UUID of the source object.
+        relationship: Optional filter by relationship type.
+
+    Returns:
+        List of ObjectReference objects the source references.
+    """
+    engine = _get_engine()
+    table = _get_object_references_table()
+
+    try:
+        with engine.connect() as conn:
+            conditions = [
+                table.c.source_object_type == str(source_type),
+                table.c.source_uuid == str(source_uuid)
+            ]
+            if relationship is not None:
+                conditions.append(table.c.relationship == str(relationship))
+            stmt = sa.select(table).where(sa.and_(*conditions))
+            result = conn.execute(stmt)
+            refs = []
+            for row in result:
+                # Enum __new__ expects (str, int) but lookup uses single arg
+                src_type = ObjectType(row.source_object_type)  # type: ignore
+                rel = RelationshipType(row.relationship)  # type: ignore
+                tgt_type = ObjectType(row.target_object_type)  # type: ignore
+                refs.append(ObjectReference(
+                    source_object_type=src_type,
+                    source_uuid=row.source_uuid,
+                    relationship=rel,
+                    relationship_value=row.relationship_value,
+                    target_object_type=tgt_type,
+                    target_uuid=row.target_uuid,
+                    created=row.created,
+                    last_active=row.last_active
+                ))
+            return refs
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get_references_from failed: {e}')
+        return []
+
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_count_references_to(
+    target_type: ObjectType,
+    target_uuid: str | UUID,
+    exclude_relationships: Optional[list[RelationshipType]] = None
+) -> int:
+    """Count references to an object directly from MariaDB.
+
+    This is the replacement for blob.ref_count - it returns the number of
+    objects that reference the target.
+
+    Args:
+        target_type: The type of the target object.
+        target_uuid: The UUID of the target object.
+        exclude_relationships: Optional list of relationship types to exclude
+            from the count.
+
+    Returns:
+        The count of references, or 0 on error.
+    """
+    engine = _get_engine()
+    table = _get_object_references_table()
+
+    try:
+        with engine.connect() as conn:
+            conditions = [
+                table.c.target_object_type == str(target_type),
+                table.c.target_uuid == str(target_uuid)
+            ]
+            if exclude_relationships:
+                excluded = [str(r) for r in exclude_relationships]
+                conditions.append(
+                    table.c.relationship.notin_(excluded)
+                )
+            stmt = sa.select(sa.func.count()).where(sa.and_(*conditions))
+            result = conn.execute(stmt)
+            row = result.fetchone()
+            return row[0] if row else 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB count_references_to failed: {e}')
+        return 0
+
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_remove_all_references_from(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: Optional[RelationshipType] = None
+) -> int:
+    """Remove all references from an object directly from MariaDB.
+
+    This is used during object deletion to clean up all references the
+    object holds. Optionally filter by relationship type.
+
+    Args:
+        source_type: The type of the source object.
+        source_uuid: The UUID of the source object.
+        relationship: Optional relationship type to filter by. If None,
+            removes all references from the source.
+
+    Returns:
+        The number of references deleted, or 0 on error.
+    """
+    engine = _get_engine()
+    table = _get_object_references_table()
+
+    try:
+        with engine.connect() as conn:
+            conditions = [
+                table.c.source_object_type == str(source_type),
+                table.c.source_uuid == str(source_uuid)
+            ]
+            if relationship is not None:
+                conditions.append(table.c.relationship == str(relationship))
+
+            stmt = sa.delete(table).where(sa.and_(*conditions))
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount
+    except OperationalError as e:
+        LOG.warning(f'MariaDB remove_all_references_from failed: {e}')
+        return 0
+
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_update_last_active(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: RelationshipType,
+    relationship_value: Optional[str],
+    target_type: ObjectType,
+    target_uuid: str | UUID
+) -> bool:
+    """Update the last_active timestamp for a reference.
+
+    Called by the cleaner daemon during maintenance scans to indicate the
+    reference is still valid/in-use.
+
+    Args:
+        source_type: The type of the source object.
+        source_uuid: The UUID of the source object.
+        relationship: The type of relationship.
+        relationship_value: Optional value for the relationship.
+        target_type: The type of the target object.
+        target_uuid: The UUID of the target object.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_object_references_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                sa.and_(
+                    table.c.source_object_type == str(source_type),
+                    table.c.source_uuid == str(source_uuid),
+                    table.c.relationship == str(relationship),
+                    table.c.relationship_value == relationship_value,
+                    table.c.target_object_type == str(target_type),
+                    table.c.target_uuid == str(target_uuid)
+                )
+            ).values(last_active=time.time())
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB update_last_active failed: {e}')
+        return False
+
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_get_stale_references(older_than: float) -> list[ObjectReference]:
+    """Get references with last_active older than the specified timestamp.
+
+    Used by the cleaner daemon to find stale references that may indicate
+    over-replication or orphaned data.
+
+    Args:
+        older_than: Unix timestamp. References with last_active older than
+            this are considered stale.
+
+    Returns:
+        List of stale ObjectReference objects.
+    """
+    engine = _get_engine()
+    table = _get_object_references_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.last_active < older_than)
+            result = conn.execute(stmt)
+            refs = []
+            for row in result:
+                # Enum __new__ expects (str, int) but lookup uses single arg
+                src_type = ObjectType(row.source_object_type)  # type: ignore
+                rel = RelationshipType(row.relationship)  # type: ignore
+                tgt_type = ObjectType(row.target_object_type)  # type: ignore
+                refs.append(ObjectReference(
+                    source_object_type=src_type,
+                    source_uuid=row.source_uuid,
+                    relationship=rel,
+                    relationship_value=row.relationship_value,
+                    target_object_type=tgt_type,
+                    target_uuid=row.target_uuid,
+                    created=row.created,
+                    last_active=row.last_active
+                ))
+            return refs
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get_stale_references failed: {e}')
+        return []
+
+
+# =============================================================================
 # DnsMasq gRPC Client Functions
 # These call the database microservice for DnsMasq operations.
 # =============================================================================
@@ -2192,6 +2699,275 @@ def _grpc_update_dnsmasq(data: DnsMasqData) -> bool:
 
 
 # =============================================================================
+# Object References gRPC Client Functions
+# These call the database microservice for object reference operations.
+# =============================================================================
+
+def _grpc_record_relationship(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: RelationshipType,
+    relationship_value: Optional[str],
+    target_type: ObjectType,
+    target_uuid: str | UUID
+) -> bool:
+    """Record a relationship via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.RecordRelationshipRequest(
+            source_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                source_type.proto_id),
+            source_uuid=str(source_uuid),
+            relationship=cast(
+                shakenfist_enums_pb2.RelationshipType.ValueType,
+                relationship.proto_id),
+            relationship_value=relationship_value or '',
+            target_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_type.proto_id),
+            target_uuid=str(target_uuid)
+        )
+        reply = stub.RecordRelationship(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC RecordRelationship failed: {e}')
+        return False
+
+
+def _grpc_remove_relationship(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: RelationshipType,
+    relationship_value: Optional[str],
+    target_type: ObjectType,
+    target_uuid: str | UUID
+) -> bool:
+    """Remove a relationship via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.RemoveRelationshipRequest(
+            source_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                source_type.proto_id),
+            source_uuid=str(source_uuid),
+            relationship=cast(
+                shakenfist_enums_pb2.RelationshipType.ValueType,
+                relationship.proto_id),
+            relationship_value=relationship_value or '',
+            target_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_type.proto_id),
+            target_uuid=str(target_uuid)
+        )
+        reply = stub.RemoveRelationship(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC RemoveRelationship failed: {e}')
+        return False
+
+
+def _grpc_get_references_to(
+    target_type: ObjectType,
+    target_uuid: str | UUID,
+    relationship: Optional[RelationshipType] = None
+) -> list[ObjectReference]:
+    """Get references to an object via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetReferencesToRequest(
+            target_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_type.proto_id),
+            target_uuid=str(target_uuid)
+        )
+        if relationship is not None:
+            request.relationship = cast(
+                shakenfist_enums_pb2.RelationshipType.ValueType,
+                relationship.proto_id)
+        reply = stub.GetReferencesTo(request)
+        refs = []
+        for ref in reply.references:
+            src_type = ObjectType.from_proto_id(ref.source_type)
+            rel_type = RelationshipType.from_proto_id(ref.relationship)
+            tgt_type = ObjectType.from_proto_id(ref.target_type)
+            if src_type is None or rel_type is None or tgt_type is None:
+                continue
+            refs.append(ObjectReference(
+                source_object_type=src_type,
+                source_uuid=ref.source_uuid,
+                relationship=rel_type,
+                relationship_value=ref.relationship_value or None,
+                target_object_type=tgt_type,
+                target_uuid=ref.target_uuid,
+                created=ref.created,
+                last_active=ref.last_active
+            ))
+        return refs
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetReferencesTo failed: {e}')
+        return []
+
+
+def _grpc_get_references_from(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: Optional[RelationshipType] = None
+) -> list[ObjectReference]:
+    """Get references from an object via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetReferencesFromRequest(
+            source_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                source_type.proto_id),
+            source_uuid=str(source_uuid)
+        )
+        if relationship is not None:
+            request.relationship = cast(
+                shakenfist_enums_pb2.RelationshipType.ValueType,
+                relationship.proto_id)
+        reply = stub.GetReferencesFrom(request)
+        refs = []
+        for ref in reply.references:
+            src_type = ObjectType.from_proto_id(ref.source_type)
+            rel_type = RelationshipType.from_proto_id(ref.relationship)
+            tgt_type = ObjectType.from_proto_id(ref.target_type)
+            if src_type is None or rel_type is None or tgt_type is None:
+                continue
+            refs.append(ObjectReference(
+                source_object_type=src_type,
+                source_uuid=ref.source_uuid,
+                relationship=rel_type,
+                relationship_value=ref.relationship_value or None,
+                target_object_type=tgt_type,
+                target_uuid=ref.target_uuid,
+                created=ref.created,
+                last_active=ref.last_active
+            ))
+        return refs
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetReferencesFrom failed: {e}')
+        return []
+
+
+def _grpc_count_references_to(
+    target_type: ObjectType,
+    target_uuid: str | UUID,
+    exclude_relationships: Optional[list[RelationshipType]] = None
+) -> int:
+    """Count references to an object via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        excluded_proto = []
+        if exclude_relationships:
+            excluded_proto = [
+                cast(
+                    shakenfist_enums_pb2.RelationshipType.ValueType,
+                    r.proto_id)
+                for r in exclude_relationships
+            ]
+        request = database_pb2.CountReferencesToRequest(
+            target_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_type.proto_id),
+            target_uuid=str(target_uuid),
+            exclude_relationships=excluded_proto
+        )
+        reply = stub.CountReferencesTo(request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC CountReferencesTo failed: {e}')
+        return 0
+
+
+def _grpc_remove_all_references_from(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: Optional[RelationshipType] = None
+) -> int:
+    """Remove all references from an object via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.RemoveAllReferencesFromRequest(
+            source_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                source_type.proto_id),
+            source_uuid=str(source_uuid)
+        )
+        if relationship is not None:
+            request.relationship = cast(
+                shakenfist_enums_pb2.RelationshipType.ValueType,
+                relationship.proto_id)
+        reply = stub.RemoveAllReferencesFrom(request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC RemoveAllReferencesFrom failed: {e}')
+        return 0
+
+
+def _grpc_update_last_active(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: RelationshipType,
+    relationship_value: Optional[str],
+    target_type: ObjectType,
+    target_uuid: str | UUID
+) -> bool:
+    """Update last_active timestamp via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateLastActiveRequest(
+            source_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                source_type.proto_id),
+            source_uuid=str(source_uuid),
+            relationship=cast(
+                shakenfist_enums_pb2.RelationshipType.ValueType,
+                relationship.proto_id),
+            relationship_value=relationship_value or '',
+            target_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_type.proto_id),
+            target_uuid=str(target_uuid)
+        )
+        reply = stub.UpdateLastActive(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC UpdateLastActive failed: {e}')
+        return False
+
+
+def _grpc_get_stale_references(older_than: float) -> list[ObjectReference]:
+    """Get stale references via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetStaleReferencesRequest(older_than=older_than)
+        reply = stub.GetStaleReferences(request)
+        refs = []
+        for ref in reply.references:
+            src_type = ObjectType.from_proto_id(ref.source_type)
+            rel_type = RelationshipType.from_proto_id(ref.relationship)
+            tgt_type = ObjectType.from_proto_id(ref.target_type)
+            if src_type is None or rel_type is None or tgt_type is None:
+                continue
+            refs.append(ObjectReference(
+                source_object_type=src_type,
+                source_uuid=ref.source_uuid,
+                relationship=rel_type,
+                relationship_value=ref.relationship_value or None,
+                target_object_type=tgt_type,
+                target_uuid=ref.target_uuid,
+                created=ref.created,
+                last_active=ref.last_active
+            ))
+        return refs
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetStaleReferences failed: {e}')
+        return []
+
+
+# =============================================================================
 # DnsMasq Public API Functions
 # These route to either direct or gRPC access based on configuration.
 # =============================================================================
@@ -2270,3 +3046,215 @@ def update_dnsmasq(data: DnsMasqData) -> bool:
     if _use_database_service():
         return _grpc_update_dnsmasq(data)
     return _direct_update_dnsmasq(data)
+
+
+# =============================================================================
+# Object References Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def record_relationship(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: RelationshipType,
+    relationship_value: Optional[str],
+    target_type: ObjectType,
+    target_uuid: str | UUID
+) -> bool:
+    """Record a relationship between objects.
+
+    Creates a reference from source to target. Idempotent - if the reference
+    already exists, it's a no-op.
+
+    Args:
+        source_type: The type of the source object.
+        source_uuid: The UUID of the source object.
+        relationship: The type of relationship.
+        relationship_value: Optional value for the relationship (e.g., disk
+            index, transcode style).
+        target_type: The type of the target object.
+        target_uuid: The UUID of the target object.
+
+    Returns:
+        True if created (or already existed), False on error.
+    """
+    if _use_database_service():
+        return _grpc_record_relationship(
+            source_type, source_uuid, relationship, relationship_value,
+            target_type, target_uuid)
+    return _direct_record_relationship(
+        source_type, source_uuid, relationship, relationship_value,
+        target_type, target_uuid)
+
+
+def remove_relationship(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: RelationshipType,
+    relationship_value: Optional[str],
+    target_type: ObjectType,
+    target_uuid: str | UUID
+) -> bool:
+    """Remove a relationship between objects.
+
+    Args:
+        source_type: The type of the source object.
+        source_uuid: The UUID of the source object.
+        relationship: The type of relationship.
+        relationship_value: Optional value for the relationship.
+        target_type: The type of the target object.
+        target_uuid: The UUID of the target object.
+
+    Returns:
+        True if removed (or didn't exist), False on error.
+    """
+    if _use_database_service():
+        return _grpc_remove_relationship(
+            source_type, source_uuid, relationship, relationship_value,
+            target_type, target_uuid)
+    return _direct_remove_relationship(
+        source_type, source_uuid, relationship, relationship_value,
+        target_type, target_uuid)
+
+
+def get_references_to(
+    target_type: ObjectType,
+    target_uuid: str | UUID,
+    relationship: Optional[RelationshipType] = None
+) -> list[ObjectReference]:
+    """Get all references to an object.
+
+    Args:
+        target_type: The type of the target object.
+        target_uuid: The UUID of the target object.
+        relationship: Optional filter by relationship type.
+
+    Returns:
+        List of ObjectReference objects referencing the target.
+    """
+    if _use_database_service():
+        return _grpc_get_references_to(target_type, target_uuid, relationship)
+    return _direct_get_references_to(target_type, target_uuid, relationship)
+
+
+def get_references_from(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: Optional[RelationshipType] = None
+) -> list[ObjectReference]:
+    """Get all references from an object.
+
+    Args:
+        source_type: The type of the source object.
+        source_uuid: The UUID of the source object.
+        relationship: Optional filter by relationship type.
+
+    Returns:
+        List of ObjectReference objects the source references.
+    """
+    if _use_database_service():
+        return _grpc_get_references_from(source_type, source_uuid, relationship)
+    return _direct_get_references_from(source_type, source_uuid, relationship)
+
+
+def count_references_to(
+    target_type: ObjectType,
+    target_uuid: str | UUID,
+    exclude_relationships: Optional[list[RelationshipType]] = None
+) -> int:
+    """Count references to an object.
+
+    This is the replacement for blob.ref_count - it returns the number of
+    objects that reference the target.
+
+    Args:
+        target_type: The type of the target object.
+        target_uuid: The UUID of the target object.
+        exclude_relationships: Optional list of relationship types to exclude
+            from the count.
+
+    Returns:
+        The count of references, or 0 on error.
+    """
+    if _use_database_service():
+        return _grpc_count_references_to(
+            target_type, target_uuid, exclude_relationships)
+    return _direct_count_references_to(
+        target_type, target_uuid, exclude_relationships)
+
+
+def remove_all_references_from(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: Optional[RelationshipType] = None
+) -> int:
+    """Remove all references from an object.
+
+    This is used during object deletion to clean up all references the
+    object holds. Optionally filter by relationship type.
+
+    Args:
+        source_type: The type of the source object.
+        source_uuid: The UUID of the source object.
+        relationship: Optional relationship type to filter by. If None,
+            removes all references from the source.
+
+    Returns:
+        The number of references deleted, or 0 on error.
+    """
+    if _use_database_service():
+        return _grpc_remove_all_references_from(
+            source_type, source_uuid, relationship)
+    return _direct_remove_all_references_from(
+        source_type, source_uuid, relationship)
+
+
+def update_last_active(
+    source_type: ObjectType,
+    source_uuid: str | UUID,
+    relationship: RelationshipType,
+    relationship_value: Optional[str],
+    target_type: ObjectType,
+    target_uuid: str | UUID
+) -> bool:
+    """Update the last_active timestamp for a reference.
+
+    Called by the cleaner daemon during maintenance scans to indicate the
+    reference is still valid/in-use.
+
+    Args:
+        source_type: The type of the source object.
+        source_uuid: The UUID of the source object.
+        relationship: The type of relationship.
+        relationship_value: Optional value for the relationship.
+        target_type: The type of the target object.
+        target_uuid: The UUID of the target object.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_last_active(
+            source_type, source_uuid, relationship, relationship_value,
+            target_type, target_uuid)
+    return _direct_update_last_active(
+        source_type, source_uuid, relationship, relationship_value,
+        target_type, target_uuid)
+
+
+def get_stale_references(older_than: float) -> list[ObjectReference]:
+    """Get references with last_active older than the specified timestamp.
+
+    Used by the cleaner daemon to find stale references that may indicate
+    over-replication or orphaned data.
+
+    Args:
+        older_than: Unix timestamp. References with last_active older than
+            this are considered stale.
+
+    Returns:
+        List of stale ObjectReference objects.
+    """
+    if _use_database_service():
+        return _grpc_get_stale_references(older_than)
+    return _direct_get_stale_references(older_than)

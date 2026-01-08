@@ -1,3 +1,7 @@
+import json
+
+from testtools import content
+
 from shakenfist_ci import base
 from shakenfist_client import apiclient
 
@@ -14,21 +18,32 @@ class TestAuth(base.BaseTestCase):
         name = 'ci-auth-%s' % self._uniquifier()
         key = self._uniquifier()
 
-        self.assertNotIn(name, self.system_client.get_namespaces())
+        namespaces = self.system_client.get_namespaces()
+        self.addDetail('namespaces_initial', content.text_content(json.dumps(
+            namespaces, indent=4, sort_keys=True)))
+        self.assertNotIn(name, namespaces)
         self.system_client.create_namespace(name)
         self.system_client.add_namespace_key(name, 'test', key)
-        self.assertIn(
-            name, _namespace_names(self.system_client.get_namespaces()))
+        namespaces = self.system_client.get_namespaces()
+        self.addDetail('namespaces_after_create', content.text_content(
+            json.dumps(namespaces, indent=4, sort_keys=True)))
+        self.assertIn(name, _namespace_names(namespaces))
 
         self.assertRaises(apiclient.ResourceNotFoundException,
                           self.system_client.delete_namespace_key, name, 'banana')
-        self.assertIn(
-            name, _namespace_names(self.system_client.get_namespaces()))
+        namespaces = self.system_client.get_namespaces()
+        self.addDetail('namespaces_after_bad_delete', content.text_content(
+            json.dumps(namespaces, indent=4, sort_keys=True)))
+        self.assertIn(name, _namespace_names(namespaces))
 
         self.system_client.delete_namespace_key(name, 'test')
-        self.assertIn(
-            name, _namespace_names(self.system_client.get_namespaces()))
+        namespaces = self.system_client.get_namespaces()
+        self.addDetail('namespaces_after_key_delete', content.text_content(
+            json.dumps(namespaces, indent=4, sort_keys=True)))
+        self.assertIn(name, _namespace_names(namespaces))
 
         self.system_client.delete_namespace(name)
-        self.assertNotIn(
-            name, _namespace_names(self.system_client.get_namespaces()))
+        namespaces = self.system_client.get_namespaces()
+        self.addDetail('namespaces_after_ns_delete', content.text_content(
+            json.dumps(namespaces, indent=4, sort_keys=True)))
+        self.assertNotIn(name, _namespace_names(namespaces))

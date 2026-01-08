@@ -1,4 +1,7 @@
+import json
 import string
+
+from testtools import content
 
 from shakenfist_ci import base
 
@@ -10,6 +13,9 @@ class TestUploads(base.BaseNamespacedTestCase):
 
     def test_upload(self):
         upl = self.test_client.create_upload()
+        self.addDetail(
+            'upl',
+            content.text_content(json.dumps(upl, indent=4, sort_keys=True)))
         for _ in range(100):
             self.test_client.send_upload(upl['uuid'], string.ascii_letters)
 
@@ -19,6 +25,9 @@ class TestUploads(base.BaseNamespacedTestCase):
             self.test_client.send_upload(upl['uuid'], string.ascii_letters)
 
         a = self.test_client.upload_artifact('test', upl['uuid'])
+        self.addDetail(
+            'artifact',
+            content.text_content(json.dumps(a, indent=4, sort_keys=True)))
 
         self.assertEqual(
             len(string.ascii_letters) * 50 + 100, a['blobs']['1']['size'])

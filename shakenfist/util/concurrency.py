@@ -4,6 +4,8 @@ import os
 import socket
 import threading
 import time
+from types import TracebackType
+from typing import Any, Self
 
 from google.protobuf.message import DecodeError
 from shakenfist_utilities import logs                     # noreorder
@@ -39,16 +41,16 @@ NODELOCK_SOCKET_PATH = '/srv/shakenfist/.nodelock'
 
 
 class Job:
-    def __init__(self):
+    def __init__(self) -> None:
         self.exit = threading.Event()
 
-    def run(self):
+    def run(self) -> None:
         LOG.debug('Starting job execution')
         self.execute()
         LOG.debug('Finished job execution')
 
 
-def _log_results(**kwargs):
+def _log_results(**kwargs: Any) -> None:
     truncated = False
     if len(kwargs['stdout']) > 512:
         kwargs['stdout'] = kwargs['stdout'][:512] + '...'
@@ -68,7 +70,7 @@ PRIORITY_LOW = common_pb2.ExecuteRequest.LOW
 PRIORITY_HIGH = common_pb2.ExecuteRequest.HIGH
 
 
-def _marshal_privexec_request(request, expected_field):
+def _marshal_privexec_request(request: Any, expected_field: str) -> Any:
     if not os.path.exists(PRIVEXEC_SOCKET_PATH):
         raise MissingPrivExecSocket()
 
@@ -104,9 +106,18 @@ def _marshal_privexec_request(request, expected_field):
         client.close()
 
 
-def execute(command, check_exit_code=[0], env_variables=None,
-            netns=None, iopriority=None, cwd=None,
-            suppress_command_logging=False):
+def execute(
+    command: str,
+    check_exit_code: list[int] | None = None,
+    env_variables: dict[str, str] | None = None,
+    netns: Any = None,
+    iopriority: int | None = None,
+    cwd: str | None = None,
+    suppress_command_logging: bool = False
+) -> tuple[str, str]:
+    if check_exit_code is None:
+        check_exit_code = [0]
+
     try:
         request_id = flask.request.environ.get('FLASK_REQUEST_ID')
     except RuntimeError:
@@ -171,7 +182,7 @@ def execute(command, check_exit_code=[0], env_variables=None,
     )
 
 
-def hash_file(path, algorithm_str):
+def hash_file(path: str, algorithm_str: str) -> str:
     hash_algorithms = {
         'sha1': privexec_pb2.HashAlgorithm.SHA1,
         'sha256': privexec_pb2.HashAlgorithm.SHA256,
@@ -193,7 +204,9 @@ def hash_file(path, algorithm_str):
     return response.hash
 
 
-def enable_nat(network_uuid, network_address, network_mask, vxid):
+def enable_nat(
+    network_uuid: Any, network_address: str, network_mask: str, vxid: int
+) -> None:
     # Convert network_uuid to string if it's a UUID object
     network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
@@ -210,7 +223,9 @@ def enable_nat(network_uuid, network_address, network_mask, vxid):
         raise EnableNATFailed()
 
 
-def ensure_vxlan_mesh(network_uuid, vxid, node_ips):
+def ensure_vxlan_mesh(
+    network_uuid: Any, vxid: int, node_ips: list[str]
+) -> tuple[list[str], list[str]]:
     # Convert network_uuid to string if it's a UUID object
     network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
@@ -227,7 +242,9 @@ def ensure_vxlan_mesh(network_uuid, vxid, node_ips):
     return list(response.added_addresses), list(response.removed_addresses)
 
 
-def add_floating_ip(network_uuid, floating_address, inner_address):
+def add_floating_ip(
+    network_uuid: Any, floating_address: str, inner_address: str
+) -> None:
     # Convert network_uuid to string if it's a UUID object
     network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
@@ -243,7 +260,7 @@ def add_floating_ip(network_uuid, floating_address, inner_address):
         raise AddFloatingIPFailed()
 
 
-def remove_floating_ip(network_uuid, floating_address):
+def remove_floating_ip(network_uuid: Any, floating_address: str) -> None:
     # Convert network_uuid to string if it's a UUID object
     network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
@@ -258,7 +275,7 @@ def remove_floating_ip(network_uuid, floating_address):
         raise RemoveFloatingIPFailed()
 
 
-def create_vxlan_interface(vx_id, mesh_interface):
+def create_vxlan_interface(vx_id: int, mesh_interface: str) -> None:
     request = privexec_pb2.PrivExecRequest(
         create_vxlan_interface_request=privexec_pb2.CreateVXLANInterfaceRequest(
             vx_id=vx_id,
@@ -271,7 +288,7 @@ def create_vxlan_interface(vx_id, mesh_interface):
         raise CreateVXLANInterfaceFailed()
 
 
-def create_network_namespace(netns):
+def create_network_namespace(netns: Any) -> None:
     # Convert netns to string if it's a UUID object
     netns_str = str(netns)
     request = privexec_pb2.PrivExecRequest(
@@ -286,7 +303,7 @@ def create_network_namespace(netns):
         raise CreateNetworkNamespaceFailed()
 
 
-def set_thread_name(name):
+def set_thread_name(name: str) -> None:
     try:
         import pyprctl
         pyprctl.set_name(name)
@@ -294,7 +311,7 @@ def set_thread_name(name):
         LOG.debug(f'Failed to change thread name to {name}: {e}')
 
 
-def _node_lock_request(request):
+def _node_lock_request(request: Any) -> bool:
     if not os.path.exists(NODELOCK_SOCKET_PATH):
         raise MissingNodeLockSocket()
 
@@ -342,7 +359,7 @@ def _node_lock_request(request):
 
 
 class NodeLock():
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         self.name = name
         self.requester = json.dumps({
             'caller': util_callstack.get_caller(offset=-3),
@@ -354,7 +371,7 @@ class NodeLock():
             'name': name
         })
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         start_time = time.time()
         slow_warned = False
 
@@ -374,7 +391,12 @@ class NodeLock():
             time.sleep(0.2)
         return self
 
-    def __exit__(self, exc_type, exc_val, traceback):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        traceback: TracebackType | None
+    ) -> None:
         request = nodelock_pb2.NodeLockRequest(
             unlock_request=nodelock_pb2.UnlockRequest(
                 requester=self.requester,

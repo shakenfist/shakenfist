@@ -100,12 +100,14 @@ class EventMultiRequest(google.protobuf.message.Message):
         objects: collections.abc.Iterable[global___EventObject] | None = ...,
         event_type: builtins.str = ...,
         fqdn: builtins.str = ...,
-        duration: builtins.float = ...,
+        duration: builtins.float | None = ...,
         message: builtins.str = ...,
         extra: builtins.str = ...,
         timestamp: builtins.float = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["duration", b"duration", "event_type", b"event_type", "extra", b"extra", "fqdn", b"fqdn", "message", b"message", "objects", b"objects", "timestamp", b"timestamp"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_duration", b"_duration", "duration", b"duration"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_duration", b"_duration", "duration", b"duration", "event_type", b"event_type", "extra", b"extra", "fqdn", b"fqdn", "message", b"message", "objects", b"objects", "timestamp", b"timestamp"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_duration", b"_duration"]) -> typing.Literal["duration"] | None: ...
 
 global___EventMultiRequest = EventMultiRequest
 

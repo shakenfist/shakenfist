@@ -858,6 +858,47 @@ returns an iterator of binary chunks ready for you to process or write to a file
             f.write(chunk)
     ```
 
+## Object References
+
+Instance API responses include `references_to` and `references_from` fields that
+show the relationships between instances and other objects in the system. These
+fields help you understand how instances are connected to blobs and other objects.
+
+The `references_to` field shows what objects reference this instance (typically
+empty for instances). The `references_from` field shows what blobs this instance
+references (e.g., disk blobs, NVRAM template blobs).
+
+??? example "Example references_from output for an instance"
+
+    ```json
+    "references_from": {
+        "disk": [
+            {
+                "source_object_type": "instance",
+                "source_uuid": "d51aa352-368c-484c-9e4c-4542927b4277",
+                "relationship": "disk",
+                "relationship_value": "0",
+                "target_object_type": "blob",
+                "target_uuid": "5117f778-b214-4184-8358-f2c7376b76db",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ],
+        "nvram_template": [
+            {
+                "source_object_type": "instance",
+                "source_uuid": "d51aa352-368c-484c-9e4c-4542927b4277",
+                "relationship": "nvram_template",
+                "relationship_value": null,
+                "target_object_type": "blob",
+                "target_uuid": "abc123-def456-ghi789",
+                "created": 1683995934.357137,
+                "last_active": 1684054381.217045
+            }
+        ]
+    }
+    ```
+
 ## Metadata
 
 All objects exposed by the REST API may have metadata associated with them. This

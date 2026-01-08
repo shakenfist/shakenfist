@@ -1,9 +1,10 @@
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import blob
+from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.operations.baseoperation import BaseOperation
+from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 
 
@@ -68,6 +69,15 @@ class AgentOperation(BaseOperation):
             'commands': self.commands,
             'results': self.results
         })
+
+        # Add object references (what references this agent operation and what
+        # this agent operation references)
+        refs_to = mariadb.get_references_to(ObjectType.AGENTOPERATION, self.uuid)
+        refs_from = mariadb.get_references_from(
+            ObjectType.AGENTOPERATION, self.uuid)
+        retval['references_to'] = references_to_grouped_dict(refs_to)
+        retval['references_from'] = references_to_grouped_dict(refs_from)
+
         return retval
 
     # Static values
@@ -102,13 +112,8 @@ class AgentOperation(BaseOperation):
             self._db_set_attribute('results', {'results': results})
 
     def delete(self):
-        for result in self._db_get_attribute('results'):
-            for key in result:
-                if key.endswith('_blob'):
-                    b = blob.Blob.from_db(result[key], suppress_failure_audit=True)
-                    if b:
-                        b.ref_count_dec(self)
-
+        # Remove all blob references from this agent operation
+        mariadb.remove_all_references_from(ObjectType.AGENTOPERATION, self.uuid)
         self.state = self.STATE_DELETED
 
 

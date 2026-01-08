@@ -24,6 +24,7 @@ from shakenfist import eventlog
 from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_status
@@ -36,6 +37,7 @@ from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
@@ -953,6 +955,284 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database UpdateDnsMasq failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
+    # =========================================================================
+    # Object Reference Operations (MariaDB)
+    # =========================================================================
+
+    def RecordRelationship(
+        self,
+        request: database_pb2.RecordRelationshipRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Record a relationship between two objects."""
+        try:
+            self.monitor.counters['record_relationship'].inc()
+            source_type = ObjectType.from_proto_id(request.source_type)
+            target_type = ObjectType.from_proto_id(request.target_type)
+            relationship = RelationshipType.from_proto_id(request.relationship)
+            if source_type is None or target_type is None or relationship is None:
+                return database_pb2.StatusReply(
+                    success=False, error='Invalid type or relationship')
+            rel_value = request.relationship_value if request.relationship_value else None
+            success = mariadb._direct_record_relationship(
+                source_type, request.source_uuid, relationship, rel_value,
+                target_type, request.target_uuid)
+            if success:
+                # Emit structured event for audit trail on both ends of the
+                # relationship. add_event_multi automatically adds a
+                # correlation_id when there are multiple objects.
+                eventlog.add_event_multi(
+                    EVENT_TYPE_MUTATE,
+                    [(source_type.value, request.source_uuid),
+                     (target_type.value, request.target_uuid)],
+                    'added reference',
+                    extra={
+                        'relationship': relationship.value,
+                        'relationship_value': rel_value
+                    })
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database RecordRelationship failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def RemoveRelationship(
+        self,
+        request: database_pb2.RemoveRelationshipRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Remove a relationship between two objects."""
+        try:
+            self.monitor.counters['remove_relationship'].inc()
+            source_type = ObjectType.from_proto_id(request.source_type)
+            target_type = ObjectType.from_proto_id(request.target_type)
+            relationship = RelationshipType.from_proto_id(request.relationship)
+            if source_type is None or target_type is None or relationship is None:
+                return database_pb2.StatusReply(
+                    success=False, error='Invalid type or relationship')
+            rel_value = request.relationship_value if request.relationship_value else None
+            success = mariadb._direct_remove_relationship(
+                source_type, request.source_uuid, relationship, rel_value,
+                target_type, request.target_uuid)
+            if success:
+                # Emit structured event for audit trail on both ends of the
+                # relationship. add_event_multi automatically adds a
+                # correlation_id when there are multiple objects.
+                eventlog.add_event_multi(
+                    EVENT_TYPE_MUTATE,
+                    [(source_type.value, request.source_uuid),
+                     (target_type.value, request.target_uuid)],
+                    'removed reference',
+                    extra={
+                        'relationship': relationship.value,
+                        'relationship_value': rel_value
+                    })
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database RemoveRelationship failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetReferencesTo(
+        self,
+        request: database_pb2.GetReferencesToRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetReferencesReply:
+        """Get all references to a target object."""
+        try:
+            self.monitor.counters['get_references_to'].inc()
+            target_type = ObjectType.from_proto_id(request.target_type)
+            if target_type is None:
+                return database_pb2.GetReferencesReply(references=[])
+            relationship = None
+            if request.HasField('relationship'):
+                relationship = RelationshipType.from_proto_id(
+                    request.relationship)
+            refs = mariadb._direct_get_references_to(
+                target_type, request.target_uuid, relationship)
+            result = []
+            for ref in refs:
+                result.append(database_pb2.ObjectReferenceData(
+                    source_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        ref.source_object_type.proto_id),
+                    source_uuid=str(ref.source_uuid),
+                    relationship=cast(
+                        shakenfist_enums_pb2.RelationshipType.ValueType,
+                        ref.relationship.proto_id),
+                    relationship_value=ref.relationship_value or '',
+                    target_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        ref.target_object_type.proto_id),
+                    target_uuid=str(ref.target_uuid),
+                    created=ref.created,
+                    last_active=ref.last_active
+                ))
+            return database_pb2.GetReferencesReply(references=result)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetReferencesTo failed', e)
+            return database_pb2.GetReferencesReply(references=[])
+
+    def GetReferencesFrom(
+        self,
+        request: database_pb2.GetReferencesFromRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetReferencesReply:
+        """Get all references from a source object."""
+        try:
+            self.monitor.counters['get_references_from'].inc()
+            source_type = ObjectType.from_proto_id(request.source_type)
+            if source_type is None:
+                return database_pb2.GetReferencesReply(references=[])
+            relationship = None
+            if request.HasField('relationship'):
+                relationship = RelationshipType.from_proto_id(
+                    request.relationship)
+            refs = mariadb._direct_get_references_from(
+                source_type, request.source_uuid, relationship)
+            result = []
+            for ref in refs:
+                result.append(database_pb2.ObjectReferenceData(
+                    source_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        ref.source_object_type.proto_id),
+                    source_uuid=str(ref.source_uuid),
+                    relationship=cast(
+                        shakenfist_enums_pb2.RelationshipType.ValueType,
+                        ref.relationship.proto_id),
+                    relationship_value=ref.relationship_value or '',
+                    target_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        ref.target_object_type.proto_id),
+                    target_uuid=str(ref.target_uuid),
+                    created=ref.created,
+                    last_active=ref.last_active
+                ))
+            return database_pb2.GetReferencesReply(references=result)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetReferencesFrom failed', e)
+            return database_pb2.GetReferencesReply(references=[])
+
+    def CountReferencesTo(
+        self,
+        request: database_pb2.CountReferencesToRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.CountReply:
+        """Count references to a target object."""
+        try:
+            self.monitor.counters['count_references_to'].inc()
+            target_type = ObjectType.from_proto_id(request.target_type)
+            if target_type is None:
+                return database_pb2.CountReply(count=0)
+            exclude_relationships: list[RelationshipType] | None = None
+            if request.exclude_relationships:
+                converted = []
+                for r in request.exclude_relationships:
+                    rel = RelationshipType.from_proto_id(r)
+                    if rel is not None:
+                        converted.append(rel)
+                exclude_relationships = converted if converted else None
+            count = mariadb._direct_count_references_to(
+                target_type, request.target_uuid, exclude_relationships)
+            return database_pb2.CountReply(count=count)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CountReferencesTo failed', e)
+            return database_pb2.CountReply(count=0)
+
+    def RemoveAllReferencesFrom(
+        self,
+        request: database_pb2.RemoveAllReferencesFromRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.CountReply:
+        """Remove all references from a source object."""
+        try:
+            self.monitor.counters['remove_all_references_from'].inc()
+            source_type = ObjectType.from_proto_id(request.source_type)
+            if source_type is None:
+                return database_pb2.CountReply(count=0)
+            # Optional relationship filter (0 = UNSPECIFIED means all)
+            relationship = None
+            if request.relationship:
+                relationship = RelationshipType.from_proto_id(
+                    request.relationship)
+            count = mariadb._direct_remove_all_references_from(
+                source_type, request.source_uuid, relationship)
+            if count > 0:
+                # Emit structured event for audit trail
+                eventlog.add_event(
+                    EVENT_TYPE_MUTATE,
+                    source_type.value, request.source_uuid,
+                    'removed all references',
+                    extra={
+                        'relationship': relationship.value if relationship else 'all',
+                        'count': count
+                    })
+            return database_pb2.CountReply(count=count)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database RemoveAllReferencesFrom failed', e)
+            return database_pb2.CountReply(count=0)
+
+    def UpdateLastActive(
+        self,
+        request: database_pb2.UpdateLastActiveRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update the last_active timestamp of a relationship."""
+        try:
+            self.monitor.counters['update_last_active'].inc()
+            source_type = ObjectType.from_proto_id(request.source_type)
+            target_type = ObjectType.from_proto_id(request.target_type)
+            relationship = RelationshipType.from_proto_id(request.relationship)
+            if source_type is None or target_type is None or relationship is None:
+                return database_pb2.StatusReply(
+                    success=False, error='Invalid type or relationship')
+            rel_value = request.relationship_value if request.relationship_value else None
+            success = mariadb._direct_update_last_active(
+                source_type, request.source_uuid, relationship, rel_value,
+                target_type, request.target_uuid)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateLastActive failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetStaleReferences(
+        self,
+        request: database_pb2.GetStaleReferencesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetReferencesReply:
+        """Get references with last_active older than specified time."""
+        try:
+            self.monitor.counters['get_stale_references'].inc()
+            refs = mariadb._direct_get_stale_references(request.older_than)
+            result = []
+            for ref in refs:
+                result.append(database_pb2.ObjectReferenceData(
+                    source_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        ref.source_object_type.proto_id),
+                    source_uuid=str(ref.source_uuid),
+                    relationship=cast(
+                        shakenfist_enums_pb2.RelationshipType.ValueType,
+                        ref.relationship.proto_id),
+                    relationship_value=ref.relationship_value or '',
+                    target_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        ref.target_object_type.proto_id),
+                    target_uuid=str(ref.target_uuid),
+                    created=ref.created,
+                    last_active=ref.last_active
+                ))
+            return database_pb2.GetReferencesReply(references=result)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetStaleReferences failed', e)
+            return database_pb2.GetReferencesReply(references=[])
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -985,7 +1265,12 @@ class Monitor(daemon.WorkerPoolDaemon):
             'update_upload',
             # MariaDB DnsMasq operations
             'create_dnsmasq', 'get_dnsmasq', 'get_dnsmasqs', 'delete_dnsmasq',
-            'update_dnsmasq'
+            'update_dnsmasq',
+            # MariaDB object reference operations
+            'record_relationship', 'remove_relationship', 'get_references_to',
+            'get_references_from', 'count_references_to',
+            'remove_all_references_from', 'update_last_active',
+            'get_stale_references'
         ]
         for op in operations:
             self.counters[op] = Counter(

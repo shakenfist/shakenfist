@@ -234,6 +234,46 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.UpdateDnsMasqRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.RecordRelationship = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/RecordRelationship',
+                request_serializer=database__pb2.RecordRelationshipRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.RemoveRelationship = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/RemoveRelationship',
+                request_serializer=database__pb2.RemoveRelationshipRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetReferencesTo = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetReferencesTo',
+                request_serializer=database__pb2.GetReferencesToRequest.SerializeToString,
+                response_deserializer=database__pb2.GetReferencesReply.FromString,
+                _registered_method=True)
+        self.GetReferencesFrom = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetReferencesFrom',
+                request_serializer=database__pb2.GetReferencesFromRequest.SerializeToString,
+                response_deserializer=database__pb2.GetReferencesReply.FromString,
+                _registered_method=True)
+        self.CountReferencesTo = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CountReferencesTo',
+                request_serializer=database__pb2.CountReferencesToRequest.SerializeToString,
+                response_deserializer=database__pb2.CountReply.FromString,
+                _registered_method=True)
+        self.RemoveAllReferencesFrom = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/RemoveAllReferencesFrom',
+                request_serializer=database__pb2.RemoveAllReferencesFromRequest.SerializeToString,
+                response_deserializer=database__pb2.CountReply.FromString,
+                _registered_method=True)
+        self.UpdateLastActive = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateLastActive',
+                request_serializer=database__pb2.UpdateLastActiveRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetStaleReferences = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetStaleReferences',
+                request_serializer=database__pb2.GetStaleReferencesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetReferencesReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -487,6 +527,55 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RecordRelationship(self, request, context):
+        """Object Reference Operations (MariaDB)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RemoveRelationship(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetReferencesTo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetReferencesFrom(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CountReferencesTo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RemoveAllReferencesFrom(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateLastActive(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetStaleReferences(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -689,6 +778,46 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.UpdateDnsMasq,
                     request_deserializer=database__pb2.UpdateDnsMasqRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'RecordRelationship': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordRelationship,
+                    request_deserializer=database__pb2.RecordRelationshipRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'RemoveRelationship': grpc.unary_unary_rpc_method_handler(
+                    servicer.RemoveRelationship,
+                    request_deserializer=database__pb2.RemoveRelationshipRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetReferencesTo': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetReferencesTo,
+                    request_deserializer=database__pb2.GetReferencesToRequest.FromString,
+                    response_serializer=database__pb2.GetReferencesReply.SerializeToString,
+            ),
+            'GetReferencesFrom': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetReferencesFrom,
+                    request_deserializer=database__pb2.GetReferencesFromRequest.FromString,
+                    response_serializer=database__pb2.GetReferencesReply.SerializeToString,
+            ),
+            'CountReferencesTo': grpc.unary_unary_rpc_method_handler(
+                    servicer.CountReferencesTo,
+                    request_deserializer=database__pb2.CountReferencesToRequest.FromString,
+                    response_serializer=database__pb2.CountReply.SerializeToString,
+            ),
+            'RemoveAllReferencesFrom': grpc.unary_unary_rpc_method_handler(
+                    servicer.RemoveAllReferencesFrom,
+                    request_deserializer=database__pb2.RemoveAllReferencesFromRequest.FromString,
+                    response_serializer=database__pb2.CountReply.SerializeToString,
+            ),
+            'UpdateLastActive': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateLastActive,
+                    request_deserializer=database__pb2.UpdateLastActiveRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetStaleReferences': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetStaleReferences,
+                    request_deserializer=database__pb2.GetStaleReferencesRequest.FromString,
+                    response_serializer=database__pb2.GetReferencesReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1771,6 +1900,222 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/UpdateDnsMasq',
             database__pb2.UpdateDnsMasqRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RecordRelationship(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/RecordRelationship',
+            database__pb2.RecordRelationshipRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RemoveRelationship(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/RemoveRelationship',
+            database__pb2.RemoveRelationshipRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetReferencesTo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetReferencesTo',
+            database__pb2.GetReferencesToRequest.SerializeToString,
+            database__pb2.GetReferencesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetReferencesFrom(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetReferencesFrom',
+            database__pb2.GetReferencesFromRequest.SerializeToString,
+            database__pb2.GetReferencesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CountReferencesTo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CountReferencesTo',
+            database__pb2.CountReferencesToRequest.SerializeToString,
+            database__pb2.CountReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RemoveAllReferencesFrom(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/RemoveAllReferencesFrom',
+            database__pb2.RemoveAllReferencesFromRequest.SerializeToString,
+            database__pb2.CountReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateLastActive(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateLastActive',
+            database__pb2.UpdateLastActiveRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetStaleReferences(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetStaleReferences',
+            database__pb2.GetStaleReferencesRequest.SerializeToString,
+            database__pb2.GetReferencesReply.FromString,
             options,
             channel_credentials,
             insecure,
