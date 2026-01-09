@@ -1342,6 +1342,9 @@ def main() -> None:
     # Ensure the MariaDB schema exists before accepting requests
     mariadb.ensure_schema()
 
+    # Run any pending data migrations (e.g., etcd -> MariaDB)
+    mariadb.ensure_data_migrations()
+
     # Create the gRPC server
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     server.add_insecure_port(

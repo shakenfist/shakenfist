@@ -2,6 +2,7 @@ import json
 import os
 import threading
 import time
+from typing import Any, Generator, Optional
 
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
@@ -349,7 +350,9 @@ def create(objecttype, subtype, name, data):
     return create_raw(path, data)
 
 
-def get(objecttype, subtype, name):
+def get(
+        objecttype: str, subtype: Optional[str], name: Optional[str]
+) -> Optional[dict[str, Any]]:
     if _use_database_service():
         from shakenfist import database
         return database.get(objecttype, subtype, name)
@@ -357,7 +360,10 @@ def get(objecttype, subtype, name):
     return get_raw(path)
 
 
-def get_all(objecttype, subtype, prefix=None, limit=0):
+def get_all(
+        objecttype: str, subtype: Optional[str],
+        prefix: Optional[str] = None, limit: int = 0
+) -> Generator[tuple[str, dict[str, Any]], None, None]:
     if _use_database_service():
         from shakenfist import database
         return database.get_all(objecttype, subtype, prefix=prefix, limit=limit)
@@ -383,7 +389,7 @@ def replace(objecttype, subtype, name, original_data, new_data):
     }])[0]
 
 
-def delete(objecttype, subtype, name):
+def delete(objecttype: str, subtype: Optional[str], name: str) -> bool:
     if _use_database_service():
         from shakenfist import database
         return database.delete(objecttype, subtype, name)
@@ -632,7 +638,7 @@ def compact(revision):
 
 
 @_retry_etcd_native_client
-def get_raw(path):
+def get_raw(path: str) -> Optional[dict[str, Any]]:
     path_encoded = path.encode()
     channel = get_etcd_native_client()
     stub = etcd_pb2_grpc.KVStub(channel)
@@ -653,7 +659,9 @@ def get_raw(path):
 
 
 @_retry_etcd_native_client
-def get_prefix_raw(path, limit=0):
+def get_prefix_raw(
+        path: str, limit: int = 0
+) -> Generator[tuple[str, dict[str, Any]], None, None]:
     path_encoded = path.encode()
 
     # From the etcd API docs: "If range_end is key plus one (e.g.,
@@ -713,7 +721,7 @@ def put_raw(path, new_data):
 
 
 @_retry_etcd_native_client
-def delete_raw(path):
+def delete_raw(path: str) -> bool:
     path_encoded = path.encode()
     channel = get_etcd_native_client()
     stub = etcd_pb2_grpc.KVStub(channel)
