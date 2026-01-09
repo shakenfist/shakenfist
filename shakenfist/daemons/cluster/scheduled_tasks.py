@@ -86,8 +86,17 @@ def _process_per_blob_queue(execution_limit=10):
 
         # Every blob location should have a checksum performed at least every
         # config.CHECKSUM_VERIFICATION_FREQUENCY seconds.
-        checksums = b.checksums
         node_uuids = b.locations
+
+        # Get existing hash verification timestamps from MariaDB
+        # We check sha512 since it's always computed
+        blob_hashes = mariadb.get_blob_hashes(str(b.uuid))
+        last_verified_by_node: dict[str, float] = {}
+        for h in blob_hashes:
+            if h.algorithm == 'sha512' and h.verification_status == 'valid':
+                if (h.node not in last_verified_by_node or
+                        h.last_verified_at > last_verified_by_node[h.node]):
+                    last_verified_by_node[h.node] = h.last_verified_at
 
         requests_by_node = defaultdict(list)
         for _, value in etcd.get_prefix_raw('/sf/clusteroperations-by-blob/'):
@@ -97,7 +106,8 @@ def _process_per_blob_queue(execution_limit=10):
             requests_by_node[op.node_uuid].append((op_type, op_uuid))
 
         for node_uuid in node_uuids:
-            last_checksum = checksums.get(config.NODE_NAME, 0)
+            # Check when this specific node last verified the blob
+            last_checksum = last_verified_by_node.get(node_uuid, 0)
             age = time.time() - last_checksum
 
             if age < config.CHECKSUM_VERIFICATION_FREQUENCY:

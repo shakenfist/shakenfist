@@ -284,17 +284,21 @@ class Artifact(dbowo):
     def add_index(self, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
             mri = self.most_recent_index
+            old_sha512 = None
+            old_blob_uuid = None
             if 'blob_uuid' in mri:
                 old_blob = blob.Blob.from_db(mri['blob_uuid'])
                 if not old_blob:
                     raise exceptions.BlobMissing(
                         'Failed to retrieve previous artifact version: '
                         f'{mri["blob_uuid"]}')
-                old_checksums = old_blob.checksums
                 old_blob_uuid = old_blob.uuid
-            else:
-                old_checksums = {}
-                old_blob_uuid = None
+                # Get sha512 hash from MariaDB
+                old_hashes = mariadb.get_blob_hashes(str(old_blob.uuid))
+                for h in old_hashes:
+                    if h.algorithm == 'sha512' and h.verification_status == 'valid':
+                        old_sha512 = h.hash_value
+                        break
 
             if old_blob_uuid and old_blob_uuid == blob_uuid:
                 # Skip using the same blob UUID as two consecutive indexes
@@ -304,10 +308,16 @@ class Artifact(dbowo):
             if not new_blob:
                 raise exceptions.BlobMissing(
                     f'Failed to retrieve new artifact version: {blob_uuid}')
-            new_checksums = new_blob.checksums
+            # Get sha512 hash from MariaDB
+            new_sha512 = None
+            new_hashes = mariadb.get_blob_hashes(str(new_blob.uuid))
+            for h in new_hashes:
+                if h.algorithm == 'sha512' and h.verification_status == 'valid':
+                    new_sha512 = h.hash_value
+                    break
 
-            if old_checksums.get('sha512') and new_checksums.get('sha512'):
-                if old_checksums.get('sha512') == new_checksums.get('sha512'):
+            if old_sha512 and new_sha512:
+                if old_sha512 == new_sha512:
                     # Skipping the update, the blobs have the same content...
                     return mri
 

@@ -1615,3 +1615,169 @@ class GetStaleReferencesRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["older_than", b"older_than"]) -> None: ...
 
 global___GetStaleReferencesRequest = GetStaleReferencesRequest
+
+@typing.final
+class BlobHashData(google.protobuf.message.Message):
+    """Blob Hash Operations (MariaDB)
+    These operations manage blob checksums/hashes, replacing the etcd-based
+    checksums attribute. Enables O(1) hash lookups and per-node verification.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BLOB_UUID_FIELD_NUMBER: builtins.int
+    NODE_FIELD_NUMBER: builtins.int
+    ALGORITHM_FIELD_NUMBER: builtins.int
+    HASH_VALUE_FIELD_NUMBER: builtins.int
+    FILE_SIZE_FIELD_NUMBER: builtins.int
+    COMPUTED_AT_FIELD_NUMBER: builtins.int
+    LAST_VERIFIED_AT_FIELD_NUMBER: builtins.int
+    VERIFICATION_STATUS_FIELD_NUMBER: builtins.int
+    ERROR_MESSAGE_FIELD_NUMBER: builtins.int
+    blob_uuid: builtins.str
+    node: builtins.str
+    algorithm: builtins.str
+    hash_value: builtins.str
+    file_size: builtins.int
+    computed_at: builtins.float
+    last_verified_at: builtins.float
+    verification_status: builtins.str
+    error_message: builtins.str
+    """Empty string for NULL"""
+    def __init__(
+        self,
+        *,
+        blob_uuid: builtins.str = ...,
+        node: builtins.str = ...,
+        algorithm: builtins.str = ...,
+        hash_value: builtins.str = ...,
+        file_size: builtins.int = ...,
+        computed_at: builtins.float = ...,
+        last_verified_at: builtins.float = ...,
+        verification_status: builtins.str = ...,
+        error_message: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["algorithm", b"algorithm", "blob_uuid", b"blob_uuid", "computed_at", b"computed_at", "error_message", b"error_message", "file_size", b"file_size", "hash_value", b"hash_value", "last_verified_at", b"last_verified_at", "node", b"node", "verification_status", b"verification_status"]) -> None: ...
+
+global___BlobHashData = BlobHashData
+
+@typing.final
+class UpsertBlobHashRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BLOB_HASH_FIELD_NUMBER: builtins.int
+    @property
+    def blob_hash(self) -> global___BlobHashData: ...
+    def __init__(
+        self,
+        *,
+        blob_hash: global___BlobHashData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["blob_hash", b"blob_hash"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["blob_hash", b"blob_hash"]) -> None: ...
+
+global___UpsertBlobHashRequest = UpsertBlobHashRequest
+
+@typing.final
+class GetBlobHashesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BLOB_UUID_FIELD_NUMBER: builtins.int
+    NODE_FIELD_NUMBER: builtins.int
+    blob_uuid: builtins.str
+    node: builtins.str
+    """If provided, filter by node"""
+    def __init__(
+        self,
+        *,
+        blob_uuid: builtins.str = ...,
+        node: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_node", b"_node", "node", b"node"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_node", b"_node", "blob_uuid", b"blob_uuid", "node", b"node"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_node", b"_node"]) -> typing.Literal["node"] | None: ...
+
+global___GetBlobHashesRequest = GetBlobHashesRequest
+
+@typing.final
+class GetBlobHashesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    HASHES_FIELD_NUMBER: builtins.int
+    @property
+    def hashes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___BlobHashData]: ...
+    def __init__(
+        self,
+        *,
+        hashes: collections.abc.Iterable[global___BlobHashData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["hashes", b"hashes"]) -> None: ...
+
+global___GetBlobHashesReply = GetBlobHashesReply
+
+@typing.final
+class FindBlobByHashRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ALGORITHM_FIELD_NUMBER: builtins.int
+    HASH_VALUE_FIELD_NUMBER: builtins.int
+    algorithm: builtins.str
+    hash_value: builtins.str
+    def __init__(
+        self,
+        *,
+        algorithm: builtins.str = ...,
+        hash_value: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["algorithm", b"algorithm", "hash_value", b"hash_value"]) -> None: ...
+
+global___FindBlobByHashRequest = FindBlobByHashRequest
+
+@typing.final
+class FindBlobByHashReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    BLOB_UUID_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    blob_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        blob_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["blob_uuid", b"blob_uuid", "found", b"found"]) -> None: ...
+
+global___FindBlobByHashReply = FindBlobByHashReply
+
+@typing.final
+class GetStaleBlobHashesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OLDER_THAN_FIELD_NUMBER: builtins.int
+    older_than: builtins.float
+    """Unix timestamp - return hashes with last_verified_at < this"""
+    def __init__(
+        self,
+        *,
+        older_than: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["older_than", b"older_than"]) -> None: ...
+
+global___GetStaleBlobHashesRequest = GetStaleBlobHashesRequest
+
+@typing.final
+class DeleteBlobHashesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BLOB_UUID_FIELD_NUMBER: builtins.int
+    blob_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        blob_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["blob_uuid", b"blob_uuid"]) -> None: ...
+
+global___DeleteBlobHashesRequest = DeleteBlobHashesRequest

@@ -268,6 +268,32 @@ class DatabaseServiceStub:
         database_pb2.GetReferencesReply,
     ]
 
+    UpsertBlobHash: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpsertBlobHashRequest,
+        database_pb2.StatusReply,
+    ]
+    """Blob Hash Operations (MariaDB)"""
+
+    GetBlobHashes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobHashesRequest,
+        database_pb2.GetBlobHashesReply,
+    ]
+
+    FindBlobByHash: grpc.UnaryUnaryMultiCallable[
+        database_pb2.FindBlobByHashRequest,
+        database_pb2.FindBlobByHashReply,
+    ]
+
+    GetStaleBlobHashes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetStaleBlobHashesRequest,
+        database_pb2.GetBlobHashesReply,
+    ]
+
+    DeleteBlobHashes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteBlobHashesRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -516,6 +542,32 @@ class DatabaseServiceAsyncStub:
     GetStaleReferences: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetStaleReferencesRequest,
         database_pb2.GetReferencesReply,
+    ]
+
+    UpsertBlobHash: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpsertBlobHashRequest,
+        database_pb2.StatusReply,
+    ]
+    """Blob Hash Operations (MariaDB)"""
+
+    GetBlobHashes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobHashesRequest,
+        database_pb2.GetBlobHashesReply,
+    ]
+
+    FindBlobByHash: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.FindBlobByHashRequest,
+        database_pb2.FindBlobByHashReply,
+    ]
+
+    GetStaleBlobHashes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetStaleBlobHashesRequest,
+        database_pb2.GetBlobHashesReply,
+    ]
+
+    DeleteBlobHashes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteBlobHashesRequest,
+        database_pb2.StatusReply,
     ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
@@ -863,5 +915,41 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.GetStaleReferencesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetReferencesReply, collections.abc.Awaitable[database_pb2.GetReferencesReply]]: ...
+
+    @abc.abstractmethod
+    def UpsertBlobHash(
+        self,
+        request: database_pb2.UpsertBlobHashRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Blob Hash Operations (MariaDB)"""
+
+    @abc.abstractmethod
+    def GetBlobHashes(
+        self,
+        request: database_pb2.GetBlobHashesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetBlobHashesReply, collections.abc.Awaitable[database_pb2.GetBlobHashesReply]]: ...
+
+    @abc.abstractmethod
+    def FindBlobByHash(
+        self,
+        request: database_pb2.FindBlobByHashRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.FindBlobByHashReply, collections.abc.Awaitable[database_pb2.FindBlobByHashReply]]: ...
+
+    @abc.abstractmethod
+    def GetStaleBlobHashes(
+        self,
+        request: database_pb2.GetStaleBlobHashesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetBlobHashesReply, collections.abc.Awaitable[database_pb2.GetBlobHashesReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteBlobHashes(
+        self,
+        request: database_pb2.DeleteBlobHashesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

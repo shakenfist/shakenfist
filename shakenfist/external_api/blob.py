@@ -23,7 +23,7 @@ from shakenfist.blob import Blob
 from shakenfist.blob import Blobs
 from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.daemons import daemon
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
@@ -304,9 +304,11 @@ class BlobChecksumEndpoint(api_base.Resource):
         if algorithm not in BLOB_HASH_ALGORITHMS:
             return sf_api.error(400, 'unknown hash algorithm')
 
-        cs = blob_from_db.checksums
-        if algorithm in cs:
-            return cs[algorithm]
+        # Get hashes from MariaDB and find the requested algorithm
+        hashes = mariadb.get_blob_hashes(str(blob_from_db.uuid))
+        for h in hashes:
+            if h.algorithm == algorithm and h.verification_status == 'valid':
+                return h.hash_value
 
         # Otherwise, request a hashing of this blob and return None
         locations = blob_from_db.locations
@@ -340,22 +342,20 @@ class BlobChecksumsEndpoint(api_base.Resource):
         if not hash:
             return sf_api.error(400, 'you must specify a hash')
 
-        # Search for blobs matching the given hash by iterating through all
-        # blobs. This replaces the previous cache-based lookup.
-        for objkey, _ in etcd.get_all(Blob.object_type, None):
-            blob_uuid = objkey.split('/')[-1]
-            b = Blob.from_db(blob_uuid)
-            if not b:
-                continue
-            if b.state.value != dbo.STATE_CREATED:
-                continue
+        # O(1) lookup via idx_hash_lookup index in MariaDB
+        blob_uuid = mariadb.find_blob_by_hash(algorithm, hash)
+        if not blob_uuid:
+            return None
 
-            if b.checksums.get(algorithm) == hash:
-                out = b.external_view()
-                out['instances'] = instance_usage_for_blob_uuid(b.uuid)
-                return out
+        b = Blob.from_db(blob_uuid)
+        if not b:
+            return None
+        if b.state.value != dbo.STATE_CREATED:
+            return None
 
-        return None
+        out = b.external_view()
+        out['instances'] = instance_usage_for_blob_uuid(b.uuid)
+        return out
 
 
 class BlobMetadatasEndpoint(api_base.Resource):

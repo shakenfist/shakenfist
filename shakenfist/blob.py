@@ -22,6 +22,7 @@ from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import etcd
 from shakenfist import mariadb
+from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
 from shakenfist.schema.operations.node_blob_op \
@@ -187,9 +188,13 @@ class Blob(dbo):
         # expect
         out = self._external_view()
 
-        checksums = self.checksums
-        if 'nodes' in checksums:
-            del checksums['nodes']
+        # Get checksums from MariaDB and build a dict for display
+        # (excludes internal fields like node and verification timestamps)
+        hashes = mariadb.get_blob_hashes(str(self.uuid))
+        checksums: dict[str, str] = {}
+        for h in hashes:
+            if h.verification_status == 'valid' and h.algorithm not in checksums:
+                checksums[h.algorithm] = h.hash_value
 
         out.update({
             'size': self.size,
@@ -882,10 +887,6 @@ class Blob(dbo):
         blob_uuid = str(blob_uuid)
         return os.path.join(Blob.filedir(blob_uuid), blob_uuid)
 
-    @property
-    def checksums(self) -> dict[str, Any]:
-        return self._db_get_attribute('checksums')
-
     def _remove_corrupt_blob(self) -> None:
         blob_path = Blob.filepath(self.uuid)
         if os.path.exists(blob_path):
@@ -912,6 +913,10 @@ class Blob(dbo):
             return False
         return True
 
+    def hard_delete(self) -> None:
+        mariadb.delete_blob_hashes(str(self.uuid))
+        super().hard_delete()
+
     def verify_checksum(self, hash: Optional[str] = None, urgent: bool = True) -> bool:
         # This method is focussed on sha512 hashes at the moment, but I also
         # want it to be able to do other hash types later -- for example OVA
@@ -919,18 +924,23 @@ class Blob(dbo):
         # we always make sure there is a sha512, but if we're not in a hurry
         # we'll calculate a few others just once as well.
         file_path = self.filepath(self.uuid)
+        blob_uuid = str(self.uuid)
+        now = time.time()
 
         if hash:
             sha512_hash = hash
         if not hash:
             sha512_hash = util_concurrency.hash_file(file_path, 'sha512')
 
-        # If we're not in a hurry, calculate missing extra hashes
-        extra_hashes = {}
+        # Get existing hashes for this blob on this node from MariaDB
+        existing_hashes = mariadb.get_blob_hashes(blob_uuid, config.NODE_NAME)
+        existing_by_alg = {h.algorithm: h for h in existing_hashes}
+
+        # Check for hash algorithms we don't have yet
         needs_rehashing = False
-        c = self.checksums
+        extra_hashes = {}
         for alg in BLOB_HASH_ALGORITHMS:
-            if alg not in c:
+            if alg not in existing_by_alg:
                 if not urgent:
                     extra_hashes[alg] = \
                         util_concurrency.hash_file(file_path, alg)
@@ -946,33 +956,57 @@ class Blob(dbo):
                 [nbo_tasks.verify_size_and_checksum],
                 PRIORITY.background_high_io)
 
-        # Validate / update our stored checksums
-        with self.get_lock_attr('checksums', op='update checksums'):
-            c = self.checksums
-            if 'sha512' not in c:
-                c['sha512'] = sha512_hash
+        # Validate sha512 hash against stored value
+        is_new_hash = 'sha512' not in existing_by_alg
+        if 'sha512' in existing_by_alg:
+            stored_hash = existing_by_alg['sha512'].hash_value
+            if stored_hash != sha512_hash:
+                self.add_event(EVENT_TYPE_AUDIT,
+                               'blob failed checksum validation',
+                               extra={
+                                   'stored_hash': stored_hash,
+                                   'node_hash': sha512_hash,
+                                   'node': config.NODE_NAME
+                               })
+                self._remove_corrupt_blob()
+                return False
             else:
-                if c['sha512'] != sha512_hash:
-                    self.add_event(EVENT_TYPE_AUDIT,
-                                   'blob failed checksum validation',
-                                   extra={
-                                       'stored_hash': c['sha512'],
-                                       'node_hash': sha512_hash,
-                                       'node': config.NODE_NAME
-                                   })
-                    self._remove_corrupt_blob()
-                    return False
+                self.add_event(EVENT_TYPE_AUDIT,
+                               'blob checksum verified',
+                               extra={
+                                   'algorithm': 'sha512',
+                                   'node': config.NODE_NAME
+                               })
 
-            if 'nodes' not in c:
-                c['nodes'] = {config.NODE_NAME: time.time()}
-            else:
-                c['nodes'][config.NODE_NAME] = time.time()
+        # Upsert sha512 hash (and any extra hashes we calculated)
+        all_hashes = {'sha512': sha512_hash}
+        all_hashes.update(extra_hashes)
 
-            for alg in extra_hashes:
-                if alg not in c:
-                    c[alg] = extra_hashes[alg]
+        for alg, hash_value in all_hashes.items():
+            blob_hash = BlobHash(
+                blob_uuid=blob_uuid,
+                node=config.NODE_NAME,
+                algorithm=alg,
+                hash_value=hash_value,
+                file_size=self.size,
+                computed_at=now,
+                last_verified_at=now,
+                verification_status='valid',
+                error_message=None
+            )
+            mariadb.upsert_blob_hash(blob_hash)
 
-            self._db_set_attribute('checksums', c)
+        # Log event for hash recording
+        if is_new_hash or extra_hashes:
+            new_algorithms = list(extra_hashes.keys())
+            if is_new_hash:
+                new_algorithms.insert(0, 'sha512')
+            self.add_event(EVENT_TYPE_AUDIT,
+                           'blob hash recorded',
+                           extra={
+                               'algorithms': new_algorithms,
+                               'node': config.NODE_NAME
+                           })
 
         return True
 

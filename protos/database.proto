@@ -70,6 +70,13 @@ service DatabaseService {
   rpc RemoveAllReferencesFrom (RemoveAllReferencesFromRequest) returns (CountReply) {}
   rpc UpdateLastActive (UpdateLastActiveRequest) returns (StatusReply) {}
   rpc GetStaleReferences (GetStaleReferencesRequest) returns (GetReferencesReply) {}
+
+  // Blob Hash Operations (MariaDB)
+  rpc UpsertBlobHash (UpsertBlobHashRequest) returns (StatusReply) {}
+  rpc GetBlobHashes (GetBlobHashesRequest) returns (GetBlobHashesReply) {}
+  rpc FindBlobByHash (FindBlobByHashRequest) returns (FindBlobByHashReply) {}
+  rpc GetStaleBlobHashes (GetStaleBlobHashesRequest) returns (GetBlobHashesReply) {}
+  rpc DeleteBlobHashes (DeleteBlobHashesRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -516,4 +523,51 @@ message UpdateLastActiveRequest {
 
 message GetStaleReferencesRequest {
   double older_than = 1;  // Unix timestamp - return refs with last_active < this
+}
+
+// Blob Hash Operations (MariaDB)
+// These operations manage blob checksums/hashes, replacing the etcd-based
+// checksums attribute. Enables O(1) hash lookups and per-node verification.
+
+message BlobHashData {
+  string blob_uuid = 1;
+  string node = 2;
+  string algorithm = 3;
+  string hash_value = 4;
+  int64 file_size = 5;
+  double computed_at = 6;
+  double last_verified_at = 7;
+  string verification_status = 8;
+  string error_message = 9;  // Empty string for NULL
+}
+
+message UpsertBlobHashRequest {
+  BlobHashData blob_hash = 1;
+}
+
+message GetBlobHashesRequest {
+  string blob_uuid = 1;
+  optional string node = 2;  // If provided, filter by node
+}
+
+message GetBlobHashesReply {
+  repeated BlobHashData hashes = 1;
+}
+
+message FindBlobByHashRequest {
+  string algorithm = 1;
+  string hash_value = 2;
+}
+
+message FindBlobByHashReply {
+  bool found = 1;
+  string blob_uuid = 2;
+}
+
+message GetStaleBlobHashesRequest {
+  double older_than = 1;  // Unix timestamp - return hashes with last_verified_at < this
+}
+
+message DeleteBlobHashesRequest {
+  string blob_uuid = 1;
 }

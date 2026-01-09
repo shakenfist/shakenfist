@@ -274,6 +274,31 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetStaleReferencesRequest.SerializeToString,
                 response_deserializer=database__pb2.GetReferencesReply.FromString,
                 _registered_method=True)
+        self.UpsertBlobHash = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpsertBlobHash',
+                request_serializer=database__pb2.UpsertBlobHashRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetBlobHashes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetBlobHashes',
+                request_serializer=database__pb2.GetBlobHashesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetBlobHashesReply.FromString,
+                _registered_method=True)
+        self.FindBlobByHash = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/FindBlobByHash',
+                request_serializer=database__pb2.FindBlobByHashRequest.SerializeToString,
+                response_deserializer=database__pb2.FindBlobByHashReply.FromString,
+                _registered_method=True)
+        self.GetStaleBlobHashes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetStaleBlobHashes',
+                request_serializer=database__pb2.GetStaleBlobHashesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetBlobHashesReply.FromString,
+                _registered_method=True)
+        self.DeleteBlobHashes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteBlobHashes',
+                request_serializer=database__pb2.DeleteBlobHashesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -576,6 +601,37 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def UpsertBlobHash(self, request, context):
+        """Blob Hash Operations (MariaDB)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBlobHashes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FindBlobByHash(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetStaleBlobHashes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteBlobHashes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -818,6 +874,31 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetStaleReferences,
                     request_deserializer=database__pb2.GetStaleReferencesRequest.FromString,
                     response_serializer=database__pb2.GetReferencesReply.SerializeToString,
+            ),
+            'UpsertBlobHash': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpsertBlobHash,
+                    request_deserializer=database__pb2.UpsertBlobHashRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetBlobHashes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBlobHashes,
+                    request_deserializer=database__pb2.GetBlobHashesRequest.FromString,
+                    response_serializer=database__pb2.GetBlobHashesReply.SerializeToString,
+            ),
+            'FindBlobByHash': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindBlobByHash,
+                    request_deserializer=database__pb2.FindBlobByHashRequest.FromString,
+                    response_serializer=database__pb2.FindBlobByHashReply.SerializeToString,
+            ),
+            'GetStaleBlobHashes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetStaleBlobHashes,
+                    request_deserializer=database__pb2.GetStaleBlobHashesRequest.FromString,
+                    response_serializer=database__pb2.GetBlobHashesReply.SerializeToString,
+            ),
+            'DeleteBlobHashes': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteBlobHashes,
+                    request_deserializer=database__pb2.DeleteBlobHashesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2116,6 +2197,141 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetStaleReferences',
             database__pb2.GetStaleReferencesRequest.SerializeToString,
             database__pb2.GetReferencesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpsertBlobHash(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpsertBlobHash',
+            database__pb2.UpsertBlobHashRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetBlobHashes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetBlobHashes',
+            database__pb2.GetBlobHashesRequest.SerializeToString,
+            database__pb2.GetBlobHashesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FindBlobByHash(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/FindBlobByHash',
+            database__pb2.FindBlobByHashRequest.SerializeToString,
+            database__pb2.FindBlobByHashReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetStaleBlobHashes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetStaleBlobHashes',
+            database__pb2.GetStaleBlobHashesRequest.SerializeToString,
+            database__pb2.GetBlobHashesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteBlobHashes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteBlobHashes',
+            database__pb2.DeleteBlobHashesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
             insecure,
