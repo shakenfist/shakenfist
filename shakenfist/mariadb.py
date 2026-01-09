@@ -63,25 +63,12 @@ _object_references_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
-#   object_states v1: Initial schema with VARCHAR(32) for object_type
-#   object_states v2: Changed object_type from VARCHAR(32) to ENUM(ObjectType)
-#   ipam_reservations v1: Initial schema with VARCHAR(32) for reservation_type
-#                         and VARCHAR(45) for address
-#   ipam_reservations v2: Changed reservation_type from VARCHAR(32) to
-#                         ENUM(ReservationType)
-#   ipam_reservations v3: Changed address from VARCHAR(45) to INET4
-#   ipam_reservations v4: Changed user_type from VARCHAR(32) to ENUM(ObjectType)
-#   ipam_reservations v5: Changed ipam_uuid and user_uuid from VARCHAR(36) to UUID
-#   uploads v1: Initial schema for upload objects
-#   dnsmasq v1: Initial schema for DnsMasq objects
-#   object_references v1: Initial schema for object reference tracking
-#   object_references v2: Changed source_uuid and target_uuid from UUID to
-#                         VARCHAR(255) to support Node objects which use FQDN
-#                         as their identifier instead of UUID
+#   All tables v1: Initial schema creation
+#   All tables v2: Data migration from etcd to MariaDB
 OBJECT_STATES_VERSION = 2
-IPAM_RESERVATIONS_VERSION = 5
-UPLOADS_VERSION = 1
-DNSMASQ_VERSION = 1
+IPAM_RESERVATIONS_VERSION = 2
+UPLOADS_VERSION = 2
+DNSMASQ_VERSION = 2
 OBJECT_REFERENCES_VERSION = 2
 
 
@@ -295,10 +282,10 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_object_states_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it with current
-    # schema (which includes the ENUM type)
+    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
+    # Data migration from etcd will upgrade to version 2.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version {OBJECT_STATES_VERSION})')
+        LOG.info(f'Creating {table_name} table (version 1)')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -309,24 +296,7 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = OBJECT_STATES_VERSION
-        _set_table_version(engine, table_name, current_ver)
-
-    # Migration from v1 to v2: Convert object_type from VARCHAR(32) to ENUM
-    if current_ver == 1:
-        LOG.info('Upgrading object_states from v1 to v2: '
-                 'converting object_type to ENUM')
-        enum_values = _build_object_type_enum_values()
-        with engine.connect() as conn:
-            # ALTER TABLE to change column type from VARCHAR to ENUM
-            # MariaDB will automatically convert existing string values to
-            # enum values if they match
-            conn.execute(sa.text(
-                f'ALTER TABLE object_states '
-                f'MODIFY COLUMN object_type ENUM({enum_values}) NOT NULL'
-            ))
-            conn.commit()
-        current_ver = 2
+        current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -397,10 +367,10 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_ipam_reservations_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it with current
-    # schema (which includes the ENUM and INET4 types)
+    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
+    # Data migration from etcd will upgrade to version 2.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version {IPAM_RESERVATIONS_VERSION})')
+        LOG.info(f'Creating {table_name} table (version 1)')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -411,73 +381,7 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = IPAM_RESERVATIONS_VERSION
-        _set_table_version(engine, table_name, current_ver)
-
-    # Migration from v1 to v2: Convert reservation_type from VARCHAR(32) to ENUM
-    if current_ver == 1:
-        LOG.info('Upgrading ipam_reservations from v1 to v2: '
-                 'converting reservation_type to ENUM')
-        enum_values = _build_reservation_type_enum_values()
-        with engine.connect() as conn:
-            # ALTER TABLE to change column type from VARCHAR to ENUM
-            # MariaDB will automatically convert existing string values to
-            # enum values if they match
-            conn.execute(sa.text(
-                f'ALTER TABLE ipam_reservations '
-                f'MODIFY COLUMN reservation_type ENUM({enum_values}) NOT NULL'
-            ))
-            conn.commit()
-        current_ver = 2
-        _set_table_version(engine, table_name, current_ver)
-
-    # Migration from v2 to v3: Convert address from VARCHAR(45) to INET4
-    if current_ver == 2:
-        LOG.info('Upgrading ipam_reservations from v2 to v3: '
-                 'converting address to INET4')
-        with engine.connect() as conn:
-            # ALTER TABLE to change column type from VARCHAR to INET4
-            # MariaDB will automatically convert existing IP string values
-            # to INET4 format
-            conn.execute(sa.text(
-                'ALTER TABLE ipam_reservations '
-                'MODIFY COLUMN address INET4 NOT NULL'
-            ))
-            conn.commit()
-        current_ver = 3
-        _set_table_version(engine, table_name, current_ver)
-
-    # Migration from v3 to v4: Convert user_type from VARCHAR(32) to ENUM
-    if current_ver == 3:
-        LOG.info('Upgrading ipam_reservations from v3 to v4: '
-                 'converting user_type to ENUM')
-        enum_values = _build_object_type_enum_values()
-        with engine.connect() as conn:
-            # ALTER TABLE to change column type from VARCHAR to ENUM
-            # MariaDB will automatically convert existing string values to
-            # enum values if they match. NULL values remain NULL.
-            conn.execute(sa.text(
-                f'ALTER TABLE ipam_reservations '
-                f'MODIFY COLUMN user_type ENUM({enum_values}) NULL'
-            ))
-            conn.commit()
-        current_ver = 4
-        _set_table_version(engine, table_name, current_ver)
-
-    # Migration from v4 to v5: Convert UUID columns from VARCHAR(36) to UUID
-    if current_ver == 4:
-        LOG.info('Upgrading ipam_reservations from v4 to v5: '
-                 'converting UUID columns to native UUID type')
-        with engine.connect() as conn:
-            # ALTER TABLE to change ipam_uuid and user_uuid from VARCHAR to UUID
-            # MariaDB will automatically convert existing UUID string values
-            conn.execute(sa.text(
-                'ALTER TABLE ipam_reservations '
-                'MODIFY COLUMN ipam_uuid UUID NOT NULL, '
-                'MODIFY COLUMN user_uuid UUID NULL'
-            ))
-            conn.commit()
-        current_ver = 5
+        current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -524,10 +428,10 @@ def _ensure_uploads_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_uploads_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it with current
-    # schema
+    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
+    # Data migration from etcd will upgrade to version 2.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version {UPLOADS_VERSION})')
+        LOG.info(f'Creating {table_name} table (version 1)')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -538,10 +442,8 @@ def _ensure_uploads_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = UPLOADS_VERSION
+        current_ver = 1
         _set_table_version(engine, table_name, current_ver)
-
-    # Future migrations would go here (if current_ver == 1: ...)
 
     return {
         'table': table_name,
@@ -587,10 +489,10 @@ def _ensure_dnsmasq_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_dnsmasq_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it with current
-    # schema
+    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
+    # Data migration from etcd will upgrade to version 2.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version {DNSMASQ_VERSION})')
+        LOG.info(f'Creating {table_name} table (version 1)')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -601,10 +503,8 @@ def _ensure_dnsmasq_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = DNSMASQ_VERSION
+        current_ver = 1
         _set_table_version(engine, table_name, current_ver)
-
-    # Future migrations would go here (if current_ver == 1: ...)
 
     return {
         'table': table_name,
@@ -653,12 +553,10 @@ def _ensure_object_references_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_object_references_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it with current
-    # schema
+    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
+    # Data migration from etcd will upgrade to version 2.
     if current_ver <= 0:
-        LOG.info(
-            f'Creating {table_name} table (version {OBJECT_REFERENCES_VERSION})'
-        )
+        LOG.info(f'Creating {table_name} table (version 1)')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -669,24 +567,7 @@ def _ensure_object_references_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = OBJECT_REFERENCES_VERSION
-        _set_table_version(engine, table_name, current_ver)
-
-    # Migration from v1 to v2: Convert source_uuid and target_uuid from UUID to
-    # VARCHAR(255) to support Node objects which use FQDN as their identifier
-    if current_ver == 1:
-        LOG.info('Upgrading object_references from v1 to v2: '
-                 'converting UUID columns to VARCHAR(255)')
-        with engine.connect() as conn:
-            # ALTER TABLE to change column types from UUID to VARCHAR(255)
-            # MariaDB will automatically convert existing UUID values to strings
-            conn.execute(sa.text(
-                'ALTER TABLE object_references '
-                'MODIFY COLUMN source_uuid VARCHAR(255) NOT NULL, '
-                'MODIFY COLUMN target_uuid VARCHAR(255) NOT NULL'
-            ))
-            conn.commit()
-        current_ver = 2
+        current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -767,12 +648,9 @@ def ensure_schema() -> list[dict[str, Any]]:
 
 # Registry of data migrations: table_name -> {version: migration_function}
 # Migrations are run in version order when current version is below target.
-DATA_MIGRATIONS: dict[str, dict[int, Callable[[sa.Engine], dict[str, Any]]]] = {
-    # Migrations will be added here as needed. Example:
-    # 'blob_hashes': {
-    #     2: _migrate_blob_checksums_from_etcd,
-    # },
-}
+# NOTE: This is populated at the end of this section, after migration functions
+# are defined.
+DATA_MIGRATIONS: dict[str, dict[int, Callable[[sa.Engine], dict[str, Any]]]] = {}
 
 
 def ensure_data_migrations() -> list[dict[str, Any]]:
@@ -878,6 +756,458 @@ def ensure_data_migrations() -> list[dict[str, Any]]:
         LOG.error(f'Data migrations failed: {len(failed)} errors')
 
     return results
+
+
+# =============================================================================
+# Data Migration Functions
+#
+# These functions migrate data from etcd to MariaDB. They are called
+# automatically by ensure_data_migrations() when the table version is below
+# the target version.
+#
+# All migration functions must:
+# - Be idempotent (use upserts, handle already-migrated data)
+# - Return a dict with 'migrated_count' and 'error_count' keys
+# - Delete source data from etcd after successful migration
+# - Use LOG for progress reporting (not click.echo)
+# =============================================================================
+
+# Object types that have state stored in etcd
+_OBJECT_TYPES_WITH_STATE = [
+    'agentoperation', 'artifact', 'blob', 'dhcp', 'instance', 'interface',
+    'ipam', 'namespace', 'network', 'node', 'upload',
+    'artifact_fetch_op', 'imgcache_op', 'node_blob_op', 'node_op'
+]
+
+
+def _migrate_etcd_object_states(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate object state from etcd attributes to MariaDB.
+
+    Scans all object types that store state in etcd and migrates them
+    to the object_states table.
+    """
+    from shakenfist import etcd
+
+    migrated_count = 0
+    error_count = 0
+
+    for object_type in _OBJECT_TYPES_WITH_STATE:
+        LOG.info(f'Migrating {object_type} state from etcd...')
+        type_count = 0
+
+        for objkey, _ in etcd.get_all(object_type, None):
+            objuuid = objkey.split('/')[-1]
+            state_data = etcd.get(f'attribute/{object_type}', objuuid, 'state')
+            if not state_data:
+                continue
+
+            try:
+                state = State(**state_data)
+                success = _direct_set_state(
+                    ObjectType(object_type),  # type: ignore[call-arg]
+                    objuuid, state)
+                if success:
+                    etcd.delete(f'attribute/{object_type}', objuuid, 'state')
+                    migrated_count += 1
+                    type_count += 1
+            except Exception as e:
+                LOG.warning(f'Error migrating state for {object_type}/{objuuid}: {e}')
+                error_count += 1
+
+            if type_count > 0 and type_count % 100 == 0:
+                LOG.info(f'  ... {type_count} {object_type} objects processed')
+
+        if type_count > 0:
+            LOG.info(f'  Migrated {type_count} {object_type} objects')
+
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
+def _migrate_etcd_ipam_reservations(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate IPAM reservations from etcd to MariaDB."""
+    from shakenfist import etcd
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating IPAM reservations from etcd...')
+
+    for key, data in etcd.get_prefix_raw('/sf/ipam_reservations/'):
+        parts = key.split('/')
+        if len(parts) < 5:
+            LOG.warning(f'Skipping invalid IPAM key: {key}')
+            error_count += 1
+            continue
+
+        ipam_uuid = parts[3]
+        # address = parts[4]  # Not needed, in data
+
+        try:
+            reservation = IPAMReservation.from_legacy_dict(ipam_uuid, data)
+            success = _direct_reserve_address(reservation)
+            if success:
+                etcd.delete_raw(key)
+                migrated_count += 1
+            else:
+                # Already exists, just delete from etcd
+                etcd.delete_raw(key)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(f'Error migrating IPAM reservation {key}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(f'  ... {migrated_count + skipped_count} reservations processed')
+
+    LOG.info(f'IPAM migration: {migrated_count} migrated, {skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
+def _migrate_etcd_uploads(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate upload objects from etcd to MariaDB."""
+    from shakenfist import etcd
+    from shakenfist.upload import Upload
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating uploads from etcd...')
+
+    for objkey, data in etcd.get_all('upload', None):
+        upload_uuid = objkey.split('/')[-1]
+
+        try:
+            upload_uuid_obj = UUIDType(upload_uuid)
+            success = create_upload(
+                upload_uuid_obj,
+                data['node'],
+                data['created_at'],
+                data.get('version', Upload.current_version)
+            )
+            if success:
+                etcd.delete('upload', None, upload_uuid)
+                migrated_count += 1
+            else:
+                # Already exists
+                etcd.delete('upload', None, upload_uuid)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(f'Error migrating upload {upload_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(f'  ... {migrated_count + skipped_count} uploads processed')
+
+    LOG.info(f'Upload migration: {migrated_count} migrated, {skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
+def _migrate_etcd_dnsmasq(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate DnsMasq objects from etcd to MariaDB."""
+    from shakenfist import etcd
+    from shakenfist.managed_executables.dnsmasq import DnsMasq
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating DnsMasq objects from etcd...')
+
+    # DnsMasq uses ObjectType.DHCP for historical reasons
+    for objkey, data in etcd.get_all('dhcp', None):
+        dnsmasq_uuid = objkey.split('/')[-1]
+
+        try:
+            # Apply upgrades to legacy data
+            version = data.get('version', DnsMasq.initial_version)
+            while version < DnsMasq.current_version:
+                step_name = f'_upgrade_step_{version}_to_{version + 1}'
+                step_func = getattr(DnsMasq, step_name, None)
+                if step_func:
+                    step_func(data)
+                version += 1
+                data['version'] = version
+
+            # Convert owner_type to ObjectType if it's a string
+            owner_type_value = data.get('owner_type')
+            if isinstance(owner_type_value, str):
+                owner_type = ObjectType(owner_type_value)  # type: ignore[call-arg]
+            else:
+                owner_type = ObjectType.UNKNOWN
+
+            from uuid import UUID as UUIDType
+            dnsmasq_data = DnsMasqData(
+                uuid=UUIDType(dnsmasq_uuid),
+                namespace=data.get('namespace', 'unknown'),
+                owner_type=owner_type,
+                owner_uuid=UUIDType(data.get('owner_uuid', dnsmasq_uuid)),
+                version=DnsMasq.current_version,
+                provide_dhcp=data.get('provide_dhcp', True),
+                provide_dns=data.get('provide_dns', False)
+            )
+            success = create_dnsmasq(dnsmasq_data)
+            if success:
+                etcd.delete('dhcp', None, dnsmasq_uuid)
+                migrated_count += 1
+            else:
+                # Already exists
+                etcd.delete('dhcp', None, dnsmasq_uuid)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(f'Error migrating DnsMasq {dnsmasq_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(f'  ... {migrated_count + skipped_count} DnsMasq objects processed')
+
+    LOG.info(f'DnsMasq migration: {migrated_count} migrated, {skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
+def _migrate_etcd_object_references(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate blob references from various objects to MariaDB.
+
+    This is a complex migration that scans multiple object types to build
+    the object_references table. It migrates:
+    - Instance disk and nvram_template references
+    - Artifact index references
+    - Blob depends_on and transcoded references
+    - Agent operation blob references
+    - Blob location references
+    """
+    from shakenfist import etcd
+    from shakenfist.schema.relationship_types import RelationshipType
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    def parse_uuid(uuid_str: str) -> Optional[UUIDType]:
+        try:
+            return UUIDType(uuid_str)
+        except (ValueError, AttributeError):
+            return None
+
+    # --- Instances: disk references and nvram_template ---
+    LOG.info('Migrating instance blob references...')
+    for objkey, data in etcd.get_all('instance', None):
+        instance_uuid = objkey.split('/')[-1]
+        instance_uuid_obj = parse_uuid(instance_uuid)
+        if not instance_uuid_obj:
+            error_count += 1
+            continue
+
+        disk_spec = data.get('disk_spec', [])
+
+        # Create DISK references for each disk with a blob_uuid
+        for disk_idx, disk in enumerate(disk_spec):
+            blob_uuid = disk.get('blob_uuid')
+            if not blob_uuid:
+                continue
+
+            blob_uuid_obj = parse_uuid(blob_uuid)
+            if not blob_uuid_obj:
+                error_count += 1
+                continue
+
+            success = record_relationship(
+                ObjectType.INSTANCE, instance_uuid_obj,
+                RelationshipType.DISK, str(disk_idx),
+                ObjectType.BLOB, blob_uuid_obj)
+            if success:
+                migrated_count += 1
+            else:
+                skipped_count += 1
+
+        # Handle nvram_template
+        nvram_template = data.get('nvram_template')
+        if nvram_template:
+            nvram_uuid_obj = parse_uuid(nvram_template)
+            if nvram_uuid_obj:
+                success = record_relationship(
+                    ObjectType.INSTANCE, instance_uuid_obj,
+                    RelationshipType.NVRAM_TEMPLATE, None,
+                    ObjectType.BLOB, nvram_uuid_obj)
+                if success:
+                    migrated_count += 1
+                else:
+                    skipped_count += 1
+
+        # Remove old blob_references attribute
+        etcd.delete('attribute/instance', instance_uuid, 'blob_references')
+
+    # --- Artifacts: index_* references ---
+    LOG.info('Migrating artifact index references...')
+    for objkey, _ in etcd.get_all('artifact', None):
+        artifact_uuid = objkey.split('/')[-1]
+        artifact_uuid_obj = parse_uuid(artifact_uuid)
+        if not artifact_uuid_obj:
+            error_count += 1
+            continue
+
+        # Get all index_* attributes
+        for attrkey, index_data in etcd.get_all(
+                'attribute/artifact', artifact_uuid, prefix='index_'):
+            if not index_data:
+                continue
+
+            index_str = attrkey.split('/')[-1].replace('index_', '')
+            blob_uuid = index_data.get('blob_uuid')
+            if not blob_uuid:
+                continue
+
+            blob_uuid_obj = parse_uuid(blob_uuid)
+            if not blob_uuid_obj:
+                error_count += 1
+                continue
+
+            success = record_relationship(
+                ObjectType.ARTIFACT, artifact_uuid_obj,
+                RelationshipType.ARTIFACT_INDEX, index_str,
+                ObjectType.BLOB, blob_uuid_obj)
+            if success:
+                migrated_count += 1
+            else:
+                skipped_count += 1
+
+    # --- Blobs: depends_on and transcoded references ---
+    LOG.info('Migrating blob depends_on and transcoded references...')
+    for objkey, data in etcd.get_all('blob', None):
+        blob_uuid = objkey.split('/')[-1]
+        blob_uuid_obj = parse_uuid(blob_uuid)
+        if not blob_uuid_obj:
+            error_count += 1
+            continue
+
+        # Handle depends_on
+        depends_on = data.get('depends_on')
+        if depends_on:
+            dep_uuid_obj = parse_uuid(depends_on)
+            if dep_uuid_obj:
+                success = record_relationship(
+                    ObjectType.BLOB, blob_uuid_obj,
+                    RelationshipType.DEPENDS_ON, None,
+                    ObjectType.BLOB, dep_uuid_obj)
+                if success:
+                    migrated_count += 1
+                else:
+                    skipped_count += 1
+
+        # Handle transcoded
+        transcoded = etcd.get('attribute/blob', blob_uuid, 'transcoded')
+        if transcoded:
+            for style, transcoded_blob_uuid in transcoded.items():
+                trans_uuid_obj = parse_uuid(transcoded_blob_uuid)
+                if not trans_uuid_obj:
+                    error_count += 1
+                    continue
+
+                success = record_relationship(
+                    ObjectType.BLOB, blob_uuid_obj,
+                    RelationshipType.TRANSCODE, style,
+                    ObjectType.BLOB, trans_uuid_obj)
+                if success:
+                    migrated_count += 1
+                else:
+                    skipped_count += 1
+
+        # Remove old attributes
+        etcd.delete('attribute/blob', blob_uuid, 'ref_count')
+        etcd.delete('attribute/blob', blob_uuid, 'transcoded')
+
+    # --- AgentOperations: *_blob references ---
+    LOG.info('Migrating agent operation blob references...')
+    for objkey, _ in etcd.get_all('agentoperation', None):
+        aop_uuid = objkey.split('/')[-1]
+        aop_uuid_obj = parse_uuid(aop_uuid)
+        if not aop_uuid_obj:
+            error_count += 1
+            continue
+
+        results_data = etcd.get('attribute/agentoperation', aop_uuid, 'results')
+        if not results_data:
+            continue
+
+        results = results_data.get('results', {})
+        for result_idx, result in results.items():
+            if not isinstance(result, dict):
+                continue
+            for key, value in result.items():
+                if not key.endswith('_blob'):
+                    continue
+                output_type = key.replace('_blob', '')
+
+                result_blob_uuid_obj = parse_uuid(value)
+                if not result_blob_uuid_obj:
+                    error_count += 1
+                    continue
+
+                success = record_relationship(
+                    ObjectType.AGENTOPERATION, aop_uuid_obj,
+                    RelationshipType.AGENT_OUTPUT, output_type,
+                    ObjectType.BLOB, result_blob_uuid_obj)
+                if success:
+                    migrated_count += 1
+                else:
+                    skipped_count += 1
+
+    # --- Blobs: locations -> BLOB_LOCATION ---
+    LOG.info('Migrating blob location references...')
+    for objkey, _ in etcd.get_all('blob', None):
+        blob_uuid = objkey.split('/')[-1]
+        blob_uuid_obj = parse_uuid(blob_uuid)
+        if not blob_uuid_obj:
+            error_count += 1
+            continue
+
+        locations_data = etcd.get('attribute/blob', blob_uuid, 'locations')
+        if not locations_data:
+            continue
+
+        locations = locations_data.get('locations', [])
+        for node_name in locations:
+            # Node UUIDs are node names (strings like "sf-1"), not UUIDs
+            success = record_relationship(
+                ObjectType.NODE, node_name,
+                RelationshipType.BLOB_LOCATION, None,
+                ObjectType.BLOB, blob_uuid_obj)
+            if success:
+                migrated_count += 1
+            else:
+                skipped_count += 1
+
+        # Remove old locations attribute
+        etcd.delete('attribute/blob', blob_uuid, 'locations')
+
+    LOG.info(
+        f'References migration: {migrated_count} created, '
+        f'{skipped_count} skipped, {error_count} errors')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
+# Populate DATA_MIGRATIONS now that all migration functions are defined.
+# All data migrations happen at version 2 (after table creation at version 1).
+DATA_MIGRATIONS.update({
+    'object_states': {
+        2: _migrate_etcd_object_states,
+    },
+    'ipam_reservations': {
+        2: _migrate_etcd_ipam_reservations,
+    },
+    'uploads': {
+        2: _migrate_etcd_uploads,
+    },
+    'dnsmasq': {
+        2: _migrate_etcd_dnsmasq,
+    },
+    'object_references': {
+        2: _migrate_etcd_object_references,
+    },
+})
 
 
 def _direct_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:

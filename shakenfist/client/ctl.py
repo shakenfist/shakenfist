@@ -458,7 +458,7 @@ def migrate_floating_network_uuid(dry_run: bool) -> None:
         return
 
     # Check if new UUID already exists
-    new_network = etcd.get('network', None, FLOATING_NETWORK_UUID)
+    new_network = etcd.get('network', None, str(FLOATING_NETWORK_UUID))
     if new_network:
         click.echo(f'Network with new UUID {FLOATING_NETWORK_UUID} already exists.')
         click.echo('Cannot migrate - would overwrite existing network.')
@@ -627,11 +627,12 @@ def migrate_dnsmasq_to_mariadb(dry_run: bool) -> None:
             continue
 
         try:
+            owner_uuid_str = data.get('owner_uuid', dnsmasq_uuid)
             dnsmasq_data = DnsMasqData(
-                uuid=dnsmasq_uuid,
+                uuid=uuid_module.UUID(dnsmasq_uuid),
                 namespace=data.get('namespace', 'unknown'),
                 owner_type=owner_type,
-                owner_uuid=data.get('owner_uuid', dnsmasq_uuid),
+                owner_uuid=uuid_module.UUID(owner_uuid_str),
                 version=DnsMasq.current_version,
                 provide_dhcp=data.get('provide_dhcp', True),
                 provide_dns=data.get('provide_dns', False)
