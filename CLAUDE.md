@@ -9,6 +9,19 @@ completeness, designed to be understood in its entirety by a single developer.
 - **Homepage**: https://shakenfist.com/
 - **Repository**: https://github.com/shakenfist/shakenfist
 
+## Development goals
+
+There is some discussion of overall project goals in `GOALS.md`, and roadmap
+items are documented in `docs/plans/*.md`. However, we should always:
+
+* Seek to improve mypy coverage, especially for code we've added.
+* Ensure there is unit test coverage, and preferably functional test coverage
+  as well (see `shakenfist/deploy/cluster_ci` for functional coverage). We
+  prefer functional tests to unit tests if we can only have one.
+* Preserve event logging -- the exact logging can change if required, but we
+  like having good coverage of events for audit and debugging.
+* Perform a code review a the end of a plan and address any concerns raised.
+
 ## Quick Reference
 
 ### Running Tests
