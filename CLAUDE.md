@@ -14,6 +14,7 @@ completeness, designed to be understood in its entirety by a single developer.
 There is some discussion of overall project goals in `GOALS.md`, and roadmap
 items are documented in `docs/plans/*.md`. However, we should always:
 
+* Ensure objects are correctly cleaned up in `hard_delete()` when appropriate.
 * Seek to improve mypy coverage, especially for code we've added.
 * Ensure there is unit test coverage, and preferably functional test coverage
   as well (see `shakenfist/deploy/cluster_ci` for functional coverage). We
