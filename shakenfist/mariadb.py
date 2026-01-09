@@ -21,7 +21,7 @@
 from ipaddress import IPv4Address
 import time
 import threading
-from typing import Any, cast, Optional
+from typing import Any, Callable, cast, Optional
 from uuid import UUID
 
 import grpc
@@ -736,6 +736,146 @@ def ensure_schema() -> list[dict[str, Any]]:
         LOG.info(f'MariaDB schema updated: {len(migrated)} table(s) migrated')
     else:
         LOG.info('MariaDB schema verified (no migrations needed)')
+
+    return results
+
+
+# Data Migration Framework
+#
+# Data migrations transfer data from other storage systems (e.g., etcd) into
+# MariaDB tables. They use the same version numbers as schema migrations,
+# allowing a single version to track both "schema created" and "data migrated"
+# states.
+#
+# To add a new data migration:
+# 1. Register it in DATA_MIGRATIONS with table name and target version
+# 2. Implement the migration function that returns a dict with migration stats
+# 3. The migration runs automatically on daemon startup when version is lower
+#
+# Example:
+#   DATA_MIGRATIONS = {
+#       'blob_hashes': {
+#           2: _migrate_blob_checksums_from_etcd,
+#       },
+#   }
+#
+# The migration function signature should be:
+#   def _migrate_foo(engine: sa.Engine) -> dict[str, Any]
+#
+# It should return a dict with at least:
+#   {'migrated_count': int, 'error_count': int}
+
+# Registry of data migrations: table_name -> {version: migration_function}
+# Migrations are run in version order when current version is below target.
+DATA_MIGRATIONS: dict[str, dict[int, Callable[[sa.Engine], dict[str, Any]]]] = {
+    # Migrations will be added here as needed. Example:
+    # 'blob_hashes': {
+    #     2: _migrate_blob_checksums_from_etcd,
+    # },
+}
+
+
+def ensure_data_migrations() -> list[dict[str, Any]]:
+    """Run pending data migrations after schema setup.
+
+    Data migrations transfer data from other storage systems (e.g., etcd)
+    into MariaDB tables. They're tracked using the same version numbers
+    as schema migrations, allowing a single version to represent both
+    "schema created" and "data migrated" states.
+
+    This function should be called after ensure_schema() to ensure all
+    tables exist before attempting data migrations.
+
+    Safe to call multiple times - it's idempotent. Migrations that have
+    already run (version >= target) are skipped.
+
+    Important notes for migration authors:
+    - Migration functions MUST be idempotent (use upserts, not inserts)
+    - If a migration fails partway through, it will retry from the start
+      on the next daemon restart
+    - No concurrency protection: assumes only one database daemon runs
+      migrations at a time (typical deployment)
+
+    Returns:
+        List of dicts describing the migration status for each table.
+
+    Raises:
+        RuntimeError: If MARIADB_HOST is not configured.
+    """
+    if not config.MARIADB_HOST:
+        raise RuntimeError('MariaDB is not configured (MARIADB_HOST not set)')
+
+    if not DATA_MIGRATIONS:
+        LOG.debug('No data migrations registered')
+        return []
+
+    engine = _get_engine()
+    results = []
+
+    for table_name, migrations in DATA_MIGRATIONS.items():
+        current_ver = _get_table_version(engine, table_name)
+
+        # Skip if table doesn't exist yet (schema migration hasn't run)
+        if current_ver <= 0:
+            LOG.warning(
+                f'Skipping data migrations for {table_name}: '
+                f'table does not exist (run ensure_schema first)'
+            )
+            continue
+
+        # Run migrations in version order
+        for target_ver in sorted(migrations.keys()):
+            if current_ver >= target_ver:
+                continue  # Already at or past this version
+
+            migrate_func = migrations[target_ver]
+            LOG.info(
+                f'Running data migration for {table_name}: '
+                f'v{current_ver} -> v{target_ver}'
+            )
+
+            try:
+                from_ver = current_ver
+                stats = migrate_func(engine)
+                _set_table_version(engine, table_name, target_ver)
+                current_ver = target_ver
+
+                results.append({
+                    'table': table_name,
+                    'from_version': from_ver,
+                    'to_version': target_ver,
+                    'migrated': True,
+                    'stats': stats
+                })
+
+                LOG.info(
+                    f'Data migration complete for {table_name}: '
+                    f'migrated {stats.get("migrated_count", "?")} items, '
+                    f'{stats.get("error_count", 0)} errors'
+                )
+
+            except Exception as e:
+                LOG.error(
+                    f'Data migration failed for {table_name} '
+                    f'v{current_ver} -> v{target_ver}: {e}'
+                )
+                results.append({
+                    'table': table_name,
+                    'from_version': current_ver,
+                    'to_version': target_ver,
+                    'migrated': False,
+                    'error': str(e)
+                })
+                # Stop processing this table on error
+                break
+
+    # Log summary
+    migrated = [r for r in results if r.get('migrated')]
+    failed = [r for r in results if not r.get('migrated')]
+    if migrated:
+        LOG.info(f'Data migrations complete: {len(migrated)} succeeded')
+    if failed:
+        LOG.error(f'Data migrations failed: {len(failed)} errors')
 
     return results
 
