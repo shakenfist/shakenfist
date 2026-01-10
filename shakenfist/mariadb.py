@@ -3330,10 +3330,13 @@ def _direct_find_blob_by_hash(
 
     try:
         with engine.connect() as conn:
+            # Only return blobs with valid hashes to avoid returning blobs
+            # with corrupted or unverified data
             stmt = sa.select(table.c.blob_uuid).where(
                 sa.and_(
                     table.c.algorithm == algorithm,
-                    table.c.hash_value == hash_value
+                    table.c.hash_value == hash_value,
+                    table.c.verification_status == 'valid'
                 )
             ).limit(1)
             result = conn.execute(stmt)
