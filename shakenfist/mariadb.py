@@ -50,6 +50,10 @@ from shakenfist.util import callstack as util_callstack
 
 LOG, _ = logs.setup(__name__)
 
+# Sentinel node name used during migration when the original node is unknown.
+# This uses a name that cannot conflict with real hostnames.
+MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
+
 # Thread-local storage for database connections and gRPC channels
 _local = threading.local()
 
@@ -1284,8 +1288,8 @@ def _migrate_etcd_blob_hashes(engine: sa.Engine) -> dict[str, Any]:
         # Get the nodes dict (node_name -> last_verified_timestamp)
         nodes = checksums.get('nodes', {})
         if not nodes:
-            # If no nodes recorded, use current time as fallback
-            nodes = {'unknown': time.time()}
+            # If no nodes recorded, use sentinel name as fallback
+            nodes = {MIGRATION_UNKNOWN_NODE: time.time()}
 
         # Get file_size from blob object data
         file_size = data.get('size', 0)
