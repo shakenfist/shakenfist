@@ -188,13 +188,9 @@ class Blob(dbo):
         # expect
         out = self._external_view()
 
-        # Get checksums from MariaDB and build a dict for display
-        # (excludes internal fields like node and verification timestamps)
-        hashes = mariadb.get_blob_hashes(str(self.uuid))
-        checksums: dict[str, str] = {}
-        for h in hashes:
-            if h.verification_status == 'valid' and h.algorithm not in checksums:
-                checksums[h.algorithm] = h.hash_value
+        # Get checksums from MariaDB (excludes internal fields like node and
+        # verification timestamps)
+        checksums = mariadb.get_valid_checksums(str(self.uuid))
 
         out.update({
             'size': self.size,
@@ -983,6 +979,8 @@ class Blob(dbo):
         all_hashes.update(extra_hashes)
 
         for alg, hash_value in all_hashes.items():
+            # Note: computed_at is only used on first insert; the upsert
+            # preserves the original value on subsequent updates.
             blob_hash = BlobHash(
                 blob_uuid=blob_uuid,
                 node=config.NODE_NAME,

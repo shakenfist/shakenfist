@@ -293,12 +293,7 @@ class Artifact(dbowo):
                         'Failed to retrieve previous artifact version: '
                         f'{mri["blob_uuid"]}')
                 old_blob_uuid = old_blob.uuid
-                # Get sha512 hash from MariaDB
-                old_hashes = mariadb.get_blob_hashes(str(old_blob.uuid))
-                for h in old_hashes:
-                    if h.algorithm == 'sha512' and h.verification_status == 'valid':
-                        old_sha512 = h.hash_value
-                        break
+                old_sha512 = mariadb.get_valid_hash(str(old_blob.uuid), 'sha512')
 
             if old_blob_uuid and old_blob_uuid == blob_uuid:
                 # Skip using the same blob UUID as two consecutive indexes
@@ -308,13 +303,7 @@ class Artifact(dbowo):
             if not new_blob:
                 raise exceptions.BlobMissing(
                     f'Failed to retrieve new artifact version: {blob_uuid}')
-            # Get sha512 hash from MariaDB
-            new_sha512 = None
-            new_hashes = mariadb.get_blob_hashes(str(new_blob.uuid))
-            for h in new_hashes:
-                if h.algorithm == 'sha512' and h.verification_status == 'valid':
-                    new_sha512 = h.hash_value
-                    break
+            new_sha512 = mariadb.get_valid_hash(str(new_blob.uuid), 'sha512')
 
             if old_sha512 and new_sha512:
                 if old_sha512 == new_sha512:

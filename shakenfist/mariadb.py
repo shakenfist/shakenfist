@@ -4253,6 +4253,45 @@ def get_blob_hashes(
     return _direct_get_blob_hashes(blob_uuid, node)
 
 
+def get_valid_hash(blob_uuid: str, algorithm: str) -> Optional[str]:
+    """Get the valid hash value for a blob and algorithm.
+
+    Convenience function that finds the first valid hash for the given
+    algorithm across all nodes.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+        algorithm: The hash algorithm (sha512, sha256, etc.).
+
+    Returns:
+        The hash value string if found and valid, None otherwise.
+    """
+    for h in get_blob_hashes(blob_uuid):
+        if h.algorithm == algorithm and h.verification_status == 'valid':
+            return h.hash_value
+    return None
+
+
+def get_valid_checksums(blob_uuid: str) -> dict[str, str]:
+    """Get all valid checksums for a blob as a dict.
+
+    Convenience function that collects all valid hashes into a dict
+    keyed by algorithm. If multiple nodes have the same algorithm,
+    only the first valid one is included.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        Dict mapping algorithm name to hash value for all valid hashes.
+    """
+    checksums: dict[str, str] = {}
+    for h in get_blob_hashes(blob_uuid):
+        if h.verification_status == 'valid' and h.algorithm not in checksums:
+            checksums[h.algorithm] = h.hash_value
+    return checksums
+
+
 def find_blob_by_hash(algorithm: str, hash_value: str) -> Optional[str]:
     """Find a blob UUID by hash value.
 
