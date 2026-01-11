@@ -20,9 +20,9 @@ Artifact → Blob B (composite) → [Chunk1, Chunk4, Chunk5]
                             Shared chunk (stored once)
 ```
 
-## Current State
+## The state before any changes
 
-Today, blob storage has several limitations:
+Before this work, blob storage had several limitations:
 
 - **Hash storage in etcd**: Hashes stored at `attribute/blob/{uuid}/checksums` with O(n) lookup
 - **No deduplication**: Two users uploading identical content get two copies on disk
