@@ -23,6 +23,7 @@ from shakenfist_utilities import random as sf_random  # noreorder
 from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.schema.blob_hash import BlobHash
+from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
 from shakenfist.schema.operations.node_blob_op \
@@ -48,7 +49,6 @@ from shakenfist.exceptions import BlobMissing
 from shakenfist.exceptions import BlobsMustHaveContent
 from shakenfist.exceptions import BlobSizeCannotChange
 from shakenfist.exceptions import BlobTransferSetupFailed
-from shakenfist.exceptions import LocklessUpdateFailed
 from shakenfist.node import Node
 from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import callstack as util_callstack
@@ -204,10 +204,11 @@ class Blob(dbo):
             'checksums': checksums
         })
 
-        # Locations and their incomplete counterparts
         if request_namespace() == 'system':
             out['locations'] = self.locations
-            out['locations'].extend(self.incomplete_locations)
+            for loc in self.incomplete_locations:
+                out['locations'].append(
+                    f'{loc["node"]} ({loc["percentage"]:.1f}%)')
 
         # Include information about the blob
         out.update(self.info)
@@ -277,91 +278,26 @@ class Blob(dbo):
             ObjectType.BLOB, self.uuid)
 
     @property
-    def incomplete_locations(self) -> list[str]:
-        out: list[str] = []
-        locs = self._db_get_attribute(
-            'incomplete_locations', {'locations': {}})
-        for loc in locs['locations']:
-            out.append(f'{loc} ({locs["locations"][loc]:.2f}%)')
-        return out
+    def incomplete_locations(self) -> list[dict[str, Any]]:
+        """Return list of in-progress transfers for this blob.
+
+        Each transfer is represented as a dict with:
+            - node: The node name receiving the blob
+            - percentage: Transfer progress (0.0-100.0)
+        """
+        transfers = mariadb.get_blob_transfers_for_blob(str(self.uuid))
+        return [{'node': t.requesting_node, 'percentage': t.percentage}
+                for t in transfers]
 
     @property
-    def incomplete_healthy_locations(self) -> list[str]:
+    def incomplete_healthy_locations(self) -> list[dict[str, Any]]:
+        """Return incomplete_locations filtered to only active nodes."""
         absent_nodes = Nodes([], prefilter='inactive')
-        out: list[str] = []
+        out: list[dict[str, Any]] = []
         for loc in self.incomplete_locations:
-            if loc not in absent_nodes:
+            if loc['node'] not in absent_nodes:
                 out.append(loc)
         return out
-
-    def _update_incomplete_location_inner(
-            self, percentage: float, node: Optional[str] = None
-    ) -> bool:
-        if not node:
-            node = config.NODE_NAME
-
-        original = etcd.get(f'attribute/{self.object_type}', self.uuid,
-                            'incomplete_locations')
-        updated: dict[str, Any]
-        if not original:
-            updated = {'locations': {}}
-        else:
-            updated = copy.deepcopy(original)
-        changed = False
-
-        if node not in updated['locations']:
-            changed = True
-            updated['locations'][node] = percentage
-        elif updated['locations'][node] != percentage:
-            changed = True
-            updated['locations'][node] = percentage
-
-        if changed:
-            return etcd.replace(f'attribute/{self.object_type}', self.uuid,
-                                'incomplete_locations', original, updated)
-
-        return True
-
-    def update_incomplete_location(
-            self, percentage: float, node: Optional[str] = None
-    ) -> None:
-        percentage = round(percentage, 1)
-        attempts = 0
-        while attempts < 3:
-            if self._update_incomplete_location_inner(percentage, node=node):
-                return
-            attempts += 1
-            time.sleep(0.01)
-
-        raise LocklessUpdateFailed(
-            f'Lockless update of incomplete locations for blob {self.uuid} '
-            'failed.')
-
-    def _remove_incomplete_location_inner(self) -> bool:
-        original = etcd.get(f'attribute/{self.object_type}', self.uuid,
-                            'incomplete_locations')
-        if not original:
-            return True
-
-        if config.NODE_NAME in original['locations']:
-            updated = copy.deepcopy(original)
-            del updated['locations'][config.NODE_NAME]
-            return etcd.replace(f'attribute/{self.object_type}', self.uuid,
-                                'incomplete_locations', original, updated)
-
-        return True
-
-    def remove_incomplete_location(self) -> None:
-        attempts = 0
-        while attempts < 3:
-            if self._remove_incomplete_location_inner():
-                return
-            attempts += 1
-            time.sleep(0.01)
-
-        raise LocklessUpdateFailed(
-            f'Lockless removal of incomplete locations for blob {self.uuid} '
-            'failed.')
 
     @property
     def info(self) -> dict[str, Any]:
@@ -678,45 +614,60 @@ class Blob(dbo):
                     f'There are no online sources for blob {self.uuid}')
 
             random.shuffle(locations)
-            name = sf_random.random_id()
+            transfer_name = sf_random.random_id()
             token = sf_random.random_id()
-            data = {
-                'server_state': dbo.STATE_INITIAL,
-                'requestor': config.NODE_MESH_IP,
-                'blob_uuid': self.uuid,
-                'token': token
-            }
+            now = time.time()
+
+            # Create transfer request in MariaDB
+            transfer = BlobTransfer(
+                source_node=locations[0],
+                transfer_name=transfer_name,
+                requesting_node=config.NODE_MESH_IP,
+                blob_uuid=str(self.uuid),
+                token=token,
+                server_state=dbo.STATE_INITIAL,
+                port=None,
+                percentage=0.0,
+                created_at=now,
+                updated_at=now
+            )
 
             direction_info = f'({locations[0]} -> {config.NODE_NAME})'
             affected_objects = copy.deepcopy(affected_objects)
             affected_objects.append(('node', config.NODE_NAME))
             affected_objects.append(('node', locations[0]))
 
-            etcd.put('transfer', locations[0], name, data)
+            mariadb.create_blob_transfer(transfer)
             add_event_multi(
                 EVENT_TYPE_AUDIT, affected_objects,
-                f'created transfer request {direction_info}', extra=data)
+                f'created transfer request {direction_info}',
+                extra=transfer.external_view())
 
+            # Poll for server to set up the transfer
             waiting_time = time.time()
             while time.time() - waiting_time < 30:
-                data = etcd.get('transfer', locations[0], name)
-                if data['server_state'] == dbo.STATE_CREATED:
+                transfer = mariadb.get_blob_transfer(locations[0], transfer_name)
+                if transfer and transfer.server_state == dbo.STATE_CREATED:
                     break
                 time.sleep(1)
 
-            if data['server_state'] != dbo.STATE_CREATED:
+            if not transfer or transfer.server_state != dbo.STATE_CREATED:
+                state = transfer.server_state if transfer else 'missing'
                 add_event_multi(
                     EVENT_TYPE_AUDIT, affected_objects,
-                    f'transfer setup failed {direction_info}', extra=data)
+                    f'transfer setup failed {direction_info}',
+                    extra={'server_state': state})
+                mariadb.delete_blob_transfer(locations[0], transfer_name)
                 raise BlobTransferSetupFailed(
-                    f'transfer {name} failed to setup, state is {data["server_state"]}')
+                    f'transfer {transfer_name} failed to setup, state is {state}')
 
             add_event_multi(
                 EVENT_TYPE_AUDIT, affected_objects,
-                f'transfer setup succeeded  {direction_info}', extra=data)
+                f'transfer setup succeeded {direction_info}',
+                extra=transfer.external_view())
 
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client.connect((locations[0], data['port']))
+            client.connect((locations[0], transfer.port))
             client.send(token.encode('utf-8'))
 
             total_bytes_received = 0
@@ -743,12 +694,9 @@ class Blob(dbo):
                                 'percentage': int(percentage)
                             }
                         )
-                        self.update_incomplete_location(percentage)
                         if (next_percentage - percentage) < 0:
                             next_percentage += 10
                         last_event = time.time()
-
-            self.remove_incomplete_location()
 
             if total_bytes_received != int(self.size):
                 add_event_multi(
@@ -795,8 +743,8 @@ class Blob(dbo):
             # We take current transfers into account when replicating, to avoid
             # over replicating very large blobs
             current_transfers = 0
-            for node in self.incomplete_locations:
-                if node not in absent_nodes:
+            for loc in self.incomplete_locations:
+                if loc['node'] not in absent_nodes:
                     current_transfers += 1
 
             locations = self.locations
@@ -842,7 +790,6 @@ class Blob(dbo):
                         self.uuid,
                         [nbo_tasks.ensure_local],
                         PRIORITY.background_high_io)
-                    self.update_incomplete_location(0, node=n)
                     self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
 
@@ -911,6 +858,7 @@ class Blob(dbo):
 
     def hard_delete(self) -> None:
         mariadb.delete_blob_hashes(str(self.uuid))
+        mariadb.delete_blob_transfers_for_blob(str(self.uuid))
         super().hard_delete()
 
     def verify_checksum(self, hash: Optional[str] = None, urgent: bool = True) -> bool:
@@ -1084,12 +1032,10 @@ def http_fetch(
                         'percentage': int(percentage),
                         'bytes_fetched': fetched
                     })
-                b.update_incomplete_location(percentage)
                 if (next_percentage - percentage) < 0:
                     next_percentage += 10
                 last_event = time.time()
 
-    b.remove_incomplete_location()
     add_event_multi(
         EVENT_TYPE_USAGE, affected_objects,
         'fetching required HTTP resource complete',

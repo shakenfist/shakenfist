@@ -1781,3 +1781,229 @@ class DeleteBlobHashesRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["blob_uuid", b"blob_uuid"]) -> None: ...
 
 global___DeleteBlobHashesRequest = DeleteBlobHashesRequest
+
+@typing.final
+class BlobTransferData(google.protobuf.message.Message):
+    """Blob Transfer Operations (MariaDB)
+    These operations manage blob transfer coordination, replacing the etcd-based
+    /sf/transfer/{node}/{name} keys and incomplete_locations attributes.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_NODE_FIELD_NUMBER: builtins.int
+    TRANSFER_NAME_FIELD_NUMBER: builtins.int
+    REQUESTING_NODE_FIELD_NUMBER: builtins.int
+    BLOB_UUID_FIELD_NUMBER: builtins.int
+    TOKEN_FIELD_NUMBER: builtins.int
+    SERVER_STATE_FIELD_NUMBER: builtins.int
+    PORT_FIELD_NUMBER: builtins.int
+    PERCENTAGE_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    UPDATED_AT_FIELD_NUMBER: builtins.int
+    source_node: builtins.str
+    """Node that has the blob (server side)"""
+    transfer_name: builtins.str
+    """Unique transfer identifier"""
+    requesting_node: builtins.str
+    """Node requesting the transfer (client side)"""
+    blob_uuid: builtins.str
+    """UUID of the blob being transferred"""
+    token: builtins.str
+    """Authentication token for TCP connection"""
+    server_state: builtins.str
+    """'initial' or 'created'"""
+    port: builtins.int
+    """TCP port (0 if not yet set)"""
+    percentage: builtins.float
+    """Transfer progress (0.0 to 100.0)"""
+    created_at: builtins.float
+    """Unix timestamp when transfer was initiated"""
+    updated_at: builtins.float
+    """Unix timestamp of last update"""
+    def __init__(
+        self,
+        *,
+        source_node: builtins.str = ...,
+        transfer_name: builtins.str = ...,
+        requesting_node: builtins.str = ...,
+        blob_uuid: builtins.str = ...,
+        token: builtins.str = ...,
+        server_state: builtins.str = ...,
+        port: builtins.int = ...,
+        percentage: builtins.float = ...,
+        created_at: builtins.float = ...,
+        updated_at: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["blob_uuid", b"blob_uuid", "created_at", b"created_at", "percentage", b"percentage", "port", b"port", "requesting_node", b"requesting_node", "server_state", b"server_state", "source_node", b"source_node", "token", b"token", "transfer_name", b"transfer_name", "updated_at", b"updated_at"]) -> None: ...
+
+global___BlobTransferData = BlobTransferData
+
+@typing.final
+class CreateBlobTransferRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TRANSFER_FIELD_NUMBER: builtins.int
+    @property
+    def transfer(self) -> global___BlobTransferData: ...
+    def __init__(
+        self,
+        *,
+        transfer: global___BlobTransferData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["transfer", b"transfer"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["transfer", b"transfer"]) -> None: ...
+
+global___CreateBlobTransferRequest = CreateBlobTransferRequest
+
+@typing.final
+class GetBlobTransferRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_NODE_FIELD_NUMBER: builtins.int
+    TRANSFER_NAME_FIELD_NUMBER: builtins.int
+    source_node: builtins.str
+    transfer_name: builtins.str
+    def __init__(
+        self,
+        *,
+        source_node: builtins.str = ...,
+        transfer_name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["source_node", b"source_node", "transfer_name", b"transfer_name"]) -> None: ...
+
+global___GetBlobTransferRequest = GetBlobTransferRequest
+
+@typing.final
+class GetBlobTransferReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    TRANSFER_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def transfer(self) -> global___BlobTransferData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        transfer: global___BlobTransferData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["transfer", b"transfer"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["found", b"found", "transfer", b"transfer"]) -> None: ...
+
+global___GetBlobTransferReply = GetBlobTransferReply
+
+@typing.final
+class GetBlobTransfersForNodeRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_NODE_FIELD_NUMBER: builtins.int
+    source_node: builtins.str
+    def __init__(
+        self,
+        *,
+        source_node: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["source_node", b"source_node"]) -> None: ...
+
+global___GetBlobTransfersForNodeRequest = GetBlobTransfersForNodeRequest
+
+@typing.final
+class GetBlobTransfersForBlobRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BLOB_UUID_FIELD_NUMBER: builtins.int
+    blob_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        blob_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["blob_uuid", b"blob_uuid"]) -> None: ...
+
+global___GetBlobTransfersForBlobRequest = GetBlobTransfersForBlobRequest
+
+@typing.final
+class GetBlobTransfersReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TRANSFERS_FIELD_NUMBER: builtins.int
+    @property
+    def transfers(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___BlobTransferData]: ...
+    def __init__(
+        self,
+        *,
+        transfers: collections.abc.Iterable[global___BlobTransferData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["transfers", b"transfers"]) -> None: ...
+
+global___GetBlobTransfersReply = GetBlobTransfersReply
+
+@typing.final
+class UpdateBlobTransferRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_NODE_FIELD_NUMBER: builtins.int
+    TRANSFER_NAME_FIELD_NUMBER: builtins.int
+    SERVER_STATE_FIELD_NUMBER: builtins.int
+    PORT_FIELD_NUMBER: builtins.int
+    PERCENTAGE_FIELD_NUMBER: builtins.int
+    source_node: builtins.str
+    transfer_name: builtins.str
+    server_state: builtins.str
+    port: builtins.int
+    percentage: builtins.float
+    def __init__(
+        self,
+        *,
+        source_node: builtins.str = ...,
+        transfer_name: builtins.str = ...,
+        server_state: builtins.str | None = ...,
+        port: builtins.int | None = ...,
+        percentage: builtins.float | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_percentage", b"_percentage", "_port", b"_port", "_server_state", b"_server_state", "percentage", b"percentage", "port", b"port", "server_state", b"server_state"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_percentage", b"_percentage", "_port", b"_port", "_server_state", b"_server_state", "percentage", b"percentage", "port", b"port", "server_state", b"server_state", "source_node", b"source_node", "transfer_name", b"transfer_name"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_percentage", b"_percentage"]) -> typing.Literal["percentage"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_port", b"_port"]) -> typing.Literal["port"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_server_state", b"_server_state"]) -> typing.Literal["server_state"] | None: ...
+
+global___UpdateBlobTransferRequest = UpdateBlobTransferRequest
+
+@typing.final
+class DeleteBlobTransferRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_NODE_FIELD_NUMBER: builtins.int
+    TRANSFER_NAME_FIELD_NUMBER: builtins.int
+    source_node: builtins.str
+    transfer_name: builtins.str
+    def __init__(
+        self,
+        *,
+        source_node: builtins.str = ...,
+        transfer_name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["source_node", b"source_node", "transfer_name", b"transfer_name"]) -> None: ...
+
+global___DeleteBlobTransferRequest = DeleteBlobTransferRequest
+
+@typing.final
+class DeleteStaleTransfersRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OLDER_THAN_FIELD_NUMBER: builtins.int
+    older_than: builtins.float
+    """Unix timestamp - delete transfers with updated_at < this"""
+    def __init__(
+        self,
+        *,
+        older_than: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["older_than", b"older_than"]) -> None: ...
+
+global___DeleteStaleTransfersRequest = DeleteStaleTransfersRequest

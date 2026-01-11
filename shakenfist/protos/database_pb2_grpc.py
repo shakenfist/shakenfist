@@ -299,6 +299,41 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteBlobHashesRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.CreateBlobTransfer = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateBlobTransfer',
+                request_serializer=database__pb2.CreateBlobTransferRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetBlobTransfer = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetBlobTransfer',
+                request_serializer=database__pb2.GetBlobTransferRequest.SerializeToString,
+                response_deserializer=database__pb2.GetBlobTransferReply.FromString,
+                _registered_method=True)
+        self.GetBlobTransfersForNode = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetBlobTransfersForNode',
+                request_serializer=database__pb2.GetBlobTransfersForNodeRequest.SerializeToString,
+                response_deserializer=database__pb2.GetBlobTransfersReply.FromString,
+                _registered_method=True)
+        self.GetBlobTransfersForBlob = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetBlobTransfersForBlob',
+                request_serializer=database__pb2.GetBlobTransfersForBlobRequest.SerializeToString,
+                response_deserializer=database__pb2.GetBlobTransfersReply.FromString,
+                _registered_method=True)
+        self.UpdateBlobTransfer = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateBlobTransfer',
+                request_serializer=database__pb2.UpdateBlobTransferRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteBlobTransfer = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteBlobTransfer',
+                request_serializer=database__pb2.DeleteBlobTransferRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteStaleTransfers = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteStaleTransfers',
+                request_serializer=database__pb2.DeleteStaleTransfersRequest.SerializeToString,
+                response_deserializer=database__pb2.DeleteCountReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -632,6 +667,49 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateBlobTransfer(self, request, context):
+        """Blob Transfer Operations (MariaDB)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBlobTransfer(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBlobTransfersForNode(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBlobTransfersForBlob(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateBlobTransfer(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteBlobTransfer(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteStaleTransfers(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -899,6 +977,41 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.DeleteBlobHashes,
                     request_deserializer=database__pb2.DeleteBlobHashesRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateBlobTransfer': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateBlobTransfer,
+                    request_deserializer=database__pb2.CreateBlobTransferRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetBlobTransfer': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBlobTransfer,
+                    request_deserializer=database__pb2.GetBlobTransferRequest.FromString,
+                    response_serializer=database__pb2.GetBlobTransferReply.SerializeToString,
+            ),
+            'GetBlobTransfersForNode': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBlobTransfersForNode,
+                    request_deserializer=database__pb2.GetBlobTransfersForNodeRequest.FromString,
+                    response_serializer=database__pb2.GetBlobTransfersReply.SerializeToString,
+            ),
+            'GetBlobTransfersForBlob': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBlobTransfersForBlob,
+                    request_deserializer=database__pb2.GetBlobTransfersForBlobRequest.FromString,
+                    response_serializer=database__pb2.GetBlobTransfersReply.SerializeToString,
+            ),
+            'UpdateBlobTransfer': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateBlobTransfer,
+                    request_deserializer=database__pb2.UpdateBlobTransferRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteBlobTransfer': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteBlobTransfer,
+                    request_deserializer=database__pb2.DeleteBlobTransferRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteStaleTransfers': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteStaleTransfers,
+                    request_deserializer=database__pb2.DeleteStaleTransfersRequest.FromString,
+                    response_serializer=database__pb2.DeleteCountReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2332,6 +2445,195 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/DeleteBlobHashes',
             database__pb2.DeleteBlobHashesRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateBlobTransfer(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateBlobTransfer',
+            database__pb2.CreateBlobTransferRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetBlobTransfer(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetBlobTransfer',
+            database__pb2.GetBlobTransferRequest.SerializeToString,
+            database__pb2.GetBlobTransferReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetBlobTransfersForNode(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetBlobTransfersForNode',
+            database__pb2.GetBlobTransfersForNodeRequest.SerializeToString,
+            database__pb2.GetBlobTransfersReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetBlobTransfersForBlob(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetBlobTransfersForBlob',
+            database__pb2.GetBlobTransfersForBlobRequest.SerializeToString,
+            database__pb2.GetBlobTransfersReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateBlobTransfer(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateBlobTransfer',
+            database__pb2.UpdateBlobTransferRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteBlobTransfer(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteBlobTransfer',
+            database__pb2.DeleteBlobTransferRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteStaleTransfers(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteStaleTransfers',
+            database__pb2.DeleteStaleTransfersRequest.SerializeToString,
+            database__pb2.DeleteCountReply.FromString,
             options,
             channel_credentials,
             insecure,

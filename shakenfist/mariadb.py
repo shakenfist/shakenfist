@@ -36,6 +36,7 @@ from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.blob_hash import BlobHash
+from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
@@ -66,6 +67,7 @@ _uploads_table: Optional[sa.Table] = None
 _dnsmasq_table: Optional[sa.Table] = None
 _object_references_table: Optional[sa.Table] = None
 _blob_hashes_table: Optional[sa.Table] = None
+_blob_transfers_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -78,6 +80,7 @@ UPLOADS_VERSION = 2
 DNSMASQ_VERSION = 2
 OBJECT_REFERENCES_VERSION = 2
 BLOB_HASHES_VERSION = 2
+BLOB_TRANSFERS_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -648,6 +651,66 @@ def _ensure_blob_hashes_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _get_blob_transfers_table() -> sa.Table:
+    """Get or create the blob_transfers table definition.
+
+    This table stores blob transfer coordination data, replacing the etcd-based
+    /sf/transfer/{node}/{name} keys and incomplete_locations attributes. It
+    tracks in-progress blob transfers between nodes.
+
+    The table has a compound primary key of (source_node, transfer_name) to
+    uniquely identify each transfer operation.
+    """
+    global _blob_transfers_table
+    if _blob_transfers_table is None:
+        metadata = _get_metadata()
+        _blob_transfers_table = pydantic_to_sqlalchemy_table(
+            BlobTransfer,
+            'blob_transfers',
+            metadata,
+            primary_key_fields=['source_node', 'transfer_name'],
+            include_id_column=False
+        )
+    return _blob_transfers_table
+
+
+def _ensure_blob_transfers_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the blob_transfers table schema is up to date.
+
+    Applies any necessary migrations based on the current version.
+    Returns a dict with migration status information.
+    """
+    table_name = 'blob_transfers'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_blob_transfers_table()
+
+    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
+    # Cleanup migration will upgrade to version 2.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        # Create indexes
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': BLOB_TRANSFERS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def ensure_schema() -> list[dict[str, Any]]:
     """Ensure all MariaDB tables exist with current schema versions.
 
@@ -680,6 +743,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_dnsmasq_schema(engine))
     results.append(_ensure_object_references_schema(engine))
     results.append(_ensure_blob_hashes_schema(engine))
+    results.append(_ensure_blob_transfers_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -1345,6 +1409,59 @@ def _migrate_etcd_blob_hashes(engine: sa.Engine) -> dict[str, Any]:
     return {'migrated_count': migrated_count, 'error_count': error_count}
 
 
+def _cleanup_etcd_blob_transfers(engine: sa.Engine) -> dict[str, Any]:
+    """Clean up old etcd transfer keys during migration.
+
+    Unlike other migrations, we don't migrate transfer data - transfers are
+    transient and any in-flight transfer during an upgrade will fail anyway.
+    The requesting node will simply retry, creating a new record in MariaDB.
+
+    This function just deletes the old etcd keys:
+    - /sf/transfer/{node}/{name} - transfer handshake records
+    - /sf/attribute/blob/{uuid}/incomplete_locations - progress tracking
+    """
+    from shakenfist import etcd
+
+    deleted_transfers = 0
+    deleted_incomplete = 0
+
+    # Delete all transfer records
+    LOG.info('Cleaning up etcd transfer records...')
+    try:
+        for objkey, _data in etcd.get_all('transfer', None):
+            # objkey format: /sf/transfer/{node}/{name}
+            parts = objkey.split('/')
+            if len(parts) >= 4:
+                node = parts[-2]
+                name = parts[-1]
+                etcd.delete('transfer', node, name)
+                deleted_transfers += 1
+    except Exception as e:
+        LOG.warning(f'Error cleaning up transfer records: {e}')
+
+    # Delete all incomplete_locations attributes
+    LOG.info('Cleaning up etcd incomplete_locations attributes...')
+    try:
+        for objkey, _data in etcd.get_all('attribute/blob', None):
+            # Check if this is an incomplete_locations attribute
+            if objkey.endswith('/incomplete_locations'):
+                parts = objkey.split('/')
+                if len(parts) >= 3:
+                    blob_uuid = parts[-2]
+                    etcd.delete('attribute/blob', blob_uuid, 'incomplete_locations')
+                    deleted_incomplete += 1
+    except Exception as e:
+        LOG.warning(f'Error cleaning up incomplete_locations: {e}')
+
+    LOG.info(
+        f'Blob transfers cleanup: {deleted_transfers} transfer records deleted, '
+        f'{deleted_incomplete} incomplete_locations deleted')
+    return {
+        'deleted_transfers': deleted_transfers,
+        'deleted_incomplete': deleted_incomplete
+    }
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -1365,6 +1482,9 @@ DATA_MIGRATIONS.update({
     },
     'blob_hashes': {
         2: _migrate_etcd_blob_hashes,
+    },
+    'blob_transfers': {
+        2: _cleanup_etcd_blob_transfers,
     },
 })
 
@@ -4345,3 +4465,618 @@ def delete_blob_hashes(blob_uuid: str) -> bool:
     if _use_database_service():
         return _grpc_delete_blob_hashes(blob_uuid)
     return _direct_delete_blob_hashes(blob_uuid)
+
+
+# =============================================================================
+# Blob Transfer Direct Access Functions
+# These provide direct MariaDB access for the database daemon.
+# =============================================================================
+
+def _direct_create_blob_transfer(
+    transfer: 'BlobTransfer'
+) -> bool:
+    """Create a blob transfer record directly in MariaDB.
+
+    Args:
+        transfer: The BlobTransfer record to create.
+
+    Returns:
+        True if created, False on error or if already exists.
+    """
+    engine = _get_engine()
+    table = _get_blob_transfers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                source_node=transfer.source_node,
+                transfer_name=transfer.transfer_name,
+                requesting_node=transfer.requesting_node,
+                blob_uuid=transfer.blob_uuid,
+                token=transfer.token,
+                server_state=transfer.server_state,
+                port=transfer.port,
+                percentage=transfer.percentage,
+                created_at=transfer.created_at,
+                updated_at=transfer.updated_at
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        # Already exists
+        return False
+    except OperationalError as e:
+        LOG.warning(f'MariaDB create_blob_transfer failed: {e}')
+        return False
+
+
+def _direct_get_blob_transfer(
+    source_node: str,
+    transfer_name: str
+) -> Optional['BlobTransfer']:
+    """Get a specific blob transfer record directly from MariaDB.
+
+    Args:
+        source_node: The source node name.
+        transfer_name: The transfer name.
+
+    Returns:
+        The BlobTransfer record if found, None otherwise.
+    """
+    engine = _get_engine()
+    table = _get_blob_transfers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                sa.and_(
+                    table.c.source_node == source_node,
+                    table.c.transfer_name == transfer_name
+                )
+            )
+            result = conn.execute(stmt)
+            row = result.fetchone()
+            if row is None:
+                return None
+            return BlobTransfer(
+                source_node=row.source_node,
+                transfer_name=row.transfer_name,
+                requesting_node=row.requesting_node,
+                blob_uuid=row.blob_uuid,
+                token=row.token,
+                server_state=row.server_state,
+                port=row.port,
+                percentage=row.percentage,
+                created_at=row.created_at,
+                updated_at=row.updated_at
+            )
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get_blob_transfer failed: {e}')
+        return None
+
+
+def _direct_get_blob_transfers_for_node(
+    source_node: str
+) -> list['BlobTransfer']:
+    """Get all blob transfers for a source node directly from MariaDB.
+
+    Used by the transfers daemon to poll for pending work.
+
+    Args:
+        source_node: The source node name.
+
+    Returns:
+        List of BlobTransfer records for the node.
+    """
+    engine = _get_engine()
+    table = _get_blob_transfers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.source_node == source_node)
+            result = conn.execute(stmt)
+            transfers = []
+            for row in result:
+                transfers.append(BlobTransfer(
+                    source_node=row.source_node,
+                    transfer_name=row.transfer_name,
+                    requesting_node=row.requesting_node,
+                    blob_uuid=row.blob_uuid,
+                    token=row.token,
+                    server_state=row.server_state,
+                    port=row.port,
+                    percentage=row.percentage,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at
+                ))
+            return transfers
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get_blob_transfers_for_node failed: {e}')
+        return []
+
+
+def _direct_get_blob_transfers_for_blob(
+    blob_uuid: str
+) -> list['BlobTransfer']:
+    """Get all blob transfers for a blob directly from MariaDB.
+
+    Used by replication logic to avoid over-replicating during active transfers.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        List of BlobTransfer records for the blob.
+    """
+    engine = _get_engine()
+    table = _get_blob_transfers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.blob_uuid == blob_uuid)
+            result = conn.execute(stmt)
+            transfers = []
+            for row in result:
+                transfers.append(BlobTransfer(
+                    source_node=row.source_node,
+                    transfer_name=row.transfer_name,
+                    requesting_node=row.requesting_node,
+                    blob_uuid=row.blob_uuid,
+                    token=row.token,
+                    server_state=row.server_state,
+                    port=row.port,
+                    percentage=row.percentage,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at
+                ))
+            return transfers
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get_blob_transfers_for_blob failed: {e}')
+        return []
+
+
+def _direct_update_blob_transfer(
+    source_node: str,
+    transfer_name: str,
+    server_state: Optional[str] = None,
+    port: Optional[int] = None,
+    percentage: Optional[float] = None
+) -> bool:
+    """Update a blob transfer record directly in MariaDB.
+
+    Args:
+        source_node: The source node name.
+        transfer_name: The transfer name.
+        server_state: Optional new server state.
+        port: Optional new port number.
+        percentage: Optional new percentage.
+
+    Returns:
+        True if updated, False on error or no fields to update.
+    """
+    # Build the update values dict with only provided fields
+    values: dict[str, Any] = {'updated_at': time.time()}
+    if server_state is not None:
+        values['server_state'] = server_state
+    if port is not None:
+        values['port'] = port
+    if percentage is not None:
+        values['percentage'] = percentage
+
+    if len(values) == 1:  # Only updated_at
+        return False
+
+    engine = _get_engine()
+    table = _get_blob_transfers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                sa.and_(
+                    table.c.source_node == source_node,
+                    table.c.transfer_name == transfer_name
+                )
+            ).values(**values)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB update_blob_transfer failed: {e}')
+        return False
+
+
+def _direct_delete_blob_transfer(
+    source_node: str,
+    transfer_name: str
+) -> bool:
+    """Delete a blob transfer record directly from MariaDB.
+
+    Args:
+        source_node: The source node name.
+        transfer_name: The transfer name.
+
+    Returns:
+        True if deleted (or didn't exist), False on error.
+    """
+    engine = _get_engine()
+    table = _get_blob_transfers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.source_node == source_node,
+                    table.c.transfer_name == transfer_name
+                )
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete_blob_transfer failed: {e}')
+        return False
+
+
+def _direct_delete_stale_transfers(max_age: float) -> int:
+    """Delete stale transfers directly from MariaDB.
+
+    Args:
+        max_age: Maximum age in seconds. Transfers not updated in this
+            many seconds are deleted.
+
+    Returns:
+        Number of deleted records.
+    """
+    older_than = time.time() - max_age
+    engine = _get_engine()
+    table = _get_blob_transfers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.updated_at < older_than)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete_stale_transfers failed: {e}')
+        return 0
+
+
+# =============================================================================
+# Blob Transfer gRPC Client Functions
+# These call the database microservice for blob transfer operations.
+# =============================================================================
+
+def _grpc_create_blob_transfer(transfer: 'BlobTransfer') -> bool:
+    """Create a blob transfer record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateBlobTransferRequest(
+            transfer=database_pb2.BlobTransferData(
+                source_node=transfer.source_node,
+                transfer_name=transfer.transfer_name,
+                requesting_node=transfer.requesting_node,
+                blob_uuid=transfer.blob_uuid,
+                token=transfer.token,
+                server_state=transfer.server_state,
+                port=transfer.port if transfer.port else 0,
+                percentage=transfer.percentage,
+                created_at=transfer.created_at,
+                updated_at=transfer.updated_at
+            )
+        )
+        reply = stub.CreateBlobTransfer(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateBlobTransfer failed for '
+            f'{transfer.source_node}/{transfer.transfer_name}: {e}')
+        return False
+
+
+def _grpc_get_blob_transfer(
+    source_node: str,
+    transfer_name: str
+) -> Optional['BlobTransfer']:
+    """Get a blob transfer record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetBlobTransferRequest(
+            source_node=source_node,
+            transfer_name=transfer_name
+        )
+        reply = stub.GetBlobTransfer(request)
+        if not reply.found:
+            return None
+        t = reply.transfer
+        return BlobTransfer(
+            source_node=t.source_node,
+            transfer_name=t.transfer_name,
+            requesting_node=t.requesting_node,
+            blob_uuid=t.blob_uuid,
+            token=t.token,
+            server_state=t.server_state,
+            port=t.port if t.port else None,
+            percentage=t.percentage,
+            created_at=t.created_at,
+            updated_at=t.updated_at
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetBlobTransfer failed for '
+            f'{source_node}/{transfer_name}: {e}')
+        return None
+
+
+def _grpc_get_blob_transfers_for_node(
+    source_node: str
+) -> list['BlobTransfer']:
+    """Get all blob transfers for a node via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetBlobTransfersForNodeRequest(
+            source_node=source_node
+        )
+        reply = stub.GetBlobTransfersForNode(request)
+        transfers = []
+        for t in reply.transfers:
+            transfers.append(BlobTransfer(
+                source_node=t.source_node,
+                transfer_name=t.transfer_name,
+                requesting_node=t.requesting_node,
+                blob_uuid=t.blob_uuid,
+                token=t.token,
+                server_state=t.server_state,
+                port=t.port if t.port else None,
+                percentage=t.percentage,
+                created_at=t.created_at,
+                updated_at=t.updated_at
+            ))
+        return transfers
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetBlobTransfersForNode failed for {source_node}: {e}')
+        return []
+
+
+def _grpc_get_blob_transfers_for_blob(
+    blob_uuid: str
+) -> list['BlobTransfer']:
+    """Get all blob transfers for a blob via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetBlobTransfersForBlobRequest(
+            blob_uuid=blob_uuid
+        )
+        reply = stub.GetBlobTransfersForBlob(request)
+        transfers = []
+        for t in reply.transfers:
+            transfers.append(BlobTransfer(
+                source_node=t.source_node,
+                transfer_name=t.transfer_name,
+                requesting_node=t.requesting_node,
+                blob_uuid=t.blob_uuid,
+                token=t.token,
+                server_state=t.server_state,
+                port=t.port if t.port else None,
+                percentage=t.percentage,
+                created_at=t.created_at,
+                updated_at=t.updated_at
+            ))
+        return transfers
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetBlobTransfersForBlob failed for {blob_uuid}: {e}')
+        return []
+
+
+def _grpc_update_blob_transfer(
+    source_node: str,
+    transfer_name: str,
+    server_state: Optional[str] = None,
+    port: Optional[int] = None,
+    percentage: Optional[float] = None
+) -> bool:
+    """Update a blob transfer record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        # Build request with only provided optional fields
+        kwargs: dict[str, Any] = {
+            'source_node': source_node,
+            'transfer_name': transfer_name
+        }
+        if server_state is not None:
+            kwargs['server_state'] = server_state
+        if port is not None:
+            kwargs['port'] = port
+        if percentage is not None:
+            kwargs['percentage'] = percentage
+
+        request = database_pb2.UpdateBlobTransferRequest(**kwargs)
+        reply = stub.UpdateBlobTransfer(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC UpdateBlobTransfer failed for '
+            f'{source_node}/{transfer_name}: {e}')
+        return False
+
+
+def _grpc_delete_blob_transfer(
+    source_node: str,
+    transfer_name: str
+) -> bool:
+    """Delete a blob transfer record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteBlobTransferRequest(
+            source_node=source_node,
+            transfer_name=transfer_name
+        )
+        reply = stub.DeleteBlobTransfer(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteBlobTransfer failed for '
+            f'{source_node}/{transfer_name}: {e}')
+        return False
+
+
+def _grpc_delete_stale_transfers(max_age: float) -> int:
+    """Delete stale transfers via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        older_than = time.time() - max_age
+        request = database_pb2.DeleteStaleTransfersRequest(
+            older_than=older_than
+        )
+        reply = stub.DeleteStaleTransfers(request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC DeleteStaleTransfers failed: {e}')
+        return 0
+
+
+# =============================================================================
+# Blob Transfer Public API Functions
+# These route to direct or gRPC based on configuration.
+# =============================================================================
+
+def create_blob_transfer(transfer: 'BlobTransfer') -> bool:
+    """Create a blob transfer record.
+
+    Args:
+        transfer: The BlobTransfer record to create.
+
+    Returns:
+        True if created, False on error or if already exists.
+    """
+    if _use_database_service():
+        return _grpc_create_blob_transfer(transfer)
+    return _direct_create_blob_transfer(transfer)
+
+
+def get_blob_transfer(
+    source_node: str,
+    transfer_name: str
+) -> Optional['BlobTransfer']:
+    """Get a specific blob transfer record.
+
+    Args:
+        source_node: The source node name.
+        transfer_name: The transfer name.
+
+    Returns:
+        The BlobTransfer record if found, None otherwise.
+    """
+    if _use_database_service():
+        return _grpc_get_blob_transfer(source_node, transfer_name)
+    return _direct_get_blob_transfer(source_node, transfer_name)
+
+
+def get_blob_transfers_for_node(source_node: str) -> list['BlobTransfer']:
+    """Get all blob transfers for a source node.
+
+    Used by the transfers daemon to poll for pending work.
+
+    Args:
+        source_node: The source node name.
+
+    Returns:
+        List of BlobTransfer records for the node.
+    """
+    if _use_database_service():
+        return _grpc_get_blob_transfers_for_node(source_node)
+    return _direct_get_blob_transfers_for_node(source_node)
+
+
+def get_blob_transfers_for_blob(blob_uuid: str) -> list['BlobTransfer']:
+    """Get all blob transfers for a blob.
+
+    Used by replication logic to avoid over-replicating during active transfers.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        List of BlobTransfer records for the blob.
+    """
+    if _use_database_service():
+        return _grpc_get_blob_transfers_for_blob(blob_uuid)
+    return _direct_get_blob_transfers_for_blob(blob_uuid)
+
+
+def update_blob_transfer(
+    source_node: str,
+    transfer_name: str,
+    server_state: Optional[str] = None,
+    port: Optional[int] = None,
+    percentage: Optional[float] = None
+) -> bool:
+    """Update a blob transfer record.
+
+    Args:
+        source_node: The source node name.
+        transfer_name: The transfer name.
+        server_state: Optional new server state.
+        port: Optional new port number.
+        percentage: Optional new percentage.
+
+    Returns:
+        True if updated, False on error.
+    """
+    if _use_database_service():
+        return _grpc_update_blob_transfer(
+            source_node, transfer_name, server_state, port, percentage)
+    return _direct_update_blob_transfer(
+        source_node, transfer_name, server_state, port, percentage)
+
+
+def delete_blob_transfer(source_node: str, transfer_name: str) -> bool:
+    """Delete a blob transfer record.
+
+    Args:
+        source_node: The source node name.
+        transfer_name: The transfer name.
+
+    Returns:
+        True if deleted (or didn't exist), False on error.
+    """
+    if _use_database_service():
+        return _grpc_delete_blob_transfer(source_node, transfer_name)
+    return _direct_delete_blob_transfer(source_node, transfer_name)
+
+
+def delete_stale_transfers(max_age: float) -> int:
+    """Delete stale transfers.
+
+    Used by scheduled cleanup tasks to remove abandoned transfers.
+
+    Args:
+        max_age: Maximum age in seconds. Transfers not updated in this
+            many seconds are deleted.
+
+    Returns:
+        Number of deleted records.
+    """
+    if _use_database_service():
+        return _grpc_delete_stale_transfers(max_age)
+    return _direct_delete_stale_transfers(max_age)
+
+
+def delete_blob_transfers_for_blob(blob_uuid: str) -> bool:
+    """Delete all transfer records for a blob.
+
+    Used by Blob.hard_delete() to clean up any pending transfers.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        True if all deleted successfully, False on any error.
+    """
+    transfers = get_blob_transfers_for_blob(blob_uuid)
+    success = True
+    for t in transfers:
+        if not delete_blob_transfer(t.source_node, t.transfer_name):
+            success = False
+    return success

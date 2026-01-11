@@ -93,6 +93,11 @@ performs essential post-processing.
 
 ### Import Organization
 
+**All imports must be at the top of the file.** Late imports inside functions
+or methods should only be used when absolutely necessary to avoid circular
+import issues, and must include a comment explaining why. If you see a late
+import without such a comment, move it to the top of the file.
+
 ```python
 # 1. Standard library
 import base64

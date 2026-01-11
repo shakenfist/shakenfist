@@ -294,6 +294,42 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateBlobTransfer: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateBlobTransferRequest,
+        database_pb2.StatusReply,
+    ]
+    """Blob Transfer Operations (MariaDB)"""
+
+    GetBlobTransfer: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobTransferRequest,
+        database_pb2.GetBlobTransferReply,
+    ]
+
+    GetBlobTransfersForNode: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobTransfersForNodeRequest,
+        database_pb2.GetBlobTransfersReply,
+    ]
+
+    GetBlobTransfersForBlob: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobTransfersForBlobRequest,
+        database_pb2.GetBlobTransfersReply,
+    ]
+
+    UpdateBlobTransfer: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateBlobTransferRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteBlobTransfer: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteBlobTransferRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteStaleTransfers: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteStaleTransfersRequest,
+        database_pb2.DeleteCountReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -568,6 +604,42 @@ class DatabaseServiceAsyncStub:
     DeleteBlobHashes: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteBlobHashesRequest,
         database_pb2.StatusReply,
+    ]
+
+    CreateBlobTransfer: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateBlobTransferRequest,
+        database_pb2.StatusReply,
+    ]
+    """Blob Transfer Operations (MariaDB)"""
+
+    GetBlobTransfer: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobTransferRequest,
+        database_pb2.GetBlobTransferReply,
+    ]
+
+    GetBlobTransfersForNode: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobTransfersForNodeRequest,
+        database_pb2.GetBlobTransfersReply,
+    ]
+
+    GetBlobTransfersForBlob: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobTransfersForBlobRequest,
+        database_pb2.GetBlobTransfersReply,
+    ]
+
+    UpdateBlobTransfer: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateBlobTransferRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteBlobTransfer: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteBlobTransferRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteStaleTransfers: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteStaleTransfersRequest,
+        database_pb2.DeleteCountReply,
     ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
@@ -951,5 +1023,55 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteBlobHashesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateBlobTransfer(
+        self,
+        request: database_pb2.CreateBlobTransferRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Blob Transfer Operations (MariaDB)"""
+
+    @abc.abstractmethod
+    def GetBlobTransfer(
+        self,
+        request: database_pb2.GetBlobTransferRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetBlobTransferReply, collections.abc.Awaitable[database_pb2.GetBlobTransferReply]]: ...
+
+    @abc.abstractmethod
+    def GetBlobTransfersForNode(
+        self,
+        request: database_pb2.GetBlobTransfersForNodeRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetBlobTransfersReply, collections.abc.Awaitable[database_pb2.GetBlobTransfersReply]]: ...
+
+    @abc.abstractmethod
+    def GetBlobTransfersForBlob(
+        self,
+        request: database_pb2.GetBlobTransfersForBlobRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetBlobTransfersReply, collections.abc.Awaitable[database_pb2.GetBlobTransfersReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateBlobTransfer(
+        self,
+        request: database_pb2.UpdateBlobTransferRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteBlobTransfer(
+        self,
+        request: database_pb2.DeleteBlobTransferRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteStaleTransfers(
+        self,
+        request: database_pb2.DeleteStaleTransfersRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...
