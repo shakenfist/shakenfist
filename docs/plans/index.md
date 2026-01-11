@@ -9,9 +9,12 @@ This section contains forward-looking roadmaps for Shaken Fist development. Thes
 
 | Plan | Phase | Status | Description |
 |------|-------|--------|-------------|
-| [Blob Storage Roadmap](blob-storage-roadmap.md) | Phase 1: Hash Tracking | Planning | Move hash storage to MariaDB |
+| [Blob Storage Roadmap](blob-storage-roadmap.md) | Phase 1: Hash Tracking | Complete | Move hash storage to MariaDB |
 | [Blob Storage Roadmap](blob-storage-roadmap.md) | Phase 2: Lazy Dedup | Future | Composite blobs and deduplication |
 | [Blob Storage Roadmap](blob-storage-roadmap.md) | Phase 3: Chunking | Future | Content-defined chunking |
+| [API Query Batching](api-query-batching-roadmap.md) | Phase 1: Batch Infrastructure | Planning | Add batch query functions |
+| [API Query Batching](api-query-batching-roadmap.md) | Phase 2: Prefetch Pattern | Future | Modify API to prefetch related data |
+| [API Query Batching](api-query-batching-roadmap.md) | Phase 3: Generic Framework | Future | Declarative prefetch requirements |
 
 ### Status Definitions
 

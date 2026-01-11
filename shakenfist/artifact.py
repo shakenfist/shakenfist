@@ -284,17 +284,16 @@ class Artifact(dbowo):
     def add_index(self, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
             mri = self.most_recent_index
+            old_sha512 = None
+            old_blob_uuid = None
             if 'blob_uuid' in mri:
                 old_blob = blob.Blob.from_db(mri['blob_uuid'])
                 if not old_blob:
                     raise exceptions.BlobMissing(
                         'Failed to retrieve previous artifact version: '
                         f'{mri["blob_uuid"]}')
-                old_checksums = old_blob.checksums
                 old_blob_uuid = old_blob.uuid
-            else:
-                old_checksums = {}
-                old_blob_uuid = None
+                old_sha512 = mariadb.get_valid_hash(str(old_blob.uuid), 'sha512')
 
             if old_blob_uuid and old_blob_uuid == blob_uuid:
                 # Skip using the same blob UUID as two consecutive indexes
@@ -304,10 +303,10 @@ class Artifact(dbowo):
             if not new_blob:
                 raise exceptions.BlobMissing(
                     f'Failed to retrieve new artifact version: {blob_uuid}')
-            new_checksums = new_blob.checksums
+            new_sha512 = mariadb.get_valid_hash(str(new_blob.uuid), 'sha512')
 
-            if old_checksums.get('sha512') and new_checksums.get('sha512'):
-                if old_checksums.get('sha512') == new_checksums.get('sha512'):
+            if old_sha512 and new_sha512:
+                if old_sha512 == new_sha512:
                     # Skipping the update, the blobs have the same content...
                     return mri
 

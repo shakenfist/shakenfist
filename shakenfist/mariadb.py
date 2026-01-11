@@ -35,6 +35,7 @@ from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
@@ -49,6 +50,10 @@ from shakenfist.util import callstack as util_callstack
 
 LOG, _ = logs.setup(__name__)
 
+# Sentinel node name used during migration when the original node is unknown.
+# This uses a name that cannot conflict with real hostnames.
+MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
+
 # Thread-local storage for database connections and gRPC channels
 _local = threading.local()
 
@@ -60,16 +65,19 @@ _ipam_reservations_table: Optional[sa.Table] = None
 _uploads_table: Optional[sa.Table] = None
 _dnsmasq_table: Optional[sa.Table] = None
 _object_references_table: Optional[sa.Table] = None
+_blob_hashes_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
 #   All tables v1: Initial schema creation
 #   All tables v2: Data migration from etcd to MariaDB
+#   blob_hashes: Same pattern - v1 schema, v2 data migration from etcd
 OBJECT_STATES_VERSION = 2
 IPAM_RESERVATIONS_VERSION = 2
 UPLOADS_VERSION = 2
 DNSMASQ_VERSION = 2
 OBJECT_REFERENCES_VERSION = 2
+BLOB_HASHES_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -579,6 +587,67 @@ def _ensure_object_references_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _get_blob_hashes_table() -> sa.Table:
+    """Get or create the blob_hashes table definition.
+
+    This table stores blob checksums/hashes, replacing the etcd-based
+    checksums attribute. It enables O(1) hash lookups via the idx_hash_lookup
+    index and tracks per-node verification status.
+
+    The table has a compound primary key of (blob_uuid, node, algorithm) to
+    allow each node to independently verify blob integrity with multiple
+    hash algorithms.
+    """
+    global _blob_hashes_table
+    if _blob_hashes_table is None:
+        metadata = _get_metadata()
+        _blob_hashes_table = pydantic_to_sqlalchemy_table(
+            BlobHash,
+            'blob_hashes',
+            metadata,
+            primary_key_fields=['blob_uuid', 'node', 'algorithm'],
+            include_id_column=False
+        )
+    return _blob_hashes_table
+
+
+def _ensure_blob_hashes_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the blob_hashes table schema is up to date.
+
+    Applies any necessary migrations based on the current version.
+    Returns a dict with migration status information.
+    """
+    table_name = 'blob_hashes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_blob_hashes_table()
+
+    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
+    # Data migration from etcd will upgrade to version 2.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        # Create indexes
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': BLOB_HASHES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def ensure_schema() -> list[dict[str, Any]]:
     """Ensure all MariaDB tables exist with current schema versions.
 
@@ -610,6 +679,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_uploads_schema(engine))
     results.append(_ensure_dnsmasq_schema(engine))
     results.append(_ensure_object_references_schema(engine))
+    results.append(_ensure_blob_hashes_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -1189,6 +1259,92 @@ def _migrate_etcd_object_references(engine: sa.Engine) -> dict[str, Any]:
     return {'migrated_count': migrated_count, 'error_count': error_count}
 
 
+def _migrate_etcd_blob_hashes(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate blob checksums from etcd to MariaDB blob_hashes table.
+
+    This migration scans all blobs in etcd and migrates their checksums
+    attribute to the MariaDB blob_hashes table. This enables O(1) hash
+    lookups and proper per-node verification tracking.
+
+    After migration, the checksums attributes are removed from etcd, but
+    only if ALL hash records for that blob were successfully created.
+    """
+    from shakenfist import etcd
+
+    migrated_count = 0
+    skipped_count = 0
+    error_count = 0
+
+    LOG.info('Migrating blob checksums from etcd to MariaDB...')
+
+    for objkey, data in etcd.get_all('blob', None):
+        blob_uuid = objkey.split('/')[-1]
+
+        # Get checksums attribute from etcd
+        checksums = etcd.get('attribute/blob', blob_uuid, 'checksums')
+        if not checksums:
+            continue
+
+        # Get the nodes dict (node_name -> last_verified_timestamp)
+        nodes = checksums.get('nodes', {})
+        if not nodes:
+            # If no nodes recorded, use sentinel name as fallback
+            nodes = {MIGRATION_UNKNOWN_NODE: time.time()}
+
+        # Get file_size from blob object data
+        file_size = data.get('size', 0)
+
+        # Track success for this blob to handle partial failures
+        blob_success = True
+        blob_migrated = 0
+
+        # For each algorithm that has a hash value
+        for algorithm in ['sha512', 'sha256', 'sha1', 'xxh128']:
+            hash_value = checksums.get(algorithm)
+            if not hash_value:
+                continue
+
+            # Create a hash record for each node that has verified this blob
+            for node_name, last_verified in nodes.items():
+                blob_hash = BlobHash(
+                    blob_uuid=blob_uuid,
+                    node=node_name,
+                    algorithm=algorithm,
+                    hash_value=hash_value,
+                    file_size=file_size,
+                    computed_at=last_verified,
+                    last_verified_at=last_verified,
+                    verification_status='valid',
+                    error_message=None
+                )
+                try:
+                    success = upsert_blob_hash(blob_hash)
+                    if success:
+                        blob_migrated += 1
+                    else:
+                        # upsert_blob_hash returned False - skip, already exists
+                        skipped_count += 1
+                except Exception as e:
+                    LOG.warning(
+                        f'Error migrating blob hash for {blob_uuid}: {e}')
+                    blob_success = False
+                    error_count += 1
+
+        # Only delete the etcd attribute if ALL upserts succeeded for this blob
+        if blob_success and blob_migrated > 0:
+            etcd.delete('attribute/blob', blob_uuid, 'checksums')
+            migrated_count += blob_migrated
+        elif not blob_success:
+            LOG.warning(
+                f'Partial failure migrating blob {blob_uuid}, '
+                f'etcd attribute retained')
+
+    LOG.info(
+        f'Blob hashes migration: {migrated_count} created, '
+        f'{skipped_count} skipped, {error_count} errors')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -1206,6 +1362,9 @@ DATA_MIGRATIONS.update({
     },
     'object_references': {
         2: _migrate_etcd_object_references,
+    },
+    'blob_hashes': {
+        2: _migrate_etcd_blob_hashes,
     },
 })
 
@@ -3046,6 +3205,224 @@ def _direct_get_stale_references(older_than: float) -> list[ObjectReference]:
 
 
 # =============================================================================
+# Blob Hashes Direct Access Functions
+# These access the database directly and are used by the database daemon.
+# =============================================================================
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_upsert_blob_hash(blob_hash: BlobHash) -> bool:
+    """Upsert a blob hash record directly in MariaDB.
+
+    Creates or updates a hash record for a blob. If the record already exists
+    (based on blob_uuid, node, algorithm), updates all mutable fields.
+
+    Args:
+        blob_hash: The BlobHash record to upsert.
+
+    Returns:
+        True if created or updated, False on error.
+    """
+    engine = _get_engine()
+
+    try:
+        with engine.connect() as conn:
+            # Use INSERT ... ON DUPLICATE KEY UPDATE for idempotent upsert
+            stmt = sa.text('''
+                INSERT INTO blob_hashes (
+                    blob_uuid, node, algorithm, hash_value, file_size,
+                    computed_at, last_verified_at, verification_status,
+                    error_message
+                ) VALUES (
+                    :blob_uuid, :node, :algorithm, :hash_value, :file_size,
+                    :computed_at, :last_verified_at, :verification_status,
+                    :error_message
+                ) ON DUPLICATE KEY UPDATE
+                    hash_value = VALUES(hash_value),
+                    file_size = VALUES(file_size),
+                    last_verified_at = VALUES(last_verified_at),
+                    verification_status = VALUES(verification_status),
+                    error_message = VALUES(error_message)
+            ''')
+            conn.execute(stmt, {
+                'blob_uuid': blob_hash.blob_uuid,
+                'node': blob_hash.node,
+                'algorithm': blob_hash.algorithm,
+                'hash_value': blob_hash.hash_value,
+                'file_size': blob_hash.file_size,
+                'computed_at': blob_hash.computed_at,
+                'last_verified_at': blob_hash.last_verified_at,
+                'verification_status': blob_hash.verification_status,
+                'error_message': blob_hash.error_message
+            })
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(f'MariaDB upsert_blob_hash failed: {e}')
+        return False
+
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_get_blob_hashes(
+    blob_uuid: str,
+    node: Optional[str] = None
+) -> list[BlobHash]:
+    """Get all hash records for a blob directly from MariaDB.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+        node: Optional filter by node name.
+
+    Returns:
+        List of BlobHash records for the blob.
+    """
+    engine = _get_engine()
+    table = _get_blob_hashes_table()
+
+    try:
+        with engine.connect() as conn:
+            conditions = [table.c.blob_uuid == blob_uuid]
+            if node is not None:
+                conditions.append(table.c.node == node)
+            stmt = sa.select(table).where(sa.and_(*conditions))
+            result = conn.execute(stmt)
+            hashes = []
+            for row in result:
+                hashes.append(BlobHash(
+                    blob_uuid=row.blob_uuid,
+                    node=row.node,
+                    algorithm=row.algorithm,
+                    hash_value=row.hash_value,
+                    file_size=row.file_size,
+                    computed_at=row.computed_at,
+                    last_verified_at=row.last_verified_at,
+                    verification_status=row.verification_status,
+                    error_message=row.error_message
+                ))
+            return hashes
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get_blob_hashes failed: {e}')
+        return []
+
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_find_blob_by_hash(
+    algorithm: str,
+    hash_value: str
+) -> Optional[str]:
+    """Find a blob UUID by hash value directly from MariaDB.
+
+    Uses the idx_hash_lookup index for O(1) lookup performance.
+
+    Args:
+        algorithm: The hash algorithm (sha512, sha256, etc.).
+        hash_value: The hash value to search for.
+
+    Returns:
+        The blob UUID if found, None otherwise.
+    """
+    engine = _get_engine()
+    table = _get_blob_hashes_table()
+
+    try:
+        with engine.connect() as conn:
+            # Only return blobs with valid hashes to avoid returning blobs
+            # with corrupted or unverified data
+            stmt = sa.select(table.c.blob_uuid).where(
+                sa.and_(
+                    table.c.algorithm == algorithm,
+                    table.c.hash_value == hash_value,
+                    table.c.verification_status == 'valid'
+                )
+            ).limit(1)
+            result = conn.execute(stmt)
+            row = result.fetchone()
+            if row:
+                return str(row.blob_uuid)
+            return None
+    except OperationalError as e:
+        LOG.warning(f'MariaDB find_blob_by_hash failed: {e}')
+        return None
+
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_get_stale_blob_hashes(older_than: float) -> list[BlobHash]:
+    """Get blob hashes with last_verified_at older than the specified timestamp.
+
+    Used by the scheduled verification task to find blobs needing re-verification.
+
+    Args:
+        older_than: Unix timestamp. Hashes with last_verified_at older than
+            this are considered stale.
+
+    Returns:
+        List of stale BlobHash records.
+    """
+    engine = _get_engine()
+    table = _get_blob_hashes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.last_verified_at < older_than)
+            result = conn.execute(stmt)
+            hashes = []
+            for row in result:
+                hashes.append(BlobHash(
+                    blob_uuid=row.blob_uuid,
+                    node=row.node,
+                    algorithm=row.algorithm,
+                    hash_value=row.hash_value,
+                    file_size=row.file_size,
+                    computed_at=row.computed_at,
+                    last_verified_at=row.last_verified_at,
+                    verification_status=row.verification_status,
+                    error_message=row.error_message
+                ))
+            return hashes
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get_stale_blob_hashes failed: {e}')
+        return []
+
+
+@util_callstack.restrict_caller(
+        'shakenfist.daemons.database',
+        'shakenfist.mariadb'
+    )
+def _direct_delete_blob_hashes(blob_uuid: str) -> bool:
+    """Delete all hash records for a blob directly from MariaDB.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        True if deleted (or didn't exist), False on error.
+    """
+    engine = _get_engine()
+    table = _get_blob_hashes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.blob_uuid == blob_uuid)
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete_blob_hashes failed: {e}')
+        return False
+
+
+# =============================================================================
 # DnsMasq gRPC Client Functions
 # These call the database microservice for DnsMasq operations.
 # =============================================================================
@@ -3438,6 +3815,119 @@ def _grpc_get_stale_references(older_than: float) -> list[ObjectReference]:
 
 
 # =============================================================================
+# Blob Hashes gRPC Client Functions
+# These call the database microservice for blob hash operations.
+# =============================================================================
+
+def _grpc_upsert_blob_hash(blob_hash: BlobHash) -> bool:
+    """Upsert a blob hash record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpsertBlobHashRequest(
+            blob_hash=database_pb2.BlobHashData(
+                blob_uuid=blob_hash.blob_uuid,
+                node=blob_hash.node,
+                algorithm=blob_hash.algorithm,
+                hash_value=blob_hash.hash_value,
+                file_size=blob_hash.file_size,
+                computed_at=blob_hash.computed_at,
+                last_verified_at=blob_hash.last_verified_at,
+                verification_status=blob_hash.verification_status,
+                error_message=blob_hash.error_message or ''
+            )
+        )
+        reply = stub.UpsertBlobHash(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC UpsertBlobHash failed: {e}')
+        return False
+
+
+def _grpc_get_blob_hashes(
+    blob_uuid: str,
+    node: Optional[str] = None
+) -> list[BlobHash]:
+    """Get blob hash records via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetBlobHashesRequest(blob_uuid=blob_uuid)
+        if node is not None:
+            request.node = node
+        reply = stub.GetBlobHashes(request)
+        hashes = []
+        for h in reply.hashes:
+            hashes.append(BlobHash(
+                blob_uuid=h.blob_uuid,
+                node=h.node,
+                algorithm=h.algorithm,
+                hash_value=h.hash_value,
+                file_size=h.file_size,
+                computed_at=h.computed_at,
+                last_verified_at=h.last_verified_at,
+                verification_status=h.verification_status,
+                error_message=h.error_message or None
+            ))
+        return hashes
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetBlobHashes failed: {e}')
+        return []
+
+
+def _grpc_find_blob_by_hash(algorithm: str, hash_value: str) -> Optional[str]:
+    """Find a blob UUID by hash via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.FindBlobByHashRequest(
+            algorithm=algorithm,
+            hash_value=hash_value
+        )
+        reply = stub.FindBlobByHash(request)
+        if reply.found:
+            return str(reply.blob_uuid)
+        return None
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC FindBlobByHash failed: {e}')
+        return None
+
+
+def _grpc_get_stale_blob_hashes(older_than: float) -> list[BlobHash]:
+    """Get stale blob hashes via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetStaleBlobHashesRequest(older_than=older_than)
+        reply = stub.GetStaleBlobHashes(request)
+        hashes = []
+        for h in reply.hashes:
+            hashes.append(BlobHash(
+                blob_uuid=h.blob_uuid,
+                node=h.node,
+                algorithm=h.algorithm,
+                hash_value=h.hash_value,
+                file_size=h.file_size,
+                computed_at=h.computed_at,
+                last_verified_at=h.last_verified_at,
+                verification_status=h.verification_status,
+                error_message=h.error_message or None
+            ))
+        return hashes
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetStaleBlobHashes failed: {e}')
+        return []
+
+
+def _grpc_delete_blob_hashes(blob_uuid: str) -> bool:
+    """Delete blob hash records via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteBlobHashesRequest(blob_uuid=blob_uuid)
+        reply = stub.DeleteBlobHashes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC DeleteBlobHashes failed: {e}')
+        return False
+
+
+# =============================================================================
 # DnsMasq Public API Functions
 # These route to either direct or gRPC access based on configuration.
 # =============================================================================
@@ -3728,3 +4218,130 @@ def get_stale_references(older_than: float) -> list[ObjectReference]:
     if _use_database_service():
         return _grpc_get_stale_references(older_than)
     return _direct_get_stale_references(older_than)
+
+
+# =============================================================================
+# Blob Hashes Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def upsert_blob_hash(blob_hash: BlobHash) -> bool:
+    """Upsert a blob hash record.
+
+    Creates or updates a hash record for a blob. If the record already exists
+    (based on blob_uuid, node, algorithm), updates all mutable fields.
+
+    Args:
+        blob_hash: The BlobHash record to upsert.
+
+    Returns:
+        True if created or updated, False on error.
+    """
+    if _use_database_service():
+        return _grpc_upsert_blob_hash(blob_hash)
+    return _direct_upsert_blob_hash(blob_hash)
+
+
+def get_blob_hashes(
+    blob_uuid: str,
+    node: Optional[str] = None
+) -> list[BlobHash]:
+    """Get all hash records for a blob.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+        node: Optional filter by node name.
+
+    Returns:
+        List of BlobHash records for the blob.
+    """
+    if _use_database_service():
+        return _grpc_get_blob_hashes(blob_uuid, node)
+    return _direct_get_blob_hashes(blob_uuid, node)
+
+
+def get_valid_hash(blob_uuid: str, algorithm: str) -> Optional[str]:
+    """Get the valid hash value for a blob and algorithm.
+
+    Convenience function that finds the first valid hash for the given
+    algorithm across all nodes.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+        algorithm: The hash algorithm (sha512, sha256, etc.).
+
+    Returns:
+        The hash value string if found and valid, None otherwise.
+    """
+    for h in get_blob_hashes(blob_uuid):
+        if h.algorithm == algorithm and h.verification_status == 'valid':
+            return h.hash_value
+    return None
+
+
+def get_valid_checksums(blob_uuid: str) -> dict[str, str]:
+    """Get all valid checksums for a blob as a dict.
+
+    Convenience function that collects all valid hashes into a dict
+    keyed by algorithm. If multiple nodes have the same algorithm,
+    only the first valid one is included.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        Dict mapping algorithm name to hash value for all valid hashes.
+    """
+    checksums: dict[str, str] = {}
+    for h in get_blob_hashes(blob_uuid):
+        if h.verification_status == 'valid' and h.algorithm not in checksums:
+            checksums[h.algorithm] = h.hash_value
+    return checksums
+
+
+def find_blob_by_hash(algorithm: str, hash_value: str) -> Optional[str]:
+    """Find a blob UUID by hash value.
+
+    Uses the idx_hash_lookup index for O(1) lookup performance.
+
+    Args:
+        algorithm: The hash algorithm (sha512, sha256, etc.).
+        hash_value: The hash value to search for.
+
+    Returns:
+        The blob UUID if found, None otherwise.
+    """
+    if _use_database_service():
+        return _grpc_find_blob_by_hash(algorithm, hash_value)
+    return _direct_find_blob_by_hash(algorithm, hash_value)
+
+
+def get_stale_blob_hashes(older_than: float) -> list[BlobHash]:
+    """Get blob hashes with last_verified_at older than the specified timestamp.
+
+    Used by the scheduled verification task to find blobs needing re-verification.
+
+    Args:
+        older_than: Unix timestamp. Hashes with last_verified_at older than
+            this are considered stale.
+
+    Returns:
+        List of stale BlobHash records.
+    """
+    if _use_database_service():
+        return _grpc_get_stale_blob_hashes(older_than)
+    return _direct_get_stale_blob_hashes(older_than)
+
+
+def delete_blob_hashes(blob_uuid: str) -> bool:
+    """Delete all hash records for a blob.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        True if deleted (or didn't exist), False on error.
+    """
+    if _use_database_service():
+        return _grpc_delete_blob_hashes(blob_uuid)
+    return _direct_delete_blob_hashes(blob_uuid)

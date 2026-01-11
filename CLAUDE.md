@@ -21,6 +21,10 @@ items are documented in `docs/plans/*.md`. However, we should always:
   prefer functional tests to unit tests if we can only have one.
 * Preserve event logging -- the exact logging can change if required, but we
   like having good coverage of events for audit and debugging.
+* Object or attribute filtering should be "pushed down" to the mariadb SQL
+  layer where indexes can improve its performance where possible. Also ensure
+  that we have the appropriate indicies for query efficiency when adding
+  queries.
 * Perform a code review a the end of a plan and address any concerns raised.
 
 ## Quick Reference

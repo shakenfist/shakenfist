@@ -79,6 +79,7 @@ nav:
         - "Workflow": developer_guide/workflow.md
     - Plans:
         - "Overview": plans/index.md
+        - "API Query Batching": plans/api-query-batching-roadmap.md
         - "Blob Storage Roadmap": plans/blob-storage-roadmap.md
     - Operator Guide:
        - "Installation": operator_guide/installation.md

@@ -40,7 +40,7 @@ Key code locations:
 
 **Goal**: Move hash storage from etcd to MariaDB with proper indexes, enabling O(1) hash lookups.
 
-**Status**: Planning
+**Status**: COMPLETE
 
 **Prerequisites**: PLAN-reference-counts.md (COMPLETE)
 

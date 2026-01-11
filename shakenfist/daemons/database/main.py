@@ -1233,6 +1233,128 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetStaleReferences failed', e)
             return database_pb2.GetReferencesReply(references=[])
 
+    # =========================================================================
+    # Blob Hash Operations
+    # =========================================================================
+
+    def UpsertBlobHash(
+        self,
+        request: database_pb2.UpsertBlobHashRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Upsert a blob hash record."""
+        try:
+            self.monitor.counters['upsert_blob_hash'].inc()
+            from shakenfist.schema.blob_hash import BlobHash
+            blob_hash = BlobHash(
+                blob_uuid=request.blob_hash.blob_uuid,
+                node=request.blob_hash.node,
+                algorithm=request.blob_hash.algorithm,
+                hash_value=request.blob_hash.hash_value,
+                file_size=request.blob_hash.file_size,
+                computed_at=request.blob_hash.computed_at,
+                last_verified_at=request.blob_hash.last_verified_at,
+                verification_status=request.blob_hash.verification_status,
+                error_message=request.blob_hash.error_message or None
+            )
+            success = mariadb._direct_upsert_blob_hash(blob_hash)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpsertBlobHash failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetBlobHashes(
+        self,
+        request: database_pb2.GetBlobHashesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetBlobHashesReply:
+        """Get all hash records for a blob."""
+        try:
+            self.monitor.counters['get_blob_hashes'].inc()
+            node = request.node if request.HasField('node') else None
+            hashes = mariadb._direct_get_blob_hashes(request.blob_uuid, node)
+            result = []
+            for h in hashes:
+                result.append(database_pb2.BlobHashData(
+                    blob_uuid=h.blob_uuid,
+                    node=h.node,
+                    algorithm=h.algorithm,
+                    hash_value=h.hash_value,
+                    file_size=h.file_size,
+                    computed_at=h.computed_at,
+                    last_verified_at=h.last_verified_at,
+                    verification_status=h.verification_status,
+                    error_message=h.error_message or ''
+                ))
+            return database_pb2.GetBlobHashesReply(hashes=result)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetBlobHashes failed', e)
+            return database_pb2.GetBlobHashesReply(hashes=[])
+
+    def FindBlobByHash(
+        self,
+        request: database_pb2.FindBlobByHashRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindBlobByHashReply:
+        """Find a blob UUID by hash value."""
+        try:
+            self.monitor.counters['find_blob_by_hash'].inc()
+            blob_uuid = mariadb._direct_find_blob_by_hash(
+                request.algorithm, request.hash_value)
+            if blob_uuid:
+                return database_pb2.FindBlobByHashReply(
+                    found=True, blob_uuid=blob_uuid)
+            return database_pb2.FindBlobByHashReply(found=False, blob_uuid='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindBlobByHash failed', e)
+            return database_pb2.FindBlobByHashReply(found=False, blob_uuid='')
+
+    def GetStaleBlobHashes(
+        self,
+        request: database_pb2.GetStaleBlobHashesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetBlobHashesReply:
+        """Get blob hashes with last_verified_at older than specified time."""
+        try:
+            self.monitor.counters['get_stale_blob_hashes'].inc()
+            hashes = mariadb._direct_get_stale_blob_hashes(request.older_than)
+            result = []
+            for h in hashes:
+                result.append(database_pb2.BlobHashData(
+                    blob_uuid=h.blob_uuid,
+                    node=h.node,
+                    algorithm=h.algorithm,
+                    hash_value=h.hash_value,
+                    file_size=h.file_size,
+                    computed_at=h.computed_at,
+                    last_verified_at=h.last_verified_at,
+                    verification_status=h.verification_status,
+                    error_message=h.error_message or ''
+                ))
+            return database_pb2.GetBlobHashesReply(hashes=result)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetStaleBlobHashes failed', e)
+            return database_pb2.GetBlobHashesReply(hashes=[])
+
+    def DeleteBlobHashes(
+        self,
+        request: database_pb2.DeleteBlobHashesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete all hash records for a blob."""
+        try:
+            self.monitor.counters['delete_blob_hashes'].inc()
+            success = mariadb._direct_delete_blob_hashes(request.blob_uuid)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteBlobHashes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -1270,7 +1392,10 @@ class Monitor(daemon.WorkerPoolDaemon):
             'record_relationship', 'remove_relationship', 'get_references_to',
             'get_references_from', 'count_references_to',
             'remove_all_references_from', 'update_last_active',
-            'get_stale_references'
+            'get_stale_references',
+            # MariaDB blob hash operations
+            'upsert_blob_hash', 'get_blob_hashes', 'find_blob_by_hash',
+            'get_stale_blob_hashes', 'delete_blob_hashes'
         ]
         for op in operations:
             self.counters[op] = Counter(
