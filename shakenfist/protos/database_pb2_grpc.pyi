@@ -325,6 +325,11 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    DeleteBlobTransfersForBlob: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteBlobTransfersForBlobRequest,
+        database_pb2.DeleteCountReply,
+    ]
+
     DeleteStaleTransfers: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteStaleTransfersRequest,
         database_pb2.DeleteCountReply,
@@ -635,6 +640,11 @@ class DatabaseServiceAsyncStub:
     DeleteBlobTransfer: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteBlobTransferRequest,
         database_pb2.StatusReply,
+    ]
+
+    DeleteBlobTransfersForBlob: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteBlobTransfersForBlobRequest,
+        database_pb2.DeleteCountReply,
     ]
 
     DeleteStaleTransfers: grpc.aio.UnaryUnaryMultiCallable[
@@ -1066,6 +1076,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteBlobTransferRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteBlobTransfersForBlob(
+        self,
+        request: database_pb2.DeleteBlobTransfersForBlobRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
 
     @abc.abstractmethod
     def DeleteStaleTransfers(

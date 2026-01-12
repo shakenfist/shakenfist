@@ -1538,6 +1538,22 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteStaleTransfers failed', e)
             return database_pb2.DeleteCountReply(count=0)
 
+    def DeleteBlobTransfersForBlob(
+        self,
+        request: database_pb2.DeleteBlobTransfersForBlobRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DeleteCountReply:
+        """Delete all transfers for a blob."""
+        try:
+            self.monitor.counters['delete_blob_transfers_for_blob'].inc()
+            count = mariadb._direct_delete_blob_transfers_for_blob(
+                request.blob_uuid)
+            return database_pb2.DeleteCountReply(count=count)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteBlobTransfersForBlob failed', e)
+            return database_pb2.DeleteCountReply(count=-1)
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -1583,7 +1599,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_blob_transfer', 'get_blob_transfer',
             'get_blob_transfers_for_node', 'get_blob_transfers_for_blob',
             'update_blob_transfer', 'delete_blob_transfer',
-            'delete_stale_transfers'
+            'delete_stale_transfers', 'delete_blob_transfers_for_blob'
         ]
         for op in operations:
             self.counters[op] = Counter(

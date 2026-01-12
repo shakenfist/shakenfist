@@ -329,6 +329,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteBlobTransferRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.DeleteBlobTransfersForBlob = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteBlobTransfersForBlob',
+                request_serializer=database__pb2.DeleteBlobTransfersForBlobRequest.SerializeToString,
+                response_deserializer=database__pb2.DeleteCountReply.FromString,
+                _registered_method=True)
         self.DeleteStaleTransfers = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteStaleTransfers',
                 request_serializer=database__pb2.DeleteStaleTransfersRequest.SerializeToString,
@@ -704,6 +709,12 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def DeleteBlobTransfersForBlob(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DeleteStaleTransfers(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1007,6 +1018,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.DeleteBlobTransfer,
                     request_deserializer=database__pb2.DeleteBlobTransferRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteBlobTransfersForBlob': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteBlobTransfersForBlob,
+                    request_deserializer=database__pb2.DeleteBlobTransfersForBlobRequest.FromString,
+                    response_serializer=database__pb2.DeleteCountReply.SerializeToString,
             ),
             'DeleteStaleTransfers': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteStaleTransfers,
@@ -2607,6 +2623,33 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/DeleteBlobTransfer',
             database__pb2.DeleteBlobTransferRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteBlobTransfersForBlob(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteBlobTransfersForBlob',
+            database__pb2.DeleteBlobTransfersForBlobRequest.SerializeToString,
+            database__pb2.DeleteCountReply.FromString,
             options,
             channel_credentials,
             insecure,

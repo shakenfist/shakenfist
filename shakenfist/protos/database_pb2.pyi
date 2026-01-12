@@ -1993,6 +1993,21 @@ class DeleteBlobTransferRequest(google.protobuf.message.Message):
 global___DeleteBlobTransferRequest = DeleteBlobTransferRequest
 
 @typing.final
+class DeleteBlobTransfersForBlobRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BLOB_UUID_FIELD_NUMBER: builtins.int
+    blob_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        blob_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["blob_uuid", b"blob_uuid"]) -> None: ...
+
+global___DeleteBlobTransfersForBlobRequest = DeleteBlobTransfersForBlobRequest
+
+@typing.final
 class DeleteStaleTransfersRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

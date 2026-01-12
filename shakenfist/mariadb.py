@@ -4718,17 +4718,15 @@ def _direct_delete_blob_transfer(
         return False
 
 
-def _direct_delete_stale_transfers(max_age: float) -> int:
+def _direct_delete_stale_transfers(older_than: float) -> int:
     """Delete stale transfers directly from MariaDB.
 
     Args:
-        max_age: Maximum age in seconds. Transfers not updated in this
-            many seconds are deleted.
+        older_than: Unix timestamp. Transfers with updated_at < this are deleted.
 
     Returns:
         Number of deleted records.
     """
-    older_than = time.time() - max_age
     engine = _get_engine()
     table = _get_blob_transfers_table()
 
@@ -4741,6 +4739,31 @@ def _direct_delete_stale_transfers(max_age: float) -> int:
     except OperationalError as e:
         LOG.warning(f'MariaDB delete_stale_transfers failed: {e}')
         return 0
+
+
+def _direct_delete_blob_transfers_for_blob(blob_uuid: str) -> int:
+    """Delete all transfers for a blob directly from MariaDB.
+
+    This is more efficient than fetching and deleting one by one.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        Number of deleted records, or -1 on error.
+    """
+    engine = _get_engine()
+    table = _get_blob_transfers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.blob_uuid == blob_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete_blob_transfers_for_blob failed: {e}')
+        return -1
 
 
 # =============================================================================
@@ -4936,6 +4959,20 @@ def _grpc_delete_stale_transfers(max_age: float) -> int:
         return 0
 
 
+def _grpc_delete_blob_transfers_for_blob(blob_uuid: str) -> int:
+    """Delete all transfers for a blob via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteBlobTransfersForBlobRequest(
+            blob_uuid=blob_uuid
+        )
+        reply = stub.DeleteBlobTransfersForBlob(request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC DeleteBlobTransfersForBlob failed: {e}')
+        return -1
+
+
 # =============================================================================
 # Blob Transfer Public API Functions
 # These route to direct or gRPC based on configuration.
@@ -5060,23 +5097,25 @@ def delete_stale_transfers(max_age: float) -> int:
     """
     if _use_database_service():
         return _grpc_delete_stale_transfers(max_age)
-    return _direct_delete_stale_transfers(max_age)
+    older_than = time.time() - max_age
+    return _direct_delete_stale_transfers(older_than)
 
 
 def delete_blob_transfers_for_blob(blob_uuid: str) -> bool:
     """Delete all transfer records for a blob.
 
     Used by Blob.hard_delete() to clean up any pending transfers.
+    Uses bulk SQL DELETE for efficiency.
 
     Args:
         blob_uuid: The UUID of the blob.
 
     Returns:
-        True if all deleted successfully, False on any error.
+        True if deleted successfully (or no records exist), False on error.
     """
-    transfers = get_blob_transfers_for_blob(blob_uuid)
-    success = True
-    for t in transfers:
-        if not delete_blob_transfer(t.source_node, t.transfer_name):
-            success = False
-    return success
+    if _use_database_service():
+        result = _grpc_delete_blob_transfers_for_blob(blob_uuid)
+    else:
+        result = _direct_delete_blob_transfers_for_blob(blob_uuid)
+    # result is -1 on error, >= 0 (count of deleted records) on success
+    return result >= 0

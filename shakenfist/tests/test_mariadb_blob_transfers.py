@@ -211,10 +211,8 @@ class DeleteStaleTransfersTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-    @mock.patch('time.time')
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_delete_stale_transfers(self, mock_get_engine, mock_time):
-        mock_time.return_value = 1234567890.0
+    def test_delete_stale_transfers(self, mock_get_engine):
         mock_engine = mock.MagicMock()
         mock_conn = mock.MagicMock()
         mock_result = mock.MagicMock()
@@ -226,11 +224,78 @@ class DeleteStaleTransfersTestCase(base.ShakenFistTestCase):
             return_value=False)
         mock_get_engine.return_value = mock_engine
 
-        result = mariadb._direct_delete_stale_transfers(max_age=600)
+        # older_than is now a timestamp, not max_age
+        older_than = 1234567290.0
+        result = mariadb._direct_delete_stale_transfers(older_than)
 
         self.assertEqual(result, 3)
         mock_conn.execute.assert_called_once()
         mock_conn.commit.assert_called_once()
+
+
+class DeleteBlobTransfersForBlobTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_delete_blob_transfers_for_blob() function."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_delete_transfers_for_blob_success(self, mock_get_engine):
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_result = mock.MagicMock()
+        mock_result.rowcount = 2
+        mock_conn.execute.return_value = mock_result
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_delete_blob_transfers_for_blob('blob-uuid-123')
+
+        self.assertEqual(result, 2)
+        mock_conn.execute.assert_called_once()
+        mock_conn.commit.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_delete_transfers_for_blob_none_exist(self, mock_get_engine):
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_result = mock.MagicMock()
+        mock_result.rowcount = 0
+        mock_conn.execute.return_value = mock_result
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_delete_blob_transfers_for_blob('blob-uuid-123')
+
+        # 0 is a valid success case (no transfers existed)
+        self.assertEqual(result, 0)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_delete_transfers_for_blob_error(self, mock_get_engine):
+        from sqlalchemy.exc import OperationalError
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.side_effect = OperationalError(
+            'statement', {}, Exception('DB error'))
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_delete_blob_transfers_for_blob('blob-uuid-123')
+
+        # -1 indicates error
+        self.assertEqual(result, -1)
 
 
 class CleanupEtcdBlobTransfersTestCase(base.ShakenFistTestCase):

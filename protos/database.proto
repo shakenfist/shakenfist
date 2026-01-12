@@ -85,6 +85,7 @@ service DatabaseService {
   rpc GetBlobTransfersForBlob (GetBlobTransfersForBlobRequest) returns (GetBlobTransfersReply) {}
   rpc UpdateBlobTransfer (UpdateBlobTransferRequest) returns (StatusReply) {}
   rpc DeleteBlobTransfer (DeleteBlobTransferRequest) returns (StatusReply) {}
+  rpc DeleteBlobTransfersForBlob (DeleteBlobTransfersForBlobRequest) returns (DeleteCountReply) {}
   rpc DeleteStaleTransfers (DeleteStaleTransfersRequest) returns (DeleteCountReply) {}
 }
 
@@ -635,6 +636,10 @@ message UpdateBlobTransferRequest {
 message DeleteBlobTransferRequest {
   string source_node = 1;
   string transfer_name = 2;
+}
+
+message DeleteBlobTransfersForBlobRequest {
+  string blob_uuid = 1;
 }
 
 message DeleteStaleTransfersRequest {
