@@ -181,6 +181,11 @@ class Blob(dbo):
 
         b = Blob.from_db(blob_uuid)
         b.state = Blob.STATE_INITIAL
+        # Initialize last_used to prevent the cluster daemon from treating this
+        # as an unused blob eligible for cleanup. Without this, new blobs with
+        # ref_count=0 can be deleted before register() is called, causing a
+        # race condition where the blob transitions from deleted to created.
+        b.record_usage()
         return b
 
     def external_view(self) -> dict[str, Any]:
