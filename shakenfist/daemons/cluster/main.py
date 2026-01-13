@@ -218,7 +218,11 @@ class Monitor(daemon.Daemon):
             # cleanup runs. With the MariaDB-based object_references table,
             # ref_count is computed dynamically from actual relationships.
             if b.ref_count < 1:
-                last_used = b.last_used or 0
+                # Use fetched_at as fallback for last_used. This handles new
+                # blobs that haven't been registered yet - they get a 300s
+                # grace period from creation time instead of appearing unused
+                # since epoch (which caused race conditions during downloads).
+                last_used = b.last_used or b.fetched_at
                 age = time.time() - last_used
                 if age > 300:
                     b.add_event(
