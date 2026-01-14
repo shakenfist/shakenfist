@@ -464,15 +464,8 @@ class Blob(dbo):
     def add_node_location(self) -> None:
         self.add_location(config.NODE_NAME)
 
-        n = Node.from_db(config.NODE_NAME)
-        n.add_blob(self.uuid)
-
     def drop_node_location(self, node: str = config.NODE_NAME) -> None:
         self.remove_location(node)
-
-        # Remove from cached node blob list
-        n = Node.from_db(node)
-        n.remove_blob(self.uuid)
 
     def observe(self) -> None:
         self.add_node_location()
@@ -1086,9 +1079,8 @@ def observe_local_blobs() -> int:
     """Observe all blob files on this node to update BLOB_LOCATION references.
 
     This function scans the local blob storage directory and calls observe()
-    on each valid blob. This updates:
-    1. The BLOB_LOCATION reference in MariaDB (with last_active timestamp)
-    2. The node.blobs cache in etcd
+    on each valid blob. This updates the BLOB_LOCATION reference in MariaDB
+    (with last_active timestamp).
 
     This replaces the cluster daemon's periodic cache rebuild, making each
     node authoritative for its own blob locations.
@@ -1118,7 +1110,7 @@ def observe_local_blobs() -> int:
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b and b.state.value == Blob.STATE_CREATED:
                 # Calling observe() updates the BLOB_LOCATION reference
-                # (with last_active timestamp) and the node.blobs cache
+                # in MariaDB (with last_active timestamp)
                 b.observe()
                 observed_count += 1
 

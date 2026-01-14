@@ -15,6 +15,7 @@ from shakenfist.exceptions import NoSuchDaemon
 from shakenfist.exceptions import NoSuchDaemonState
 from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.util import general as util_general
 
 
@@ -24,7 +25,7 @@ LOG, _ = logs.setup(__name__)
 class Node(dbo):
     object_type = ObjectType.NODE
     initial_version = 2
-    current_version = 9
+    current_version = 10
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
@@ -128,6 +129,12 @@ class Node(dbo):
     def _upgrade_step_8_to_9(cls, static_values):
         # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
+
+    @classmethod
+    def _upgrade_step_9_to_10(cls, static_values):
+        # The node.blobs cache has been removed. Blob locations are now queried
+        # directly from MariaDB's object_references table (BLOB_LOCATION).
+        etcd.delete('attribute/node', static_values['fqdn'], 'blobs')
 
     @classmethod
     def new(cls, name, ip):
@@ -273,17 +280,14 @@ class Node(dbo):
 
     @property
     def blobs(self):
-        return self._db_get_attribute('blobs').get('blobs', [])
+        """Return list of blob UUIDs present on this node.
 
-    @blobs.setter
-    def blobs(self, value):
-        self._db_set_attribute('blobs', {'blobs': value})
-
-    def add_blob(self, blob):
-        self._add_item_in_attribute_list('blobs', blob)
-
-    def remove_blob(self, blob):
-        self._remove_item_in_attribute_list('blobs', blob)
+        This queries the object_references table for BLOB_LOCATION relationships
+        where this node is the source (meaning the node has the blob).
+        """
+        refs = mariadb.get_references_from(
+            ObjectType.NODE, self.uuid, RelationshipType.BLOB_LOCATION)
+        return [str(ref.target_uuid) for ref in refs]
 
     @property
     def instances(self):
