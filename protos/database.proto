@@ -77,6 +77,16 @@ service DatabaseService {
   rpc FindBlobByHash (FindBlobByHashRequest) returns (FindBlobByHashReply) {}
   rpc GetStaleBlobHashes (GetStaleBlobHashesRequest) returns (GetBlobHashesReply) {}
   rpc DeleteBlobHashes (DeleteBlobHashesRequest) returns (StatusReply) {}
+
+  // Blob Transfer Operations (MariaDB)
+  rpc CreateBlobTransfer (CreateBlobTransferRequest) returns (StatusReply) {}
+  rpc GetBlobTransfer (GetBlobTransferRequest) returns (GetBlobTransferReply) {}
+  rpc GetBlobTransfersForNode (GetBlobTransfersForNodeRequest) returns (GetBlobTransfersReply) {}
+  rpc GetBlobTransfersForBlob (GetBlobTransfersForBlobRequest) returns (GetBlobTransfersReply) {}
+  rpc UpdateBlobTransfer (UpdateBlobTransferRequest) returns (StatusReply) {}
+  rpc DeleteBlobTransfer (DeleteBlobTransferRequest) returns (StatusReply) {}
+  rpc DeleteBlobTransfersForBlob (DeleteBlobTransfersForBlobRequest) returns (DeleteCountReply) {}
+  rpc DeleteStaleTransfers (DeleteStaleTransfersRequest) returns (DeleteCountReply) {}
 }
 
 // Generic status reply
@@ -570,4 +580,68 @@ message GetStaleBlobHashesRequest {
 
 message DeleteBlobHashesRequest {
   string blob_uuid = 1;
+}
+
+// Blob Transfer Operations (MariaDB)
+// These operations manage blob transfer coordination, replacing the etcd-based
+// /sf/transfer/{node}/{name} keys and incomplete_locations attributes.
+
+message BlobTransferData {
+  string source_node = 1;       // Node that has the blob (server side)
+  string transfer_name = 2;     // Unique transfer identifier
+  string requesting_node = 3;   // Node requesting the transfer (client side)
+  string blob_uuid = 4;         // UUID of the blob being transferred
+  string token = 5;             // Authentication token for TCP connection
+  string server_state = 6;      // 'initial' or 'created'
+  int32 port = 7;               // TCP port (0 if not yet set)
+  double percentage = 8;        // Transfer progress (0.0 to 100.0)
+  double created_at = 9;        // Unix timestamp when transfer was initiated
+  double updated_at = 10;       // Unix timestamp of last update
+}
+
+message CreateBlobTransferRequest {
+  BlobTransferData transfer = 1;
+}
+
+message GetBlobTransferRequest {
+  string source_node = 1;
+  string transfer_name = 2;
+}
+
+message GetBlobTransferReply {
+  bool found = 1;
+  BlobTransferData transfer = 2;
+}
+
+message GetBlobTransfersForNodeRequest {
+  string source_node = 1;
+}
+
+message GetBlobTransfersForBlobRequest {
+  string blob_uuid = 1;
+}
+
+message GetBlobTransfersReply {
+  repeated BlobTransferData transfers = 1;
+}
+
+message UpdateBlobTransferRequest {
+  string source_node = 1;
+  string transfer_name = 2;
+  optional string server_state = 3;
+  optional int32 port = 4;
+  optional double percentage = 5;
+}
+
+message DeleteBlobTransferRequest {
+  string source_node = 1;
+  string transfer_name = 2;
+}
+
+message DeleteBlobTransfersForBlobRequest {
+  string blob_uuid = 1;
+}
+
+message DeleteStaleTransfersRequest {
+  double older_than = 1;  // Unix timestamp - delete transfers with updated_at < this
 }

@@ -13,6 +13,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import artifact
 from shakenfist import etcd
 from shakenfist import eventlog
+from shakenfist import mariadb
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import namespace
@@ -72,6 +73,12 @@ class Monitor(daemon.Daemon):
         # cleaner daemon calling observe() on local blobs. The cleaner also
         # handles hard-deleting blobs with no locations. This is more accurate
         # since each node knows definitively what files exist on its local disk.
+
+        # Cleanup stale blob transfers (transfers that haven't been updated in
+        # more than 10 minutes are likely abandoned)
+        deleted = mariadb.delete_stale_transfers(max_age=600)
+        if deleted > 0:
+            LOG.info(f'Deleted {deleted} stale blob transfers')
 
         # Cleanup vxids which specify a missing network. We ignore allocations
         # less than five minutes old to let the network setup complete.
@@ -211,7 +218,11 @@ class Monitor(daemon.Daemon):
             # cleanup runs. With the MariaDB-based object_references table,
             # ref_count is computed dynamically from actual relationships.
             if b.ref_count < 1:
-                last_used = b.last_used or 0
+                # Use fetched_at as fallback for last_used. This handles new
+                # blobs that haven't been registered yet - they get a 300s
+                # grace period from creation time instead of appearing unused
+                # since epoch (which caused race conditions during downloads).
+                last_used = b.last_used or b.fetched_at
                 age = time.time() - last_used
                 if age > 300:
                     b.add_event(
@@ -222,7 +233,8 @@ class Monitor(daemon.Daemon):
                     b.cascading_delete()
                 continue
 
-            locations = b.locations + b.incomplete_healthy_locations
+            incomplete_nodes = [loc['node'] for loc in b.incomplete_healthy_locations]
+            locations = b.locations + incomplete_nodes
             delta = len(locations) - config.BLOB_REPLICATION_FACTOR
             if delta > 0:
                 # So... The blob replication factor is a target not a limit.

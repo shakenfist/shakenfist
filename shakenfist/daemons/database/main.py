@@ -1355,6 +1355,205 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteBlobHashes failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
+    # =========================================================================
+    # Blob Transfer Operations
+    # =========================================================================
+
+    def CreateBlobTransfer(
+        self,
+        request: database_pb2.CreateBlobTransferRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create a blob transfer record."""
+        try:
+            self.monitor.counters['create_blob_transfer'].inc()
+            from shakenfist.schema.blob_transfer import BlobTransfer
+            transfer = BlobTransfer(
+                source_node=request.transfer.source_node,
+                transfer_name=request.transfer.transfer_name,
+                requesting_node=request.transfer.requesting_node,
+                blob_uuid=request.transfer.blob_uuid,
+                token=request.transfer.token,
+                server_state=request.transfer.server_state,
+                port=request.transfer.port if request.transfer.port else None,
+                percentage=request.transfer.percentage,
+                created_at=request.transfer.created_at,
+                updated_at=request.transfer.updated_at
+            )
+            success = mariadb._direct_create_blob_transfer(transfer)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateBlobTransfer failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetBlobTransfer(
+        self,
+        request: database_pb2.GetBlobTransferRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetBlobTransferReply:
+        """Get a specific blob transfer record."""
+        try:
+            self.monitor.counters['get_blob_transfer'].inc()
+            transfer = mariadb._direct_get_blob_transfer(
+                request.source_node, request.transfer_name)
+            if transfer is None:
+                return database_pb2.GetBlobTransferReply(found=False)
+            return database_pb2.GetBlobTransferReply(
+                found=True,
+                transfer=database_pb2.BlobTransferData(
+                    source_node=transfer.source_node,
+                    transfer_name=transfer.transfer_name,
+                    requesting_node=transfer.requesting_node,
+                    blob_uuid=transfer.blob_uuid,
+                    token=transfer.token,
+                    server_state=transfer.server_state,
+                    port=transfer.port if transfer.port else 0,
+                    percentage=transfer.percentage,
+                    created_at=transfer.created_at,
+                    updated_at=transfer.updated_at
+                )
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetBlobTransfer failed', e)
+            return database_pb2.GetBlobTransferReply(found=False)
+
+    def GetBlobTransfersForNode(
+        self,
+        request: database_pb2.GetBlobTransfersForNodeRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetBlobTransfersReply:
+        """Get all blob transfers for a source node."""
+        try:
+            self.monitor.counters['get_blob_transfers_for_node'].inc()
+            transfers = mariadb._direct_get_blob_transfers_for_node(
+                request.source_node)
+            result = []
+            for t in transfers:
+                result.append(database_pb2.BlobTransferData(
+                    source_node=t.source_node,
+                    transfer_name=t.transfer_name,
+                    requesting_node=t.requesting_node,
+                    blob_uuid=t.blob_uuid,
+                    token=t.token,
+                    server_state=t.server_state,
+                    port=t.port if t.port else 0,
+                    percentage=t.percentage,
+                    created_at=t.created_at,
+                    updated_at=t.updated_at
+                ))
+            return database_pb2.GetBlobTransfersReply(transfers=result)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetBlobTransfersForNode failed', e)
+            return database_pb2.GetBlobTransfersReply(transfers=[])
+
+    def GetBlobTransfersForBlob(
+        self,
+        request: database_pb2.GetBlobTransfersForBlobRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetBlobTransfersReply:
+        """Get all blob transfers for a blob."""
+        try:
+            self.monitor.counters['get_blob_transfers_for_blob'].inc()
+            transfers = mariadb._direct_get_blob_transfers_for_blob(
+                request.blob_uuid)
+            result = []
+            for t in transfers:
+                result.append(database_pb2.BlobTransferData(
+                    source_node=t.source_node,
+                    transfer_name=t.transfer_name,
+                    requesting_node=t.requesting_node,
+                    blob_uuid=t.blob_uuid,
+                    token=t.token,
+                    server_state=t.server_state,
+                    port=t.port if t.port else 0,
+                    percentage=t.percentage,
+                    created_at=t.created_at,
+                    updated_at=t.updated_at
+                ))
+            return database_pb2.GetBlobTransfersReply(transfers=result)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetBlobTransfersForBlob failed', e)
+            return database_pb2.GetBlobTransfersReply(transfers=[])
+
+    def UpdateBlobTransfer(
+        self,
+        request: database_pb2.UpdateBlobTransferRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update a blob transfer record."""
+        try:
+            self.monitor.counters['update_blob_transfer'].inc()
+            # Extract optional fields only if they are set
+            server_state = (request.server_state if
+                            request.HasField('server_state') else None)
+            port = request.port if request.HasField('port') else None
+            percentage = (request.percentage if
+                          request.HasField('percentage') else None)
+
+            success = mariadb._direct_update_blob_transfer(
+                request.source_node,
+                request.transfer_name,
+                server_state=server_state,
+                port=port,
+                percentage=percentage
+            )
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateBlobTransfer failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def DeleteBlobTransfer(
+        self,
+        request: database_pb2.DeleteBlobTransferRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a blob transfer record."""
+        try:
+            self.monitor.counters['delete_blob_transfer'].inc()
+            success = mariadb._direct_delete_blob_transfer(
+                request.source_node, request.transfer_name)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteBlobTransfer failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def DeleteStaleTransfers(
+        self,
+        request: database_pb2.DeleteStaleTransfersRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DeleteCountReply:
+        """Delete stale transfers."""
+        try:
+            self.monitor.counters['delete_stale_transfers'].inc()
+            count = mariadb._direct_delete_stale_transfers(request.older_than)
+            return database_pb2.DeleteCountReply(count=count)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteStaleTransfers failed', e)
+            return database_pb2.DeleteCountReply(count=0)
+
+    def DeleteBlobTransfersForBlob(
+        self,
+        request: database_pb2.DeleteBlobTransfersForBlobRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DeleteCountReply:
+        """Delete all transfers for a blob."""
+        try:
+            self.monitor.counters['delete_blob_transfers_for_blob'].inc()
+            count = mariadb._direct_delete_blob_transfers_for_blob(
+                request.blob_uuid)
+            return database_pb2.DeleteCountReply(count=count)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteBlobTransfersForBlob failed', e)
+            return database_pb2.DeleteCountReply(count=-1)
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -1395,7 +1594,12 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_stale_references',
             # MariaDB blob hash operations
             'upsert_blob_hash', 'get_blob_hashes', 'find_blob_by_hash',
-            'get_stale_blob_hashes', 'delete_blob_hashes'
+            'get_stale_blob_hashes', 'delete_blob_hashes',
+            # MariaDB blob transfer operations
+            'create_blob_transfer', 'get_blob_transfer',
+            'get_blob_transfers_for_node', 'get_blob_transfers_for_blob',
+            'update_blob_transfer', 'delete_blob_transfer',
+            'delete_stale_transfers', 'delete_blob_transfers_for_blob'
         ]
         for op in operations:
             self.counters[op] = Counter(
