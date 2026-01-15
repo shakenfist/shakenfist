@@ -38,6 +38,7 @@ from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
+from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
@@ -824,6 +825,106 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=False, error=str(e))
 
     # =========================================================================
+    # Blob Operations (MariaDB)
+    # These operations manage blob static values in MariaDB. Blobs are
+    # immutable binary data objects (images, snapshots, etc.) that store
+    # actual content on disk and track metadata in the database.
+    # =========================================================================
+
+    def CreateBlob(
+        self,
+        request: database_pb2.CreateBlobRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create a blob record in MariaDB."""
+        try:
+            self.monitor.counters['create_blob'].inc()
+            success = mariadb._direct_create_blob(
+                UUID(request.blob.uuid),
+                request.blob.modified,
+                request.blob.fetched_at,
+                request.blob.version
+            )
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database CreateBlob failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetBlob(
+        self,
+        request: database_pb2.GetBlobRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetBlobReply:
+        """Get blob static values from MariaDB."""
+        try:
+            self.monitor.counters['get_blob'].inc()
+            data = mariadb._direct_get_blob(UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetBlobReply(found=False)
+            return database_pb2.GetBlobReply(
+                found=True,
+                blob=database_pb2.BlobData(
+                    uuid=str(data.uuid),
+                    modified=data.modified,
+                    fetched_at=data.fetched_at,
+                    version=data.version
+                )
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception('database GetBlob failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetBlobReply(found=False)
+
+    def GetAllBlobUuids(
+        self,
+        request: database_pb2.GetAllBlobUuidsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllBlobUuidsReply:
+        """Get all blob UUIDs from MariaDB."""
+        try:
+            self.monitor.counters['get_all_blob_uuids'].inc()
+            uuids = mariadb._direct_get_all_blob_uuids()
+            return database_pb2.GetAllBlobUuidsReply(uuids=uuids)
+        except Exception as e:
+            util_exceptions.ignore_exception('database GetAllBlobUuids failed', e)
+            return database_pb2.GetAllBlobUuidsReply(uuids=[])
+
+    def DeleteBlob(
+        self,
+        request: database_pb2.DeleteBlobRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a blob record from MariaDB."""
+        try:
+            self.monitor.counters['delete_blob'].inc()
+            success = mariadb._direct_delete_blob(UUID(request.uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database DeleteBlob failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def UpdateBlob(
+        self,
+        request: database_pb2.UpdateBlobRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update a blob record in MariaDB."""
+        try:
+            self.monitor.counters['update_blob'].inc()
+            data = BlobData(
+                uuid=UUID(request.blob.uuid),
+                modified=request.blob.modified,
+                fetched_at=request.blob.fetched_at,
+                version=request.blob.version
+            )
+            success = mariadb._direct_update_blob(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database UpdateBlob failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    # =========================================================================
     # DnsMasq Operations (MariaDB)
     # =========================================================================
 
@@ -1584,6 +1685,9 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB upload operations
             'create_upload', 'get_upload', 'get_uploads', 'delete_upload',
             'update_upload',
+            # MariaDB blob operations
+            'create_blob', 'get_blob', 'get_all_blob_uuids', 'delete_blob',
+            'update_blob',
             # MariaDB DnsMasq operations
             'create_dnsmasq', 'get_dnsmasq', 'get_dnsmasqs', 'delete_dnsmasq',
             'update_dnsmasq',

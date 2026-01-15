@@ -35,6 +35,7 @@ from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.dnsmasq import DnsMasqData
@@ -66,6 +67,7 @@ _ipam_reservations_table: Optional[sa.Table] = None
 _uploads_table: Optional[sa.Table] = None
 _dnsmasq_table: Optional[sa.Table] = None
 _object_references_table: Optional[sa.Table] = None
+_blobs_table: Optional[sa.Table] = None
 _blob_hashes_table: Optional[sa.Table] = None
 _blob_transfers_table: Optional[sa.Table] = None
 
@@ -79,6 +81,7 @@ IPAM_RESERVATIONS_VERSION = 2
 UPLOADS_VERSION = 2
 DNSMASQ_VERSION = 2
 OBJECT_REFERENCES_VERSION = 2
+BLOBS_VERSION = 2
 BLOB_HASHES_VERSION = 2
 BLOB_TRANSFERS_VERSION = 2
 
@@ -526,6 +529,67 @@ def _ensure_dnsmasq_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _get_blobs_table() -> sa.Table:
+    """Get or create the blobs table definition.
+
+    This table stores static values for blob objects. Blobs are immutable
+    binary data objects (images, snapshots, etc.) that store actual content
+    on disk and track metadata in the database.
+
+    The table schema is generated from the BlobData Pydantic model in
+    schema/blob_data.py. The uuid is the primary key, with indexes on
+    modified and fetched_at for cleanup and reporting queries.
+    """
+    global _blobs_table
+    if _blobs_table is None:
+        metadata = _get_metadata()
+        _blobs_table = pydantic_to_sqlalchemy_table(
+            BlobData,
+            'blobs',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+    return _blobs_table
+
+
+def _ensure_blobs_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the blobs table schema is up to date.
+
+    Applies any necessary migrations based on the current version.
+    Returns a dict with migration status information.
+    """
+    table_name = 'blobs'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_blobs_table()
+
+    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
+    # Data migration from etcd will upgrade to version 2.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        # Create indexes
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': BLOBS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def _get_object_references_table() -> sa.Table:
     """Get or create the object_references table definition.
 
@@ -741,6 +805,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_ipam_reservations_schema(engine))
     results.append(_ensure_uploads_schema(engine))
     results.append(_ensure_dnsmasq_schema(engine))
+    results.append(_ensure_blobs_schema(engine))
     results.append(_ensure_object_references_schema(engine))
     results.append(_ensure_blob_hashes_schema(engine))
     results.append(_ensure_blob_transfers_schema(engine))
@@ -1098,6 +1163,55 @@ def _migrate_etcd_dnsmasq(engine: sa.Engine) -> dict[str, Any]:
             LOG.info(f'  ... {migrated_count + skipped_count} DnsMasq objects processed')
 
     LOG.info(f'DnsMasq migration: {migrated_count} migrated, {skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
+def _migrate_etcd_blobs(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate blob static values from etcd to MariaDB.
+
+    This migration scans all blobs in etcd and copies their static values
+    (modified, fetched_at, version) to the MariaDB blobs table. After
+    successful migration, the etcd entry is deleted.
+
+    Note: depends_on is NOT migrated here - it's already in the
+    object_references table as a DEPENDS_ON relationship.
+    """
+    from shakenfist import etcd
+    from shakenfist.blob import Blob
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating blobs from etcd...')
+
+    for objkey, data in etcd.get_all('blob', None):
+        blob_uuid = objkey.split('/')[-1]
+
+        try:
+            blob_uuid_obj = UUIDType(blob_uuid)
+            success = create_blob(
+                blob_uuid_obj,
+                data.get('modified', 0.0),
+                data.get('fetched_at', 0.0),
+                data.get('version', Blob.current_version)
+            )
+            if success:
+                etcd.delete('blob', None, blob_uuid)
+                migrated_count += 1
+            else:
+                # Already exists
+                etcd.delete('blob', None, blob_uuid)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(f'Error migrating blob {blob_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(f'  ... {migrated_count + skipped_count} blobs processed')
+
+    LOG.info(f'Blob migration: {migrated_count} migrated, {skipped_count} skipped')
     return {'migrated_count': migrated_count, 'error_count': error_count}
 
 
@@ -1476,6 +1590,9 @@ DATA_MIGRATIONS.update({
     },
     'dnsmasq': {
         2: _migrate_etcd_dnsmasq,
+    },
+    'blobs': {
+        2: _migrate_etcd_blobs,
     },
     'object_references': {
         2: _migrate_etcd_object_references,
@@ -2546,6 +2663,150 @@ def _direct_update_upload(data: UploadData) -> bool:
 
 
 # =============================================================================
+# Blob Direct Access Functions
+# These are used by the database daemon for blob object storage.
+# =============================================================================
+
+def _direct_create_blob(blob_uuid: UUID, modified: float, fetched_at: float,
+                        version: int) -> bool:
+    """Create a blob record in MariaDB.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+        modified: Unix timestamp when the blob source was last modified.
+        fetched_at: Unix timestamp when the blob was fetched.
+        version: The object version number.
+
+    Returns:
+        True if the record was created, False if it already exists or error.
+    """
+    engine = _get_engine()
+    table = _get_blobs_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=blob_uuid,
+                modified=modified,
+                fetched_at=fetched_at,
+                version=version
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        # Blob already exists
+        return False
+    except OperationalError as e:
+        LOG.warning(f'MariaDB create failed for blob {blob_uuid}: {e}')
+        return False
+
+
+def _direct_get_blob(blob_uuid: UUID) -> Optional[BlobData]:
+    """Get blob static values from MariaDB.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        A BlobData object, or None if not found.
+    """
+    engine = _get_engine()
+    table = _get_blobs_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == blob_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return BlobData(
+                uuid=result.uuid,
+                modified=result.modified,
+                fetched_at=result.fetched_at,
+                version=result.version
+            )
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get failed for blob {blob_uuid}: {e}')
+        return None
+
+
+def _direct_get_all_blob_uuids() -> list[str]:
+    """Get all blob UUIDs from MariaDB.
+
+    Returns:
+        List of blob UUID strings.
+    """
+    engine = _get_engine()
+    table = _get_blobs_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.uuid)
+            result = conn.execute(stmt).fetchall()
+            return [str(row.uuid) for row in result]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for blob UUIDs: {e}')
+        return []
+
+
+def _direct_delete_blob(blob_uuid: UUID) -> bool:
+    """Delete a blob record from MariaDB.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_blobs_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == blob_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for blob {blob_uuid}: {e}')
+        return False
+
+
+def _direct_update_blob(data: BlobData) -> bool:
+    """Update a blob record in MariaDB.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The BlobData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_blobs_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                modified=data.modified,
+                fetched_at=data.fetched_at,
+                version=data.version
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB update failed for blob {data.uuid}: {e}')
+        return False
+
+
+# =============================================================================
 # Upload gRPC Client Functions
 # These call the database microservice for upload operations.
 # =============================================================================
@@ -2647,6 +2908,93 @@ def _grpc_update_upload(data: UploadData) -> bool:
 
 
 # =============================================================================
+# Blob gRPC Client Functions
+# These call the database microservice for blob operations.
+# =============================================================================
+
+def _grpc_create_blob(blob_uuid: UUID, modified: float, fetched_at: float,
+                      version: int) -> bool:
+    """Create a blob record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateBlobRequest(
+            blob=database_pb2.BlobData(
+                uuid=str(blob_uuid),
+                modified=modified,
+                fetched_at=fetched_at,
+                version=version
+            )
+        )
+        reply = stub.CreateBlob(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC CreateBlob failed for {blob_uuid}: {e}')
+        return False
+
+
+def _grpc_get_blob(blob_uuid: UUID) -> Optional[BlobData]:
+    """Get blob static values via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetBlobRequest(uuid=str(blob_uuid))
+        reply = stub.GetBlob(request)
+        if not reply.found:
+            return None
+        return BlobData(
+            uuid=reply.blob.uuid,
+            modified=reply.blob.modified,
+            fetched_at=reply.blob.fetched_at,
+            version=reply.blob.version
+        )
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetBlob failed for {blob_uuid}: {e}')
+        return None
+
+
+def _grpc_get_all_blob_uuids() -> list[str]:
+    """Get all blob UUIDs via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllBlobUuidsRequest()
+        reply = stub.GetAllBlobUuids(request)
+        return list(reply.uuids)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetAllBlobUuids failed: {e}')
+        return []
+
+
+def _grpc_delete_blob(blob_uuid: UUID) -> bool:
+    """Delete a blob record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteBlobRequest(uuid=str(blob_uuid))
+        reply = stub.DeleteBlob(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC DeleteBlob failed for {blob_uuid}: {e}')
+        return False
+
+
+def _grpc_update_blob(data: BlobData) -> bool:
+    """Update a blob record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateBlobRequest(
+            blob=database_pb2.BlobData(
+                uuid=str(data.uuid),
+                modified=data.modified,
+                fetched_at=data.fetched_at,
+                version=data.version
+            )
+        )
+        reply = stub.UpdateBlob(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC UpdateBlob failed for {data.uuid}: {e}')
+        return False
+
+
+# =============================================================================
 # Upload Public API Functions
 # These route to either direct or gRPC access based on configuration.
 # =============================================================================
@@ -2730,6 +3078,96 @@ def update_upload(data: UploadData) -> bool:
     if _use_database_service():
         return _grpc_update_upload(data)
     return _direct_update_upload(data)
+
+
+# =============================================================================
+# Blob Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def create_blob(blob_uuid: UUID, modified: float, fetched_at: float,
+                version: int) -> bool:
+    """Create a blob record.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+        modified: Unix timestamp when the blob source was last modified.
+        fetched_at: Unix timestamp when the blob was fetched.
+        version: The object version number.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_blob(blob_uuid, modified, fetched_at, version)
+    return _direct_create_blob(blob_uuid, modified, fetched_at, version)
+
+
+def get_blob(blob_uuid: UUID) -> Optional[BlobData]:
+    """Get blob static values.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        A BlobData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_blob(blob_uuid)
+    return _direct_get_blob(blob_uuid)
+
+
+def get_all_blob_uuids() -> list[str]:
+    """Get all blob UUIDs.
+
+    Returns:
+        List of blob UUID strings.
+    """
+    if _use_database_service():
+        return _grpc_get_all_blob_uuids()
+    return _direct_get_all_blob_uuids()
+
+
+def delete_blob(blob_uuid: UUID) -> bool:
+    """Delete a blob record.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_blob(blob_uuid)
+    return _direct_delete_blob(blob_uuid)
+
+
+def update_blob(data: BlobData) -> bool:
+    """Update a blob record.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The BlobData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_blob(data)
+    return _direct_update_blob(data)
+
+
+def get_active_blob_uuids() -> list[str]:
+    """Get UUIDs of all blobs in active states.
+
+    Active states are 'initial' and 'created' (not 'deleted' or 'error').
+
+    Returns:
+        List of blob UUID strings in active states.
+    """
+    active_states = ['initial', 'created']
+    return _direct_get_objects_by_state(ObjectType.BLOB, active_states)
 
 
 # =============================================================================

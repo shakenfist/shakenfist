@@ -54,6 +54,13 @@ service DatabaseService {
   rpc DeleteUpload (DeleteUploadRequest) returns (StatusReply) {}
   rpc UpdateUpload (UpdateUploadRequest) returns (StatusReply) {}
 
+  // Blob Operations (MariaDB)
+  rpc CreateBlob (CreateBlobRequest) returns (StatusReply) {}
+  rpc GetBlob (GetBlobRequest) returns (GetBlobReply) {}
+  rpc GetAllBlobUuids (GetAllBlobUuidsRequest) returns (GetAllBlobUuidsReply) {}
+  rpc DeleteBlob (DeleteBlobRequest) returns (StatusReply) {}
+  rpc UpdateBlob (UpdateBlobRequest) returns (StatusReply) {}
+
   // DnsMasq Operations (MariaDB)
   rpc CreateDnsMasq (CreateDnsMasqRequest) returns (StatusReply) {}
   rpc GetDnsMasq (GetDnsMasqRequest) returns (GetDnsMasqReply) {}
@@ -408,6 +415,47 @@ message DeleteUploadRequest {
 
 message UpdateUploadRequest {
   UploadData upload = 1;
+}
+
+// Blob Operations (MariaDB)
+// These operations manage blob static values in MariaDB. Blobs are
+// immutable binary data objects (images, snapshots, etc.) that store
+// actual content on disk and track metadata in the database.
+
+message BlobData {
+  string uuid = 1;          // UUID as string (consistent with other messages)
+  double modified = 2;      // Unix timestamp when blob source was last modified
+  double fetched_at = 3;    // Unix timestamp when blob was fetched
+  int32 version = 4;        // Object version number
+}
+
+message CreateBlobRequest {
+  BlobData blob = 1;
+}
+
+message GetBlobRequest {
+  string uuid = 1;
+}
+
+message GetBlobReply {
+  bool found = 1;
+  BlobData blob = 2;
+}
+
+message GetAllBlobUuidsRequest {
+  // No filters currently needed - returns all blob UUIDs
+}
+
+message GetAllBlobUuidsReply {
+  repeated string uuids = 1;
+}
+
+message DeleteBlobRequest {
+  string uuid = 1;
+}
+
+message UpdateBlobRequest {
+  BlobData blob = 1;
 }
 
 // DnsMasq Operations (MariaDB)
