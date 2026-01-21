@@ -1,0 +1,107 @@
+site_name: Shaken Fist
+site_url: https://shakenfist.com
+repo_url: https://github.com/shakenfist/shakenfist
+site_description: A minimal cloud aimed at small and edge deployments
+
+theme:
+  name: material
+  palette:
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+markdown_extensions:
+    - admonition
+    - pymdownx.details
+    - pymdownx.superfences:
+        custom_fences:
+          - name: mermaid
+            class: mermaid
+            format: !!python/name:pymdownx.superfences.fence_code_format
+    - pymdownx.magiclink:
+        repo_url_shorthand: true
+        user: shakenfist
+
+nav:
+    - Introduction: index.md
+    - Manifesto: manifesto.md
+    - Components:
+        - "Overview": components/overview.md
+        - Kerbside: components/kerbside/index.md
+            - "Configuring Kerbside": components/kerbside/configuration.md
+            - "Console Sources": components/kerbside/console-sources.md
+            - "Database Schema": components/kerbside/schema.md
+            - "Kerbside Proxy Architecture": components/kerbside/proxy-architecture.md
+            - "Keyboard Scancodes": components/kerbside/scancodes.md
+            - "SPICE Capabilities": components/kerbside/capabilities.md
+            - "SPICE Channel Protocols": components/kerbside/channel-protocols.md
+            - "SPICE Compression Protocols": components/kerbside/compression-protocols.md
+            - "SPICE Link Protocol": components/kerbside/spice-link-protocol.md
+            - "SPICE Protocol Overview": components/kerbside/protocol-overview.md
+            - "USB Redirection Protocol": components/kerbside/usb-redirection.md
+            - "VD Agent Protocol": components/kerbside/vd-agent-protocol.md
+    - Features: features.md
+    - Release notes:
+        - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
+    - Community: community.md
+    - User Guide:
+        - "Usage": user_guide/usage.md
+        - "Authentication": user_guide/authentication.md
+        - "Ansible module": user_guide/ansible.md
+        - "Artifacts": user_guide/artifacts.md
+        - "Affinity": user_guide/affinity.md
+        - "Consoles": user_guide/consoles.md
+        - "Events": user_guide/events.md
+        - "Objects": user_guide/objects.md
+        - "Object Metadata": user_guide/metadata.md
+    - Developer Guide:
+        - API reference:
+            - "Admin (/admin/)": developer_guide/api_reference/admin.md
+            - "Agent Operations (/agentoperations/)": developer_guide/api_reference/agentoperations.md
+            - "Artifacts (/artifacts/)": developer_guide/api_reference/artifacts.md
+            - "Authentication (/auth/)": developer_guide/api_reference/authentication.md
+            - "Blob Checksums (/blob_checksums/)": developer_guide/api_reference/blob_checksums.md
+            - "Blobs (/blobs/)": developer_guide/api_reference/blobs.md
+            - "Cluster Operations": developer_guide/api_reference/clusteroperations.md
+            - "Instances (/instances/)": developer_guide/api_reference/instances.md
+            - "Label (/label/)": developer_guide/api_reference/label.md
+            - "Networks (/networks/)": developer_guide/api_reference/networks.md
+            - "Network Interfaces (/interfaces/)": developer_guide/api_reference/interfaces.md
+            - "Nodes (/nodes/)": developer_guide/api_reference/nodes.md
+            - "Upload (/upload/)": developer_guide/api_reference/upload.md
+        - "Agent protocol": developer_guide/agent_protocol.md
+        - "Authentication": developer_guide/authentication.md
+        - "CI API coverage": developer_guide/ci_api_coverage.md
+        - "Mypy": developer_guide/mypy.md
+        - "Release process": developer_guide/release_process.md
+        - "Standards": developer_guide/standards.md
+        - "State machine": developer_guide/state_machine.md
+        - "Updating docs": developer_guide/updating_docs.md
+        - "Workflow": developer_guide/workflow.md
+    - Plans:
+        - "Overview": plans/index.md
+        - "API Query Batching": plans/api-query-batching-roadmap.md
+        - "Blob Storage Roadmap": plans/blob-storage-roadmap.md
+    - Operator Guide:
+       - "Installation": operator_guide/installation.md
+       - "Artifacts": operator_guide/artifacts.md
+       - "Authentication": operator_guide/authentication.md
+       - "Database": operator_guide/database.md
+       - "Exception Tracking": operator_guide/exception_tracking.md
+       - "Locks": operator_guide/locks.md
+       - "Networking": operator_guide/networking/overview.md
+       - "Power States": operator_guide/power_states.md
+       - "Python Versions": operator_guide/python_versions.md
+       - "Threads": operator_guide/threads.md
+       - "Upgrades": "operator_guide/upgrades.md"
