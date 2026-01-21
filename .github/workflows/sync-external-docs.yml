@@ -1,0 +1,59 @@
+name: Sync docs from affiliated projects for web publication
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 * * * *'        # utc
+
+jobs:
+  docs-sync:
+    runs-on: [self-hosted, vm]
+    timeout-minutes: 15
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Set environment variables
+        run: |
+          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
+
+      - name: Checkout the shakenfist repository
+        uses: actions/checkout@v4
+        with:
+          path: shakenfist
+          fetch-depth: 0
+
+      - name: Checkout the actions repository
+        uses: actions/checkout@v4
+        with:
+          repository: shakenfist/actions
+          path: actions
+          fetch-depth: 0
+
+      - name: Checkout the kerbside repository
+        uses: actions/checkout@v4
+        with:
+          repository: shakenfist/kerbside
+          path: kerbside
+          fetch-depth: 0
+
+      - name: Install the github command line
+        run: |
+          sudo apt update
+          sudo apt install -y curl
+
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+
+          sudo apt update
+          sudo apt install -y gh
+
+      - name: Scan for obsolete syntax
+        env:
+          GITHUB_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN }}
+        run: |
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          . /srv/ci/venv/bin/activate
+          ${GITHUB_WORKSPACE}/actions/tools/ci_sync_docs.sh
