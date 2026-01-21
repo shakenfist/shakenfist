@@ -16,7 +16,7 @@ on:
 
 jobs:
   export-config:
-    runs-on: [self-hosted, vm]
+    runs-on: [self-hosted, static]
     timeout-minutes: 10
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
