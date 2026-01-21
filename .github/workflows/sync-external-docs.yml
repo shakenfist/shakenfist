@@ -50,10 +50,8 @@ jobs:
           sudo apt update
           sudo apt install -y gh
 
-      - name: Scan for obsolete syntax
+      - name: Import docs from other repositories
         env:
           GITHUB_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN }}
         run: |
-          cd ${GITHUB_WORKSPACE}/shakenfist
-          . /srv/ci/venv/bin/activate
           ${GITHUB_WORKSPACE}/actions/tools/ci_sync_docs.sh
