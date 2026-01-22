@@ -154,5 +154,5 @@ Audit log for console access and protocol events.
 
 ## Related Documentation
 
-- [Configuration](/components/kerbside/configuration.md) - Database connection settings
-- [Console Sources](/components/kerbside/console-sources.md) - Source configuration
+- [Configuration](/components/kerbside/configuration/) - Database connection settings
+- [Console Sources](/components/kerbside/console-sources/) - Source configuration

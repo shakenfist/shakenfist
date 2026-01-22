@@ -122,7 +122,7 @@ Offset  Size  Type    Field
 
 **error** (4 bytes)
 : Error code. 0 indicates success. See
-  [Protocol Overview - Error Codes](/components/kerbside/protocol-overview.md#error-codes) for the
+  [Protocol Overview - Error Codes](/components/kerbside/protocol-overview/#error-codes) for the
   complete list.
 
 **pubkey** (162 bytes)
@@ -303,5 +303,5 @@ capabilities are known.
 
 ## Related Documentation
 
-- [Protocol Overview](/components/kerbside/protocol-overview.md) - High-level protocol introduction
-- [Channel Protocols](/components/kerbside/channel-protocols.md) - Per-channel message formats
+- [Protocol Overview](/components/kerbside/protocol-overview/) - High-level protocol introduction
+- [Channel Protocols](/components/kerbside/channel-protocols/) - Per-channel message formats

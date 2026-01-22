@@ -2,7 +2,7 @@
 
 This document describes the message formats for each SPICE channel type. All
 messages follow the standard header format described in the
-[Protocol Overview](/components/kerbside/protocol-overview.md).
+[Protocol Overview](/components/kerbside/protocol-overview/).
 
 **Note**: Message IDs documented here are from Kerbside's internal constants
 (`kerbside/spiceprotocol/packets/constants.py`) and match the values used in
@@ -291,7 +291,7 @@ Offset  Size  Type    Field
 ## Inputs Channel (Type 3)
 
 The inputs channel handles keyboard and mouse input from client to server.
-See [Keyboard Scancodes](/components/kerbside/scancodes.md) for a complete scancode reference.
+See [Keyboard Scancodes](/components/kerbside/scancodes/) for a complete scancode reference.
 
 ### Client to Server Messages
 
@@ -531,7 +531,7 @@ Offset  Size  Type    Field
 ```
 
 For detailed VMC/USB redirection message formats, see
-[USB Redirection](/components/kerbside/usb-redirection.md).
+[USB Redirection](/components/kerbside/usb-redirection/).
 
 ## Common Message Details
 
@@ -902,7 +902,7 @@ Drawing commands use raster operation flags to control how pixels are combined:
 
 ## Related Documentation
 
-- [Protocol Overview](/components/kerbside/protocol-overview.md) - High-level protocol introduction
-- [Link Protocol](/components/kerbside/spice-link-protocol.md) - Connection handshake details
-- [USB Redirection](/components/kerbside/usb-redirection.md) - USB device redirection protocol
-- [VD Agent Protocol](/components/kerbside/vd-agent-protocol.md) - Guest agent for clipboard and file transfer
+- [Protocol Overview](/components/kerbside/protocol-overview/) - High-level protocol introduction
+- [Link Protocol](/components/kerbside/spice-link-protocol/) - Connection handshake details
+- [USB Redirection](/components/kerbside/usb-redirection/) - USB device redirection protocol
+- [VD Agent Protocol](/components/kerbside/vd-agent-protocol/) - Guest agent for clipboard and file transfer

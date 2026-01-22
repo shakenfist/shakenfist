@@ -103,5 +103,5 @@ Values tracked include:
 
 ## Related Documentation
 
-- [Console Sources](/components/kerbside/console-sources.md) - Configuring sources.yaml
-- [Proxy Architecture](/components/kerbside/proxy-architecture.md) - Internal proxy design
+- [Console Sources](/components/kerbside/console-sources/) - Configuring sources.yaml
+- [Proxy Architecture](/components/kerbside/proxy-architecture/) - Internal proxy design

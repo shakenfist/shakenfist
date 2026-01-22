@@ -609,5 +609,5 @@ security monitoring purposes.
 
 ## Related Documentation
 
-- [Protocol Overview](/components/kerbside/protocol-overview.md) - High-level protocol introduction
-- [Channel Protocols](/components/kerbside/channel-protocols.md) - Per-channel message formats
+- [Protocol Overview](/components/kerbside/protocol-overview/) - High-level protocol introduction
+- [Channel Protocols](/components/kerbside/channel-protocols/) - Per-channel message formats

@@ -137,5 +137,5 @@ An example configuration follows:
 
 ## Related Documentation
 
-- [Configuration](/components/kerbside/configuration.md) - General configuration reference
-- [Proxy Architecture](/components/kerbside/proxy-architecture.md) - Internal proxy design
+- [Configuration](/components/kerbside/configuration/) - General configuration reference
+- [Proxy Architecture](/components/kerbside/proxy-architecture/) - Internal proxy design
