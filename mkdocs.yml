@@ -38,7 +38,8 @@ nav:
     - Manifesto: manifesto.md
     - Components:
         - "Overview": components/overview.md
-        - Kerbside: components/kerbside/index.md
+        - Kerbside:
+            - "Introduction": components/kerbside/index.md
             - "Configuring Kerbside": components/kerbside/configuration.md
             - "Console Sources": components/kerbside/console-sources.md
             - "Database Schema": components/kerbside/schema.md
