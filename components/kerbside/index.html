@@ -16,7 +16,7 @@
         <link rel="prev" href="../overview/">
       
       
-        <link rel="next" href="../../features/">
+        <link rel="next" href="configuration/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Kerbside - Shaken Fist</title>
+        <title>Introduction - Shaken Fist</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#kerbside" class="md-skip">
+        <a href="#kerbside-documentation" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Kerbside
+              Introduction
             
           </span>
         </div>
@@ -392,6 +392,55 @@
   
   
   
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kerbside
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
     <li class="md-nav__item md-nav__item--active">
       
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
@@ -407,7 +456,7 @@
   <span class="md-ellipsis">
     
   
-    Kerbside
+    Introduction
   
 
     
@@ -425,7 +474,7 @@
   <span class="md-ellipsis">
     
   
-    Kerbside
+    Introduction
   
 
     
@@ -451,28 +500,62 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#documentation-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation Version
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Introduction">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#kerbside-is-experimental" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Kerbside is experimental
+        Kerbside is Experimental
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#kerbside-is-a-proxy-not-a-complete-user-interface" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Kerbside is a proxy, not a complete user interface
+        Kerbside is a Proxy, Not a Complete User Interface
       
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#connection-flow-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
       
-        <li class="md-nav__item">
+        Connection Flow Diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#implementation-in-openstack" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -481,14 +564,13 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Implementation in OpenStack">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
   <a href="#what-about-bumblebee" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What about Bumblebee?
+        What About Bumblebee?
       
     </span>
   </a>
@@ -500,9 +582,519 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#documentation-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation Index
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Documentation Index">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operator-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spice-protocol-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SPICE Protocol Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device-redirection-protocols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Device Redirection Protocols
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guest-agent-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guest Agent Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocol-implementation-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol Implementation Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#channel-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Channel Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Codes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Capabilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#external-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External References
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#document-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Document Conventions
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuring Kerbside
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="console-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Console Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="proxy-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside Proxy Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="scancodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Scancodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="channel-protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Channel Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="compression-protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Compression Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spice-link-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Link Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="protocol-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Protocol Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="usb-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    USB Redirection Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="vd-agent-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VD Agent Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
       
     </li>
   
@@ -1708,7 +2300,7 @@
   <span class="md-ellipsis">
     
   
-    Operator Guide
+    Plans
   
 
     
@@ -1721,6 +2313,144 @@
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/api-query-batching-roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Query Batching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/blob-storage-roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blob Storage Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operator Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1829,6 +2559,34 @@
     
   
     Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operator_guide/exception_tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exception Tracking
   
 
     
@@ -2044,28 +2802,62 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#documentation-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation Version
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Introduction">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#kerbside-is-experimental" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Kerbside is experimental
+        Kerbside is Experimental
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#kerbside-is-a-proxy-not-a-complete-user-interface" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Kerbside is a proxy, not a complete user interface
+        Kerbside is a Proxy, Not a Complete User Interface
       
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#connection-flow-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
       
-        <li class="md-nav__item">
+        Connection Flow Diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#implementation-in-openstack" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2074,14 +2866,13 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Implementation in OpenStack">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
   <a href="#what-about-bumblebee" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What about Bumblebee?
+        What About Bumblebee?
       
     </span>
   </a>
@@ -2090,6 +2881,172 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#documentation-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation Index
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Documentation Index">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operator-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spice-protocol-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SPICE Protocol Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device-redirection-protocols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Device Redirection Protocols
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guest-agent-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guest Agent Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocol-implementation-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol Implementation Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#channel-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Channel Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Codes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Capabilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#external-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External References
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#document-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Document Conventions
+      
+    </span>
+  </a>
   
 </li>
       
@@ -2113,7 +3070,19 @@
   
 
 
-<h1 id="kerbside">Kerbside</h1>
+<h1 id="kerbside-documentation">Kerbside Documentation</h1>
+<p>Welcome to the Kerbside documentation.</p>
+<h2 id="documentation-version">Documentation Version</h2>
+<p>This documentation covers:</p>
+<ul>
+<li><strong>SPICE Protocol Version</strong>: 2.2 (current as of spice-protocol 0.14)</li>
+<li><strong>Kerbside Version</strong>: Verified against <code>kerbside/spiceprotocol/packets/constants.py</code></li>
+<li><strong>OpenStack Integration</strong>: Nova 2025.1 (Epoxy) and later</li>
+</ul>
+<p>Protocol documentation is derived from the official SPICE protocol sources at
+<code>gitlab.freedesktop.org/spice/spice-protocol</code> and verified against Kerbside's
+implementation. Message IDs and constants reflect Kerbside's internal mappings.</p>
+<h2 id="introduction">Introduction</h2>
 <p>Kerbside is a <a href="https://spice-space.org/">SPICE</a> protocol native VDI proxy
 responsible for providing rich VDI experiences to users of Shaken Fist, oVirt,
 OpenStack, or any other cloud where the hypervisor is capable of providing SPICE
@@ -2128,70 +3097,385 @@ we avoid these problems.</p>
 <p>Novel features of SPICE include high resolution desktops, multi-screen desktops,
 USB device passthrough, sound, multiple user connections to a single console,
 adaptive compression, and more.</p>
-<h2 id="kerbside-is-experimental">Kerbside is experimental</h2>
+<h3 id="kerbside-is-experimental">Kerbside is Experimental</h3>
 <p>Kerbside is currently considered experimental. While it works, it has not yet
-seen large scale deployment and it is likely that it will needed modifications
+seen large scale deployment and it is likely that it will need modifications
 as it is hardened for production use.</p>
-<h2 id="kerbside-is-a-proxy-not-a-complete-user-interface">Kerbside is a proxy, not a complete user interface</h2>
+<h3 id="kerbside-is-a-proxy-not-a-complete-user-interface">Kerbside is a Proxy, Not a Complete User Interface</h3>
 <p>Whilst Kerbside presents a simple administrative interface over HTTP and has
 REST APIs for orchestrating consoles, it is not intended as a complete SPICE
 desktop VDI solution. It is intended that Kerbside itself is orchestrated by
 an external system. That is, in order for a desktop to be presented to a user
 the following steps need to occur:</p>
-<ul>
+<ol>
 <li>
 <p>The user requests a desktop via an external user interface that we call "the
-  Broker". In Shaken Fist's case the broker is embedded in Shaken Fist itself
-  and is initiated via a Shaken Fist REST API. In the OpenStack case this role
-  is likely performed by Horizon or Skyline, although this is not yet implemented.</p>
+   Broker". In Shaken Fist's case the broker is embedded in Shaken Fist itself
+   and is initiated via a Shaken Fist REST API. In the OpenStack case this role
+   is likely performed by Horizon or Skyline, although this is not yet
+   implemented.</p>
 </li>
 <li>
 <p>The cloud boots the instance that runs the desktop. The Broker waits for the
-  instance to be booted.</p>
+   instance to be booted.</p>
 </li>
 <li>
-<p>The Broker requests a <code>.vv</code> virt-viewer compatible ini file from Kerbside, and
-  delivers that to the requesting user. The configuration file describes a
-  connection to Kerbside, along with short lived access token.</p>
+<p>The Broker requests a <code>.vv</code> virt-viewer compatible ini file from Kerbside,
+   and delivers that to the requesting user. The configuration file describes a
+   connection to Kerbside, along with short lived access token.</p>
 </li>
 <li>
 <p>The user opens the <code>.vv</code> file with a SPICE client such as <code>remote-viewer</code>.
-  <code>remote-viewer</code> connects to Kerbside.</p>
+   <code>remote-viewer</code> connects to Kerbside.</p>
 </li>
 <li>
 <p>Kerbside uses the access token to determine which instance in the cloud is
-  the requested desktop and initiates a proxied connection to the hypervisor.</p>
+   the requested desktop and initiates a proxied connection to the hypervisor.</p>
 </li>
 <li>
 <p>The user then happily uses their SPICE console, largely unaware of these
-  various steps.</p>
+   various steps.</p>
 </li>
-</ul>
-<h2 id="implementation-in-openstack">Implementation in OpenStack</h2>
-<p>The Kerbside implementation in OpenStack is still experimental and has not yet
-landed upstream. There is a
-<a href="https://review.opendev.org/c/openstack/nova-specs/+/915190">proposed Nova specification</a>
-to add the APIs required to orchestrate the consoles, but it is not yet approved.
-Apart from the modifications to Nova's APIs there are some minor changes to
-the libvirt domain XML that must be made to expose full SPICE console support
-in virtual machines managed by OpenStack.</p>
-<p>Additionally, Kerbside needs to be deployed as a component of the OpenStack
-cluster in order to provide a safe mechanism for users to interact with their
-console. OpenStack is (wisely) unwilling to provide direct network connectivity
-from a client network to TCP ports on the hypervisor, and so Kerbside acts as
-an intermediary to protect those hypervisors. There is a sample implementation
-of Kerbside deployment using Kolla-Ansible in the
+</ol>
+<h3 id="connection-flow-diagram">Connection Flow Diagram</h3>
+<div class="highlight"><pre><span></span><code>+------------------+              +-------------------+              +------------------+
+|                  |              |                   |              |                  |
+|  External Broker |  1. Request  |     Kerbside      |  5. Connect  |   Hypervisor     |
+|  (SF/Horizon)    +-------------&gt;|   SPICE Proxy     +-------------&gt;|   (QEMU/KVM)     |
+|                  |   .vv file   |                   |   to console |                  |
++--------+---------+              +---------+---------+              +------------------+
+         |                                  ^
+         | 2. Return                        |
+         |    .vv file                      | 4. Connect with
+         v                                  |    access token
++--------+---------+                        |
+|                  |                        |
+|   User&#39;s SPICE   +------------------------+
+|   Client         |  3. User opens .vv file
+|  (remote-viewer) |
+|                  |
++------------------+
+</code></pre></div>
+<h3 id="implementation-in-openstack">Implementation in OpenStack</h3>
+<p>OpenStack Nova now supports native SPICE direct consoles as of the 2025.1 Epoxy
+release. The
+<a href="https://specs.openstack.org/openstack/nova-specs/specs/2025.1/implemented/libvirt-spice-direct-consoles.html">Nova specification</a>
+adds a new "spice-direct" console type that enables users to access virtual
+desktops using native SPICE clients like remote-viewer instead of HTML5 proxies.</p>
+<p>When users request a SPICE direct console, Nova returns a URL pointing to
+Kerbside with an authentication token. Kerbside validates this token via the
+<code>/os-console-auth-tokens/</code> API and establishes the proxied connection to the
+hypervisor. This provides users with a much richer virtual desktop experience
+including support for USB passthrough, audio, and multi-monitor configurations.</p>
+<p>Kerbside needs to be deployed as a component of the OpenStack cluster to provide
+a safe mechanism for users to interact with their console. OpenStack is (wisely)
+unwilling to provide direct network connectivity from a client network to TCP
+ports on the hypervisor, and so Kerbside acts as an intermediary to protect
+those hypervisors. There is a sample implementation of Kerbside deployment using
+Kolla-Ansible in the
 <a href="https://github.com/shakenfist/kerbside-patches">Kerbside Patches repository</a>.</p>
-<h3 id="what-about-bumblebee">What about Bumblebee?</h3>
+<h3 id="what-about-bumblebee">What About Bumblebee?</h3>
 <p>The folks over at the NECTAR research cloud developed
 <a href="https://github.com/NeCTAR-RC/bumblebee">Bumblebee VDI</a>, which is superficially
 similar to Kerbside in that it provides a mechanism to make it easier to obtain
 a virtual desktop as a user. The Kerbside description above would classify
 Bumblebee as a Broker to our model -- it orchestrates the creation and then
-access to virtual desktops for users. However, Bumblebee exclusive orchestrates
+access to virtual desktops for users. However, Bumblebee exclusively orchestrates
 HTML5 consoles using Apache Guacamole as its HTML5 proxy at the moment, so misses
 out on some of the richer features of SPICE and has the performance implications
 of a HTML5 desktop environment.</p>
+<h2 id="documentation-index">Documentation Index</h2>
+<h3 id="operator-documentation">Operator Documentation</h3>
+<p>Guides for deploying and configuring Kerbside:</p>
+<ul>
+<li>
+<p><a href="/components/kerbside/configuration.md">Configuration</a> - Configuration reference for all Kerbside
+  settings including TLS, Keystone, API, and monitoring options</p>
+</li>
+<li>
+<p><a href="/components/kerbside/console-sources.md">Console Sources</a> - Configuring console sources
+  (sources.yaml) for Shaken Fist, oVirt, and OpenStack</p>
+</li>
+<li>
+<p><a href="/components/kerbside/schema.md">Database Schema</a> - Database tables, columns, and relationships</p>
+</li>
+</ul>
+<h3 id="architecture-documentation">Architecture Documentation</h3>
+<p>Internal design of the Kerbside proxy:</p>
+<ul>
+<li>
+<p><a href="/components/kerbside/proxy-architecture.md">Proxy Architecture</a> - Internal architecture including
+  process model, connection state machine, traffic inspection, and worker
+  management</p>
+</li>
+<li>
+<p><a href="/components/kerbside/../ARCHITECTURE.md">ARCHITECTURE.md</a> - High-level system architecture
+  overview (in project root)</p>
+</li>
+</ul>
+<h3 id="spice-protocol-documentation">SPICE Protocol Documentation</h3>
+<p>Core protocol specifications covering connection handshake, authentication, and
+channel message formats:</p>
+<ul>
+<li>
+<p><a href="/components/kerbside/protocol-overview.md">Protocol Overview</a> - Introduction to SPICE protocol
+  fundamentals including channel types, message structure, capabilities, and
+  security model</p>
+</li>
+<li>
+<p><a href="/components/kerbside/spice-link-protocol.md">Link Protocol</a> - Connection handshake details
+  including SpiceLinkMess/SpiceLinkReply formats, RSA key exchange, and
+  authentication flow</p>
+</li>
+<li>
+<p><a href="/components/kerbside/channel-protocols.md">Channel Protocols</a> - Detailed message formats for each
+  SPICE channel:</p>
+</li>
+<li>Main channel - Session control, channel negotiation</li>
+<li>Display channel - Screen updates, drawing operations, video streaming</li>
+<li>Inputs channel - Keyboard and mouse input</li>
+<li>Cursor channel - Cursor shape and position</li>
+<li>Playback/Record channels - Audio streaming</li>
+<li>
+<p>Smartcard channel - Smart card redirection</p>
+</li>
+<li>
+<p><a href="/components/kerbside/scancodes.md">Keyboard Scancodes</a> - Complete reference for IBM PC XT
+  scancodes used by the inputs channel, including standard keys, extended keys
+  (E0 prefix), and media/browser keys</p>
+</li>
+<li>
+<p><a href="/components/kerbside/compression-protocols.md">Compression Protocols</a> - LZ and GLZ image
+  compression formats used by the display channel, including header formats,
+  command encoding, and dictionary-based decompression</p>
+</li>
+<li>
+<p><a href="/components/kerbside/capabilities.md">Capabilities</a> - Channel capability negotiation including
+  common, display, audio, and input capabilities with recommended settings</p>
+</li>
+</ul>
+<h3 id="device-redirection-protocols">Device Redirection Protocols</h3>
+<p>Protocols for redirecting client devices to the virtual machine:</p>
+<ul>
+<li><a href="/components/kerbside/usb-redirection.md">USB Redirection</a> - USB device redirection protocol
+  (usbredir) including all control and data message formats, capability
+  negotiation, and device filter rules</li>
+</ul>
+<h3 id="guest-agent-protocol">Guest Agent Protocol</h3>
+<p>Protocol for advanced guest integration features:</p>
+<ul>
+<li><a href="/components/kerbside/vd-agent-protocol.md">VD Agent Protocol</a> - Guest agent protocol for
+  clipboard sharing, file transfer, display configuration, and volume sync</li>
+</ul>
+<h2 id="protocol-implementation-status">Protocol Implementation Status</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SPICE Link Handshake</td>
+<td>Full</td>
+<td>Token-based auth extension</td>
+</tr>
+<tr>
+<td>Main Channel</td>
+<td>Full</td>
+<td>Session control, agent passthrough</td>
+</tr>
+<tr>
+<td>Display Channel</td>
+<td>Full</td>
+<td>All drawing ops, video streaming</td>
+</tr>
+<tr>
+<td>Inputs Channel</td>
+<td>Full</td>
+<td>Keyboard, mouse, scancodes</td>
+</tr>
+<tr>
+<td>Cursor Channel</td>
+<td>Full</td>
+<td>Shape, position, trail</td>
+</tr>
+<tr>
+<td>Playback Channel</td>
+<td>Proxy</td>
+<td>Audio passthrough</td>
+</tr>
+<tr>
+<td>Record Channel</td>
+<td>Proxy</td>
+<td>Audio passthrough</td>
+</tr>
+<tr>
+<td>Smartcard Channel</td>
+<td>Proxy</td>
+<td>Passthrough</td>
+</tr>
+<tr>
+<td>USB Redirection</td>
+<td>Proxy</td>
+<td>Passthrough with hello decoding</td>
+</tr>
+<tr>
+<td>Port Channel (VMC)</td>
+<td>Full</td>
+<td>USB redir encapsulation</td>
+</tr>
+<tr>
+<td>WebDAV Channel</td>
+<td>Proxy</td>
+<td>Passthrough</td>
+</tr>
+<tr>
+<td>VD Agent</td>
+<td>Proxy</td>
+<td>Clipboard/file transfer passthrough</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Full</strong>: Protocol decoded and logged during inspection
+<strong>Proxy</strong>: Traffic forwarded transparently without decoding</p>
+<h2 id="quick-reference">Quick Reference</h2>
+<h3 id="channel-types">Channel Types</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">ID</th>
+<th>Channel</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td>main</td>
+<td>Session control</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>display</td>
+<td>Screen updates</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td>inputs</td>
+<td>Keyboard/mouse</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td>cursor</td>
+<td>Cursor rendering</td>
+</tr>
+<tr>
+<td style="text-align: right;">5</td>
+<td>playback</td>
+<td>Audio output</td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td>record</td>
+<td>Audio input</td>
+</tr>
+<tr>
+<td style="text-align: right;">7</td>
+<td>tunnel</td>
+<td>Obsolete</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td>smartcard</td>
+<td>Smart card</td>
+</tr>
+<tr>
+<td style="text-align: right;">9</td>
+<td>usbredir</td>
+<td>USB devices</td>
+</tr>
+<tr>
+<td style="text-align: right;">10</td>
+<td>port</td>
+<td>VMC protocol</td>
+</tr>
+<tr>
+<td style="text-align: right;">11</td>
+<td>webdav</td>
+<td>File sharing</td>
+</tr>
+</tbody>
+</table>
+<h3 id="error-codes">Error Codes</h3>
+<p>See <a href="/components/kerbside/protocol-overview.md#error-codes">Protocol Overview - Error Codes</a> for the
+complete list of SPICE link error codes.</p>
+<h3 id="common-capabilities">Common Capabilities</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Bit</th>
+<th>Capability</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td>AuthSelection</td>
+<td>Auth mechanism selection</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td>AuthSpice</td>
+<td>SPICE native auth</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>AuthSASL</td>
+<td>SASL auth</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td>MiniHeader</td>
+<td>Compact message headers</td>
+</tr>
+</tbody>
+</table>
+<h2 id="external-references">External References</h2>
+<p>Official SPICE protocol resources:</p>
+<ul>
+<li><a href="https://www.spice-space.org/spice-protocol.html">SPICE Protocol Documentation</a></li>
+<li><a href="https://gitlab.freedesktop.org/spice/spice-protocol">SPICE Protocol Source</a></li>
+<li><a href="https://gitlab.freedesktop.org/spice/spice">SPICE Server Source</a></li>
+<li><a href="https://www.spice-space.org/usbredir.html">USB Redirection Protocol</a></li>
+<li><a href="https://gitlab.freedesktop.org/spice/usbredir">usbredir Source</a></li>
+<li><a href="https://gitlab.freedesktop.org/spice/usbredir/-/blob/main/docs/usb-redirection-protocol.md">usbredir Protocol Spec</a></li>
+</ul>
+<h2 id="contributing">Contributing</h2>
+<p>When adding new protocol support or modifying existing implementations:</p>
+<ol>
+<li>Update the relevant documentation in this directory</li>
+<li>Include binary format descriptions with field offsets</li>
+<li>Document any deviations from the official SPICE protocol</li>
+<li>Add traffic inspection support in <code>spiceprotocol/packets/</code></li>
+<li>Update constants in <code>spiceprotocol/packets/constants.py</code></li>
+</ol>
+<h2 id="document-conventions">Document Conventions</h2>
+<p>Throughout this documentation:</p>
+<ul>
+<li><strong>Binary formats</strong> use little-endian byte order unless noted otherwise</li>
+<li><strong>Offset</strong> values are in bytes from the start of the structure</li>
+<li><strong>Size</strong> values are in bytes</li>
+<li><strong>uint32</strong>, <strong>uint16</strong>, <strong>uint8</strong> refer to unsigned integers</li>
+<li><strong>int32</strong>, <strong>int16</strong>, <strong>int8</strong> refer to signed integers</li>
+<li><strong>bytes</strong> refers to raw binary data</li>
+<li><strong>string</strong> refers to null-terminated ASCII/UTF-8 text</li>
+<li><strong>S-&gt;C</strong> means server to client direction</li>
+<li><strong>C-&gt;S</strong> means client to server direction</li>
+</ul>
 
 
 

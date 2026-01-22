@@ -1,0 +1,4625 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A minimal cloud aimed at small and edge deployments">
+      
+      
+      
+        <link rel="canonical" href="https://shakenfist.com/components/kerbside/usb-redirection/">
+      
+      
+        <link rel="prev" href="../protocol-overview/">
+      
+      
+        <link rel="next" href="../vd-agent-protocol/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>USB Redirection Protocol - Shaken Fist</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#usb-redirection-protocol" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Shaken Fist
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              USB Redirection Protocol
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/shakenfist/shakenfist" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Shaken Fist
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/shakenfist/shakenfist" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../manifesto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manifesto
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kerbside
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuring Kerbside
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../console-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Console Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proxy-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside Proxy Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scancodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Scancodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../channel-protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Channel Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compression-protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Compression Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spice-link-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Link Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../protocol-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Protocol Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    USB Redirection Protocol
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    USB Redirection Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocol-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol References
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usb-redir-packet-header" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        USB Redir Packet Header
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="USB Redir Packet Header">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standard-header-32-bit-ids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standard Header (32-bit IDs)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extended-header-64-bit-ids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extended Header (64-bit IDs)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vmc-encapsulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VMC Encapsulation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usb-redirection-message-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        USB Redirection Message Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="USB Redirection Message Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#control-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control Messages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Messages
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#message-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Message Formats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Message Formats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_hello-id-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_hello (ID 0)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_device_connect-id-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_device_connect (ID 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_device_disconnect-id-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_device_disconnect (ID 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_reset-id-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_reset (ID 3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_interface_info-id-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_interface_info (ID 4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_ep_info-id-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_ep_info (ID 5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_set_configuration-id-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_set_configuration (ID 6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_get_configuration-id-7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_get_configuration (ID 7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_configuration_status-id-8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_configuration_status (ID 8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_set_alt_setting-id-9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_set_alt_setting (ID 9)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_get_alt_setting-id-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_get_alt_setting (ID 10)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_alt_setting_status-id-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_alt_setting_status (ID 11)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-transfer-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Transfer Messages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Transfer Messages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_control_packet-id-100" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_control_packet (ID 100)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_bulk_packet-id-101" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_bulk_packet (ID 101)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_iso_packet-id-102" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_iso_packet (ID 102)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_interrupt_packet-id-103" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_interrupt_packet (ID 103)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Codes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capabilities
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#additional-control-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additional Control Messages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Additional Control Messages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_start_iso_stream-id-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_start_iso_stream (ID 12)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_stop_iso_stream-id-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_stop_iso_stream (ID 13)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_iso_stream_status-id-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_iso_stream_status (ID 14)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_start_interrupt_receiving-id-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_start_interrupt_receiving (ID 15)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_stop_interrupt_receiving-id-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_stop_interrupt_receiving (ID 16)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_interrupt_receiving_status-id-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_interrupt_receiving_status (ID 17)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_alloc_bulk_streams-id-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_alloc_bulk_streams (ID 18)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_free_bulk_streams-id-19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_free_bulk_streams (ID 19)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_bulk_streams_status-id-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_bulk_streams_status (ID 20)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_start_bulk_receiving-id-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_start_bulk_receiving (ID 25)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_stop_bulk_receiving-id-26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_stop_bulk_receiving (ID 26)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_bulk_receiving_status-id-27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_bulk_receiving_status (ID 27)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_filter_filter-id-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_filter_filter (ID 23)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_buffered_bulk_packet-id-104" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_buffered_bulk_packet (ID 104)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocol-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol Rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Protocol Rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#message-direction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Message Direction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#initialization-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initialization Sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#endpoint-numbering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Endpoint Numbering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stream-id-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stream ID Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connection-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kerbside-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kerbside Implementation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Kerbside Implementation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#decoded-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decoded Messages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#traffic-inspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Traffic Inspection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Considerations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vd-agent-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VD Agent Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release_notes/v07-v08/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.7 to v0.8 (unreleased)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../community/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Community
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/ansible/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ansible module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/affinity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affinity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/consoles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consoles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/objects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/admin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin (/admin/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Operations (/agentoperations/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts (/artifacts/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication (/auth/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blob Checksums (/blob_checksums/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/blobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blobs (/blobs/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/instances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instances (/instances/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/label/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Label (/label/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks (/networks/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Interfaces (/interfaces/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/nodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nodes (/nodes/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/api_reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload (/upload/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/agent_protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/ci_api_coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI API coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/mypy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mypy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/release_process/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/standards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/state_machine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State machine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/updating_docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Updating docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plans/api-query-batching-roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Query Batching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plans/blob-storage-roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blob Storage Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operator Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operator Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/exception_tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exception Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/locks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Locks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/networking/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/power_states/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power States
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/python_versions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/threads/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocol-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol References
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usb-redir-packet-header" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        USB Redir Packet Header
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="USB Redir Packet Header">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standard-header-32-bit-ids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standard Header (32-bit IDs)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extended-header-64-bit-ids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extended Header (64-bit IDs)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vmc-encapsulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VMC Encapsulation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usb-redirection-message-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        USB Redirection Message Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="USB Redirection Message Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#control-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control Messages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Messages
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#message-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Message Formats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Message Formats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_hello-id-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_hello (ID 0)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_device_connect-id-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_device_connect (ID 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_device_disconnect-id-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_device_disconnect (ID 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_reset-id-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_reset (ID 3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_interface_info-id-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_interface_info (ID 4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_ep_info-id-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_ep_info (ID 5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_set_configuration-id-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_set_configuration (ID 6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_get_configuration-id-7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_get_configuration (ID 7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_configuration_status-id-8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_configuration_status (ID 8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_set_alt_setting-id-9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_set_alt_setting (ID 9)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_get_alt_setting-id-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_get_alt_setting (ID 10)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_alt_setting_status-id-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_alt_setting_status (ID 11)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-transfer-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Transfer Messages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Transfer Messages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_control_packet-id-100" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_control_packet (ID 100)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_bulk_packet-id-101" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_bulk_packet (ID 101)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_iso_packet-id-102" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_iso_packet (ID 102)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_interrupt_packet-id-103" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_interrupt_packet (ID 103)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Codes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capabilities
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#additional-control-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additional Control Messages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Additional Control Messages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_start_iso_stream-id-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_start_iso_stream (ID 12)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_stop_iso_stream-id-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_stop_iso_stream (ID 13)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_iso_stream_status-id-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_iso_stream_status (ID 14)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_start_interrupt_receiving-id-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_start_interrupt_receiving (ID 15)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_stop_interrupt_receiving-id-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_stop_interrupt_receiving (ID 16)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_interrupt_receiving_status-id-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_interrupt_receiving_status (ID 17)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_alloc_bulk_streams-id-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_alloc_bulk_streams (ID 18)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_free_bulk_streams-id-19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_free_bulk_streams (ID 19)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_bulk_streams_status-id-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_bulk_streams_status (ID 20)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_start_bulk_receiving-id-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_start_bulk_receiving (ID 25)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_stop_bulk_receiving-id-26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_stop_bulk_receiving (ID 26)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_bulk_receiving_status-id-27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_bulk_receiving_status (ID 27)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_filter_filter-id-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_filter_filter (ID 23)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usb_redir_buffered_bulk_packet-id-104" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        usb_redir_buffered_bulk_packet (ID 104)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocol-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol Rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Protocol Rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#message-direction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Message Direction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#initialization-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initialization Sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#endpoint-numbering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Endpoint Numbering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stream-id-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stream ID Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connection-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kerbside-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kerbside Implementation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Kerbside Implementation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#decoded-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decoded Messages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#traffic-inspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Traffic Inspection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Considerations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="usb-redirection-protocol">USB Redirection Protocol</h1>
+<p>This document describes the USB redirection protocol used within SPICE's port
+channel. USB redirection allows USB devices connected to the client machine to
+be redirected to the virtual machine.</p>
+<h2 id="overview">Overview</h2>
+<p>USB redirection in SPICE uses the VMC (Virtual Machine Communication) protocol
+as a transport layer. The USB-specific protocol is called "usbredir" and is
+encapsulated within VMC data messages on the port channel (channel type 9).</p>
+<h2 id="protocol-references">Protocol References</h2>
+<ul>
+<li><a href="https://www.spice-space.org/usbredir.html">USB Redirection Protocol Spec</a></li>
+<li><a href="https://gitlab.freedesktop.org/spice/usbredir">usbredir Source Code</a></li>
+<li><a href="https://gitlab.freedesktop.org/spice/usbredir/-/blob/main/usbredirparser/usbredirproto.h">Protocol Header</a></li>
+<li><a href="https://gitlab.freedesktop.org/spice/usbredir/-/blob/main/docs/usb-redirection-protocol.md">Protocol Documentation</a></li>
+</ul>
+<h2 id="usb-redir-packet-header">USB Redir Packet Header</h2>
+<p>USB redirection uses its own packet header format within the VMC encapsulation.
+The protocol supports two header formats depending on negotiated capabilities.</p>
+<h3 id="standard-header-32-bit-ids">Standard Header (32-bit IDs)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       4     uint32  type (message type)
+4       4     uint32  length (payload length)
+8       4     uint32  id (sequence/correlation ID)
+</code></pre></div>
+<h3 id="extended-header-64-bit-ids">Extended Header (64-bit IDs)</h3>
+<p>When both sides advertise <code>usb_redir_cap_64bits_ids</code>:</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       4     uint32  type (message type)
+4       4     uint32  length (payload length)
+8       8     uint64  id (sequence/correlation ID)
+</code></pre></div>
+<p>All integers use little-endian byte order. Structures are packed without padding.</p>
+<h2 id="vmc-encapsulation">VMC Encapsulation</h2>
+<p>USB redirection messages are wrapped in VMC data packets:</p>
+<div class="highlight"><pre><span></span><code>-- SPICE Port Channel Header (6 bytes) --
+Offset  Size  Type    Field
+------  ----  ------  -----------
+0       2     uint16  message_type (101 = vmc_data)
+2       4     uint32  message_size
+
+-- VMC Header (12 bytes) --
+6       4     uint32  vmc_type (usb_redir message type)
+10      4     uint32  vmc_length (usb_redir payload length)
+14      4     uint32  vmc_id (sequence/correlation ID)
+
+-- USB Redir Payload --
+18      var   bytes   usb_redir message data
+</code></pre></div>
+<h2 id="usb-redirection-message-types">USB Redirection Message Types</h2>
+<h3 id="control-messages">Control Messages</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">ID</th>
+<th>Message</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td>usb_redir_hello</td>
+<td>Protocol version exchange</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td>usb_redir_device_connect</td>
+<td>Device connection notification</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>usb_redir_device_disconnect</td>
+<td>Device disconnection notification</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td>usb_redir_reset</td>
+<td>Reset USB device</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td>usb_redir_interface_info</td>
+<td>Interface descriptor info</td>
+</tr>
+<tr>
+<td style="text-align: right;">5</td>
+<td>usb_redir_ep_info</td>
+<td>Endpoint descriptor info</td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td>usb_redir_set_configuration</td>
+<td>Set USB configuration</td>
+</tr>
+<tr>
+<td style="text-align: right;">7</td>
+<td>usb_redir_get_configuration</td>
+<td>Get current configuration</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td>usb_redir_configuration_status</td>
+<td>Configuration status response</td>
+</tr>
+<tr>
+<td style="text-align: right;">9</td>
+<td>usb_redir_set_alt_setting</td>
+<td>Set alternate interface setting</td>
+</tr>
+<tr>
+<td style="text-align: right;">10</td>
+<td>usb_redir_get_alt_setting</td>
+<td>Get current alternate setting</td>
+</tr>
+<tr>
+<td style="text-align: right;">11</td>
+<td>usb_redir_alt_setting_status</td>
+<td>Alternate setting status response</td>
+</tr>
+<tr>
+<td style="text-align: right;">12</td>
+<td>usb_redir_start_iso_stream</td>
+<td>Start isochronous stream</td>
+</tr>
+<tr>
+<td style="text-align: right;">13</td>
+<td>usb_redir_stop_iso_stream</td>
+<td>Stop isochronous stream</td>
+</tr>
+<tr>
+<td style="text-align: right;">14</td>
+<td>usb_redir_iso_stream_status</td>
+<td>Isochronous stream status</td>
+</tr>
+<tr>
+<td style="text-align: right;">15</td>
+<td>usb_redir_start_interrupt_receiving</td>
+<td>Start interrupt endpoint</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td>usb_redir_stop_interrupt_receiving</td>
+<td>Stop interrupt endpoint</td>
+</tr>
+<tr>
+<td style="text-align: right;">17</td>
+<td>usb_redir_interrupt_receiving_status</td>
+<td>Interrupt status</td>
+</tr>
+<tr>
+<td style="text-align: right;">18</td>
+<td>usb_redir_alloc_bulk_streams</td>
+<td>Allocate bulk streams</td>
+</tr>
+<tr>
+<td style="text-align: right;">19</td>
+<td>usb_redir_free_bulk_streams</td>
+<td>Free bulk streams</td>
+</tr>
+<tr>
+<td style="text-align: right;">20</td>
+<td>usb_redir_bulk_streams_status</td>
+<td>Bulk streams status</td>
+</tr>
+<tr>
+<td style="text-align: right;">21</td>
+<td>usb_redir_cancel_data_packet</td>
+<td>Cancel pending data packet</td>
+</tr>
+<tr>
+<td style="text-align: right;">22</td>
+<td>usb_redir_filter_reject</td>
+<td>Filter rejection notification</td>
+</tr>
+<tr>
+<td style="text-align: right;">23</td>
+<td>usb_redir_filter_filter</td>
+<td>Device filter rules</td>
+</tr>
+<tr>
+<td style="text-align: right;">24</td>
+<td>usb_redir_device_disconnect_ack</td>
+<td>Acknowledge disconnection</td>
+</tr>
+<tr>
+<td style="text-align: right;">25</td>
+<td>usb_redir_start_bulk_receiving</td>
+<td>Start bulk endpoint receiving</td>
+</tr>
+<tr>
+<td style="text-align: right;">26</td>
+<td>usb_redir_stop_bulk_receiving</td>
+<td>Stop bulk endpoint receiving</td>
+</tr>
+<tr>
+<td style="text-align: right;">27</td>
+<td>usb_redir_bulk_receiving_status</td>
+<td>Bulk receiving status</td>
+</tr>
+</tbody>
+</table>
+<h3 id="data-messages">Data Messages</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">ID</th>
+<th>Message</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">100</td>
+<td>usb_redir_control_packet</td>
+<td>Control transfer data</td>
+</tr>
+<tr>
+<td style="text-align: right;">101</td>
+<td>usb_redir_bulk_packet</td>
+<td>Bulk transfer data</td>
+</tr>
+<tr>
+<td style="text-align: right;">102</td>
+<td>usb_redir_iso_packet</td>
+<td>Isochronous transfer data</td>
+</tr>
+<tr>
+<td style="text-align: right;">103</td>
+<td>usb_redir_interrupt_packet</td>
+<td>Interrupt transfer data</td>
+</tr>
+<tr>
+<td style="text-align: right;">104</td>
+<td>usb_redir_buffered_bulk_packet</td>
+<td>Buffered bulk transfer</td>
+</tr>
+</tbody>
+</table>
+<h2 id="message-formats">Message Formats</h2>
+<h3 id="usb_redir_hello-id-0">usb_redir_hello (ID 0)</h3>
+<p>The first message exchanged between client and server to establish protocol
+version and capabilities.</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       64    string  version (null-terminated, padded)
+64      4     uint32  capabilities (bitmask)
+</code></pre></div>
+<p>The version string identifies the usbredir implementation and version (e.g.,
+"qemu usb-redir guest 0.8.0").</p>
+<h3 id="usb_redir_device_connect-id-1">usb_redir_device_connect (ID 1)</h3>
+<p>Sent when a USB device is connected and available for redirection.</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   speed (USB speed class)
+1       1     uint8   device_class
+2       1     uint8   device_subclass
+3       1     uint8   device_protocol
+4       2     uint16  vendor_id
+6       2     uint16  product_id
+8       2     uint16  device_version_bcd
+</code></pre></div>
+<p>USB Speed values:
+| Value | Speed |
+|------:|-------|
+| 0     | Unknown |
+| 1     | Low (1.5 Mbps) |
+| 2     | Full (12 Mbps) |
+| 3     | High (480 Mbps) |
+| 4     | Super (5 Gbps) |
+| 5     | Super+ (10 Gbps) |</p>
+<h3 id="usb_redir_device_disconnect-id-2">usb_redir_device_disconnect (ID 2)</h3>
+<p>Sent when a redirected USB device is disconnected. This message has no payload.</p>
+<h3 id="usb_redir_reset-id-3">usb_redir_reset (ID 3)</h3>
+<p>Request to reset the USB device. This message has no payload.</p>
+<h3 id="usb_redir_interface_info-id-4">usb_redir_interface_info (ID 4)</h3>
+<p>Provides information about all interfaces on the device.</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       32    uint8[] interface_count per alt setting
+32      32    uint8[] interface_class
+64      32    uint8[] interface_subclass
+96      32    uint8[] interface_protocol
+</code></pre></div>
+<h3 id="usb_redir_ep_info-id-5">usb_redir_ep_info (ID 5)</h3>
+<p>Provides information about all endpoints on the device.</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       32    uint8[] ep_type (per endpoint)
+32      32    uint8[] ep_interval
+64      32    uint8[] ep_interface
+96      64    uint16[] ep_max_packet_size
+</code></pre></div>
+<p>Endpoint types:
+| Value | Type |
+|------:|------|
+| 0     | Control |
+| 1     | Isochronous |
+| 2     | Bulk |
+| 3     | Interrupt |
+| 255   | Invalid |</p>
+<h3 id="usb_redir_set_configuration-id-6">usb_redir_set_configuration (ID 6)</h3>
+<p>Request to set a specific USB configuration.</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   configuration
+</code></pre></div>
+<h3 id="usb_redir_get_configuration-id-7">usb_redir_get_configuration (ID 7)</h3>
+<p>Request the current USB configuration. This message has no payload.</p>
+<h3 id="usb_redir_configuration_status-id-8">usb_redir_configuration_status (ID 8)</h3>
+<p>Response to set/get configuration requests.</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   status
+1       1     uint8   configuration
+</code></pre></div>
+<h3 id="usb_redir_set_alt_setting-id-9">usb_redir_set_alt_setting (ID 9)</h3>
+<p>Request to set an alternate interface setting.</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   interface
+1       1     uint8   alt_setting
+</code></pre></div>
+<h3 id="usb_redir_get_alt_setting-id-10">usb_redir_get_alt_setting (ID 10)</h3>
+<p>Request the current alternate setting for an interface.</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   interface
+</code></pre></div>
+<h3 id="usb_redir_alt_setting_status-id-11">usb_redir_alt_setting_status (ID 11)</h3>
+<p>Response to set/get alternate setting requests.</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   status
+1       1     uint8   interface
+2       1     uint8   alt_setting
+</code></pre></div>
+<h2 id="data-transfer-messages">Data Transfer Messages</h2>
+<h3 id="usb_redir_control_packet-id-100">usb_redir_control_packet (ID 100)</h3>
+<p>USB control transfer (used for device configuration and standard requests).</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   endpoint
+1       1     uint8   request
+2       1     uint8   request_type
+3       1     uint8   status
+4       2     uint16  value
+6       2     uint16  index
+8       2     uint16  length
+10      var   bytes   data (if length &gt; 0)
+</code></pre></div>
+<h3 id="usb_redir_bulk_packet-id-101">usb_redir_bulk_packet (ID 101)</h3>
+<p>USB bulk transfer (used for large data transfers).</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   endpoint
+1       1     uint8   status
+2       2     uint16  length
+4       4     uint32  stream_id
+8       2     uint16  length_high (extended length)
+10      var   bytes   data (if length &gt; 0)
+</code></pre></div>
+<h3 id="usb_redir_iso_packet-id-102">usb_redir_iso_packet (ID 102)</h3>
+<p>USB isochronous transfer (used for streaming data like audio/video).</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   endpoint
+1       1     uint8   status
+2       2     uint16  length
+4       var   bytes   data
+</code></pre></div>
+<h3 id="usb_redir_interrupt_packet-id-103">usb_redir_interrupt_packet (ID 103)</h3>
+<p>USB interrupt transfer (used for periodic small data transfers).</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   endpoint
+1       1     uint8   status
+2       2     uint16  length
+4       var   bytes   data
+</code></pre></div>
+<h2 id="status-codes">Status Codes</h2>
+<p>USB redirection operations return status codes:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Value</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td>Success</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td>Cancelled</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>INVAL (invalid parameter)</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td>IOERROR</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td>STALL</td>
+</tr>
+<tr>
+<td style="text-align: right;">5</td>
+<td>TIMEOUT</td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td>BABBLE</td>
+</tr>
+</tbody>
+</table>
+<h2 id="capabilities">Capabilities</h2>
+<p>The hello message includes a capabilities bitmask indicating supported features:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Bit</th>
+<th>Capability</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td>bulk_streams</td>
+<td>USB 3.0 bulk streams support</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td>connect_device_version</td>
+<td>Device version BCD in connect packet</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>filter</td>
+<td>Filter reject/filter packets supported</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td>device_disconnect_ack</td>
+<td>Disconnect acknowledgment required</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td>ep_info_max_packet_size</td>
+<td>Max packet size in endpoint info</td>
+</tr>
+<tr>
+<td style="text-align: right;">5</td>
+<td>64bits_ids</td>
+<td>64-bit packet IDs</td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td>32bits_bulk_length</td>
+<td>32-bit bulk packet length</td>
+</tr>
+<tr>
+<td style="text-align: right;">7</td>
+<td>bulk_receiving</td>
+<td>Buffered bulk input support</td>
+</tr>
+</tbody>
+</table>
+<h2 id="additional-control-messages">Additional Control Messages</h2>
+<h3 id="usb_redir_start_iso_stream-id-12">usb_redir_start_iso_stream (ID 12)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   endpoint
+1       1     uint8   pkts_per_urb
+2       1     uint8   no_urbs
+</code></pre></div>
+<h3 id="usb_redir_stop_iso_stream-id-13">usb_redir_stop_iso_stream (ID 13)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   endpoint
+</code></pre></div>
+<h3 id="usb_redir_iso_stream_status-id-14">usb_redir_iso_stream_status (ID 14)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   status
+1       1     uint8   endpoint
+</code></pre></div>
+<h3 id="usb_redir_start_interrupt_receiving-id-15">usb_redir_start_interrupt_receiving (ID 15)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   endpoint
+</code></pre></div>
+<h3 id="usb_redir_stop_interrupt_receiving-id-16">usb_redir_stop_interrupt_receiving (ID 16)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   endpoint
+</code></pre></div>
+<h3 id="usb_redir_interrupt_receiving_status-id-17">usb_redir_interrupt_receiving_status (ID 17)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       1     uint8   status
+1       1     uint8   endpoint
+</code></pre></div>
+<h3 id="usb_redir_alloc_bulk_streams-id-18">usb_redir_alloc_bulk_streams (ID 18)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       4     uint32  endpoints (bitmask: bit N = endpoint N)
+4       4     uint32  no_streams
+</code></pre></div>
+<h3 id="usb_redir_free_bulk_streams-id-19">usb_redir_free_bulk_streams (ID 19)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       4     uint32  endpoints (bitmask)
+</code></pre></div>
+<h3 id="usb_redir_bulk_streams_status-id-20">usb_redir_bulk_streams_status (ID 20)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       4     uint32  endpoints (bitmask)
+4       4     uint32  no_streams
+8       1     uint8   status
+</code></pre></div>
+<h3 id="usb_redir_start_bulk_receiving-id-25">usb_redir_start_bulk_receiving (ID 25)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       4     uint32  stream_id
+4       4     uint32  bytes_per_transfer
+8       1     uint8   endpoint
+9       1     uint8   no_transfers
+</code></pre></div>
+<h3 id="usb_redir_stop_bulk_receiving-id-26">usb_redir_stop_bulk_receiving (ID 26)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       4     uint32  stream_id
+4       1     uint8   endpoint
+</code></pre></div>
+<h3 id="usb_redir_bulk_receiving_status-id-27">usb_redir_bulk_receiving_status (ID 27)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       4     uint32  stream_id
+4       1     uint8   endpoint
+5       1     uint8   status
+</code></pre></div>
+<h3 id="usb_redir_filter_filter-id-23">usb_redir_filter_filter (ID 23)</h3>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       N     string  filter rules (null-terminated)
+</code></pre></div>
+<p>Filter format: Rules separated by <code>|</code>, each rule is:
+<code>&lt;class&gt;,&lt;vendor&gt;,&lt;product&gt;,&lt;version&gt;,&lt;allow&gt;</code></p>
+<ul>
+<li>Use <code>-1</code> as wildcard for any value</li>
+<li>Values can be decimal or <code>0x</code>-prefixed hex</li>
+<li><code>&lt;allow&gt;</code> is 0 (deny) or 1 (allow)</li>
+</ul>
+<p>Example: <code>-1,-1,-1,-1,1</code> allows all devices</p>
+<h3 id="usb_redir_buffered_bulk_packet-id-104">usb_redir_buffered_bulk_packet (ID 104)</h3>
+<p>For buffered bulk input (requires <code>bulk_receiving</code> capability):</p>
+<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
+------  ----  ------  -----------
+0       4     uint32  stream_id
+4       4     uint32  length
+8       1     uint8   endpoint
+9       1     uint8   status
+10      var   bytes   data
+</code></pre></div>
+<h2 id="protocol-rules">Protocol Rules</h2>
+<h3 id="message-direction">Message Direction</h3>
+<ul>
+<li><strong>Guest initiates</strong>: Control packets and outbound data packets</li>
+<li><strong>Host responds</strong>: Same message type with matching ID</li>
+<li><strong>Unsolicited from host</strong>: <code>device_connect</code>, <code>device_disconnect</code>,
+  <code>filter_reject</code>, input data streams</li>
+</ul>
+<h3 id="initialization-sequence">Initialization Sequence</h3>
+<p>The host must send messages in this order before <code>device_connect</code>:
+1. <code>ep_info</code> - Endpoint information
+2. <code>interface_info</code> - Interface descriptors
+3. <code>device_connect</code> - Device availability</p>
+<h3 id="configuration-changes">Configuration Changes</h3>
+<p>After successful <code>set_configuration</code> or <code>set_alt_setting</code>, the host must send:
+1. <code>ep_info</code> - Updated endpoint information
+2. <code>interface_info</code> - Updated interface descriptors
+3. <code>configuration_status</code> or <code>alt_setting_status</code> - Status response</p>
+<h3 id="endpoint-numbering">Endpoint Numbering</h3>
+<p>Endpoints are numbered 0-31:
+- Endpoints 0-15: OUT direction (host to device)
+- Endpoints 16-31: IN direction (device to host)
+- Endpoint 0 and 16: Control endpoint (always present)</p>
+<h3 id="stream-id-management">Stream ID Management</h3>
+<p>For isochronous and buffered bulk streams:
+- IDs start at 0 and increment per packet
+- IDs reset after stall condition recovery
+- Host resets ID on <code>_start_*</code> messages</p>
+<h2 id="connection-flow">Connection Flow</h2>
+<p>A typical USB redirection session follows this flow:</p>
+<div class="highlight"><pre><span></span><code>    Client                                     Server (VM)
+      |                                            |
+      |  usb_redir_hello (version + caps)          |
+      |-------------------------------------------&gt;|
+      |                                            |
+      |  usb_redir_hello (version + caps)          |
+      |&lt;-------------------------------------------|
+      |                                            |
+      |  usb_redir_device_connect                  |
+      |-------------------------------------------&gt;|
+      |                                            |
+      |  usb_redir_interface_info                  |
+      |-------------------------------------------&gt;|
+      |                                            |
+      |  usb_redir_ep_info                         |
+      |-------------------------------------------&gt;|
+      |                                            |
+      |  usb_redir_set_configuration               |
+      |&lt;-------------------------------------------|
+      |                                            |
+      |  usb_redir_configuration_status            |
+      |-------------------------------------------&gt;|
+      |                                            |
+      |  [ Data transfers: bulk, interrupt, etc ]  |
+      |&lt;------------------------------------------&gt;|
+      |                                            |
+      |  usb_redir_device_disconnect               |
+      |-------------------------------------------&gt;|
+      |                                            |
+      |  usb_redir_device_disconnect_ack           |
+      |&lt;-------------------------------------------|
+</code></pre></div>
+<h2 id="kerbside-implementation">Kerbside Implementation</h2>
+<p>Kerbside's USB redirection handling is implemented in
+<code>spiceprotocol/packets/port.py</code>. The proxy:</p>
+<ol>
+<li>Parses VMC headers to identify USB redirection messages</li>
+<li>Decodes the <code>usb_redir_hello</code> message to log version information</li>
+<li>Forwards all USB redirection traffic transparently between client and server</li>
+<li>Supports traffic inspection/logging when configured</li>
+</ol>
+<h3 id="decoded-messages">Decoded Messages</h3>
+<p>Kerbside currently decodes:
+- <code>usb_redir_hello</code> - Logs version string and capabilities</p>
+<p>All other USB redirection messages are forwarded without detailed parsing but
+can be logged in raw form for debugging.</p>
+<h3 id="traffic-inspection">Traffic Inspection</h3>
+<p>When traffic inspection is enabled, USB redirection traffic can be logged:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Example inspection output</span>
+<span class="n">Client</span> <span class="n">sent</span> <span class="mi">80</span> <span class="n">byte</span> <span class="n">opcode</span> <span class="mi">101</span> <span class="n">vmc_data</span>
+   <span class="o">...</span> <span class="n">VMC</span> <span class="nb">type</span> <span class="n">usb_redir_hello</span><span class="p">,</span> <span class="n">length</span> <span class="mi">68</span><span class="p">,</span> <span class="nb">id</span> <span class="mi">0</span>
+   <span class="o">...</span> <span class="n">version</span><span class="p">:</span> <span class="n">qemu</span> <span class="n">usb</span><span class="o">-</span><span class="n">redir</span> <span class="n">guest</span> <span class="mf">0.8.0</span>
+   <span class="o">...</span> <span class="n">capabilities</span><span class="p">:</span> <span class="mi">127</span>
+</code></pre></div>
+<h2 id="security-considerations">Security Considerations</h2>
+<p>USB redirection presents security considerations:</p>
+<ol>
+<li>
+<p><strong>Device Access</strong>: Redirected USB devices have direct access to the VM,
+   potentially exposing sensitive data.</p>
+</li>
+<li>
+<p><strong>Malicious Devices</strong>: USB devices can potentially be used for attacks
+   (e.g., BadUSB).</p>
+</li>
+<li>
+<p><strong>Data Exposure</strong>: USB traffic may contain sensitive data that should be
+   protected.</p>
+</li>
+</ol>
+<p>Kerbside's audit logging records USB redirection channel establishment for
+security monitoring purposes.</p>
+<h2 id="related-documentation">Related Documentation</h2>
+<ul>
+<li><a href="/components/kerbside/protocol-overview.md">Protocol Overview</a> - High-level protocol introduction</li>
+<li><a href="/components/kerbside/channel-protocols.md">Channel Protocols</a> - Per-channel message formats</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": [], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
