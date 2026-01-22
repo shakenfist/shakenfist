@@ -246,6 +246,6 @@ Kerbside includes `kerbside-util` which can:
 
 ## Related Documentation
 
-- [Protocol Overview](/components/kerbside/protocol-overview.md) - High-level SPICE protocol
-- [Channel Protocols](/components/kerbside/channel-protocols.md) - Display channel message formats
-- [Capabilities](/components/kerbside/capabilities.md) - LZ4Compression and PrefCompression capabilities
+- [Protocol Overview](/components/kerbside/protocol-overview/) - High-level SPICE protocol
+- [Channel Protocols](/components/kerbside/channel-protocols/) - Display channel message formats
+- [Capabilities](/components/kerbside/capabilities/) - LZ4Compression and PrefCompression capabilities

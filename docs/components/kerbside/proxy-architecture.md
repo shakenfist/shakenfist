@@ -432,6 +432,6 @@ Each connection runs in its own process:
 
 ## Related Documentation
 
-- [Protocol Overview](/components/kerbside/protocol-overview.md) - SPICE protocol introduction
-- [Link Protocol](/components/kerbside/spice-link-protocol.md) - Connection handshake details
-- [Channel Protocols](/components/kerbside/channel-protocols.md) - Per-channel message formats
+- [Protocol Overview](/components/kerbside/protocol-overview/) - SPICE protocol introduction
+- [Link Protocol](/components/kerbside/spice-link-protocol/) - Connection handshake details
+- [Channel Protocols](/components/kerbside/channel-protocols/) - Per-channel message formats

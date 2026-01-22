@@ -131,23 +131,23 @@ of a HTML5 desktop environment.
 
 Guides for deploying and configuring Kerbside:
 
-- [Configuration](/components/kerbside/configuration.md) - Configuration reference for all Kerbside
+- [Configuration](/components/kerbside/configuration/) - Configuration reference for all Kerbside
   settings including TLS, Keystone, API, and monitoring options
 
-- [Console Sources](/components/kerbside/console-sources.md) - Configuring console sources
+- [Console Sources](/components/kerbside/console-sources/) - Configuring console sources
   (sources.yaml) for Shaken Fist, oVirt, and OpenStack
 
-- [Database Schema](/components/kerbside/schema.md) - Database tables, columns, and relationships
+- [Database Schema](/components/kerbside/schema/) - Database tables, columns, and relationships
 
 ### Architecture Documentation
 
 Internal design of the Kerbside proxy:
 
-- [Proxy Architecture](/components/kerbside/proxy-architecture.md) - Internal architecture including
+- [Proxy Architecture](/components/kerbside/proxy-architecture/) - Internal architecture including
   process model, connection state machine, traffic inspection, and worker
   management
 
-- [ARCHITECTURE.md](/components/kerbside/../ARCHITECTURE.md) - High-level system architecture
+- [ARCHITECTURE.md](/components/kerbside/../ARCHITECTURE/) - High-level system architecture
   overview (in project root)
 
 ### SPICE Protocol Documentation
@@ -155,15 +155,15 @@ Internal design of the Kerbside proxy:
 Core protocol specifications covering connection handshake, authentication, and
 channel message formats:
 
-- [Protocol Overview](/components/kerbside/protocol-overview.md) - Introduction to SPICE protocol
+- [Protocol Overview](/components/kerbside/protocol-overview/) - Introduction to SPICE protocol
   fundamentals including channel types, message structure, capabilities, and
   security model
 
-- [Link Protocol](/components/kerbside/spice-link-protocol.md) - Connection handshake details
+- [Link Protocol](/components/kerbside/spice-link-protocol/) - Connection handshake details
   including SpiceLinkMess/SpiceLinkReply formats, RSA key exchange, and
   authentication flow
 
-- [Channel Protocols](/components/kerbside/channel-protocols.md) - Detailed message formats for each
+- [Channel Protocols](/components/kerbside/channel-protocols/) - Detailed message formats for each
   SPICE channel:
   - Main channel - Session control, channel negotiation
   - Display channel - Screen updates, drawing operations, video streaming
@@ -172,22 +172,22 @@ channel message formats:
   - Playback/Record channels - Audio streaming
   - Smartcard channel - Smart card redirection
 
-- [Keyboard Scancodes](/components/kerbside/scancodes.md) - Complete reference for IBM PC XT
+- [Keyboard Scancodes](/components/kerbside/scancodes/) - Complete reference for IBM PC XT
   scancodes used by the inputs channel, including standard keys, extended keys
   (E0 prefix), and media/browser keys
 
-- [Compression Protocols](/components/kerbside/compression-protocols.md) - LZ and GLZ image
+- [Compression Protocols](/components/kerbside/compression-protocols/) - LZ and GLZ image
   compression formats used by the display channel, including header formats,
   command encoding, and dictionary-based decompression
 
-- [Capabilities](/components/kerbside/capabilities.md) - Channel capability negotiation including
+- [Capabilities](/components/kerbside/capabilities/) - Channel capability negotiation including
   common, display, audio, and input capabilities with recommended settings
 
 ### Device Redirection Protocols
 
 Protocols for redirecting client devices to the virtual machine:
 
-- [USB Redirection](/components/kerbside/usb-redirection.md) - USB device redirection protocol
+- [USB Redirection](/components/kerbside/usb-redirection/) - USB device redirection protocol
   (usbredir) including all control and data message formats, capability
   negotiation, and device filter rules
 
@@ -195,7 +195,7 @@ Protocols for redirecting client devices to the virtual machine:
 
 Protocol for advanced guest integration features:
 
-- [VD Agent Protocol](/components/kerbside/vd-agent-protocol.md) - Guest agent protocol for
+- [VD Agent Protocol](/components/kerbside/vd-agent-protocol/) - Guest agent protocol for
   clipboard sharing, file transfer, display configuration, and volume sync
 
 ## Protocol Implementation Status
@@ -238,7 +238,7 @@ Protocol for advanced guest integration features:
 
 ### Error Codes
 
-See [Protocol Overview - Error Codes](/components/kerbside/protocol-overview.md#error-codes) for the
+See [Protocol Overview - Error Codes](/components/kerbside/protocol-overview/#error-codes) for the
 complete list of SPICE link error codes.
 
 ### Common Capabilities
