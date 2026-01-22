@@ -38,6 +38,12 @@ nav:
     - Manifesto: manifesto.md
     - Components:
         - "Overview": components/overview.md
+        - Clingwrap:
+            - "Introduction": components/clingwrap/index.md
+            - "Command Types": components/clingwrap/command-types.md
+            - "Configuration": components/clingwrap/configuration.md
+            - "Examples": components/clingwrap/examples.md
+            - "Installation": components/clingwrap/installation.md
         - Kerbside:
             - "Introduction": components/kerbside/index.md
             - "Configuring Kerbside": components/kerbside/configuration.md
@@ -52,6 +58,12 @@ nav:
             - "SPICE Protocol Overview": components/kerbside/protocol-overview.md
             - "USB Redirection Protocol": components/kerbside/usb-redirection.md
             - "VD Agent Protocol": components/kerbside/vd-agent-protocol.md
+        - Occystrap:
+            - "Introduction": components/occystrap/index.md
+            - "Command Reference": components/occystrap/command-reference.md
+            - "Installation": components/occystrap/installation.md
+            - "Pipeline Architecture": components/occystrap/pipeline.md
+            - "Use Cases": components/occystrap/use-cases.md
     - Features: features.md
     - Release notes:
         - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
