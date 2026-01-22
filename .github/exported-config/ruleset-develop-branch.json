@@ -1,11 +1,5 @@
 {
-    "bypass_actors": [
-        {
-            "actor_id": 11722172,
-            "actor_type": "Team",
-            "bypass_mode": "always"
-        }
-    ],
+    "bypass_actors": [],
     "conditions": {
         "ref_name": {
             "exclude": [],
@@ -59,6 +53,10 @@
                     },
                     {
                         "context": "Can enqueue",
+                        "integration_id": 15368
+                    },
+                    {
+                        "context": "Can merge",
                         "integration_id": 15368
                     }
                 ],
