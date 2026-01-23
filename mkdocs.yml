@@ -5,6 +5,12 @@ site_description: A minimal cloud aimed at small and edge deployments
 
 theme:
   name: material
+  icon:
+    annotation: material/arrow-right-circle
+    admonition:
+      puzzle: material/puzzle-outline
+      foreshadow: material/head-lightbulb-outline
+
   palette:
 
     # Palette toggle for dark mode
@@ -38,6 +44,11 @@ nav:
     - Manifesto: manifesto.md
     - Components:
         - "Overview": components/overview.md
+        - Cloudgood:
+            - "Introduction": components/cloudgood/index.md
+            - "Technology primer": components/cloudgood/technology-primer.md
+            - "Fundamentals": components/cloudgood/fundamentals.md
+            - "Virtualization history": components/cloudgood/virtualization-history.md
         - Clingwrap:
             - "Introduction": components/clingwrap/index.md
             - "Command Types": components/clingwrap/command-types.md
