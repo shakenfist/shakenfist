@@ -1,0 +1,29 @@
+# Skip workflow for docs-only PRs
+#
+# This workflow provides the required "Can enqueue" check for PRs that only
+# modify documentation files. Without this, PRs touching only docs would have
+# a perpetually pending status check because the main functional-tests.yml
+# workflow uses paths-ignore to skip running for docs changes.
+#
+# IMPORTANT: The paths list below must be kept in sync with the paths-ignore
+# list in functional-tests.yml. If you add or remove paths from one file,
+# update the other file to match.
+
+name: Functional tests
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - v*-releases
+    paths:
+      - 'docs/**'
+      - mkdocs.yml
+      - mkdocs.yml.tmpl
+
+jobs:
+  can_enqueue:
+    name: "Can enqueue"
+    runs-on: [self-hosted, static]
+    steps:
+      - run: echo "Skipping functional tests - docs only change"
