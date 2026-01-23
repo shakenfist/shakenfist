@@ -10,9 +10,14 @@ on:
     branches:
       - develop
       - v*-releases
+    # IMPORTANT: The paths-ignore list below must be kept in sync with the
+    # paths list in functional-tests-skip.yml. That workflow provides the
+    # required "Can enqueue" check for docs-only PRs. If you add or remove
+    # paths here, update the other file to match.
     paths-ignore:
       - 'docs/**'
       - mkdocs.yml
+      - mkdocs.yml.tmpl
 
 jobs:
   # Check if the last commit was from the bot to prevent infinite loops in

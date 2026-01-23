@@ -38,6 +38,13 @@ jobs:
           path: clingwrap
           fetch-depth: 0
 
+      - name: Checkout the cloudgood repository
+        uses: actions/checkout@v4
+        with:
+          repository: shakenfist/cloudgood
+          path: clingwrap
+          fetch-depth: 0
+
       - name: Checkout the kerbside repository
         uses: actions/checkout@v4
         with:

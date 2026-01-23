@@ -1,0 +1,62 @@
+# Skip workflow for docs-only PRs and merge queue entries
+#
+# This workflow provides the required "Can enqueue" and "Can merge" checks for
+# PRs and merge queue entries that only modify documentation files. Without
+# this, docs-only changes would have perpetually pending status checks because
+# the main functional-tests.yml workflow uses paths-ignore to skip running.
+#
+# IMPORTANT: The paths list below must be kept in sync with the paths-ignore
+# list in functional-tests.yml. If you add or remove paths from one file,
+# update the other file to match.
+
+name: Functional tests
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - v*-releases
+    paths:
+      - 'docs/**'
+      - mkdocs.yml
+      - mkdocs.yml.tmpl
+  merge_group:
+
+jobs:
+  # Check if only docs files changed. For pull_request events this is
+  # redundant (we already filtered by paths), but for merge_group events
+  # we need to check explicitly since merge_group doesn't support path filters.
+  check_paths:
+    name: "Check paths"
+    runs-on: [self-hosted, static]
+    outputs:
+      code_changed: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # Check if any non-docs files changed. If code == 'false', only docs
+          # changed and we can skip the functional tests.
+          filters: |
+            code:
+              - '**'
+              - '!docs/**'
+              - '!mkdocs.yml'
+              - '!mkdocs.yml.tmpl'
+
+  can_enqueue:
+    name: "Can enqueue"
+    needs: check_paths
+    if: github.event_name == 'pull_request'
+    runs-on: [self-hosted, static]
+    steps:
+      - run: echo "Skipping functional tests - docs only change"
+
+  can_merge:
+    name: "Can merge"
+    needs: check_paths
+    if: github.event_name == 'merge_group' && needs.check_paths.outputs.code_changed == 'false'
+    runs-on: [self-hosted, static]
+    steps:
+      - run: echo "Skipping functional tests - docs only change"
