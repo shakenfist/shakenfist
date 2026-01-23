@@ -367,11 +367,20 @@ Even with hardware-assisted CPU virtualization, device emulation remains a bottl
 
 Virtio, developed for use with KVM (but now used by other hypervisors too), takes the paravirtualization approach for devices. Instead of emulating real hardware, virtio defines a simple, efficient interface specifically designed for hypervisor-to-guest communication:
 
-- **virtio-net**: Paravirtualized network card
-- **virtio-blk**: Paravirtualized block device (disk)
-- **virtio-scsi**: Paravirtualized SCSI controller
-- **virtio-gpu**: Paravirtualized graphics
-- **virtio-fs**: Paravirtualized filesystem sharing
+`virtio-net`
+:   Paravirtualized network card for efficient packet transmission between guest and host.
+
+`virtio-blk`
+:   Paravirtualized block device for disk I/O with minimal overhead.
+
+`virtio-scsi`
+:   Paravirtualized SCSI controller supporting advanced features like TRIM and multiqueue.
+
+`virtio-gpu`
+:   Paravirtualized graphics for 2D/3D acceleration without full GPU emulation.
+
+`virtio-fs`
+:   Paravirtualized filesystem sharing between host and guest using FUSE.
 
 The virtio interface uses shared memory queues ("virtqueues") for communication. The guest places requests in a queue, notifies the hypervisor with a single write, and the hypervisor processes them and places responses in a return queue. This is far more efficient than emulating hundreds of register accesses for a single I/O operation.
 
@@ -768,27 +777,55 @@ A few other hypervisors are worth mentioning:
 
 If you're on a Linux system and want to know what hypervisor you're running under (if any):
 
-```bash
-# Check if you're in a VM and what type
-systemd-detect-virt
+=== "systemd-detect-virt"
 
-# More detailed information
-hostnamectl | grep -i virtualization
+    The simplest method on systems with systemd:
 
-# Or check DMI data directly
-cat /sys/class/dmi/id/product_name
-cat /sys/class/dmi/id/sys_vendor
-```
+    ```bash
+    systemd-detect-virt
+    ```
 
-Common outputs:
+    Returns the hypervisor name or `none` for bare metal.
 
-- `kvm` - Running under KVM/QEMU
-- `microsoft` - Hyper-V
-- `vmware` - VMware
-- `xen` - Xen
-- `oracle` - VirtualBox
-- `amazon` - AWS Nitro
-- `none` - Bare metal (no hypervisor detected)
+=== "hostnamectl"
+
+    Shows virtualization info along with other system details:
+
+    ```bash
+    hostnamectl | grep -i virtualization
+    ```
+
+=== "DMI data"
+
+    Check the hardware identification directly:
+
+    ```bash
+    cat /sys/class/dmi/id/product_name
+    cat /sys/class/dmi/id/sys_vendor
+    ```
+
+Common outputs from these commands:
+
+`kvm`
+:   Running under KVM/QEMU
+
+`microsoft`
+:   Hyper-V
+
+`vmware`
+:   VMware
+
+`xen`
+:   Xen
+
+`oracle`
+:   VirtualBox
+
+`amazon`
+:   AWS Nitro
+
+`none`
+:   Bare metal (no hypervisor detected)
 
 ## Conclusion
 
@@ -820,3 +857,5 @@ If you're building or operating virtualized infrastructure today, the most impor
 For performance, always use virtio devices for disk and network unless you have a specific compatibility requirement -- the performance difference compared to emulated hardware is substantial. Understanding your workload matters too; long-running server VMs, serverless functions, and container isolation have different requirements, and the right virtualization approach depends on what you're actually running.
 
 It's worth keeping an eye on the DPU space. Hardware offload is coming to mainstream infrastructure, and even if you're not ready to deploy DPUs today, understanding the architecture will help you evaluate future options. That said, don't over-engineer: for most workloads, standard KVM/QEMU with virtio devices and a sensible management layer (Proxmox, OpenStack, or even just libvirt) is perfectly adequate. The exotic optimizations we discussed are for hyperscale environments with hyperscale problems.
+
+--8<-- "docs-include/abbreviations.md"
