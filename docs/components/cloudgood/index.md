@@ -17,8 +17,11 @@ Specific contributions are noted in commit messages.
 
 !!! note
 
-    This work is licensed under
-    [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/).
+    Please note that unlike the rest of the Shaken Fist projects, this work
+    is licensed under
+    [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/)
+    license, which seemed more appropriate for a "book like" work than the
+    usual Apache2.
 
 This document is also by definition Linux specific, and to a large
 extent x86 specific. This is because this is where my own experience lies.
