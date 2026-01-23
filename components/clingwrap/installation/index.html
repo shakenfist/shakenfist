@@ -3304,26 +3304,26 @@
   
 
 
-<h1 id="installation">Installation</h1>
-<h2 id="requirements">Requirements</h2>
+<h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Python 3.7 or later</li>
 <li>pip (Python package installer)</li>
 </ul>
-<h2 id="installing-from-pypi">Installing from PyPI</h2>
+<h2 id="installing-from-pypi">Installing from PyPI<a class="headerlink" href="#installing-from-pypi" title="Permanent link">&para;</a></h2>
 <p>The simplest way to install clingwrap is from PyPI:</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>clingwrap
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>clingwrap
 </code></pre></div>
-<h2 id="installing-from-source">Installing from Source</h2>
+<h2 id="installing-from-source">Installing from Source<a class="headerlink" href="#installing-from-source" title="Permanent link">&para;</a></h2>
 <p>To install from source, clone the repository and install using pip:</p>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/shakenfist/clingwrap.git
-<span class="nb">cd</span><span class="w"> </span>clingwrap
-pip<span class="w"> </span>install<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/shakenfist/clingwrap.git
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>clingwrap
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pip<span class="w"> </span>install<span class="w"> </span>.
 </code></pre></div>
 <p>For development installations with editable mode:</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 </code></pre></div>
-<h2 id="dependencies">Dependencies</h2>
+<h2 id="dependencies">Dependencies<a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h2>
 <p>Clingwrap has the following runtime dependencies (installed automatically):</p>
 <table>
 <thead>
@@ -3356,9 +3356,9 @@ pip<span class="w"> </span>install<span class="w"> </span>.
 </tr>
 </tbody>
 </table>
-<h2 id="development-dependencies">Development Dependencies</h2>
+<h2 id="development-dependencies">Development Dependencies<a class="headerlink" href="#development-dependencies" title="Permanent link">&para;</a></h2>
 <p>For running tests and development work, install the test dependencies:</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>clingwrap<span class="o">[</span>test<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span>clingwrap<span class="o">[</span>test<span class="o">]</span>
 </code></pre></div>
 <p>This installs additional packages:</p>
 <table>
@@ -3395,12 +3395,12 @@ pip<span class="w"> </span>install<span class="w"> </span>.
 </tr>
 </tbody>
 </table>
-<h2 id="verifying-installation">Verifying Installation</h2>
+<h2 id="verifying-installation">Verifying Installation<a class="headerlink" href="#verifying-installation" title="Permanent link">&para;</a></h2>
 <p>After installation, verify clingwrap is available:</p>
-<div class="highlight"><pre><span></span><code>clingwrap<span class="w"> </span>--help
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>clingwrap<span class="w"> </span>--help
 </code></pre></div>
 <p>You should see output showing the available commands and options.</p>
-<h2 id="permissions">Permissions</h2>
+<h2 id="permissions">Permissions<a class="headerlink" href="#permissions" title="Permanent link">&para;</a></h2>
 <p>Clingwrap collects system information, which may require elevated privileges
 depending on what you want to collect. Common scenarios requiring root or sudo:</p>
 <ul>
@@ -3410,7 +3410,7 @@ depending on what you want to collect. Common scenarios requiring root or sudo:<
 <li>Executing privileged commands (e.g., <code>iptables</code>, <code>etcdctl</code>)</li>
 </ul>
 <p>Run with appropriate permissions based on your collection requirements:</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>clingwrap<span class="w"> </span>gather<span class="w"> </span>--target<span class="w"> </span>myconfig.cwd<span class="w"> </span>--output<span class="w"> </span>debug.zip
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sudo<span class="w"> </span>clingwrap<span class="w"> </span>gather<span class="w"> </span>--target<span class="w"> </span>myconfig.cwd<span class="w"> </span>--output<span class="w"> </span>debug.zip
 </code></pre></div>
 
 

@@ -3248,7 +3248,7 @@
   
 
 
-<h1 id="installing-shaken-fist">Installing Shaken Fist</h1>
+<h1 id="installing-shaken-fist">Installing Shaken Fist<a class="headerlink" href="#installing-shaken-fist" title="Permanent link">&para;</a></h1>
 <p>The purpose of this guide is to walk you through a Shaken Fist installation. Shaken Fist will work just fine on a single machine, although its also happy to run on clusters of machines. We'll discuss the general guidance for install options as we go.</p>
 <p>Shaken Fist only supports Ubuntu 24.04, and Debian 12, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. Bug reports are welcome if you have any issues, and may be filed at <a href="https://github.com/shakenfist/shakenfist/issues">https://github.com/shakenfist/shakenfist/issues</a></p>
 <details class="note" open="open">
@@ -3265,20 +3265,20 @@ in v0.8.</p>
 <li>Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement, although the exact username is configurable in the SSH_USER variable.</li>
 </ul>
 <p>We now have a fancy helper to help you install your first cluster, so let's give that a go:</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>https://raw.githubusercontent.com/shakenfist/shakenfist/develop/deploy/getsf<span class="w"> </span>-o<span class="w"> </span>getsf
-chmod<span class="w"> </span>ugo+rx<span class="w"> </span>getsf
-sudo<span class="w"> </span>./getsf
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>https://raw.githubusercontent.com/shakenfist/shakenfist/develop/deploy/getsf<span class="w"> </span>-o<span class="w"> </span>getsf
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>chmod<span class="w"> </span>ugo+rx<span class="w"> </span>getsf
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>sudo<span class="w"> </span>./getsf
 </code></pre></div>
 <p>This script will then walk you through the installation steps, asking questions as you go. The script leaves you with an installer configuration at <code>/root/sf-deploy</code>, which is the basis for later upgrades and cluster expansions.</p>
 <p>You can script the answers to <code>getsf</code> by setting environment variables. For example:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_FLOATING_BLOCK</span><span class="o">=</span><span class="m">192</span>.168.10.0/24
-<span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_DEPLOY_NAME</span><span class="o">=</span>bonkerslab
-<span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_RELEASE</span><span class="o">=</span>pre-release
-<span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_NODES</span><span class="o">=</span>localhost
-<span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_WARNING</span><span class="o">=</span>yes
-sudo<span class="w"> </span>--preserve-env<span class="w"> </span>./getsf
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_FLOATING_BLOCK</span><span class="o">=</span><span class="m">192</span>.168.10.0/24
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_DEPLOY_NAME</span><span class="o">=</span>bonkerslab
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_RELEASE</span><span class="o">=</span>pre-release
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_NODES</span><span class="o">=</span>localhost
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_WARNING</span><span class="o">=</span>yes
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>sudo<span class="w"> </span>--preserve-env<span class="w"> </span>./getsf
 </code></pre></div>
-<h2 id="notes-for-multi-node-installations">Notes for multi-node installations</h2>
+<h2 id="notes-for-multi-node-installations">Notes for multi-node installations<a class="headerlink" href="#notes-for-multi-node-installations" title="Permanent link">&para;</a></h2>
 <p>Not every node needs to be an etcd_master. I'd select three in most situations. One node must be marked as the primary node, and one must be marked as the network node. It is not currently supported having more than one of each of those node types.</p>
 <ul>
 <li>The primary node runs an apache load balancer across the API servers in the cluster, and therefore needs to be accessable to your users on HTTP and HTTPS.</li>
@@ -3286,63 +3286,63 @@ sudo<span class="w"> </span>--preserve-env<span class="w"> </span>./getsf
 </ul>
 <p>Some of the considerations here can be subtle. Please reach out if you need a hand.</p>
 <p><code>getsf</code> writes a configuration file called <code>sf-deploy</code>. For a more complicated installation, <code>sf-deploy</code> might like this:</p>
-<div class="highlight"><pre><span></span><code>#!/bin/bash
-
-export ADMIN_PASSWORD=engeeF1o
-export FLOATING_IP_BLOCK=&quot;192.168.10.0/24&quot;
-export DEPLOY_NAME=&quot;bonkerslab&quot;
-export SSH_USER=&quot;cloudadmin&quot;
-export SSH_KEY_FILENAME=&quot;/root/.ssh/id_rsa&quot;
-
-export KSM_ENABLED=1
-
-# Topology is in JSON (the || true handles read&#39;s exit code with heredocs)
-read -r -d &#39;&#39; TOPOLOGY &lt;&lt;&#39;EOF&#39; || true
-[
-  {
-    &quot;name&quot;: &quot;sf-primary&quot;,
-    &quot;node_egress_ip&quot;: &quot;192.168.1.50&quot;,
-    &quot;node_egress_nic&quot;: &quot;enp0s31f6&quot;,
-    &quot;node_mesh_ip&quot;: &quot;192.168.21.50&quot;,
-    &quot;node_mesh_nic&quot;: &quot;enp0s31f6:1&quot;,
-    &quot;primary_node&quot;: true,
-    &quot;api_url&quot;: &quot;https://...your...install...here.com/api&quot;
-  },
-  {
-    &quot;name&quot;: &quot;sf-1&quot;,
-    &quot;node_egress_ip&quot;: &quot;192.168.1.51&quot;,
-    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
-    &quot;node_mesh_ip&quot;: &quot;192.168.21.51&quot;,
-    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
-    &quot;etcd_master&quot;: true,
-    &quot;network_node&quot;: true,
-    &quot;hypervisor&quot;: true
-  },
-  {
-    &quot;name&quot;: &quot;sf-2&quot;,
-    &quot;node_egress_ip&quot;: &quot;192.168.1.52&quot;,
-    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
-    &quot;node_mesh_ip&quot;: &quot;192.168.21.52&quot;,
-    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
-    &quot;etcd_master&quot;: true,
-    &quot;hypervisor&quot;: true
-  },
-  {
-    &quot;name&quot;: &quot;sf-3&quot;,
-    &quot;node_egress_ip&quot;: &quot;192.168.1.53&quot;,
-    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
-    &quot;node_mesh_ip&quot;: &quot;192.168.21.53&quot;,
-    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
-    &quot;etcd_master&quot;: true,
-    &quot;hypervisor&quot;: true
-  },
-]
-EOF
-export TOPOLOGY
-
-/srv/shakenfist/venv/share/shakenfist/installer/install
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>#!/bin/bash
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>export ADMIN_PASSWORD=engeeF1o
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>export FLOATING_IP_BLOCK=&quot;192.168.10.0/24&quot;
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>export DEPLOY_NAME=&quot;bonkerslab&quot;
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>export SSH_USER=&quot;cloudadmin&quot;
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>export SSH_KEY_FILENAME=&quot;/root/.ssh/id_rsa&quot;
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>export KSM_ENABLED=1
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a># Topology is in JSON (the || true handles read&#39;s exit code with heredocs)
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>read -r -d &#39;&#39; TOPOLOGY &lt;&lt;&#39;EOF&#39; || true
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>[
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>  {
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    &quot;name&quot;: &quot;sf-primary&quot;,
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    &quot;node_egress_ip&quot;: &quot;192.168.1.50&quot;,
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    &quot;node_egress_nic&quot;: &quot;enp0s31f6&quot;,
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    &quot;node_mesh_ip&quot;: &quot;192.168.21.50&quot;,
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>    &quot;node_mesh_nic&quot;: &quot;enp0s31f6:1&quot;,
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>    &quot;primary_node&quot;: true,
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>    &quot;api_url&quot;: &quot;https://...your...install...here.com/api&quot;
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>  },
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>  {
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>    &quot;name&quot;: &quot;sf-1&quot;,
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>    &quot;node_egress_ip&quot;: &quot;192.168.1.51&quot;,
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>    &quot;node_mesh_ip&quot;: &quot;192.168.21.51&quot;,
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>    &quot;etcd_master&quot;: true,
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>    &quot;network_node&quot;: true,
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>    &quot;hypervisor&quot;: true
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>  },
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>  {
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>    &quot;name&quot;: &quot;sf-2&quot;,
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>    &quot;node_egress_ip&quot;: &quot;192.168.1.52&quot;,
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
+<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>    &quot;node_mesh_ip&quot;: &quot;192.168.21.52&quot;,
+<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
+<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a>    &quot;etcd_master&quot;: true,
+<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>    &quot;hypervisor&quot;: true
+<a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a>  },
+<a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>  {
+<a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>    &quot;name&quot;: &quot;sf-3&quot;,
+<a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a>    &quot;node_egress_ip&quot;: &quot;192.168.1.53&quot;,
+<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a>    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
+<a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a>    &quot;node_mesh_ip&quot;: &quot;192.168.21.53&quot;,
+<a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a>    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
+<a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a>    &quot;etcd_master&quot;: true,
+<a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a>    &quot;hypervisor&quot;: true
+<a id="__codelineno-2-50" name="__codelineno-2-50" href="#__codelineno-2-50"></a>  },
+<a id="__codelineno-2-51" name="__codelineno-2-51" href="#__codelineno-2-51"></a>]
+<a id="__codelineno-2-52" name="__codelineno-2-52" href="#__codelineno-2-52"></a>EOF
+<a id="__codelineno-2-53" name="__codelineno-2-53" href="#__codelineno-2-53"></a>export TOPOLOGY
+<a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a>
+<a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a>/srv/shakenfist/venv/share/shakenfist/installer/install
 </code></pre></div>
-<h2 id="your-first-instance">Your first instance</h2>
+<h2 id="your-first-instance">Your first instance<a class="headerlink" href="#your-first-instance" title="Permanent link">&para;</a></h2>
 <p>Before you can start your first instance you'll need to authenticate to Shaken Fist, and create a network. Shaken Fist's python api client (as used by the command line client) looks for authentication details in the following locations:</p>
 <ul>
 <li>Command line flags</li>
@@ -3358,64 +3358,64 @@ It is customized per installation, setting the following variables:</p>
 <li><strong>SHAKENFIST_API_URL</strong>, a URL to the Shaken Fist API server</li>
 </ul>
 <p>Before interacting with Shaken Fist, we need to source the rc file.</p>
-<div class="highlight"><pre><span></span><code>.<span class="w"> </span>/etc/sf/sfrc
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>.<span class="w"> </span>/etc/sf/sfrc
 </code></pre></div>
 <p>Instances must be launched attached to a network.</p>
 <p>Create your first network:
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.42.0/24
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.42.0/24
 </code></pre></div></p>
 <p>You can get help for the command line client by running <code>`sf-client --help</code>. The above command creates a new network called "mynet", with the IP block 192.168.42.0/24. You will receive some descriptive output back:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.42.0/24
-uuid<span class="w">            </span>:<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
-name<span class="w">            </span>:<span class="w"> </span>mynet
-vxlan<span class="w"> </span>id<span class="w">        </span>:<span class="w"> </span><span class="m">2</span>
-netblock<span class="w">        </span>:<span class="w"> </span><span class="m">192</span>.168.42.0/24
-provide<span class="w"> </span>dhcp<span class="w">    </span>:<span class="w"> </span>True
-provide<span class="w"> </span>nat<span class="w">     </span>:<span class="w"> </span>True
-floating<span class="w"> </span>gateway:<span class="w"> </span>None
-namespace<span class="w">       </span>:<span class="w"> </span>system
-state<span class="w">           </span>:<span class="w"> </span>initial
-
-Metadata:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>$<span class="w"> </span>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.42.0/24
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>uuid<span class="w">            </span>:<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>name<span class="w">            </span>:<span class="w"> </span>mynet
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>vxlan<span class="w"> </span>id<span class="w">        </span>:<span class="w"> </span><span class="m">2</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>netblock<span class="w">        </span>:<span class="w"> </span><span class="m">192</span>.168.42.0/24
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>provide<span class="w"> </span>dhcp<span class="w">    </span>:<span class="w"> </span>True
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>provide<span class="w"> </span>nat<span class="w">     </span>:<span class="w"> </span>True
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>floating<span class="w"> </span>gateway:<span class="w"> </span>None
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>namespace<span class="w">       </span>:<span class="w"> </span>system
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>state<span class="w">           </span>:<span class="w"> </span>initial
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>Metadata:
 </code></pre></div>
 <p>The UUID is important, as that is how we will refer to the network elsewhere. Let's now create a simple first instance (you'll need to change this to use your actual network UUID):</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myvm<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">1024</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span>-n<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
-uuid<span class="w">        </span>:<span class="w"> </span>c6c4ba94-ed34-497d-8964-c223489dee3e
-name<span class="w">        </span>:<span class="w"> </span>myvm
-namespace<span class="w">   </span>:<span class="w"> </span>system
-cpus<span class="w">        </span>:<span class="w"> </span><span class="m">1</span>
-memory<span class="w">      </span>:<span class="w"> </span><span class="m">1024</span>
-disk<span class="w"> </span>spec<span class="w">   </span>:<span class="w"> </span><span class="nv">type</span><span class="o">=</span>disk<span class="w">   </span><span class="nv">bus</span><span class="o">=</span>None<span class="w">  </span><span class="nv">size</span><span class="o">=</span><span class="m">8</span><span class="w">   </span><span class="nv">base</span><span class="o">=</span>cirros
-video<span class="w">       </span>:<span class="w"> </span><span class="nv">model</span><span class="o">=</span>cirrus<span class="w">  </span><span class="nv">memory</span><span class="o">=</span><span class="m">16384</span>
-node<span class="w">        </span>:<span class="w"> </span>marvin
-power<span class="w"> </span>state<span class="w"> </span>:<span class="w"> </span>on
-state<span class="w">       </span>:<span class="w"> </span>created
-console<span class="w"> </span>port:<span class="w"> </span><span class="m">31839</span>
-vdi<span class="w"> </span>port<span class="w">    </span>:<span class="w"> </span><span class="m">34442</span>
-
-ssh<span class="w"> </span>key<span class="w">     </span>:<span class="w"> </span>None
-user<span class="w"> </span>data<span class="w">   </span>:<span class="w"> </span>None
-
-Metadata:
-
-Interfaces:
-
-<span class="w">    </span>uuid<span class="w">    </span>:<span class="w"> </span>e56b3c7b-8056-4645-b5b5-1779721ff21d
-<span class="w">    </span>network<span class="w"> </span>:<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
-<span class="w">    </span>macaddr<span class="w"> </span>:<span class="w"> </span>ae:15:4d:9c:d8:c0
-<span class="w">    </span>order<span class="w">   </span>:<span class="w"> </span><span class="m">0</span>
-<span class="w">    </span>ipv4<span class="w">    </span>:<span class="w"> </span><span class="m">192</span>.168.42.76
-<span class="w">    </span>floating:<span class="w"> </span>None
-<span class="w">    </span>model<span class="w">   </span>:<span class="w"> </span>virtio
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>$<span class="w"> </span>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myvm<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">1024</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span>-n<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>uuid<span class="w">        </span>:<span class="w"> </span>c6c4ba94-ed34-497d-8964-c223489dee3e
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>name<span class="w">        </span>:<span class="w"> </span>myvm
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>namespace<span class="w">   </span>:<span class="w"> </span>system
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>cpus<span class="w">        </span>:<span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>memory<span class="w">      </span>:<span class="w"> </span><span class="m">1024</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>disk<span class="w"> </span>spec<span class="w">   </span>:<span class="w"> </span><span class="nv">type</span><span class="o">=</span>disk<span class="w">   </span><span class="nv">bus</span><span class="o">=</span>None<span class="w">  </span><span class="nv">size</span><span class="o">=</span><span class="m">8</span><span class="w">   </span><span class="nv">base</span><span class="o">=</span>cirros
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>video<span class="w">       </span>:<span class="w"> </span><span class="nv">model</span><span class="o">=</span>cirrus<span class="w">  </span><span class="nv">memory</span><span class="o">=</span><span class="m">16384</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>node<span class="w">        </span>:<span class="w"> </span>marvin
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>power<span class="w"> </span>state<span class="w"> </span>:<span class="w"> </span>on
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>state<span class="w">       </span>:<span class="w"> </span>created
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>console<span class="w"> </span>port:<span class="w"> </span><span class="m">31839</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>vdi<span class="w"> </span>port<span class="w">    </span>:<span class="w"> </span><span class="m">34442</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>ssh<span class="w"> </span>key<span class="w">     </span>:<span class="w"> </span>None
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>user<span class="w"> </span>data<span class="w">   </span>:<span class="w"> </span>None
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>Metadata:
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>Interfaces:
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="w">    </span>uuid<span class="w">    </span>:<span class="w"> </span>e56b3c7b-8056-4645-b5b5-1779721ff21d
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="w">    </span>network<span class="w"> </span>:<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="w">    </span>macaddr<span class="w"> </span>:<span class="w"> </span>ae:15:4d:9c:d8:c0
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a><span class="w">    </span>order<span class="w">   </span>:<span class="w"> </span><span class="m">0</span>
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="w">    </span>ipv4<span class="w">    </span>:<span class="w"> </span><span class="m">192</span>.168.42.76
+<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a><span class="w">    </span>floating:<span class="w"> </span>None
+<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a><span class="w">    </span>model<span class="w">   </span>:<span class="w"> </span>virtio
 </code></pre></div>
 <p>Probably the easiest way to interact with this instance is to connect to its console port, which is the serial console of the instance over telnet. In the case above, that is available on port 31829 on localhost (my laptop is called marvin).</p>
-<h3 id="other-caveats">Other caveats</h3>
+<h3 id="other-caveats">Other caveats<a class="headerlink" href="#other-caveats" title="Permanent link">&para;</a></h3>
 <p>The installer will also enforce the following sanity checks:</p>
 <ul>
 <li>That KVM will operate on your machines. This is generally fine unless you're using virtual machines at which point nested virtualization needs to be enabled.</li>
 <li>That your network interface MTU is greater than 2,000 bytes. This is required because the VXLAN mesh our virtual networks use add overhead to packets and a standard MTU of 1500 bytes for the physical network will result in packets being fragmented too frequently on the virtual networks. You can set a higher MTU if you desire, I generally select 9,000 bytes.</li>
 </ul>
-<h3 id="deployment-variables">Deployment variables</h3>
+<h3 id="deployment-variables">Deployment variables<a class="headerlink" href="#deployment-variables" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>

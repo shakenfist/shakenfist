@@ -3638,10 +3638,10 @@
   
 
 
-<h1 id="command-reference">Command Reference</h1>
+<h1 id="command-reference">Command Reference<a class="headerlink" href="#command-reference" title="Permanent link">&para;</a></h1>
 <p>This document provides a complete reference for Occy Strap's command-line
 interface.</p>
-<h2 id="global-options">Global Options</h2>
+<h2 id="global-options">Global Options<a class="headerlink" href="#global-options" title="Permanent link">&para;</a></h2>
 <p>These options apply to all commands and must be specified before the command
 name:</p>
 <table>
@@ -3691,13 +3691,13 @@ name:</p>
 </tbody>
 </table>
 <p>Example:</p>
-<div class="highlight"><pre><span></span><code>occystrap<span class="w"> </span>--verbose<span class="w"> </span>--architecture<span class="w"> </span>arm64<span class="w"> </span>--variant<span class="w"> </span>v8<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span>tar://busybox.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>occystrap<span class="w"> </span>--verbose<span class="w"> </span>--architecture<span class="w"> </span>arm64<span class="w"> </span>--variant<span class="w"> </span>v8<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span>tar://busybox.tar
 </code></pre></div>
-<h2 id="commands">Commands</h2>
-<h3 id="process">process</h3>
+<h2 id="commands">Commands<a class="headerlink" href="#commands" title="Permanent link">&para;</a></h2>
+<h3 id="process">process<a class="headerlink" href="#process" title="Permanent link">&para;</a></h3>
 <p>The primary command for processing container images through the pipeline.</p>
-<div class="highlight"><pre><span></span><code>occystrap<span class="w"> </span>process<span class="w"> </span>SOURCE<span class="w"> </span>DESTINATION<span class="w"> </span><span class="o">[</span>-f<span class="w"> </span>FILTER<span class="o">]</span>...
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>SOURCE<span class="w"> </span>DESTINATION<span class="w"> </span><span class="o">[</span>-f<span class="w"> </span>FILTER<span class="o">]</span>...
 </code></pre></div>
 <p><strong>Arguments:</strong></p>
 <ul>
@@ -3706,19 +3706,19 @@ name:</p>
 <li><code>-f FILTER</code> - Optional filter(s) to apply (can be specified multiple times)</li>
 </ul>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Registry to tarball</span>
-occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span>tar://busybox.tar
-
-<span class="c1"># Registry to directory with filters</span>
-occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/python:3.11<span class="w"> </span>dir://python<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/__pycache__/**&quot;</span>
-
-<span class="c1"># Docker daemon to registry</span>
-occystrap<span class="w"> </span>process<span class="w"> </span>docker://myimage:v1<span class="w"> </span>registry://myregistry.com/myimage:v1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Registry to tarball</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span>tar://busybox.tar
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Registry to directory with filters</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/python:3.11<span class="w"> </span>dir://python<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/__pycache__/**&quot;</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Docker daemon to registry</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>occystrap<span class="w"> </span>process<span class="w"> </span>docker://myimage:v1<span class="w"> </span>registry://myregistry.com/myimage:v1
 </code></pre></div>
-<h3 id="search">search</h3>
+<h3 id="search">search<a class="headerlink" href="#search" title="Permanent link">&para;</a></h3>
 <p>Search for files within container image layers.</p>
-<div class="highlight"><pre><span></span><code>occystrap<span class="w"> </span>search<span class="w"> </span>SOURCE<span class="w"> </span>PATTERN<span class="w"> </span><span class="o">[</span>--regex<span class="o">]</span><span class="w"> </span><span class="o">[</span>--script-friendly<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>occystrap<span class="w"> </span>search<span class="w"> </span>SOURCE<span class="w"> </span>PATTERN<span class="w"> </span><span class="o">[</span>--regex<span class="o">]</span><span class="w"> </span><span class="o">[</span>--script-friendly<span class="o">]</span>
 </code></pre></div>
 <p><strong>Arguments:</strong></p>
 <ul>
@@ -3731,19 +3731,19 @@ occystrap<span class="w"> </span>process<span class="w"> </span>docker://myimage
 <li><code>--script-friendly</code> - Output in machine-parseable format</li>
 </ul>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Search for shell binaries</span>
-occystrap<span class="w"> </span>search<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="s2">&quot;bin/*sh&quot;</span>
-
-<span class="c1"># Search with regex</span>
-occystrap<span class="w"> </span>search<span class="w"> </span>--regex<span class="w"> </span>docker://python:3.11<span class="w"> </span><span class="s2">&quot;.*\.py</span>$<span class="s2">&quot;</span>
-
-<span class="c1"># Machine-parseable output</span>
-occystrap<span class="w"> </span>search<span class="w"> </span>--script-friendly<span class="w"> </span>tar://image.tar<span class="w"> </span><span class="s2">&quot;*.conf&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Search for shell binaries</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>occystrap<span class="w"> </span>search<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="s2">&quot;bin/*sh&quot;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Search with regex</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>occystrap<span class="w"> </span>search<span class="w"> </span>--regex<span class="w"> </span>docker://python:3.11<span class="w"> </span><span class="s2">&quot;.*\.py</span>$<span class="s2">&quot;</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Machine-parseable output</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>occystrap<span class="w"> </span>search<span class="w"> </span>--script-friendly<span class="w"> </span>tar://image.tar<span class="w"> </span><span class="s2">&quot;*.conf&quot;</span>
 </code></pre></div>
-<h2 id="input-uri-schemes">Input URI Schemes</h2>
-<h3 id="registry">registry://</h3>
+<h2 id="input-uri-schemes">Input URI Schemes<a class="headerlink" href="#input-uri-schemes" title="Permanent link">&para;</a></h2>
+<h3 id="registry">registry://<a class="headerlink" href="#registry" title="Permanent link">&para;</a></h3>
 <p>Fetch images from Docker/OCI registries via HTTP API.</p>
-<div class="highlight"><pre><span></span><code>registry://[user:pass@]HOST/IMAGE:TAG[?options]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>registry://[user:pass@]HOST/IMAGE:TAG[?options]
 </code></pre></div>
 <p><strong>Query Options:</strong></p>
 <table>
@@ -3773,22 +3773,22 @@ occystrap<span class="w"> </span>search<span class="w"> </span>--script-friendly
 </tbody>
 </table>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Docker Hub</span>
-registry://docker.io/library/busybox:latest
-registry://registry-1.docker.io/library/python:3.11
-
-<span class="c1"># GitHub Container Registry</span>
-registry://ghcr.io/myorg/myimage:v1
-
-<span class="c1"># Private registry</span>
-registry://myregistry.example.com/myproject/myimage:latest
-
-<span class="c1"># With architecture selection</span>
-registry://docker.io/library/busybox:latest?os<span class="o">=</span>linux<span class="p">&amp;</span><span class="nv">arch</span><span class="o">=</span>arm64<span class="p">&amp;</span><span class="nv">variant</span><span class="o">=</span>v8
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Docker Hub</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>registry://docker.io/library/busybox:latest
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>registry://registry-1.docker.io/library/python:3.11
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># GitHub Container Registry</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>registry://ghcr.io/myorg/myimage:v1
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="c1"># Private registry</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>registry://myregistry.example.com/myproject/myimage:latest
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="c1"># With architecture selection</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>registry://docker.io/library/busybox:latest?os<span class="o">=</span>linux<span class="p">&amp;</span><span class="nv">arch</span><span class="o">=</span>arm64<span class="p">&amp;</span><span class="nv">variant</span><span class="o">=</span>v8
 </code></pre></div>
-<h3 id="docker">docker://</h3>
+<h3 id="docker">docker://<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h3>
 <p>Fetch images from the local Docker or Podman daemon.</p>
-<div class="highlight"><pre><span></span><code>docker://IMAGE:TAG[?socket=/path/to/socket]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>docker://IMAGE:TAG[?socket=/path/to/socket]
 </code></pre></div>
 <p><strong>Query Options:</strong></p>
 <table>
@@ -3806,32 +3806,32 @@ registry://docker.io/library/busybox:latest?os<span class="o">=</span>linux<span
 </tbody>
 </table>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Docker daemon (default socket)</span>
-docker://myimage:v1
-
-<span class="c1"># Podman (rootful)</span>
-docker://myimage:v1?socket<span class="o">=</span>/run/podman/podman.sock
-
-<span class="c1"># Podman (rootless)</span>
-docker://myimage:v1?socket<span class="o">=</span>/run/user/1000/podman/podman.sock
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Docker daemon (default socket)</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>docker://myimage:v1
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Podman (rootful)</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>docker://myimage:v1?socket<span class="o">=</span>/run/podman/podman.sock
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># Podman (rootless)</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>docker://myimage:v1?socket<span class="o">=</span>/run/user/1000/podman/podman.sock
 </code></pre></div>
-<h3 id="tar">tar://</h3>
+<h3 id="tar">tar://<a class="headerlink" href="#tar" title="Permanent link">&para;</a></h3>
 <p>Read images from docker-save format tarballs.</p>
-<div class="highlight"><pre><span></span><code>tar:///path/to/file.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>tar:///path/to/file.tar
 </code></pre></div>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code>tar:///home/user/images/busybox.tar
-tar://./local-image.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>tar:///home/user/images/busybox.tar
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>tar://./local-image.tar
 </code></pre></div>
-<h2 id="output-uri-schemes">Output URI Schemes</h2>
-<h3 id="tar_1">tar://</h3>
+<h2 id="output-uri-schemes">Output URI Schemes<a class="headerlink" href="#output-uri-schemes" title="Permanent link">&para;</a></h2>
+<h3 id="tar_1">tar://<a class="headerlink" href="#tar_1" title="Permanent link">&para;</a></h3>
 <p>Create docker-loadable tarballs (v1.2 format).</p>
-<div class="highlight"><pre><span></span><code>tar:///path/to/output.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>tar:///path/to/output.tar
 </code></pre></div>
 <p>The resulting tarball can be loaded with <code>docker load -i output.tar</code>.</p>
-<h3 id="dir">dir://</h3>
+<h3 id="dir">dir://<a class="headerlink" href="#dir" title="Permanent link">&para;</a></h3>
 <p>Extract images to a directory.</p>
-<div class="highlight"><pre><span></span><code>dir:///path/to/directory[?options]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>dir:///path/to/directory[?options]
 </code></pre></div>
 <p><strong>Query Options:</strong></p>
 <table>
@@ -3853,53 +3853,53 @@ tar://./local-image.tar
 </tbody>
 </table>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Simple extraction</span>
-dir://./extracted
-
-<span class="c1"># With layer deduplication (for multiple images)</span>
-dir://./shared?unique_names<span class="o">=</span><span class="nb">true</span>
-
-<span class="c1"># Expanded layers for inspection</span>
-dir://./inspect?expand<span class="o">=</span><span class="nb">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Simple extraction</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>dir://./extracted
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># With layer deduplication (for multiple images)</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>dir://./shared?unique_names<span class="o">=</span><span class="nb">true</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="c1"># Expanded layers for inspection</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>dir://./inspect?expand<span class="o">=</span><span class="nb">true</span>
 </code></pre></div>
-<h3 id="oci">oci://</h3>
+<h3 id="oci">oci://<a class="headerlink" href="#oci" title="Permanent link">&para;</a></h3>
 <p>Create OCI runtime bundles for use with runc.</p>
-<div class="highlight"><pre><span></span><code>oci:///path/to/bundle
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>oci:///path/to/bundle
 </code></pre></div>
 <p>The bundle can be run with <code>runc run &lt;container-id&gt;</code>.</p>
-<h3 id="mounts">mounts://</h3>
+<h3 id="mounts">mounts://<a class="headerlink" href="#mounts" title="Permanent link">&para;</a></h3>
 <p>Create overlay mount-based extraction using extended attributes.</p>
-<div class="highlight"><pre><span></span><code>mounts:///path/to/directory
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>mounts:///path/to/directory
 </code></pre></div>
-<h3 id="docker_1">docker://</h3>
+<h3 id="docker_1">docker://<a class="headerlink" href="#docker_1" title="Permanent link">&para;</a></h3>
 <p>Load images into the local Docker or Podman daemon.</p>
-<div class="highlight"><pre><span></span><code>docker://IMAGE:TAG[?socket=/path/to/socket]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>docker://IMAGE:TAG[?socket=/path/to/socket]
 </code></pre></div>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Load into Docker</span>
-docker://myimage:v1
-
-<span class="c1"># Load into Podman</span>
-docker://myimage:v1?socket<span class="o">=</span>/run/podman/podman.sock
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Load into Docker</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>docker://myimage:v1
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Load into Podman</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>docker://myimage:v1?socket<span class="o">=</span>/run/podman/podman.sock
 </code></pre></div>
-<h3 id="registry_1">registry://</h3>
+<h3 id="registry_1">registry://<a class="headerlink" href="#registry_1" title="Permanent link">&para;</a></h3>
 <p>Push images to Docker/OCI registries.</p>
-<div class="highlight"><pre><span></span><code>registry://HOST/IMAGE:TAG[?insecure=true]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>registry://HOST/IMAGE:TAG[?insecure=true]
 </code></pre></div>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Push to private registry</span>
-registry://myregistry.example.com/myproject/myimage:v1
-
-<span class="c1"># Push with insecure (HTTP)</span>
-registry://internal.local/image:tag?insecure<span class="o">=</span><span class="nb">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Push to private registry</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>registry://myregistry.example.com/myproject/myimage:v1
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Push with insecure (HTTP)</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>registry://internal.local/image:tag?insecure<span class="o">=</span><span class="nb">true</span>
 </code></pre></div>
-<h2 id="filters">Filters</h2>
+<h2 id="filters">Filters<a class="headerlink" href="#filters" title="Permanent link">&para;</a></h2>
 <p>Filters transform or inspect image elements as they pass through the pipeline.
 Multiple filters can be chained using multiple <code>-f</code> options.</p>
-<h3 id="normalize-timestamps">normalize-timestamps</h3>
+<h3 id="normalize-timestamps">normalize-timestamps<a class="headerlink" href="#normalize-timestamps" title="Permanent link">&para;</a></h3>
 <p>Normalize file modification times in layer tarballs for reproducible builds.</p>
-<div class="highlight"><pre><span></span><code>normalize-timestamps
-normalize-timestamps:ts=TIMESTAMP
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>normalize-timestamps
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>normalize-timestamps:ts=TIMESTAMP
 </code></pre></div>
 <p><strong>Options:</strong></p>
 <table>
@@ -3919,15 +3919,15 @@ normalize-timestamps:ts=TIMESTAMP
 <p>When timestamps are normalized, layer SHA256 hashes are recalculated and the
 manifest is updated.</p>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Normalize to Unix epoch</span>
--f<span class="w"> </span>normalize-timestamps
-
-<span class="c1"># Normalize to specific timestamp (Jan 1, 2021)</span>
--f<span class="w"> </span><span class="s2">&quot;normalize-timestamps:ts=1609459200&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Normalize to Unix epoch</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>-f<span class="w"> </span>normalize-timestamps
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="c1"># Normalize to specific timestamp (Jan 1, 2021)</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>-f<span class="w"> </span><span class="s2">&quot;normalize-timestamps:ts=1609459200&quot;</span>
 </code></pre></div>
-<h3 id="search_1">search</h3>
+<h3 id="search_1">search<a class="headerlink" href="#search_1" title="Permanent link">&para;</a></h3>
 <p>Search for files matching a pattern while processing.</p>
-<div class="highlight"><pre><span></span><code>search:pattern=PATTERN[,regex=true][,script_friendly=true]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>search:pattern=PATTERN[,regex=true][,script_friendly=true]
 </code></pre></div>
 <p><strong>Options:</strong></p>
 <table>
@@ -3954,26 +3954,26 @@ manifest is updated.</p>
 </table>
 <p>When used as a filter, search prints matches AND passes elements to the output.</p>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Search while creating tarball</span>
--f<span class="w"> </span><span class="s2">&quot;search:pattern=*.conf&quot;</span>
-
-<span class="c1"># Search with regex</span>
--f<span class="w"> </span><span class="s2">&quot;search:pattern=.*\.py</span>$<span class="s2">,regex=true&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Search while creating tarball</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>-f<span class="w"> </span><span class="s2">&quot;search:pattern=*.conf&quot;</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Search with regex</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>-f<span class="w"> </span><span class="s2">&quot;search:pattern=.*\.py</span>$<span class="s2">,regex=true&quot;</span>
 </code></pre></div>
-<h3 id="exclude">exclude</h3>
+<h3 id="exclude">exclude<a class="headerlink" href="#exclude" title="Permanent link">&para;</a></h3>
 <p>Exclude files matching glob patterns from image layers.</p>
-<div class="highlight"><pre><span></span><code>exclude:pattern=PATTERN[,PATTERN2,...]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>exclude:pattern=PATTERN[,PATTERN2,...]
 </code></pre></div>
 <p>Files matching the patterns are removed from layers. Layer hashes are
 recalculated after modification.</p>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Exclude git directories</span>
--f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**&quot;</span>
-
-<span class="c1"># Exclude multiple patterns</span>
--f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Exclude git directories</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**&quot;</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="c1"># Exclude multiple patterns</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc&quot;</span>
 </code></pre></div>
-<h2 id="legacy-commands">Legacy Commands</h2>
+<h2 id="legacy-commands">Legacy Commands<a class="headerlink" href="#legacy-commands" title="Permanent link">&para;</a></h2>
 <p>The following commands are deprecated but still available for backwards
 compatibility. Use the <code>process</code> and <code>search</code> commands instead.</p>
 <table>

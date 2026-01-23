@@ -3336,8 +3336,8 @@
   
 
 
-<h1 id="development-workflow">Development Workflow</h1>
-<h3 id="short-lesson">Short Lesson</h3>
+<h1 id="development-workflow">Development Workflow<a class="headerlink" href="#development-workflow" title="Permanent link">&para;</a></h1>
+<h3 id="short-lesson">Short Lesson<a class="headerlink" href="#short-lesson" title="Permanent link">&para;</a></h3>
 <p>The majority of teams using git have a work flow that looks similar to the four
 well known work flows:</p>
 <ul>
@@ -3346,10 +3346,10 @@ well known work flows:</p>
 <li><a href="https://about.gitlab.com/blog/2014/09/29/gitlab-flow/">GitLab Flow</a></li>
 <li><a href="https://trunkbaseddevelopment.com/">Trunk Based Development</a></li>
 </ul>
-<h2 id="git-development-the-shaken-fist-way">Git Development - the Shaken Fist Way</h2>
+<h2 id="git-development-the-shaken-fist-way">Git Development - the Shaken Fist Way<a class="headerlink" href="#git-development-the-shaken-fist-way" title="Permanent link">&para;</a></h2>
 <p>The Shaken Fist developers have chosen <strong>Trunk Based Development</strong> with some
 minor tweaks.</p>
-<h2 id="branch-types">Branch Types</h2>
+<h2 id="branch-types">Branch Types<a class="headerlink" href="#branch-types" title="Permanent link">&para;</a></h2>
 <ol>
 <li>
 <p>Branch <code>develop</code></p>
@@ -3380,25 +3380,25 @@ minor tweaks.</p>
 </ul>
 </li>
 </ol>
-<h2 id="process">Process</h2>
-<h3 id="bug-fix-branches">Bug fix branches</h3>
+<h2 id="process">Process<a class="headerlink" href="#process" title="Permanent link">&para;</a></h2>
+<h3 id="bug-fix-branches">Bug fix branches<a class="headerlink" href="#bug-fix-branches" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Bug fix branches have a prefix consisting of the GitHub issue number and the word "bug", for example "bug-XXX".</li>
 <li>You commit should include the text <code>Fixes #XXX</code> where XXX is the GitHub issue number for the bug. It is possible to fix more than one GitHub issue in a single commit.</li>
 </ul>
-<h3 id="feature-branches">Feature branches</h3>
+<h3 id="feature-branches">Feature branches<a class="headerlink" href="#feature-branches" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Feature branches should be named "feature-branch-XXX" where XXX is a short description of the feature.</li>
 <li>The feature branch developers should squash commits to remove WIP commits before creating a Pull Request, but it is acceptable to have a series of incremental changes building up to a complete feature in the feature branch at merge time.</li>
 <li>It is preferable that each remaining commit passes unit testing and CI, but the final state that is merged <em>must</em> pass unit tests and CI.</li>
 </ul>
-<h3 id="merging">Merging</h3>
+<h3 id="merging">Merging<a class="headerlink" href="#merging" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Commits are <strong>not</strong> squashed when merged to <code>develop</code>.</li>
 <li>Not squashing commits maintains history of multiple issues being solved.</li>
 <li>Pull Request related commits remain grouped and can be understood as a single merge</li>
 </ul>
-<h3 id="minimal-backports">Minimal backports</h3>
+<h3 id="minimal-backports">Minimal backports<a class="headerlink" href="#minimal-backports" title="Permanent link">&para;</a></h3>
 <p>Only <strong>necessary</strong> bug fixes are cherry-picked from <code>master</code> to an existing release branch.</p>
 
 

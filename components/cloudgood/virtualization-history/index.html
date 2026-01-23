@@ -4280,28 +4280,25 @@
   
 
 
-<h1 id="a-slightly-unreliable-history-of-virtualization">A slightly unreliable history of virtualization</h1>
-<p>Virtualization of compute is a very old technology (1). IBM had something which looked a bit like modern virtualization on its mainframe platforms in the 1960s. Depending on your definition (is simulation virtualization?), the x86 platform has had virtualization since at least the mid-1990s. Then again, mainstream virtualization is really a mid-2000s development. Either way, you are grappling with at least 20 years of history when you try to understand the current state of virtualization platforms.
-{ .annotate }</p>
+<h1 id="a-slightly-unreliable-history-of-virtualization">A slightly unreliable history of virtualization<a class="headerlink" href="#a-slightly-unreliable-history-of-virtualization" title="Permanent link">&para;</a></h1>
+<p class="annotate">Virtualization of compute is a very old technology (1). IBM had something which looked a bit like modern virtualization on its mainframe platforms in the 1960s. Depending on your definition (is simulation virtualization?), the x86 platform has had virtualization since at least the mid-1990s. Then again, mainstream virtualization is really a mid-2000s development. Either way, you are grappling with at least 20 years of history when you try to understand the current state of virtualization platforms.</p>
 <ol>
 <li><a href="https://en.wikipedia.org/wiki/Timeline_of_virtualization_technologies">https://en.wikipedia.org/wiki/Timeline_of_virtualization_technologies</a> has a useful timeline if you're that way inclined.</li>
 </ol>
 <p>This document attempts to summarize the relevant parts of that history, while also introducing background as required.</p>
-<h2 id="the-mainframe-era-and-the-birth-of-hypervisors">The mainframe era and the birth of hypervisors</h2>
+<h2 id="the-mainframe-era-and-the-birth-of-hypervisors">The mainframe era and the birth of hypervisors<a class="headerlink" href="#the-mainframe-era-and-the-birth-of-hypervisors" title="Permanent link">&para;</a></h2>
 <p>The story of virtualization properly begins with IBM's mainframes in the 1960s, but the important developments happened in the early 1970s.</p>
-<h3 id="cpcms-and-vm370">CP/CMS and VM/370</h3>
-<p>In 1972, IBM released VM/370, a virtualization system for its System/370 mainframes. VM/370 grew out of earlier work on CP/CMS (Control Program / Cambridge Monitor System), a research project at IBM's Cambridge Scientific Center. The key insight was simple but powerful: create a thin layer of software -- the <strong>Control Program</strong> -- that presents multiple virtual copies of the underlying hardware, each of which can run its own operating system.</p>
-<p>This was the birth of what we now call a <strong>hypervisor</strong> (1). The Control Program sat directly on the hardware (what we'd now call a "Type 1" or "bare metal" hypervisor) and multiplexed the physical machine into several virtual machines, each believing it had exclusive access to a complete System/370.
-{ .annotate }</p>
+<h3 id="cpcms-and-vm370">CP/CMS and <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>/370<a class="headerlink" href="#cpcms-and-vm370" title="Permanent link">&para;</a></h3>
+<p>In 1972, IBM released <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>/370, a virtualization system for its System/370 mainframes. <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>/370 grew out of earlier work on CP/CMS (Control Program / Cambridge Monitor System), a research project at IBM's Cambridge Scientific Center. The key insight was simple but powerful: create a thin layer of software -- the <strong>Control Program</strong> -- that presents multiple virtual copies of the underlying hardware, each of which can run its own operating system.</p>
+<p class="annotate">This was the birth of what we now call a <strong>hypervisor</strong> (1). The Control Program sat directly on the hardware (what we'd now call a "Type 1" or "bare metal" hypervisor) and multiplexed the physical machine into several virtual machines, each believing it had exclusive access to a complete System/370.</p>
 <ol>
 <li>The term "hypervisor" comes from the idea that this layer supervises the supervisors (operating systems), hence "hyper" (above) + "visor" (supervisor).</li>
 </ol>
 <p>This worked because the System/370 architecture was specifically designed to be virtualizable. The hardware supported multiple privilege levels, and critically, any instruction that could reveal whether you were running on real hardware or in a virtual machine would cause a trap that the Control Program could intercept and handle.</p>
-<h3 id="the-popek-and-goldberg-requirements">The Popek and Goldberg requirements</h3>
-<p>In 1974, Gerald Popek and Robert Goldberg published a seminal paper, "Formal Requirements for Virtualizable Third Generation Architectures" (1), that formalized what it means for a computer architecture to be virtualizable. Their key insight was about <strong>sensitive instructions</strong> -- instructions that behave differently depending on whether the processor is in privileged mode or not.
-{ .annotate }</p>
+<h3 id="the-popek-and-goldberg-requirements">The Popek and Goldberg requirements<a class="headerlink" href="#the-popek-and-goldberg-requirements" title="Permanent link">&para;</a></h3>
+<p class="annotate">In 1974, Gerald Popek and Robert Goldberg published a seminal paper, "Formal Requirements for Virtualizable Third Generation Architectures" (1), that formalized what it means for a computer architecture to be virtualizable. Their key insight was about <strong>sensitive instructions</strong> -- instructions that behave differently depending on whether the processor is in privileged mode or not.</p>
 <ol>
-<li>Published in Communications of the ACM, <a href="https://dl.acm.org/doi/10.1145/361011.361073">this paper</a> is still the definitive reference for understanding CPU virtualization requirements.</li>
+<li>Published in Communications of the ACM, <a href="https://dl.acm.org/doi/10.1145/361011.361073">this paper</a> is still the definitive reference for understanding <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> virtualization requirements.</li>
 </ol>
 <p>Popek and Goldberg identified that for an architecture to be efficiently virtualizable:</p>
 <ul>
@@ -4310,19 +4307,19 @@
 </ul>
 <p>If this property holds, you can run a guest operating system in non-privileged mode. Whenever it tries to do something sensitive (like modify page tables or access hardware), the instruction traps to the hypervisor, which can then emulate the expected behavior. The guest never knows it's not running on real hardware.</p>
 <p>The System/370 was designed with this property. The x86 architecture, unfortunately, was not.</p>
-<h3 id="the-x86-problem">The x86 problem</h3>
+<h3 id="the-x86-problem">The x86 problem<a class="headerlink" href="#the-x86-problem" title="Permanent link">&para;</a></h3>
 <p>When Intel designed the 8086 (1978) and later the 80386 (1985, the first 32-bit x86), they weren't thinking about virtualization. The x86 architecture has approximately 17 instructions that are sensitive but not privileged -- they don't trap when executed in user mode, but their behavior reveals information about the true state of the processor.</p>
 <p>The classic example is the <code>POPF</code> (pop flags) instruction. When executed in kernel mode, it can modify the interrupt flag (IF). When executed in user mode, it silently fails to modify IF rather than trapping. A guest kernel running in user mode would execute <code>POPF</code> expecting to disable interrupts, but nothing would happen -- and the instruction wouldn't trap to give the hypervisor a chance to emulate the correct behavior.</p>
 <p>Other problematic instructions include <code>SGDT</code>/<code>SIDT</code> (store global/interrupt descriptor table register), which reveal the true location of system tables, and several segment register operations. These made x86 "non-virtualizable" in the Popek and Goldberg sense.</p>
 <p>This is why for decades, the conventional wisdom was that x86 simply couldn't be efficiently virtualized. IBM's mainframes could do it because they were designed for it. Sun's SPARC and other RISC architectures could do it. But x86 was considered a lost cause.</p>
-<h3 id="vmwares-binary-translation-breakthrough">VMware's binary translation breakthrough</h3>
+<h3 id="vmwares-binary-translation-breakthrough">VMware's binary translation breakthrough<a class="headerlink" href="#vmwares-binary-translation-breakthrough" title="Permanent link">&para;</a></h3>
 <p>In 1998, a startup called VMware proved the conventional wisdom wrong.</p>
-<p>VMware's key innovation was <strong>binary translation</strong>. Instead of trying to run guest code directly on the CPU and trapping on sensitive instructions (which didn't work because x86 sensitive instructions don't trap), VMware dynamically rewrote the guest's kernel code before executing it.</p>
+<p>VMware's key innovation was <strong>binary translation</strong>. Instead of trying to run guest code directly on the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> and trapping on sensitive instructions (which didn't work because x86 sensitive instructions don't trap), VMware dynamically rewrote the guest's kernel code before executing it.</p>
 <p>The approach worked like this:</p>
 <ol>
-<li>Guest user-space code ran directly on the CPU (it doesn't contain sensitive instructions, so this is safe and fast)</li>
+<li>Guest user-space code ran directly on the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> (it doesn't contain sensitive instructions, so this is safe and fast)</li>
 <li>Guest kernel code was scanned before execution</li>
-<li>Any sensitive instructions were replaced with calls into VMware's virtualization layer (the VMM, or Virtual Machine Monitor)</li>
+<li>Any sensitive instructions were replaced with calls into VMware's virtualization layer (the <abbr title="Virtual Machine Monitor -- software that creates and manages virtual machines.">VMM</abbr>, or Virtual Machine Monitor)</li>
 <li>The translated code was cached for reuse</li>
 </ol>
 <p>This wasn't free -- binary translation added overhead, especially for kernel-heavy workloads. But it worked, and it worked well enough to be commercially useful. VMware Workstation shipped in 1999 for running virtual machines on Windows and Linux desktops.</p>
@@ -4351,167 +4348,166 @@
 </tbody>
 </table>
 </div>
-<h3 id="the-state-of-virtualization-in-1999">The state of virtualization in 1999</h3>
+<h3 id="the-state-of-virtualization-in-1999">The state of virtualization in 1999<a class="headerlink" href="#the-state-of-virtualization-in-1999" title="Permanent link">&para;</a></h3>
 <p>So by 1999, when User Mode Linux appeared, the virtualization landscape looked like this:</p>
 <ul>
-<li><strong>Mainframes</strong>: IBM's VM/370 and its successors had been doing efficient hardware virtualization for nearly 30 years</li>
+<li><strong>Mainframes</strong>: IBM's <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>/370 and its successors had been doing efficient hardware virtualization for nearly 30 years</li>
 <li><strong>VMware</strong>: Just released their first product, using binary translation to work around x86's limitations</li>
 <li><strong>Everything else</strong>: Mostly full software emulation (slow) or nothing at all</li>
 </ul>
-<p>VMware's server products (GSX in 2001, ESX in 2001) were still in the future. Xen (2003) and hardware virtualization support from Intel (VT-x in 2005) and AMD (AMD-V in 2006) were years away.</p>
+<p>VMware's server products (GSX in 2001, ESX in 2001) were still in the future. Xen (2003) and hardware virtualization support from Intel (<abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr> in 2005) and AMD (<abbr title="AMD Virtualization -- AMD's hardware virtualization extensions for x86 processors.">AMD-V</abbr> in 2006) were years away.</p>
 <p>It was in this context that Jeff Dike had a different idea: what if instead of trying to virtualize hardware, you virtualized the operating system interface instead?</p>
-<h2 id="user-mode-linux">User Mode Linux</h2>
+<h2 id="user-mode-linux">User Mode Linux<a class="headerlink" href="#user-mode-linux" title="Permanent link">&para;</a></h2>
 <div class="admonition puzzle">
 <p class="admonition-title">Things snap together</p>
 <p><em>Now we can combine a few of the concepts we've discussed in <a href="/components/cloudgood/fundamentals/">the fundamentals chapter</a> into a larger quite interesting idea. When we encounter one of these "things snap together" moments, we'll use this puzzle piece icon.</em></p>
 </div>
 <p>In this case, we are now at the point where we have the pieces to build possibly the first example of virtualization on Linux. That is, what if we ported Linux to a new architecture where that architecture was in fact Linux system calls instead of microprocessor instructions? That is, can we run Linux as a user space program on Linux?</p>
-<p>This in fact exists. In 1999 Jeff Dike started a port of Linux to user space called User Mode Linux (UML). At the time this was a relatively revolutionary idea, and entire companies were built upon it -- for example many of the early virtual private server hosting providers like Linode started as UML hosting platforms. In terms of context, at the time the first version of VMware had only been released the year before and was intended for workstations. The first server version of VMware (VMware GSX) wouldn't be released until 2001. Xen wasn't released until 2003, but we'll talk more about Xen later.</p>
-<p>Because UML is a user space program, you can run it as a non-root user and it is just another program that you download. To run a simple UML instance on Debian 12, you do this:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>user-mode-linux<span class="w"> </span>uml-utilities
-...
-$<span class="w"> </span>linux.uml
+<p>This in fact exists. In 1999 Jeff Dike started a port of Linux to user space called User Mode Linux (<abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr>). At the time this was a relatively revolutionary idea, and entire companies were built upon it -- for example many of the early virtual private server hosting providers like Linode started as <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> hosting platforms. In terms of context, at the time the first version of VMware had only been released the year before and was intended for workstations. The first server version of VMware (VMware GSX) wouldn't be released until 2001. Xen wasn't released until 2003, but we'll talk more about Xen later.</p>
+<p>Because <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> is a user space program, you can run it as a non-root user and it is just another program that you download. To run a simple <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> instance on Debian 12, you do this:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$<span class="w"> </span>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>user-mode-linux<span class="w"> </span>uml-utilities
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>...
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>$<span class="w"> </span>linux.uml
 </code></pre></div>
-<p>No really, that's it. Now, that UML virtual machine wont boot because it lacks a root filesystem. Instead, you'll see something like this (heavily truncated) output:</p>
-<div class="highlight"><pre><span></span><code>$ linux.uml
-...
-Linux version 6.1.82 (buildd@x86-conova-01) (gcc (Debian 12.2.0-14) 12.2.0, GNU ld (GNU Binutils for Debian) 2.40) #1 Fri Mar 29 18:07:35 UTC 2024
-Zone ranges:
-  Normal   [mem 0x0000000000000000-0x0000000096731fff]
-Movable zone start for each node
-Early memory node ranges
-  node   0: [mem 0x0000000000000000-0x0000000036731fff]
-Initmem setup node 0 [mem 0x0000000000000000-0x0000000036731fff]
-Built 1 zonelists, mobility grouping on.  Total pages: 219541
-Kernel command line: root=98:0 console=tty0
-...
-Console initialized on /dev/tty0
-printk: console [tty0] enabled
-Initializing software serial port version 1
-printk: console [mc-1] enabled
-...
-VFS: Cannot open root device &quot;98:0&quot; or unknown-block(98,0): error -6
-Please append a correct &quot;root=&quot; boot option; here are the available partitions:
-Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(98,0)
-CPU: 0 PID: 1 Comm: swapper Not tainted 6.1.82 #1
-Stack:
- 60688a8e 607daa3c 93443cf0 60670226
- 607b70c1 607daa3c 6004603f 00008001
- 00000000 9454b000 93443d20 60693645
-Call Trace:
- [&lt;60688a8e&gt;] ? _printk+0x0/0x94
- [&lt;6002d380&gt;] show_stack+0x113/0x18b
-...
-Aborted
+<p>No really, that's it. Now, that <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> virtual machine wont boot because it lacks a root filesystem. Instead, you'll see something like this (heavily truncated) output:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$ linux.uml
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>...
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>Linux version 6.1.82 (buildd@x86-conova-01) (gcc (Debian 12.2.0-14) 12.2.0, GNU ld (GNU Binutils for Debian) 2.40) #1 Fri Mar 29 18:07:35 UTC 2024
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>Zone ranges:
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  Normal   [mem 0x0000000000000000-0x0000000096731fff]
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>Movable zone start for each node
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>Early memory node ranges
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  node   0: [mem 0x0000000000000000-0x0000000036731fff]
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>Initmem setup node 0 [mem 0x0000000000000000-0x0000000036731fff]
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>Built 1 zonelists, mobility grouping on.  Total pages: 219541
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>Kernel command line: root=98:0 console=tty0
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>...
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>Console initialized on /dev/tty0
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>printk: console [tty0] enabled
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>Initializing software serial port version 1
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>printk: console [mc-1] enabled
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>...
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>VFS: Cannot open root device &quot;98:0&quot; or unknown-block(98,0): error -6
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>Please append a correct &quot;root=&quot; boot option; here are the available partitions:
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(98,0)
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>CPU: 0 PID: 1 Comm: swapper Not tainted 6.1.82 #1
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>Stack:
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a> 60688a8e 607daa3c 93443cf0 60670226
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a> 607b70c1 607daa3c 6004603f 00008001
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a> 00000000 9454b000 93443d20 60693645
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>Call Trace:
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a> [&lt;60688a8e&gt;] ? _printk+0x0/0x94
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a> [&lt;6002d380&gt;] show_stack+0x113/0x18b
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>...
+<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>Aborted
 </code></pre></div>
-<p>Here the Linux kernel panicked because it could not find its root filesystem and therefore could not continue booting. Note that a kernel panic in UML results in a user space process terminating, instead of the bare metal machine halting. Note as well that there was no boot loader in this output, as opposed to what you are used to seeing in boot messages on physical machines. This is because the UML architecture does not require any pre-kernel setup before starting the kernel.</p>
+<p>Here the Linux kernel panicked because it could not find its root filesystem and therefore could not continue booting. Note that a kernel panic in <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> results in a user space process terminating, instead of the bare metal machine halting. Note as well that there was no boot loader in this output, as opposed to what you are used to seeing in boot messages on physical machines. This is because the <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> architecture does not require any pre-kernel setup before starting the kernel.</p>
 <p>Specifically, this section of the output above is the error:</p>
-<div class="highlight"><pre><span></span><code>VFS: Cannot open root device &quot;98:0&quot; or unknown-block(98,0): error -6
-Please append a correct &quot;root=&quot; boot option; here are the available partitions:
-Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(98,0)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>VFS: Cannot open root device &quot;98:0&quot; or unknown-block(98,0): error -6
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Please append a correct &quot;root=&quot; boot option; here are the available partitions:
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(98,0)
 </code></pre></div>
 <div class="admonition foreshadow">
 <p class="admonition-title">Brace for learning</p>
 <p>Whenever I spend more time than seems reasonable on a concept which seems tangential to the actual topic, we'll use this light bulb inserted into someone's head. In general, this is happening because this concept is important later, but it might also be that I am simply on a power trip.</p>
 </div>
-<p>Obviously, we should provide a filesystem for the UML kernel to load. Most Linux distributions these days offer pre-baked cloud images in qcow2 format, but those have a kernel and kernel modules which expect to be running on virtualized hardware and in the UML case we're bringing our own kernel for an architecture which is not one of the ones modern Linux distributions build cloud images for. So instead, we really want a root filesystem which doesn't have general cloud cruft and we're going to have to build it for ourselves.</p>
-<p>We should also note that this pattern where the kernel is separate from the root filesystem is unusual today but was common in virtualization until about ten years ago. We moved back to all-in-one disk images as part of the movement to KVM based virtualization from a Xen paravirtualization dominated landscape. We'll talk more about paravirtualization when we get to discussing Xen.</p>
-<p>For Debian-derived Linux distributions, the way we'd build such a filesystem is with the "debootstrap" command. This command requires a running Linux machine but does not require that the machine itself be running Debian. This works by creating a chroot (1) and then fetching and installing the various components of the operating system:
-{ .annotate }</p>
+<p>Obviously, we should provide a filesystem for the <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> kernel to load. Most Linux distributions these days offer pre-baked cloud images in qcow2 format, but those have a kernel and kernel modules which expect to be running on virtualized hardware and in the <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> case we're bringing our own kernel for an architecture which is not one of the ones modern Linux distributions build cloud images for. So instead, we really want a root filesystem which doesn't have general cloud cruft and we're going to have to build it for ourselves.</p>
+<p>We should also note that this pattern where the kernel is separate from the root filesystem is unusual today but was common in virtualization until about ten years ago. We moved back to all-in-one disk images as part of the movement to <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> based virtualization from a Xen paravirtualization dominated landscape. We'll talk more about paravirtualization when we get to discussing Xen.</p>
+<p class="annotate">For Debian-derived Linux distributions, the way we'd build such a filesystem is with the "debootstrap" command. This command requires a running Linux machine but does not require that the machine itself be running Debian. This works by creating a chroot (1) and then fetching and installing the various components of the operating system:</p>
 <ol>
 <li>"chroot" is the name of a Linux system call, and is short for "change root". It changes what a given process believes to be the root of the filesystem from / to whatever path you specify. That is, the process can't see things outside of that subpath from then on. It was commonly used as a security mechanism 20 years ago, but is generally considered to be not particularly hard to escape from these days. The concept of isolating a process into a filesystem subtree lives on in containers, though modern container runtimes use the more secure <code>pivot_root</code> system call instead.</li>
 </ol>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>debootstrap
-...
-Unpacking<span class="w"> </span>debootstrap<span class="w"> </span><span class="o">(</span><span class="m">1</span>.0.128+nmu2+deb12u2<span class="o">)</span><span class="w"> </span>...
-Setting<span class="w"> </span>up<span class="w"> </span>debootstrap<span class="w"> </span><span class="o">(</span><span class="m">1</span>.0.128+nmu2+deb12u2<span class="o">)</span><span class="w"> </span>...
-$<span class="w"> </span>mkdir<span class="w"> </span>debian_unstable
-$<span class="w"> </span>sudo<span class="w"> </span>debootstrap<span class="w"> </span>sid<span class="w"> </span>debian_unstable<span class="w"> </span>http://deb.debian.org/debian
-...quite<span class="w"> </span>a<span class="w"> </span>lot<span class="w"> </span>of<span class="w"> </span>output...
-$<span class="w"> </span>chroot<span class="w"> </span>debian_unstable<span class="w"> </span>/bin/bash
-root@uml:/#<span class="w"> </span>passwd
-New<span class="w"> </span>password:<span class="w"> </span>...
-Retype<span class="w"> </span>new<span class="w"> </span>password:<span class="w"> </span>...
-passwd:<span class="w"> </span>password<span class="w"> </span>updated<span class="w"> </span>successfully
-root@uml:/#<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>dev
-root@uml:/dev#<span class="w"> </span>mknod<span class="w"> </span>--mode<span class="o">=</span><span class="m">660</span><span class="w"> </span>ubd0<span class="w"> </span>b<span class="w"> </span><span class="m">98</span><span class="w"> </span><span class="m">0</span>
-mknod:<span class="w"> </span>cannot<span class="w"> </span><span class="nb">set</span><span class="w"> </span>permissions<span class="w"> </span>of<span class="w"> </span><span class="s1">&#39;ubd0&#39;</span>:<span class="w"> </span>Operation<span class="w"> </span>not<span class="w"> </span>supported
-root@uml:/dev#<span class="w"> </span>chown<span class="w"> </span>root:disk<span class="w"> </span>ubd0
-root@uml:/#<span class="w"> </span><span class="nb">exit</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>$<span class="w"> </span>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>debootstrap
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>...
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>Unpacking<span class="w"> </span>debootstrap<span class="w"> </span><span class="o">(</span><span class="m">1</span>.0.128+nmu2+deb12u2<span class="o">)</span><span class="w"> </span>...
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>Setting<span class="w"> </span>up<span class="w"> </span>debootstrap<span class="w"> </span><span class="o">(</span><span class="m">1</span>.0.128+nmu2+deb12u2<span class="o">)</span><span class="w"> </span>...
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>$<span class="w"> </span>mkdir<span class="w"> </span>debian_unstable
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>$<span class="w"> </span>sudo<span class="w"> </span>debootstrap<span class="w"> </span>sid<span class="w"> </span>debian_unstable<span class="w"> </span>http://deb.debian.org/debian
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>...quite<span class="w"> </span>a<span class="w"> </span>lot<span class="w"> </span>of<span class="w"> </span>output...
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>$<span class="w"> </span>chroot<span class="w"> </span>debian_unstable<span class="w"> </span>/bin/bash
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>root@uml:/#<span class="w"> </span>passwd
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>New<span class="w"> </span>password:<span class="w"> </span>...
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>Retype<span class="w"> </span>new<span class="w"> </span>password:<span class="w"> </span>...
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>passwd:<span class="w"> </span>password<span class="w"> </span>updated<span class="w"> </span>successfully
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>root@uml:/#<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>dev
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>root@uml:/dev#<span class="w"> </span>mknod<span class="w"> </span>--mode<span class="o">=</span><span class="m">660</span><span class="w"> </span>ubd0<span class="w"> </span>b<span class="w"> </span><span class="m">98</span><span class="w"> </span><span class="m">0</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>mknod:<span class="w"> </span>cannot<span class="w"> </span><span class="nb">set</span><span class="w"> </span>permissions<span class="w"> </span>of<span class="w"> </span><span class="s1">&#39;ubd0&#39;</span>:<span class="w"> </span>Operation<span class="w"> </span>not<span class="w"> </span>supported
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>root@uml:/dev#<span class="w"> </span>chown<span class="w"> </span>root:disk<span class="w"> </span>ubd0
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>root@uml:/#<span class="w"> </span><span class="nb">exit</span>
 </code></pre></div>
-<p>This produces a Debian filesystem in the directory debian_unstable. However, UML requires the filesystem to be present as a block device image, which makes sense when you consider that this is effectively what a hard disk is when attached to a physical machine. We can convert our new Debian unstable filesystem into a raw block device image like this:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># qemu-img create -f raw debian_unstable.raw 1G</span>
-Formatting<span class="w"> </span><span class="s1">&#39;debian_unstable.raw&#39;</span>,<span class="w"> </span><span class="nv">fmt</span><span class="o">=</span>raw<span class="w"> </span><span class="nv">size</span><span class="o">=</span><span class="m">1073741824</span>
-<span class="c1"># modprobe nbd max_part=8</span>
-<span class="c1"># qemu-nbd --connect=/dev/nbd0 debian_unstable.raw -f raw</span>
-<span class="c1"># mkfs.ext4 /dev/nbd0</span>
-mke2fs<span class="w"> </span><span class="m">1</span>.47.0<span class="w"> </span><span class="o">(</span><span class="m">5</span>-Feb-2023<span class="o">)</span>
-Discarding<span class="w"> </span>device<span class="w"> </span>blocks:<span class="w"> </span><span class="k">done</span>
-Creating<span class="w"> </span>filesystem<span class="w"> </span>with<span class="w"> </span><span class="m">262144</span><span class="w"> </span>4k<span class="w"> </span>blocks<span class="w"> </span>and<span class="w"> </span><span class="m">65536</span><span class="w"> </span>inodes
-Filesystem<span class="w"> </span>UUID:<span class="w"> </span>931b4dbe-a270-4845-8088-dbf660be7f22
-Superblock<span class="w"> </span>backups<span class="w"> </span>stored<span class="w"> </span>on<span class="w"> </span>blocks:
-<span class="w">    </span><span class="m">32768</span>,<span class="w"> </span><span class="m">98304</span>,<span class="w"> </span><span class="m">163840</span>,<span class="w"> </span><span class="m">229376</span>
-Allocating<span class="w"> </span>group<span class="w"> </span>tables:
-Writing<span class="w"> </span>inode<span class="w"> </span>tables:<span class="w"> </span><span class="k">done</span>
-Creating<span class="w"> </span>journal<span class="w"> </span><span class="o">(</span><span class="m">8192</span><span class="w"> </span>blocks<span class="o">)</span>:<span class="w"> </span><span class="k">done</span>
-Writing<span class="w"> </span>superblocks<span class="w"> </span>and<span class="w"> </span>filesystem<span class="w"> </span>accounting<span class="w"> </span>information:<span class="w"> </span><span class="k">done</span>
-<span class="c1"># mount /dev/nbd0 /mnt</span>
-<span class="c1"># cp -Rp debian_unstable/* /mnt/</span>
-<span class="c1"># umount /mnt</span>
-<span class="c1"># qemu-nbd --disconnect /dev/nbd0</span>
-/dev/nbd0<span class="w"> </span>disconnected
+<p>This produces a Debian filesystem in the directory debian_unstable. However, <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> requires the filesystem to be present as a block device image, which makes sense when you consider that this is effectively what a hard disk is when attached to a physical machine. We can convert our new Debian unstable filesystem into a raw block device image like this:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># qemu-img create -f raw debian_unstable.raw 1G</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Formatting<span class="w"> </span><span class="s1">&#39;debian_unstable.raw&#39;</span>,<span class="w"> </span><span class="nv">fmt</span><span class="o">=</span>raw<span class="w"> </span><span class="nv">size</span><span class="o">=</span><span class="m">1073741824</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># modprobe nbd max_part=8</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># qemu-nbd --connect=/dev/nbd0 debian_unstable.raw -f raw</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># mkfs.ext4 /dev/nbd0</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>mke2fs<span class="w"> </span><span class="m">1</span>.47.0<span class="w"> </span><span class="o">(</span><span class="m">5</span>-Feb-2023<span class="o">)</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>Discarding<span class="w"> </span>device<span class="w"> </span>blocks:<span class="w"> </span><span class="k">done</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>Creating<span class="w"> </span>filesystem<span class="w"> </span>with<span class="w"> </span><span class="m">262144</span><span class="w"> </span>4k<span class="w"> </span>blocks<span class="w"> </span>and<span class="w"> </span><span class="m">65536</span><span class="w"> </span>inodes
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>Filesystem<span class="w"> </span>UUID:<span class="w"> </span>931b4dbe-a270-4845-8088-dbf660be7f22
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>Superblock<span class="w"> </span>backups<span class="w"> </span>stored<span class="w"> </span>on<span class="w"> </span>blocks:
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="m">32768</span>,<span class="w"> </span><span class="m">98304</span>,<span class="w"> </span><span class="m">163840</span>,<span class="w"> </span><span class="m">229376</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>Allocating<span class="w"> </span>group<span class="w"> </span>tables:
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>Writing<span class="w"> </span>inode<span class="w"> </span>tables:<span class="w"> </span><span class="k">done</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>Creating<span class="w"> </span>journal<span class="w"> </span><span class="o">(</span><span class="m">8192</span><span class="w"> </span>blocks<span class="o">)</span>:<span class="w"> </span><span class="k">done</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>Writing<span class="w"> </span>superblocks<span class="w"> </span>and<span class="w"> </span>filesystem<span class="w"> </span>accounting<span class="w"> </span>information:<span class="w"> </span><span class="k">done</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="c1"># mount /dev/nbd0 /mnt</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="c1"># cp -Rp debian_unstable/* /mnt/</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="c1"># umount /mnt</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="c1"># qemu-nbd --disconnect /dev/nbd0</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>/dev/nbd0<span class="w"> </span>disconnected
 </code></pre></div>
 <p>This set of commands heavily relies of qemu's tools to create the image, but we'll discuss qemu in more detail later.</p>
-<p>I guess I should also note that we could have created this virtual disk first, made a filesystem on it, mounted it, and then run debootstrap inside that new filesystem. This would have the same effect but provides a slightly less clear story as to why we are doing these things. Another issue I had while preparing this demo is that UML dates back to those simpler days of init scripts, and I cannot find any prior art of getting systemd working well. I am sure it's possible, but it was a tangent from what I am trying to talk about here that I did not follow. Therefore, we're just going to set init to being a shell to prove that the kernel boots and starts user space. I should note this was a common technique back in the day. Similarly, containers today often run a single application process directly as PID 1 rather than using a traditional init system.</p>
+<p>I guess I should also note that we could have created this virtual disk first, made a filesystem on it, mounted it, and then run debootstrap inside that new filesystem. This would have the same effect but provides a slightly less clear story as to why we are doing these things. Another issue I had while preparing this demo is that <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> dates back to those simpler days of init scripts, and I cannot find any prior art of getting systemd working well. I am sure it's possible, but it was a tangent from what I am trying to talk about here that I did not follow. Therefore, we're just going to set init to being a shell to prove that the kernel boots and starts user space. I should note this was a common technique back in the day. Similarly, containers today often run a single application process directly as <abbr title="Process ID -- a unique number identifying a running process.">PID</abbr> 1 rather than using a traditional init system.</p>
 <details class="info" open="open">
 <summary>Info</summary>
-<p>PID 1? What's PID 1? We'll talk more about that in <a href="/components/cloudgood/more-fundamentals/">the next chapter</a>.</p>
+<p><abbr title="Process ID -- a unique number identifying a running process.">PID</abbr> 1? What's <abbr title="Process ID -- a unique number identifying a running process.">PID</abbr> 1? We'll talk more about that in <a href="/components/cloudgood/more-fundamentals/">the next chapter</a>.</p>
 </details>
-<p>Regardless, we can now boot a working UML virtual machine:</p>
-<div class="highlight"><pre><span></span><code># linux.uml mem=128M ubda=debian_unstable.raw init=/bin/bash
-...a really huge amount of output...
-printk: console [mc-1] enabled
-registered taskstats version 1
-zswap: loaded using pool lzo/zbud
-Btrfs loaded, crc32c=crc32c-generic, zoned=no, fsverity=no
-EXT4-fs (ubda): mounted filesystem with ordered data mode. Quota mode: none.
-VFS: Mounted root (ext4 filesystem) readonly on device 98:0.
-devtmpfs: mounted
-This architecture does not have kernel memory protection.
-Run /bin/bash as init process
-bash: cannot set terminal process group (-1): Inappropriate ioctl for device
-bash: no job control in this shell
-root@(none):/# uptime
-uptime: Cannot get system uptime: No such file or directory
-root@(none):/# whoami
-root
-root@(none):/# ls
-bin  boot  dev  etc  home  lib  lib64  lost+found  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
-root@(none):/# exit
-exit
-Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
+<p>Regardless, we can now boot a working <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> virtual machine:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a># linux.uml mem=128M ubda=debian_unstable.raw init=/bin/bash
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>...a really huge amount of output...
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>printk: console [mc-1] enabled
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>registered taskstats version 1
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>zswap: loaded using pool lzo/zbud
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>Btrfs loaded, crc32c=crc32c-generic, zoned=no, fsverity=no
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>EXT4-fs (ubda): mounted filesystem with ordered data mode. Quota mode: none.
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>VFS: Mounted root (ext4 filesystem) readonly on device 98:0.
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>devtmpfs: mounted
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>This architecture does not have kernel memory protection.
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>Run /bin/bash as init process
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>bash: no job control in this shell
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>root@(none):/# uptime
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>uptime: Cannot get system uptime: No such file or directory
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>root@(none):/# whoami
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>root
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>root@(none):/# ls
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>bin  boot  dev  etc  home  lib  lib64  lost+found  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>root@(none):/# exit
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>exit
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 </code></pre></div>
-<p>Ultimately UML was an evolutionary dead end -- users want more performance than UML can offer, and they want to be able to reuse software compiled against a real architecture not the synthetic UML architecture. However, it is the conceptual basis for what came next, so it deserved some time.</p>
-<h2 id="microprocessor-simulators">Microprocessor simulators</h2>
-<p>UML doesn't simulate a real processor architecture, so while its useful for debugging shared components of the Linux kernel, it is not useful for debugging the kernel that runs on a real processor. Microprocessor simulators (sometimes called emulators) pre-date UML and are still common today.</p>
-<p>Bochs is an example of an older x86 simulator, having been first released in 1994, but the reality is that pretty much everyone uses the qemu project now. One of the reasons for this is that Bochs only supports Intel 32 and 64 bit architectures, whereas qemu supports a much larger number of machines. These packages are capable of emulating entire machines, not just the CPU.</p>
-<h3 id="how-full-emulation-works">How full emulation works</h3>
-<p>In full emulation mode, the emulator simulates every aspect of the target hardware in software. When the guest operating system executes a CPU instruction, the emulator:</p>
+<p>Ultimately <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> was an evolutionary dead end -- users want more performance than <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> can offer, and they want to be able to reuse software compiled against a real architecture not the synthetic <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> architecture. However, it is the conceptual basis for what came next, so it deserved some time.</p>
+<h2 id="microprocessor-simulators">Microprocessor simulators<a class="headerlink" href="#microprocessor-simulators" title="Permanent link">&para;</a></h2>
+<p><abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> doesn't simulate a real processor architecture, so while its useful for debugging shared components of the Linux kernel, it is not useful for debugging the kernel that runs on a real processor. Microprocessor simulators (sometimes called emulators) pre-date <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> and are still common today.</p>
+<p>Bochs is an example of an older x86 simulator, having been first released in 1994, but the reality is that pretty much everyone uses the qemu project now. One of the reasons for this is that Bochs only supports Intel 32 and 64 bit architectures, whereas qemu supports a much larger number of machines. These packages are capable of emulating entire machines, not just the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr>.</p>
+<h3 id="how-full-emulation-works">How full emulation works<a class="headerlink" href="#how-full-emulation-works" title="Permanent link">&para;</a></h3>
+<p>In full emulation mode, the emulator simulates every aspect of the target hardware in software. When the guest operating system executes a <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> instruction, the emulator:</p>
 <ol>
-<li>Fetches and decodes the instruction (just like a real CPU would)</li>
+<li>Fetches and decodes the instruction (just like a real <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> would)</li>
 <li>Simulates the effect of that instruction on virtual registers, virtual memory, and virtual devices</li>
-<li>Updates its internal state to reflect what a real CPU would have done</li>
+<li>Updates its internal state to reflect what a real <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> would have done</li>
 <li>Moves on to the next instruction</li>
 </ol>
-<p>This applies to everything -- not just CPU instructions, but also memory accesses, interrupt handling, timer ticks, and I/O operations. When the guest writes to what it thinks is a network card's registers, the emulator intercepts that write, figures out what the guest was trying to do, and simulates the network card's response.</p>
+<p>This applies to everything -- not just <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> instructions, but also memory accesses, interrupt handling, timer ticks, and I/O operations. When the guest writes to what it thinks is a network card's registers, the emulator intercepts that write, figures out what the guest was trying to do, and simulates the network card's response.</p>
 <p>The advantage of this approach is complete isolation and flexibility. You can run an ARM operating system on an x86 host, or vice versa. You can pause execution at any point and inspect the complete machine state. You can even simulate hardware that doesn't physically exist yet, which is valuable for hardware designers.</p>
-<h3 id="the-performance-cost">The performance cost</h3>
+<h3 id="the-performance-cost">The performance cost<a class="headerlink" href="#the-performance-cost" title="Permanent link">&para;</a></h3>
 <p>The disadvantage is performance. Consider what happens when the guest executes a single instruction like <code>add eax, ebx</code> (add two registers):</p>
 <ul>
-<li>On real hardware, this takes perhaps 1 CPU cycle</li>
+<li>On real hardware, this takes perhaps 1 <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> cycle</li>
 <li>In an emulator, the host must: fetch the instruction bytes, decode them to understand what operation is requested, look up the virtual register values, perform the addition, store the result back, update virtual flags, and advance the virtual program counter</li>
 </ul>
-<p>This might take dozens or hundreds of host CPU cycles for a single guest instruction. The ratio varies depending on the instruction -- simple arithmetic might be 10-50x slower, while complex operations involving memory or I/O can be 100-1000x slower.</p>
+<p>This might take dozens or hundreds of host <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> cycles for a single guest instruction. The ratio varies depending on the instruction -- simple arithmetic might be 10-50x slower, while complex operations involving memory or I/O can be 100-1000x slower.</p>
 <p>In practice, pure software emulation typically runs at 1-10% of native speed, sometimes less. This is acceptable for debugging, testing, or running software that isn't performance-sensitive, but it's far too slow for production workloads. A virtual machine running at 5% of native speed would make even basic operations feel painfully sluggish.</p>
 <p>This performance gap is what drove the development of hardware-assisted virtualization, which we'll discuss shortly. But first, let's look at what hardware qemu actually emulates.</p>
 <p>Even qemu doesn't support every possible x86 chipset -- it supports just two: i440fx, and q35. Most OpenStack workloads are using i440fx by default. The differences between the two are:</p>
@@ -4555,78 +4551,83 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 <td></td>
 </tr>
 <tr>
-<td>SATA</td>
+<td><abbr title="Serial ATA -- an interface for connecting storage devices.">SATA</abbr></td>
 <td></td>
 <td>Yes</td>
 </tr>
 <tr>
-<td>BIOS / UEFI</td>
-<td>BIOS</td>
-<td>BIOS or UEFI with optional secure boot</td>
+<td><abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr> / <abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr></td>
+<td><abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr></td>
+<td><abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr> or <abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr> with optional secure boot</td>
 </tr>
 </tbody>
 </table>
-<p>In general cloud platforms will use i440fx unless you need UEFI or secure boot. However, it should be noted that these hardware platforms are quite old and therefore stand out as virtual machines to software which is doing platform identification things. This makes virtual machines much less useful for things like malware analysis, but that's a story for another day.</p>
-<h2 id="hardware-assisted-virtualization">Hardware-assisted virtualization</h2>
-<p>As we discussed above, pure software emulation is slow -- typically running at 1-10% of native speed. This is fine for debugging or running legacy software, but completely impractical for production workloads. The solution came from the CPU vendors themselves.</p>
-<h3 id="the-x86-virtualization-problem">The x86 virtualization problem</h3>
-<p>Before hardware support, virtualizing x86 was particularly tricky. The x86 architecture has certain "sensitive" instructions that behave differently depending on the CPU's privilege level, but don't trap when executed in user mode. In a properly virtualizable architecture, any instruction that could reveal or affect the machine's true state would cause a trap, allowing the hypervisor to intercept and emulate it. x86 didn't work this way.</p>
+<p>In general cloud platforms will use i440fx unless you need <abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr> or secure boot. However, it should be noted that these hardware platforms are quite old and therefore stand out as virtual machines to software which is doing platform identification things. This makes virtual machines much less useful for things like malware analysis, but that's a story for another day.</p>
+<h2 id="hardware-assisted-virtualization">Hardware-assisted virtualization<a class="headerlink" href="#hardware-assisted-virtualization" title="Permanent link">&para;</a></h2>
+<p>As we discussed above, pure software emulation is slow -- typically running at 1-10% of native speed. This is fine for debugging or running legacy software, but completely impractical for production workloads. The solution came from the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> vendors themselves.</p>
+<h3 id="the-x86-virtualization-problem">The x86 virtualization problem<a class="headerlink" href="#the-x86-virtualization-problem" title="Permanent link">&para;</a></h3>
+<p>Before hardware support, virtualizing x86 was particularly tricky. The x86 architecture has certain "sensitive" instructions that behave differently depending on the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr>'s privilege level, but don't trap when executed in user mode. In a properly virtualizable architecture, any instruction that could reveal or affect the machine's true state would cause a trap, allowing the hypervisor to intercept and emulate it. x86 didn't work this way.</p>
 <p>Early x86 hypervisors like VMware used clever techniques to work around this. They would scan the guest's code before execution and rewrite problematic instructions to trap into the hypervisor -- a technique called "binary translation". This worked, but added complexity and overhead.</p>
-<h3 id="intel-vt-x-and-amd-v">Intel VT-x and AMD-V</h3>
-<p>In 2005-2006, both Intel and AMD released CPU extensions specifically designed for virtualization:</p>
+<h3 id="intel-vt-x-and-amd-v">Intel <abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr> and <abbr title="AMD Virtualization -- AMD's hardware virtualization extensions for x86 processors.">AMD-V</abbr><a class="headerlink" href="#intel-vt-x-and-amd-v" title="Permanent link">&para;</a></h3>
+<p>In 2005-2006, both Intel and AMD released <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> extensions specifically designed for virtualization:</p>
 <ul>
-<li><strong>Intel VT-x</strong> (codenamed "Vanderpool") - first appeared in Pentium 4 processors in late 2005</li>
-<li><strong>AMD-V</strong> (codenamed "Pacifica", later marketed as AMD Virtualization) - appeared in Athlon 64 processors in 2006</li>
+<li><strong>Intel <abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr></strong> (codenamed "Vanderpool") - first appeared in Pentium 4 processors in late 2005</li>
+<li><strong><abbr title="AMD Virtualization -- AMD's hardware virtualization extensions for x86 processors.">AMD-V</abbr></strong> (codenamed "Pacifica", later marketed as AMD Virtualization) - appeared in Athlon 64 processors in 2006</li>
 </ul>
-<p>These extensions add a new CPU mode specifically for running hypervisors. The key concepts are:</p>
-<p><strong>VMX root and non-root modes</strong> (Intel terminology): The hypervisor runs in "root mode" with full control, while guest operating systems run in "non-root mode". The guest thinks it's running at ring 0 with full privileges, but the CPU knows it's actually a guest and will trap to the hypervisor when necessary.</p>
-<p><strong>VMCS/VMCB</strong>: The Virtual Machine Control Structure (Intel) or Virtual Machine Control Block (AMD) is a data structure that defines the guest's state and controls what operations cause exits to the hypervisor. The hypervisor configures this to trap on specific events -- like I/O operations, certain interrupts, or access to specific registers.</p>
-<p><strong>VM entry and VM exit</strong>: When the hypervisor wants to run guest code, it performs a "VM entry" which loads the guest state and switches to non-root mode. When something happens that the hypervisor needs to handle, a "VM exit" occurs, saving the guest state and returning control to the hypervisor.</p>
-<p>This means the guest's code runs directly on the CPU at near-native speed for most operations. The hypervisor only gets involved when something interesting happens -- an I/O operation, a page fault, a timer interrupt, etc.</p>
-<h3 id="extended-page-tables-eptnpt">Extended Page Tables (EPT/NPT)</h3>
-<p>The original VT-x and AMD-V implementations still had a significant overhead for memory operations. Every memory access in a virtual machine involves two levels of address translation:</p>
+<p>These extensions add a new <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> mode specifically for running hypervisors. The key concepts are:</p>
+<p><strong><abbr title="Virtual Machine Extensions -- Intel's instruction set for hardware virtualization.">VMX</abbr> root and non-root modes</strong> (Intel terminology): The hypervisor runs in "root mode" with full control, while guest operating systems run in "non-root mode". The guest thinks it's running at ring 0 with full privileges, but the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> knows it's actually a guest and will trap to the hypervisor when necessary.</p>
+<p><strong><abbr title="Virtual Machine Control Structure -- Intel data structure controlling VM behavior.">VMCS</abbr>/<abbr title="Virtual Machine Control Block -- AMD's equivalent to Intel's VMCS.">VMCB</abbr></strong>: The Virtual Machine Control Structure (Intel) or Virtual Machine Control Block (AMD) is a data structure that defines the guest's state and controls what operations cause exits to the hypervisor. The hypervisor configures this to trap on specific events -- like I/O operations, certain interrupts, or access to specific registers.</p>
+<p><strong><abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> entry and <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> exit</strong>: When the hypervisor wants to run guest code, it performs a "<abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> entry" which loads the guest state and switches to non-root mode. When something happens that the hypervisor needs to handle, a "<abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> exit" occurs, saving the guest state and returning control to the hypervisor.</p>
+<p>This means the guest's code runs directly on the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> at near-native speed for most operations. The hypervisor only gets involved when something interesting happens -- an I/O operation, a page fault, a timer interrupt, etc.</p>
+<h3 id="extended-page-tables-eptnpt">Extended Page Tables (<abbr title="Extended Page Tables -- Intel's hardware support for nested page table translation.">EPT</abbr>/<abbr title="Nested Page Tables -- AMD's hardware support for nested page table translation.">NPT</abbr>)<a class="headerlink" href="#extended-page-tables-eptnpt" title="Permanent link">&para;</a></h3>
+<p>The original <abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr> and <abbr title="AMD Virtualization -- AMD's hardware virtualization extensions for x86 processors.">AMD-V</abbr> implementations still had a significant overhead for memory operations. Every memory access in a virtual machine involves two levels of address translation:</p>
 <ol>
 <li>Guest virtual address → Guest physical address (using the guest's page tables)</li>
 <li>Guest physical address → Host physical address (using the hypervisor's shadow page tables)</li>
 </ol>
 <p>Originally, the hypervisor had to maintain "shadow page tables" that combined both translations, and trap on every guest page table modification to keep them synchronized. This was expensive.</p>
-<p>Intel's Extended Page Tables (EPT, introduced with Nehalem in 2008) and AMD's Nested Page Tables (NPT, introduced with Barcelona in 2007) solve this by doing both translations in hardware. The CPU walks both sets of page tables automatically, eliminating most of the hypervisor's involvement in memory management.</p>
-<h3 id="kvm-the-linux-approach">KVM: The Linux approach</h3>
-<p>With hardware virtualization support widely available, Linux gained its own hypervisor: KVM (Kernel-based Virtual Machine), first merged in 2007. KVM takes an elegant approach -- instead of being a separate hypervisor, it turns the Linux kernel itself into a hypervisor.</p>
-<p>KVM is implemented as a kernel module that exposes the hardware virtualization features through a simple interface. User-space programs (typically QEMU) use this interface to create and run virtual machines. The division of labor is:</p>
+<p>Intel's Extended Page Tables (<abbr title="Extended Page Tables -- Intel's hardware support for nested page table translation.">EPT</abbr>, introduced with Nehalem in 2008) and AMD's Nested Page Tables (<abbr title="Nested Page Tables -- AMD's hardware support for nested page table translation.">NPT</abbr>, introduced with Barcelona in 2007) solve this by doing both translations in hardware. The <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> walks both sets of page tables automatically, eliminating most of the hypervisor's involvement in memory management.</p>
+<h3 id="kvm-the-linux-approach"><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>: The Linux approach<a class="headerlink" href="#kvm-the-linux-approach" title="Permanent link">&para;</a></h3>
+<p>With hardware virtualization support widely available, Linux gained its own hypervisor: <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> (Kernel-based Virtual Machine), first merged in 2007. <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> takes an elegant approach -- instead of being a separate hypervisor, it turns the Linux kernel itself into a hypervisor.</p>
+<p><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> is implemented as a kernel module that exposes the hardware virtualization features through a simple interface. User-space programs (typically <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr>) use this interface to create and run virtual machines. The division of labor is:</p>
 <ul>
-<li><strong>KVM</strong> (kernel): Handles VM entry/exit, memory management, interrupt injection</li>
-<li><strong>QEMU</strong> (user space): Provides device emulation, disk and network I/O, VNC/SPICE console</li>
+<li><strong><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr></strong> (kernel): Handles <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> entry/exit, memory management, interrupt injection</li>
+<li><strong><abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr></strong> (user space): Provides device emulation, disk and network I/O, VNC/SPICE console</li>
 </ul>
-<p>This means QEMU, which we discussed earlier as a software emulator, can also work as a frontend for hardware-accelerated virtualization. When you run <code>qemu-system-x86_64</code> on a Linux system with KVM available, it uses hardware virtualization for the CPU and memory, falling back to emulation only for devices.</p>
-<p>The partnership between QEMU and KVM wasn't always so tight. QEMU was started by Fabrice Bellard in 2003 as a pure software emulator. KVM was developed separately by Qumranet (later acquired by Red Hat) and merged into Linux in 2007. Initially, KVM had its own simple user-space tool, but the QEMU developers quickly added KVM support, and the combination proved more capable than either project alone. By around 2010, "QEMU/KVM" had become the standard way to refer to Linux virtualization, and the projects have been closely coordinated ever since.</p>
-<h2 id="paravirtualization">Paravirtualization</h2>
-<p>Hardware-assisted virtualization solved the CPU performance problem, but there's another approach that predates it and remains relevant today: paravirtualization.</p>
-<h3 id="the-concept">The concept</h3>
-<p>In paravirtualization, instead of pretending to be real hardware (which requires trapping and emulating hardware operations), the hypervisor exposes an explicitly virtual interface. The guest operating system knows it's running in a virtual machine and cooperates with the hypervisor using a purpose-designed API.</p>
+<p>This means <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr>, which we discussed earlier as a software emulator, can also work as a frontend for hardware-accelerated virtualization. When you run <code>qemu-system-x86_64</code> on a Linux system with <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> available, it uses hardware virtualization for the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> and memory, falling back to emulation only for devices.</p>
+<p>The partnership between <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> and <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> wasn't always so tight. <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> was started by Fabrice Bellard in 2003 as a pure software emulator. <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> was developed separately by Qumranet (later acquired by Red Hat) and merged into Linux in 2007. Initially, <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> had its own simple user-space tool, but the <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> developers quickly added <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> support, and the combination proved more capable than either project alone. By around 2010, "<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr>/<abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>" had become the standard way to refer to Linux virtualization, and the projects have been closely coordinated ever since.</p>
+<h2 id="paravirtualization">Paravirtualization<a class="headerlink" href="#paravirtualization" title="Permanent link">&para;</a></h2>
+<p>Hardware-assisted virtualization solved the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> performance problem, but there's another approach that predates it and remains relevant today: paravirtualization.</p>
+<h3 id="the-concept">The concept<a class="headerlink" href="#the-concept" title="Permanent link">&para;</a></h3>
+<p>In paravirtualization, instead of pretending to be real hardware (which requires trapping and emulating hardware operations), the hypervisor exposes an explicitly virtual interface. The guest operating system knows it's running in a virtual machine and cooperates with the hypervisor using a purpose-designed <abbr title="Application Programming Interface -- a defined interface for software interaction.">API</abbr>.</p>
 <p>Think of it as the difference between a flight simulator that perfectly replicates every switch and dial of a real cockpit versus one that presents a simplified interface designed for efficient simulation. The latter isn't "realistic," but it might be more practical.</p>
-<h3 id="xen-the-paravirtualization-pioneer">Xen: The paravirtualization pioneer</h3>
-<p>Xen, first released in 2003, pioneered paravirtualization on x86. A paravirtualized Xen guest (called a "PV guest") runs a modified kernel that:</p>
+<h3 id="xen-the-paravirtualization-pioneer">Xen: The paravirtualization pioneer<a class="headerlink" href="#xen-the-paravirtualization-pioneer" title="Permanent link">&para;</a></h3>
+<p>Xen, first released in 2003, pioneered paravirtualization on x86. A paravirtualized Xen guest (called a "<abbr title="Paravirtualization -- virtualization where the guest cooperates with the hypervisor.">PV</abbr> guest") runs a modified kernel that:</p>
 <ul>
 <li>Uses "hypercalls" instead of privileged instructions to communicate with the hypervisor</li>
 <li>Knows its page tables are managed cooperatively with the hypervisor</li>
 <li>Uses paravirtualized drivers for disk and network I/O</li>
 </ul>
 <p>This required modifying the guest kernel, which meant you couldn't run unmodified operating systems. However, the performance was excellent -- often within a few percent of native speed, even before hardware virtualization support existed.</p>
-<p>When VT-x and AMD-V arrived, Xen added support for "HVM" (Hardware Virtual Machine) guests that could run unmodified operating systems. Modern Xen supports a hybrid "PVHVM" mode that uses hardware virtualization for the CPU but paravirtualized drivers for I/O.</p>
-<h3 id="virtio-paravirtualization-for-devices">Virtio: Paravirtualization for devices</h3>
-<p>Even with hardware-assisted CPU virtualization, device emulation remains a bottleneck. Emulating a real Intel e1000 network card means the hypervisor must intercept every register access, simulate the hardware's behavior, and translate between the guest's I/O operations and actual network traffic. This is slow.</p>
-<p>Virtio, developed for use with KVM (but now used by other hypervisors too), takes the paravirtualization approach for devices. Instead of emulating real hardware, virtio defines a simple, efficient interface specifically designed for hypervisor-to-guest communication:</p>
-<ul>
-<li><strong>virtio-net</strong>: Paravirtualized network card</li>
-<li><strong>virtio-blk</strong>: Paravirtualized block device (disk)</li>
-<li><strong>virtio-scsi</strong>: Paravirtualized SCSI controller</li>
-<li><strong>virtio-gpu</strong>: Paravirtualized graphics</li>
-<li><strong>virtio-fs</strong>: Paravirtualized filesystem sharing</li>
-</ul>
+<p>When <abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr> and <abbr title="AMD Virtualization -- AMD's hardware virtualization extensions for x86 processors.">AMD-V</abbr> arrived, Xen added support for "<abbr title="Hardware Virtual Machine -- a VM using hardware virtualization extensions.">HVM</abbr>" (Hardware Virtual Machine) guests that could run unmodified operating systems. Modern Xen supports a hybrid "<abbr title="Paravirtualized Hardware Virtual Machine -- HVM with paravirtualized drivers.">PVHVM</abbr>" mode that uses hardware virtualization for the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> but paravirtualized drivers for I/O.</p>
+<h3 id="virtio-paravirtualization-for-devices">Virtio: Paravirtualization for devices<a class="headerlink" href="#virtio-paravirtualization-for-devices" title="Permanent link">&para;</a></h3>
+<p>Even with hardware-assisted <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> virtualization, device emulation remains a bottleneck. Emulating a real Intel e1000 network card means the hypervisor must intercept every register access, simulate the hardware's behavior, and translate between the guest's I/O operations and actual network traffic. This is slow.</p>
+<p>Virtio, developed for use with <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> (but now used by other hypervisors too), takes the paravirtualization approach for devices. Instead of emulating real hardware, virtio defines a simple, efficient interface specifically designed for hypervisor-to-guest communication:</p>
+<dl>
+<dt><code>virtio-net</code></dt>
+<dd>Paravirtualized network card for efficient packet transmission between guest and host.</dd>
+<dt><code>virtio-blk</code></dt>
+<dd>Paravirtualized block device for disk I/O with minimal overhead.</dd>
+<dt><code>virtio-scsi</code></dt>
+<dd>Paravirtualized <abbr title="Small Computer System Interface -- a standard for connecting storage devices.">SCSI</abbr> controller supporting advanced features like TRIM and multiqueue.</dd>
+<dt><code>virtio-gpu</code></dt>
+<dd>Paravirtualized graphics for 2D/3D acceleration without full GPU emulation.</dd>
+<dt><code>virtio-fs</code></dt>
+<dd>Paravirtualized filesystem sharing between host and guest using FUSE.</dd>
+</dl>
 <p>The virtio interface uses shared memory queues ("virtqueues") for communication. The guest places requests in a queue, notifies the hypervisor with a single write, and the hypervisor processes them and places responses in a return queue. This is far more efficient than emulating hundreds of register accesses for a single I/O operation.</p>
-<p>The trade-off is that the guest must have virtio drivers. Linux has had virtio support since 2008, and Windows virtio drivers are available (though not included by default). When you provision a cloud VM, you're almost certainly using virtio devices even if you don't realize it.</p>
-<h3 id="paravirtualization-today">Paravirtualization today</h3>
+<p>The trade-off is that the guest must have virtio drivers. Linux has had virtio support since 2008, and Windows virtio drivers are available (though not included by default). When you provision a cloud <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>, you're almost certainly using virtio devices even if you don't realize it.</p>
+<h3 id="paravirtualization-today">Paravirtualization today<a class="headerlink" href="#paravirtualization-today" title="Permanent link">&para;</a></h3>
 <p>You'll still see the term "paravirtualization" in older documentation, particularly around AWS EC2's older instance types and Xen-based platforms. However, the term has fallen somewhat out of fashion -- we now just talk about "virtio drivers" without necessarily invoking the paravirtualization concept.</p>
 <p>The pattern remains important though: rather than perfectly emulating legacy hardware, design an interface optimized for the virtual environment. This principle extends beyond virtualization to containers (where the "hardware" is the kernel's syscall interface) and even to some modern hardware designs.</p>
 <div class="admonition info">
@@ -4640,12 +4641,12 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 </thead>
 <tbody>
 <tr>
-<td>Intel VT-x</td>
+<td>Intel <abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr></td>
 <td><a href="https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html">Intel's virtualization technology documentation</a> (Vol. 3, Chapter 23+) is comprehensive but dense</td>
 </tr>
 <tr>
-<td>KVM internals</td>
-<td><a href="https://lwn.net/Articles/658511/">This LWN article series</a> covers KVM's architecture</td>
+<td><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> internals</td>
+<td><a href="https://lwn.net/Articles/658511/">This LWN article series</a> covers <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>'s architecture</td>
 </tr>
 <tr>
 <td>Virtio specification</td>
@@ -4662,46 +4663,45 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 </tbody>
 </table>
 </div>
-<h2 id="microvms">MicroVMs</h2>
-<p>We've discussed how QEMU emulates specific Intel chipsets (i440fx or q35) to maintain compatibility with existing operating systems. This is powerful -- you can run an unmodified Windows installation from 2005 if you want -- but it comes with costs. QEMU must initialize all those emulated devices, the guest BIOS must probe them, and the guest kernel must detect and initialize drivers for them. Even with virtio devices doing the real work, there's still overhead from the legacy compatibility layer.</p>
+<h2 id="microvms">MicroVMs<a class="headerlink" href="#microvms" title="Permanent link">&para;</a></h2>
+<p>We've discussed how <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> emulates specific Intel chipsets (i440fx or q35) to maintain compatibility with existing operating systems. This is powerful -- you can run an unmodified Windows installation from 2005 if you want -- but it comes with costs. <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> must initialize all those emulated devices, the guest <abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr> must probe them, and the guest kernel must detect and initialize drivers for them. Even with virtio devices doing the real work, there's still overhead from the legacy compatibility layer.</p>
 <p>MicroVMs take a radically different approach: what if we didn't pretend to be a legacy Intel PC at all?</p>
-<h3 id="the-firecracker-approach">The Firecracker approach</h3>
+<h3 id="the-firecracker-approach">The Firecracker approach<a class="headerlink" href="#the-firecracker-approach" title="Permanent link">&para;</a></h3>
 <p>Firecracker, developed by Amazon and released as open source in 2018, is the most prominent example of the microVM concept. It powers AWS Lambda (serverless functions) and AWS Fargate (serverless containers).</p>
-<p>Firecracker is not a fork of QEMU -- it's a clean-room implementation of a minimal Virtual Machine Monitor (VMM) written in Rust. It uses KVM for hardware virtualization but provides an extremely limited device model:</p>
+<p>Firecracker is not a fork of <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> -- it's a clean-room implementation of a minimal Virtual Machine Monitor (<abbr title="Virtual Machine Monitor -- software that creates and manages virtual machines.">VMM</abbr>) written in Rust. It uses <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> for hardware virtualization but provides an extremely limited device model:</p>
 <ul>
 <li>One virtio-net device (network)</li>
 <li>One virtio-block device (disk)</li>
 <li>A serial console</li>
 <li>A minimal "i8042" keyboard controller (just enough to handle reboot requests)</li>
-<li>An RTC (real-time clock)</li>
+<li>An <abbr title="Real-Time Clock -- hardware that keeps track of time even when powered off.">RTC</abbr> (real-time clock)</li>
 </ul>
-<p>That's it. No emulated IDE controllers, no emulated SATA, no emulated graphics, no PCI bus, no ACPI (1), no USB, no legacy anything. The guest kernel must be configured to work with this minimal environment -- you can't boot an arbitrary Linux distribution ISO.
-{ .annotate }</p>
+<p class="annotate">That's it. No emulated IDE controllers, no emulated <abbr title="Serial ATA -- an interface for connecting storage devices.">SATA</abbr>, no emulated graphics, no PCI bus, no <abbr title="Advanced Configuration and Power Interface -- standard for hardware discovery and power management.">ACPI</abbr> (1), no USB, no legacy anything. The guest kernel must be configured to work with this minimal environment -- you can't boot an arbitrary Linux distribution ISO.</p>
 <ol>
-<li>ACPI (Advanced Configuration and Power Interface) is how modern operating systems discover hardware, manage power states, and handle events like pressing the power button. Firecracker's lack of ACPI means guests must be specifically built to work without it.</li>
+<li><abbr title="Advanced Configuration and Power Interface -- standard for hardware discovery and power management.">ACPI</abbr> (Advanced Configuration and Power Interface) is how modern operating systems discover hardware, manage power states, and handle events like pressing the power button. Firecracker's lack of <abbr title="Advanced Configuration and Power Interface -- standard for hardware discovery and power management.">ACPI</abbr> means guests must be specifically built to work without it.</li>
 </ol>
-<h3 id="the-trade-offs">The trade-offs</h3>
+<h3 id="the-trade-offs">The trade-offs<a class="headerlink" href="#the-trade-offs" title="Permanent link">&para;</a></h3>
 <p>This minimalism has significant benefits:</p>
-<p><strong>Boot time</strong>: A Firecracker microVM can boot a Linux kernel in around 125 milliseconds. Compare this to a traditional QEMU VM which might take 2-5 seconds even with optimization. For serverless workloads where you're starting VMs in response to incoming requests, this difference is critical.</p>
-<p><strong>Memory overhead</strong>: Firecracker's VMM process uses about 5MB of memory. QEMU's process can easily use 30-50MB or more before you even count the guest's memory. When running thousands of microVMs on a single host (as AWS does), this adds up.</p>
-<p><strong>Attack surface</strong>: Less code means fewer potential security vulnerabilities. Firecracker is around 50,000 lines of code; QEMU is over 2 million. For multi-tenant environments where isolation is paramount, this matters.</p>
-<p><strong>Startup overhead</strong>: No complex device initialization, no BIOS/UEFI boot process, no GRUB. Firecracker loads the kernel directly into memory and starts executing it.</p>
+<p><strong>Boot time</strong>: A Firecracker microVM can boot a Linux kernel in around 125 milliseconds. Compare this to a traditional <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> which might take 2-5 seconds even with optimization. For serverless workloads where you're starting VMs in response to incoming requests, this difference is critical.</p>
+<p><strong>Memory overhead</strong>: Firecracker's <abbr title="Virtual Machine Monitor -- software that creates and manages virtual machines.">VMM</abbr> process uses about 5MB of memory. <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr>'s process can easily use 30-50MB or more before you even count the guest's memory. When running thousands of microVMs on a single host (as AWS does), this adds up.</p>
+<p><strong>Attack surface</strong>: Less code means fewer potential security vulnerabilities. Firecracker is around 50,000 lines of code; <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> is over 2 million. For multi-tenant environments where isolation is paramount, this matters.</p>
+<p><strong>Startup overhead</strong>: No complex device initialization, no <abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr>/<abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr> boot process, no <abbr title="GRand Unified Bootloader -- the most common Linux bootloader.">GRUB</abbr>. Firecracker loads the kernel directly into memory and starts executing it.</p>
 <p>The costs are flexibility:</p>
 <p><strong>Guest requirements</strong>: The guest kernel must be built with the right drivers (virtio) and without dependencies on hardware that doesn't exist. You can't just download a cloud image and boot it.</p>
 <p><strong>No graphical output</strong>: There's no emulated graphics card. This is fine for server workloads but means you can't run desktop applications.</p>
-<p><strong>Limited device support</strong>: Need to pass through a GPU? Attach a USB device? Use SR-IOV networking? These aren't supported.</p>
+<p><strong>Limited device support</strong>: Need to pass through a GPU? Attach a USB device? Use <abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr> networking? These aren't supported.</p>
 <p><strong>Linux-centric</strong>: While technically you could run other operating systems, Firecracker is really designed for Linux guests. Windows support is not a priority.</p>
-<h3 id="cloud-hypervisor-and-alternatives">Cloud Hypervisor and alternatives</h3>
+<h3 id="cloud-hypervisor-and-alternatives">Cloud Hypervisor and alternatives<a class="headerlink" href="#cloud-hypervisor-and-alternatives" title="Permanent link">&para;</a></h3>
 <p>Firecracker isn't alone in this space. Cloud Hypervisor, started by Intel and now a Linux Foundation project, takes a similar approach with some different trade-offs:</p>
 <ul>
 <li>Written in Rust (like Firecracker)</li>
 <li>Supports more devices (including PCI, VFIO for device passthrough, and vhost-user)</li>
-<li>Can boot from UEFI (using the rust-hypervisor-firmware or OVMF)</li>
+<li>Can boot from <abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr> (using the rust-hypervisor-firmware or OVMF)</li>
 <li>Supports hotplug of CPUs, memory, and devices</li>
 <li>Generally targets a slightly broader set of use cases than Firecracker</li>
 </ul>
-<p>QEMU itself has a "microvm" machine type that strips down the device model significantly, giving you some of the microVM benefits while staying within the QEMU ecosystem.</p>
-<h3 id="when-to-use-what">When to use what</h3>
+<p><abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> itself has a "microvm" machine type that strips down the device model significantly, giving you some of the microVM benefits while staying within the <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> ecosystem.</p>
+<h3 id="when-to-use-what">When to use what<a class="headerlink" href="#when-to-use-what" title="Permanent link">&para;</a></h3>
 <p>The choice between traditional VMs, microVMs, and containers depends on your requirements:</p>
 <table>
 <thead>
@@ -4714,12 +4714,12 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 <tbody>
 <tr>
 <td>Running arbitrary guest OSes</td>
-<td>Traditional VM (QEMU/KVM)</td>
+<td>Traditional <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> (<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr>/<abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>)</td>
 <td>Full hardware emulation for compatibility</td>
 </tr>
 <tr>
 <td>Long-running server workloads</td>
-<td>Traditional VM or microVM</td>
+<td>Traditional <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> or microVM</td>
 <td>Boot time less critical, flexibility may matter</td>
 </tr>
 <tr>
@@ -4730,16 +4730,16 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 <tr>
 <td>Container isolation</td>
 <td>MicroVM</td>
-<td>Lighter than traditional VM, stronger isolation than containers</td>
+<td>Lighter than traditional <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>, stronger isolation than containers</td>
 </tr>
 <tr>
 <td>Desktop virtualization</td>
-<td>Traditional VM</td>
+<td>Traditional <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr></td>
 <td>Need graphics, USB, broad hardware support</td>
 </tr>
 <tr>
 <td>Development/testing</td>
-<td>Traditional VM</td>
+<td>Traditional <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr></td>
 <td>Flexibility trumps performance</td>
 </tr>
 </tbody>
@@ -4774,30 +4774,30 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 </tbody>
 </table>
 </div>
-<h2 id="hardware-offloading-aws-nitro">Hardware offloading: AWS Nitro</h2>
+<h2 id="hardware-offloading-aws-nitro">Hardware offloading: AWS Nitro<a class="headerlink" href="#hardware-offloading-aws-nitro" title="Permanent link">&para;</a></h2>
 <p>MicroVMs reduce overhead by minimizing the software hypervisor. AWS Nitro takes a different approach: offload the hypervisor's work to dedicated hardware.</p>
-<h3 id="the-traditional-hypervisor-problem">The traditional hypervisor problem</h3>
-<p>In a traditional virtualization setup, the hypervisor software running on the main CPU handles:</p>
+<h3 id="the-traditional-hypervisor-problem">The traditional hypervisor problem<a class="headerlink" href="#the-traditional-hypervisor-problem" title="Permanent link">&para;</a></h3>
+<p>In a traditional virtualization setup, the hypervisor software running on the main <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> handles:</p>
 <ul>
-<li>CPU virtualization (with hardware assist from VT-x/AMD-V)</li>
+<li><abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> virtualization (with hardware assist from <abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr>/<abbr title="AMD Virtualization -- AMD's hardware virtualization extensions for x86 processors.">AMD-V</abbr>)</li>
 <li>Memory management and page table handling</li>
 <li>Network I/O (even with virtio, the hypervisor processes packets)</li>
 <li>Storage I/O (reading and writing to disk images)</li>
 <li>Security monitoring and isolation enforcement</li>
 </ul>
-<p>Even with efficient implementations, all of this work competes with guest workloads for CPU cycles. The hypervisor needs CPU time to process network packets, handle storage requests, and manage VM state. This creates "noisy neighbor" problems where one VM's I/O can affect another's performance, and means customers aren't getting 100% of the CPU they're paying for.</p>
-<h3 id="the-nitro-approach">The Nitro approach</h3>
-<p>AWS Nitro, introduced starting around 2017 and fully deployed by 2018, moves almost all of this work off the main CPU and onto dedicated hardware:</p>
-<p><strong>Nitro Cards</strong>: Custom PCIe cards that handle specific functions:</p>
+<p>Even with efficient implementations, all of this work competes with guest workloads for <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> cycles. The hypervisor needs <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> time to process network packets, handle storage requests, and manage <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> state. This creates "noisy neighbor" problems where one <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>'s I/O can affect another's performance, and means customers aren't getting 100% of the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> they're paying for.</p>
+<h3 id="the-nitro-approach">The Nitro approach<a class="headerlink" href="#the-nitro-approach" title="Permanent link">&para;</a></h3>
+<p>AWS Nitro, introduced starting around 2017 and fully deployed by 2018, moves almost all of this work off the main <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> and onto dedicated hardware:</p>
+<p><strong>Nitro Cards</strong>: Custom <abbr title="PCI Express -- high-speed serial bus for connecting hardware components.">PCIe</abbr> cards that handle specific functions:</p>
 <ul>
 <li>
-<p><em>Nitro Card for VPC</em>: Handles all network I/O, including VPC networking, security groups, and Elastic Network Adapters (ENAs). Network packets flow directly between the Nitro card and guest memory via SR-IOV, never touching the hypervisor.</p>
+<p><em>Nitro Card for <abbr title="Virtual Private Cloud -- an isolated virtual network within a cloud provider.">VPC</abbr></em>: Handles all network I/O, including <abbr title="Virtual Private Cloud -- an isolated virtual network within a cloud provider.">VPC</abbr> networking, security groups, and Elastic Network Adapters (ENAs). Network packets flow directly between the Nitro card and guest memory via <abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr>, never touching the hypervisor.</p>
 </li>
 <li>
-<p><em>Nitro Card for EBS</em>: Handles Elastic Block Store (remote storage) I/O. Storage requests go directly to the Nitro card, which handles encryption, network transport to EBS servers, and data integrity -- all without hypervisor involvement.</p>
+<p><em>Nitro Card for <abbr title="Elastic Block Store -- AWS's block storage service for EC2 instances.">EBS</abbr></em>: Handles Elastic Block Store (remote storage) I/O. Storage requests go directly to the Nitro card, which handles encryption, network transport to <abbr title="Elastic Block Store -- AWS's block storage service for EC2 instances.">EBS</abbr> servers, and data integrity -- all without hypervisor involvement.</p>
 </li>
 <li>
-<p><em>Nitro Card for Instance Storage</em>: Manages local NVMe storage, including encryption.</p>
+<p><em>Nitro Card for Instance Storage</em>: Manages local <abbr title="Non-Volatile Memory Express -- a protocol for accessing SSDs over PCIe.">NVMe</abbr> storage, including encryption.</p>
 </li>
 </ul>
 <p><strong>Nitro Security Chip</strong>: A dedicated chip on the motherboard that provides:</p>
@@ -4807,18 +4807,18 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 <li>Continuous monitoring of firmware and hardware</li>
 <li>Protection against physical attacks</li>
 </ul>
-<p><strong>Nitro Hypervisor</strong>: What's left of the hypervisor is minimal -- it's a stripped-down, KVM-based system that handles only CPU and memory virtualization. Because network and storage are offloaded, the Nitro Hypervisor has very little to do during normal operation.</p>
-<h3 id="the-benefits">The benefits</h3>
-<p><strong>Near-bare-metal performance</strong>: With I/O offloaded to hardware, guests get nearly 100% of the CPU they're paying for. AWS claims the Nitro Hypervisor itself consumes negligible resources.</p>
+<p><strong>Nitro Hypervisor</strong>: What's left of the hypervisor is minimal -- it's a stripped-down, <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>-based system that handles only <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> and memory virtualization. Because network and storage are offloaded, the Nitro Hypervisor has very little to do during normal operation.</p>
+<h3 id="the-benefits">The benefits<a class="headerlink" href="#the-benefits" title="Permanent link">&para;</a></h3>
+<p><strong>Near-bare-metal performance</strong>: With I/O offloaded to hardware, guests get nearly 100% of the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> they're paying for. AWS claims the Nitro Hypervisor itself consumes negligible resources.</p>
 <p><strong>Improved security</strong>: The hypervisor is minimal and doesn't need to process network traffic or storage I/O, reducing attack surface. The Nitro Security Chip provides hardware-backed isolation that software can't achieve.</p>
-<p><strong>Consistent performance</strong>: Because I/O doesn't compete with compute for CPU cycles, performance is more predictable. The "noisy neighbor" problem is significantly reduced.</p>
+<p><strong>Consistent performance</strong>: Because I/O doesn't compete with compute for <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> cycles, performance is more predictable. The "noisy neighbor" problem is significantly reduced.</p>
 <p><strong>New instance types</strong>: Nitro enabled instance types that weren't previously possible, including bare-metal instances (where customers get direct hardware access with no hypervisor overhead at all) and instances with very high network bandwidth (100 Gbps+).</p>
-<h3 id="the-trade-offs_1">The trade-offs</h3>
+<h3 id="the-trade-offs_1">The trade-offs<a class="headerlink" href="#the-trade-offs_1" title="Permanent link">&para;</a></h3>
 <p>Nitro is not something you can deploy in your own data center -- it's proprietary AWS hardware. The concepts, however, are worth understanding:</p>
 <p><strong>Hardware cost</strong>: Building custom silicon is expensive. This only makes sense at AWS's scale where the per-unit cost is amortized across millions of instances.</p>
-<p><strong>Flexibility vs. optimization</strong>: Nitro is optimized for AWS's specific use cases. A general-purpose hypervisor like QEMU/KVM can do things Nitro can't, but with more overhead.</p>
+<p><strong>Flexibility vs. optimization</strong>: Nitro is optimized for AWS's specific use cases. A general-purpose hypervisor like <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr>/<abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> can do things Nitro can't, but with more overhead.</p>
 <p><strong>Vendor lock-in</strong>: Workloads optimized for Nitro's performance characteristics may behave differently on other cloud providers or on-premises infrastructure.</p>
-<h3 id="comparison-of-approaches">Comparison of approaches</h3>
+<h3 id="comparison-of-approaches">Comparison of approaches<a class="headerlink" href="#comparison-of-approaches" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4829,8 +4829,8 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 </thead>
 <tbody>
 <tr>
-<td>Hardware-assisted virtualization (VT-x)</td>
-<td>CPU handles VM traps efficiently</td>
+<td>Hardware-assisted virtualization (<abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr>)</td>
+<td><abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> handles <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> traps efficiently</td>
 <td>Still need software for devices</td>
 </tr>
 <tr>
@@ -4850,30 +4850,30 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 </tr>
 </tbody>
 </table>
-<p>These approaches aren't mutually exclusive -- AWS Nitro uses hardware-assisted virtualization (KVM) combined with virtio-style interfaces to the Nitro cards. The evolution of virtualization has been about pushing different bottlenecks to wherever they can be handled most efficiently.</p>
-<h3 id="other-cloud-providers">Other cloud providers</h3>
+<p>These approaches aren't mutually exclusive -- AWS Nitro uses hardware-assisted virtualization (<abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>) combined with virtio-style interfaces to the Nitro cards. The evolution of virtualization has been about pushing different bottlenecks to wherever they can be handled most efficiently.</p>
+<h3 id="other-cloud-providers">Other cloud providers<a class="headerlink" href="#other-cloud-providers" title="Permanent link">&para;</a></h3>
 <p>AWS isn't alone in this approach:</p>
 <ul>
 <li><strong>Google Cloud</strong>: Uses custom Titanium hardware for similar offloading of network and security functions</li>
-<li><strong>Microsoft Azure</strong>: Has been moving towards hardware offload with their SmartNIC and FPGA-based approaches</li>
+<li><strong>Microsoft Azure</strong>: Has been moving towards hardware offload with their SmartNIC and <abbr title="Field-Programmable Gate Array -- reconfigurable integrated circuit.">FPGA</abbr>-based approaches</li>
 <li><strong>Alibaba Cloud</strong>: Developed their own hardware acceleration called MOC (Multi-function Offload Card)</li>
 </ul>
 <p>The trend toward hardware offloading is clear: at hyperscale, custom silicon makes economic sense, and the performance benefits are substantial.</p>
-<h3 id="commercially-available-hardware-dpus-and-smartnics">Commercially available hardware: DPUs and SmartNICs</h3>
-<p>While AWS Nitro is proprietary, you can buy similar hardware for your own data center. The industry has settled on terms like "SmartNIC" (smart network interface card) and "DPU" (Data Processing Unit) for these devices, though the marketing terminology varies.</p>
-<p><strong>NVIDIA BlueField</strong>: The most prominent commercially available DPU. BlueField cards include:</p>
+<h3 id="commercially-available-hardware-dpus-and-smartnics">Commercially available hardware: DPUs and SmartNICs<a class="headerlink" href="#commercially-available-hardware-dpus-and-smartnics" title="Permanent link">&para;</a></h3>
+<p>While AWS Nitro is proprietary, you can buy similar hardware for your own data center. The industry has settled on terms like "SmartNIC" (smart network interface card) and "<abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr>" (Data Processing Unit) for these devices, though the marketing terminology varies.</p>
+<p><strong>NVIDIA BlueField</strong>: The most prominent commercially available <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr>. BlueField cards include:</p>
 <ul>
 <li>ARM cores that can run a full Linux distribution (including a hypervisor)</li>
-<li>Hardware acceleration for networking (OVS offload, VXLAN/Geneve encapsulation)</li>
-<li>Storage offload (NVMe-oF, encryption, compression)</li>
+<li>Hardware acceleration for networking (<abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr> offload, <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr>/Geneve encapsulation)</li>
+<li>Storage offload (<abbr title="NVMe over Fabrics -- NVMe extended to work over network fabrics.">NVMe-oF</abbr>, encryption, compression)</li>
 <li>Security functions (IPsec, TLS, firewalling)</li>
 </ul>
-<p>The BlueField can operate in different modes. In "DPU mode," the ARM cores on the card run the hypervisor and control plane, and the x86 host runs only guest workloads -- essentially the same architecture as Nitro. NVIDIA calls this approach "infrastructure on a chip."</p>
+<p>The BlueField can operate in different modes. In "<abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> mode," the ARM cores on the card run the hypervisor and control plane, and the x86 host runs only guest workloads -- essentially the same architecture as Nitro. NVIDIA calls this approach "infrastructure on a chip."</p>
 <p><strong>AMD/Pensando</strong>: AMD acquired Pensando in 2022. Their DPUs focus on network and security offload, with programmable packet processing pipelines. They're used in Oracle Cloud Infrastructure and other environments.</p>
-<p><strong>Intel IPU</strong>: Intel's Infrastructure Processing Unit is their answer to the DPU trend. Intel has been working on both FPGA-based and ASIC-based solutions.</p>
-<p><strong>Marvell OCTEON</strong>: Another established player in the SmartNIC/DPU space, with a focus on programmable networking and security.</p>
+<p><strong>Intel IPU</strong>: Intel's Infrastructure Processing Unit is their answer to the <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> trend. Intel has been working on both <abbr title="Field-Programmable Gate Array -- reconfigurable integrated circuit.">FPGA</abbr>-based and <abbr title="Application-Specific Integrated Circuit -- custom chip designed for a specific purpose.">ASIC</abbr>-based solutions.</p>
+<p><strong>Marvell OCTEON</strong>: Another established player in the SmartNIC/<abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> space, with a focus on programmable networking and security.</p>
 <p><strong>Fungible</strong>: Was an interesting startup building DPUs with a focus on storage and composable infrastructure. Microsoft acquired them in 2023, presumably for Azure infrastructure.</p>
-<h3 id="what-these-can-offload">What these can offload</h3>
+<h3 id="what-these-can-offload">What these can offload<a class="headerlink" href="#what-these-can-offload" title="Permanent link">&para;</a></h3>
 <p>Modern DPUs can handle:</p>
 <table>
 <thead>
@@ -4884,11 +4884,11 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 </thead>
 <tbody>
 <tr>
-<td>OVS offload</td>
+<td><abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr> offload</td>
 <td>Move Open vSwitch packet processing to hardware</td>
 </tr>
 <tr>
-<td>VXLAN/Geneve</td>
+<td><abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr>/Geneve</td>
 <td>Tunnel encapsulation/decapsulation in hardware</td>
 </tr>
 <tr>
@@ -4900,8 +4900,8 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 <td>IPsec, TLS, or storage encryption acceleration</td>
 </tr>
 <tr>
-<td>NVMe-oF</td>
-<td>Remote storage access without CPU involvement</td>
+<td><abbr title="NVMe over Fabrics -- NVMe extended to work over network fabrics.">NVMe-oF</abbr></td>
+<td>Remote storage access without <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> involvement</td>
 </tr>
 <tr>
 <td>Virtio acceleration</td>
@@ -4909,50 +4909,50 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 </tr>
 </tbody>
 </table>
-<p>The most interesting capability is running the hypervisor itself on the DPU's embedded cores. This gives you the Nitro architecture -- a minimal trust boundary on the host, with infrastructure management isolated on the DPU.</p>
-<h3 id="why-the-focus-on-networking">Why the focus on networking?</h3>
-<p>Virtual networking is disproportionately expensive in CPU terms. Open vSwitch (OVS), the software switch used by most cloud platforms, is notoriously CPU-hungry. In extreme cases, a <a href="https://www.electronicdesign.com/technologies/test-measurement/article/21168521/napatech-virtual-switch-offloading-maximizes-data-center-utilization">16-core server might dedicate 8 cores to the vSwitch</a> while only 6 run actual VMs. Research on <a href="https://www.sciencedirect.com/science/article/abs/pii/S1389128621000244">SmartNIC offload</a> has shown that moving OVS flow processing to hardware can reduce host CPU utilization by up to 97% for that function.</p>
-<p>The network focus makes sense for several reasons. Every packet requires processing -- it's a per-operation cost that scales directly with traffic volume. Cloud networking adds layers of overhead: VXLAN or Geneve encapsulation for overlay networks, security group rule evaluation, VPC routing, and connection tracking for stateful firewalls. Unlike storage I/O which can be batched and is often sequential, network traffic is bursty and latency-sensitive. A few milliseconds of delay in packet processing is immediately visible to applications.</p>
-<p>This is why AWS, before Nitro, had to <a href="https://perspectives.mvdirona.com/2019/02/aws-nitro-system/">reserve multiple CPU cores from each server</a> just for network and storage emulation -- cores they couldn't sell to customers. Offloading this work to dedicated hardware means those cores become available for guest workloads.</p>
-<h3 id="should-you-use-them">Should you use them?</h3>
+<p>The most interesting capability is running the hypervisor itself on the <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr>'s embedded cores. This gives you the Nitro architecture -- a minimal trust boundary on the host, with infrastructure management isolated on the <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr>.</p>
+<h3 id="why-the-focus-on-networking">Why the focus on networking?<a class="headerlink" href="#why-the-focus-on-networking" title="Permanent link">&para;</a></h3>
+<p>Virtual networking is disproportionately expensive in <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> terms. Open vSwitch (<abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr>), the software switch used by most cloud platforms, is notoriously <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr>-hungry. In extreme cases, a <a href="https://www.electronicdesign.com/technologies/test-measurement/article/21168521/napatech-virtual-switch-offloading-maximizes-data-center-utilization">16-core server might dedicate 8 cores to the vSwitch</a> while only 6 run actual VMs. Research on <a href="https://www.sciencedirect.com/science/article/abs/pii/S1389128621000244">SmartNIC offload</a> has shown that moving <abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr> flow processing to hardware can reduce host <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> utilization by up to 97% for that function.</p>
+<p>The network focus makes sense for several reasons. Every packet requires processing -- it's a per-operation cost that scales directly with traffic volume. Cloud networking adds layers of overhead: <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> or Geneve encapsulation for overlay networks, security group rule evaluation, <abbr title="Virtual Private Cloud -- an isolated virtual network within a cloud provider.">VPC</abbr> routing, and connection tracking for stateful firewalls. Unlike storage I/O which can be batched and is often sequential, network traffic is bursty and latency-sensitive. A few milliseconds of delay in packet processing is immediately visible to applications.</p>
+<p>This is why AWS, before Nitro, had to <a href="https://perspectives.mvdirona.com/2019/02/aws-nitro-system/">reserve multiple <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> cores from each server</a> just for network and storage emulation -- cores they couldn't sell to customers. Offloading this work to dedicated hardware means those cores become available for guest workloads.</p>
+<h3 id="should-you-use-them">Should you use them?<a class="headerlink" href="#should-you-use-them" title="Permanent link">&para;</a></h3>
 <p>For most organizations, the answer is probably "not yet" for several reasons:</p>
 <p><strong>Cost</strong>: DPUs are expensive -- a BlueField-2 was in the $1,000-2,000+ range when released, and newer generations cost more. You need significant scale before the performance benefits outweigh the hardware cost.</p>
 <p><strong>Complexity</strong>: These devices add another layer of infrastructure to manage. You need expertise in configuring and monitoring them, and your existing tooling may not support them.</p>
 <p><strong>Software maturity</strong>: While the hardware is capable, the software ecosystem is still maturing. Integration with hypervisors, container runtimes, and orchestration systems varies in quality.</p>
-<p><strong>Workload fit</strong>: If your workloads aren't network or storage I/O intensive, you won't see much benefit. A CPU-bound application doesn't care about DPU offload.</p>
+<p><strong>Workload fit</strong>: If your workloads aren't network or storage I/O intensive, you won't see much benefit. A <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr>-bound application doesn't care about <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> offload.</p>
 <p>That said, if you're building infrastructure at significant scale (hundreds of servers), running network-intensive workloads (NFV, CDN, high-frequency trading), or have strict security isolation requirements, DPUs are worth evaluating.</p>
-<h3 id="open-source-platform-support">Open source platform support</h3>
-<p>If you're running an open source cloud platform, here's the current state of DPU/SmartNIC support:</p>
+<h3 id="open-source-platform-support">Open source platform support<a class="headerlink" href="#open-source-platform-support" title="Permanent link">&para;</a></h3>
+<p>If you're running an open source cloud platform, here's the current state of <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr>/SmartNIC support:</p>
 <p><strong>OpenStack</strong>: Has the most mature support among open source platforms. Key integration points include:</p>
 <ul>
-<li><em>OVS hardware offload</em>: Open vSwitch can offload flow processing to SmartNICs. This is configured through Neutron and requires the right drivers and <code>tc</code> (traffic control) flower offload support. Works with BlueField, Pensando, and others.</li>
-<li><em>OVN offload</em>: Similar to OVS offload but for OVN-based deployments. Still maturing.</li>
-<li><em>SR-IOV</em>: A simpler form of hardware offload where virtual functions are passed directly to VMs. Well-supported in Nova and Neutron.</li>
+<li><em><abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr> hardware offload</em>: Open vSwitch can offload flow processing to SmartNICs. This is configured through Neutron and requires the right drivers and <code>tc</code> (traffic control) flower offload support. Works with BlueField, Pensando, and others.</li>
+<li><em>OVN offload</em>: Similar to <abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr> offload but for OVN-based deployments. Still maturing.</li>
+<li><em><abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr></em>: A simpler form of hardware offload where virtual functions are passed directly to VMs. Well-supported in Nova and Neutron.</li>
 <li><em>NVIDIA DOCA/BlueField</em>: NVIDIA provides documentation and some upstream patches for BlueField integration, but expect to do significant integration work yourself.</li>
 </ul>
 <p>The reality is that while OpenStack can use these devices, the configuration is complex, documentation is scattered, and you'll likely need vendor support or significant expertise. Most OpenStack deployments still use software-based networking.</p>
-<p><strong>oVirt</strong>: Limited native DPU support. oVirt is built on libvirt and KVM, so it inherits whatever those support:</p>
+<p><strong>oVirt</strong>: Limited native <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> support. oVirt is built on libvirt and <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>, so it inherits whatever those support:</p>
 <ul>
-<li><em>SR-IOV</em>: Works through libvirt's hostdev passthrough. You can assign virtual functions to VMs.</li>
-<li><em>OVS offload</em>: Possible in theory since oVirt uses OVS, but not well-documented or tested.</li>
-<li><em>Full DPU mode</em>: Not really a supported configuration.</li>
+<li><em><abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr></em>: Works through libvirt's hostdev passthrough. You can assign virtual functions to VMs.</li>
+<li><em><abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr> offload</em>: Possible in theory since oVirt uses <abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr>, but not well-documented or tested.</li>
+<li><em>Full <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> mode</em>: Not really a supported configuration.</li>
 </ul>
 <p>oVirt is more focused on traditional enterprise virtualization use cases than cutting-edge hardware offload.</p>
-<p><strong>Proxmox</strong>: Minimal DPU support. Proxmox targets small-to-medium deployments where the complexity of DPUs isn't justified:</p>
+<p><strong>Proxmox</strong>: Minimal <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> support. Proxmox targets small-to-medium deployments where the complexity of DPUs isn't justified:</p>
 <ul>
-<li><em>SR-IOV</em>: Works for network passthrough to VMs, configured manually outside the GUI.</li>
+<li><em><abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr></em>: Works for network passthrough to VMs, configured manually outside the GUI.</li>
 <li><em>SmartNIC offload</em>: No integrated support. You'd have to configure everything at the Linux level yourself.</li>
-<li><em>Full DPU mode</em>: Not supported.</li>
+<li><em>Full <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> mode</em>: Not supported.</li>
 </ul>
 <p>Proxmox's strength is simplicity; DPUs add complexity that conflicts with that philosophy.</p>
-<p><strong>Kubernetes</strong>: Actually has some of the better DPU integration stories:</p>
+<p><strong>Kubernetes</strong>: Actually has some of the better <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> integration stories:</p>
 <ul>
 <li><em>NVIDIA Network Operator</em>: Deploys and manages BlueField configuration in Kubernetes clusters.</li>
-<li><em>SR-IOV Network Operator</em>: Manages SR-IOV virtual functions for container networking.</li>
-<li><em>Multus CNI</em>: Allows pods to have multiple network interfaces, including SR-IOV and DPU-accelerated ones.</li>
+<li><em><abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr> Network Operator</em>: Manages <abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr> virtual functions for container networking.</li>
+<li><em>Multus CNI</em>: Allows pods to have multiple network interfaces, including <abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr> and <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr>-accelerated ones.</li>
 </ul>
 <p>The container ecosystem has embraced hardware offload more readily than traditional virtualization platforms, possibly because Kubernetes is more commonly deployed at the scale where it matters.</p>
-<p><strong>The honest assessment</strong>: Unless you're running OpenStack at significant scale or have very specific performance requirements, DPU support in open source platforms is probably not mature enough for production use without vendor support contracts. SR-IOV is the exception -- it's simpler, well-understood, and works reliably across platforms.</p>
+<p><strong>The honest assessment</strong>: Unless you're running OpenStack at significant scale or have very specific performance requirements, <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> support in open source platforms is probably not mature enough for production use without vendor support contracts. <abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr> is the exception -- it's simpler, well-understood, and works reliably across platforms.</p>
 <div class="admonition info">
 <p class="admonition-title">Want to know more?</p>
 <table>
@@ -4976,8 +4976,8 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 <td><a href="https://aws.amazon.com/blogs/security/security-design-of-the-aws-nitro-system/">AWS blog post</a> on Nitro's security design</td>
 </tr>
 <tr>
-<td>OpenStack SR-IOV</td>
-<td><a href="https://docs.openstack.org/neutron/latest/admin/config-sriov.html">OpenStack SR-IOV documentation</a> covers the basics</td>
+<td>OpenStack <abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr></td>
+<td><a href="https://docs.openstack.org/neutron/latest/admin/config-sriov.html">OpenStack <abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr> documentation</a> covers the basics</td>
 </tr>
 <tr>
 <td>NVIDIA BlueField with OpenStack</td>
@@ -4986,10 +4986,10 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 </tbody>
 </table>
 </div>
-<h2 id="what-hypervisor-am-i-running">What hypervisor am I running?</h2>
+<h2 id="what-hypervisor-am-i-running">What hypervisor am I running?<a class="headerlink" href="#what-hypervisor-am-i-running" title="Permanent link">&para;</a></h2>
 <p>We've covered a lot of history and technology. But what are you actually likely to encounter in practice? Let's survey the landscape.</p>
-<h3 id="linux-server-virtualization-kvmqemu-dominates">Linux server virtualization: KVM/QEMU dominates</h3>
-<p>If you're running virtual machines on Linux servers, you're almost certainly using KVM with QEMU. The open source cloud and virtualization platforms have converged on this stack:</p>
+<h3 id="linux-server-virtualization-kvmqemu-dominates">Linux server virtualization: <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>/<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> dominates<a class="headerlink" href="#linux-server-virtualization-kvmqemu-dominates" title="Permanent link">&para;</a></h3>
+<p>If you're running virtual machines on Linux servers, you're almost certainly using <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> with <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr>. The open source cloud and virtualization platforms have converged on this stack:</p>
 <table>
 <thead>
 <tr>
@@ -5001,49 +5001,49 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 <tbody>
 <tr>
 <td>OpenStack</td>
-<td>KVM/QEMU</td>
+<td><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>/<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr></td>
 <td>libvirt + Nova</td>
 </tr>
 <tr>
 <td>oVirt</td>
-<td>KVM/QEMU</td>
+<td><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>/<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr></td>
 <td>libvirt + VDSM</td>
 </tr>
 <tr>
 <td>Proxmox VE</td>
-<td>KVM/QEMU</td>
+<td><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>/<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr></td>
 <td>libvirt + custom tools</td>
 </tr>
 <tr>
 <td>Shaken Fist</td>
-<td>KVM/QEMU</td>
+<td><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>/<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr></td>
 <td>libvirt</td>
 </tr>
 <tr>
 <td>Red Hat Virtualization</td>
-<td>KVM/QEMU</td>
+<td><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>/<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr></td>
 <td>libvirt + VDSM</td>
 </tr>
 </tbody>
 </table>
-<p>The common thread is <strong>libvirt</strong> -- a virtualization API that abstracts away the details of the underlying hypervisor. While libvirt technically supports multiple hypervisors (Xen, VirtualBox, VMware ESXi, and others), surveys consistently show that 95%+ of libvirt users are running KVM/QEMU.</p>
+<p>The common thread is <strong>libvirt</strong> -- a virtualization <abbr title="Application Programming Interface -- a defined interface for software interaction.">API</abbr> that abstracts away the details of the underlying hypervisor. While libvirt technically supports multiple hypervisors (Xen, VirtualBox, VMware ESXi, and others), surveys consistently show that 95%+ of libvirt users are running <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>/<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr>.</p>
 <p>This convergence happened because:</p>
 <ul>
-<li>KVM is in the mainline Linux kernel, so it's always available and well-maintained</li>
-<li>QEMU provides mature, full-featured device emulation</li>
+<li><abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> is in the mainline Linux kernel, so it's always available and well-maintained</li>
+<li><abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> provides mature, full-featured device emulation</li>
 <li>The combination is free (as in beer and freedom)</li>
 <li>Performance is competitive with commercial alternatives</li>
 <li>The ecosystem (libvirt, virtio, SPICE) is mature</li>
 </ul>
-<h3 id="cloud-providers-proprietary-stacks">Cloud providers: proprietary stacks</h3>
+<h3 id="cloud-providers-proprietary-stacks">Cloud providers: proprietary stacks<a class="headerlink" href="#cloud-providers-proprietary-stacks" title="Permanent link">&para;</a></h3>
 <p>The major cloud providers have moved away from off-the-shelf solutions:</p>
-<p><strong>Amazon Web Services</strong>: Modern EC2 instances run on AWS Nitro, which we discussed earlier. The Nitro Hypervisor is a minimal KVM-based system, but the overall stack is proprietary. Older instance types ran on Xen, and you may still encounter these in documentation or legacy deployments. AWS Lambda and Fargate use Firecracker.</p>
-<p><strong>Google Cloud Platform</strong>: Uses a custom hypervisor that Google doesn't publicly document in detail. It's known to be KVM-based, and Google has been a significant contributor to KVM development. Google also developed gVisor, a user-space kernel that provides container isolation without traditional virtualization.</p>
-<p><strong>Microsoft Azure</strong>: Uses Hyper-V, Microsoft's hypervisor. Azure was one of the reasons Microsoft invested heavily in making Hyper-V competitive with KVM and VMware. More recently, Azure has been moving toward hardware offload with SmartNICs and FPGAs.</p>
-<p><strong>Oracle Cloud Infrastructure</strong>: Uses KVM with their own modifications. They acquired Pensando (now AMD) DPUs and use them for network offload.</p>
-<p><strong>Alibaba Cloud</strong>: Uses a KVM-based stack with custom modifications and their MOC (Multi-function Offload Card) for hardware acceleration.</p>
-<p>The pattern is clear: everyone is using or building on KVM, but the cloud providers have all heavily customized it and added proprietary hardware acceleration.</p>
-<h3 id="enterprise-virtualization-vmware-and-hyper-v">Enterprise virtualization: VMware and Hyper-V</h3>
+<p><strong>Amazon Web Services</strong>: Modern EC2 instances run on AWS Nitro, which we discussed earlier. The Nitro Hypervisor is a minimal <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>-based system, but the overall stack is proprietary. Older instance types ran on Xen, and you may still encounter these in documentation or legacy deployments. AWS Lambda and Fargate use Firecracker.</p>
+<p><strong>Google Cloud Platform</strong>: Uses a custom hypervisor that Google doesn't publicly document in detail. It's known to be <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>-based, and Google has been a significant contributor to <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> development. Google also developed gVisor, a user-space kernel that provides container isolation without traditional virtualization.</p>
+<p><strong>Microsoft Azure</strong>: Uses Hyper-V, Microsoft's hypervisor. Azure was one of the reasons Microsoft invested heavily in making Hyper-V competitive with <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> and VMware. More recently, Azure has been moving toward hardware offload with SmartNICs and FPGAs.</p>
+<p><strong>Oracle Cloud Infrastructure</strong>: Uses <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> with their own modifications. They acquired Pensando (now AMD) DPUs and use them for network offload.</p>
+<p><strong>Alibaba Cloud</strong>: Uses a <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>-based stack with custom modifications and their MOC (Multi-function Offload Card) for hardware acceleration.</p>
+<p>The pattern is clear: everyone is using or building on <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>, but the cloud providers have all heavily customized it and added proprietary hardware acceleration.</p>
+<h3 id="enterprise-virtualization-vmware-and-hyper-v">Enterprise virtualization: VMware and Hyper-V<a class="headerlink" href="#enterprise-virtualization-vmware-and-hyper-v" title="Permanent link">&para;</a></h3>
 <p>In traditional enterprise data centers, two commercial products dominate:</p>
 <p><strong>VMware vSphere/ESXi</strong>: The long-standing market leader for enterprise virtualization. ESXi is a Type 1 (bare-metal) hypervisor with its own kernel -- it's not based on Linux. VMware has comprehensive management tools (vCenter), ecosystem integration, and enterprise support. It's expensive, but many enterprises value the support and stability.</p>
 <p>Recent developments have shaken the VMware market:</p>
@@ -5059,14 +5059,14 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 <li>Good integration with Active Directory, System Center, and Azure</li>
 <li>Reasonable performance for Windows guests</li>
 </ul>
-<p>For Linux guests, KVM generally offers better performance and integration than Hyper-V, which is why Linux-focused environments tend to use KVM-based solutions.</p>
-<h3 id="desktop-virtualization">Desktop virtualization</h3>
+<p>For Linux guests, <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> generally offers better performance and integration than Hyper-V, which is why Linux-focused environments tend to use <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>-based solutions.</p>
+<h3 id="desktop-virtualization">Desktop virtualization<a class="headerlink" href="#desktop-virtualization" title="Permanent link">&para;</a></h3>
 <p>On personal computers, the landscape is more diverse:</p>
 <p><strong>macOS</strong>:</p>
 <ul>
 <li><em>Parallels Desktop</em>: The most popular commercial option. Fast, polished, good Windows integration. Not cheap (~$100/year for the standard version).</li>
 <li><em>VMware Fusion</em>: Long-standing competitor to Parallels. Recently made free for personal use.</li>
-<li><em>UTM</em>: Free, open source, uses Apple's Hypervisor.framework (on Apple Silicon) or QEMU (on Intel). Good for running Linux, more limited for Windows.</li>
+<li><em>UTM</em>: Free, open source, uses Apple's Hypervisor.framework (on Apple Silicon) or <abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> (on Intel). Good for running Linux, more limited for Windows.</li>
 <li><em>VirtualBox</em>: Free, but performance on macOS (especially Apple Silicon) is poor compared to native solutions.</li>
 </ul>
 <p>The transition to Apple Silicon (ARM-based M1/M2/M3 chips) changed this market significantly. Running x86 Windows now requires emulation, which is slower than native virtualization was on Intel Macs.</p>
@@ -5075,18 +5075,18 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 <li><em>Hyper-V</em>: Built into Windows 10/11 Pro and Enterprise. Free, good performance, but the UI is basic. Can conflict with other virtualization software.</li>
 <li><em>VMware Workstation</em>: Long-standing commercial product. Recently made free for personal use.</li>
 <li><em>VirtualBox</em>: Free, cross-platform, open source. Performance is adequate for most uses.</li>
-<li><em>WSL 2</em>: Windows Subsystem for Linux 2 uses a lightweight Hyper-V VM to run a real Linux kernel. Not general-purpose virtualization, but relevant if you just need Linux.</li>
+<li><em>WSL 2</em>: Windows Subsystem for Linux 2 uses a lightweight Hyper-V <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> to run a real Linux kernel. Not general-purpose virtualization, but relevant if you just need Linux.</li>
 </ul>
 <p><strong>Linux</strong>:</p>
 <ul>
-<li><em>virt-manager</em>: GTK-based GUI for libvirt/KVM. Free, well-integrated with the Linux desktop.</li>
+<li><em>virt-manager</em>: GTK-based GUI for libvirt/<abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>. Free, well-integrated with the Linux desktop.</li>
 <li><em>GNOME Boxes</em>: Simpler libvirt frontend, focused on ease of use.</li>
-<li><em>VirtualBox</em>: Works on Linux, though KVM generally offers better performance.</li>
+<li><em>VirtualBox</em>: Works on Linux, though <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> generally offers better performance.</li>
 <li><em>VMware Workstation</em>: Available for Linux, but less common than on Windows.</li>
 </ul>
-<h3 id="legacy-and-niche-hypervisors">Legacy and niche hypervisors</h3>
+<h3 id="legacy-and-niche-hypervisors">Legacy and niche hypervisors<a class="headerlink" href="#legacy-and-niche-hypervisors" title="Permanent link">&para;</a></h3>
 <p>A few other hypervisors are worth mentioning:</p>
-<p><strong>Xen</strong>: Still exists and is actively developed, but has largely lost the Linux market to KVM. You'll encounter it in:</p>
+<p><strong>Xen</strong>: Still exists and is actively developed, but has largely lost the Linux market to <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>. You'll encounter it in:</p>
 <ul>
 <li>Older AWS EC2 instances (pre-Nitro)</li>
 <li>Citrix Hypervisor (formerly XenServer)</li>
@@ -5094,47 +5094,82 @@ Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
 </ul>
 <p><strong>bhyve</strong>: FreeBSD's native hypervisor. If you're running FreeBSD, this is what you'd use. Not relevant to Linux environments.</p>
 <p><strong>Jailhouse</strong>: A partitioning hypervisor for safety-critical and real-time systems. Used in automotive and industrial applications where you need guaranteed isolation and deterministic behavior.</p>
-<h3 id="how-to-tell-what-youre-running">How to tell what you're running</h3>
+<h3 id="how-to-tell-what-youre-running">How to tell what you're running<a class="headerlink" href="#how-to-tell-what-youre-running" title="Permanent link">&para;</a></h3>
 <p>If you're on a Linux system and want to know what hypervisor you're running under (if any):</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Check if you&#39;re in a VM and what type</span>
-systemd-detect-virt
-
-<span class="c1"># More detailed information</span>
-hostnamectl<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-i<span class="w"> </span>virtualization
-
-<span class="c1"># Or check DMI data directly</span>
-cat<span class="w"> </span>/sys/class/dmi/id/product_name
-cat<span class="w"> </span>/sys/class/dmi/id/sys_vendor
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">systemd-detect-virt</label><label for="__tabbed_1_2">hostnamectl</label><label for="__tabbed_1_3">DMI data</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>The simplest method on systems with systemd:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>systemd-detect-virt
 </code></pre></div>
-<p>Common outputs:</p>
-<ul>
-<li><code>kvm</code> - Running under KVM/QEMU</li>
-<li><code>microsoft</code> - Hyper-V</li>
-<li><code>vmware</code> - VMware</li>
-<li><code>xen</code> - Xen</li>
-<li><code>oracle</code> - VirtualBox</li>
-<li><code>amazon</code> - AWS Nitro</li>
-<li><code>none</code> - Bare metal (no hypervisor detected)</li>
-</ul>
-<h2 id="conclusion">Conclusion</h2>
-<p>It would be fair to summarize this chapter by saying that virtualization is a mature technology with a surprisingly long history. However, the reality today is that unless you work for a hyperscaler, the thing to understand is KVM/QEMU -- basically everything you encounter in the Linux server market will have that under the hood.</p>
+<p>Returns the hypervisor name or <code>none</code> for bare metal.</p>
+</div>
+<div class="tabbed-block">
+<p>Shows virtualization info along with other system details:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>hostnamectl<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-i<span class="w"> </span>virtualization
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Check the hardware identification directly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>cat<span class="w"> </span>/sys/class/dmi/id/product_name
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>cat<span class="w"> </span>/sys/class/dmi/id/sys_vendor
+</code></pre></div>
+</div>
+</div>
+</div>
+<p>Common outputs from these commands:</p>
+<dl>
+<dt><code>kvm</code></dt>
+<dd>Running under <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>/<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr></dd>
+<dt><code>microsoft</code></dt>
+<dd>Hyper-V</dd>
+<dt><code>vmware</code></dt>
+<dd>VMware</dd>
+<dt><code>xen</code></dt>
+<dd>Xen</dd>
+<dt><code>oracle</code></dt>
+<dd>VirtualBox</dd>
+<dt><code>amazon</code></dt>
+<dd>AWS Nitro</dd>
+<dt><code>none</code></dt>
+<dd>Bare metal (no hypervisor detected)</dd>
+</dl>
+<h2 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h2>
+<p>It would be fair to summarize this chapter by saying that virtualization is a mature technology with a surprisingly long history. However, the reality today is that unless you work for a hyperscaler, the thing to understand is <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>/<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> -- basically everything you encounter in the Linux server market will have that under the hood.</p>
 <p>A few key themes emerged as we traced this history:</p>
 <p><strong>The march toward hardware</strong>: We started with pure software emulation (slow), moved to hardware-assisted virtualization (fast), and are now seeing hardware offload of entire subsystems (faster still). Each generation pushed more work into silicon, trading generality for performance.</p>
-<p><strong>The paravirtualization pattern persists</strong>: Even though we don't use the term much anymore, the core idea -- designing interfaces for the virtual environment rather than emulating legacy hardware -- lives on in virtio, microVMs, and DPU architectures. The most efficient virtualization is always a collaboration between guest and host.</p>
-<p><strong>Consolidation around KVM</strong>: The fragmented hypervisor landscape of the 2000s (VMware, Xen, Hyper-V, KVM, various commercial offerings) has largely consolidated. KVM won the open source server market, VMware retained the enterprise market (though that's shifting), and the hyperscalers built custom stacks on KVM foundations.</p>
-<p><strong>Specialization at scale</strong>: AWS Nitro, Firecracker, and microVMs represent a trend toward purpose-built solutions. When you're running millions of VMs, the economics justify custom silicon and stripped-down hypervisors. For the rest of us, general-purpose KVM/QEMU remains the pragmatic choice.</p>
-<h3 id="what-we-havent-covered">What we haven't covered</h3>
+<p><strong>The paravirtualization pattern persists</strong>: Even though we don't use the term much anymore, the core idea -- designing interfaces for the virtual environment rather than emulating legacy hardware -- lives on in virtio, microVMs, and <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> architectures. The most efficient virtualization is always a collaboration between guest and host.</p>
+<p><strong>Consolidation around <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr></strong>: The fragmented hypervisor landscape of the 2000s (VMware, Xen, Hyper-V, <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>, various commercial offerings) has largely consolidated. <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> won the open source server market, VMware retained the enterprise market (though that's shifting), and the hyperscalers built custom stacks on <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> foundations.</p>
+<p><strong>Specialization at scale</strong>: AWS Nitro, Firecracker, and microVMs represent a trend toward purpose-built solutions. When you're running millions of VMs, the economics justify custom silicon and stripped-down hypervisors. For the rest of us, general-purpose <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>/<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> remains the pragmatic choice.</p>
+<h3 id="what-we-havent-covered">What we haven't covered<a class="headerlink" href="#what-we-havent-covered" title="Permanent link">&para;</a></h3>
 <p>This chapter focused on compute virtualization, but there's much more to the cloud infrastructure story:</p>
 <ul>
 <li><strong>Containers</strong>: How do containers relate to VMs? What's the isolation/performance trade-off? We'll explore this in a future chapter.</li>
-<li><strong>Virtual networking</strong>: How do virtual machines talk to each other and the outside world? Software-defined networking, OVS, eBPF, and network virtualization deserve their own treatment.</li>
+<li><strong>Virtual networking</strong>: How do virtual machines talk to each other and the outside world? Software-defined networking, <abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr>, eBPF, and network virtualization deserve their own treatment.</li>
 <li><strong>Storage</strong>: Block storage, object storage, distributed filesystems, and how they integrate with virtualization.</li>
 <li><strong>Orchestration</strong>: How do you manage thousands of VMs? This is where OpenStack, Kubernetes, and friends come in.</li>
 </ul>
-<h3 id="practical-takeaways">Practical takeaways</h3>
-<p>If you're building or operating virtualized infrastructure today, the most important thing is to learn libvirt and KVM well. These are the foundation of almost everything in the open source Linux virtualization world, and time invested here pays dividends across every platform you might use.</p>
+<h3 id="practical-takeaways">Practical takeaways<a class="headerlink" href="#practical-takeaways" title="Permanent link">&para;</a></h3>
+<p>If you're building or operating virtualized infrastructure today, the most important thing is to learn libvirt and <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr> well. These are the foundation of almost everything in the open source Linux virtualization world, and time invested here pays dividends across every platform you might use.</p>
 <p>For performance, always use virtio devices for disk and network unless you have a specific compatibility requirement -- the performance difference compared to emulated hardware is substantial. Understanding your workload matters too; long-running server VMs, serverless functions, and container isolation have different requirements, and the right virtualization approach depends on what you're actually running.</p>
-<p>It's worth keeping an eye on the DPU space. Hardware offload is coming to mainstream infrastructure, and even if you're not ready to deploy DPUs today, understanding the architecture will help you evaluate future options. That said, don't over-engineer: for most workloads, standard KVM/QEMU with virtio devices and a sensible management layer (Proxmox, OpenStack, or even just libvirt) is perfectly adequate. The exotic optimizations we discussed are for hyperscale environments with hyperscale problems.</p>
+<p>It's worth keeping an eye on the <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> space. Hardware offload is coming to mainstream infrastructure, and even if you're not ready to deploy DPUs today, understanding the architecture will help you evaluate future options. That said, don't over-engineer: for most workloads, standard <abbr title="Kernel-based Virtual Machine -- Linux's built-in hypervisor using hardware virtualization.">KVM</abbr>/<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> with virtio devices and a sensible management layer (Proxmox, OpenStack, or even just libvirt) is perfectly adequate. The exotic optimizations we discussed are for hyperscale environments with hyperscale problems.</p>
+<!-- Shared abbreviations for cloudgood documentation pages -->
+<!-- Include at the bottom of cloudgood files with: --8<-- "docs-include/abbreviations.md" -->
+<!-- These definitions are invisible - they enable hover tooltips for the defined terms -->
+
+<!-- CPU and processor terms -->
+<!-- Memory terms -->
+<!-- Virtualization - CPU extensions -->
+<!-- Virtualization - memory -->
+<!-- Virtualization - general -->
+<!-- Networking -->
+<!-- Storage -->
+<!-- Boot and firmware -->
+<!-- Linux and OS concepts -->
+<!-- Containers -->
+<!-- x86 architecture -->
+<!-- APIs and interfaces -->
+<!-- Miscellaneous -->
 
 
 

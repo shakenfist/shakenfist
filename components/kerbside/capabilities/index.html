@@ -3460,11 +3460,11 @@
   
 
 
-<h1 id="spice-capabilities">SPICE Capabilities</h1>
+<h1 id="spice-capabilities">SPICE Capabilities<a class="headerlink" href="#spice-capabilities" title="Permanent link">&para;</a></h1>
 <p>This document describes the capability negotiation system used by the SPICE
 protocol. Capabilities are exchanged during the link handshake to determine
 which features both client and server support.</p>
-<h2 id="capability-negotiation">Capability Negotiation</h2>
+<h2 id="capability-negotiation">Capability Negotiation<a class="headerlink" href="#capability-negotiation" title="Permanent link">&para;</a></h2>
 <p>During the SPICE link handshake, both client and server exchange capability
 bitmaps. A feature is only enabled if both sides advertise support for it.
 Capabilities are organized into:</p>
@@ -3472,7 +3472,7 @@ Capabilities are organized into:</p>
 <li><strong>Common capabilities</strong>: Apply to all channel types</li>
 <li><strong>Channel-specific capabilities</strong>: Apply only to specific channels</li>
 </ul>
-<h2 id="common-capabilities">Common Capabilities</h2>
+<h2 id="common-capabilities">Common Capabilities<a class="headerlink" href="#common-capabilities" title="Permanent link">&para;</a></h2>
 <p>These capabilities apply to all SPICE channels.</p>
 <table>
 <thead>
@@ -3505,23 +3505,23 @@ Capabilities are organized into:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="mini-header-format">Mini Header Format</h3>
+<h3 id="mini-header-format">Mini Header Format<a class="headerlink" href="#mini-header-format" title="Permanent link">&para;</a></h3>
 <p>When both sides support <code>MiniHeader</code>, messages use a compact format:</p>
 <p><strong>Standard Header (16 bytes):</strong>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       8     uint64  serial
-8       2     uint16  type
-10      4     uint32  size
-14      4     uint32  sub_list
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>------  ----  ------  -----------
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>0       8     uint64  serial
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>8       2     uint16  type
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>10      4     uint32  size
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>14      4     uint32  sub_list
 </code></pre></div></p>
 <p><strong>Mini Header (6 bytes):</strong>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       2     uint16  type
-2       4     uint32  size
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>------  ----  ------  -----------
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>0       2     uint16  type
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>2       4     uint32  size
 </code></pre></div></p>
-<h2 id="main-channel-capabilities">Main Channel Capabilities</h2>
+<h2 id="main-channel-capabilities">Main Channel Capabilities<a class="headerlink" href="#main-channel-capabilities" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -3553,7 +3553,7 @@ Capabilities are organized into:</p>
 </tr>
 </tbody>
 </table>
-<h2 id="display-channel-capabilities">Display Channel Capabilities</h2>
+<h2 id="display-channel-capabilities">Display Channel Capabilities<a class="headerlink" href="#display-channel-capabilities" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -3640,20 +3640,20 @@ Capabilities are organized into:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="gl-scanout">GL Scanout</h3>
+<h3 id="gl-scanout">GL Scanout<a class="headerlink" href="#gl-scanout" title="Permanent link">&para;</a></h3>
 <p>When <code>GLScanout</code> is supported, the server can send GPU-rendered frames directly
 to the client using DMA-buf file descriptors, bypassing software rendering.</p>
 <p><strong>GL Scanout Message (ID 133):</strong>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     int32   fd (DMA-buf file descriptor)
-4       4     uint32  width
-8       4     uint32  height
-12      4     uint32  stride
-16      4     uint32  drm_fourcc (DRM pixel format)
-20      4     uint32  flags (1=Y0_TOP)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>------  ----  ------  -----------
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>0       4     int32   fd (DMA-buf file descriptor)
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>4       4     uint32  width
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>8       4     uint32  height
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>12      4     uint32  stride
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>16      4     uint32  drm_fourcc (DRM pixel format)
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>20      4     uint32  flags (1=Y0_TOP)
 </code></pre></div></p>
-<h2 id="inputs-channel-capabilities">Inputs Channel Capabilities</h2>
+<h2 id="inputs-channel-capabilities">Inputs Channel Capabilities<a class="headerlink" href="#inputs-channel-capabilities" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -3670,7 +3670,7 @@ to the client using DMA-buf file descriptors, bypassing software rendering.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="playback-channel-capabilities">Playback Channel Capabilities</h2>
+<h2 id="playback-channel-capabilities">Playback Channel Capabilities<a class="headerlink" href="#playback-channel-capabilities" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -3702,7 +3702,7 @@ to the client using DMA-buf file descriptors, bypassing software rendering.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="record-channel-capabilities">Record Channel Capabilities</h2>
+<h2 id="record-channel-capabilities">Record Channel Capabilities<a class="headerlink" href="#record-channel-capabilities" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -3729,7 +3729,7 @@ to the client using DMA-buf file descriptors, bypassing software rendering.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="spicevmc-channel-capabilities">SpiceVMC Channel Capabilities</h2>
+<h2 id="spicevmc-channel-capabilities">SpiceVMC Channel Capabilities<a class="headerlink" href="#spicevmc-channel-capabilities" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -3746,22 +3746,22 @@ to the client using DMA-buf file descriptors, bypassing software rendering.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="capability-bitmap-encoding">Capability Bitmap Encoding</h2>
+<h2 id="capability-bitmap-encoding">Capability Bitmap Encoding<a class="headerlink" href="#capability-bitmap-encoding" title="Permanent link">&para;</a></h2>
 <p>Capabilities are transmitted as a bitmap where each bit position corresponds
 to a specific capability. The bitmap is sent as an array of 32-bit words.</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Example: Check if capability N is supported</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">has_capability</span><span class="p">(</span><span class="n">caps_bitmap</span><span class="p">,</span> <span class="n">cap_num</span><span class="p">):</span>
-    <span class="n">word_index</span> <span class="o">=</span> <span class="n">cap_num</span> <span class="o">//</span> <span class="mi">32</span>
-    <span class="n">bit_index</span> <span class="o">=</span> <span class="n">cap_num</span> <span class="o">%</span> <span class="mi">32</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">caps_bitmap</span><span class="p">[</span><span class="n">word_index</span><span class="p">]</span> <span class="o">&gt;&gt;</span> <span class="n">bit_index</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">1</span>
-
-<span class="c1"># Example: Set capability N</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">set_capability</span><span class="p">(</span><span class="n">caps_bitmap</span><span class="p">,</span> <span class="n">cap_num</span><span class="p">):</span>
-    <span class="n">word_index</span> <span class="o">=</span> <span class="n">cap_num</span> <span class="o">//</span> <span class="mi">32</span>
-    <span class="n">bit_index</span> <span class="o">=</span> <span class="n">cap_num</span> <span class="o">%</span> <span class="mi">32</span>
-    <span class="n">caps_bitmap</span><span class="p">[</span><span class="n">word_index</span><span class="p">]</span> <span class="o">|=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">bit_index</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Example: Check if capability N is supported</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">has_capability</span><span class="p">(</span><span class="n">caps_bitmap</span><span class="p">,</span> <span class="n">cap_num</span><span class="p">):</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">word_index</span> <span class="o">=</span> <span class="n">cap_num</span> <span class="o">//</span> <span class="mi">32</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">bit_index</span> <span class="o">=</span> <span class="n">cap_num</span> <span class="o">%</span> <span class="mi">32</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="k">return</span> <span class="p">(</span><span class="n">caps_bitmap</span><span class="p">[</span><span class="n">word_index</span><span class="p">]</span> <span class="o">&gt;&gt;</span> <span class="n">bit_index</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">1</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Example: Set capability N</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">set_capability</span><span class="p">(</span><span class="n">caps_bitmap</span><span class="p">,</span> <span class="n">cap_num</span><span class="p">):</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">word_index</span> <span class="o">=</span> <span class="n">cap_num</span> <span class="o">//</span> <span class="mi">32</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">bit_index</span> <span class="o">=</span> <span class="n">cap_num</span> <span class="o">%</span> <span class="mi">32</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">caps_bitmap</span><span class="p">[</span><span class="n">word_index</span><span class="p">]</span> <span class="o">|=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">bit_index</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="recommended-capability-set">Recommended Capability Set</h2>
+<h2 id="recommended-capability-set">Recommended Capability Set<a class="headerlink" href="#recommended-capability-set" title="Permanent link">&para;</a></h2>
 <p>For a modern SPICE client, the recommended minimum capabilities are:</p>
 <p><strong>Common:</strong>
 - AuthSelection (0)
@@ -3781,7 +3781,7 @@ to a specific capability. The bitmap is sent as an array of 32-bit words.</p>
 - Opus (3/2)</p>
 <p><strong>Inputs:</strong>
 - KeyScancode (0)</p>
-<h2 id="related-documentation">Related Documentation</h2>
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/kerbside/spice-link-protocol/">Link Protocol</a> - Capability exchange during handshake</li>
 <li><a href="/components/kerbside/protocol-overview/">Protocol Overview</a> - High-level protocol structure</li>

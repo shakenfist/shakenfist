@@ -3624,11 +3624,11 @@
   
 
 
-<h1 id="type-checking-with-mypy">Type Checking with mypy</h1>
+<h1 id="type-checking-with-mypy">Type Checking with mypy<a class="headerlink" href="#type-checking-with-mypy" title="Permanent link">&para;</a></h1>
 <p>Shaken Fist is incrementally adopting mypy for static type checking. This page
 documents the rollout strategy and guidelines for adding type annotations to
 the codebase.</p>
-<h2 id="current-status">Current Status</h2>
+<h2 id="current-status">Current Status<a class="headerlink" href="#current-status" title="Permanent link">&para;</a></h2>
 <p>Type checking is enforced for:</p>
 <ul>
 <li><code>shakenfist/schema/sqlalchemy.py</code> - Pydantic to SQLAlchemy conversion</li>
@@ -3636,58 +3636,58 @@ the codebase.</p>
 <li><code>shakenfist/ipam.py</code> - IPAM (IP Address Manager) class</li>
 </ul>
 <p>Additional modules will be added over time as they are annotated.</p>
-<h2 id="running-mypy">Running mypy</h2>
+<h2 id="running-mypy">Running mypy<a class="headerlink" href="#running-mypy" title="Permanent link">&para;</a></h2>
 <p>To run type checking locally:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Run mypy via tox (recommended)</span>
-tox<span class="w"> </span>-e<span class="w"> </span>mypy
-
-<span class="c1"># Or run mypy directly</span>
-mypy<span class="w"> </span>--strict<span class="w"> </span>--ignore-missing-imports<span class="w"> </span>shakenfist/schema/sqlalchemy.py
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Run mypy via tox (recommended)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tox<span class="w"> </span>-e<span class="w"> </span>mypy
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Or run mypy directly</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>mypy<span class="w"> </span>--strict<span class="w"> </span>--ignore-missing-imports<span class="w"> </span>shakenfist/schema/sqlalchemy.py
 </code></pre></div>
-<h2 id="configuration">Configuration</h2>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <p>mypy is configured in <code>pyproject.toml</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="k">[tool.mypy]</span>
-<span class="n">python_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;3.11&quot;</span>
-<span class="n">warn_return_any</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<span class="n">warn_unused_configs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<span class="n">ignore_missing_imports</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-
-<span class="c1"># Strict checking for typed modules</span>
-<span class="k">[[tool.mypy.overrides]]</span>
-<span class="n">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shakenfist.schema.sqlalchemy&quot;</span>
-<span class="n">strict</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-
-<span class="k">[[tool.mypy.overrides]]</span>
-<span class="n">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shakenfist.schema.ipam_reservation&quot;</span>
-<span class="n">strict</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-
-<span class="k">[[tool.mypy.overrides]]</span>
-<span class="n">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shakenfist.ipam&quot;</span>
-<span class="n">strict</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">[tool.mypy]</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">python_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;3.11&quot;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">warn_return_any</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">warn_unused_configs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">ignore_missing_imports</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Strict checking for typed modules</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="k">[[tool.mypy.overrides]]</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shakenfist.schema.sqlalchemy&quot;</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">strict</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="k">[[tool.mypy.overrides]]</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="n">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shakenfist.schema.ipam_reservation&quot;</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="n">strict</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="k">[[tool.mypy.overrides]]</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="n">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shakenfist.ipam&quot;</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="n">strict</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </code></pre></div>
 <p>The <code>ignore_missing_imports = true</code> setting is necessary because some of our
 dependencies (like <code>shakenfist_utilities</code>) don't have type stubs.</p>
-<h2 id="rollout-strategy">Rollout Strategy</h2>
+<h2 id="rollout-strategy">Rollout Strategy<a class="headerlink" href="#rollout-strategy" title="Permanent link">&para;</a></h2>
 <p>We're adopting an incremental approach to type checking:</p>
-<h3 id="phase-1-schema-module-current">Phase 1: Schema Module (Current)</h3>
+<h3 id="phase-1-schema-module-current">Phase 1: Schema Module (Current)<a class="headerlink" href="#phase-1-schema-module-current" title="Permanent link">&para;</a></h3>
 <p>Start with the <code>shakenfist/schema/</code> module because:</p>
 <ul>
 <li>Pydantic models already have type annotations</li>
 <li>The SQLAlchemy utilities benefit most from type checking</li>
 <li>It's a self-contained module with clear boundaries</li>
 </ul>
-<h3 id="phase-2-new-code">Phase 2: New Code</h3>
+<h3 id="phase-2-new-code">Phase 2: New Code<a class="headerlink" href="#phase-2-new-code" title="Permanent link">&para;</a></h3>
 <p>All new code should include type annotations. When adding new files or
 significantly modifying existing ones, add type annotations and enable strict
 checking.</p>
-<h3 id="phase-3-core-utilities">Phase 3: Core Utilities</h3>
+<h3 id="phase-3-core-utilities">Phase 3: Core Utilities<a class="headerlink" href="#phase-3-core-utilities" title="Permanent link">&para;</a></h3>
 <p>Gradually add types to utility modules that are used across the codebase:</p>
 <ul>
 <li><code>shakenfist/util/</code></li>
 <li><code>shakenfist/constants.py</code></li>
 <li><code>shakenfist/config.py</code></li>
 </ul>
-<h3 id="phase-4-object-classes">Phase 4: Object Classes</h3>
+<h3 id="phase-4-object-classes">Phase 4: Object Classes<a class="headerlink" href="#phase-4-object-classes" title="Permanent link">&para;</a></h3>
 <p>Add types to the object model layer:</p>
 <ul>
 <li><code>shakenfist/baseobject.py</code></li>
@@ -3695,98 +3695,98 @@ checking.</p>
 <li><code>shakenfist/network/</code></li>
 <li>etc.</li>
 </ul>
-<h2 id="guidelines-for-adding-types">Guidelines for Adding Types</h2>
-<h3 id="use-modern-syntax">Use Modern Syntax</h3>
+<h2 id="guidelines-for-adding-types">Guidelines for Adding Types<a class="headerlink" href="#guidelines-for-adding-types" title="Permanent link">&para;</a></h2>
+<h3 id="use-modern-syntax">Use Modern Syntax<a class="headerlink" href="#use-modern-syntax" title="Permanent link">&para;</a></h3>
 <p>Use Python 3.9+ type annotation syntax:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Good - use built-in generics</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">items</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
-    <span class="o">...</span>
-
-<span class="c1"># Avoid - old typing module generics</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">items</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
-    <span class="o">...</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Good - use built-in generics</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">items</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="o">...</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># Avoid - old typing module generics</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">items</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="o">...</span>
 </code></pre></div>
-<h3 id="use-optional-explicitly">Use Optional Explicitly</h3>
+<h3 id="use-optional-explicitly">Use Optional Explicitly<a class="headerlink" href="#use-optional-explicitly" title="Permanent link">&para;</a></h3>
 <p>Never use implicit Optional. If a parameter can be None, annotate it
 explicitly:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Good</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">find</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Result</span><span class="p">]:</span>
-    <span class="o">...</span>
-
-<span class="c1"># Bad - implicit Optional</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">find</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>  <span class="c1"># mypy will reject this</span>
-    <span class="o">...</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Good</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">find</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Result</span><span class="p">]:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="o">...</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># Bad - implicit Optional</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">find</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>  <span class="c1"># mypy will reject this</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="o">...</span>
 </code></pre></div>
-<h3 id="use-any-sparingly">Use Any Sparingly</h3>
+<h3 id="use-any-sparingly">Use Any Sparingly<a class="headerlink" href="#use-any-sparingly" title="Permanent link">&para;</a></h3>
 <p>When dealing with dynamic types, use <code>Any</code> but document why:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">get_annotation</span><span class="p">(</span><span class="n">field</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process a type annotation.</span>
-
-<span class="sd">    We use Any here because type annotations can be arbitrary types,</span>
-<span class="sd">    generic aliases, or special forms that don&#39;t have a common base.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="o">...</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_annotation</span><span class="p">(</span><span class="n">field</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Process a type annotation.</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="sd">    We use Any here because type annotations can be arbitrary types,</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="sd">    generic aliases, or special forms that don&#39;t have a common base.</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="o">...</span>
 </code></pre></div>
-<h3 id="leverage-pydantic">Leverage Pydantic</h3>
+<h3 id="leverage-pydantic">Leverage Pydantic<a class="headerlink" href="#leverage-pydantic" title="Permanent link">&para;</a></h3>
 <p>Pydantic models are already typed. Use them as the source of truth for types
 in related code:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.operations.node_blob_op</span><span class="w"> </span><span class="kn">import</span> <span class="n">model</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">process_operation</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">model</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="c1"># op.uuid, op.blob_uuid, etc. are all properly typed</span>
-    <span class="o">...</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.operations.node_blob_op</span><span class="w"> </span><span class="kn">import</span> <span class="n">model</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">process_operation</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">model</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="c1"># op.uuid, op.blob_uuid, etc. are all properly typed</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="o">...</span>
 </code></pre></div>
-<h3 id="adding-a-new-typed-module">Adding a New Typed Module</h3>
+<h3 id="adding-a-new-typed-module">Adding a New Typed Module<a class="headerlink" href="#adding-a-new-typed-module" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Add type annotations to all functions and classes</li>
 <li>Add an override section in <code>pyproject.toml</code>:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><span class="k">[[tool.mypy.overrides]]</span>
-<span class="n">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shakenfist.your_module&quot;</span>
-<span class="n">strict</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">[[tool.mypy.overrides]]</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shakenfist.your_module&quot;</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">strict</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </code></pre></div>
 <ol>
 <li>Add the module to the tox mypy command in <code>tox.ini</code></li>
 <li>Run <code>tox -e mypy</code> to verify</li>
 </ol>
-<h2 id="common-patterns">Common Patterns</h2>
-<h3 id="type-aliases">Type Aliases</h3>
+<h2 id="common-patterns">Common Patterns<a class="headerlink" href="#common-patterns" title="Permanent link">&para;</a></h2>
+<h3 id="type-aliases">Type Aliases<a class="headerlink" href="#type-aliases" title="Permanent link">&para;</a></h3>
 <p>Define type aliases for complex types:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeAlias</span>
-
-<span class="n">IndexColumns</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
-<span class="n">IndexDefinition</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">IndexColumns</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeAlias</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">IndexColumns</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">IndexDefinition</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">IndexColumns</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span>
 </code></pre></div>
-<h3 id="generic-classes">Generic Classes</h3>
+<h3 id="generic-classes">Generic Classes<a class="headerlink" href="#generic-classes" title="Permanent link">&para;</a></h3>
 <p>When writing generic utilities, use TypeVar:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeVar</span><span class="p">,</span> <span class="n">Generic</span>
-
-<span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s1">&#39;T&#39;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="s1">&#39;DatabaseBackedObject&#39;</span><span class="p">)</span>
-
-<span class="k">class</span><span class="w"> </span><span class="nc">Repository</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">T</span><span class="p">]):</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">uuid</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">T</span><span class="p">]:</span>
-        <span class="o">...</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeVar</span><span class="p">,</span> <span class="n">Generic</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s1">&#39;T&#39;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="s1">&#39;DatabaseBackedObject&#39;</span><span class="p">)</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">Repository</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">T</span><span class="p">]):</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">uuid</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">T</span><span class="p">]:</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>        <span class="o">...</span>
 </code></pre></div>
-<h3 id="callable-types">Callable Types</h3>
+<h3 id="callable-types">Callable Types<a class="headerlink" href="#callable-types" title="Permanent link">&para;</a></h3>
 <p>For callbacks and function parameters:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">with_retry</span><span class="p">(</span>
-    <span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">T</span><span class="p">],</span>
-    <span class="n">retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">T</span><span class="p">:</span>
-    <span class="o">...</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">with_retry</span><span class="p">(</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">T</span><span class="p">],</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">T</span><span class="p">:</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="o">...</span>
 </code></pre></div>
-<h2 id="ide-integration">IDE Integration</h2>
+<h2 id="ide-integration">IDE Integration<a class="headerlink" href="#ide-integration" title="Permanent link">&para;</a></h2>
 <p>Most modern IDEs support mypy integration:</p>
 <ul>
 <li><strong>VS Code</strong>: Install the Pylance or mypy extensions</li>
 <li><strong>PyCharm</strong>: Built-in support for type checking</li>
 <li><strong>vim/neovim</strong>: Use ALE or coc.nvim with mypy</li>
 </ul>
-<h2 id="ci-integration">CI Integration</h2>
+<h2 id="ci-integration">CI Integration<a class="headerlink" href="#ci-integration" title="Permanent link">&para;</a></h2>
 <p>The mypy check runs as part of CI. Any PR that modifies a typed module must
 pass mypy strict checks.</p>
 

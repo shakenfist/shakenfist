@@ -3416,12 +3416,12 @@
   
 
 
-<h1 id="occy-strap-documentation">Occy Strap Documentation</h1>
+<h1 id="occy-strap-documentation">Occy Strap Documentation<a class="headerlink" href="#occy-strap-documentation" title="Permanent link">&para;</a></h1>
 <p>Occy Strap is a Docker/OCI container image manipulation toolkit that allows you
 to work with container images without requiring Docker to be installed. It
 follows a flexible <strong>input -&gt; filter -&gt; output</strong> pipeline pattern for processing
 container images.</p>
-<h2 id="what-can-occy-strap-do">What Can Occy Strap Do?</h2>
+<h2 id="what-can-occy-strap-do">What Can Occy Strap Do?<a class="headerlink" href="#what-can-occy-strap-do" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Download images</strong> from Docker registries, local Docker/Podman daemons, or
   existing tarballs</li>
@@ -3431,38 +3431,38 @@ container images.</p>
   registries</li>
 <li><strong>Search images</strong> for files matching glob or regex patterns</li>
 </ul>
-<h2 id="quick-example">Quick Example</h2>
-<div class="highlight"><pre><span></span><code><span class="c1"># Download an image from Docker Hub to a tarball</span>
-occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span>tar://busybox.tar
-
-<span class="c1"># Search for shell binaries in an image</span>
-occystrap<span class="w"> </span>search<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="s2">&quot;bin/*sh&quot;</span>
-
-<span class="c1"># Download with timestamp normalization for reproducible builds</span>
-occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/python:3.11<span class="w"> </span>tar://python.tar<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-f<span class="w"> </span>normalize-timestamps
+<h2 id="quick-example">Quick Example<a class="headerlink" href="#quick-example" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Download an image from Docker Hub to a tarball</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span>tar://busybox.tar
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Search for shell binaries in an image</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>occystrap<span class="w"> </span>search<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="s2">&quot;bin/*sh&quot;</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Download with timestamp normalization for reproducible builds</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/python:3.11<span class="w"> </span>tar://python.tar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps
 </code></pre></div>
-<h2 id="documentation-index">Documentation Index</h2>
-<h3 id="getting-started">Getting Started</h3>
+<h2 id="documentation-index">Documentation Index<a class="headerlink" href="#documentation-index" title="Permanent link">&para;</a></h2>
+<h3 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h3>
 <ul>
 <li><a href="/components/occystrap/installation/">Installation</a> - How to install Occy Strap and verify it's
   working</li>
 </ul>
-<h3 id="reference">Reference</h3>
+<h3 id="reference">Reference<a class="headerlink" href="#reference" title="Permanent link">&para;</a></h3>
 <ul>
 <li><a href="/components/occystrap/command-reference/">Command Reference</a> - Complete CLI commands, options,
   URI schemes, and filters</li>
 <li><a href="/components/occystrap/pipeline/">Pipeline Architecture</a> - Understanding inputs, filters, and
   outputs</li>
 </ul>
-<h3 id="guides">Guides</h3>
+<h3 id="guides">Guides<a class="headerlink" href="#guides" title="Permanent link">&para;</a></h3>
 <ul>
 <li><a href="/components/occystrap/use-cases/">Use Cases</a> - Common scenarios and examples</li>
 </ul>
-<h2 id="key-concepts">Key Concepts</h2>
-<h3 id="uri-style-commands">URI-Style Commands</h3>
+<h2 id="key-concepts">Key Concepts<a class="headerlink" href="#key-concepts" title="Permanent link">&para;</a></h2>
+<h3 id="uri-style-commands">URI-Style Commands<a class="headerlink" href="#uri-style-commands" title="Permanent link">&para;</a></h3>
 <p>Occy Strap uses URI-style arguments for specifying sources and destinations:</p>
-<div class="highlight"><pre><span></span><code>occystrap<span class="w"> </span>process<span class="w"> </span>SOURCE<span class="w"> </span>DESTINATION<span class="w"> </span><span class="o">[</span>-f<span class="w"> </span>FILTER<span class="o">]</span>...
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>SOURCE<span class="w"> </span>DESTINATION<span class="w"> </span><span class="o">[</span>-f<span class="w"> </span>FILTER<span class="o">]</span>...
 </code></pre></div>
 <p>Input URIs specify where to get images:
 - <code>registry://docker.io/library/busybox:latest</code> - Docker/OCI registry
@@ -3473,19 +3473,19 @@ occystrap<span class="w"> </span>process<span class="w"> </span>registry://docke
 - <code>dir:///path/to/directory</code> - Extracted directory
 - <code>oci:///path/to/bundle</code> - OCI runtime bundle
 - <code>registry://myregistry.com/image:tag</code> - Push to registry</p>
-<h3 id="pipeline-pattern">Pipeline Pattern</h3>
-<div class="highlight"><pre><span></span><code>Input Source  --&gt;  Filter Chain (optional)  --&gt;  Output Writer  --&gt;  Files
+<h3 id="pipeline-pattern">Pipeline Pattern<a class="headerlink" href="#pipeline-pattern" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Input Source  --&gt;  Filter Chain (optional)  --&gt;  Output Writer  --&gt;  Files
 </code></pre></div>
 <p>Filters transform or inspect image elements as they flow through the pipeline.
 Multiple filters can be chained together.</p>
-<h2 id="requirements">Requirements</h2>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Python 3.6+</li>
 <li>No Docker installation required (works independently)</li>
 <li>For registry access: network connectivity to the registry</li>
 <li>For local Docker access: running Docker daemon with accessible socket</li>
 </ul>
-<h2 id="links">Links</h2>
+<h2 id="links">Links<a class="headerlink" href="#links" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="https://github.com/shakenfist/occystrap">GitHub Repository</a></li>
 <li><a href="https://shakenfist.com">Shaken Fist Project</a></li>

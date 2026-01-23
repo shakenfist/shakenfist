@@ -5008,7 +5008,7 @@
   
 
 
-<h1 id="spice-channel-protocols">SPICE Channel Protocols</h1>
+<h1 id="spice-channel-protocols">SPICE Channel Protocols<a class="headerlink" href="#spice-channel-protocols" title="Permanent link">&para;</a></h1>
 <p>This document describes the message formats for each SPICE channel type. All
 messages follow the standard header format described in the
 <a href="/components/kerbside/protocol-overview/">Protocol Overview</a>.</p>
@@ -5016,17 +5016,17 @@ messages follow the standard header format described in the
 (<code>kerbside/spiceprotocol/packets/constants.py</code>) and match the values used in
 Kerbside's traffic inspection and audit logging. Some IDs may differ from the
 official SPICE protocol specification for historical reasons.</p>
-<h2 id="standard-message-header">Standard Message Header</h2>
+<h2 id="standard-message-header">Standard Message Header<a class="headerlink" href="#standard-message-header" title="Permanent link">&para;</a></h2>
 <p>All channel messages use this header:</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       2     uint16  message_type
-2       4     uint32  message_size (payload length)
-6+      var   bytes   payload
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>------  ----  ------  -----------
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>0       2     uint16  message_type
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>2       4     uint32  message_size (payload length)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>6+      var   bytes   payload
 </code></pre></div>
-<h2 id="main-channel-type-1">Main Channel (Type 1)</h2>
+<h2 id="main-channel-type-1">Main Channel (Type 1)<a class="headerlink" href="#main-channel-type-1" title="Permanent link">&para;</a></h2>
 <p>The main channel handles session control and channel negotiation.</p>
-<h3 id="client-to-server-messages">Client to Server Messages</h3>
+<h3 id="client-to-server-messages">Client to Server Messages<a class="headerlink" href="#client-to-server-messages" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5073,7 +5073,7 @@ official SPICE protocol specification for historical reasons.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="server-to-client-messages">Server to Client Messages</h3>
+<h3 id="server-to-client-messages">Server to Client Messages<a class="headerlink" href="#server-to-client-messages" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5130,31 +5130,31 @@ official SPICE protocol specification for historical reasons.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="main-init-message-server-id-103">Main Init Message (Server, ID 103)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  session_id
-4       4     uint32  display_channels_hint
-8       4     uint32  supported_mouse_modes
-12      4     uint32  current_mouse_mode
-16      4     uint32  agent_connected
-20      4     uint32  agent_tokens
-24      4     uint32  multi_media_time
-28      4     uint32  ram_hint
+<h3 id="main-init-message-server-id-103">Main Init Message (Server, ID 103)<a class="headerlink" href="#main-init-message-server-id-103" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>------  ----  ------  -----------
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>0       4     uint32  session_id
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>4       4     uint32  display_channels_hint
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>8       4     uint32  supported_mouse_modes
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>12      4     uint32  current_mouse_mode
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>16      4     uint32  agent_connected
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>20      4     uint32  agent_tokens
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>24      4     uint32  multi_media_time
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>28      4     uint32  ram_hint
 </code></pre></div>
-<h3 id="channels-list-message-server-id-104">Channels List Message (Server, ID 104)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  num_channels
-4+      2*N   struct  channel entries
-
-Each channel entry:
-0       1     uint8   channel_type
-1       1     uint8   channel_id
+<h3 id="channels-list-message-server-id-104">Channels List Message (Server, ID 104)<a class="headerlink" href="#channels-list-message-server-id-104" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>------  ----  ------  -----------
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>0       4     uint32  num_channels
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>4+      2*N   struct  channel entries
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>Each channel entry:
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>0       1     uint8   channel_type
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>1       1     uint8   channel_id
 </code></pre></div>
-<h2 id="display-channel-type-2">Display Channel (Type 2)</h2>
+<h2 id="display-channel-type-2">Display Channel (Type 2)<a class="headerlink" href="#display-channel-type-2" title="Permanent link">&para;</a></h2>
 <p>The display channel handles screen updates and drawing operations.</p>
-<h3 id="client-to-server-messages_1">Client to Server Messages</h3>
+<h3 id="client-to-server-messages_1">Client to Server Messages<a class="headerlink" href="#client-to-server-messages_1" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5171,15 +5171,15 @@ Each channel entry:
 </tr>
 </tbody>
 </table>
-<h3 id="display-init-message-client-id-101">Display Init Message (Client, ID 101)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       1     uint8   cache_id
-1       8     uint64  cache_size
-9       1     uint8   glz_dict_id
-10      4     uint32  dict_window_size
+<h3 id="display-init-message-client-id-101">Display Init Message (Client, ID 101)<a class="headerlink" href="#display-init-message-client-id-101" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>------  ----  ------  -----------
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>0       1     uint8   cache_id
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>1       8     uint64  cache_size
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>9       1     uint8   glz_dict_id
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>10      4     uint32  dict_window_size
 </code></pre></div>
-<h3 id="server-to-client-messages_1">Server to Client Messages</h3>
+<h3 id="server-to-client-messages_1">Server to Client Messages<a class="headerlink" href="#server-to-client-messages_1" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5356,50 +5356,50 @@ Each channel entry:
 </tr>
 </tbody>
 </table>
-<h3 id="surface-create-message-server-id-314">Surface Create Message (Server, ID 314)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  surface_id
-4       4     uint32  width
-8       4     uint32  height
-12      4     uint32  format
-16      4     uint32  flags
+<h3 id="surface-create-message-server-id-314">Surface Create Message (Server, ID 314)<a class="headerlink" href="#surface-create-message-server-id-314" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>------  ----  ------  -----------
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>0       4     uint32  surface_id
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>4       4     uint32  width
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>8       4     uint32  height
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>12      4     uint32  format
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>16      4     uint32  flags
 </code></pre></div>
-<h3 id="draw-copy-message-server-id-304">Draw Copy Message (Server, ID 304)</h3>
+<h3 id="draw-copy-message-server-id-304">Draw Copy Message (Server, ID 304)<a class="headerlink" href="#draw-copy-message-server-id-304" title="Permanent link">&para;</a></h3>
 <p>This is one of the most common display messages, used for copying image data.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
--- SpiceMsgDisplayBase --
-0       4     uint32  surface_id
-4       4     uint32  rect_top
-8       4     uint32  rect_left
-12      4     uint32  rect_bottom
-16      4     uint32  rect_right
-20      1     uint8   clip_type
-
--- Clip Rectangles (if clip_type == 1) --
-21      4     uint32  num_rects
-25+     16*N  struct  rectangles
-
--- Source Info --
-var     4     uint32  source_image_offset
-var     4     uint32  src_rect_top
-var     4     uint32  src_rect_left
-var     4     uint32  src_rect_bottom
-var     4     uint32  src_rect_right
-var     2     uint16  raster_operations
-var     1     uint8   scale_mode
-
--- Mask --
-var     1     uint8   mask_flags
-var     4     uint32  mask_pos_x
-var     4     uint32  mask_pos_y
-var     4     uint32  mask_bitmap_address
-
--- Image Data --
-var     var   struct  image (see Image Format below)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>------  ----  ------  -----------
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>-- SpiceMsgDisplayBase --
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>0       4     uint32  surface_id
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>4       4     uint32  rect_top
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>8       4     uint32  rect_left
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>12      4     uint32  rect_bottom
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>16      4     uint32  rect_right
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>20      1     uint8   clip_type
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>-- Clip Rectangles (if clip_type == 1) --
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>21      4     uint32  num_rects
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>25+     16*N  struct  rectangles
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>-- Source Info --
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>var     4     uint32  source_image_offset
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>var     4     uint32  src_rect_top
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>var     4     uint32  src_rect_left
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>var     4     uint32  src_rect_bottom
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>var     4     uint32  src_rect_right
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>var     2     uint16  raster_operations
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>var     1     uint8   scale_mode
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>-- Mask --
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>var     1     uint8   mask_flags
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>var     4     uint32  mask_pos_x
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>var     4     uint32  mask_pos_y
+<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>var     4     uint32  mask_bitmap_address
+<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>
+<a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>-- Image Data --
+<a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>var     var   struct  image (see Image Format below)
 </code></pre></div>
-<h3 id="clip-types">Clip Types</h3>
+<h3 id="clip-types">Clip Types<a class="headerlink" href="#clip-types" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5426,7 +5426,7 @@ var     var   struct  image (see Image Format below)
 </tr>
 </tbody>
 </table>
-<h3 id="raster-operations">Raster Operations</h3>
+<h3 id="raster-operations">Raster Operations<a class="headerlink" href="#raster-operations" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5481,7 +5481,7 @@ var     var   struct  image (see Image Format below)
 </tr>
 </tbody>
 </table>
-<h3 id="scale-modes">Scale Modes</h3>
+<h3 id="scale-modes">Scale Modes<a class="headerlink" href="#scale-modes" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5500,18 +5500,18 @@ var     var   struct  image (see Image Format below)
 </tr>
 </tbody>
 </table>
-<h3 id="image-format">Image Format</h3>
+<h3 id="image-format">Image Format<a class="headerlink" href="#image-format" title="Permanent link">&para;</a></h3>
 <p>Images in display messages use this header:</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       8     uint64  image_id
-8       1     uint8   type
-9       1     uint8   flags
-10      4     uint32  width
-12      4     uint32  height
-16+     var   bytes   image_data (format-specific)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>------  ----  ------  -----------
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>0       8     uint64  image_id
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>8       1     uint8   type
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>9       1     uint8   flags
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>10      4     uint32  width
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>12      4     uint32  height
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>16+     var   bytes   image_data (format-specific)
 </code></pre></div>
-<h3 id="image-types">Image Types</h3>
+<h3 id="image-types">Image Types<a class="headerlink" href="#image-types" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5553,30 +5553,30 @@ var     var   struct  image (see Image Format below)
 </tr>
 </tbody>
 </table>
-<h3 id="lzglz-image-header">LZ/GLZ Image Header</h3>
+<h3 id="lzglz-image-header">LZ/GLZ Image Header<a class="headerlink" href="#lzglz-image-header" title="Permanent link">&para;</a></h3>
 <p>For LZ and GLZ compressed images:</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  data_size
-
--- LZ Header (big-endian) --
-4       4     bytes   magic (&quot;  ZL&quot;)
-8       2     uint16  version_major
-10      2     uint16  version_minor
-12      3     bytes   padding
-15      1     uint8   type
-16      4     uint32  width
-20      4     uint32  height
-24      4     uint32  stride
-28      4     uint32  top_down
-
--- For GLZ only --
-28      8     uint64  image_id
-36      4     uint32  win_head_dist
-
--- Compressed data follows --
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>------  ----  ------  -----------
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>0       4     uint32  data_size
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>-- LZ Header (big-endian) --
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>4       4     bytes   magic (&quot;  ZL&quot;)
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>8       2     uint16  version_major
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>10      2     uint16  version_minor
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>12      3     bytes   padding
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>15      1     uint8   type
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>16      4     uint32  width
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>20      4     uint32  height
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>24      4     uint32  stride
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>28      4     uint32  top_down
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>-- For GLZ only --
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>28      8     uint64  image_id
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>36      4     uint32  win_head_dist
+<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>
+<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>-- Compressed data follows --
 </code></pre></div>
-<h3 id="lz-image-types">LZ Image Types</h3>
+<h3 id="lz-image-types">LZ Image Types<a class="headerlink" href="#lz-image-types" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5643,10 +5643,10 @@ var     var   struct  image (see Image Format below)
 </tr>
 </tbody>
 </table>
-<h2 id="inputs-channel-type-3">Inputs Channel (Type 3)</h2>
+<h2 id="inputs-channel-type-3">Inputs Channel (Type 3)<a class="headerlink" href="#inputs-channel-type-3" title="Permanent link">&para;</a></h2>
 <p>The inputs channel handles keyboard and mouse input from client to server.
 See <a href="/components/kerbside/scancodes/">Keyboard Scancodes</a> for a complete scancode reference.</p>
-<h3 id="client-to-server-messages_2">Client to Server Messages</h3>
+<h3 id="client-to-server-messages_2">Client to Server Messages<a class="headerlink" href="#client-to-server-messages_2" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5698,7 +5698,7 @@ See <a href="/components/kerbside/scancodes/">Keyboard Scancodes</a> for a compl
 </tr>
 </tbody>
 </table>
-<h3 id="server-to-client-messages_2">Server to Client Messages</h3>
+<h3 id="server-to-client-messages_2">Server to Client Messages<a class="headerlink" href="#server-to-client-messages_2" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5725,15 +5725,15 @@ See <a href="/components/kerbside/scancodes/">Keyboard Scancodes</a> for a compl
 </tr>
 </tbody>
 </table>
-<h3 id="key-downup-message-client-id-101102">Key Down/Up Message (Client, ID 101/102)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  scancode
+<h3 id="key-downup-message-client-id-101102">Key Down/Up Message (Client, ID 101/102)<a class="headerlink" href="#key-downup-message-client-id-101102" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>------  ----  ------  -----------
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>0       4     uint32  scancode
 </code></pre></div>
-<h3 id="key-modifiers-message-id-103102">Key Modifiers Message (ID 103/102)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       2     uint16  modifiers
+<h3 id="key-modifiers-message-id-103102">Key Modifiers Message (ID 103/102)<a class="headerlink" href="#key-modifiers-message-id-103102" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>------  ----  ------  -----------
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>0       2     uint16  modifiers
 </code></pre></div>
 <p>Modifier flags:
 | Bit | Modifier    |
@@ -5741,34 +5741,34 @@ See <a href="/components/kerbside/scancodes/">Keyboard Scancodes</a> for a compl
 | 0   | Scroll Lock |
 | 1   | Num Lock    |
 | 2   | Caps Lock   |</p>
-<h3 id="key-scancode-message-client-id-104">Key Scancode Message (Client, ID 104)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       N     uint8[] scancodes (N bytes, one per scancode)
+<h3 id="key-scancode-message-client-id-104">Key Scancode Message (Client, ID 104)<a class="headerlink" href="#key-scancode-message-client-id-104" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>------  ----  ------  -----------
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>0       N     uint8[] scancodes (N bytes, one per scancode)
 </code></pre></div>
-<h3 id="mouse-motion-message-client-id-111">Mouse Motion Message (Client, ID 111)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     int32   delta_x
-4       4     int32   delta_y
-8       2     uint16  button_state
+<h3 id="mouse-motion-message-client-id-111">Mouse Motion Message (Client, ID 111)<a class="headerlink" href="#mouse-motion-message-client-id-111" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>------  ----  ------  -----------
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>0       4     int32   delta_x
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>4       4     int32   delta_y
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>8       2     uint16  button_state
 </code></pre></div>
-<h3 id="mouse-position-message-client-id-112">Mouse Position Message (Client, ID 112)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  x
-4       4     uint32  y
-8       2     uint16  button_state
-10      1     uint8   display_id
+<h3 id="mouse-position-message-client-id-112">Mouse Position Message (Client, ID 112)<a class="headerlink" href="#mouse-position-message-client-id-112" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>------  ----  ------  -----------
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>0       4     uint32  x
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>4       4     uint32  y
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>8       2     uint16  button_state
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>10      1     uint8   display_id
 </code></pre></div>
-<h3 id="mouse-pressrelease-message-client-id-113114">Mouse Press/Release Message (Client, ID 113/114)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       1     uint8   button
-1       2     uint16  button_state
-3       1     uint8   display_id
+<h3 id="mouse-pressrelease-message-client-id-113114">Mouse Press/Release Message (Client, ID 113/114)<a class="headerlink" href="#mouse-pressrelease-message-client-id-113114" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>------  ----  ------  -----------
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>0       1     uint8   button
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>1       2     uint16  button_state
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>3       1     uint8   display_id
 </code></pre></div>
-<h3 id="mouse-buttons">Mouse Buttons</h3>
+<h3 id="mouse-buttons">Mouse Buttons<a class="headerlink" href="#mouse-buttons" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5811,7 +5811,7 @@ See <a href="/components/kerbside/scancodes/">Keyboard Scancodes</a> for a compl
 </tr>
 </tbody>
 </table>
-<h3 id="mouse-button-state-masks">Mouse Button State Masks</h3>
+<h3 id="mouse-button-state-masks">Mouse Button State Masks<a class="headerlink" href="#mouse-button-state-masks" title="Permanent link">&para;</a></h3>
 <p>The <code>button_state</code> field is a bitmask of currently pressed buttons:</p>
 <table>
 <thead>
@@ -5859,7 +5859,7 @@ See <a href="/components/kerbside/scancodes/">Keyboard Scancodes</a> for a compl
 </tr>
 </tbody>
 </table>
-<h3 id="mouse-modes">Mouse Modes</h3>
+<h3 id="mouse-modes">Mouse Modes<a class="headerlink" href="#mouse-modes" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5881,9 +5881,9 @@ See <a href="/components/kerbside/scancodes/">Keyboard Scancodes</a> for a compl
 </tr>
 </tbody>
 </table>
-<h2 id="cursor-channel-type-4">Cursor Channel (Type 4)</h2>
+<h2 id="cursor-channel-type-4">Cursor Channel (Type 4)<a class="headerlink" href="#cursor-channel-type-4" title="Permanent link">&para;</a></h2>
 <p>The cursor channel handles cursor shape and position updates.</p>
-<h3 id="server-to-client-messages_3">Server to Client Messages</h3>
+<h3 id="server-to-client-messages_3">Server to Client Messages<a class="headerlink" href="#server-to-client-messages_3" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -5935,26 +5935,26 @@ See <a href="/components/kerbside/scancodes/">Keyboard Scancodes</a> for a compl
 </tr>
 </tbody>
 </table>
-<h3 id="cursor-init-message-server-id-101">Cursor Init Message (Server, ID 101)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       2     uint16  x
-2       2     uint16  y
-4       2     uint16  trail_length
-6       2     uint16  trail_frequency
-8       1     uint8   visible
-
--- SpiceCursor follows if size permits --
-9       4     uint32  flags
-13      8     uint64  unique_id
-21      2     uint16  cursor_type
-23      2     uint16  width
-25      2     uint16  height
-27      2     uint16  hot_spot_x
-29      2     uint16  hot_spot_y
-31+     var   bytes   cursor_data
+<h3 id="cursor-init-message-server-id-101">Cursor Init Message (Server, ID 101)<a class="headerlink" href="#cursor-init-message-server-id-101" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>------  ----  ------  -----------
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>0       2     uint16  x
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>2       2     uint16  y
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>4       2     uint16  trail_length
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>6       2     uint16  trail_frequency
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>8       1     uint8   visible
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>-- SpiceCursor follows if size permits --
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>9       4     uint32  flags
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>13      8     uint64  unique_id
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>21      2     uint16  cursor_type
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a>23      2     uint16  width
+<a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>25      2     uint16  height
+<a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>27      2     uint16  hot_spot_x
+<a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a>29      2     uint16  hot_spot_y
+<a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a>31+     var   bytes   cursor_data
 </code></pre></div>
-<h3 id="cursor-types">Cursor Types</h3>
+<h3 id="cursor-types">Cursor Types<a class="headerlink" href="#cursor-types" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -6001,7 +6001,7 @@ See <a href="/components/kerbside/scancodes/">Keyboard Scancodes</a> for a compl
 </tr>
 </tbody>
 </table>
-<h3 id="cursor-flags">Cursor Flags</h3>
+<h3 id="cursor-flags">Cursor Flags<a class="headerlink" href="#cursor-flags" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -6028,36 +6028,36 @@ See <a href="/components/kerbside/scancodes/">Keyboard Scancodes</a> for a compl
 </tr>
 </tbody>
 </table>
-<h3 id="cursor-set-message-server-id-103">Cursor Set Message (Server, ID 103)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       2     uint16  x
-2       2     uint16  y
-4       1     uint8   visible
-
--- SpiceCursor follows --
+<h3 id="cursor-set-message-server-id-103">Cursor Set Message (Server, ID 103)<a class="headerlink" href="#cursor-set-message-server-id-103" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>------  ----  ------  -----------
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>0       2     uint16  x
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>2       2     uint16  y
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>4       1     uint8   visible
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>-- SpiceCursor follows --
 </code></pre></div>
-<h3 id="cursor-move-message-server-id-104">Cursor Move Message (Server, ID 104)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       2     uint16  x
-2       2     uint16  y
+<h3 id="cursor-move-message-server-id-104">Cursor Move Message (Server, ID 104)<a class="headerlink" href="#cursor-move-message-server-id-104" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>------  ----  ------  -----------
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>0       2     uint16  x
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>2       2     uint16  y
 </code></pre></div>
-<h3 id="cursor-trail-message-server-id-106">Cursor Trail Message (Server, ID 106)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       2     uint16  trail_length
-2       2     uint16  trail_frequency
+<h3 id="cursor-trail-message-server-id-106">Cursor Trail Message (Server, ID 106)<a class="headerlink" href="#cursor-trail-message-server-id-106" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>------  ----  ------  -----------
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>0       2     uint16  trail_length
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>2       2     uint16  trail_frequency
 </code></pre></div>
-<h3 id="cursor-invalidate-one-message-server-id-107">Cursor Invalidate One Message (Server, ID 107)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       8     uint64  cursor_id
+<h3 id="cursor-invalidate-one-message-server-id-107">Cursor Invalidate One Message (Server, ID 107)<a class="headerlink" href="#cursor-invalidate-one-message-server-id-107" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>------  ----  ------  -----------
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>0       8     uint64  cursor_id
 </code></pre></div>
-<h2 id="port-channel-type-9">Port Channel (Type 9)</h2>
+<h2 id="port-channel-type-9">Port Channel (Type 9)<a class="headerlink" href="#port-channel-type-9" title="Permanent link">&para;</a></h2>
 <p>The port channel handles device redirection, primarily USB devices through the
 VMC (Virtual Machine Communication) protocol.</p>
-<h3 id="client-and-server-messages">Client and Server Messages</h3>
+<h3 id="client-and-server-messages">Client and Server Messages<a class="headerlink" href="#client-and-server-messages" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -6079,61 +6079,61 @@ VMC (Virtual Machine Communication) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="vmc-data-message-id-101">VMC Data Message (ID 101)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  vmc_type (USB redir message type)
-4       4     uint32  vmc_length
-8       4     uint32  vmc_id
-12+     var   bytes   vmc_payload (see USB Redirection)
+<h3 id="vmc-data-message-id-101">VMC Data Message (ID 101)<a class="headerlink" href="#vmc-data-message-id-101" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>------  ----  ------  -----------
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>0       4     uint32  vmc_type (USB redir message type)
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>4       4     uint32  vmc_length
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>8       4     uint32  vmc_id
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>12+     var   bytes   vmc_payload (see USB Redirection)
 </code></pre></div>
 <p>For detailed VMC/USB redirection message formats, see
 <a href="/components/kerbside/usb-redirection/">USB Redirection</a>.</p>
-<h2 id="common-message-details">Common Message Details</h2>
-<h3 id="ping-message-server">Ping Message (Server)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  ping_id
-4       8     uint64  timestamp
+<h2 id="common-message-details">Common Message Details<a class="headerlink" href="#common-message-details" title="Permanent link">&para;</a></h2>
+<h3 id="ping-message-server">Ping Message (Server)<a class="headerlink" href="#ping-message-server" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>------  ----  ------  -----------
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>0       4     uint32  ping_id
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>4       8     uint64  timestamp
 </code></pre></div>
-<h3 id="pong-message-client">Pong Message (Client)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  ping_id
-4       8     uint64  timestamp
+<h3 id="pong-message-client">Pong Message (Client)<a class="headerlink" href="#pong-message-client" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>------  ----  ------  -----------
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>0       4     uint32  ping_id
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>4       8     uint64  timestamp
 </code></pre></div>
-<h3 id="set-ack-message-server">Set Ack Message (Server)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  generation
-4       4     uint32  window
+<h3 id="set-ack-message-server">Set Ack Message (Server)<a class="headerlink" href="#set-ack-message-server" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>------  ----  ------  -----------
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>0       4     uint32  generation
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>4       4     uint32  window
 </code></pre></div>
-<h3 id="ack-sync-message-client">Ack Sync Message (Client)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  generation
+<h3 id="ack-sync-message-client">Ack Sync Message (Client)<a class="headerlink" href="#ack-sync-message-client" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>------  ----  ------  -----------
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>0       4     uint32  generation
 </code></pre></div>
-<h3 id="ack-message-client">Ack Message (Client)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  generation
+<h3 id="ack-message-client">Ack Message (Client)<a class="headerlink" href="#ack-message-client" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>------  ----  ------  -----------
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>0       4     uint32  generation
 </code></pre></div>
 <p>Note: Display channel ACKs may have zero-length payloads.</p>
-<h3 id="disconnecting-message">Disconnecting Message</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       8     uint64  timestamp
-4       4     uint32  reason (error code)
+<h3 id="disconnecting-message">Disconnecting Message<a class="headerlink" href="#disconnecting-message" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>------  ----  ------  -----------
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>0       8     uint64  timestamp
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>4       4     uint32  reason (error code)
 </code></pre></div>
-<h3 id="notify-message-server">Notify Message (Server)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       8     uint64  timestamp
-8       4     uint32  severity
-12      4     uint32  visibility
-16      4     uint32  what (topic code)
-20      4     uint32  message_length
-24      N     bytes   message (UTF-8, null-terminated)
+<h3 id="notify-message-server">Notify Message (Server)<a class="headerlink" href="#notify-message-server" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>------  ----  ------  -----------
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>0       8     uint64  timestamp
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>8       4     uint32  severity
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>12      4     uint32  visibility
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>16      4     uint32  what (topic code)
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>20      4     uint32  message_length
+<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>24      N     bytes   message (UTF-8, null-terminated)
 </code></pre></div>
 <p>Severity values:
 | Value | Severity |
@@ -6147,10 +6147,10 @@ VMC (Virtual Machine Communication) protocol.</p>
 | 0     | low        |
 | 1     | medium     |
 | 2     | high       |</p>
-<h2 id="playback-channel-type-5">Playback Channel (Type 5)</h2>
+<h2 id="playback-channel-type-5">Playback Channel (Type 5)<a class="headerlink" href="#playback-channel-type-5" title="Permanent link">&para;</a></h2>
 <p>The playback channel handles audio output from the VM to the client.</p>
 <p><strong>Note</strong>: Kerbside proxies this channel transparently without decoding.</p>
-<h3 id="server-to-client-messages_4">Server to Client Messages</h3>
+<h3 id="server-to-client-messages_4">Server to Client Messages<a class="headerlink" href="#server-to-client-messages_4" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -6197,12 +6197,12 @@ VMC (Virtual Machine Communication) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="playback-mode-message-server-id-102">Playback Mode Message (Server, ID 102)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  time (multimedia time)
-4       4     uint32  mode
-8       var   bytes   codec-specific data
+<h3 id="playback-mode-message-server-id-102">Playback Mode Message (Server, ID 102)<a class="headerlink" href="#playback-mode-message-server-id-102" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>------  ----  ------  -----------
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>0       4     uint32  time (multimedia time)
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>4       4     uint32  mode
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>8       var   bytes   codec-specific data
 </code></pre></div>
 <p>Mode values:
 | Value | Mode      | Description |
@@ -6216,29 +6216,29 @@ VMC (Virtual Machine Communication) protocol.</p>
 - Channels: 2 (stereo)
 - Max compressed frame: ~480 bytes
 - Max uncompressed frame: 1920 bytes (480 samples × 2 channels × 2 bytes)</p>
-<h3 id="playback-start-message-server-id-103">Playback Start Message (Server, ID 103)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  channels (1=mono, 2=stereo)
-4       4     uint32  format (1=S16, 16-bit signed)
-8       4     uint32  frequency (sample rate in Hz)
+<h3 id="playback-start-message-server-id-103">Playback Start Message (Server, ID 103)<a class="headerlink" href="#playback-start-message-server-id-103" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>------  ----  ------  -----------
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>0       4     uint32  channels (1=mono, 2=stereo)
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>4       4     uint32  format (1=S16, 16-bit signed)
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>8       4     uint32  frequency (sample rate in Hz)
 </code></pre></div>
-<h3 id="playback-data-message-server-id-101">Playback Data Message (Server, ID 101)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  time (multimedia time)
-4       var   bytes   audio data
+<h3 id="playback-data-message-server-id-101">Playback Data Message (Server, ID 101)<a class="headerlink" href="#playback-data-message-server-id-101" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>------  ----  ------  -----------
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>0       4     uint32  time (multimedia time)
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>4       var   bytes   audio data
 </code></pre></div>
-<h3 id="playback-volume-message-server-id-105">Playback Volume Message (Server, ID 105)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       1     uint8   num_channels
-1       2*N   uint16  volume per channel (0-65535)
+<h3 id="playback-volume-message-server-id-105">Playback Volume Message (Server, ID 105)<a class="headerlink" href="#playback-volume-message-server-id-105" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>------  ----  ------  -----------
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>0       1     uint8   num_channels
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>1       2*N   uint16  volume per channel (0-65535)
 </code></pre></div>
-<h2 id="record-channel-type-6">Record Channel (Type 6)</h2>
+<h2 id="record-channel-type-6">Record Channel (Type 6)<a class="headerlink" href="#record-channel-type-6" title="Permanent link">&para;</a></h2>
 <p>The record channel handles audio input from the client to the VM.</p>
 <p><strong>Note</strong>: Kerbside proxies this channel transparently without decoding.</p>
-<h3 id="server-to-client-messages_5">Server to Client Messages</h3>
+<h3 id="server-to-client-messages_5">Server to Client Messages<a class="headerlink" href="#server-to-client-messages_5" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -6270,7 +6270,7 @@ VMC (Virtual Machine Communication) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="client-to-server-messages_3">Client to Server Messages</h3>
+<h3 id="client-to-server-messages_3">Client to Server Messages<a class="headerlink" href="#client-to-server-messages_3" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -6297,24 +6297,24 @@ VMC (Virtual Machine Communication) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="record-start-message-server-id-101">Record Start Message (Server, ID 101)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  channels
-4       4     uint32  format (1=S16)
-8       4     uint32  frequency
+<h3 id="record-start-message-server-id-101">Record Start Message (Server, ID 101)<a class="headerlink" href="#record-start-message-server-id-101" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>------  ----  ------  -----------
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>0       4     uint32  channels
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>4       4     uint32  format (1=S16)
+<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a>8       4     uint32  frequency
 </code></pre></div>
-<h3 id="record-data-message-client-id-101">Record Data Message (Client, ID 101)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  time (multimedia time)
-4       var   bytes   audio data
+<h3 id="record-data-message-client-id-101">Record Data Message (Client, ID 101)<a class="headerlink" href="#record-data-message-client-id-101" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>------  ----  ------  -----------
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>0       4     uint32  time (multimedia time)
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>4       var   bytes   audio data
 </code></pre></div>
-<h2 id="smartcard-channel-type-8">Smartcard Channel (Type 8)</h2>
+<h2 id="smartcard-channel-type-8">Smartcard Channel (Type 8)<a class="headerlink" href="#smartcard-channel-type-8" title="Permanent link">&para;</a></h2>
 <p>The smartcard channel handles smart card redirection for authentication using
 the VSC (Virtual Smart Card) protocol.</p>
 <p><strong>Note</strong>: Kerbside proxies this channel transparently without decoding.</p>
-<h3 id="server-to-client-messages_6">Server to Client Messages</h3>
+<h3 id="server-to-client-messages_6">Server to Client Messages<a class="headerlink" href="#server-to-client-messages_6" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -6336,7 +6336,7 @@ the VSC (Virtual Smart Card) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="client-to-server-messages_4">Client to Server Messages</h3>
+<h3 id="client-to-server-messages_4">Client to Server Messages<a class="headerlink" href="#client-to-server-messages_4" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -6378,7 +6378,7 @@ the VSC (Virtual Smart Card) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="vsc-message-types">VSC Message Types</h3>
+<h3 id="vsc-message-types">VSC Message Types<a class="headerlink" href="#vsc-message-types" title="Permanent link">&para;</a></h3>
 <p>The smartcard data payload contains VSC (Virtual Smart Card) messages:</p>
 <table>
 <thead>
@@ -6436,9 +6436,9 @@ the VSC (Virtual Smart Card) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="video-streaming">Video Streaming</h2>
+<h2 id="video-streaming">Video Streaming<a class="headerlink" href="#video-streaming" title="Permanent link">&para;</a></h2>
 <p>The display channel supports video streaming for efficient screen updates.</p>
-<h3 id="video-codecs">Video Codecs</h3>
+<h3 id="video-codecs">Video Codecs<a class="headerlink" href="#video-codecs" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -6475,41 +6475,41 @@ the VSC (Virtual Smart Card) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="stream-create-message-server-id-122">Stream Create Message (Server, ID 122)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  stream_id
-4       4     uint32  flags (1=TOP_DOWN)
-8       4     uint32  codec_type
-12      8     uint64  reserved
-20      4     uint32  stream_width
-24      4     uint32  stream_height
-28      4     uint32  source_width
-32      4     uint32  source_height
-36      16    struct  destination rect (top, left, bottom, right)
-52      var   struct  clip (type + data)
+<h3 id="stream-create-message-server-id-122">Stream Create Message (Server, ID 122)<a class="headerlink" href="#stream-create-message-server-id-122" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>------  ----  ------  -----------
+<a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>0       4     uint32  stream_id
+<a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a>4       4     uint32  flags (1=TOP_DOWN)
+<a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>8       4     uint32  codec_type
+<a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a>12      8     uint64  reserved
+<a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a>20      4     uint32  stream_width
+<a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a>24      4     uint32  stream_height
+<a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a>28      4     uint32  source_width
+<a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a>32      4     uint32  source_height
+<a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a>36      16    struct  destination rect (top, left, bottom, right)
+<a id="__codelineno-33-12" name="__codelineno-33-12" href="#__codelineno-33-12"></a>52      var   struct  clip (type + data)
 </code></pre></div>
-<h3 id="stream-data-message-server-id-123">Stream Data Message (Server, ID 123)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  stream_id
-4       4     uint32  multimedia_time
-8       4     uint32  data_size
-12      4     uint32  pad_size (for alignment)
-16      var   bytes   compressed video frame
+<h3 id="stream-data-message-server-id-123">Stream Data Message (Server, ID 123)<a class="headerlink" href="#stream-data-message-server-id-123" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>------  ----  ------  -----------
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>0       4     uint32  stream_id
+<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>4       4     uint32  multimedia_time
+<a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a>8       4     uint32  data_size
+<a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a>12      4     uint32  pad_size (for alignment)
+<a id="__codelineno-34-7" name="__codelineno-34-7" href="#__codelineno-34-7"></a>16      var   bytes   compressed video frame
 </code></pre></div>
-<h3 id="stream-clip-message-server-id-124">Stream Clip Message (Server, ID 124)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  stream_id
-4       var   struct  clip (type + rectangles)
+<h3 id="stream-clip-message-server-id-124">Stream Clip Message (Server, ID 124)<a class="headerlink" href="#stream-clip-message-server-id-124" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>------  ----  ------  -----------
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>0       4     uint32  stream_id
+<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a>4       var   struct  clip (type + rectangles)
 </code></pre></div>
-<h3 id="stream-destroy-message-server-id-125">Stream Destroy Message (Server, ID 125)</h3>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  stream_id
+<h3 id="stream-destroy-message-server-id-125">Stream Destroy Message (Server, ID 125)<a class="headerlink" href="#stream-destroy-message-server-id-125" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>------  ----  ------  -----------
+<a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>0       4     uint32  stream_id
 </code></pre></div>
-<h2 id="additional-image-types">Additional Image Types</h2>
+<h2 id="additional-image-types">Additional Image Types<a class="headerlink" href="#additional-image-types" title="Permanent link">&para;</a></h2>
 <p>Beyond the basic compression types documented earlier, SPICE supports:</p>
 <table>
 <thead>
@@ -6577,7 +6577,7 @@ the VSC (Virtual Smart Card) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="raster-operations-rop">Raster Operations (ROP)</h2>
+<h2 id="raster-operations-rop">Raster Operations (ROP)<a class="headerlink" href="#raster-operations-rop" title="Permanent link">&para;</a></h2>
 <p>Drawing commands use raster operation flags to control how pixels are combined:</p>
 <table>
 <thead>
@@ -6645,7 +6645,7 @@ the VSC (Virtual Smart Card) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="clip-types_1">Clip Types</h2>
+<h2 id="clip-types_1">Clip Types<a class="headerlink" href="#clip-types_1" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -6672,7 +6672,7 @@ the VSC (Virtual Smart Card) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="brush-types">Brush Types</h2>
+<h2 id="brush-types">Brush Types<a class="headerlink" href="#brush-types" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -6699,7 +6699,7 @@ the VSC (Virtual Smart Card) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="scale-modes_1">Scale Modes</h2>
+<h2 id="scale-modes_1">Scale Modes<a class="headerlink" href="#scale-modes_1" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -6721,7 +6721,7 @@ the VSC (Virtual Smart Card) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="mouse-button-masks">Mouse Button Masks</h2>
+<h2 id="mouse-button-masks">Mouse Button Masks<a class="headerlink" href="#mouse-button-masks" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -6760,7 +6760,7 @@ the VSC (Virtual Smart Card) protocol.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="related-documentation">Related Documentation</h2>
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/kerbside/protocol-overview/">Protocol Overview</a> - High-level protocol introduction</li>
 <li><a href="/components/kerbside/spice-link-protocol/">Link Protocol</a> - Connection handshake details</li>

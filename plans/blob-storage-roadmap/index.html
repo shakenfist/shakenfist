@@ -3704,9 +3704,9 @@
   
 
 
-<h1 id="blob-storage-roadmap">Blob Storage Roadmap</h1>
+<h1 id="blob-storage-roadmap">Blob Storage Roadmap<a class="headerlink" href="#blob-storage-roadmap" title="Permanent link">&para;</a></h1>
 <p>This document describes the planned evolution of Shaken Fist's blob storage system, from the current etcd-based hash tracking to a fully content-addressable, deduplicated storage layer with support for content-defined chunking.</p>
-<h2 id="vision">Vision</h2>
+<h2 id="vision">Vision<a class="headerlink" href="#vision" title="Permanent link">&para;</a></h2>
 <p>The end state is a storage system where:</p>
 <ul>
 <li><strong>Content-addressable</strong>: Blobs can be looked up by hash in O(1) time</li>
@@ -3714,14 +3714,14 @@
 <li><strong>Chunked</strong>: Large blobs are broken into content-defined chunks that can be shared across blobs</li>
 <li><strong>Efficient</strong>: Hash lookups, duplicate detection, and verification are all database-indexed operations</li>
 </ul>
-<div class="highlight"><pre><span></span><code>End state architecture:
-
-Instance → Blob A (composite) → [Chunk1, Chunk2, Chunk3]
-Artifact → Blob B (composite) → [Chunk1, Chunk4, Chunk5]
-                                    ↑
-                            Shared chunk (stored once)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>End state architecture:
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>Instance → Blob A (composite) → [Chunk1, Chunk2, Chunk3]
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>Artifact → Blob B (composite) → [Chunk1, Chunk4, Chunk5]
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                                    ↑
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                            Shared chunk (stored once)
 </code></pre></div>
-<h2 id="the-state-before-any-changes">The state before any changes</h2>
+<h2 id="the-state-before-any-changes">The state before any changes<a class="headerlink" href="#the-state-before-any-changes" title="Permanent link">&para;</a></h2>
 <p>Before this work, blob storage had several limitations:</p>
 <ul>
 <li><strong>Hash storage in etcd</strong>: Hashes stored at <code>attribute/blob/{uuid}/checksums</code> with O(n) lookup</li>
@@ -3733,8 +3733,8 @@ Artifact → Blob B (composite) → [Chunk1, Chunk4, Chunk5]
 - Hash verification: <code>shakenfist/blob.py:915-977</code>
 - Hash lookup API: <code>shakenfist/external_api/blob.py:345-358</code>
 - Scheduled verification: <code>shakenfist/daemons/cluster/scheduled_tasks.py:95-111</code></p>
-<h2 id="roadmap">Roadmap</h2>
-<h3 id="phase-1-hash-tracking-in-mariadb">Phase 1: Hash Tracking in MariaDB</h3>
+<h2 id="roadmap">Roadmap<a class="headerlink" href="#roadmap" title="Permanent link">&para;</a></h2>
+<h3 id="phase-1-hash-tracking-in-mariadb">Phase 1: Hash Tracking in MariaDB<a class="headerlink" href="#phase-1-hash-tracking-in-mariadb" title="Permanent link">&para;</a></h3>
 <p><strong>Goal</strong>: Move hash storage from etcd to MariaDB with proper indexes, enabling O(1) hash lookups.</p>
 <p><strong>Status</strong>: COMPLETE</p>
 <p><strong>Prerequisites</strong>: PLAN-reference-counts.md (COMPLETE)</p>
@@ -3743,26 +3743,26 @@ Artifact → Blob B (composite) → [Chunk1, Chunk4, Chunk5]
 - Proper separation of hash values from verification metadata
 - Foundation for duplicate detection in Phase 2
 - Support for additional hash algorithms (BLAKE3, etc.)</p>
-<h4 id="schema">Schema</h4>
-<div class="highlight"><pre><span></span><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">blob_hashes</span><span class="w"> </span><span class="p">(</span>
-<span class="w">    </span><span class="n">blob_uuid</span><span class="w"> </span><span class="n">UUID</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
-<span class="w">    </span><span class="n">node</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
-<span class="w">    </span><span class="n">algorithm</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
-<span class="w">    </span><span class="n">hash_value</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">256</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
-<span class="w">    </span><span class="n">file_size</span><span class="w"> </span><span class="nb">BIGINT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
-<span class="w">    </span><span class="n">computed_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
-<span class="w">    </span><span class="n">last_verified_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
-<span class="w">    </span><span class="n">verification_status</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">&#39;pending&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="n">error_message</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span>
-<span class="w">    </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">,</span><span class="w"> </span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="n">algorithm</span><span class="p">),</span>
-<span class="w">    </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_blob_status</span><span class="w"> </span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">,</span><span class="w"> </span><span class="n">verification_status</span><span class="p">),</span>
-<span class="w">    </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_node</span><span class="w"> </span><span class="p">(</span><span class="n">node</span><span class="p">),</span>
-<span class="w">    </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_last_verified</span><span class="w"> </span><span class="p">(</span><span class="n">last_verified_at</span><span class="p">),</span>
-<span class="w">    </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_status</span><span class="w"> </span><span class="p">(</span><span class="n">verification_status</span><span class="p">),</span>
-<span class="w">    </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_hash_lookup</span><span class="w"> </span><span class="p">(</span><span class="n">algorithm</span><span class="p">,</span><span class="w"> </span><span class="n">hash_value</span><span class="p">)</span>
-<span class="p">);</span>
+<h4 id="schema">Schema<a class="headerlink" href="#schema" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">blob_hashes</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="n">blob_uuid</span><span class="w"> </span><span class="n">UUID</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="n">node</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="n">algorithm</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="n">hash_value</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">256</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="n">file_size</span><span class="w"> </span><span class="nb">BIGINT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="n">computed_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="n">last_verified_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="n">verification_status</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">&#39;pending&#39;</span><span class="p">,</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="n">error_message</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">,</span><span class="w"> </span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="n">algorithm</span><span class="p">),</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_blob_status</span><span class="w"> </span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">,</span><span class="w"> </span><span class="n">verification_status</span><span class="p">),</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_node</span><span class="w"> </span><span class="p">(</span><span class="n">node</span><span class="p">),</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_last_verified</span><span class="w"> </span><span class="p">(</span><span class="n">last_verified_at</span><span class="p">),</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_status</span><span class="w"> </span><span class="p">(</span><span class="n">verification_status</span><span class="p">),</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_hash_lookup</span><span class="w"> </span><span class="p">(</span><span class="n">algorithm</span><span class="p">,</span><span class="w"> </span><span class="n">hash_value</span><span class="p">)</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="p">);</span>
 </code></pre></div>
-<h4 id="migration-strategy">Migration Strategy</h4>
+<h4 id="migration-strategy">Migration Strategy<a class="headerlink" href="#migration-strategy" title="Permanent link">&para;</a></h4>
 <p>Hard cutover using <code>sf-client migrate-checksums-to-mariadb</code>:</p>
 <ol>
 <li>Run migration command to copy existing checksums from etcd to MariaDB</li>
@@ -3770,7 +3770,7 @@ Artifact → Blob B (composite) → [Chunk1, Chunk4, Chunk5]
 <li>Delete old <code>checksums</code> attributes from etcd</li>
 </ol>
 <p>The migration command is idempotent and can be run multiple times safely.</p>
-<h4 id="implementation-steps">Implementation Steps</h4>
+<h4 id="implementation-steps">Implementation Steps<a class="headerlink" href="#implementation-steps" title="Permanent link">&para;</a></h4>
 <ol>
 <li>Create Pydantic schema for BlobHash</li>
 <li>Add MariaDB table and access functions (following <code>object_references</code> patterns)</li>
@@ -3781,7 +3781,7 @@ Artifact → Blob B (composite) → [Chunk1, Chunk4, Chunk5]
 <li>Remove etcd checksum code</li>
 </ol>
 <hr />
-<h3 id="phase-2-composite-blobs-and-lazy-deduplication">Phase 2: Composite Blobs and Lazy Deduplication</h3>
+<h3 id="phase-2-composite-blobs-and-lazy-deduplication">Phase 2: Composite Blobs and Lazy Deduplication<a class="headerlink" href="#phase-2-composite-blobs-and-lazy-deduplication" title="Permanent link">&para;</a></h3>
 <p><strong>Goal</strong>: Enable storage deduplication by converting duplicate blobs to composites that reference shared content.</p>
 <p><strong>Status</strong>: Future</p>
 <p><strong>Prerequisites</strong>: Phase 1 (blob_hashes table with <code>idx_hash_lookup</code>)</p>
@@ -3789,20 +3789,20 @@ Artifact → Blob B (composite) → [Chunk1, Chunk4, Chunk5]
 - Storage savings when identical content is uploaded multiple times
 - Incremental deduplication (happens lazily, no big migration)
 - Foundation for content-defined chunking in Phase 3</p>
-<h4 id="key-concept-composite-blobs">Key Concept: Composite Blobs</h4>
+<h4 id="key-concept-composite-blobs">Key Concept: Composite Blobs<a class="headerlink" href="#key-concept-composite-blobs" title="Permanent link">&para;</a></h4>
 <p>Add a <code>type</code> field to blobs: <code>content</code> (default) or <code>composite</code>. A composite blob's content is defined by references to other blobs (chunks).</p>
-<div class="highlight"><pre><span></span><code>Before deduplication:
-  Blob A (type=content, 10GB file)  ←── Instance disk
-  Blob B (type=content, 10GB file)  ←── Artifact index
-  # Identical content, stored twice
-
-After lazy dedup detects A.hash == B.hash:
-  Blob A (type=composite) → [C]     ←── Instance disk (resolves to C)
-  Blob B (type=composite) → [C]     ←── Artifact index (resolves to C)
-  Blob C (type=content, 10GB file)  ←── System-owned content blob
-  # Only one copy on disk
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Before deduplication:
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  Blob A (type=content, 10GB file)  ←── Instance disk
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  Blob B (type=content, 10GB file)  ←── Artifact index
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  # Identical content, stored twice
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>After lazy dedup detects A.hash == B.hash:
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  Blob A (type=composite) → [C]     ←── Instance disk (resolves to C)
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>  Blob B (type=composite) → [C]     ←── Artifact index (resolves to C)
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>  Blob C (type=content, 10GB file)  ←── System-owned content blob
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>  # Only one copy on disk
 </code></pre></div>
-<h4 id="ownership-model">Ownership Model</h4>
+<h4 id="ownership-model">Ownership Model<a class="headerlink" href="#ownership-model" title="Permanent link">&para;</a></h4>
 <p>Content blobs (type=content) are always system-owned. User-facing blobs are composites that reference shared content:</p>
 <ul>
 <li>When User A uploads content, system creates content blob C (system-owned) and composite blob A (user-owned) pointing to C</li>
@@ -3811,7 +3811,7 @@ After lazy dedup detects A.hash == B.hash:
 <li>Content blob C only deleted when ref_count hits 0 (no composites reference it)</li>
 </ul>
 <p>This cleanly separates user identity/permissions (on composite blobs) from content storage (on system-owned content blobs).</p>
-<h4 id="how-deduplication-works">How Deduplication Works</h4>
+<h4 id="how-deduplication-works">How Deduplication Works<a class="headerlink" href="#how-deduplication-works" title="Permanent link">&para;</a></h4>
 <ol>
 <li>Lazy hashing computes hashes for blobs (existing behavior)</li>
 <li><code>idx_hash_lookup</code> finds blobs with matching hashes</li>
@@ -3819,19 +3819,19 @@ After lazy dedup detects A.hash == B.hash:
 <li>Convert user blobs to composites pointing to content blob</li>
 <li>Delete duplicate files, keep only one copy</li>
 </ol>
-<h4 id="chunk-storage">Chunk Storage</h4>
+<h4 id="chunk-storage">Chunk Storage<a class="headerlink" href="#chunk-storage" title="Permanent link">&para;</a></h4>
 <p>Chunk references stored in <code>object_references</code> table:</p>
-<div class="highlight"><pre><span></span><code><span class="c1">-- RelationshipType.CHUNK added to enum</span>
-<span class="n">source_type</span><span class="o">=</span><span class="nb">BLOB</span><span class="p">,</span><span class="w"> </span><span class="n">source_uuid</span><span class="o">=</span><span class="n">composite_blob</span><span class="p">,</span>
-<span class="n">relationship</span><span class="o">=</span><span class="n">CHUNK</span><span class="p">,</span><span class="w"> </span><span class="n">relationship_value</span><span class="o">=</span><span class="ss">&quot;0&quot;</span><span class="p">,</span>
-<span class="n">target_type</span><span class="o">=</span><span class="nb">BLOB</span><span class="p">,</span><span class="w"> </span><span class="n">target_uuid</span><span class="o">=</span><span class="n">content_blob</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">-- RelationshipType.CHUNK added to enum</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">source_type</span><span class="o">=</span><span class="nb">BLOB</span><span class="p">,</span><span class="w"> </span><span class="n">source_uuid</span><span class="o">=</span><span class="n">composite_blob</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">relationship</span><span class="o">=</span><span class="n">CHUNK</span><span class="p">,</span><span class="w"> </span><span class="n">relationship_value</span><span class="o">=</span><span class="ss">&quot;0&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">target_type</span><span class="o">=</span><span class="nb">BLOB</span><span class="p">,</span><span class="w"> </span><span class="n">target_uuid</span><span class="o">=</span><span class="n">content_blob</span>
 </code></pre></div>
 <p>This provides:
 - "What chunks make up blob X?" → <code>get_references_from(BLOB, X, relationship=CHUNK)</code>
 - "What blobs use chunk C?" → <code>get_references_to(BLOB, C, relationship=CHUNK)</code>
 - Ref counting works naturally - chunk can't be deleted while referenced</p>
 <hr />
-<h3 id="phase-3-content-defined-chunking">Phase 3: Content-Defined Chunking</h3>
+<h3 id="phase-3-content-defined-chunking">Phase 3: Content-Defined Chunking<a class="headerlink" href="#phase-3-content-defined-chunking" title="Permanent link">&para;</a></h3>
 <p><strong>Goal</strong>: Break large blobs into variable-sized chunks based on content boundaries, enabling cross-blob deduplication.</p>
 <p><strong>Status</strong>: Future (prototype in <code>src/private/flywheel</code>)</p>
 <p><strong>Prerequisites</strong>: Phase 2 (composite blobs)</p>
@@ -3839,14 +3839,14 @@ After lazy dedup detects A.hash == B.hash:
 - Deduplication at sub-blob granularity
 - Efficient storage of similar but not identical images
 - Reduced transfer sizes for incremental updates</p>
-<h4 id="key-concept">Key Concept</h4>
+<h4 id="key-concept">Key Concept<a class="headerlink" href="#key-concept" title="Permanent link">&para;</a></h4>
 <p>Instead of storing a 10GB VM image as one blob, break it into ~1000 chunks of ~10MB each based on content boundaries (using algorithms like FastCDC with BLAKE3 hashing).</p>
-<div class="highlight"><pre><span></span><code>Blob X (composite) → [C1, C2, C3, C4, ...]  ←── Ubuntu 22.04 image
-Blob Y (composite) → [C1, C2, C5, C6, ...]  ←── Ubuntu 22.04 with customizations
-                       ↑   ↑
-                 Shared chunks (base OS)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Blob X (composite) → [C1, C2, C3, C4, ...]  ←── Ubuntu 22.04 image
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Blob Y (composite) → [C1, C2, C5, C6, ...]  ←── Ubuntu 22.04 with customizations
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>                       ↑   ↑
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>                 Shared chunks (base OS)
 </code></pre></div>
-<h4 id="implementation-notes">Implementation Notes</h4>
+<h4 id="implementation-notes">Implementation Notes<a class="headerlink" href="#implementation-notes" title="Permanent link">&para;</a></h4>
 <ul>
 <li>Uses same composite blob infrastructure from Phase 2</li>
 <li>Chunks are just content blobs referenced via CHUNK relationships</li>
@@ -3854,8 +3854,8 @@ Blob Y (composite) → [C1, C2, C5, C6, ...]  ←── Ubuntu 22.04 with custom
 <li>Content-defined chunking only for new uploads; existing blobs can be lazily re-chunked</li>
 </ul>
 <hr />
-<h2 id="design-decisions">Design Decisions</h2>
-<h3 id="why-composite-blobs-instead-of-a-separate-contentstore">Why Composite Blobs Instead of a Separate ContentStore?</h3>
+<h2 id="design-decisions">Design Decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h2>
+<h3 id="why-composite-blobs-instead-of-a-separate-contentstore">Why Composite Blobs Instead of a Separate ContentStore?<a class="headerlink" href="#why-composite-blobs-instead-of-a-separate-contentstore" title="Permanent link">&para;</a></h3>
 <p>We considered several approaches to deduplication:</p>
 <table>
 <thead>
@@ -3890,15 +3890,15 @@ Blob Y (composite) → [C1, C2, C5, C6, ...]  ←── Ubuntu 22.04 with custom
 </table>
 <p><strong>Decision</strong>: Option D (Composite Blobs)</p>
 <p>Key insight: Option D achieves Option A's architecture using a single object type. Chunks <em>are</em> blobs - they just play a different role (system-owned, only referenced via CHUNK relationships, hold actual bytes).</p>
-<div class="highlight"><pre><span></span><code>Option A: Blob (public) → ContentStore (internal, new type)
-Option D: Blob (composite, user-owned) → Blob (content, system-owned)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Option A: Blob (public) → ContentStore (internal, new type)
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Option D: Blob (composite, user-owned) → Blob (content, system-owned)
 </code></pre></div>
 <p>This allows incremental migration:
 - Day 1: All blobs are <code>type=content</code> (current state)
 - Day N: Lazy dedup converts some to <code>type=composite</code>
 - Day M: Content-defined chunking creates composites from the start
 - End: Most user-facing blobs are composites, most storage is in shared chunks</p>
-<h3 id="why-store-chunks-in-object_references">Why Store Chunks in object_references?</h3>
+<h3 id="why-store-chunks-in-object_references">Why Store Chunks in object_references?<a class="headerlink" href="#why-store-chunks-in-object_references" title="Permanent link">&para;</a></h3>
 <p>We considered three options for chunk list storage:</p>
 <table>
 <thead>
@@ -3932,16 +3932,16 @@ Option D: Blob (composite, user-owned) → Blob (content, system-owned)
 </table>
 <p><strong>Decision</strong>: Use <code>object_references</code> table</p>
 <p>This avoids creating another "two storage locations" problem and leverages infrastructure already built for PLAN-reference-counts.md.</p>
-<h3 id="why-varchar-instead-of-enum-for-status">Why VARCHAR Instead of ENUM for Status?</h3>
+<h3 id="why-varchar-instead-of-enum-for-status">Why VARCHAR Instead of ENUM for Status?<a class="headerlink" href="#why-varchar-instead-of-enum-for-status" title="Permanent link">&para;</a></h3>
 <p>The <code>verification_status</code> column uses <code>VARCHAR(16)</code> instead of <code>ENUM('valid', 'invalid', 'pending')</code> because ENUMs are painful to modify in MySQL. Using VARCHAR allows adding states like <code>'quarantined'</code> or <code>'verifying'</code> without schema migration.</p>
 <hr />
-<h2 id="open-questions">Open Questions</h2>
-<h3 id="rest-api-hash-references">REST API Hash References</h3>
+<h2 id="open-questions">Open Questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<h3 id="rest-api-hash-references">REST API Hash References<a class="headerlink" href="#rest-api-hash-references" title="Permanent link">&para;</a></h3>
 <p>Should the REST API accept hash-based references? e.g., <code>GET /blob/sha512:abc123...</code></p>
 <p>This would enable Docker-style content-addressable access but requires:
 - Streaming hash computation on upload
 - Decision on what to return if multiple composites share the same content</p>
-<h3 id="chunk-size-strategy">Chunk Size Strategy</h3>
+<h3 id="chunk-size-strategy">Chunk Size Strategy<a class="headerlink" href="#chunk-size-strategy" title="Permanent link">&para;</a></h3>
 <p>For content-defined chunking, what's the optimal target chunk size?
 - Smaller chunks = more deduplication, more metadata overhead
 - Larger chunks = less deduplication, simpler management

@@ -3302,7 +3302,7 @@
   
 
 
-<h1 id="artifacts">Artifacts</h1>
+<h1 id="artifacts">Artifacts<a class="headerlink" href="#artifacts" title="Permanent link">&para;</a></h1>
 <p>Shaken Fist uses artifacts as disk templates for new instances. You therefore
 need to have a least one artifact before you can create your first instance,
 although there is a shorthand notation to create that artifact during instance
@@ -3324,22 +3324,22 @@ creation.</p>
 symlinks if you'd like. All types of artifact support versioning. This is implemented
 by having each artifact have a list of blobs. You can see this in the output of a
 <code>sf-client artifact show ...</code> command:</p>
-<div class="highlight"><pre><span></span><code>$ sf-client artifact show 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
-uuid                     : 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
-namespace                : ci-images
-type                     : label
-state                    : created
-source url               : sf://label/ci-images/debian-11
-current version blob uuid: cc6a6a96-8182-474a-ab31-45f1f9310b44
-number of versions       : 3
-maximum versions         : 3
-shared                   : False
-
-Versions:
-    4  : blob f6090574-321c-4dec-b381-0caf001eeba5 is 2964.1MB
-    5  : blob 77b9032a-0d3e-4cc2-bb73-1730ad3c3cb0 is 2960.1MB
-    6  : blob cc6a6a96-8182-474a-ab31-45f1f9310b44 is 2950.4MB in use by
-         instances 78d566f1-c664-46d9-aa46-cf717aa63743
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$ sf-client artifact show 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uuid                     : 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>namespace                : ci-images
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>type                     : label
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>state                    : created
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>source url               : sf://label/ci-images/debian-11
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>current version blob uuid: cc6a6a96-8182-474a-ab31-45f1f9310b44
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>number of versions       : 3
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>maximum versions         : 3
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>shared                   : False
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>Versions:
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    4  : blob f6090574-321c-4dec-b381-0caf001eeba5 is 2964.1MB
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    5  : blob 77b9032a-0d3e-4cc2-bb73-1730ad3c3cb0 is 2960.1MB
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    6  : blob cc6a6a96-8182-474a-ab31-45f1f9310b44 is 2950.4MB in use by
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>         instances 78d566f1-c664-46d9-aa46-cf717aa63743
 </code></pre></div>
 <p>Here we can see a few things:</p>
 <ul>
@@ -3352,7 +3352,7 @@ Versions:
   6).</li>
 <li>The most recent version is currently in use by an instance.</li>
 </ul>
-<h2 id="creating-an-image-artifact">Creating an image artifact</h2>
+<h2 id="creating-an-image-artifact">Creating an image artifact<a class="headerlink" href="#creating-an-image-artifact" title="Permanent link">&para;</a></h2>
 <p>Image artifacts are created by specifying the URL of an image to download. This
 can be either in the form of an explicit request to cache a URL with a
 <code>sf-client artifact cache</code> command, or implied by specifying the URL of the
@@ -3394,13 +3394,13 @@ instance start), the URL is checked. If the image has changed a new version is
 downloaded, otherwise the already cached version is used.</p>
 <p>You can also create an image artifact by uploading it, but that's complicated
 enough that its covered separately in <a href="/developer_guide/api_reference/artifacts/">the developer guide section on artifacts</a>.</p>
-<h2 id="creating-a-snapshot-artifact">Creating a snapshot artifact</h2>
+<h2 id="creating-a-snapshot-artifact">Creating a snapshot artifact<a class="headerlink" href="#creating-a-snapshot-artifact" title="Permanent link">&para;</a></h2>
 <p>These are created by the <code>sf-client instance snapshot</code> command. You can specify
 which disk to snapshot on a multi-disk instance with the <code>--device</code> flag. Repeated
 snapshots of the same instance will result in multiple versions of the one
 artifact being created. Note that there is an artifact per device snapshotted, so
 a single snapshot of a multi-disk instance will create multiple artifacts.</p>
-<h2 id="creating-label-artifacts">Creating label artifacts</h2>
+<h2 id="creating-label-artifacts">Creating label artifacts<a class="headerlink" href="#creating-label-artifacts" title="Permanent link">&para;</a></h2>
 <p>So what's a label? Well downloading new versions of images automatically is great,
 but what if I want to ensure the version from two weeks ago that I tested is the
 one I use? Or what if I want to refer to my favourite instance snapshot by
@@ -3414,30 +3414,30 @@ you'd add that version's blob UUID to your label of known tested versions.</p>
 having that version referred to in a label artifact protects it from deletion.</p>
 <p>An example of labelling a known good version of an artifact would be something
 like this:</p>
-<div class="highlight"><pre><span></span><code>$ sf-client artifact show 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
-uuid                     : 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
-namespace                : ci-images
-type                     : label
-state                    : created
-source url               : sf://label/ci-images/debian-11
-current version blob uuid: cc6a6a96-8182-474a-ab31-45f1f9310b44
-number of versions       : 3
-maximum versions         : 3
-shared                   : False
-
-Versions:
-    4  : blob f6090574-321c-4dec-b381-0caf001eeba5 is 2964.1MB
-    5  : blob 77b9032a-0d3e-4cc2-bb73-1730ad3c3cb0 is 2960.1MB
-    6  : blob cc6a6a96-8182-474a-ab31-45f1f9310b44 is 2950.4MB in use by
-         instances 78d566f1-c664-46d9-aa46-cf717aa63743
-
-...test version 6 with blob UUID cc6a6a96-8182-474a-ab31-45f1f9310b44...
-
-$ sf-client label update my-tested-thing cc6a6a96-8182-474a-ab31-45f1f9310b44
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$ sf-client artifact show 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>uuid                     : 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>namespace                : ci-images
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>type                     : label
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>state                    : created
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>source url               : sf://label/ci-images/debian-11
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>current version blob uuid: cc6a6a96-8182-474a-ab31-45f1f9310b44
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>number of versions       : 3
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>maximum versions         : 3
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>shared                   : False
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>Versions:
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    4  : blob f6090574-321c-4dec-b381-0caf001eeba5 is 2964.1MB
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    5  : blob 77b9032a-0d3e-4cc2-bb73-1730ad3c3cb0 is 2960.1MB
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    6  : blob cc6a6a96-8182-474a-ab31-45f1f9310b44 is 2950.4MB in use by
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>         instances 78d566f1-c664-46d9-aa46-cf717aa63743
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>...test version 6 with blob UUID cc6a6a96-8182-474a-ab31-45f1f9310b44...
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>$ sf-client label update my-tested-thing cc6a6a96-8182-474a-ab31-45f1f9310b44
 </code></pre></div>
 <p>If the label <code>my-tested-thing</code> does not exist, it will be created the first
 time you update it.</p>
-<h2 id="listing-and-deleting-artifacts">Listing and deleting artifacts</h2>
+<h2 id="listing-and-deleting-artifacts">Listing and deleting artifacts<a class="headerlink" href="#listing-and-deleting-artifacts" title="Permanent link">&para;</a></h2>
 <p>Artifacts follow the same user interface patterns as other objects. That is, you
 can list artifacts with this command:</p>
 <p><code>sf-client artifact list</code></p>
@@ -3454,15 +3454,15 @@ is not currently exposed in the command line client.</p>
 <p>Finally, deleting a namespace implies deleting all artifacts within that namespace,
 so show care when deleting namespaces to ensure they no longer contain any data
 you are fond of.</p>
-<h2 id="controlling-the-number-of-versions">Controlling the number of versions</h2>
+<h2 id="controlling-the-number-of-versions">Controlling the number of versions<a class="headerlink" href="#controlling-the-number-of-versions" title="Permanent link">&para;</a></h2>
 <p>You can also control the number of versions stored by an artifact with the
 <code>sf-client artifact max-versions</code> command.</p>
-<h2 id="blob-replication">Blob replication</h2>
+<h2 id="blob-replication">Blob replication<a class="headerlink" href="#blob-replication" title="Permanent link">&para;</a></h2>
 <p>You can control the number of copies of a given blob are stored in the cluster
 as well. This protects against machine or disk failures causing data loss. The
 default number of replicas is 2, but this is not configurable per-blob. It is
 configured with the <code>BLOB_REPLICATION_FACTOR</code> configuration variable.</p>
-<h2 id="artifact-uploads-and-downloads">Artifact uploads and downloads</h2>
+<h2 id="artifact-uploads-and-downloads">Artifact uploads and downloads<a class="headerlink" href="#artifact-uploads-and-downloads" title="Permanent link">&para;</a></h2>
 <p>Artifacts may also be uploaded and downloaded. This means you can extract a
 snapshot from your cluster for offline backup (or movement to another cloud),
 or upload an image built with a tool like Hashicorp Packer.</p>

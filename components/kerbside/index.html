@@ -3648,9 +3648,9 @@
   
 
 
-<h1 id="kerbside-documentation">Kerbside Documentation</h1>
+<h1 id="kerbside-documentation">Kerbside Documentation<a class="headerlink" href="#kerbside-documentation" title="Permanent link">&para;</a></h1>
 <p>Welcome to the Kerbside documentation.</p>
-<h2 id="documentation-version">Documentation Version</h2>
+<h2 id="documentation-version">Documentation Version<a class="headerlink" href="#documentation-version" title="Permanent link">&para;</a></h2>
 <p>This documentation covers:</p>
 <ul>
 <li><strong>SPICE Protocol Version</strong>: 2.2 (current as of spice-protocol 0.14)</li>
@@ -3660,7 +3660,7 @@
 <p>Protocol documentation is derived from the official SPICE protocol sources at
 <code>gitlab.freedesktop.org/spice/spice-protocol</code> and verified against Kerbside's
 implementation. Message IDs and constants reflect Kerbside's internal mappings.</p>
-<h2 id="introduction">Introduction</h2>
+<h2 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h2>
 <p>Kerbside is a <a href="https://spice-space.org/">SPICE</a> protocol native VDI proxy
 responsible for providing rich VDI experiences to users of Shaken Fist, oVirt,
 OpenStack, or any other cloud where the hypervisor is capable of providing SPICE
@@ -3675,11 +3675,11 @@ we avoid these problems.</p>
 <p>Novel features of SPICE include high resolution desktops, multi-screen desktops,
 USB device passthrough, sound, multiple user connections to a single console,
 adaptive compression, and more.</p>
-<h3 id="kerbside-is-experimental">Kerbside is Experimental</h3>
+<h3 id="kerbside-is-experimental">Kerbside is Experimental<a class="headerlink" href="#kerbside-is-experimental" title="Permanent link">&para;</a></h3>
 <p>Kerbside is currently considered experimental. While it works, it has not yet
 seen large scale deployment and it is likely that it will need modifications
 as it is hardened for production use.</p>
-<h3 id="kerbside-is-a-proxy-not-a-complete-user-interface">Kerbside is a Proxy, Not a Complete User Interface</h3>
+<h3 id="kerbside-is-a-proxy-not-a-complete-user-interface">Kerbside is a Proxy, Not a Complete User Interface<a class="headerlink" href="#kerbside-is-a-proxy-not-a-complete-user-interface" title="Permanent link">&para;</a></h3>
 <p>Whilst Kerbside presents a simple administrative interface over HTTP and has
 REST APIs for orchestrating consoles, it is not intended as a complete SPICE
 desktop VDI solution. It is intended that Kerbside itself is orchestrated by
@@ -3715,26 +3715,26 @@ the following steps need to occur:</p>
    various steps.</p>
 </li>
 </ol>
-<h3 id="connection-flow-diagram">Connection Flow Diagram</h3>
-<div class="highlight"><pre><span></span><code>+------------------+              +-------------------+              +------------------+
-|                  |              |                   |              |                  |
-|  External Broker |  1. Request  |     Kerbside      |  5. Connect  |   Hypervisor     |
-|  (SF/Horizon)    +-------------&gt;|   SPICE Proxy     +-------------&gt;|   (QEMU/KVM)     |
-|                  |   .vv file   |                   |   to console |                  |
-+--------+---------+              +---------+---------+              +------------------+
-         |                                  ^
-         | 2. Return                        |
-         |    .vv file                      | 4. Connect with
-         v                                  |    access token
-+--------+---------+                        |
-|                  |                        |
-|   User&#39;s SPICE   +------------------------+
-|   Client         |  3. User opens .vv file
-|  (remote-viewer) |
-|                  |
-+------------------+
+<h3 id="connection-flow-diagram">Connection Flow Diagram<a class="headerlink" href="#connection-flow-diagram" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>+------------------+              +-------------------+              +------------------+
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>|                  |              |                   |              |                  |
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>|  External Broker |  1. Request  |     Kerbside      |  5. Connect  |   Hypervisor     |
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>|  (SF/Horizon)    +-------------&gt;|   SPICE Proxy     +-------------&gt;|   (QEMU/KVM)     |
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>|                  |   .vv file   |                   |   to console |                  |
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>+--------+---------+              +---------+---------+              +------------------+
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>         |                                  ^
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>         | 2. Return                        |
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>         |    .vv file                      | 4. Connect with
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>         v                                  |    access token
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>+--------+---------+                        |
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>|                  |                        |
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>|   User&#39;s SPICE   +------------------------+
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>|   Client         |  3. User opens .vv file
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>|  (remote-viewer) |
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>|                  |
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>+------------------+
 </code></pre></div>
-<h3 id="implementation-in-openstack">Implementation in OpenStack</h3>
+<h3 id="implementation-in-openstack">Implementation in OpenStack<a class="headerlink" href="#implementation-in-openstack" title="Permanent link">&para;</a></h3>
 <p>OpenStack Nova now supports native SPICE direct consoles as of the 2025.1 Epoxy
 release. The
 <a href="https://specs.openstack.org/openstack/nova-specs/specs/2025.1/implemented/libvirt-spice-direct-consoles.html">Nova specification</a>
@@ -3752,7 +3752,7 @@ ports on the hypervisor, and so Kerbside acts as an intermediary to protect
 those hypervisors. There is a sample implementation of Kerbside deployment using
 Kolla-Ansible in the
 <a href="https://github.com/shakenfist/kerbside-patches">Kerbside Patches repository</a>.</p>
-<h3 id="what-about-bumblebee">What About Bumblebee?</h3>
+<h3 id="what-about-bumblebee">What About Bumblebee?<a class="headerlink" href="#what-about-bumblebee" title="Permanent link">&para;</a></h3>
 <p>The folks over at the NECTAR research cloud developed
 <a href="https://github.com/NeCTAR-RC/bumblebee">Bumblebee VDI</a>, which is superficially
 similar to Kerbside in that it provides a mechanism to make it easier to obtain
@@ -3762,8 +3762,8 @@ access to virtual desktops for users. However, Bumblebee exclusively orchestrate
 HTML5 consoles using Apache Guacamole as its HTML5 proxy at the moment, so misses
 out on some of the richer features of SPICE and has the performance implications
 of a HTML5 desktop environment.</p>
-<h2 id="documentation-index">Documentation Index</h2>
-<h3 id="operator-documentation">Operator Documentation</h3>
+<h2 id="documentation-index">Documentation Index<a class="headerlink" href="#documentation-index" title="Permanent link">&para;</a></h2>
+<h3 id="operator-documentation">Operator Documentation<a class="headerlink" href="#operator-documentation" title="Permanent link">&para;</a></h3>
 <p>Guides for deploying and configuring Kerbside:</p>
 <ul>
 <li>
@@ -3778,7 +3778,7 @@ of a HTML5 desktop environment.</p>
 <p><a href="/components/kerbside/schema/">Database Schema</a> - Database tables, columns, and relationships</p>
 </li>
 </ul>
-<h3 id="architecture-documentation">Architecture Documentation</h3>
+<h3 id="architecture-documentation">Architecture Documentation<a class="headerlink" href="#architecture-documentation" title="Permanent link">&para;</a></h3>
 <p>Internal design of the Kerbside proxy:</p>
 <ul>
 <li>
@@ -3791,7 +3791,7 @@ of a HTML5 desktop environment.</p>
   overview (in project root)</p>
 </li>
 </ul>
-<h3 id="spice-protocol-documentation">SPICE Protocol Documentation</h3>
+<h3 id="spice-protocol-documentation">SPICE Protocol Documentation<a class="headerlink" href="#spice-protocol-documentation" title="Permanent link">&para;</a></h3>
 <p>Core protocol specifications covering connection handshake, authentication, and
 channel message formats:</p>
 <ul>
@@ -3832,20 +3832,20 @@ channel message formats:</p>
   common, display, audio, and input capabilities with recommended settings</p>
 </li>
 </ul>
-<h3 id="device-redirection-protocols">Device Redirection Protocols</h3>
+<h3 id="device-redirection-protocols">Device Redirection Protocols<a class="headerlink" href="#device-redirection-protocols" title="Permanent link">&para;</a></h3>
 <p>Protocols for redirecting client devices to the virtual machine:</p>
 <ul>
 <li><a href="/components/kerbside/usb-redirection/">USB Redirection</a> - USB device redirection protocol
   (usbredir) including all control and data message formats, capability
   negotiation, and device filter rules</li>
 </ul>
-<h3 id="guest-agent-protocol">Guest Agent Protocol</h3>
+<h3 id="guest-agent-protocol">Guest Agent Protocol<a class="headerlink" href="#guest-agent-protocol" title="Permanent link">&para;</a></h3>
 <p>Protocol for advanced guest integration features:</p>
 <ul>
 <li><a href="/components/kerbside/vd-agent-protocol/">VD Agent Protocol</a> - Guest agent protocol for
   clipboard sharing, file transfer, display configuration, and volume sync</li>
 </ul>
-<h2 id="protocol-implementation-status">Protocol Implementation Status</h2>
+<h2 id="protocol-implementation-status">Protocol Implementation Status<a class="headerlink" href="#protocol-implementation-status" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -3919,8 +3919,8 @@ channel message formats:</p>
 </table>
 <p><strong>Full</strong>: Protocol decoded and logged during inspection
 <strong>Proxy</strong>: Traffic forwarded transparently without decoding</p>
-<h2 id="quick-reference">Quick Reference</h2>
-<h3 id="channel-types">Channel Types</h3>
+<h2 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
+<h3 id="channel-types">Channel Types<a class="headerlink" href="#channel-types" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -3987,10 +3987,10 @@ channel message formats:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="error-codes">Error Codes</h3>
+<h3 id="error-codes">Error Codes<a class="headerlink" href="#error-codes" title="Permanent link">&para;</a></h3>
 <p>See <a href="/components/kerbside/protocol-overview/#error-codes">Protocol Overview - Error Codes</a> for the
 complete list of SPICE link error codes.</p>
-<h3 id="common-capabilities">Common Capabilities</h3>
+<h3 id="common-capabilities">Common Capabilities<a class="headerlink" href="#common-capabilities" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4022,7 +4022,7 @@ complete list of SPICE link error codes.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="external-references">External References</h2>
+<h2 id="external-references">External References<a class="headerlink" href="#external-references" title="Permanent link">&para;</a></h2>
 <p>Official SPICE protocol resources:</p>
 <ul>
 <li><a href="https://www.spice-space.org/spice-protocol.html">SPICE Protocol Documentation</a></li>
@@ -4032,7 +4032,7 @@ complete list of SPICE link error codes.</p>
 <li><a href="https://gitlab.freedesktop.org/spice/usbredir">usbredir Source</a></li>
 <li><a href="https://gitlab.freedesktop.org/spice/usbredir/-/blob/main/docs/usb-redirection-protocol.md">usbredir Protocol Spec</a></li>
 </ul>
-<h2 id="contributing">Contributing</h2>
+<h2 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">&para;</a></h2>
 <p>When adding new protocol support or modifying existing implementations:</p>
 <ol>
 <li>Update the relevant documentation in this directory</li>
@@ -4041,7 +4041,7 @@ complete list of SPICE link error codes.</p>
 <li>Add traffic inspection support in <code>spiceprotocol/packets/</code></li>
 <li>Update constants in <code>spiceprotocol/packets/constants.py</code></li>
 </ol>
-<h2 id="document-conventions">Document Conventions</h2>
+<h2 id="document-conventions">Document Conventions<a class="headerlink" href="#document-conventions" title="Permanent link">&para;</a></h2>
 <p>Throughout this documentation:</p>
 <ul>
 <li><strong>Binary formats</strong> use little-endian byte order unless noted otherwise</li>

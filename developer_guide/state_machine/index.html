@@ -3346,7 +3346,7 @@
   
 
 
-<h1 id="shaken-fists-state-machine">Shaken Fist's State Machine</h1>
+<h1 id="shaken-fists-state-machine">Shaken Fist's State Machine<a class="headerlink" href="#shaken-fists-state-machine" title="Permanent link">&para;</a></h1>
 <p>Shaken Fist implements a state machine for each object type. This page documents
 the possible states for each object, and which transitions between states are
 valid.</p>
@@ -3360,7 +3360,7 @@ configured with the CLEANER_DELAY configuration option. Once an object is hard
 deleted it will no longer appear in any API request, as it no longer exists in
 the database. The exception is that it will still appear in relevant events that
 have not yet aged out.</p>
-<h2 id="agent-operations">Agent Operations</h2>
+<h2 id="agent-operations">Agent Operations<a class="headerlink" href="#agent-operations" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>initial</code>: the first state for an agent operation. A UUID has been allocated,
   and a placeholder database entry created.</li>
@@ -3403,7 +3403,7 @@ have not yet aged out.</p>
   error --&gt; deleted
 
   deleted --&gt; [*]</code></pre>
-<h2 id="artifacts">Artifacts</h2>
+<h2 id="artifacts">Artifacts<a class="headerlink" href="#artifacts" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>initial</code>: the first state for an artifact. A UUID has been allocated,
   and a placeholder database entry created.</li>
@@ -3425,7 +3425,7 @@ have not yet aged out.</p>
   error --&gt; deleted
 
   deleted --&gt; [*]</code></pre>
-<h2 id="blobs">Blobs</h2>
+<h2 id="blobs">Blobs<a class="headerlink" href="#blobs" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>initial</code>: the first state for an blob. A UUID has been allocated,
   and a placeholder database entry created.</li>
@@ -3447,7 +3447,7 @@ have not yet aged out.</p>
   error --&gt; deleted
 
   deleted --&gt; [*]</code></pre>
-<h2 id="instances">Instances</h2>
+<h2 id="instances">Instances<a class="headerlink" href="#instances" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>initial</code>: this is the first state for an instance. A UUID has been allocated,
   a placeholder database entry created, and a request to create the instance has
@@ -3507,7 +3507,7 @@ underscores in some state names due to limitations in the diagram renderer):</p>
   delete_wait --&gt; delete_wait_error
 
   deleted --&gt; [*]</code></pre>
-<h2 id="namespaces">Namespaces</h2>
+<h2 id="namespaces">Namespaces<a class="headerlink" href="#namespaces" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>created</code>: the namespace exists.</li>
 <li><code>deleted</code>: the namespace has been deleted.</li>
@@ -3517,7 +3517,7 @@ underscores in some state names due to limitations in the diagram renderer):</p>
   [*] --&gt; created
   created --&gt; deleted
   deleted --&gt; [*]</code></pre>
-<h2 id="networks">Networks</h2>
+<h2 id="networks">Networks<a class="headerlink" href="#networks" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>initial</code>: first state for a network. A UUID has been allocated, database entry
   created, and a request to create the network on the <code>networknode</code> has been queued.</li>
@@ -3548,7 +3548,7 @@ underscores in some state names due to limitations in the diagram renderer):</p>
   error --&gt; deleted
 
   deleted --&gt; [*]</code></pre>
-<h2 id="network-interfaces">Network Interfaces</h2>
+<h2 id="network-interfaces">Network Interfaces<a class="headerlink" href="#network-interfaces" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>initial</code>: the first state for a network interface. A UUID has been allocated,
   and a placeholder database entry created.</li>
@@ -3570,7 +3570,7 @@ underscores in some state names due to limitations in the diagram renderer):</p>
   error --&gt; deleted
 
   deleted --&gt; [*]</code></pre>
-<h2 id="nodes">Nodes</h2>
+<h2 id="nodes">Nodes<a class="headerlink" href="#nodes" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>created</code>: on first check in, a node is created in the "created" state.</li>
 <li><code>stopping</code>: the node is gracefully shutting down.</li>
@@ -3609,7 +3609,7 @@ underscores in some state names due to limitations in the diagram renderer):</p>
   missing --&gt; created
   missing --&gt; deleted
   missing --&gt; error</code></pre>
-<h2 id="upload">Upload</h2>
+<h2 id="upload">Upload<a class="headerlink" href="#upload" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>created</code>: the upload has data associated with it.</li>
 <li><code>deleted</code>: the network interface has been deleted.</li>

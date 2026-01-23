@@ -3380,11 +3380,11 @@
   
 
 
-<h1 id="usage">Usage</h1>
+<h1 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h1>
 <p>This page attempts to provide a summary of the minimum amount of information you
 need to get started as a Shaken Fist user. The other pages in this section of
 the documentation provide deeper information about specific sub areas.</p>
-<h2 id="clients">Clients</h2>
+<h2 id="clients">Clients<a class="headerlink" href="#clients" title="Permanent link">&para;</a></h2>
 <p>The primary Shaken Fist client is packaged and released in the <code>shakenfist-client</code>
 package from pypi. This client is released at the same time as any major release
 of Shaken Fist, but there is no guarantee that minor releases are done in sync.
@@ -3402,7 +3402,7 @@ client is exposed as <code>sf-client</code> once the python package is installed
 "pretty" format, a mostly-csv format called "simple" (which is aimed at being
 easy to parse in shell scripts), and JSON. You select the output format with a
 flag like this:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>--simple<span class="w"> </span>instance<span class="w"> </span>list
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sf-client<span class="w"> </span>--simple<span class="w"> </span>instance<span class="w"> </span>list
 </code></pre></div>
 <p>The default formatter is the "pretty" formatter, so you never need to specify
 that on the command line.</p>
@@ -3419,73 +3419,73 @@ that on the command line.</p>
 </ul>
 </details>
 <p>You can explore what the command line client is capable of by asking it for help:</p>
-<div class="highlight"><pre><span></span><code>$ sf-client --help
-Usage: sf-client [OPTIONS] COMMAND [ARGS]...
-
-Options:
-  --pretty
-  --simple
-  --json
-  --verbose / --no-verbose
-  --namespace TEXT
-  --key TEXT
-  --apiurl TEXT
-  --async-strategy, --async [continue|pause|block]
-  --help                          Show this message and exit.
-
-Commands:
-  admin      Admin commands
-  ansible    Ansible commands, intended to be used as modules
-  artifact   Artifact commands
-  backup     Backup commands
-  blob       Blob commands
-  instance   Instance commands
-  interface  Interface commands
-  k3s        k3s orchestration commands
-  label      Label commands
-  namespace  Namespace commands
-  network    Network commands
-  node       Node commands
-  version    Output the version of the client
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$ sf-client --help
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Usage: sf-client [OPTIONS] COMMAND [ARGS]...
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>Options:
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  --pretty
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  --simple
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  --json
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  --verbose / --no-verbose
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  --namespace TEXT
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  --key TEXT
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  --apiurl TEXT
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  --async-strategy, --async [continue|pause|block]
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>  --help                          Show this message and exit.
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>Commands:
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>  admin      Admin commands
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>  ansible    Ansible commands, intended to be used as modules
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>  artifact   Artifact commands
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>  backup     Backup commands
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>  blob       Blob commands
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>  instance   Instance commands
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>  interface  Interface commands
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>  k3s        k3s orchestration commands
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>  label      Label commands
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>  namespace  Namespace commands
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>  network    Network commands
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>  node       Node commands
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>  version    Output the version of the client
 </code></pre></div>
 <p>This help is present at several levels, such as:</p>
-<div class="highlight"><pre><span></span><code>$ sf-client instance --help
-Usage: sf-client instance [OPTIONS] COMMAND [ARGS]...
-
-  Instance commands
-
-Options:
-  --help  Show this message and exit.
-
-Commands:
-  add-interface    Add a network interface to an instance
-  await            Await an agent ready from the specified
-                   instance
-  consoledata      Get console data for an instance
-  consoledelete    Clear the console log for this instance
-  create           Create an instance.
-  delete           Delete an instance
-  delete-all       Delete ALL instances
-  delete-metadata  Delete a metadata item
-  download         Download a file from an instance
-  events           Display events for an instance
-  execute          Execute a command on an instance
-  list             List instances
-  pause            Pause an instance
-  poweroff         Power off an instance
-  poweron          Power on an instance
-  reboot           Reboot instance
-  screenshot       Download a screenshot of the console of
-                   an instance
-  set-metadata     Set a metadata item
-  show             Show an instance
-  snapshot         Snapshot instance
-  unpause          Unpause an instance
-  upload           Upload a file to an instance
-  vdiconsole       Launch a VDI console for the instance
-  vdiconsolefile   Download a .vv file for the VDI console
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>$ sf-client instance --help
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Usage: sf-client instance [OPTIONS] COMMAND [ARGS]...
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  Instance commands
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>Options:
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  --help  Show this message and exit.
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>Commands:
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>  add-interface    Add a network interface to an instance
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>  await            Await an agent ready from the specified
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>                   instance
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>  consoledata      Get console data for an instance
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>  consoledelete    Clear the console log for this instance
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>  create           Create an instance.
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>  delete           Delete an instance
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>  delete-all       Delete ALL instances
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>  delete-metadata  Delete a metadata item
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>  download         Download a file from an instance
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>  events           Display events for an instance
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>  execute          Execute a command on an instance
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>  list             List instances
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>  pause            Pause an instance
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>  poweroff         Power off an instance
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>  poweron          Power on an instance
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>  reboot           Reboot instance
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>  screenshot       Download a screenshot of the console of
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>                   an instance
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>  set-metadata     Set a metadata item
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>  show             Show an instance
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>  snapshot         Snapshot instance
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>  unpause          Unpause an instance
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>  upload           Upload a file to an instance
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>  vdiconsole       Launch a VDI console for the instance
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>  vdiconsolefile   Download a .vv file for the VDI console
 </code></pre></div>
-<h2 id="networking-fundamentals">Networking fundamentals</h2>
+<h2 id="networking-fundamentals">Networking fundamentals<a class="headerlink" href="#networking-fundamentals" title="Permanent link">&para;</a></h2>
 <p>Virtual networks / micro segmentation is provided by VXLAN meshes between the
 instances. Hypervisors are joined to a given mesh when they start their first
 instance on that network. DHCP services are optionally offered from a "network
@@ -3494,13 +3494,13 @@ NAT is also optionally available from the network services node. If your network
 provides NAT, it consumes an IP address from the floating IP pool to do so, and
 performs NAT in a network namespace on the network node.</p>
 <p>You create a network on the command line like this:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.1.0/24
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.1.0/24
 </code></pre></div>
 <p>Where "192.168.1.0/24" is the CIDR network address range to use, and "mynet" is
 the name of the network. You'll get back output describing the network, including
 the UUID of the network, which is used in later calls.</p>
-<h2 id="instances">Instances</h2>
-<h3 id="config-drive">Config drive</h3>
+<h2 id="instances">Instances<a class="headerlink" href="#instances" title="Permanent link">&para;</a></h2>
+<h3 id="config-drive">Config drive<a class="headerlink" href="#config-drive" title="Permanent link">&para;</a></h3>
 <p>By default every instance gets a config drive, this config drive is always
 presented as a ISO9660 filesystem on a virtual hard drive. You can however
 disable the config drive if you want.</p>
@@ -3514,13 +3514,13 @@ disable the config drive if you want.</p>
 <p>If a config drive is configured, it is always the second virtual disk attached
 to the VM (vdb on Linux if you're using virtio disks). There is no metadata
 server.</p>
-<h3 id="image-service-instance-flavors-or-types">Image service, instance flavors or types</h3>
+<h3 id="image-service-instance-flavors-or-types">Image service, instance flavors or types<a class="headerlink" href="#image-service-instance-flavors-or-types" title="Permanent link">&para;</a></h3>
 <p>Additionally, there is no image service -- you specify the image to use by
 providing a URL. That URL is cached, but can be to any HTTP server anywhere.
 Even better, there are no flavors. You specify what resources your instance
 should have at boot time and that's what you get. No more being forced into a
 t-shirt sized description of your needs.</p>
-<h3 id="instance-reliability-features">Instance reliability features</h3>
+<h3 id="instance-reliability-features">Instance reliability features<a class="headerlink" href="#instance-reliability-features" title="Permanent link">&para;</a></h3>
 <p>Instances are always cattle. Any feature that made instances feel like pets has
 not been implemented. That said, you can snapshot an instance. Snapshots aren't
 reliable backups, just like they're not really reliable backups on OpenStack.
@@ -3530,20 +3530,20 @@ difference from OpenStack is that when you snapshot your instance you can
 snapshot all of the virtual disks (except the config drive) if you want to.
 Snapshots are delivered as artifacts much like other objects, and can be
 downloaded via the REST API and command line client.</p>
-<h3 id="starting-your-first-instance">Starting your first instance</h3>
+<h3 id="starting-your-first-instance">Starting your first instance<a class="headerlink" href="#starting-your-first-instance" title="Permanent link">&para;</a></h3>
 <p>You start an instance like this:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-n<span class="w"> </span>netuuid
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span>-n<span class="w"> </span>netuuid
 </code></pre></div>
 <p>Where myinstance is the name of the instance, in this example it has 1 vCPU,
 2048MB of RAM, a single 8gb disk (more on this soon) and a single network
 interface on the network with the UUID "netuuid".</p>
-<h3 id="disk-specifications">Disk specifications</h3>
+<h3 id="disk-specifications">Disk specifications<a class="headerlink" href="#disk-specifications" title="Permanent link">&para;</a></h3>
 <p>"8<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/cirros" title="GitHub User: cirros">@cirros</a>" is a "short disk specification". These are in the form <code>size@image</code>,
 where the <code>@image</code> is optional. You can specify more than one disk, so this is
 valid:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-n<span class="w"> </span>netuuid
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-n<span class="w"> </span>netuuid
 </code></pre></div>
 <p>In this case we have three disks, all of 8gb. The boot disk is imaged with
 cirros. The "cirros" here is shorthand. By default, you specify a URL for the
@@ -3553,8 +3553,8 @@ old though, so for common cloud images there is a shorthand format, where
 Shaken Fist knows how to generate the download URL from a short description.
 In this case "cirros" means "the latest release of cirros". You can also specify
 a version like this:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros:0.5.1<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-n<span class="w"> </span>netuuid
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros:0.5.1<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-n<span class="w"> </span>netuuid
 </code></pre></div>
 <p>While Cirros is special cased, there are a variety of other images you can use
 this shorthand format with. The list changes as different OSes are added, and
@@ -3564,9 +3564,9 @@ images (apart from Cirros) also include the Shaken Fist in-guest agent
 pre-installed for your convenience.</p>
 <p>You can also use a "detailed disk specification", which is what fancy people use.
 Its syntax is similar:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-D<span class="w"> </span><span class="nv">size</span><span class="o">=</span><span class="m">8</span>,base<span class="o">=</span>cirros,bus<span class="o">=</span>ide,type<span class="o">=</span>cdrom<span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-n<span class="w"> </span>netuuid
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>-D<span class="w"> </span><span class="nv">size</span><span class="o">=</span><span class="m">8</span>,base<span class="o">=</span>cirros,bus<span class="o">=</span>ide,type<span class="o">=</span>cdrom<span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span>-n<span class="w"> </span>netuuid
 </code></pre></div>
 <p>The specification is composed of a series of key-value pairs. Valid keys are:
 size; base; bus; and type. If you don't specify a key, you'll get a reasonable
@@ -3580,19 +3580,19 @@ default. Here's how the keys work:</p>
   into legacy operating systems that lack them natively.</li>
 <li><em>type</em> can be one of disk or cdrom. Note that cdroms are excluded from snapshots.</li>
 </ul>
-<h3 id="network-specifications">Network specifications</h3>
+<h3 id="network-specifications">Network specifications<a class="headerlink" href="#network-specifications" title="Permanent link">&para;</a></h3>
 <p>Similarly, networks have a "short network specification", where you can specify
 the UUID or name of a network, but also optionally the IP address to use for the
 interface. You can also have more than one network interface, so this is valid:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-n<span class="w"> </span>netuuid1<span class="w"> </span>-n<span class="w"> </span>netuuid2@10.0.0.4
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>-n<span class="w"> </span>netuuid1<span class="w"> </span>-n<span class="w"> </span>netuuid2@10.0.0.4
 </code></pre></div>
 <p>Where netuuid1 and netuuid2 are both UUIDs of networks. You can also use the
 name of a network, so long as that name is unique in the namespace you are
 operating in. So for example, this is valid too:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>testnet<span class="w"> </span><span class="m">10</span>.0.0.0/24
-sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>testinstance<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">20</span>@debian:12<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-n<span class="w"> </span>testnet
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>testnet<span class="w"> </span><span class="m">10</span>.0.0.0/24
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>testinstance<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">20</span>@debian:12<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>-n<span class="w"> </span>testnet
 </code></pre></div>
 <p>Again, you can still assign a network address while using the network name, such
 as <code>testnet@10.0.0.42</code>.</p>
@@ -3600,8 +3600,8 @@ as <code>testnet@10.0.0.42</code>.</p>
 floating the interface. A "floating" interface is a routable IP address which is
 packet mangled to arrive at your virtual network address, much like in
 OpenStack. The details are the same as <code>-n</code>, except the flag is <code>-f</code>:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-f<span class="w"> </span>netuuid1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">    </span>-f<span class="w"> </span>netuuid1
 </code></pre></div>
 <p>There is a "detailed network specification" as well at <code>-N</code>, which is composed
 of the following keys:</p>
@@ -3619,10 +3619,10 @@ of the following keys:</p>
   is created.</li>
 </ul>
 <p>So for example, this is valid:</p>
-<div class="highlight"><pre><span></span><code>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>testinstance<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">20</span>@debian:12<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-N<span class="w"> </span><span class="nv">network_uuid</span><span class="o">=</span>testnet,address<span class="o">=</span><span class="m">10</span>.0.0.99,float<span class="o">=</span><span class="nb">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>testinstance<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">20</span>@debian:12<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span>-N<span class="w"> </span><span class="nv">network_uuid</span><span class="o">=</span>testnet,address<span class="o">=</span><span class="m">10</span>.0.0.99,float<span class="o">=</span><span class="nb">true</span>
 </code></pre></div>
-<h2 id="missing-documentation">Missing documentation</h2>
+<h2 id="missing-documentation">Missing documentation<a class="headerlink" href="#missing-documentation" title="Permanent link">&para;</a></h2>
 <p>I really should document these as well:</p>
 <ul>
 <li>nodes</li>

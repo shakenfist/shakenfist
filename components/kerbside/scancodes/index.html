@@ -3736,15 +3736,15 @@
   
 
 
-<h1 id="keyboard-scancodes">Keyboard Scancodes</h1>
+<h1 id="keyboard-scancodes">Keyboard Scancodes<a class="headerlink" href="#keyboard-scancodes" title="Permanent link">&para;</a></h1>
 <p>This document provides a reference for the keyboard scancodes used by the SPICE
 protocol's inputs channel. SPICE uses IBM PC XT-compatible scancodes (Set 1).</p>
-<h2 id="scancode-format">Scancode Format</h2>
+<h2 id="scancode-format">Scancode Format<a class="headerlink" href="#scancode-format" title="Permanent link">&para;</a></h2>
 <p>SPICE supports two scancode formats:</p>
-<h3 id="simple-scancodes-key_downkey_up-messages">Simple Scancodes (key_down/key_up messages)</h3>
+<h3 id="simple-scancodes-key_downkey_up-messages">Simple Scancodes (key_down/key_up messages)<a class="headerlink" href="#simple-scancodes-key_downkey_up-messages" title="Permanent link">&para;</a></h3>
 <p>The <code>key_down</code> (ID 101) and <code>key_up</code> (ID 102) messages use a 32-bit scancode
 field. For standard keys, only the low byte is used.</p>
-<h3 id="raw-scancodes-key_scancode-message">Raw Scancodes (key_scancode message)</h3>
+<h3 id="raw-scancodes-key_scancode-message">Raw Scancodes (key_scancode message)<a class="headerlink" href="#raw-scancodes-key_scancode-message" title="Permanent link">&para;</a></h3>
 <p>The <code>key_scancode</code> (ID 104) message sends raw XT scancodes as a byte array.
 This format is more efficient for extended keys and supports:</p>
 <ul>
@@ -3757,8 +3757,8 @@ This format is more efficient for extended keys and supports:</p>
 - Release 'A': <code>[0x9E]</code> (0x1E | 0x80)
 - Press Right Ctrl: <code>[0xE0, 0x1D]</code>
 - Release Right Ctrl: <code>[0xE0, 0x9D]</code></p>
-<h2 id="standard-scancodes">Standard Scancodes</h2>
-<h3 id="main-keyboard-row-1-function-keys">Main Keyboard - Row 1 (Function Keys)</h3>
+<h2 id="standard-scancodes">Standard Scancodes<a class="headerlink" href="#standard-scancodes" title="Permanent link">&para;</a></h2>
+<h3 id="main-keyboard-row-1-function-keys">Main Keyboard - Row 1 (Function Keys)<a class="headerlink" href="#main-keyboard-row-1-function-keys" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -3835,7 +3835,7 @@ This format is more efficient for extended keys and supports:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="main-keyboard-row-2-number-row">Main Keyboard - Row 2 (Number Row)</h3>
+<h3 id="main-keyboard-row-2-number-row">Main Keyboard - Row 2 (Number Row)<a class="headerlink" href="#main-keyboard-row-2-number-row" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -3917,7 +3917,7 @@ This format is more efficient for extended keys and supports:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="main-keyboard-row-3-qwerty">Main Keyboard - Row 3 (QWERTY)</h3>
+<h3 id="main-keyboard-row-3-qwerty">Main Keyboard - Row 3 (QWERTY)<a class="headerlink" href="#main-keyboard-row-3-qwerty" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -3999,7 +3999,7 @@ This format is more efficient for extended keys and supports:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="main-keyboard-row-4-asdf">Main Keyboard - Row 4 (ASDF)</h3>
+<h3 id="main-keyboard-row-4-asdf">Main Keyboard - Row 4 (ASDF)<a class="headerlink" href="#main-keyboard-row-4-asdf" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4076,7 +4076,7 @@ This format is more efficient for extended keys and supports:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="main-keyboard-row-5-zxcv">Main Keyboard - Row 5 (ZXCV)</h3>
+<h3 id="main-keyboard-row-5-zxcv">Main Keyboard - Row 5 (ZXCV)<a class="headerlink" href="#main-keyboard-row-5-zxcv" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4148,7 +4148,7 @@ This format is more efficient for extended keys and supports:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="main-keyboard-row-6-bottom">Main Keyboard - Row 6 (Bottom)</h3>
+<h3 id="main-keyboard-row-6-bottom">Main Keyboard - Row 6 (Bottom)<a class="headerlink" href="#main-keyboard-row-6-bottom" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4175,7 +4175,7 @@ This format is more efficient for extended keys and supports:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="numeric-keypad">Numeric Keypad</h3>
+<h3 id="numeric-keypad">Numeric Keypad<a class="headerlink" href="#numeric-keypad" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4267,7 +4267,7 @@ This format is more efficient for extended keys and supports:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="lock-keys">Lock Keys</h3>
+<h3 id="lock-keys">Lock Keys<a class="headerlink" href="#lock-keys" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4294,7 +4294,7 @@ This format is more efficient for extended keys and supports:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="extended-function-keys-f13-f24">Extended Function Keys (F13-F24)</h3>
+<h3 id="extended-function-keys-f13-f24">Extended Function Keys (F13-F24)<a class="headerlink" href="#extended-function-keys-f13-f24" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4366,7 +4366,7 @@ This format is more efficient for extended keys and supports:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="international-keys">International Keys</h3>
+<h3 id="international-keys">International Keys<a class="headerlink" href="#international-keys" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4408,12 +4408,12 @@ This format is more efficient for extended keys and supports:</p>
 </tr>
 </tbody>
 </table>
-<h2 id="extended-scancodes-e0-prefix">Extended Scancodes (E0 Prefix)</h2>
+<h2 id="extended-scancodes-e0-prefix">Extended Scancodes (E0 Prefix)<a class="headerlink" href="#extended-scancodes-e0-prefix" title="Permanent link">&para;</a></h2>
 <p>Extended keys require a 0xE0 prefix byte. When using the <code>key_scancode</code> message,
 send <code>[0xE0, scancode]</code> for press and <code>[0xE0, scancode | 0x80]</code> for release.</p>
 <p>When using <code>key_down</code>/<code>key_up</code> messages, the scancode is encoded as:
 <code>0xE0 | (scancode &lt;&lt; 8)</code></p>
-<h3 id="navigation-keys">Navigation Keys</h3>
+<h3 id="navigation-keys">Navigation Keys<a class="headerlink" href="#navigation-keys" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4455,7 +4455,7 @@ send <code>[0xE0, scancode]</code> for press and <code>[0xE0, scancode | 0x80]</
 </tr>
 </tbody>
 </table>
-<h3 id="arrow-keys">Arrow Keys</h3>
+<h3 id="arrow-keys">Arrow Keys<a class="headerlink" href="#arrow-keys" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4487,7 +4487,7 @@ send <code>[0xE0, scancode]</code> for press and <code>[0xE0, scancode | 0x80]</
 </tr>
 </tbody>
 </table>
-<h3 id="right-side-modifier-keys">Right-Side Modifier Keys</h3>
+<h3 id="right-side-modifier-keys">Right-Side Modifier Keys<a class="headerlink" href="#right-side-modifier-keys" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4524,7 +4524,7 @@ send <code>[0xE0, scancode]</code> for press and <code>[0xE0, scancode | 0x80]</
 </tr>
 </tbody>
 </table>
-<h3 id="numpad-extended-keys">Numpad Extended Keys</h3>
+<h3 id="numpad-extended-keys">Numpad Extended Keys<a class="headerlink" href="#numpad-extended-keys" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4561,7 +4561,7 @@ send <code>[0xE0, scancode]</code> for press and <code>[0xE0, scancode | 0x80]</
 </tr>
 </tbody>
 </table>
-<h3 id="media-keys">Media Keys</h3>
+<h3 id="media-keys">Media Keys<a class="headerlink" href="#media-keys" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4613,7 +4613,7 @@ send <code>[0xE0, scancode]</code> for press and <code>[0xE0, scancode | 0x80]</
 </tr>
 </tbody>
 </table>
-<h3 id="browser-keys">Browser Keys</h3>
+<h3 id="browser-keys">Browser Keys<a class="headerlink" href="#browser-keys" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4660,7 +4660,7 @@ send <code>[0xE0, scancode]</code> for press and <code>[0xE0, scancode | 0x80]</
 </tr>
 </tbody>
 </table>
-<h3 id="application-launch-keys">Application Launch Keys</h3>
+<h3 id="application-launch-keys">Application Launch Keys<a class="headerlink" href="#application-launch-keys" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4692,26 +4692,26 @@ send <code>[0xE0, scancode]</code> for press and <code>[0xE0, scancode | 0x80]</
 </tr>
 </tbody>
 </table>
-<h2 id="example-typing-hello">Example: Typing "Hello"</h2>
+<h2 id="example-typing-hello">Example: Typing "Hello"<a class="headerlink" href="#example-typing-hello" title="Permanent link">&para;</a></h2>
 <p>Using <code>key_scancode</code> messages:</p>
-<div class="highlight"><pre><span></span><code>H press:   [0x2A, 0x23]     (Shift down, H down)
-H release: [0xA3, 0xAA]     (H up, Shift up)
-e press:   [0x12]           (E down)
-e release: [0x92]           (E up)
-l press:   [0x26]           (L down)
-l release: [0xA6]           (L up)
-l press:   [0x26]           (L down)
-l release: [0xA6]           (L up)
-o press:   [0x18]           (O down)
-o release: [0x98]           (O up)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>H press:   [0x2A, 0x23]     (Shift down, H down)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>H release: [0xA3, 0xAA]     (H up, Shift up)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>e press:   [0x12]           (E down)
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>e release: [0x92]           (E up)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>l press:   [0x26]           (L down)
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>l release: [0xA6]           (L up)
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>l press:   [0x26]           (L down)
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>l release: [0xA6]           (L up)
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>o press:   [0x18]           (O down)
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>o release: [0x98]           (O up)
 </code></pre></div>
-<h2 id="references">References</h2>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values">MDN Keyboard Event Code Values</a></li>
 <li><a href="https://gitlab.freedesktop.org/nicholasbishop/nicholasbishop-spice-html5/-/blob/main/src/code_to_scancode.js">spice-html5 scancode mapping</a></li>
 <li><a href="/components/kerbside/channel-protocols/#inputs-channel-type-3">Inputs Channel Protocol</a></li>
 </ul>
-<h2 id="related-documentation">Related Documentation</h2>
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/kerbside/channel-protocols/">Channel Protocols</a> - Inputs channel message formats</li>
 <li><a href="/components/kerbside/capabilities/">Capabilities</a> - KeyScancode capability negotiation</li>

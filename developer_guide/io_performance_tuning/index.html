@@ -3139,19 +3139,19 @@
   
 
 
-<h1 id="io-performance-tuning">IO performance tuning</h1>
+<h1 id="io-performance-tuning">IO performance tuning<a class="headerlink" href="#io-performance-tuning" title="Permanent link">&para;</a></h1>
 <p>This page documents experiments in tuning the IO performance of Shaken Fist. It explains how we've ended up with the options we use, and what other options we considered along the way. qemu has quite a helpful guide to performance options for IO tuning at <a href="https://git.qemu.org/?p=qemu.git;a=blob;f=docs/qcow2-cache.txt">https://git.qemu.org/?p=qemu.git;a=blob;f=docs/qcow2-cache.txt</a> , but it does not provide concrete recommendations.</p>
-<h2 id="before-tuning">Before tuning</h2>
+<h2 id="before-tuning">Before tuning<a class="headerlink" href="#before-tuning" title="Permanent link">&para;</a></h2>
 <p>First off, here are some base line performance numbers before we did any tuning. All performance tests were on a Samsung Pro 980 with libvirt / kvm / qemu. All disks were a 100GB copy on write layer on top of a 30 GB virtual backing file, on an otherwise idle machine. The virtual machine had 16 vCPU and 32 GB RAM.</p>
 <p>In the interests of the comparisons below, the untuned cluster uses writethrough caching and a cluster size of 64K:</p>
-<div class="highlight"><pre><span></span><code>dd if=/dev/zero of=test1.img bs=1G count=50 oflag=dsync
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>dd if=/dev/zero of=test1.img bs=1G count=50 oflag=dsync
 </code></pre></div>
 <p>All numbers are the first run (incurs new cluster allocation cost, see later in this document), and then the average of the fastest three of five subsequent runs.</p>
 <ul>
 <li>Raw NVMe disk: 1,229 MB/s</li>
 <li>Before tuning: 611 MB/s, 655 MB/s (689, 589, 524, 572, 689)</li>
 </ul>
-<div class="highlight"><pre><span></span><code>hdparm -Tt /dev/vda1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>hdparm -Tt /dev/vda1
 </code></pre></div>
 <p>I have only recorded the buffered disk read value, as the other value is based on caching. I've used the same average of the fastest three from a run of five that I did above:</p>
 <ul>
@@ -3159,26 +3159,26 @@
 <li>Before tuning: 1,283 MB/s (695.13, 967.22, 1142.13, 1310.75, 1396.96)</li>
 </ul>
 <p>Note that all experiments below are based on a single change compared to the starting state. So for example the cluster size change experiment used the default caching of writethrough.</p>
-<h2 id="disk-cache-mode">Disk cache mode</h2>
+<h2 id="disk-cache-mode">Disk cache mode<a class="headerlink" href="#disk-cache-mode" title="Permanent link">&para;</a></h2>
 <p>qemu supports a variety of disk caching modes for disks. <a href="https://documentation.suse.com/sles/11-SP4/html/SLES-kvm4zseries/cha-qemu-cachemodes.html">https://documentation.suse.com/sles/11-SP4/html/SLES-kvm4zseries/cha-qemu-cachemodes.html</a> is a good summary of the options, which are all exposed by libvirt. Modern libvirts default to writeback, which is equivalent to using a battery backed RAID controller in a physical machine. It therefore does assume a similar level of reliability from your hypervisor nodes.</p>
 <p>Within libvirt, the caching is specified using the cache attribute to the driver element. The libvirt documentation states:</p>
 <blockquote>
 <p>The optional cache attribute controls the cache mechanism, possible values are "default", "none", "writethrough", "writeback", "directsync" (like "writethrough", but it bypasses the host page cache) and "unsafe" (host may cache all disk io, and sync requests from guest are ignored). Since 0.6.0, "directsync" since 0.9.5, "unsafe" since 0.9.7.</p>
 </blockquote>
 <p>So for the libvirt.tmpl domain XML template within Shaken Fist, specifying a writethrough as a caching mode would look like this:</p>
-<div class="highlight"><pre><span></span><code>{%- for disk in disks %}
-{%- if disk.bus != &#39;nvme&#39; %}
-&lt;disk type=&#39;{{disk.source_type}}&#39; device=&#39;{{disk.present_as}}&#39;&gt;
-  &lt;driver name=&#39;qemu&#39; type=&#39;{{disk.type}}&#39; cache=&#39;writethrough&#39;/&gt;
-  {{disk.source}}
-  {{disk.backing}}
-  &lt;target dev=&#39;{{disk.device}}&#39; bus=&#39;{{disk.bus}}&#39;/&gt;
-&lt;/disk&gt;
-{%- endif %}
-{%- endfor %}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>{%- for disk in disks %}
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>{%- if disk.bus != &#39;nvme&#39; %}
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>&lt;disk type=&#39;{{disk.source_type}}&#39; device=&#39;{{disk.present_as}}&#39;&gt;
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  &lt;driver name=&#39;qemu&#39; type=&#39;{{disk.type}}&#39; cache=&#39;writethrough&#39;/&gt;
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  {{disk.source}}
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  {{disk.backing}}
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  &lt;target dev=&#39;{{disk.device}}&#39; bus=&#39;{{disk.bus}}&#39;/&gt;
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>&lt;/disk&gt;
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>{%- endif %}
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>{%- endfor %}
 </code></pre></div>
 <p>Some performance numbers:</p>
-<div class="highlight"><pre><span></span><code>dd if=/dev/zero of=test1.img bs=1G count=50 oflag=dsync
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>dd if=/dev/zero of=test1.img bs=1G count=50 oflag=dsync
 </code></pre></div>
 <p>All numbers are the first run (incurs new cluster allocation cost, see later in this document), and then the average of the fastest three of five subsequent runs.</p>
 <ul>
@@ -3189,7 +3189,7 @@
 <li>Cache directsync: 626 MB/s, 823 MB/s (676, 938, 760, 771, 727)</li>
 <li>Cache unsafe: 857 MB/s, 1,012 MB/s (963, 1126, 948, 859, 840)</li>
 </ul>
-<div class="highlight"><pre><span></span><code>hdparm -Tt /dev/vda1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>hdparm -Tt /dev/vda1
 </code></pre></div>
 <p>I have only recorded the buffered disk read value, as the other value is based on caching. I've used the same average of the fastest three from a run of five that I did above:</p>
 <ul>
@@ -3206,17 +3206,17 @@
 </blockquote>
 <p>Specifically, I don't think that Shaken Fist should use any unsafe caching mode, which eliminates the aptly named <em>unsafe</em> as an option.</p>
 <p><strong>Recommendation: we should convert to using cache mode "none" for instances. It provides slower read performance, but much better write performance.</strong></p>
-<h2 id="cluster-size">Cluster size</h2>
+<h2 id="cluster-size">Cluster size<a class="headerlink" href="#cluster-size" title="Permanent link">&para;</a></h2>
 <p>qcow2 defaults to a cluster size of 64KB, and the maximum is 2MB. The value must be a power of two. The balance here is that the cluster size is the unit of allocation of disk when the disk needs to grow -- so a large cluster size will cause an image to grow larger than it might otherwise, but 2MB doesn't seem like a large overhead. However, if you are using a copy on write layer and change one byte of a fully allocated cluster, a 2MB cluster size means that 2MB must be read from the backing file, the byte changed, and then that 2MB written to the copy on write layer. That IO cost can add up depending on your workload.</p>
 <p><a href="https://www.ibm.com/cloud/blog/how-to-tune-qemu-l2-cache-size-and-qcow2-cluster-size">https://www.ibm.com/cloud/blog/how-to-tune-qemu-l2-cache-size-and-qcow2-cluster-size</a> has a good description of how the cluster size affects cache behaviour with qcow2, as a larger cluster size also implies that you're more likely to have in-memory cache hits and avoid extra IO operations looking up caches from disk. In the worst case, a single IO can incur the actual IO operations if the cache entries required are not currently in memory.</p>
 <p>Pleasingly, cluster size is an attribute of the qcow2 file, not the hypervisor configuration. This makes it easy for us to run benchmarks against without having to tweak the hypervisor too much.</p>
 <p>You tune cluster size like this:</p>
-<div class="highlight"><pre><span></span><code>qemu-img create -f qcow2 -o cluster_size=2M foo.qcow2 100G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>qemu-img create -f qcow2 -o cluster_size=2M foo.qcow2 100G
 </code></pre></div>
 <p>First off, the backing image size changes as I change the cluster size. Remember that in a hypervisor environment where the backing image is shared between VMs, the cost of increased size here is reduced by the multiple users of th backing image.</p>
 <p>It should be noted that you can have a different cluster size in the copy on write layer compared to the backing image, but I have not tested that as I want to keep the number of permutations here manageable.</p>
 <p>Some performance numbers, noting that performance will vary based on the size of the disk -- that is, very large disks would benefit from higher cluster sizes. I have selected what I think is a representative size for a Shaken Fist instance in these test runs:</p>
-<div class="highlight"><pre><span></span><code>qemu-img convert -p -O qcow2 -o cluster_size=256K old.qcow2 new.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>qemu-img convert -p -O qcow2 -o cluster_size=256K old.qcow2 new.qcow2
 </code></pre></div>
 <ul>
 <li>Cluster size 64 K: 672 MB</li>
@@ -3226,7 +3226,7 @@
 <li>Cluster size 1,024 K: 1.7 GB</li>
 <li>Cluster size 2,048 K: 1.8 GB</li>
 </ul>
-<div class="highlight"><pre><span></span><code>dd if=/dev/zero of=test1.img bs=1G count=50 oflag=dsync
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>dd if=/dev/zero of=test1.img bs=1G count=50 oflag=dsync
 </code></pre></div>
 <p>All numbers are the first run (incurs new cluster allocation cost), and then the average of the fastest three of five subsequent runs.</p>
 <ul>
@@ -3238,7 +3238,7 @@
 <li>Cluster size 1,024 K: 632 MB/s, 631 MB/s (734, 605, 520, 555, 541)</li>
 <li>Cluster size 2,048 K: 648 MB/s, 704 MB/s (732, 731, 650, 559, 558)</li>
 </ul>
-<div class="highlight"><pre><span></span><code>hdparm -Tt /dev/vda1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>hdparm -Tt /dev/vda1
 </code></pre></div>
 <p>I have only recorded the buffered disk read value, as the other value is based on caching. I've used the same average of the fastest three from a run of five that I did above:</p>
 <ul>
@@ -3251,9 +3251,9 @@
 <li>Cluster size 2,048 K: 2,402 MB/s (899.56, 1517.90, 1992.42, 2447.05, 2767.72)</li>
 </ul>
 <p><strong>Recommendation: a cluster size of 2,048K will use marginally more RAM to store the caches, but improves disk performance significantly, especially for reads.</strong></p>
-<h2 id="final-performance">Final performance</h2>
+<h2 id="final-performance">Final performance<a class="headerlink" href="#final-performance" title="Permanent link">&para;</a></h2>
 <p>In the interests of gloating, here are our original performance numbers, compared to after tuning:</p>
-<div class="highlight"><pre><span></span><code>dd if=/dev/zero of=test1.img bs=1G count=50 oflag=dsync
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>dd if=/dev/zero of=test1.img bs=1G count=50 oflag=dsync
 </code></pre></div>
 <p>All numbers are the first run (incurs new cluster allocation cost, see later in this document), and then the average of the fastest three of five subsequent runs.</p>
 <ul>
@@ -3261,7 +3261,7 @@
 <li>Before tuning: 611 MB/s, 655 MB/s (689, 589, 524, 572, 689)</li>
 <li>After tuning: 992 MB/s, 991 MB/s (958, 1024, 906, 869, 838)</li>
 </ul>
-<div class="highlight"><pre><span></span><code>hdparm -Tt /dev/vda1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>hdparm -Tt /dev/vda1
 </code></pre></div>
 <p>I've used the same average of the fastest three from a run of five that I did above:</p>
 <ul>

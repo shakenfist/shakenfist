@@ -3962,11 +3962,11 @@
   
 
 
-<h1 id="vd-agent-protocol">VD Agent Protocol</h1>
+<h1 id="vd-agent-protocol">VD Agent Protocol<a class="headerlink" href="#vd-agent-protocol" title="Permanent link">&para;</a></h1>
 <p>This document describes the SPICE VD (Virtual Desktop) Agent protocol, which
 enables advanced guest integration features such as clipboard sharing, file
 transfer, and display configuration.</p>
-<h2 id="overview">Overview</h2>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>The VD Agent is a guest-side component that communicates with the SPICE client
 through the main channel's agent messages. It provides:</p>
 <ul>
@@ -3978,21 +3978,21 @@ through the main channel's agent messages. It provides:</p>
 </ul>
 <p><strong>Note</strong>: Kerbside proxies agent traffic transparently without decoding. This
 documentation is provided for reference and debugging purposes.</p>
-<h2 id="transport">Transport</h2>
+<h2 id="transport">Transport<a class="headerlink" href="#transport" title="Permanent link">&para;</a></h2>
 <p>Agent messages are carried over the main channel using:
 - Server to client: <code>AGENT_DATA</code> (ID 109), <code>AGENT_TOKEN</code> (ID 110)
 - Client to server: <code>AGENT_START</code> (ID 106), <code>AGENT_DATA</code> (ID 107), <code>AGENT_TOKEN</code> (ID 108)</p>
-<h2 id="agent-message-header">Agent Message Header</h2>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  protocol (protocol identifier)
-4       4     uint32  type (message type)
-8       8     uint64  opaque (implementation-specific)
-16      4     uint32  size (payload size)
-20      var   bytes   data (payload)
+<h2 id="agent-message-header">Agent Message Header<a class="headerlink" href="#agent-message-header" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>------  ----  ------  -----------
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>0       4     uint32  protocol (protocol identifier)
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>4       4     uint32  type (message type)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>8       8     uint64  opaque (implementation-specific)
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>16      4     uint32  size (payload size)
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>20      var   bytes   data (payload)
 </code></pre></div>
 <p>Maximum data size: 2048 bytes per message (larger data is chunked)</p>
-<h2 id="message-types">Message Types</h2>
+<h2 id="message-types">Message Types<a class="headerlink" href="#message-types" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -4102,8 +4102,8 @@ documentation is provided for reference and debugging purposes.</p>
 </tbody>
 </table>
 <p>Direction key: S=Server, C=Client, A=Agent, Both=Bidirectional</p>
-<h2 id="clipboard-protocol">Clipboard Protocol</h2>
-<h3 id="clipboard-formats">Clipboard Formats</h3>
+<h2 id="clipboard-protocol">Clipboard Protocol<a class="headerlink" href="#clipboard-protocol" title="Permanent link">&para;</a></h2>
+<h3 id="clipboard-formats">Clipboard Formats<a class="headerlink" href="#clipboard-formats" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4145,35 +4145,35 @@ documentation is provided for reference and debugging purposes.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="clipboard_grab-id-7">CLIPBOARD_GRAB (ID 7)</h3>
+<h3 id="clipboard_grab-id-7">CLIPBOARD_GRAB (ID 7)<a class="headerlink" href="#clipboard_grab-id-7" title="Permanent link">&para;</a></h3>
 <p>Announces clipboard ownership and available formats.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4*N   uint32  format_types (array of available formats)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>------  ----  ------  -----------
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>0       4*N   uint32  format_types (array of available formats)
 </code></pre></div>
-<h3 id="clipboard_request-id-8">CLIPBOARD_REQUEST (ID 8)</h3>
+<h3 id="clipboard_request-id-8">CLIPBOARD_REQUEST (ID 8)<a class="headerlink" href="#clipboard_request-id-8" title="Permanent link">&para;</a></h3>
 <p>Requests clipboard data in a specific format.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  type (requested format)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>------  ----  ------  -----------
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>0       4     uint32  type (requested format)
 </code></pre></div>
-<h3 id="clipboard-id-4">CLIPBOARD (ID 4)</h3>
+<h3 id="clipboard-id-4">CLIPBOARD (ID 4)<a class="headerlink" href="#clipboard-id-4" title="Permanent link">&para;</a></h3>
 <p>Transfers clipboard data.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  type (data format)
-4       var   bytes   data
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>------  ----  ------  -----------
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>0       4     uint32  type (data format)
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>4       var   bytes   data
 </code></pre></div>
-<h3 id="clipboard_release-id-9">CLIPBOARD_RELEASE (ID 9)</h3>
+<h3 id="clipboard_release-id-9">CLIPBOARD_RELEASE (ID 9)<a class="headerlink" href="#clipboard_release-id-9" title="Permanent link">&para;</a></h3>
 <p>Releases clipboard ownership. No payload.</p>
-<h2 id="monitor-configuration">Monitor Configuration</h2>
-<h3 id="monitors_config-id-2">MONITORS_CONFIG (ID 2)</h3>
+<h2 id="monitor-configuration">Monitor Configuration<a class="headerlink" href="#monitor-configuration" title="Permanent link">&para;</a></h2>
+<h3 id="monitors_config-id-2">MONITORS_CONFIG (ID 2)<a class="headerlink" href="#monitors_config-id-2" title="Permanent link">&para;</a></h3>
 <p>Configures virtual display monitors.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  num_monitors
-4       4     uint32  flags
-8       N*28  struct  monitors (VDAgentMonConfig array)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>------  ----  ------  -----------
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>0       4     uint32  num_monitors
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>4       4     uint32  flags
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>8       N*28  struct  monitors (VDAgentMonConfig array)
 </code></pre></div>
 <p>Monitor configuration flags:
 | Bit | Flag | Description |
@@ -4181,23 +4181,23 @@ documentation is provided for reference and debugging purposes.</p>
 | 0 | USE_POS | Use X/Y position fields |
 | 1 | PHYSICAL_SIZE | Include physical size (mm) |</p>
 <p>VDAgentMonConfig structure:
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  height
-4       4     uint32  width
-8       4     uint32  depth
-12      4     int32   x (position)
-16      4     int32   y (position)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>------  ----  ------  -----------
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>0       4     uint32  height
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>4       4     uint32  width
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>8       4     uint32  depth
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>12      4     int32   x (position)
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>16      4     int32   y (position)
 </code></pre></div></p>
-<h2 id="mouse-state">Mouse State</h2>
-<h3 id="mouse_state-id-1">MOUSE_STATE (ID 1)</h3>
+<h2 id="mouse-state">Mouse State<a class="headerlink" href="#mouse-state" title="Permanent link">&para;</a></h2>
+<h3 id="mouse_state-id-1">MOUSE_STATE (ID 1)<a class="headerlink" href="#mouse_state-id-1" title="Permanent link">&para;</a></h3>
 <p>Reports mouse position and button state.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  x
-4       4     uint32  y
-8       4     uint32  buttons (button mask)
-12      1     uint8   display_id
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>------  ----  ------  -----------
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>0       4     uint32  x
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>4       4     uint32  y
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>8       4     uint32  buttons (button mask)
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>12      1     uint8   display_id
 </code></pre></div>
 <p>Agent button masks (note: different bit positions from inputs channel):</p>
 <table>
@@ -4246,31 +4246,31 @@ documentation is provided for reference and debugging purposes.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="file-transfer">File Transfer</h2>
-<h3 id="file_xfer_start-id-10">FILE_XFER_START (ID 10)</h3>
+<h2 id="file-transfer">File Transfer<a class="headerlink" href="#file-transfer" title="Permanent link">&para;</a></h2>
+<h3 id="file_xfer_start-id-10">FILE_XFER_START (ID 10)<a class="headerlink" href="#file_xfer_start-id-10" title="Permanent link">&para;</a></h3>
 <p>Initiates a file transfer.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  id (transfer ID)
-4       var   bytes   metadata (key-value pairs, null-terminated)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>------  ----  ------  -----------
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>0       4     uint32  id (transfer ID)
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>4       var   bytes   metadata (key-value pairs, null-terminated)
 </code></pre></div>
 <p>Metadata format: <code>key1:value1\nkey2:value2\n</code>
 Common keys: <code>name</code>, <code>size</code></p>
-<h3 id="file_xfer_data-id-12">FILE_XFER_DATA (ID 12)</h3>
+<h3 id="file_xfer_data-id-12">FILE_XFER_DATA (ID 12)<a class="headerlink" href="#file_xfer_data-id-12" title="Permanent link">&para;</a></h3>
 <p>Transfers file data chunk.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  id (transfer ID)
-4       8     uint64  size (chunk size)
-12      var   bytes   data
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>------  ----  ------  -----------
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>0       4     uint32  id (transfer ID)
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>4       8     uint64  size (chunk size)
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>12      var   bytes   data
 </code></pre></div>
-<h3 id="file_xfer_status-id-11">FILE_XFER_STATUS (ID 11)</h3>
+<h3 id="file_xfer_status-id-11">FILE_XFER_STATUS (ID 11)<a class="headerlink" href="#file_xfer_status-id-11" title="Permanent link">&para;</a></h3>
 <p>Reports file transfer status.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  id (transfer ID)
-4       4     uint32  result
-8       var   bytes   data (optional error details)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>------  ----  ------  -----------
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>0       4     uint32  id (transfer ID)
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>4       4     uint32  result
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>8       var   bytes   data (optional error details)
 </code></pre></div>
 <p>Result values:
 | Value | Result | Description |
@@ -4283,13 +4283,13 @@ Common keys: <code>name</code>, <code>size</code></p>
 | 5 | SESSION_LOCKED | Guest session is locked |
 | 6 | VDAGENT_NOT_CONNECTED | Agent not connected |
 | 7 | DISABLED | File transfer disabled |</p>
-<h2 id="capabilities">Capabilities</h2>
-<h3 id="announce_capabilities-id-6">ANNOUNCE_CAPABILITIES (ID 6)</h3>
+<h2 id="capabilities">Capabilities<a class="headerlink" href="#capabilities" title="Permanent link">&para;</a></h2>
+<h3 id="announce_capabilities-id-6">ANNOUNCE_CAPABILITIES (ID 6)<a class="headerlink" href="#announce_capabilities-id-6" title="Permanent link">&para;</a></h3>
 <p>Declares supported features.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  request (1 = request response)
-4       4*N   uint32  capabilities (bitmask array)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>------  ----  ------  -----------
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>0       4     uint32  request (1 = request response)
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>4       4*N   uint32  capabilities (bitmask array)
 </code></pre></div>
 <p>Capability bits:
 | Bit | Capability |
@@ -4312,82 +4312,82 @@ Common keys: <code>name</code>, <code>size</code></p>
 | 15  | GRAPHICS_DEVICE_INFO |
 | 16  | CLIPBOARD_NO_RELEASE_ON_REGRAB |
 | 17  | CLIPBOARD_GRAB_SERIAL |</p>
-<h2 id="audio-volume-sync">Audio Volume Sync</h2>
-<h3 id="audio_volume_sync-id-15">AUDIO_VOLUME_SYNC (ID 15)</h3>
+<h2 id="audio-volume-sync">Audio Volume Sync<a class="headerlink" href="#audio-volume-sync" title="Permanent link">&para;</a></h2>
+<h3 id="audio_volume_sync-id-15">AUDIO_VOLUME_SYNC (ID 15)<a class="headerlink" href="#audio_volume_sync-id-15" title="Permanent link">&para;</a></h3>
 <p>Synchronizes audio volume settings.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       1     uint8   is_playback (1=playback, 0=record)
-1       1     uint8   mute
-2       1     uint8   nchannels
-3       2*N   uint16  volume (per channel, 0-65535)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>------  ----  ------  -----------
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>0       1     uint8   is_playback (1=playback, 0=record)
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>1       1     uint8   mute
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>2       1     uint8   nchannels
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>3       2*N   uint16  volume (per channel, 0-65535)
 </code></pre></div>
-<h2 id="graphics-device-info">Graphics Device Info</h2>
-<h3 id="graphics_device_info-id-16">GRAPHICS_DEVICE_INFO (ID 16)</h3>
+<h2 id="graphics-device-info">Graphics Device Info<a class="headerlink" href="#graphics-device-info" title="Permanent link">&para;</a></h2>
+<h3 id="graphics_device_info-id-16">GRAPHICS_DEVICE_INFO (ID 16)<a class="headerlink" href="#graphics_device_info-id-16" title="Permanent link">&para;</a></h3>
 <p>Maps SPICE display channels to physical graphics devices.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  count
-4       N*..  struct  device_display_info array
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>------  ----  ------  -----------
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>0       4     uint32  count
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>4       N*..  struct  device_display_info array
 </code></pre></div>
 <p>VDAgentDeviceDisplayInfo structure:
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  channel_id
-4       4     uint32  monitor_id
-8       4     uint32  device_address_len
-12      var   bytes   device_address (null-terminated)
-16+     4     uint32  device_display_id
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>------  ----  ------  -----------
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>0       4     uint32  channel_id
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>4       4     uint32  monitor_id
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>8       4     uint32  device_address_len
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>12      var   bytes   device_address (null-terminated)
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>16+     4     uint32  device_display_id
 </code></pre></div></p>
-<h2 id="reply-message">Reply Message</h2>
-<h3 id="reply-id-3">REPLY (ID 3)</h3>
+<h2 id="reply-message">Reply Message<a class="headerlink" href="#reply-message" title="Permanent link">&para;</a></h2>
+<h3 id="reply-id-3">REPLY (ID 3)<a class="headerlink" href="#reply-id-3" title="Permanent link">&para;</a></h3>
 <p>Generic acknowledgment.</p>
-<div class="highlight"><pre><span></span><code>Offset  Size  Type    Field
-------  ----  ------  -----------
-0       4     uint32  type (message being acknowledged)
-4       4     uint32  error (0=success)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>Offset  Size  Type    Field
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>------  ----  ------  -----------
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>0       4     uint32  type (message being acknowledged)
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>4       4     uint32  error (0=success)
 </code></pre></div>
-<h2 id="protocol-flow">Protocol Flow</h2>
-<h3 id="initialization">Initialization</h3>
-<div class="highlight"><pre><span></span><code>    Client                Agent               Server
-      |                     |                    |
-      |  ANNOUNCE_CAPABILITIES (request=1)       |
-      |--------------------&gt;|                    |
-      |                     |                    |
-      |  ANNOUNCE_CAPABILITIES (request=0)       |
-      |&lt;--------------------|                    |
-      |                     |                    |
-      |  MONITORS_CONFIG                         |
-      |--------------------&gt;|                    |
+<h2 id="protocol-flow">Protocol Flow<a class="headerlink" href="#protocol-flow" title="Permanent link">&para;</a></h2>
+<h3 id="initialization">Initialization<a class="headerlink" href="#initialization" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>    Client                Agent               Server
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>      |                     |                    |
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>      |  ANNOUNCE_CAPABILITIES (request=1)       |
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>      |--------------------&gt;|                    |
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>      |                     |                    |
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>      |  ANNOUNCE_CAPABILITIES (request=0)       |
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>      |&lt;--------------------|                    |
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>      |                     |                    |
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>      |  MONITORS_CONFIG                         |
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>      |--------------------&gt;|                    |
 </code></pre></div>
-<h3 id="clipboard-copy-client-to-guest">Clipboard Copy (Client to Guest)</h3>
-<div class="highlight"><pre><span></span><code>    Client                Agent
-      |                     |
-      |  CLIPBOARD_GRAB     |
-      |--------------------&gt;|
-      |                     |
-      |  CLIPBOARD_REQUEST  |
-      |&lt;--------------------|
-      |                     |
-      |  CLIPBOARD (data)   |
-      |--------------------&gt;|
+<h3 id="clipboard-copy-client-to-guest">Clipboard Copy (Client to Guest)<a class="headerlink" href="#clipboard-copy-client-to-guest" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>    Client                Agent
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>      |                     |
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>      |  CLIPBOARD_GRAB     |
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>      |--------------------&gt;|
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>      |                     |
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>      |  CLIPBOARD_REQUEST  |
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>      |&lt;--------------------|
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>      |                     |
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>      |  CLIPBOARD (data)   |
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>      |--------------------&gt;|
 </code></pre></div>
-<h3 id="file-transfer_1">File Transfer</h3>
-<div class="highlight"><pre><span></span><code>    Client                Agent
-      |                     |
-      |  FILE_XFER_START    |
-      |--------------------&gt;|
-      |                     |
-      |  FILE_XFER_DATA     |
-      |--------------------&gt;|
-      |  FILE_XFER_DATA     |
-      |--------------------&gt;|
-      |  ...                |
-      |                     |
-      |  FILE_XFER_STATUS   |
-      |&lt;--------------------|
+<h3 id="file-transfer_1">File Transfer<a class="headerlink" href="#file-transfer_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>    Client                Agent
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>      |                     |
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>      |  FILE_XFER_START    |
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>      |--------------------&gt;|
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>      |                     |
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>      |  FILE_XFER_DATA     |
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>      |--------------------&gt;|
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>      |  FILE_XFER_DATA     |
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>      |--------------------&gt;|
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>      |  ...                |
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>      |                     |
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>      |  FILE_XFER_STATUS   |
+<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>      |&lt;--------------------|
 </code></pre></div>
-<h2 id="security-considerations">Security Considerations</h2>
+<h2 id="security-considerations">Security Considerations<a class="headerlink" href="#security-considerations" title="Permanent link">&para;</a></h2>
 <ol>
 <li>
 <p><strong>Clipboard Access</strong>: Agent clipboard sharing allows data transfer between
@@ -4404,7 +4404,7 @@ Common keys: <code>name</code>, <code>size</code></p>
 </ol>
 <p>Kerbside's audit logging records main channel establishment, which includes
 agent communication.</p>
-<h2 id="related-documentation">Related Documentation</h2>
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/kerbside/protocol-overview/">Protocol Overview</a> - High-level SPICE protocol</li>
 <li><a href="/components/kerbside/channel-protocols/">Channel Protocols</a> - Main channel message details</li>

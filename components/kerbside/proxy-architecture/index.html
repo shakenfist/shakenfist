@@ -3952,35 +3952,35 @@
   
 
 
-<h1 id="kerbside-proxy-architecture">Kerbside Proxy Architecture</h1>
+<h1 id="kerbside-proxy-architecture">Kerbside Proxy Architecture<a class="headerlink" href="#kerbside-proxy-architecture" title="Permanent link">&para;</a></h1>
 <p>This document provides a detailed technical description of Kerbside's proxy
 architecture, including the connection state machine, process model, and traffic
 handling.</p>
-<h2 id="process-architecture">Process Architecture</h2>
+<h2 id="process-architecture">Process Architecture<a class="headerlink" href="#process-architecture" title="Permanent link">&para;</a></h2>
 <p>Kerbside uses a multiprocess architecture for scalability and isolation:</p>
-<div class="highlight"><pre><span></span><code>+---------------------------+
-|    kerbside-daemon        |  Main daemon process
-|    (main.py)              |  - Spawns proxy subprocess
-|                           |  - Runs maintenance loop
-+-------------+-------------+
-              |
-              | Subprocess
-              v
-+---------------------------+
-|    kerbside-proxy         |  Proxy manager process
-|    (proxy.py:run)         |  - Accepts connections
-|                           |  - Spawns workers
-+-------------+-------------+
-              |
-              | multiprocessing.Process
-              v
-+---------------------------+
-|    kerbside-secure-*      |  Worker processes (one per connection)
-|    (SpiceTLSSession)      |  - Handles single SPICE channel
-|                           |  - Bidirectional proxy
-+---------------------------+
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>+---------------------------+
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>|    kerbside-daemon        |  Main daemon process
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>|    (main.py)              |  - Spawns proxy subprocess
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>|                           |  - Runs maintenance loop
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>+-------------+-------------+
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>              |
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>              | Subprocess
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>              v
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>+---------------------------+
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>|    kerbside-proxy         |  Proxy manager process
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>|    (proxy.py:run)         |  - Accepts connections
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>|                           |  - Spawns workers
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>+-------------+-------------+
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>              |
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>              | multiprocessing.Process
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>              v
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>+---------------------------+
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>|    kerbside-secure-*      |  Worker processes (one per connection)
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>|    (SpiceTLSSession)      |  - Handles single SPICE channel
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>|                           |  - Bidirectional proxy
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>+---------------------------+
 </code></pre></div>
-<h3 id="benefits-of-multiprocess-architecture">Benefits of Multiprocess Architecture</h3>
+<h3 id="benefits-of-multiprocess-architecture">Benefits of Multiprocess Architecture<a class="headerlink" href="#benefits-of-multiprocess-architecture" title="Permanent link">&para;</a></h3>
 <ol>
 <li>
 <p><strong>Isolation</strong>: Each connection runs in its own process, preventing one
@@ -3999,180 +3999,180 @@ handling.</p>
    easier (e.g., <code>kerbside-secure-abc123-display-0</code>).</p>
 </li>
 </ol>
-<h2 id="connection-listener">Connection Listener</h2>
+<h2 id="connection-listener">Connection Listener<a class="headerlink" href="#connection-listener" title="Permanent link">&para;</a></h2>
 <p>The <code>SpiceListener</code> class manages incoming connections:</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SpiceListener</span><span class="p">:</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">address</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">tls_port</span><span class="p">):</span>
-        <span class="c1"># Insecure port (5901) - redirects to TLS</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">unsecured</span> <span class="o">=</span> <span class="n">socket</span><span class="o">.</span><span class="n">socket</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">unsecured</span><span class="o">.</span><span class="n">bind</span><span class="p">((</span><span class="n">address</span><span class="p">,</span> <span class="n">port</span><span class="p">))</span>
-
-        <span class="c1"># Secure port (5900) - TLS-wrapped connections</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">ssl_context</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLContext</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">PROTOCOL_TLS_SERVER</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">ssl_context</span><span class="o">.</span><span class="n">load_cert_chain</span><span class="p">(</span><span class="n">cert_path</span><span class="p">,</span> <span class="n">key_path</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">secured</span> <span class="o">=</span> <span class="n">socket</span><span class="o">.</span><span class="n">socket</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">secured</span><span class="o">.</span><span class="n">bind</span><span class="p">((</span><span class="n">address</span><span class="p">,</span> <span class="n">tls_port</span><span class="p">))</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">SpiceListener</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">address</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">tls_port</span><span class="p">):</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>        <span class="c1"># Insecure port (5901) - redirects to TLS</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">unsecured</span> <span class="o">=</span> <span class="n">socket</span><span class="o">.</span><span class="n">socket</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">unsecured</span><span class="o">.</span><span class="n">bind</span><span class="p">((</span><span class="n">address</span><span class="p">,</span> <span class="n">port</span><span class="p">))</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="c1"># Secure port (5900) - TLS-wrapped connections</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">ssl_context</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLContext</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">PROTOCOL_TLS_SERVER</span><span class="p">)</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">ssl_context</span><span class="o">.</span><span class="n">load_cert_chain</span><span class="p">(</span><span class="n">cert_path</span><span class="p">,</span> <span class="n">key_path</span><span class="p">)</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">secured</span> <span class="o">=</span> <span class="n">socket</span><span class="o">.</span><span class="n">socket</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">secured</span><span class="o">.</span><span class="n">bind</span><span class="p">((</span><span class="n">address</span><span class="p">,</span> <span class="n">tls_port</span><span class="p">))</span>
 </code></pre></div>
-<h3 id="tls-configuration">TLS Configuration</h3>
+<h3 id="tls-configuration">TLS Configuration<a class="headerlink" href="#tls-configuration" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Server certificate and key loaded from configured paths</li>
 <li>CA certificate loaded for client verification (optional)</li>
 <li>Default verify paths configured for system CAs</li>
 </ul>
-<h2 id="connection-state-machine">Connection State Machine</h2>
-<h3 id="insecure-connection-flow-spicesession">Insecure Connection Flow (SpiceSession)</h3>
+<h2 id="connection-state-machine">Connection State Machine<a class="headerlink" href="#connection-state-machine" title="Permanent link">&para;</a></h2>
+<h3 id="insecure-connection-flow-spicesession">Insecure Connection Flow (SpiceSession)<a class="headerlink" href="#insecure-connection-flow-spicesession" title="Permanent link">&para;</a></h3>
 <p>Connections to the insecure port (5901) follow a simple flow:</p>
-<div class="highlight"><pre><span></span><code>     Accept Connection
-            |
-            v
-    +---------------+
-    | Receive Data  |
-    +-------+-------+
-            |
-            v
-    +---------------+
-    | Parse Client  |
-    | SpiceLinkMess |
-    +-------+-------+
-            |
-            v
-    +---------------+
-    | Send Reply    |
-    | need_secured  |
-    +-------+-------+
-            |
-            v
-    +---------------+
-    | Close         |
-    +---------------+
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>     Accept Connection
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>            |
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>            v
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    +---------------+
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    | Receive Data  |
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    +-------+-------+
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>            |
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>            v
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    +---------------+
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    | Parse Client  |
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    | SpiceLinkMess |
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    +-------+-------+
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>            |
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>            v
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    +---------------+
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    | Send Reply    |
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    | need_secured  |
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    +-------+-------+
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>            |
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>            v
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>    +---------------+
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>    | Close         |
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>    +---------------+
 </code></pre></div>
 <p>This redirects clients to use TLS on port 5900.</p>
-<h3 id="secure-connection-flow-spicetlssession">Secure Connection Flow (SpiceTLSSession)</h3>
+<h3 id="secure-connection-flow-spicetlssession">Secure Connection Flow (SpiceTLSSession)<a class="headerlink" href="#secure-connection-flow-spicetlssession" title="Permanent link">&para;</a></h3>
 <p>TLS connections follow a more complex state machine:</p>
-<div class="highlight"><pre><span></span><code>     Accept TLS Connection
-            |
-            v
-    +-------------------+
-    | ClientSpiceLinkMess|  Parse client hello, send server hello
-    +--------+----------+
-             |
-             v
-    +-------------------+
-    | ClientPassword    |  Decrypt token, validate, connect to hypervisor
-    +--------+----------+
-             |
-             v
-    +-------------------+
-    | ClientProxy       |  Bidirectional traffic relay
-    | ServerProxy       |
-    +-------------------+
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>     Accept TLS Connection
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>            |
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>            v
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    +-------------------+
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    | ClientSpiceLinkMess|  Parse client hello, send server hello
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    +--------+----------+
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>             |
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>             v
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    +-------------------+
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    | ClientPassword    |  Decrypt token, validate, connect to hypervisor
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    +--------+----------+
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>             |
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>             v
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    +-------------------+
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    | ClientProxy       |  Bidirectional traffic relay
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    | ServerProxy       |
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    +-------------------+
 </code></pre></div>
-<h3 id="state-handlers">State Handlers</h3>
+<h3 id="state-handlers">State Handlers<a class="headerlink" href="#state-handlers" title="Permanent link">&para;</a></h3>
 <p>Each state is implemented as a method that returns the number of bytes consumed:</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SpiceTLSSession</span><span class="p">:</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">client_next_packet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ClientSpiceLinkMess</span>  <span class="c1"># Initial state</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">server_next_packet</span> <span class="o">=</span> <span class="kc">None</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">ClientSpiceLinkMess</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">buffered</span><span class="p">):</span>
-        <span class="c1"># Parse client hello</span>
-        <span class="c1"># Generate RSA keypair</span>
-        <span class="c1"># Send server hello with public key</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">client_next_packet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ClientPassword</span>
-        <span class="k">return</span> <span class="n">bytes_consumed</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">ClientPassword</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">buffered</span><span class="p">):</span>
-        <span class="c1"># Decrypt token</span>
-        <span class="c1"># Validate against database</span>
-        <span class="c1"># Connect to hypervisor</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">client_next_packet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ClientProxy</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">server_next_packet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ServerProxy</span>
-        <span class="k">return</span> <span class="n">bytes_consumed</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">ClientProxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">buffered</span><span class="p">):</span>
-        <span class="c1"># Parse and forward client traffic to server</span>
-        <span class="k">return</span> <span class="n">bytes_consumed</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">ServerProxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">buffered</span><span class="p">):</span>
-        <span class="c1"># Parse and forward server traffic to client</span>
-        <span class="k">return</span> <span class="n">bytes_consumed</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">SpiceTLSSession</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">client_next_packet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ClientSpiceLinkMess</span>  <span class="c1"># Initial state</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">server_next_packet</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ClientSpiceLinkMess</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">buffered</span><span class="p">):</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="c1"># Parse client hello</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="c1"># Generate RSA keypair</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>        <span class="c1"># Send server hello with public key</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">client_next_packet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ClientPassword</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>        <span class="k">return</span> <span class="n">bytes_consumed</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ClientPassword</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">buffered</span><span class="p">):</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>        <span class="c1"># Decrypt token</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>        <span class="c1"># Validate against database</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>        <span class="c1"># Connect to hypervisor</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">client_next_packet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ClientProxy</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">server_next_packet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ServerProxy</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>        <span class="k">return</span> <span class="n">bytes_consumed</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ClientProxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">buffered</span><span class="p">):</span>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>        <span class="c1"># Parse and forward client traffic to server</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>        <span class="k">return</span> <span class="n">bytes_consumed</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ServerProxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">buffered</span><span class="p">):</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>        <span class="c1"># Parse and forward server traffic to client</span>
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>        <span class="k">return</span> <span class="n">bytes_consumed</span>
 </code></pre></div>
-<h2 id="main-processing-loop">Main Processing Loop</h2>
+<h2 id="main-processing-loop">Main Processing Loop<a class="headerlink" href="#main-processing-loop" title="Permanent link">&para;</a></h2>
 <p>The main processing loop uses non-blocking I/O with <code>select()</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="n">client_buffered</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
-    <span class="n">server_buffered</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
-
-    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-        <span class="n">sockets</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">client_conn</span><span class="p">]</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_conn</span><span class="p">:</span>
-            <span class="n">sockets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">server_conn</span><span class="p">)</span>
-
-        <span class="c1"># Wait for data (0.2 second timeout)</span>
-        <span class="n">readable</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">errors</span> <span class="o">=</span> <span class="n">select</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">sockets</span><span class="p">,</span> <span class="p">[],</span> <span class="n">sockets</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)</span>
-
-        <span class="c1"># Read available data</span>
-        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">readable</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_conn</span><span class="p">:</span>
-                <span class="n">client_buffered</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_conn</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="mi">1024000</span><span class="p">)</span>
-            <span class="k">elif</span> <span class="n">r</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_conn</span><span class="p">:</span>
-                <span class="n">server_buffered</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_conn</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="mi">1024000</span><span class="p">)</span>
-
-        <span class="c1"># Process buffered data</span>
-        <span class="k">if</span> <span class="n">client_buffered</span><span class="p">:</span>
-            <span class="n">consumed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_next_packet</span><span class="p">(</span><span class="n">client_buffered</span><span class="p">)</span>
-            <span class="k">while</span> <span class="n">consumed</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="n">client_buffered</span> <span class="o">=</span> <span class="n">client_buffered</span><span class="p">[</span><span class="n">consumed</span><span class="p">:]</span>
-                <span class="n">consumed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_next_packet</span><span class="p">(</span><span class="n">client_buffered</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_next_packet</span> <span class="ow">and</span> <span class="n">server_buffered</span><span class="p">:</span>
-            <span class="n">consumed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_next_packet</span><span class="p">(</span><span class="n">server_buffered</span><span class="p">)</span>
-            <span class="k">while</span> <span class="n">consumed</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="n">server_buffered</span> <span class="o">=</span> <span class="n">server_buffered</span><span class="p">[</span><span class="n">consumed</span><span class="p">:]</span>
-                <span class="n">consumed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_next_packet</span><span class="p">(</span><span class="n">server_buffered</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">client_buffered</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">server_buffered</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="n">sockets</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">client_conn</span><span class="p">]</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_conn</span><span class="p">:</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>            <span class="n">sockets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">server_conn</span><span class="p">)</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>        <span class="c1"># Wait for data (0.2 second timeout)</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>        <span class="n">readable</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">errors</span> <span class="o">=</span> <span class="n">select</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">sockets</span><span class="p">,</span> <span class="p">[],</span> <span class="n">sockets</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>        <span class="c1"># Read available data</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">readable</span><span class="p">:</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>            <span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_conn</span><span class="p">:</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>                <span class="n">client_buffered</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_conn</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="mi">1024000</span><span class="p">)</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>            <span class="k">elif</span> <span class="n">r</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_conn</span><span class="p">:</span>
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>                <span class="n">server_buffered</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_conn</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="mi">1024000</span><span class="p">)</span>
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>        <span class="c1"># Process buffered data</span>
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>        <span class="k">if</span> <span class="n">client_buffered</span><span class="p">:</span>
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>            <span class="n">consumed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_next_packet</span><span class="p">(</span><span class="n">client_buffered</span><span class="p">)</span>
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>            <span class="k">while</span> <span class="n">consumed</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>                <span class="n">client_buffered</span> <span class="o">=</span> <span class="n">client_buffered</span><span class="p">[</span><span class="n">consumed</span><span class="p">:]</span>
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>                <span class="n">consumed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_next_packet</span><span class="p">(</span><span class="n">client_buffered</span><span class="p">)</span>
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_next_packet</span> <span class="ow">and</span> <span class="n">server_buffered</span><span class="p">:</span>
+<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>            <span class="n">consumed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_next_packet</span><span class="p">(</span><span class="n">server_buffered</span><span class="p">)</span>
+<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>            <span class="k">while</span> <span class="n">consumed</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>                <span class="n">server_buffered</span> <span class="o">=</span> <span class="n">server_buffered</span><span class="p">[</span><span class="n">consumed</span><span class="p">:]</span>
+<a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>                <span class="n">consumed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_next_packet</span><span class="p">(</span><span class="n">server_buffered</span><span class="p">)</span>
 </code></pre></div>
-<h3 id="why-02-second-timeout">Why 0.2 Second Timeout?</h3>
+<h3 id="why-02-second-timeout">Why 0.2 Second Timeout?<a class="headerlink" href="#why-02-second-timeout" title="Permanent link">&para;</a></h3>
 <p>The short timeout ensures responsive handling even when:
 - State transitions occur that enable new packet processing
 - One socket becomes readable while processing the other
 - Clean shutdown needs to occur</p>
-<h2 id="packet-parsing-pattern">Packet Parsing Pattern</h2>
+<h2 id="packet-parsing-pattern">Packet Parsing Pattern<a class="headerlink" href="#packet-parsing-pattern" title="Permanent link">&para;</a></h2>
 <p>All packet parsers follow a consistent pattern:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">parse_packet</span><span class="p">(</span><span class="n">buffered</span><span class="p">):</span>
-    <span class="c1"># Check minimum header size</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">buffered</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">HEADER_SIZE</span><span class="p">:</span>
-        <span class="k">return</span> <span class="mi">0</span>  <span class="c1"># Need more data</span>
-
-    <span class="c1"># Parse header</span>
-    <span class="n">message_type</span><span class="p">,</span> <span class="n">message_size</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack_from</span><span class="p">(</span><span class="s1">&#39;&lt;HI&#39;</span><span class="p">,</span> <span class="n">buffered</span><span class="p">)</span>
-
-    <span class="c1"># Check if complete message is available</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">buffered</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">HEADER_SIZE</span> <span class="o">+</span> <span class="n">message_size</span><span class="p">:</span>
-        <span class="k">return</span> <span class="mi">0</span>  <span class="c1"># Need more data</span>
-
-    <span class="c1"># Process message</span>
-    <span class="c1"># ...</span>
-
-    <span class="c1"># Return bytes consumed</span>
-    <span class="k">return</span> <span class="n">HEADER_SIZE</span> <span class="o">+</span> <span class="n">message_size</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">parse_packet</span><span class="p">(</span><span class="n">buffered</span><span class="p">):</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="c1"># Check minimum header size</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">buffered</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">HEADER_SIZE</span><span class="p">:</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="k">return</span> <span class="mi">0</span>  <span class="c1"># Need more data</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="c1"># Parse header</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">message_type</span><span class="p">,</span> <span class="n">message_size</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack_from</span><span class="p">(</span><span class="s1">&#39;&lt;HI&#39;</span><span class="p">,</span> <span class="n">buffered</span><span class="p">)</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="c1"># Check if complete message is available</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">buffered</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">HEADER_SIZE</span> <span class="o">+</span> <span class="n">message_size</span><span class="p">:</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>        <span class="k">return</span> <span class="mi">0</span>  <span class="c1"># Need more data</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    <span class="c1"># Process message</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    <span class="c1"># ...</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    <span class="c1"># Return bytes consumed</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    <span class="k">return</span> <span class="n">HEADER_SIZE</span> <span class="o">+</span> <span class="n">message_size</span>
 </code></pre></div>
 <p>This pattern enables:
 - Partial packet handling (wait for more data)
 - Multiple packets in one read (process in loop)
 - Clean separation of concerns</p>
-<h2 id="traffic-inspection">Traffic Inspection</h2>
+<h2 id="traffic-inspection">Traffic Inspection<a class="headerlink" href="#traffic-inspection" title="Permanent link">&para;</a></h2>
 <p>Kerbside can optionally inspect and log all traffic:</p>
-<h3 id="inspector-architecture">Inspector Architecture</h3>
-<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">InspectableTraffic</span><span class="p">:</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">configure_inspection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">uuid</span><span class="p">,</span> <span class="n">session_id</span><span class="p">,</span> <span class="n">channel</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">TRAFFIC_INSPECTION</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">logfile</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">emit_entry</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">TRAFFIC_INSPECTION</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">logfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">timestamp</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="n">entry</span><span class="si">}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+<h3 id="inspector-architecture">Inspector Architecture<a class="headerlink" href="#inspector-architecture" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">InspectableTraffic</span><span class="p">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">configure_inspection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">uuid</span><span class="p">,</span> <span class="n">session_id</span><span class="p">,</span> <span class="n">channel</span><span class="p">):</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">TRAFFIC_INSPECTION</span><span class="p">:</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">logfile</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">emit_entry</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">TRAFFIC_INSPECTION</span><span class="p">:</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">logfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">timestamp</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="n">entry</span><span class="si">}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
 </code></pre></div>
-<h3 id="channel-specific-inspectors">Channel-Specific Inspectors</h3>
+<h3 id="channel-specific-inspectors">Channel-Specific Inspectors<a class="headerlink" href="#channel-specific-inspectors" title="Permanent link">&para;</a></h3>
 <p>Each channel type has dedicated inspectors:</p>
 <table>
 <thead>
@@ -4210,41 +4210,41 @@ handling.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="intimate-logging">Intimate Logging</h3>
+<h3 id="intimate-logging">Intimate Logging<a class="headerlink" href="#intimate-logging" title="Permanent link">&para;</a></h3>
 <p>With <code>TRAFFIC_INSPECTION_INTIMATE</code> enabled, detailed data is logged:
 - Keystrokes and scancodes
 - Mouse coordinates and button states
 - Image frame data</p>
 <p>This creates audit trails but should be used carefully due to privacy
 implications.</p>
-<h2 id="ack-handling-for-inserted-packets">ACK Handling for Inserted Packets</h2>
+<h2 id="ack-handling-for-inserted-packets">ACK Handling for Inserted Packets<a class="headerlink" href="#ack-handling-for-inserted-packets" title="Permanent link">&para;</a></h2>
 <p>When traffic inspection modifies packets (e.g., adding border frames),
 the proxy must handle acknowledgements correctly:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ClientProxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">buffered</span><span class="p">):</span>
-    <span class="n">pt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_parser</span><span class="p">(</span><span class="n">buffered</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="n">pt</span><span class="o">.</span><span class="n">inserted_packets</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="c1"># We inserted packets that server will ACK</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">server_ignore_acks</span> <span class="o">+=</span> <span class="n">pt</span><span class="o">.</span><span class="n">inserted_packets</span>
-
-    <span class="k">if</span> <span class="n">pt</span><span class="o">.</span><span class="n">packet_is_ack</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_ignore_acks</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="c1"># This ACK is for a packet we inserted, don&#39;t forward</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">client_ignore_acks</span> <span class="o">-=</span> <span class="mi">1</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">server_conn</span><span class="o">.</span><span class="n">sendall</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">data_to_send</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">ClientProxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">buffered</span><span class="p">):</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">pt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_parser</span><span class="p">(</span><span class="n">buffered</span><span class="p">)</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="k">if</span> <span class="n">pt</span><span class="o">.</span><span class="n">inserted_packets</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>        <span class="c1"># We inserted packets that server will ACK</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">server_ignore_acks</span> <span class="o">+=</span> <span class="n">pt</span><span class="o">.</span><span class="n">inserted_packets</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="k">if</span> <span class="n">pt</span><span class="o">.</span><span class="n">packet_is_ack</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_ignore_acks</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>        <span class="c1"># This ACK is for a packet we inserted, don&#39;t forward</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">client_ignore_acks</span> <span class="o">-=</span> <span class="mi">1</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">server_conn</span><span class="o">.</span><span class="n">sendall</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">data_to_send</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="worker-management">Worker Management</h2>
+<h2 id="worker-management">Worker Management<a class="headerlink" href="#worker-management" title="Permanent link">&para;</a></h2>
 <p>The proxy manager monitors and manages worker processes:</p>
-<h3 id="worker-tracking">Worker Tracking</h3>
-<div class="highlight"><pre><span></span><code><span class="n">workers</span> <span class="o">=</span> <span class="p">[]</span>
-
-<span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">client_host</span><span class="p">,</span> <span class="n">client_port</span><span class="p">,</span> <span class="n">secured</span> <span class="ow">in</span> <span class="n">listen</span><span class="o">.</span><span class="n">accept</span><span class="p">():</span>
-    <span class="n">session</span> <span class="o">=</span> <span class="n">SpiceTLSSession</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">client_host</span><span class="p">,</span> <span class="n">client_port</span><span class="p">)</span>
-    <span class="n">p</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">session</span><span class="o">.</span><span class="n">run</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
-    <span class="n">p</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
-    <span class="n">workers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+<h3 id="worker-tracking">Worker Tracking<a class="headerlink" href="#worker-tracking" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">workers</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">client_host</span><span class="p">,</span> <span class="n">client_port</span><span class="p">,</span> <span class="n">secured</span> <span class="ow">in</span> <span class="n">listen</span><span class="o">.</span><span class="n">accept</span><span class="p">():</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">session</span> <span class="o">=</span> <span class="n">SpiceTLSSession</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">client_host</span><span class="p">,</span> <span class="n">client_port</span><span class="p">)</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">p</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">session</span><span class="o">.</span><span class="n">run</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">p</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">workers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
 </code></pre></div>
-<h3 id="worker-cleanup">Worker Cleanup</h3>
+<h3 id="worker-cleanup">Worker Cleanup<a class="headerlink" href="#worker-cleanup" title="Permanent link">&para;</a></h3>
 <p>Every second, the proxy manager:</p>
 <ol>
 <li><strong>Identifies stray processes</strong>: Workers older than 5 seconds without
@@ -4253,48 +4253,48 @@ the proxy must handle acknowledgements correctly:</p>
 <li><strong>Reaps terminated workers</strong>: Joins completed processes and removes
    database records</li>
 </ol>
-<div class="highlight"><pre><span></span><code><span class="c1"># Find strays</span>
-<span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">psutil</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">())</span><span class="o">.</span><span class="n">children</span><span class="p">():</span>
-    <span class="k">if</span> <span class="n">child</span><span class="o">.</span><span class="n">pid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">channel_pids</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">child</span><span class="o">.</span><span class="n">create_time</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">:</span>
-            <span class="n">os</span><span class="o">.</span><span class="n">kill</span><span class="p">(</span><span class="n">child</span><span class="o">.</span><span class="n">pid</span><span class="p">,</span> <span class="n">signal</span><span class="o">.</span><span class="n">SIGKILL</span><span class="p">)</span>
-
-<span class="c1"># Reap terminated</span>
-<span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">workers</span><span class="p">:</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">is_alive</span><span class="p">():</span>
-        <span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">db</span><span class="o">.</span><span class="n">remove_proxy_channel</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">NODE_NAME</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">pid</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Find strays</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">psutil</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">())</span><span class="o">.</span><span class="n">children</span><span class="p">():</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="k">if</span> <span class="n">child</span><span class="o">.</span><span class="n">pid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">channel_pids</span><span class="p">:</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>        <span class="k">if</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">child</span><span class="o">.</span><span class="n">create_time</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">:</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>            <span class="n">os</span><span class="o">.</span><span class="n">kill</span><span class="p">(</span><span class="n">child</span><span class="o">.</span><span class="n">pid</span><span class="p">,</span> <span class="n">signal</span><span class="o">.</span><span class="n">SIGKILL</span><span class="p">)</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># Reap terminated</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">workers</span><span class="p">:</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">is_alive</span><span class="p">():</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>        <span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>        <span class="n">db</span><span class="o">.</span><span class="n">remove_proxy_channel</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">NODE_NAME</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">pid</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="database-state">Database State</h2>
+<h2 id="database-state">Database State<a class="headerlink" href="#database-state" title="Permanent link">&para;</a></h2>
 <p>Worker processes register their state in the database:</p>
-<h3 id="channel-info-recording">Channel Info Recording</h3>
-<div class="highlight"><pre><span></span><code><span class="n">db</span><span class="o">.</span><span class="n">record_channel_info</span><span class="p">(</span>
-    <span class="n">node_name</span><span class="p">,</span>
-    <span class="n">pid</span><span class="p">,</span>
-    <span class="n">client_ip</span><span class="o">=...</span><span class="p">,</span>
-    <span class="n">client_port</span><span class="o">=...</span><span class="p">,</span>
-    <span class="n">connection_id</span><span class="o">=...</span><span class="p">,</span>
-    <span class="n">channel_type</span><span class="o">=...</span><span class="p">,</span>
-    <span class="n">channel_id</span><span class="o">=...</span><span class="p">,</span>
-    <span class="n">session_id</span><span class="o">=...</span>
-<span class="p">)</span>
+<h3 id="channel-info-recording">Channel Info Recording<a class="headerlink" href="#channel-info-recording" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">db</span><span class="o">.</span><span class="n">record_channel_info</span><span class="p">(</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="n">node_name</span><span class="p">,</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="n">pid</span><span class="p">,</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">client_ip</span><span class="o">=...</span><span class="p">,</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="n">client_port</span><span class="o">=...</span><span class="p">,</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="n">connection_id</span><span class="o">=...</span><span class="p">,</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="n">channel_type</span><span class="o">=...</span><span class="p">,</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    <span class="n">channel_id</span><span class="o">=...</span><span class="p">,</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    <span class="n">session_id</span><span class="o">=...</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="p">)</span>
 </code></pre></div>
 <p>This enables:
 - Cross-process monitoring
 - Admin UI session display
 - Cleanup of orphaned records</p>
-<h2 id="prometheus-metrics">Prometheus Metrics</h2>
+<h2 id="prometheus-metrics">Prometheus Metrics<a class="headerlink" href="#prometheus-metrics" title="Permanent link">&para;</a></h2>
 <p>Workers report metrics via a shared queue:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># In worker</span>
-<span class="bp">self</span><span class="o">.</span><span class="n">prometheus_updates</span><span class="o">.</span><span class="n">put</span><span class="p">((</span><span class="s1">&#39;bytes_proxied&#39;</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">byte_count</span><span class="p">))</span>
-
-<span class="c1"># In manager</span>
-<span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-    <span class="n">name</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">value</span> <span class="o">=</span> <span class="n">prometheus_updates</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;bytes_proxied&#39;</span><span class="p">:</span>
-        <span class="n">bytes_proxied</span><span class="o">.</span><span class="n">labels</span><span class="p">(</span><span class="o">**</span><span class="n">labels</span><span class="p">)</span><span class="o">.</span><span class="n">inc</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># In worker</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="bp">self</span><span class="o">.</span><span class="n">prometheus_updates</span><span class="o">.</span><span class="n">put</span><span class="p">((</span><span class="s1">&#39;bytes_proxied&#39;</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">byte_count</span><span class="p">))</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># In manager</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">name</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">value</span> <span class="o">=</span> <span class="n">prometheus_updates</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;bytes_proxied&#39;</span><span class="p">:</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>        <span class="n">bytes_proxied</span><span class="o">.</span><span class="n">labels</span><span class="p">(</span><span class="o">**</span><span class="n">labels</span><span class="p">)</span><span class="o">.</span><span class="n">inc</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 </code></pre></div>
-<h3 id="exported-metrics">Exported Metrics</h3>
+<h3 id="exported-metrics">Exported Metrics<a class="headerlink" href="#exported-metrics" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4325,8 +4325,8 @@ the proxy must handle acknowledgements correctly:</p>
 </tr>
 </tbody>
 </table>
-<h2 id="error-handling">Error Handling</h2>
-<h3 id="connection-errors">Connection Errors</h3>
+<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
+<h3 id="connection-errors">Connection Errors<a class="headerlink" href="#connection-errors" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -4357,32 +4357,32 @@ the proxy must handle acknowledgements correctly:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="ssl-errors">SSL Errors</h3>
+<h3 id="ssl-errors">SSL Errors<a class="headerlink" href="#ssl-errors" title="Permanent link">&para;</a></h3>
 <p>SSL read errors are handled gracefully:</p>
-<div class="highlight"><pre><span></span><code><span class="k">try</span><span class="p">:</span>
-    <span class="n">d</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_conn</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="mi">1024000</span><span class="p">)</span>
-<span class="k">except</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLWantReadError</span><span class="p">:</span>
-    <span class="c1"># SSL layer has no data, continue loop</span>
-    <span class="k">pass</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">d</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_conn</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="mi">1024000</span><span class="p">)</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="k">except</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLWantReadError</span><span class="p">:</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="c1"># SSL layer has no data, continue loop</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="k">pass</span>
 </code></pre></div>
-<h2 id="security-considerations">Security Considerations</h2>
-<h3 id="token-validation">Token Validation</h3>
+<h2 id="security-considerations">Security Considerations<a class="headerlink" href="#security-considerations" title="Permanent link">&para;</a></h2>
+<h3 id="token-validation">Token Validation<a class="headerlink" href="#token-validation" title="Permanent link">&para;</a></h3>
 <p>All connections must present valid tokens:
 - Tokens are time-limited (configurable expiry)
 - Tokens are single-use (prevent replay attacks)
 - Invalid tokens result in immediate disconnection</p>
-<h3 id="audit-logging">Audit Logging</h3>
+<h3 id="audit-logging">Audit Logging<a class="headerlink" href="#audit-logging" title="Permanent link">&para;</a></h3>
 <p>All significant events are logged:
 - Channel creation
 - Hypervisor connection success/failure
 - Token validation results
 - Traffic inspection events (if enabled)</p>
-<h3 id="process-isolation">Process Isolation</h3>
+<h3 id="process-isolation">Process Isolation<a class="headerlink" href="#process-isolation" title="Permanent link">&para;</a></h3>
 <p>Each connection runs in its own process:
 - Memory isolation between connections
 - Independent crash handling
 - Resource limits can be applied per-process</p>
-<h2 id="related-documentation">Related Documentation</h2>
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/kerbside/protocol-overview/">Protocol Overview</a> - SPICE protocol introduction</li>
 <li><a href="/components/kerbside/spice-link-protocol/">Link Protocol</a> - Connection handshake details</li>

@@ -3494,11 +3494,11 @@
   
 
 
-<h1 id="spice-compression-protocols">SPICE Compression Protocols</h1>
+<h1 id="spice-compression-protocols">SPICE Compression Protocols<a class="headerlink" href="#spice-compression-protocols" title="Permanent link">&para;</a></h1>
 <p>This document describes the proprietary graphics compression formats implemented
 by the SPICE protocol, specifically the LZ and GLZ formats. These formats are
 used by SPICE to compress display updates for transmission to clients.</p>
-<h2 id="overview">Overview</h2>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>SPICE implements several graphics compression formats, but only two have been
 commonly observed for non-video console sessions:</p>
 <ul>
@@ -3509,13 +3509,13 @@ commonly observed for non-video console sessions:</p>
 decompressed pixels form the dictionary for later decompression. Kerbside
 includes a simple LZ/GLZ decompression tool (<code>kerbside-util</code>) that can
 decompress these formats and convert them to PNG for inspection.</p>
-<h2 id="lz-compression">LZ Compression</h2>
+<h2 id="lz-compression">LZ Compression<a class="headerlink" href="#lz-compression" title="Permanent link">&para;</a></h2>
 <p>LZ compression as implemented in SPICE is a progressive dictionary compression
 scheme. The dictionary is not transmitted separately from the image - instead,
 previously decompressed elements of the image form the dictionary for later
 decompression. As the image is processed (generally from top-left), runs of
 previously decompressed pixels are referenced where they reappear.</p>
-<h3 id="lz-image-header">LZ Image Header</h3>
+<h3 id="lz-image-header">LZ Image Header<a class="headerlink" href="#lz-image-header" title="Permanent link">&para;</a></h3>
 <p>LZ images start with a header containing the following fields. Note that
 multi-byte values are <strong>big-endian</strong>, unlike most of the SPICE protocol which
 is little-endian.</p>
@@ -3575,7 +3575,7 @@ is little-endian.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="image-types">Image Types</h3>
+<h3 id="image-types">Image Types<a class="headerlink" href="#image-types" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -3646,42 +3646,42 @@ is little-endian.</p>
 display compression. Despite the name, this format is three bytes of <strong>BGR</strong>
 (blue, green, red - reversed from traditional RGB order) with an implied alpha
 channel of 0xFF.</p>
-<h3 id="lz-compressed-data-format">LZ Compressed Data Format</h3>
+<h3 id="lz-compressed-data-format">LZ Compressed Data Format<a class="headerlink" href="#lz-compressed-data-format" title="Permanent link">&para;</a></h3>
 <p>After the header, the compressed image data follows as a sequence of unsigned
 single-byte commands with variable-length arguments.</p>
-<h4 id="direct-pixel-commands-0-32">Direct Pixel Commands (0-32)</h4>
+<h4 id="direct-pixel-commands-0-32">Direct Pixel Commands (0-32)<a class="headerlink" href="#direct-pixel-commands-0-32" title="Permanent link">&para;</a></h4>
 <p>If the command byte is 32 or less, it instructs the decoder to include N+1
 direct pixels as output, where N is the command value.</p>
 <p>For RGB32 format, a command of 0 produces:
-<div class="highlight"><pre><span></span><code>[0] [B][G][R]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[0] [B][G][R]
 </code></pre></div></p>
 <p>A command of 3 produces:
-<div class="highlight"><pre><span></span><code>[3] [B0][G0][R0] [B1][G1][R1] [B2][G2][R2] [B3][G3][R3]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>[3] [B0][G0][R0] [B1][G1][R1] [B2][G2][R2] [B3][G3][R3]
 </code></pre></div></p>
-<h4 id="reference-commands-32">Reference Commands (&gt; 32)</h4>
+<h4 id="reference-commands-32">Reference Commands (&gt; 32)<a class="headerlink" href="#reference-commands-32" title="Permanent link">&para;</a></h4>
 <p>Commands greater than 32 reference previously decompressed pixels. The command
 byte is structured as:</p>
-<div class="highlight"><pre><span></span><code>[LLLOOOOO]
- ^^^----- Length (top 3 bits)
-    ^^^^^- Pixel offset (bottom 5 bits)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>[LLLOOOOO]
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a> ^^^----- Length (top 3 bits)
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    ^^^^^- Pixel offset (bottom 5 bits)
 </code></pre></div>
 <p><strong>Decoding Length:</strong></p>
 <p>Extract the length from the top 3 bits. If the length field is maxed out at 7
 (binary 111), additional length bytes follow. Read bytes and add them to the
 length until a byte that is not 0xFF is encountered.</p>
 <p>Example encoding for 512 pixels:
-<div class="highlight"><pre><span></span><code>[111-----][11111111][11111010] = length: 7 + 255 + 250 = 512
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>[111-----][11111111][11111010] = length: 7 + 255 + 250 = 512
 </code></pre></div></p>
 <p><strong>Decoding Pixel Offset:</strong></p>
 <p>The 5 bits from the command byte form the high bits of the pixel offset. An
 additional byte is always read:</p>
-<div class="highlight"><pre><span></span><code>[---OOOOO][MMMMMMMM] = OOOOOMMMMMMMMM (offset)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>[---OOOOO][MMMMMMMM] = OOOOOMMMMMMMMM (offset)
 </code></pre></div>
 <p>If the embedded offset bits are all ones (11111) AND the additional byte is
 0xFF (255), this indicates an extended offset. Read two more bytes as a
 big-endian UINT16 and add 8191:</p>
-<div class="highlight"><pre><span></span><code>[---11111][length...][11111111][HHHHHHHH][LLLLLLLL]
-= HHHHHHHHLLLLLLLL + 8191 (offset for values &gt; 8192)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>[---11111][length...][11111111][HHHHHHHH][LLLLLLLL]
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>= HHHHHHHHLLLLLLLL + 8191 (offset for values &gt; 8192)
 </code></pre></div>
 <p>Finally, add 1 to the offset (cannot reference the current pixel).</p>
 <p><strong>Applying the Reference:</strong></p>
@@ -3689,15 +3689,15 @@ big-endian UINT16 and add 8191:</p>
 <li>If offset = 1: Duplicate the immediately prior pixel <code>length</code> times</li>
 <li>Otherwise: Copy <code>length</code> pixels from (current position - offset)</li>
 </ul>
-<h3 id="implementation-reference">Implementation Reference</h3>
+<h3 id="implementation-reference">Implementation Reference<a class="headerlink" href="#implementation-reference" title="Permanent link">&para;</a></h3>
 <p>For a working implementation, see <code>kerbside/utilities/lz.py</code> in the Kerbside
 codebase.</p>
-<h2 id="glz-compression">GLZ Compression</h2>
+<h2 id="glz-compression">GLZ Compression<a class="headerlink" href="#glz-compression" title="Permanent link">&para;</a></h2>
 <p>GLZ (Global LZ) extends LZ by allowing references to pixels from previously
 decompressed images in the session, not just the current image. This is
 efficient when frames have small differences - only the delta and context
 information need to be transmitted.</p>
-<h3 id="glz-image-header">GLZ Image Header</h3>
+<h3 id="glz-image-header">GLZ Image Header<a class="headerlink" href="#glz-image-header" title="Permanent link">&para;</a></h3>
 <p>GLZ images use a similar but distinct header format. Multi-byte values are
 <strong>big-endian</strong>.</p>
 <table>
@@ -3758,13 +3758,13 @@ information need to be transmitted.</p>
 </table>
 <p><strong>Note</strong>: The SPICE server always starts image IDs from zero. There appear to be
 bugs when using very large IDs.</p>
-<h3 id="glz-compressed-data-format">GLZ Compressed Data Format</h3>
+<h3 id="glz-compressed-data-format">GLZ Compressed Data Format<a class="headerlink" href="#glz-compressed-data-format" title="Permanent link">&para;</a></h3>
 <p>Direct pixel commands (0-32) work identically to LZ compression.</p>
 <p>For reference commands (&gt; 32), the command byte structure differs:</p>
-<div class="highlight"><pre><span></span><code>[LLLFOOOO]
- ^^^----- Length (top 3 bits)
-    ^---- Pixel flag (1 bit)
-     ^^^^- Pixel offset (bottom 4 bits)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>[LLLFOOOO]
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a> ^^^----- Length (top 3 bits)
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    ^---- Pixel flag (1 bit)
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>     ^^^^- Pixel offset (bottom 4 bits)
 </code></pre></div>
 <p><strong>Decoding Length:</strong></p>
 <p>Same as LZ - if the length field is maxed out at 7, read additional bytes
@@ -3772,7 +3772,7 @@ and add them to the length until a non-0xFF byte is encountered.</p>
 <p><strong>Decoding Pixel Offset:</strong></p>
 <p>Unlike LZ, an additional offset byte is <strong>always</strong> read and placed above the
 embedded offset:</p>
-<div class="highlight"><pre><span></span><code>[---FOOOO][length...][MMMMMMMM] = MMMMMMMMOOOO (offset)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>[---FOOOO][length...][MMMMMMMM] = MMMMMMMMOOOO (offset)
 </code></pre></div>
 <p><strong>Decoding Image Distance:</strong></p>
 <p>Read another byte. The top 2 bits form the "image flag", and processing depends
@@ -3780,14 +3780,14 @@ on the pixel flag value:</p>
 <p><strong>Pixel Flag = 0:</strong></p>
 <p>The bottom 6 bits are the image distance. The image flag indicates how many
 additional distance bytes to read, which are prepended:</p>
-<div class="highlight"><pre><span></span><code>[10DDDDDD][EEEEEEEE][FFFFFFFF]
-= FFFFFFFFEEEEEEEEDDDDDD (distance)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>[10DDDDDD][EEEEEEEE][FFFFFFFF]
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>= FFFFFFFFEEEEEEEEDDDDDD (distance)
 </code></pre></div>
 <p><strong>Pixel Flag = 1:</strong></p>
 <p>Replace the pixel flag with bit 5 of the byte. The bottom 5 bits are added
 to the pixel offset at bit position 12:</p>
-<div class="highlight"><pre><span></span><code>[---1OOOO][length...][MMMMMMMM][--PNNNNN]
-= NNNNNMMMMMMMMOOOO (17-bit offset)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>[---1OOOO][length...][MMMMMMMM][--PNNNNN]
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>= NNNNNMMMMMMMMOOOO (17-bit offset)
 </code></pre></div>
 <p>Where P is the new pixel flag (bit 5 of the byte).</p>
 <p>Then read <code>image_flag</code> bytes of image distance. If the new pixel flag is
@@ -3803,17 +3803,17 @@ for 25-bit offsets.</p>
 <li>Offset is from the <strong>start</strong> of the target image</li>
 <li>Copy <code>length</code> pixels from that location</li>
 </ul>
-<h3 id="implementation-reference_1">Implementation Reference</h3>
+<h3 id="implementation-reference_1">Implementation Reference<a class="headerlink" href="#implementation-reference_1" title="Permanent link">&para;</a></h3>
 <p>For a working implementation, see <code>kerbside/utilities/glz.py</code> in the Kerbside
 codebase.</p>
-<h2 id="utility-tool">Utility Tool</h2>
+<h2 id="utility-tool">Utility Tool<a class="headerlink" href="#utility-tool" title="Permanent link">&para;</a></h2>
 <p>Kerbside includes <code>kerbside-util</code> which can:</p>
 <ul>
 <li>Decompress LZ and GLZ compressed images</li>
 <li>Convert compressed images to PNG for inspection</li>
 <li>Useful for debugging display channel issues</li>
 </ul>
-<h2 id="related-documentation">Related Documentation</h2>
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/kerbside/protocol-overview/">Protocol Overview</a> - High-level SPICE protocol</li>
 <li><a href="/components/kerbside/channel-protocols/">Channel Protocols</a> - Display channel message formats</li>

@@ -3482,38 +3482,38 @@
   
 
 
-<h1 id="installation">Installation</h1>
+<h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
 <p>This guide covers installing Occy Strap and verifying it's working correctly.</p>
-<h2 id="requirements">Requirements</h2>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Python 3.7 or later</li>
 <li>pip (Python package manager)</li>
 <li>Network access to container registries (for downloading images)</li>
 <li>Optionally: Docker or Podman daemon (for local image operations)</li>
 </ul>
-<h2 id="installation-from-pypi">Installation from PyPI</h2>
+<h2 id="installation-from-pypi">Installation from PyPI<a class="headerlink" href="#installation-from-pypi" title="Permanent link">&para;</a></h2>
 <p>The simplest way to install Occy Strap is via pip:</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>occystrap
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>occystrap
 </code></pre></div>
-<h2 id="installation-from-source">Installation from Source</h2>
+<h2 id="installation-from-source">Installation from Source<a class="headerlink" href="#installation-from-source" title="Permanent link">&para;</a></h2>
 <p>To install the latest development version:</p>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/shakenfist/occystrap.git
-<span class="nb">cd</span><span class="w"> </span>occystrap
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/shakenfist/occystrap.git
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>occystrap
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 </code></pre></div>
-<h2 id="verifying-the-installation">Verifying the Installation</h2>
+<h2 id="verifying-the-installation">Verifying the Installation<a class="headerlink" href="#verifying-the-installation" title="Permanent link">&para;</a></h2>
 <p>After installation, verify that Occy Strap is working:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Check the version</span>
-occystrap<span class="w"> </span>--help
-
-<span class="c1"># Try downloading a small image</span>
-occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/hello-world:latest<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tar://hello-world.tar
-
-<span class="c1"># Verify the tarball was created</span>
-ls<span class="w"> </span>-la<span class="w"> </span>hello-world.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Check the version</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>occystrap<span class="w"> </span>--help
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Try downloading a small image</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/hello-world:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span>tar://hello-world.tar
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Verify the tarball was created</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>ls<span class="w"> </span>-la<span class="w"> </span>hello-world.tar
 </code></pre></div>
-<h2 id="dependencies">Dependencies</h2>
+<h2 id="dependencies">Dependencies<a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h2>
 <p>Occy Strap depends on the following Python packages (installed automatically):</p>
 <table>
 <thead>
@@ -3549,7 +3549,7 @@ ls<span class="w"> </span>-la<span class="w"> </span>hello-world.tar
 </tr>
 </tbody>
 </table>
-<h2 id="platform-support">Platform Support</h2>
+<h2 id="platform-support">Platform Support<a class="headerlink" href="#platform-support" title="Permanent link">&para;</a></h2>
 <p>Occy Strap is primarily designed for Linux systems. It may work on other
 platforms with Python support, but has been tested on:</p>
 <ul>
@@ -3557,45 +3557,45 @@ platforms with Python support, but has been tested on:</p>
 <li>CentOS 7, 8</li>
 <li>Debian 10, 11</li>
 </ul>
-<h2 id="optional-dockerpodman-socket-access">Optional: Docker/Podman Socket Access</h2>
+<h2 id="optional-dockerpodman-socket-access">Optional: Docker/Podman Socket Access<a class="headerlink" href="#optional-dockerpodman-socket-access" title="Permanent link">&para;</a></h2>
 <p>To use Occy Strap with local Docker or Podman images, you need access to the
 daemon socket:</p>
-<h3 id="docker">Docker</h3>
+<h3 id="docker">Docker<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h3>
 <p>The Docker socket is typically at <code>/var/run/docker.sock</code>. Your user needs to be
 in the <code>docker</code> group:</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
-<span class="c1"># Log out and back in for group membership to take effect</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># Log out and back in for group membership to take effect</span>
 </code></pre></div>
-<h3 id="podman">Podman</h3>
+<h3 id="podman">Podman<a class="headerlink" href="#podman" title="Permanent link">&para;</a></h3>
 <p>Podman doesn't run a daemon by default. Enable the socket service:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># For rootless Podman (recommended)</span>
-systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>podman.socket
-
-<span class="c1"># For rootful Podman</span>
-sudo<span class="w"> </span>systemctl<span class="w"> </span>start<span class="w"> </span>podman.socket
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># For rootless Podman (recommended)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>podman.socket
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># For rootful Podman</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>start<span class="w"> </span>podman.socket
 </code></pre></div>
 <p>The rootless socket is at <code>/run/user/&lt;uid&gt;/podman/podman.sock</code>, and the rootful
 socket is at <code>/run/podman/podman.sock</code>.</p>
-<h2 id="troubleshooting">Troubleshooting</h2>
-<h3 id="permission-denied-on-docker-socket">Permission Denied on Docker Socket</h3>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="permission-denied-on-docker-socket">Permission Denied on Docker Socket<a class="headerlink" href="#permission-denied-on-docker-socket" title="Permanent link">&para;</a></h3>
 <p>If you see "Permission denied" errors when accessing the Docker socket:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Add your user to the docker group</span>
-sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
-
-<span class="c1"># Log out and back in, or use newgrp</span>
-newgrp<span class="w"> </span>docker
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Add your user to the docker group</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Log out and back in, or use newgrp</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>newgrp<span class="w"> </span>docker
 </code></pre></div>
-<h3 id="ssl-certificate-errors">SSL Certificate Errors</h3>
+<h3 id="ssl-certificate-errors">SSL Certificate Errors<a class="headerlink" href="#ssl-certificate-errors" title="Permanent link">&para;</a></h3>
 <p>If you encounter SSL certificate verification errors with private registries:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Use the --insecure flag</span>
-occystrap<span class="w"> </span>--insecure<span class="w"> </span>process<span class="w"> </span>registry://myregistry.local/image:tag<span class="w"> </span>tar://out.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Use the --insecure flag</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>occystrap<span class="w"> </span>--insecure<span class="w"> </span>process<span class="w"> </span>registry://myregistry.local/image:tag<span class="w"> </span>tar://out.tar
 </code></pre></div>
-<h3 id="connection-refused-to-registry">Connection Refused to Registry</h3>
+<h3 id="connection-refused-to-registry">Connection Refused to Registry<a class="headerlink" href="#connection-refused-to-registry" title="Permanent link">&para;</a></h3>
 <p>Ensure the registry hostname is correct and network access is available:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Test connectivity</span>
-curl<span class="w"> </span>-v<span class="w"> </span>https://registry-1.docker.io/v2/
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Test connectivity</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>curl<span class="w"> </span>-v<span class="w"> </span>https://registry-1.docker.io/v2/
 </code></pre></div>
-<h2 id="next-steps">Next Steps</h2>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/occystrap/command-reference/">Command Reference</a> - Learn the CLI commands</li>
 <li><a href="/components/occystrap/use-cases/">Use Cases</a> - Common scenarios and examples</li>

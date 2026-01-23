@@ -3101,18 +3101,18 @@
   
 
 
-<h1 id="feature-matrix">Feature matrix</h1>
+<h1 id="feature-matrix">Feature matrix<a class="headerlink" href="#feature-matrix" title="Permanent link">&para;</a></h1>
 <p>What features does Shaken Fist have now? What about in the future? This page attempts to document the currently implemented features, but it is a bit a moving target. If you're left wondering if something works, please reach out to us and ask.</p>
-<h1 id="high-level-functionality">High level functionality</h1>
+<h1 id="high-level-functionality">High level functionality<a class="headerlink" href="#high-level-functionality" title="Permanent link">&para;</a></h1>
 <p>Our high level functionality is why you'd consider using Shaken Fist. Specifically, we support:</p>
 <ul>
 <li>instances: which are virtual machines deployed and managed by Shaken Fist.</li>
 <li>virtual networks: which are VXLAN meshes between hypervisors managed by Shaken Fist. These virtual networks do automatic IP address management, optionally provide DHCP and NAT, and support floating IPs for external accessability.</li>
 <li>resource efficiency: we try hard to not use much in terms of resources in an orchestration idle state (that is, your workload isn't changing), but we also deploy and configure Kernel Shared Memory (KSM) and make heavy use of qcow2 Copy On Write (COW) layers to reduce the resources used by a single instance. This means you can pack more instances onto a Shaken Fist cluster than you can alternative deployments of the same size from other projects.</li>
 </ul>
-<h1 id="object-types">Object types</h1>
+<h1 id="object-types">Object types<a class="headerlink" href="#object-types" title="Permanent link">&para;</a></h1>
 <p>We also have a lot of implementation functionality that is quite useful, but not the sort of thing you'd put on a billboard. Let's work through that by object type.</p>
-<h2 id="artifacts">Artifacts</h2>
+<h2 id="artifacts">Artifacts<a class="headerlink" href="#artifacts" title="Permanent link">&para;</a></h2>
 <p>Artifacts are Shaken Fist's object type for disk images -- the sort of thing that you would store in Glance in OpenStack. Artifacts can store downloaded disk images from the internet (the "image" type), snapshots of previous instances (the "snapshot" type), and arbitrary uploads (also stored with the "image" type). There is also a special "label" artifact type, which is an overlay on top of the other types. Its easiest to explain its behavior by explaining the lifecycle of an artifact.</p>
 <p>The normal way to get your first artifact is to download something from the internet. So for example, you might start an instance with a standard Ubuntu cloud image from <a href="https://cloud-images.ubuntu.com/">https://cloud-images.ubuntu.com/</a>. This would be done by specifying the URL of the image in the disk specification of the image: Shaken Fist will then download the image and store it as an artifact, and then start your instance. A second instance using the same image will then check the image at the URL hasn't changed, and if it hasn't use the same artifact as the first instance, skipping the repeated download.</p>
 <p>However, if the image has changed, a second version would be downloaded. Depending on the settings for the artifact, both versions are retained. By default Shaken Fist keeps the last three versions of each artifact, although this is configurable.</p>
@@ -3176,7 +3176,7 @@
 </tbody>
 </table>
 <p>Note that artifacts exist in namespaces (since v0.6). This means that your artifacts are private to your namespace, and can't be seen or used by other namespaces. There are two exceptions -- the "system" administrative namespace can see all artifacts, and the "system" namespace can create artifacts visible to all other namespaces -- this is done with the shared flag on the relevant command line or API calls, and uses a "sharedwithall" namespace in the database.</p>
-<h2 id="blobs">Blobs</h2>
+<h2 id="blobs">Blobs<a class="headerlink" href="#blobs" title="Permanent link">&para;</a></h2>
 <p>Each version of an artifact is an object called a blob. Blobs are stored on Shaken Fist nodes, and are automatically replicated around the cluster as required. By default we store at least two copies of each blob, although this is configurable. Its possible we'll store a lot more copies than that, because we only reap excess copies when we start to run low on disk. This is because these blobs are often used during the startup of instances, so having a local cache of popular blobs can significantly improve instance start up times.</p>
 <p>All hypervisor nodes store blobs, but it is also possible to have "storage only" nodes which don't run VMs and just store blobs. In previous deployments we have used these storage nodes to handle having more blobs than we need for currently running instances -- for example historical snapshots we are fond of, but are unlikely to require frequent access to. The storage nodes were therefore a cheaper machine type with slower CPU and disk, but a lot more disk than our hypervisor nodes.</p>
 <p>So for example if you had an edge deployment where you are resource constrained, but also want to take nightly instance snapshots as a backup, you might have a more centrally located storage node and Shaken Fist would migrate unused blobs there to free up space on the edge nodes as required. If a blob only present on a storage only node is required for an instance start, a hypervisor node will fetch it at that time.</p>
@@ -3198,16 +3198,16 @@
 </tr>
 </tbody>
 </table>
-<h2 id="events">Events</h2>
+<h2 id="events">Events<a class="headerlink" href="#events" title="Permanent link">&para;</a></h2>
 <p>Shaken Fist has an event logging system for the main object types. So for example, instead of reading through log files to find all the state changes that an instance went through, you can simply ask for a list of the events for that instance. This also means that the instance owner can see those logs without having to be given access to your log files.</p>
 <p>The following object types currently record events: artifacts; blobs; instances; networks; networkinterfaces; nodes; and uploads. In general, events are exposed in the API as operations on the object they relate to. So for example there is a <code>instance events</code> command, which calls the <code>get_instance_events()</code> API client call. Those various calls are documented by their object type.</p>
 <!-- document common event format once it has been finalized -->
 
-<h2 id="networks">Networks</h2>
+<h2 id="networks">Networks<a class="headerlink" href="#networks" title="Permanent link">&para;</a></h2>
 <!-- document networks here -->
 
 <p>Note that networks exist in namespaces. This means that your networks are private to your namespace, and can't be seen or used by other namespaces. There is one exception -- the "system" administrative namespace can see all networks.</p>
-<h2 id="instances">Instances</h2>
+<h2 id="instances">Instances<a class="headerlink" href="#instances" title="Permanent link">&para;</a></h2>
 <p>Instances are the primary reason that you'd run Shaken Fist, so there's a lot to cover in their implementation. Obviously instances can be created, deleted, listed, and shown. Additionally, you can list the network interfaces on an instance, track and change metadata on a given instance (a simple key value store similar to OpenStack tags), request the current serial console output; and see events related to the instance. Instances can also have their power state managed: soft (ACPI) reboots; hard (power cycle) reboots; powered off; powered on; and paused.</p>
 <p>When creating an instance you can configure:</p>
 <ul>
@@ -3226,14 +3226,14 @@
 <li>key and value metadata</li>
 </ul>
 <p>Note that instances exist in namespaces. This means that your instances are private to your namespace, and can't be seen or used by other namespaces. There is one exception -- the "system" administrative namespace can see all instances.</p>
-<h1 id="other-features">Other features</h1>
+<h1 id="other-features">Other features<a class="headerlink" href="#other-features" title="Permanent link">&para;</a></h1>
 <p>Shaken Fist supports the follow other features that are not directly related to an object type:</p>
 <ul>
 <li>JWT based API authentication</li>
 <li>graceful shutdown of hypervisors where current work is finished before the processes are stopped</li>
 <li>online upgrade of object versions as required</li>
 </ul>
-<h1 id="comparison-to-openstack">Comparison to OpenStack</h1>
+<h1 id="comparison-to-openstack">Comparison to OpenStack<a class="headerlink" href="#comparison-to-openstack" title="Permanent link">&para;</a></h1>
 <p>The development team's background is OpenStack, so we find it useful to provide
 a comparison between what OpenStack supports and what Shaken Fist supports.
 However, Shaken Fist does not intend to be a direct replacement for OpenStack,

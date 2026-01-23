@@ -4160,10 +4160,10 @@
   
 
 
-<h1 id="ci-api-coverage">CI API Coverage</h1>
+<h1 id="ci-api-coverage">CI API Coverage<a class="headerlink" href="#ci-api-coverage" title="Permanent link">&para;</a></h1>
 <p>This document tracks the CI coverage for each of our public APIs. The intent to make it clear what is "sufficiently tested", and what needs further effort. This list is manually updated, so we'll need to show discipline in ensuring that we update it as we change APIs or CI.</p>
 <p>For this document we use the python API client as a model of what to cover, as its simpler to extract a list of calls from than the API implementation itself. We list whether we have CI which calls the API directly, CI which uses the python command line client to call the API, or both. The gold standard is both.</p>
-<h2 id="get_instances">get_instances</h2>
+<h2 id="get_instances">get_instances<a class="headerlink" href="#get_instances" title="Permanent link">&para;</a></h2>
 <p>Whilst being implied by every test tearDown(), this call is explicitly used in:</p>
 <ul>
 <li>TestCirros.test_cirros_boot_no_network</li>
@@ -4173,14 +4173,14 @@
 <li>TestSystemNamespace.test_system_namespace</li>
 <li>TestUbuntu.test_ubuntu_pings</li>
 </ul>
-<h2 id="delete_all_instances">delete_all_instances</h2>
+<h2 id="delete_all_instances">delete_all_instances<a class="headerlink" href="#delete_all_instances" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="get_instance">get_instance</h2>
+<h2 id="get_instance">get_instance<a class="headerlink" href="#get_instance" title="Permanent link">&para;</a></h2>
 <p>All callers of await_instance_event call get_instance(). However, these more explicit tests exist as well:</p>
 <ul>
 <li>TestCacheImage.test_instance_invalid_image</li>
 </ul>
-<h2 id="get_instance_interfaces">get_instance_interfaces</h2>
+<h2 id="get_instance_interfaces">get_instance_interfaces<a class="headerlink" href="#get_instance_interfaces" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestMultipleNics.test_simple</li>
 <li>TestNetworking.test_virtual_networks_are_separate</li>
@@ -4192,49 +4192,49 @@
 <li>TestStateChanges.test_lifecycle_events</li>
 <li>TestUbuntu.test_ubuntu_pings</li>
 </ul>
-<h2 id="get_instance_metadata">get_instance_metadata</h2>
+<h2 id="get_instance_metadata">get_instance_metadata<a class="headerlink" href="#get_instance_metadata" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestInstanceMetadata.test_simple</li>
 </ul>
-<h2 id="set_instance_metadata_item">set_instance_metadata_item</h2>
+<h2 id="set_instance_metadata_item">set_instance_metadata_item<a class="headerlink" href="#set_instance_metadata_item" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestInstanceMetadata.test_simple</li>
 </ul>
-<h2 id="delete_instance_metadata_item">delete_instance_metadata_item</h2>
+<h2 id="delete_instance_metadata_item">delete_instance_metadata_item<a class="headerlink" href="#delete_instance_metadata_item" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="create_instance">create_instance</h2>
+<h2 id="create_instance">create_instance<a class="headerlink" href="#create_instance" title="Permanent link">&para;</a></h2>
 <p>Tested extensively in most other tests, so tests are not listed here.</p>
-<h2 id="snapshot_instance">snapshot_instance</h2>
+<h2 id="snapshot_instance">snapshot_instance<a class="headerlink" href="#snapshot_instance" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestSnapshots.test_single_disk_snapshots</li>
 <li>TestSnapshots.test_multiple_disk_snapshots</li>
 </ul>
-<h2 id="get_instance_snapshots">get_instance_snapshots</h2>
+<h2 id="get_instance_snapshots">get_instance_snapshots<a class="headerlink" href="#get_instance_snapshots" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestSnapshots.test_single_disk_snapshots</li>
 <li>TestSnapshots.test_multiple_disk_snapshots</li>
 </ul>
-<h2 id="reboot_instance">reboot_instance</h2>
+<h2 id="reboot_instance">reboot_instance<a class="headerlink" href="#reboot_instance" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestStateChanges.test_lifecycle_events</li>
 </ul>
-<h2 id="power_off_instance">power_off_instance</h2>
+<h2 id="power_off_instance">power_off_instance<a class="headerlink" href="#power_off_instance" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestStateChanges.test_lifecycle_events</li>
 </ul>
-<h2 id="power_on_instance">power_on_instance</h2>
+<h2 id="power_on_instance">power_on_instance<a class="headerlink" href="#power_on_instance" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestStateChanges.test_lifecycle_events</li>
 </ul>
-<h2 id="pause_instance">pause_instance</h2>
+<h2 id="pause_instance">pause_instance<a class="headerlink" href="#pause_instance" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestStateChanges.test_lifecycle_events</li>
 </ul>
-<h2 id="unpause_instance">unpause_instance</h2>
+<h2 id="unpause_instance">unpause_instance<a class="headerlink" href="#unpause_instance" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestStateChanges.test_lifecycle_events</li>
 </ul>
-<h2 id="delete_instance">delete_instance</h2>
+<h2 id="delete_instance">delete_instance<a class="headerlink" href="#delete_instance" title="Permanent link">&para;</a></h2>
 <p>Whilst being implied by every test tearDown(), this call is explicitly used in:</p>
 <ul>
 <li>TestCirros.test_cirros_boot_no_network</li>
@@ -4246,91 +4246,91 @@
 <li>TestSystemNamespace.test_system_namespace</li>
 <li>TestUbuntu.test_ubuntu_pings</li>
 </ul>
-<h2 id="get_instance_events">get_instance_events</h2>
+<h2 id="get_instance_events">get_instance_events<a class="headerlink" href="#get_instance_events" title="Permanent link">&para;</a></h2>
 <p>All callers of await_instance_event call get_instance(). <em>However, more testing of this method is required.</em></p>
-<h2 id="cache_image">cache_image</h2>
+<h2 id="cache_image">cache_image<a class="headerlink" href="#cache_image" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestImages.test_cache_image</li>
 </ul>
-<h2 id="get_images">get_images</h2>
+<h2 id="get_images">get_images<a class="headerlink" href="#get_images" title="Permanent link">&para;</a></h2>
 <p>(Formerly get_image_meta, old name to be removed in 0.5).</p>
 <ul>
 <li>TestImages.test_cache_image</li>
 </ul>
-<h2 id="get_image_events">get_image_events</h2>
+<h2 id="get_image_events">get_image_events<a class="headerlink" href="#get_image_events" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="get_networks">get_networks</h2>
+<h2 id="get_networks">get_networks<a class="headerlink" href="#get_networks" title="Permanent link">&para;</a></h2>
 <p>Whilst being implied by every test tearDown(), this call is explicitly used in:</p>
 <ul>
 <li>TestSystemNamespace.test_system_namespace</li>
 </ul>
-<h2 id="get_network">get_network</h2>
+<h2 id="get_network">get_network<a class="headerlink" href="#get_network" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="delete_network">delete_network</h2>
+<h2 id="delete_network">delete_network<a class="headerlink" href="#delete_network" title="Permanent link">&para;</a></h2>
 <p>Whilst being implied by every test tearDown(), this call is explicitly used in:</p>
 <ul>
 <li>TestSystemNamespace.test_system_namespace</li>
 </ul>
-<h2 id="delete_all_networks">delete_all_networks</h2>
+<h2 id="delete_all_networks">delete_all_networks<a class="headerlink" href="#delete_all_networks" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="get_network_events">get_network_events</h2>
+<h2 id="get_network_events">get_network_events<a class="headerlink" href="#get_network_events" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="allocate_network">allocate_network</h2>
+<h2 id="allocate_network">allocate_network<a class="headerlink" href="#allocate_network" title="Permanent link">&para;</a></h2>
 <p>Tested extensively in most other tests, so tests are not listed here.</p>
-<h2 id="get_network_interfaces">get_network_interfaces</h2>
+<h2 id="get_network_interfaces">get_network_interfaces<a class="headerlink" href="#get_network_interfaces" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="get_network_metadata">get_network_metadata</h2>
+<h2 id="get_network_metadata">get_network_metadata<a class="headerlink" href="#get_network_metadata" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="set_network_metadata_item">set_network_metadata_item</h2>
+<h2 id="set_network_metadata_item">set_network_metadata_item<a class="headerlink" href="#set_network_metadata_item" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="delete_network_metadata_item">delete_network_metadata_item</h2>
+<h2 id="delete_network_metadata_item">delete_network_metadata_item<a class="headerlink" href="#delete_network_metadata_item" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="get_nodes">get_nodes</h2>
+<h2 id="get_nodes">get_nodes<a class="headerlink" href="#get_nodes" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="get_interface">get_interface</h2>
+<h2 id="get_interface">get_interface<a class="headerlink" href="#get_interface" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="float_interface">float_interface</h2>
+<h2 id="float_interface">float_interface<a class="headerlink" href="#float_interface" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="defloat_interface">defloat_interface</h2>
+<h2 id="defloat_interface">defloat_interface<a class="headerlink" href="#defloat_interface" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="get_console_data">get_console_data</h2>
+<h2 id="get_console_data">get_console_data<a class="headerlink" href="#get_console_data" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestConsoleLog.test_console_log</li>
 </ul>
-<h2 id="get_namespaces">get_namespaces</h2>
+<h2 id="get_namespaces">get_namespaces<a class="headerlink" href="#get_namespaces" title="Permanent link">&para;</a></h2>
 <p>As well as being tested as a side effect of most other tests, there is the following explicit test:</p>
 <ul>
 <li>TestAuth.test_namespaces</li>
 </ul>
-<h2 id="create_namespace">create_namespace</h2>
+<h2 id="create_namespace">create_namespace<a class="headerlink" href="#create_namespace" title="Permanent link">&para;</a></h2>
 <p>As well as being tested as a side effect of most other tests, there is the following explicit test:</p>
 <ul>
 <li>TestAuth.test_namespaces</li>
 </ul>
-<h2 id="delete_namespace">delete_namespace</h2>
+<h2 id="delete_namespace">delete_namespace<a class="headerlink" href="#delete_namespace" title="Permanent link">&para;</a></h2>
 <p>As well as being tested as a side effect of most other tests, there is the following explicit test:</p>
 <ul>
 <li>TestAuth.test_namespaces</li>
 </ul>
-<h2 id="get_namespace_keynames">get_namespace_keynames</h2>
+<h2 id="get_namespace_keynames">get_namespace_keynames<a class="headerlink" href="#get_namespace_keynames" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="add_namespace_key">add_namespace_key</h2>
+<h2 id="add_namespace_key">add_namespace_key<a class="headerlink" href="#add_namespace_key" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestAuth.test_namespaces</li>
 </ul>
-<h2 id="delete_namespace_key">delete_namespace_key</h2>
+<h2 id="delete_namespace_key">delete_namespace_key<a class="headerlink" href="#delete_namespace_key" title="Permanent link">&para;</a></h2>
 <ul>
 <li>TestAuth.test_namespaces</li>
 </ul>
-<h2 id="get_namespace_metadata">get_namespace_metadata</h2>
+<h2 id="get_namespace_metadata">get_namespace_metadata<a class="headerlink" href="#get_namespace_metadata" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="set_namespace_metadata_item">set_namespace_metadata_item</h2>
+<h2 id="set_namespace_metadata_item">set_namespace_metadata_item<a class="headerlink" href="#set_namespace_metadata_item" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="delete_namespace_metadata_item">delete_namespace_metadata_item</h2>
+<h2 id="delete_namespace_metadata_item">delete_namespace_metadata_item<a class="headerlink" href="#delete_namespace_metadata_item" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="get_existing_locks">get_existing_locks</h2>
+<h2 id="get_existing_locks">get_existing_locks<a class="headerlink" href="#get_existing_locks" title="Permanent link">&para;</a></h2>
 <p><em>Not tested.</em></p>
-<h2 id="ping">ping</h2>
+<h2 id="ping">ping<a class="headerlink" href="#ping" title="Permanent link">&para;</a></h2>
 <p>Tested as a side effect of many other tests, but no explicit test.</p>
 
 

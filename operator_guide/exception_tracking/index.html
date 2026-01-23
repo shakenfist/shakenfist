@@ -3236,11 +3236,11 @@
   
 
 
-<h1 id="exception-tracking">Exception Tracking</h1>
+<h1 id="exception-tracking">Exception Tracking<a class="headerlink" href="#exception-tracking" title="Permanent link">&para;</a></h1>
 <p>Shaken Fist includes an exception tracking system that records unhandled
 exceptions to disk for later analysis. This helps operators identify and
 debug recurring issues in production clusters.</p>
-<h2 id="how-it-works">How It Works</h2>
+<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <p>When an exception occurs, it is recorded to <code>/srv/shakenfist/exceptions/</code> as
 a JSON file. Each unique exception traceback is hashed (using SHA-256) and
 stored in a file named after the last 8 characters of that hash. This means
@@ -3252,39 +3252,39 @@ identical exceptions are deduplicated automatically.</p>
 <li><code>events</code>: A list of Unix timestamps for each occurrence</li>
 </ul>
 <p>For example:</p>
-<div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;traceback&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;\nTraceback (most recent call last):\n  File ...&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;events&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">1703692800.123</span><span class="p">,</span><span class="w"> </span><span class="mf">1703693100.456</span><span class="p">,</span><span class="w"> </span><span class="mf">1703693400.789</span><span class="p">]</span>
-<span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nt">&quot;traceback&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;\nTraceback (most recent call last):\n  File ...&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">&quot;events&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">1703692800.123</span><span class="p">,</span><span class="w"> </span><span class="mf">1703693100.456</span><span class="p">,</span><span class="w"> </span><span class="mf">1703693400.789</span><span class="p">]</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">}</span>
 </code></pre></div>
-<h2 id="what-gets-tracked">What Gets Tracked</h2>
+<h2 id="what-gets-tracked">What Gets Tracked<a class="headerlink" href="#what-gets-tracked" title="Permanent link">&para;</a></h2>
 <p>The exception tracking system captures:</p>
 <ul>
 <li>Unhandled exceptions in the main thread via <code>sys.excepthook</code></li>
 <li>Unhandled exceptions in worker threads via <code>threading.excepthook</code></li>
 <li>Exceptions passed to <code>ignore_exception()</code>, which are caught but logged</li>
 </ul>
-<h2 id="viewing-exceptions">Viewing Exceptions</h2>
+<h2 id="viewing-exceptions">Viewing Exceptions<a class="headerlink" href="#viewing-exceptions" title="Permanent link">&para;</a></h2>
 <p>To list all recorded exceptions:</p>
-<div class="highlight"><pre><span></span><code>ls<span class="w"> </span>-la<span class="w"> </span>/srv/shakenfist/exceptions/
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ls<span class="w"> </span>-la<span class="w"> </span>/srv/shakenfist/exceptions/
 </code></pre></div>
 <p>To view the details of a specific exception:</p>
-<div class="highlight"><pre><span></span><code>cat<span class="w"> </span>/srv/shakenfist/exceptions/&lt;hash&gt;.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cat<span class="w"> </span>/srv/shakenfist/exceptions/&lt;hash&gt;.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.
 </code></pre></div>
 <p>To find the most frequently occurring exceptions:</p>
-<div class="highlight"><pre><span></span><code><span class="k">for</span><span class="w"> </span>f<span class="w"> </span><span class="k">in</span><span class="w"> </span>/srv/shakenfist/exceptions/*.json<span class="p">;</span><span class="w"> </span><span class="k">do</span>
-<span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>jq<span class="w"> </span>-r<span class="w"> </span>.count<span class="w"> </span><span class="nv">$f</span><span class="k">)</span><span class="s2"> </span><span class="nv">$f</span><span class="s2">&quot;</span>
-<span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-rn<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-10
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">for</span><span class="w"> </span>f<span class="w"> </span><span class="k">in</span><span class="w"> </span>/srv/shakenfist/exceptions/*.json<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>jq<span class="w"> </span>-r<span class="w"> </span>.count<span class="w"> </span><span class="nv">$f</span><span class="k">)</span><span class="s2"> </span><span class="nv">$f</span><span class="s2">&quot;</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-rn<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-10
 </code></pre></div>
-<h2 id="cleanup">Cleanup</h2>
+<h2 id="cleanup">Cleanup<a class="headerlink" href="#cleanup" title="Permanent link">&para;</a></h2>
 <p>Exception files accumulate over time. You may wish to periodically clean up
 old exception files, particularly after addressing the underlying issues:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Remove all exception files</span>
-rm<span class="w"> </span>/srv/shakenfist/exceptions/*.json
-
-<span class="c1"># Or remove files older than 7 days</span>
-find<span class="w"> </span>/srv/shakenfist/exceptions/<span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;*.json&quot;</span><span class="w"> </span>-mtime<span class="w"> </span>+7<span class="w"> </span>-delete
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Remove all exception files</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>rm<span class="w"> </span>/srv/shakenfist/exceptions/*.json
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Or remove files older than 7 days</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>find<span class="w"> </span>/srv/shakenfist/exceptions/<span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;*.json&quot;</span><span class="w"> </span>-mtime<span class="w"> </span>+7<span class="w"> </span>-delete
 </code></pre></div>
 
 

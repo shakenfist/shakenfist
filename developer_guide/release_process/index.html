@@ -3580,11 +3580,11 @@
   
 
 
-<h1 id="shaken-fists-release-process">Shaken Fist's release process</h1>
+<h1 id="shaken-fists-release-process">Shaken Fist's release process<a class="headerlink" href="#shaken-fists-release-process" title="Permanent link">&para;</a></h1>
 <p>Shaken Fist uses GitHub Actions for automated releases. The process uses
 Sigstore for signing (no GPG keys required) and PyPI Trusted Publishers for
 authentication (no API tokens required).</p>
-<h2 id="prerequisites">Prerequisites</h2>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>Before you can trigger a release, the following one-time setup must be
 completed (see <code>RELEASE-SETUP.md</code> in the repository root for details):</p>
 <ol>
@@ -3592,24 +3592,24 @@ completed (see <code>RELEASE-SETUP.md</code> in the repository root for details)
 <li>GitHub Environment named <code>release</code> with required reviewers</li>
 <li>(Optional) Protected tag rules for <code>v*</code> tags</li>
 </ol>
-<h2 id="testing">Testing</h2>
+<h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
 <p>We only release things which have passed CI testing, and preferably have had a
 period running as the underlying cloud for the CI cluster as well. Sometimes in
 an emergency we will bend the rules for a hotfix, but we should try and avoid
 doing that.</p>
-<h2 id="triggering-a-release">Triggering a release</h2>
-<h3 id="step-1-determine-the-version-number">Step 1: Determine the version number</h3>
+<h2 id="triggering-a-release">Triggering a release<a class="headerlink" href="#triggering-a-release" title="Permanent link">&para;</a></h2>
+<h3 id="step-1-determine-the-version-number">Step 1: Determine the version number<a class="headerlink" href="#step-1-determine-the-version-number" title="Permanent link">&para;</a></h3>
 <p>Check the existing tags to find the previous version:</p>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>tag<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;^v&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-V<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-5
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>tag<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;^v&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-V<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-5
 </code></pre></div>
-<h3 id="step-2-create-and-push-the-version-tag">Step 2: Create and push the version tag</h3>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>checkout<span class="w"> </span>develop<span class="w">  </span><span class="c1"># or the appropriate branch</span>
-git<span class="w"> </span>pull
-git<span class="w"> </span>tag<span class="w"> </span>v0.X.Y<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Release v0.X.Y&quot;</span>
-git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.X.Y
+<h3 id="step-2-create-and-push-the-version-tag">Step 2: Create and push the version tag<a class="headerlink" href="#step-2-create-and-push-the-version-tag" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>develop<span class="w">  </span><span class="c1"># or the appropriate branch</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>git<span class="w"> </span>pull
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>git<span class="w"> </span>tag<span class="w"> </span>v0.X.Y<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Release v0.X.Y&quot;</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.X.Y
 </code></pre></div>
 <p>This triggers the release workflow but does <strong>not</strong> publish anything yet.</p>
-<h3 id="step-3-approve-the-release">Step 3: Approve the release</h3>
+<h3 id="step-3-approve-the-release">Step 3: Approve the release<a class="headerlink" href="#step-3-approve-the-release" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Go to the repository on GitHub</li>
 <li>Navigate to <strong>Actions</strong> &gt; <strong>Release</strong> (the running workflow)</li>
@@ -3617,7 +3617,7 @@ git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </
 <li>Click <strong>Review deployments</strong></li>
 <li>Select the <code>release</code> environment and click <strong>Approve and deploy</strong></li>
 </ol>
-<h3 id="step-4-monitor-the-release">Step 4: Monitor the release</h3>
+<h3 id="step-4-monitor-the-release">Step 4: Monitor the release<a class="headerlink" href="#step-4-monitor-the-release" title="Permanent link">&para;</a></h3>
 <p>The workflow will:</p>
 <ol>
 <li>Build the Python package and archives (deploy.tgz, docs.tgz)</li>
@@ -3628,7 +3628,7 @@ git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </
 </ol>
 <p>You can monitor progress in the Actions tab. If any step fails, the workflow
 stops and you can investigate the logs.</p>
-<h2 id="what-gets-released">What gets released</h2>
+<h2 id="what-gets-released">What gets released<a class="headerlink" href="#what-gets-released" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>PyPI</strong>: The <code>shakenfist</code> Python package</li>
 <li><strong>GitHub Releases</strong>: The package files plus:<ul>
@@ -3637,47 +3637,47 @@ stops and you can investigate the logs.</p>
 </ul>
 </li>
 </ul>
-<h2 id="verifying-a-release">Verifying a release</h2>
-<h3 id="verify-the-signed-tag">Verify the signed tag</h3>
+<h2 id="verifying-a-release">Verifying a release<a class="headerlink" href="#verifying-a-release" title="Permanent link">&para;</a></h2>
+<h3 id="verify-the-signed-tag">Verify the signed tag<a class="headerlink" href="#verify-the-signed-tag" title="Permanent link">&para;</a></h3>
 <p>Anyone can verify the release tag signature using gitsign:</p>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>fetch<span class="w"> </span>--tags
-gitsign<span class="w"> </span>verify<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--certificate-identity-regexp<span class="o">=</span><span class="s1">&#39;.*&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--certificate-oidc-issuer<span class="o">=</span><span class="s1">&#39;https://token.actions.githubusercontent.com&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>v0.X.Y
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>fetch<span class="w"> </span>--tags
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>gitsign<span class="w"> </span>verify<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span>--certificate-identity-regexp<span class="o">=</span><span class="s1">&#39;.*&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span>--certificate-oidc-issuer<span class="o">=</span><span class="s1">&#39;https://token.actions.githubusercontent.com&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span>v0.X.Y
 </code></pre></div>
-<h3 id="verify-pypi-package-attestation">Verify PyPI package attestation</h3>
+<h3 id="verify-pypi-package-attestation">Verify PyPI package attestation<a class="headerlink" href="#verify-pypi-package-attestation" title="Permanent link">&para;</a></h3>
 <p>PyPI shows attestation status on the package page under the "Provenance"
 section. You can also verify locally:</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>download<span class="w"> </span><span class="nv">shakenfist</span><span class="o">==</span><span class="m">0</span>.X.Y<span class="w"> </span>--no-deps
-cosign<span class="w"> </span>verify-attestation<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--certificate-identity-regexp<span class="o">=</span><span class="s1">&#39;.*&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--certificate-oidc-issuer<span class="o">=</span><span class="s1">&#39;https://token.actions.githubusercontent.com&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>shakenfist-0.X.Y.tar.gz
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>download<span class="w"> </span><span class="nv">shakenfist</span><span class="o">==</span><span class="m">0</span>.X.Y<span class="w"> </span>--no-deps
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>cosign<span class="w"> </span>verify-attestation<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span>--certificate-identity-regexp<span class="o">=</span><span class="s1">&#39;.*&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span>--certificate-oidc-issuer<span class="o">=</span><span class="s1">&#39;https://token.actions.githubusercontent.com&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span>shakenfist-0.X.Y.tar.gz
 </code></pre></div>
-<h2 id="troubleshooting">Troubleshooting</h2>
-<h3 id="workflow-doesnt-trigger">Workflow doesn't trigger</h3>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="workflow-doesnt-trigger">Workflow doesn't trigger<a class="headerlink" href="#workflow-doesnt-trigger" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Ensure the tag matches the pattern <code>v*</code> (e.g., <code>v0.8.0</code>, not <code>0.8.0</code>)</li>
 <li>Check that you pushed to the correct remote</li>
 </ul>
-<h3 id="approval-not-requested">Approval not requested</h3>
+<h3 id="approval-not-requested">Approval not requested<a class="headerlink" href="#approval-not-requested" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Verify the <code>release</code> environment exists in repository settings</li>
 <li>Check that required reviewers are configured</li>
 </ul>
-<h3 id="pypi-publish-fails">PyPI publish fails</h3>
+<h3 id="pypi-publish-fails">PyPI publish fails<a class="headerlink" href="#pypi-publish-fails" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Verify the Trusted Publisher is configured correctly in PyPI</li>
 <li>Ensure the workflow filename and environment name match exactly</li>
 </ul>
-<h3 id="tag-signing-fails">Tag signing fails</h3>
+<h3 id="tag-signing-fails">Tag signing fails<a class="headerlink" href="#tag-signing-fails" title="Permanent link">&para;</a></h3>
 <ul>
 <li>This usually indicates an issue with the Sigstore service or OIDC token</li>
 <li>Check the workflow logs for specific error messages</li>
 <li>Retry the workflow if it's a transient issue</li>
 </ul>
-<h2 id="rolling-back-a-release">Rolling back a release</h2>
+<h2 id="rolling-back-a-release">Rolling back a release<a class="headerlink" href="#rolling-back-a-release" title="Permanent link">&para;</a></h2>
 <p>If a release needs to be rolled back:</p>
 <ol>
 <li>
@@ -3690,12 +3690,12 @@ cosign<span class="w"> </span>verify-attestation<span class="w"> </span><span cl
 </li>
 <li>
 <p><strong>GitHub</strong>: Delete the release and tag if needed:
-    <div class="highlight"><pre><span></span><code>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>:refs/tags/v0.X.Y
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>:refs/tags/v0.X.Y
 </code></pre></div>
     Then delete the release from the GitHub Releases page.</p>
 </li>
 </ol>
-<h2 id="legacy-process">Legacy process</h2>
+<h2 id="legacy-process">Legacy process<a class="headerlink" href="#legacy-process" title="Permanent link">&para;</a></h2>
 <p>The old <code>release.sh</code> script required a private VM with GPG keys and PyPI
 credentials. This has been replaced by the GitHub Actions workflow which uses
 keyless signing and OIDC authentication.</p>

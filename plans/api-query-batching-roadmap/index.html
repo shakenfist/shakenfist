@@ -3492,16 +3492,16 @@
   
 
 
-<h1 id="api-query-batching-roadmap">API Query Batching Roadmap</h1>
+<h1 id="api-query-batching-roadmap">API Query Batching Roadmap<a class="headerlink" href="#api-query-batching-roadmap" title="Permanent link">&para;</a></h1>
 <p>This document describes planned optimizations for REST API endpoints that list
 objects, addressing the N+1 query problem that affects performance when
 returning large result sets.</p>
-<h2 id="problem-statement">Problem Statement</h2>
+<h2 id="problem-statement">Problem Statement<a class="headerlink" href="#problem-statement" title="Permanent link">&para;</a></h2>
 <p>Many REST API endpoints that return lists of objects suffer from an N+1 query
 problem. When listing N objects, each object's <code>external_view()</code> method makes
 one or more additional database queries to fetch related data. This results in
 poor performance that scales linearly with result set size.</p>
-<h3 id="example-blob-listing">Example: Blob Listing</h3>
+<h3 id="example-blob-listing">Example: Blob Listing<a class="headerlink" href="#example-blob-listing" title="Permanent link">&para;</a></h3>
 <p>When listing blobs via the REST API:</p>
 <ol>
 <li>Query returns N blob records from etcd/MariaDB</li>
@@ -3512,7 +3512,7 @@ poor performance that scales linearly with result set size.</p>
 <p>With 100 blobs, this means 101 database round-trips. With content-defined
 chunking (where blob counts could reach thousands), this becomes a significant
 bottleneck.</p>
-<h3 id="affected-endpoints">Affected Endpoints</h3>
+<h3 id="affected-endpoints">Affected Endpoints<a class="headerlink" href="#affected-endpoints" title="Permanent link">&para;</a></h3>
 <p>The N+1 pattern likely affects any endpoint that:</p>
 <ul>
 <li>Lists objects with <code>external_view()</code> rendering</li>
@@ -3525,63 +3525,63 @@ bottleneck.</p>
 <li><strong>Instance listings</strong>: May fetch network info, disk info per instance</li>
 <li><strong>Artifact listings</strong>: May fetch version/blob info per artifact</li>
 </ul>
-<h2 id="proposed-solution">Proposed Solution</h2>
-<h3 id="phase-1-batch-query-infrastructure">Phase 1: Batch Query Infrastructure</h3>
+<h2 id="proposed-solution">Proposed Solution<a class="headerlink" href="#proposed-solution" title="Permanent link">&para;</a></h2>
+<h3 id="phase-1-batch-query-infrastructure">Phase 1: Batch Query Infrastructure<a class="headerlink" href="#phase-1-batch-query-infrastructure" title="Permanent link">&para;</a></h3>
 <p>Add batch query functions to the database layer that can fetch related data
 for multiple objects in a single query.</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Example batch function signature</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">get_valid_checksums_batch</span><span class="p">(</span>
-    <span class="n">blob_uuids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get valid checksums for multiple blobs in a single query.</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        blob_uuids: List of blob UUIDs to fetch checksums for.</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">        Dict mapping blob_uuid to dict of algorithm -&gt; hash_value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># Single query: SELECT * FROM blob_hashes</span>
-    <span class="c1">#               WHERE blob_uuid IN (:uuids)</span>
-    <span class="c1">#               AND verification_status = &#39;valid&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Example batch function signature</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_valid_checksums_batch</span><span class="p">(</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">blob_uuids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get valid checksums for multiple blobs in a single query.</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="sd">        blob_uuids: List of blob UUIDs to fetch checksums for.</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="sd">        Dict mapping blob_uuid to dict of algorithm -&gt; hash_value.</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="c1"># Single query: SELECT * FROM blob_hashes</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="c1">#               WHERE blob_uuid IN (:uuids)</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="c1">#               AND verification_status = &#39;valid&#39;</span>
 </code></pre></div>
-<h3 id="phase-2-prefetch-pattern-in-api-layer">Phase 2: Prefetch Pattern in API Layer</h3>
+<h3 id="phase-2-prefetch-pattern-in-api-layer">Phase 2: Prefetch Pattern in API Layer<a class="headerlink" href="#phase-2-prefetch-pattern-in-api-layer" title="Permanent link">&para;</a></h3>
 <p>Modify API endpoints to prefetch related data before rendering objects.</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Before (N+1 queries):</span>
-<span class="n">blobs</span> <span class="o">=</span> <span class="n">get_blobs</span><span class="p">()</span>
-<span class="k">return</span> <span class="p">[</span><span class="n">b</span><span class="o">.</span><span class="n">external_view</span><span class="p">()</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">blobs</span><span class="p">]</span>
-
-<span class="c1"># After (2 queries):</span>
-<span class="n">blobs</span> <span class="o">=</span> <span class="n">get_blobs</span><span class="p">()</span>
-<span class="n">blob_uuids</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">uuid</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">blobs</span><span class="p">]</span>
-<span class="n">checksums</span> <span class="o">=</span> <span class="n">mariadb</span><span class="o">.</span><span class="n">get_valid_checksums_batch</span><span class="p">(</span><span class="n">blob_uuids</span><span class="p">)</span>
-<span class="k">return</span> <span class="p">[</span><span class="n">b</span><span class="o">.</span><span class="n">external_view</span><span class="p">(</span><span class="n">prefetched_checksums</span><span class="o">=</span><span class="n">checksums</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">uuid</span><span class="p">)))</span>
-        <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">blobs</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Before (N+1 queries):</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">blobs</span> <span class="o">=</span> <span class="n">get_blobs</span><span class="p">()</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">return</span> <span class="p">[</span><span class="n">b</span><span class="o">.</span><span class="n">external_view</span><span class="p">()</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">blobs</span><span class="p">]</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># After (2 queries):</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">blobs</span> <span class="o">=</span> <span class="n">get_blobs</span><span class="p">()</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">blob_uuids</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">uuid</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">blobs</span><span class="p">]</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">checksums</span> <span class="o">=</span> <span class="n">mariadb</span><span class="o">.</span><span class="n">get_valid_checksums_batch</span><span class="p">(</span><span class="n">blob_uuids</span><span class="p">)</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="k">return</span> <span class="p">[</span><span class="n">b</span><span class="o">.</span><span class="n">external_view</span><span class="p">(</span><span class="n">prefetched_checksums</span><span class="o">=</span><span class="n">checksums</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">uuid</span><span class="p">)))</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">blobs</span><span class="p">]</span>
 </code></pre></div>
-<h3 id="phase-3-generic-prefetch-framework">Phase 3: Generic Prefetch Framework</h3>
+<h3 id="phase-3-generic-prefetch-framework">Phase 3: Generic Prefetch Framework<a class="headerlink" href="#phase-3-generic-prefetch-framework" title="Permanent link">&para;</a></h3>
 <p>Consider a more generic approach where <code>external_view()</code> can declare what
 related data it needs, and the API layer automatically batches those fetches.</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Blob</span><span class="p">(</span><span class="n">DatabaseBackedObject</span><span class="p">):</span>
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">prefetch_requirements</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">PrefetchSpec</span><span class="p">]:</span>
-        <span class="k">return</span> <span class="p">[</span>
-            <span class="n">PrefetchSpec</span><span class="p">(</span>
-                <span class="n">name</span><span class="o">=</span><span class="s1">&#39;checksums&#39;</span><span class="p">,</span>
-                <span class="n">fetcher</span><span class="o">=</span><span class="n">mariadb</span><span class="o">.</span><span class="n">get_valid_checksums_batch</span><span class="p">,</span>
-                <span class="n">key_extractor</span><span class="o">=</span><span class="k">lambda</span> <span class="n">b</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">uuid</span><span class="p">)</span>
-            <span class="p">)</span>
-        <span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Blob</span><span class="p">(</span><span class="n">DatabaseBackedObject</span><span class="p">):</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="nd">@classmethod</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">prefetch_requirements</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">PrefetchSpec</span><span class="p">]:</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        <span class="k">return</span> <span class="p">[</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>            <span class="n">PrefetchSpec</span><span class="p">(</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>                <span class="n">name</span><span class="o">=</span><span class="s1">&#39;checksums&#39;</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>                <span class="n">fetcher</span><span class="o">=</span><span class="n">mariadb</span><span class="o">.</span><span class="n">get_valid_checksums_batch</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>                <span class="n">key_extractor</span><span class="o">=</span><span class="k">lambda</span> <span class="n">b</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">uuid</span><span class="p">)</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>            <span class="p">)</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="p">]</span>
 </code></pre></div>
-<h2 id="alternative-approaches-considered">Alternative Approaches Considered</h2>
-<h3 id="denormalized-cache-tables">Denormalized Cache Tables</h3>
+<h2 id="alternative-approaches-considered">Alternative Approaches Considered<a class="headerlink" href="#alternative-approaches-considered" title="Permanent link">&para;</a></h2>
+<h3 id="denormalized-cache-tables">Denormalized Cache Tables<a class="headerlink" href="#denormalized-cache-tables" title="Permanent link">&para;</a></h3>
 <p>For frequently-accessed data like valid checksums, a denormalized table could
 reduce query complexity:</p>
-<div class="highlight"><pre><span></span><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">valid_checksums</span><span class="w"> </span><span class="p">(</span>
-<span class="w">    </span><span class="n">blob_uuid</span><span class="w"> </span><span class="n">UUID</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
-<span class="w">    </span><span class="n">algorithm</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
-<span class="w">    </span><span class="n">hash_value</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">256</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
-<span class="w">    </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">,</span><span class="w"> </span><span class="n">algorithm</span><span class="p">)</span>
-<span class="p">);</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">valid_checksums</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="n">blob_uuid</span><span class="w"> </span><span class="n">UUID</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="n">algorithm</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="n">hash_value</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">256</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">,</span><span class="w"> </span><span class="n">algorithm</span><span class="p">)</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">);</span>
 </code></pre></div>
 <p><strong>Pros:</strong></p>
 <ul>
@@ -3596,27 +3596,27 @@ reduce query complexity:</p>
 </ul>
 <p><strong>Verdict:</strong> Could be combined with batching for maximum benefit, but batching
 alone solves the core problem.</p>
-<h3 id="graphql-dataloader-pattern">GraphQL / DataLoader Pattern</h3>
+<h3 id="graphql-dataloader-pattern">GraphQL / DataLoader Pattern<a class="headerlink" href="#graphql-dataloader-pattern" title="Permanent link">&para;</a></h3>
 <p>A more radical approach would be adopting GraphQL with DataLoader-style
 batching, which automatically coalesces related queries.</p>
 <p><strong>Verdict:</strong> Too large a change for the current architecture. Batching within
 the existing REST API is more pragmatic.</p>
-<h2 id="implementation-order">Implementation Order</h2>
+<h2 id="implementation-order">Implementation Order<a class="headerlink" href="#implementation-order" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Blob checksums batching</strong> (highest impact due to blob count scaling)</li>
 <li><strong>Audit affected endpoints</strong> (identify other N+1 patterns)</li>
 <li><strong>Generic framework</strong> (if patterns are common enough to warrant it)</li>
 </ol>
-<h2 id="success-metrics">Success Metrics</h2>
+<h2 id="success-metrics">Success Metrics<a class="headerlink" href="#success-metrics" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Blob listing API response time should not scale linearly with result count</li>
 <li>Database query count for listing N objects should be O(1) not O(N)</li>
 </ul>
-<h2 id="dependencies">Dependencies</h2>
+<h2 id="dependencies">Dependencies<a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h2>
 <ul>
 <li>None (can be implemented independently)</li>
 </ul>
-<h2 id="related-work">Related Work</h2>
+<h2 id="related-work">Related Work<a class="headerlink" href="#related-work" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../blob-storage-roadmap/">Blob Storage Roadmap</a> - Phase 1 introduced the
   <code>blob_hashes</code> table that exposed this N+1 pattern</li>

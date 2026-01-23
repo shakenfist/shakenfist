@@ -3382,12 +3382,12 @@
   
 
 
-<h1 id="clingwrap-documentation">Clingwrap Documentation</h1>
+<h1 id="clingwrap-documentation">Clingwrap Documentation<a class="headerlink" href="#clingwrap-documentation" title="Permanent link">&para;</a></h1>
 <p>Clingwrap is a debugging information collection tool that bundles system state
 data into a zip file for later analysis. Originally built for the
 <a href="https://shakenfist.com">Shaken Fist</a> project, it is a general-purpose tool
 useful for any system debugging scenario.</p>
-<h2 id="key-features">Key Features</h2>
+<h2 id="key-features">Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Rapid collection</strong>: Quickly gather comprehensive system diagnostics</li>
 <li><strong>Single output</strong>: All data bundled into one compressed ZIP file for easy
@@ -3399,29 +3399,29 @@ useful for any system debugging scenario.</p>
 <li><strong>CI/CD friendly</strong>: Designed for use in automated testing pipelines to
   capture failure diagnostics</li>
 </ul>
-<h2 id="documentation-index">Documentation Index</h2>
-<h3 id="getting-started">Getting Started</h3>
+<h2 id="documentation-index">Documentation Index<a class="headerlink" href="#documentation-index" title="Permanent link">&para;</a></h2>
+<h3 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h3>
 <ul>
 <li><a href="/components/clingwrap/installation/">Installation</a> - How to install clingwrap</li>
 <li><a href="/components/clingwrap/configuration/">Configuration</a> - Configuration file format and structure</li>
 <li><a href="/components/clingwrap/examples/">Examples</a> - Example configurations and use cases</li>
 </ul>
-<h3 id="reference">Reference</h3>
+<h3 id="reference">Reference<a class="headerlink" href="#reference" title="Permanent link">&para;</a></h3>
 <ul>
 <li><a href="/components/clingwrap/command-types/">Command Types</a> - Detailed documentation of all command
   types</li>
 </ul>
-<h2 id="quick-start">Quick Start</h2>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <p>Install clingwrap:</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>clingwrap
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>clingwrap
 </code></pre></div>
 <p>Run with a built-in example configuration:</p>
-<div class="highlight"><pre><span></span><code>clingwrap<span class="w"> </span>gather<span class="w"> </span>--target<span class="w"> </span>shakenfist-ci-failure<span class="w"> </span>--output<span class="w"> </span>debug.zip
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>clingwrap<span class="w"> </span>gather<span class="w"> </span>--target<span class="w"> </span>shakenfist-ci-failure<span class="w"> </span>--output<span class="w"> </span>debug.zip
 </code></pre></div>
 <p>Or use your own configuration file:</p>
-<div class="highlight"><pre><span></span><code>clingwrap<span class="w"> </span>gather<span class="w"> </span>--target<span class="w"> </span>/path/to/config.cwd<span class="w"> </span>--output<span class="w"> </span>debug.zip
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>clingwrap<span class="w"> </span>gather<span class="w"> </span>--target<span class="w"> </span>/path/to/config.cwd<span class="w"> </span>--output<span class="w"> </span>debug.zip
 </code></pre></div>
-<h2 id="command-line-interface">Command Line Interface</h2>
+<h2 id="command-line-interface">Command Line Interface<a class="headerlink" href="#command-line-interface" title="Permanent link">&para;</a></h2>
 <p>The main command is <code>clingwrap gather</code> with the following options:</p>
 <table>
 <thead>
@@ -3445,14 +3445,14 @@ useful for any system debugging scenario.</p>
 </tbody>
 </table>
 <p>If <code>--target</code> is omitted, clingwrap reads configuration from stdin.</p>
-<h2 id="output-format">Output Format</h2>
+<h2 id="output-format">Output Format<a class="headerlink" href="#output-format" title="Permanent link">&para;</a></h2>
 <p>Clingwrap produces a single ZIP file containing:</p>
 <ul>
 <li>Collected files and directories (preserving original paths)</li>
 <li>Shell command outputs (stored in <code>_commands/</code> directory)</li>
 <li><code>clingwrap.log</code> - Execution log with timestamps and job tracking</li>
 </ul>
-<h2 id="built-in-examples">Built-in Examples</h2>
+<h2 id="built-in-examples">Built-in Examples<a class="headerlink" href="#built-in-examples" title="Permanent link">&para;</a></h2>
 <p>Clingwrap ships with example configurations that can be used by name:</p>
 <table>
 <thead>
@@ -3472,13 +3472,13 @@ useful for any system debugging scenario.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="external-resources">External Resources</h2>
+<h2 id="external-resources">External Resources<a class="headerlink" href="#external-resources" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="https://github.com/shakenfist/clingwrap">GitHub Repository</a></li>
 <li><a href="https://github.com/shakenfist/clingwrap/issues">Bug Tracker</a></li>
 <li><a href="https://shakenfist.com">Shaken Fist Project</a></li>
 </ul>
-<h2 id="license">License</h2>
+<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
 <p>Clingwrap is licensed under the Apache 2.0 license.</p>
 
 

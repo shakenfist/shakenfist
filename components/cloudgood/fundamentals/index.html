@@ -3304,20 +3304,18 @@
   
 
 
-<h1 id="fundamentals">Fundamentals</h1>
+<h1 id="fundamentals">Fundamentals<a class="headerlink" href="#fundamentals" title="Permanent link">&para;</a></h1>
 <p>Let's start back at the very very beginning. What even is a computer?</p>
-<h2 id="what-is-a-computer">What is a computer?</h2>
+<h2 id="what-is-a-computer">What is a computer?<a class="headerlink" href="#what-is-a-computer" title="Permanent link">&para;</a></h2>
 <p>If we're going to build some virtual computers, we first need to define what a computer actually is. Note that here I am using the term "computer" to refer to what we'd probably call a "core" or "hyperthread" in a modern architecture, but the concepts are close enough for now. We'll also ignore pipelining and speculative execution to simplify things.</p>
-<p>Fundamentally, a computer is a machine (1) which knows how to execute a linear (2) set of instructions in order. Those instructions can take arguments (either directly in the instruction or from various forms of memory) and produce outputs. It's normally possible to jump around in the sequence of instructions if you need to skip over or repeat some portions of the sequence. Even today all computers I am aware of start execution after a restart from a fixed point in memory, although that address is not always location "0" in the memory map. By way of example, the initial program counter is address 0 on the Intel 4004 / 8008 / 8080 series of microprocessors, whereas it is 0xFFFF0000 for 80186 onwards, the MOS 6502 stores the address of reset, non-maskable interrupt (NMI) and interrupt request (IRQ) handlers in the last six bytes of memory, and so on.
-{ .annotate }</p>
+<p class="annotate">Fundamentally, a computer is a machine (1) which knows how to execute a linear (2) set of instructions in order. Those instructions can take arguments (either directly in the instruction or from various forms of memory) and produce outputs. It's normally possible to jump around in the sequence of instructions if you need to skip over or repeat some portions of the sequence. Even today all computers I am aware of start execution after a restart from a fixed point in memory, although that address is not always location "0" in the memory map. By way of example, the initial program counter is address 0 on the Intel 4004 / 8008 / 8080 series of microprocessors, whereas it is 0xFFFF0000 for 80186 onwards, the MOS 6502 stores the address of reset, non-maskable interrupt (<abbr title="Non-Maskable Interrupt -- a hardware interrupt that cannot be ignored.">NMI</abbr>) and interrupt request (<abbr title="Interrupt Request -- a hardware signal requesting CPU attention.">IRQ</abbr>) handlers in the last six bytes of memory, and so on.</p>
 <ol>
 <li>This was not always true. Initially "computer" was a job title for a human whose job it was to perform mathematical operations by hand. Often this was in the form of producing lookup tables of values which could then be used for later calculations -- so for example you could buy a book of logarithm tables. The most common example these days of such a lookup table is the multiplication posters still used by many junior schools.</li>
 <li>It's that linear word again. As a reminder, "Linear" here is fancy for "in a line". That is, a simple list of data blocks or instructions, one after the other.</li>
 </ol>
-<p>It should also be noted that the instructions you execute on modern CPUs (modern being anything since at least the Intel 8086 released in June 1978) are translated into a smaller set of "microcode instructions" that the CPU actually executes. That is, even the machine instructions we send to the CPU to execute are in fact an abstraction (1).
-{ .annotate }</p>
+<p class="annotate">It should also be noted that the instructions you execute on modern CPUs (modern being anything since at least the Intel 8086 released in June 1978) are translated into a smaller set of "microcode instructions" that the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> actually executes. That is, even the machine instructions we send to the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> to execute are in fact an abstraction (1).</p>
 <ol>
-<li>This is true to the extent that it is asserted that the Via C3 x86 CPU is in fact a proprietary RISC CPU which converts x86 instructions on the fly to its native instruction set.</li>
+<li>This is true to the extent that it is asserted that the Via C3 x86 <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> is in fact a proprietary RISC <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> which converts x86 instructions on the fly to its native instruction set.</li>
 </ol>
 <div class="admonition quote">
 <p class="admonition-title">Quote</p>
@@ -3339,7 +3337,7 @@
 <td><a href="https://www.youtube.com/watch?v=O5nskjZ_GoI&amp;list=PL8dPuuaLjXtNlUrzyH5r6jN9ulIgZBpdo&amp;index=2">Crash Course Computer Science Episode 2</a> (YouTube)</td>
 </tr>
 <tr>
-<td>Registers and RAM</td>
+<td>Registers and <abbr title="Random Access Memory -- fast, volatile storage used by the CPU for active data and instructions.">RAM</abbr></td>
 <td><a href="https://www.youtube.com/watch?v=fpnE6UAfbtU">Crash Course Computer Science Episode 6</a> (YouTube)</td>
 </tr>
 <tr>
@@ -3361,22 +3359,20 @@
 </tbody>
 </table>
 </div>
-<h2 id="abstraction-layers">Abstraction layers</h2>
-<p>Now that we know what a computer is, we should talk about how we think about them. Pretty much everything in modern computing is built upon a set of abstraction layers -- simplifying assumptions which hide complexity while providing the next layer up with a foundation upon which to build. A really good example of this is the OSI seven layer model for networking (1) -- each higher numbered layer can rely on the ones below to perform its functions, but also it highlights an important point -- the OSI seven layer model is also a lie. The reality is that no modern networking system strictly follows the OSI model, especially given OSI was a standards body which proposed something much more complicated than TCP/IP and has now largely died out. OSI only lives on as the mental model we teach new network engineers to help them understand how our networks operate.
-{ .annotate }</p>
+<h2 id="abstraction-layers">Abstraction layers<a class="headerlink" href="#abstraction-layers" title="Permanent link">&para;</a></h2>
+<p class="annotate">Now that we know what a computer is, we should talk about how we think about them. Pretty much everything in modern computing is built upon a set of abstraction layers -- simplifying assumptions which hide complexity while providing the next layer up with a foundation upon which to build. A really good example of this is the <abbr title="Open Systems Interconnection -- a conceptual model for network communication layers.">OSI</abbr> seven layer model for networking (1) -- each higher numbered layer can rely on the ones below to perform its functions, but also it highlights an important point -- the <abbr title="Open Systems Interconnection -- a conceptual model for network communication layers.">OSI</abbr> seven layer model is also a lie. The reality is that no modern networking system strictly follows the <abbr title="Open Systems Interconnection -- a conceptual model for network communication layers.">OSI</abbr> model, especially given <abbr title="Open Systems Interconnection -- a conceptual model for network communication layers.">OSI</abbr> was a standards body which proposed something much more complicated than <abbr title="Transmission Control Protocol/Internet Protocol -- the fundamental protocols of the internet.">TCP/IP</abbr> and has now largely died out. <abbr title="Open Systems Interconnection -- a conceptual model for network communication layers.">OSI</abbr> only lives on as the mental model we teach new network engineers to help them understand how our networks operate.</p>
 <ol>
 <li><a href="https://en.wikipedia.org/wiki/OSI_model">https://en.wikipedia.org/wiki/OSI_model</a></li>
 </ol>
-<p>Exactly the same thing has happened with all areas of modern computing. For example, our mental model of how a SSD behaves is very much like a linear set of sectors (1), but that's not at all how they're implemented under the hood where an embedded microprocessor is moving sectors around to handle wear leveling and to avoid sectors which are acting unreliably. Even Micro SD cards have microprocessors in them now (2).
-{ .annotate }</p>
+<p class="annotate">Exactly the same thing has happened with all areas of modern computing. For example, our mental model of how a <abbr title="Solid State Drive -- storage using flash memory instead of spinning disks.">SSD</abbr> behaves is very much like a linear set of sectors (1), but that's not at all how they're implemented under the hood where an embedded microprocessor is moving sectors around to handle wear leveling and to avoid sectors which are acting unreliably. Even Micro SD cards have microprocessors in them now (2).</p>
 <ol>
 <li>"Linear" here is fancy for "in a line". That is, a simple list of data blocks or instructions, one after the other.</li>
 <li><a href="https://www.bunniestudios.com/blog/on-microsd-problems/">https://www.bunniestudios.com/blog/on-microsd-problems/</a></li>
 </ol>
 <p>Why does this matter? It mostly matters in a document like this because it is easy to nit-pick -- there is a line between providing sufficient detail and being completely accurate. Accuracy can sometimes confuse the reader when what we're trying to do is create a foundation we can build on later.</p>
 <p>I have tried hard to provide links with further detail on areas I think I am making simplifications in, but I am also sure I have missed things. Feel free to dig into things you find interesting but also try not to get bogged down in things which ultimately possibly aren't relevant to your overall goals.</p>
-<h2 id="what-is-a-program">What is a program?</h2>
-<p>A program is what we call some number of these instructions grouped together to perform a task. Fundamentally, apart from hardware, a program is all you need. There is nothing except from it being really annoying stopping you from running your program on even modern CPUs without any of the things we normally associate with computers like a BIOS or an operating system. This was how all computers worked in the early days, but it's largely died out because interacting with modern hardware at the raw code level is so massively annoying that basically no one wants to do it. One common example of where we still do this is embedded systems like Arduinos, which often have a single program that just starts executing immediately from power on.</p>
+<h2 id="what-is-a-program">What is a program?<a class="headerlink" href="#what-is-a-program" title="Permanent link">&para;</a></h2>
+<p>A program is what we call some number of these instructions grouped together to perform a task. Fundamentally, apart from hardware, a program is all you need. There is nothing except from it being really annoying stopping you from running your program on even modern CPUs without any of the things we normally associate with computers like a <abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr> or an operating system. This was how all computers worked in the early days, but it's largely died out because interacting with modern hardware at the raw code level is so massively annoying that basically no one wants to do it. One common example of where we still do this is embedded systems like Arduinos, which often have a single program that just starts executing immediately from power on.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>As mentioned in the <a href="/components/cloudgood/technology-primer/">technology primer</a>, some amount
@@ -3386,20 +3382,18 @@ explain how it is also sometimes quite cool to execute raw code on modern
 CPUs. Or at least I think so.</p>
 </div>
 <p>An instance of a program running on top of a kernel is called a process.</p>
-<h2 id="what-is-a-kernel">What is a kernel?</h2>
-<p>A kernel is a special program whose role is to manage the resources of the actual physical computer and share those resources among several programs which do things the user of the machine cares about. This creates a divide in terminology -- code which runs in the kernel is said to run in "kernel mode" and has unrestricted access to the computer's resources (1). On the other hand, code which runs for a user and performs a task that user has requested is said to run in "user mode". User mode programs use services provided by the kernel to implement their functionality.
-{ .annotate }</p>
+<h2 id="what-is-a-kernel">What is a kernel?<a class="headerlink" href="#what-is-a-kernel" title="Permanent link">&para;</a></h2>
+<p class="annotate">A kernel is a special program whose role is to manage the resources of the actual physical computer and share those resources among several programs which do things the user of the machine cares about. This creates a divide in terminology -- code which runs in the kernel is said to run in "kernel mode" and has unrestricted access to the computer's resources (1). On the other hand, code which runs for a user and performs a task that user has requested is said to run in "user mode". User mode programs use services provided by the kernel to implement their functionality.</p>
 <ol>
-<li>This is likely not strictly true – the CPU itself may impose rules upon the kernel as to what it can do.</li>
+<li>This is likely not strictly true – the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> itself may impose rules upon the kernel as to what it can do.</li>
 </ol>
-<p>As an example, if the kernel wants to read or write a file on a disk, it must understand a stack of things needed to know how to do that thing -- how to talk to the disk controller, how to determine where in the disk's logical address space the data lives (probably using a filesystem), and how to then ask the disk to either set or get the data at those locations (1).
-{ .annotate }</p>
+<p class="annotate">As an example, if the kernel wants to read or write a file on a disk, it must understand a stack of things needed to know how to do that thing -- how to talk to the disk controller, how to determine where in the disk's logical address space the data lives (probably using a filesystem), and how to then ask the disk to either set or get the data at those locations (1).</p>
 <ol>
-<li>A former draft of that sentence used to say "[the kernel] must understand <em>the complete stack of things</em> needed", but of course that's also not true and invites nit picking. The kernel understands how to talk to a standardized interface with the storage hardware -- a SATA controller or a NVMe device for example. The other side of that controller is of course yet another stack of software (as firmware) and hardware that will have its own abstraction layers.</li>
+<li>A former draft of that sentence used to say "[the kernel] must understand <em>the complete stack of things</em> needed", but of course that's also not true and invites nit picking. The kernel understands how to talk to a standardized interface with the storage hardware -- a <abbr title="Serial ATA -- an interface for connecting storage devices.">SATA</abbr> controller or a <abbr title="Non-Volatile Memory Express -- a protocol for accessing SSDs over PCIe.">NVMe</abbr> device for example. The other side of that controller is of course yet another stack of software (as firmware) and hardware that will have its own abstraction layers.</li>
 </ol>
 <p>On the other hand, a user space program would simply request that the kernel read or write data at the current location in a file for it. These requests are generally made via things called system calls, which we will discuss in a little bit.</p>
 <p>All this also means that while already being "more complicated", kernel code is also riskier -- a crash in the kernel will often cause the computer to reset to an initial starting state or display a scary blue error screen, whereas an error in a user mode program might cause that program to crash but is unlikely to cause the entire machine to crash.</p>
-<p>It should be noted that modern CPUs have hardware protections to stop user space programs from accessing outside their assigned address space, but that is largely outside the scope of the current discussion. You should for now just know that the CPU also has hardware protection "rings" that control what instructions can be executed. On Intel CPUs the kernel runs in ring 0, user space programs generally run in ring 3, and that there are a variety of negatively numbered rings that run under the kernel.</p>
+<p>It should be noted that modern CPUs have hardware protections to stop user space programs from accessing outside their assigned address space, but that is largely outside the scope of the current discussion. You should for now just know that the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> also has hardware protection "rings" that control what instructions can be executed. On Intel CPUs the kernel runs in ring 0, user space programs generally run in ring 3, and that there are a variety of negatively numbered rings that run under the kernel.</p>
 <p>For the purposes of this content, the only kernel we care about is Linux.</p>
 <div class="admonition info">
 <p class="admonition-title">Want to know more?</p>
@@ -3432,14 +3426,14 @@ CPUs. Or at least I think so.</p>
 <td><a href="https://www.youtube.com/watch?v=jmTwlEh8L7g">This DEF CON 28 talk</a> is not only a good watch, but contains a good explanation of the x86 ring model of privilege (YouTube)</td>
 </tr>
 <tr>
-<td>The performance implications of modern Intel CPU designs</td>
+<td>The performance implications of modern Intel <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> designs</td>
 <td><a href="https://www.youtube.com/watch?v=rglmJ6Xyj1c">This QCon talk</a> gives a nice overview of the design of relatively recent Intel CPUs and the performance implications of that design (YouTube)</td>
 </tr>
 </tbody>
 </table>
 </div>
-<h2 id="system-calls">System calls</h2>
-<p>A system call is how a user space program requests a service from the kernel. Effectively, it's the API that the kernel exposes to the programs it is managing. System calls do many things -- reading and writing filesystems, queueing network packets for dispatch, retrieving queued network packets for processing, starting sub-processes and so on. System calls are what <code>strace</code> shows you, which is a useful debugging technique for disobedient user space software.</p>
+<h2 id="system-calls">System calls<a class="headerlink" href="#system-calls" title="Permanent link">&para;</a></h2>
+<p>A system call is how a user space program requests a service from the kernel. Effectively, it's the <abbr title="Application Programming Interface -- a defined interface for software interaction.">API</abbr> that the kernel exposes to the programs it is managing. System calls do many things -- reading and writing filesystems, queueing network packets for dispatch, retrieving queued network packets for processing, starting sub-processes and so on. System calls are what <code>strace</code> shows you, which is a useful debugging technique for disobedient user space software.</p>
 <p>On 32-bit x86 you call a system call from user space by placing your arguments (including the system call number) into registers and then triggering the 0x80 interrupt. The kernel's interrupt handler will then extract the arguments and service the request. On 64-bit x86 there is a dedicated syscall instruction, which is faster to execute but the concept is the same.</p>
 <div class="admonition info">
 <p class="admonition-title">Want to know more?</p>
@@ -3458,16 +3452,32 @@ CPUs. Or at least I think so.</p>
 </tbody>
 </table>
 </div>
-<h2 id="linux-architectures">Linux architectures</h2>
-<p>Linux runs on many different microprocessors. In fact, more than one type of machine can share a microprocessor design but still operate in different ways -- ARM is probably the most common example at the moment, especially in embedded devices like mobile phones. Linux therefore calls the unique combination of a microprocessor and its supporting hardware an "architecture". The process of adding support for a new architecture is called "porting" and the newly supported architecture is called a "port". Thus, Linux supports the x86_64 architectural port, as well as the PowerPC (1) architectural port.
-{ .annotate }</p>
+<h2 id="linux-architectures">Linux architectures<a class="headerlink" href="#linux-architectures" title="Permanent link">&para;</a></h2>
+<p class="annotate">Linux runs on many different microprocessors. In fact, more than one type of machine can share a microprocessor design but still operate in different ways -- ARM is probably the most common example at the moment, especially in embedded devices like mobile phones. Linux therefore calls the unique combination of a microprocessor and its supporting hardware an "architecture". The process of adding support for a new architecture is called "porting" and the newly supported architecture is called a "port". Thus, Linux supports the x86_64 architectural port, as well as the PowerPC (1) architectural port.</p>
 <ol>
 <li>Let’s ignore that PowerPC has a variety of sub-architectures for now.</li>
 </ol>
 <p>There can sometimes be surprising differences between Linux architectures because of hardware differences -- the system calls might have different numbers, or constant values passed as arguments to a function might change. However, that's not actually why I mention architectures here -- that will become clear in the next chapter.</p>
-<h2 id="conclusion">Conclusion</h2>
+<h2 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h2>
 <p>So we've built a foundation in this document. We've talked about what a computer is at a high level. We've explored programs and how privilege levels affect what they can do. We've introduced the concept of the kernel as a special program which both abstracts away much of the complexity of real hardware, while also turning a machine which can only do one thing at once (for a single core machine) into a thing which can have its resources shared between many programs.</p>
 <p>In the next installment we'll discuss some of the history of virtualization, especially on Linux. So if you're interested please read <a href="/components/cloudgood/virtualization-history/">the virtualization history</a> chapter next.</p>
+<!-- Shared abbreviations for cloudgood documentation pages -->
+<!-- Include at the bottom of cloudgood files with: --8<-- "docs-include/abbreviations.md" -->
+<!-- These definitions are invisible - they enable hover tooltips for the defined terms -->
+
+<!-- CPU and processor terms -->
+<!-- Memory terms -->
+<!-- Virtualization - CPU extensions -->
+<!-- Virtualization - memory -->
+<!-- Virtualization - general -->
+<!-- Networking -->
+<!-- Storage -->
+<!-- Boot and firmware -->
+<!-- Linux and OS concepts -->
+<!-- Containers -->
+<!-- x86 architecture -->
+<!-- APIs and interfaces -->
+<!-- Miscellaneous -->
 
 
 

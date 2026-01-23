@@ -3292,14 +3292,14 @@
   
 
 
-<h1 id="agent-protocol-v2">Agent protocol v2</h1>
+<h1 id="agent-protocol-v2">Agent protocol v2<a class="headerlink" href="#agent-protocol-v2" title="Permanent link">&para;</a></h1>
 <p>v2 of the Shaken Fist agent protocol is serialized protobufs sent down
 virtio-vsock channels to the in-guest agent. This page documents the expected
 flow of messages between the hypervisor and this in-guest agent.</p>
 <p>There is some attempt to enforce these particular flows via unit testing in the
 agent code base at <code>shakenfist_agent.tests.daemom.DaemonAgentV2TestCase</code>, but
 the reality is there might be drift over time.</p>
-<h2 id="initial-connection-to-the-agent">Initial connection to the agent</h2>
+<h2 id="initial-connection-to-the-agent">Initial connection to the agent<a class="headerlink" href="#initial-connection-to-the-agent" title="Permanent link">&para;</a></h2>
 <p>The sidechannel daemon process on the hypervisor wants to maintain an open
 connection to each instance with an in-guest agent for the lifetime of that
 instance. This is implemented in
@@ -3324,7 +3324,7 @@ a <code>GatherFactsResponse</code>.</p>
 <p>When then sidechannel daemon process is instructed to terminate by systemd, it
 will silently terminate the connection to the in-guest agent and sends no
 further packets.</p>
-<h2 id="agentoperation-execution">AgentOperation execution</h2>
+<h2 id="agentoperation-execution">AgentOperation execution<a class="headerlink" href="#agentoperation-execution" title="Permanent link">&para;</a></h2>
 <p>AgentOperations are executed with a separate connection to the in-guest agent.
 For any instance which has a healthy initial connection and no AgentOperations
 already executing, the sidechannel daemon checks if there are any queued
@@ -3341,12 +3341,12 @@ instance at any one time.</p>
 and the in-guest agent has been idle for more than two seconds, then a
 <code>PingRequest</code> is send and a <code>PingReply</code> received. This can happen if a
 particular AgentOperation takes a while to execute, for example a slow command.</p>
-<h3 id="command-execution">Command execution</h3>
+<h3 id="command-execution">Command execution<a class="headerlink" href="#command-execution" title="Permanent link">&para;</a></h3>
 <p>Commands are executed using <code>ExecuteRequest</code>, which receives a single
 <code>ExecuteReply</code>. For large stdout and stderr responses, they are converted to
 blobs before a result is recorded in the database. Smaller responses are stored
 inline in the database.</p>
-<h3 id="upload-a-file-to-an-instance">Upload a file to an instance</h3>
+<h3 id="upload-a-file-to-an-instance">Upload a file to an instance<a class="headerlink" href="#upload-a-file-to-an-instance" title="Permanent link">&para;</a></h3>
 <p>File uploads into an instance are implemented with the <code>PutBlob</code> message. This
 message includes the destination filename, optionally the required file mode,
 and so forth. It also includes the first <code>FileChunk</code> message. A series of other
@@ -3357,10 +3357,10 @@ of the transfer.</p>
 then send single messages as outstanding messages are acknowledged by the
 in-guest agent. At the time of writing, not more than five <code>FileChunk</code> messages
 should be in flight at any one time.</p>
-<h3 id="chmod">chmod</h3>
+<h3 id="chmod">chmod<a class="headerlink" href="#chmod" title="Permanent link">&para;</a></h3>
 <p>Changes of file mode which are not embedded in a file upload are implemented
 using the <code>ChmodRequest</code> message, which receives a <code>ChmodReply</code> message.</p>
-<h2 id="handling-agent-errors">Handling agent errors</h2>
+<h2 id="handling-agent-errors">Handling agent errors<a class="headerlink" href="#handling-agent-errors" title="Permanent link">&para;</a></h2>
 <p>For either type of connection between Shaken Fist and the in-guest agent, if
 the agent experiences an error while processing a command message it will
 return a <code>CommandError</code> message.</p>

@@ -3282,7 +3282,7 @@
   
 
 
-<h1 id="console-sources">Console Sources</h1>
+<h1 id="console-sources">Console Sources<a class="headerlink" href="#console-sources" title="Permanent link">&para;</a></h1>
 <p>Kerbside can connect to the following platforms:</p>
 <ul>
 <li><a href="https://shakenfist.com">Shaken Fist</a></li>
@@ -3293,7 +3293,7 @@
 <p>The connection to each platform (a source of consoles, so "console sources") is
 defined in the <code>sources.yaml</code> configuration file in YAML format. The path to
 this file is configured via the <code>SOURCES_PATH</code> setting.</p>
-<h2 id="how-console-sources-work">How Console Sources Work</h2>
+<h2 id="how-console-sources-work">How Console Sources Work<a class="headerlink" href="#how-console-sources-work" title="Permanent link">&para;</a></h2>
 <p>Kerbside handles different source types in different ways:</p>
 <ul>
 <li>
@@ -3313,7 +3313,7 @@ this file is configured via the <code>SOURCES_PATH</code> setting.</p>
 <p>It is possible to have more than one console source for a given type, so for
 example the VDI proxy could be used to combine virtual machines from two
 OpenStack clusters together seamlessly.</p>
-<h2 id="shaken-fist">Shaken Fist</h2>
+<h2 id="shaken-fist">Shaken Fist<a class="headerlink" href="#shaken-fist" title="Permanent link">&para;</a></h2>
 <p>The following options are used to configure a Shaken Fist console source
 (<code>type: shakenfist</code>).</p>
 <table>
@@ -3353,7 +3353,7 @@ OpenStack clusters together seamlessly.</p>
 <p><strong>Note</strong>: The CA certificate is verified against the cluster's advertised
 certificate during initialization. If they don't match, the source will be
 marked as errored.</p>
-<h2 id="ovirt">oVirt</h2>
+<h2 id="ovirt">oVirt<a class="headerlink" href="#ovirt" title="Permanent link">&para;</a></h2>
 <p>The following options are used to configure an oVirt console source
 (<code>type: ovirt</code>).</p>
 <table>
@@ -3393,7 +3393,7 @@ marked as errored.</p>
 <p><strong>Note</strong>: The CA certificate is verified against the engine's PKI certificate
 during initialization. If they don't match, the source will be marked as
 errored.</p>
-<h2 id="openstack">OpenStack</h2>
+<h2 id="openstack">OpenStack<a class="headerlink" href="#openstack" title="Permanent link">&para;</a></h2>
 <p>OpenStack sources work differently from Shaken Fist and oVirt. Instead of
 periodically scraping for available consoles, Kerbside validates authentication
 tokens issued by Nova when users request SPICE direct console access.</p>
@@ -3456,38 +3456,38 @@ support enabled. See the
 for Kolla-Ansible deployment support, and the
 <a href="https://specs.openstack.org/openstack/nova-specs/specs/2025.1/implemented/libvirt-spice-direct-consoles.html">Nova specification</a>
 for configuration details.</p>
-<h2 id="example-sourcesyaml">Example sources.yaml</h2>
+<h2 id="example-sourcesyaml">Example sources.yaml<a class="headerlink" href="#example-sourcesyaml" title="Permanent link">&para;</a></h2>
 <p>An example configuration follows:</p>
-<div class="highlight"><pre><span></span><code><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sfmel</span>
-<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shakenfist</span>
-<span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://sfmel.example.org/api</span>
-<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sfvdi</span>
-<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...omitted...</span>
-<span class="w">  </span><span class="nt">ca_cert</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<span class="w">    </span><span class="no">-----BEGIN CERTIFICATE-----</span>
-<span class="w">    </span><span class="no">...</span>
-<span class="w">    </span><span class="no">-----END CERTIFICATE-----</span>
-
-<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ovirt</span>
-<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ovirt</span>
-<span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://ovirt.example.org/ovirt-engine</span>
-<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kerbside@internal</span>
-<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...omitted...</span>
-<span class="w">  </span><span class="nt">ca_cert</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<span class="w">    </span><span class="no">-----BEGIN CERTIFICATE-----</span>
-<span class="w">    </span><span class="no">...</span>
-<span class="w">    </span><span class="no">-----END CERTIFICATE-----</span>
-
-<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kolla</span>
-<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openstack</span>
-<span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://keystone.example.org:5000</span>
-<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kerbside</span>
-<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...omitted...</span>
-<span class="w">  </span><span class="nt">project_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span>
-<span class="w">  </span><span class="nt">user_domain_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
-<span class="w">  </span><span class="nt">project_domain_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sfmel</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shakenfist</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://sfmel.example.org/api</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sfvdi</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...omitted...</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">ca_cert</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="no">-----BEGIN CERTIFICATE-----</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="no">...</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="no">-----END CERTIFICATE-----</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ovirt</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ovirt</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://ovirt.example.org/ovirt-engine</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kerbside@internal</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...omitted...</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">ca_cert</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">    </span><span class="no">-----BEGIN CERTIFICATE-----</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="no">...</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="no">-----END CERTIFICATE-----</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kolla</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openstack</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://keystone.example.org:5000</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kerbside</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...omitted...</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">  </span><span class="nt">project_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">  </span><span class="nt">user_domain_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">  </span><span class="nt">project_domain_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
 </code></pre></div>
-<h2 id="related-documentation">Related Documentation</h2>
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/kerbside/configuration/">Configuration</a> - General configuration reference</li>
 <li><a href="/components/kerbside/proxy-architecture/">Proxy Architecture</a> - Internal proxy design</li>

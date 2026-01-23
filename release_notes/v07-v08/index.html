@@ -3424,8 +3424,8 @@
   
 
 
-<h1 id="v07-to-v08-release-notes">v0.7 to v0.8 release notes</h1>
-<h2 id="major-changes">Major changes</h2>
+<h1 id="v07-to-v08-release-notes">v0.7 to v0.8 release notes<a class="headerlink" href="#v07-to-v08-release-notes" title="Permanent link">&para;</a></h1>
+<h2 id="major-changes">Major changes<a class="headerlink" href="#major-changes" title="Permanent link">&para;</a></h2>
 <ul>
 <li>You can now hot plug (add) a network interface to a running instance. This is
   exposed by a POST to the <code>/instance/...instanceref.../interfaces</code> endpoint, passing
@@ -3445,14 +3445,14 @@
   unexpected results if you have many very active filesystems mounted on a single
   hypervisor.</li>
 </ul>
-<h2 id="rest-api">REST API</h2>
+<h2 id="rest-api">REST API<a class="headerlink" href="#rest-api" title="Permanent link">&para;</a></h2>
 <ul>
 <li>There is now an API call (<code>GET /admin/resources</code>) which exposes the resource
   utilization of the cluster to admin users.</li>
 <li>You can now POST to <code>/instance/...instanceref.../interfaces</code> as described
   above to hot plug new network interfaces into an existing instance.</li>
 </ul>
-<h2 id="supported-distributions">Supported distributions</h2>
+<h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Debian 12 is now supported as a host OS. Support for Debian 11 as a host OS
   has been dropped.</li>
@@ -3460,14 +3460,14 @@
 <li>Fedora 34, 38, and 29, as well as Ubuntu 22.04 now have canned guest images.</li>
 <li>Rocky 8 and 9 now have canned guest images.</li>
 </ul>
-<h2 id="logging">Logging</h2>
+<h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
 <ul>
 <li>REST API request traces are now logged via the event logging mechanism with
   the object type "api-requests" and the UUID being the request id.</li>
 <li>Effort is now taken to report an event against all objects it affects, not
   just an arbitrary single object. This should ease debugging.</li>
 </ul>
-<h3 id="containers-and-kubernetes">Containers and Kubernetes</h3>
+<h3 id="containers-and-kubernetes">Containers and Kubernetes<a class="headerlink" href="#containers-and-kubernetes" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The Shaken Fist client can now orchestrate k3s Kubernetes clusters for you. The
   lifecycle support is relatively simple at the moment, with cluster creation and
@@ -3478,7 +3478,7 @@
   to customize the orchestration if desired without having to alter the main
   server code.</li>
 </ul>
-<h3 id="networking">Networking</h3>
+<h3 id="networking">Networking<a class="headerlink" href="#networking" title="Permanent link">&para;</a></h3>
 <ul>
 <li>IP address management has moved to a new baseobject called IPAM. Events are
   therefore recorded for address management as you would expect.</li>
@@ -3498,7 +3498,7 @@
 <li>Network orchestration now waits for <code>iptables</code> locks, instead of failing
   commands in high load situations.</li>
 </ul>
-<h3 id="instances">Instances</h3>
+<h3 id="instances">Instances<a class="headerlink" href="#instances" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Shaken Fist can now capture screenshots of instance consoles.</li>
 <li>Pause and unpause are now retried several times on failure, as sometimes libvirt
@@ -3512,13 +3512,13 @@
   delete operation. The one exception at this time is snapshots, which will
   complete before the deletion occurs.</li>
 </ul>
-<h3 id="artifacts">Artifacts</h3>
+<h3 id="artifacts">Artifacts<a class="headerlink" href="#artifacts" title="Permanent link">&para;</a></h3>
 <ul>
 <li>When you refer to an artifact by name, and there is more than one match then
   the match in your local namespace (if any) is now preferred instead of returning
   an error.</li>
 </ul>
-<h3 id="deployment">Deployment</h3>
+<h3 id="deployment">Deployment<a class="headerlink" href="#deployment" title="Permanent link">&para;</a></h3>
 <ul>
 <li>We no longer reset the authentication secret used to generate authentication
   tokens on upgrade. This means tokens from before an upgrade will continue to work
@@ -3532,7 +3532,7 @@
 <li>TLS certificates on hypervisors which are within 30 days of expiry are now
   automatically replaced.</li>
 </ul>
-<h2 id="database">Database</h2>
+<h2 id="database">Database<a class="headerlink" href="#database" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Object state (created, deleted, error, etc.) is now stored in MariaDB instead
   of etcd. This improves query performance for state-based lookups and reduces
@@ -3552,7 +3552,7 @@
   <code>sf-ctl migrate-floating-network-uuid</code> after stopping services to migrate.
   This change enables proper UUID4 type validation in the IPAM schema.</li>
 </ul>
-<h2 id="performance">Performance</h2>
+<h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Events are no longer queued via etcd unless the eventlog node is down at the
   time of the event. This reduces the number of etcd writes significantly during
@@ -3564,7 +3564,7 @@
 <li>etcd traffic levels are now monitored in CI and we attempt to hold fewer
   cluster level locks for local operations.</li>
 </ul>
-<h2 id="minor-changes">Minor changes</h2>
+<h2 id="minor-changes">Minor changes<a class="headerlink" href="#minor-changes" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Unhandled exceptions are now recorded to <code>/srv/shakenfist/exceptions/</code> for
   later analysis. See <a href="/operator_guide/exception_tracking/">the operator guide</a>
