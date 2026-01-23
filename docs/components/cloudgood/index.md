@@ -58,3 +58,5 @@ model for how things work and why.
 through some more fundamental things you would have learned in a university
 level operating systems class, but without taking six months of your life.
 There is also no exam, you're welcome.
+
+--8<-- "docs-include/abbreviations.md"

@@ -122,3 +122,5 @@ There can sometimes be surprising differences between Linux architectures becaus
 So we've built a foundation in this document. We've talked about what a computer is at a high level. We've explored programs and how privilege levels affect what they can do. We've introduced the concept of the kernel as a special program which both abstracts away much of the complexity of real hardware, while also turning a machine which can only do one thing at once (for a single core machine) into a thing which can have its resources shared between many programs.
 
 In the next installment we'll discuss some of the history of virtualization, especially on Linux. So if you're interested please read [the virtualization history](/components/cloudgood/virtualization-history/) chapter next.
+
+--8<-- "docs-include/abbreviations.md"

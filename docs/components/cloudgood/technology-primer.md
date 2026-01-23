@@ -19,17 +19,32 @@ open file descriptors, credentials, and scheduling metadata - all managed
 through kernel data structures. Specifically, a `task_struct` contains or
 points to:
 
-- **CPU context**: General-purpose registers, instruction pointer, stack
-  pointer, flags register, and FPU/SIMD state
-- **Memory mapping**: A pointer to the `mm_struct` which describes the
-  virtual address space via page tables and virtual memory areas (VMAs)
-- **File descriptors**: A table of open files, sockets, and pipes
-- **Credentials**: User ID, group ID, and capabilities
-- **Namespaces**: Isolated views of system resources like PIDs, network
-  interfaces, and mount points (this is how containers work)
-- **Scheduling state**: Priority, CPU affinity, and time accounting
-- **Signal handling**: Pending signals and registered signal handlers
-- **Process relationships**: Parent process, children, and thread group
+CPU context
+:   General-purpose registers, instruction pointer, stack pointer, flags
+    register, and FPU/SIMD state.
+
+Memory mapping
+:   A pointer to the `mm_struct` which describes the virtual address space
+    via page tables and virtual memory areas (VMAs).
+
+File descriptors
+:   A table of open files, sockets, and pipes.
+
+Credentials
+:   User ID, group ID, and capabilities.
+
+Namespaces
+:   Isolated views of system resources like PIDs, network interfaces, and
+    mount points (this is how containers work).
+
+Scheduling state
+:   Priority, CPU affinity, and time accounting.
+
+Signal handling
+:   Pending signals and registered signal handlers.
+
+Process relationships
+:   Parent process, children, and thread group.
 
 **A note on threads**: Linux threads are also `task_struct` instances, but
 they share certain resources with other threads in the same process. Most
@@ -754,3 +769,5 @@ Each step along this spectrum trades off between isolation strength,
 performance, flexibility, and operational complexity. There is no universally
 "right" choice - the appropriate level of isolation depends on the threat
 model, the workload, and the operational constraints.
+
+--8<-- "docs-include/abbreviations.md"
