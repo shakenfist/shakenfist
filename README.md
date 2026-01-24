@@ -15,6 +15,11 @@ common development tasks:
 - **migrate-etcd-to-mariadb**: Guides the migration of object data from etcd
   to MariaDB, following established patterns from Upload, DnsMasq, IPAM, and
   blob migrations.
+- **add-grpc-service**: Guides adding new gRPC service methods to the database
+  microservice, including proto definitions, handler implementation, and client
+  functions.
+- **add-mypy-coverage**: Guides adding mypy type annotations to modules,
+  following the incremental rollout approach documented in PLAN-mypy-rollout.md.
 
 These skills are loaded automatically when using Claude Code within this
 repository.
