@@ -4,5 +4,17 @@
     <img src="https://img.shields.io/pypi/v/shakenfist?color=%2334D058&label=pypi%20package" alt="Package version">
 </a>
 
-**Documentation:** https://shakenfist.com/  
-**Source Code:** https://github.com/shakenfist/shakenfist  
+**Documentation:** https://shakenfist.com/
+**Source Code:** https://github.com/shakenfist/shakenfist
+
+## Claude Code Skills
+
+This repository includes Claude Code skills in `.claude/skills/` to assist with
+common development tasks:
+
+- **migrate-etcd-to-mariadb**: Guides the migration of object data from etcd
+  to MariaDB, following established patterns from Upload, DnsMasq, IPAM, and
+  blob migrations.
+
+These skills are loaded automatically when using Claude Code within this
+repository.
