@@ -68,6 +68,7 @@ nav:
             - "Technology primer": components/cloudgood/technology-primer.md
             - "Fundamentals": components/cloudgood/fundamentals.md
             - "Virtualization history": components/cloudgood/virtualization-history.md
+            - "Memory mapped devices": components/cloudgood/memory-mapped-devices.md
         - Clingwrap:
             - "Introduction": components/clingwrap/index.md
             - "Command Types": components/clingwrap/command-types.md
