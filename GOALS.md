@@ -42,6 +42,9 @@
 * Drop generic methods on the database service which mimic etcd calls -- `get`, `put`, etc. Instead the database service should own all of the business logic around accessing the database tier, and calls to the database service should in the form of coherent requests -- list all uploads on this node for example.
 * Stop converting UUIDs to strings all the time.
 * mTLS for inter-cluster traffic.
+* I am not confident that the affinity rules for instances work as expected.
+* systemd restarts often timeout / fail.
+* I am no longer sure that many binaries / systemd services is a good idea. Perhaps one big binary would be better?
 
 ## Wider structural things
 
