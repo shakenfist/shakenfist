@@ -94,6 +94,7 @@ nav:
             - "Command Reference": components/occystrap/command-reference.md
             - "Installation": components/occystrap/installation.md
             - "Pipeline Architecture": components/occystrap/pipeline.md
+            - "Tar Format Selection": components/occystrap/tar-format-selection.md
             - "Use Cases": components/occystrap/use-cases.md
     - Features: features.md
     - Release notes:
