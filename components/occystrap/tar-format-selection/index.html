@@ -10,31 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/developer_guide/state_machine/">
+        <link rel="canonical" href="https://shakenfist.com/components/occystrap/tar-format-selection/">
       
       
-        <link rel="prev" href="../standards/">
+        <link rel="prev" href="../pipeline/">
       
       
-        <link rel="next" href="../updating_docs/">
+        <link rel="next" href="../use-cases/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
-        <title>State machine - Shaken Fist</title>
+        <title>Tar Format Selection - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
   
@@ -74,7 +74,7 @@
       
     
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -99,7 +99,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#shaken-fists-state-machine" class="md-skip">
+        <a href="#tar-format-selection" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +115,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -135,7 +135,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              State machine
+              Tar Format Selection
             
           </span>
         </div>
@@ -251,7 +251,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -281,7 +281,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href="../../.." class="md-nav__link">
         
   
   
@@ -308,7 +308,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manifesto/" class="md-nav__link">
+      <a href="../../../manifesto/" class="md-nav__link">
         
   
   
@@ -332,18 +332,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -364,7 +366,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -382,7 +384,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/overview/" class="md-nav__link">
+      <a href="../../overview/" class="md-nav__link">
         
   
   
@@ -457,7 +459,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/" class="md-nav__link">
+      <a href="../../cloudgood/" class="md-nav__link">
         
   
   
@@ -485,7 +487,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/technology-primer/" class="md-nav__link">
+      <a href="../../cloudgood/technology-primer/" class="md-nav__link">
         
   
   
@@ -513,7 +515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/fundamentals/" class="md-nav__link">
+      <a href="../../cloudgood/fundamentals/" class="md-nav__link">
         
   
   
@@ -541,7 +543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/virtualization-history/" class="md-nav__link">
+      <a href="../../cloudgood/virtualization-history/" class="md-nav__link">
         
   
   
@@ -569,7 +571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/memory-mapped-devices/" class="md-nav__link">
+      <a href="../../cloudgood/memory-mapped-devices/" class="md-nav__link">
         
   
   
@@ -652,7 +654,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/clingwrap/" class="md-nav__link">
+      <a href="../../clingwrap/" class="md-nav__link">
         
   
   
@@ -680,7 +682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/clingwrap/command-types/" class="md-nav__link">
+      <a href="../../clingwrap/command-types/" class="md-nav__link">
         
   
   
@@ -708,7 +710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/clingwrap/configuration/" class="md-nav__link">
+      <a href="../../clingwrap/configuration/" class="md-nav__link">
         
   
   
@@ -736,7 +738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/clingwrap/examples/" class="md-nav__link">
+      <a href="../../clingwrap/examples/" class="md-nav__link">
         
   
   
@@ -764,7 +766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/clingwrap/installation/" class="md-nav__link">
+      <a href="../../clingwrap/installation/" class="md-nav__link">
         
   
   
@@ -847,7 +849,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/" class="md-nav__link">
+      <a href="../../kerbside/" class="md-nav__link">
         
   
   
@@ -875,7 +877,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/configuration/" class="md-nav__link">
+      <a href="../../kerbside/configuration/" class="md-nav__link">
         
   
   
@@ -903,7 +905,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/console-sources/" class="md-nav__link">
+      <a href="../../kerbside/console-sources/" class="md-nav__link">
         
   
   
@@ -931,7 +933,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/schema/" class="md-nav__link">
+      <a href="../../kerbside/schema/" class="md-nav__link">
         
   
   
@@ -959,7 +961,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/proxy-architecture/" class="md-nav__link">
+      <a href="../../kerbside/proxy-architecture/" class="md-nav__link">
         
   
   
@@ -987,7 +989,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/scancodes/" class="md-nav__link">
+      <a href="../../kerbside/scancodes/" class="md-nav__link">
         
   
   
@@ -1015,7 +1017,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/capabilities/" class="md-nav__link">
+      <a href="../../kerbside/capabilities/" class="md-nav__link">
         
   
   
@@ -1043,7 +1045,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/channel-protocols/" class="md-nav__link">
+      <a href="../../kerbside/channel-protocols/" class="md-nav__link">
         
   
   
@@ -1071,7 +1073,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/compression-protocols/" class="md-nav__link">
+      <a href="../../kerbside/compression-protocols/" class="md-nav__link">
         
   
   
@@ -1099,7 +1101,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/spice-link-protocol/" class="md-nav__link">
+      <a href="../../kerbside/spice-link-protocol/" class="md-nav__link">
         
   
   
@@ -1127,7 +1129,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/protocol-overview/" class="md-nav__link">
+      <a href="../../kerbside/protocol-overview/" class="md-nav__link">
         
   
   
@@ -1155,7 +1157,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/usb-redirection/" class="md-nav__link">
+      <a href="../../kerbside/usb-redirection/" class="md-nav__link">
         
   
   
@@ -1183,7 +1185,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/vd-agent-protocol/" class="md-nav__link">
+      <a href="../../kerbside/vd-agent-protocol/" class="md-nav__link">
         
   
   
@@ -1216,18 +1218,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" checked>
         
           
           <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
@@ -1248,7 +1252,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1266,7 +1270,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -1294,7 +1298,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/command-reference/" class="md-nav__link">
+      <a href="../command-reference/" class="md-nav__link">
         
   
   
@@ -1322,7 +1326,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/installation/" class="md-nav__link">
+      <a href="../installation/" class="md-nav__link">
         
   
   
@@ -1350,7 +1354,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/pipeline/" class="md-nav__link">
+      <a href="../pipeline/" class="md-nav__link">
         
   
   
@@ -1375,10 +1379,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../components/occystrap/tar-format-selection/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tar Format Selection
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1394,6 +1425,148 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#real-world-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real-World Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-solution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Solution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ustar-format-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        USTAR Format Limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#affected-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Affected Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Affected Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#filters-smart-format-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filters (Smart Format Selection)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-writers-direct-ustar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Writers (Direct USTAR)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1406,7 +1579,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/use-cases/" class="md-nav__link">
+      <a href="../use-cases/" class="md-nav__link">
         
   
   
@@ -1449,7 +1622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../features/" class="md-nav__link">
+      <a href="../../../features/" class="md-nav__link">
         
   
   
@@ -1523,7 +1696,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../release_notes/v07-v08/" class="md-nav__link">
+      <a href="../../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -1558,7 +1731,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../community/" class="md-nav__link">
+      <a href="../../../community/" class="md-nav__link">
         
   
   
@@ -1632,7 +1805,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/usage/" class="md-nav__link">
+      <a href="../../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -1660,7 +1833,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/authentication/" class="md-nav__link">
+      <a href="../../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -1688,7 +1861,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/ansible/" class="md-nav__link">
+      <a href="../../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -1716,7 +1889,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/artifacts/" class="md-nav__link">
+      <a href="../../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -1744,7 +1917,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/affinity/" class="md-nav__link">
+      <a href="../../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -1772,7 +1945,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/consoles/" class="md-nav__link">
+      <a href="../../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -1800,7 +1973,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/events/" class="md-nav__link">
+      <a href="../../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -1828,7 +2001,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/objects/" class="md-nav__link">
+      <a href="../../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -1856,7 +2029,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/metadata/" class="md-nav__link">
+      <a href="../../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -1888,20 +2061,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -1922,7 +2093,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1987,7 +2158,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/admin/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/admin/" class="md-nav__link">
         
   
   
@@ -2015,7 +2186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/agentoperations/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
         
   
   
@@ -2043,7 +2214,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/artifacts/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
         
   
   
@@ -2071,7 +2242,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/authentication/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/authentication/" class="md-nav__link">
         
   
   
@@ -2099,7 +2270,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/blob_checksums/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
         
   
   
@@ -2127,7 +2298,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/blobs/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/blobs/" class="md-nav__link">
         
   
   
@@ -2155,7 +2326,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/clusteroperations/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
         
   
   
@@ -2183,7 +2354,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/instances/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/instances/" class="md-nav__link">
         
   
   
@@ -2211,7 +2382,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/label/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/label/" class="md-nav__link">
         
   
   
@@ -2239,7 +2410,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/networks/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/networks/" class="md-nav__link">
         
   
   
@@ -2267,7 +2438,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/interfaces/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
         
   
   
@@ -2295,7 +2466,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/nodes/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/nodes/" class="md-nav__link">
         
   
   
@@ -2323,7 +2494,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api_reference/upload/" class="md-nav__link">
+      <a href="../../../developer_guide/api_reference/upload/" class="md-nav__link">
         
   
   
@@ -2359,7 +2530,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agent_protocol/" class="md-nav__link">
+      <a href="../../../developer_guide/agent_protocol/" class="md-nav__link">
         
   
   
@@ -2387,7 +2558,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../authentication/" class="md-nav__link">
+      <a href="../../../developer_guide/authentication/" class="md-nav__link">
         
   
   
@@ -2415,7 +2586,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ci_api_coverage/" class="md-nav__link">
+      <a href="../../../developer_guide/ci_api_coverage/" class="md-nav__link">
         
   
   
@@ -2443,7 +2614,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../mypy/" class="md-nav__link">
+      <a href="../../../developer_guide/mypy/" class="md-nav__link">
         
   
   
@@ -2471,7 +2642,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../release_process/" class="md-nav__link">
+      <a href="../../../developer_guide/release_process/" class="md-nav__link">
         
   
   
@@ -2499,7 +2670,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../standards/" class="md-nav__link">
+      <a href="../../../developer_guide/standards/" class="md-nav__link">
         
   
   
@@ -2524,37 +2695,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    State machine
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/state_machine/" class="md-nav__link">
         
   
   
@@ -2570,125 +2714,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#agent-operations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent Operations
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#artifacts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Artifacts
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#blobs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Blobs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#instances" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Instances
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#namespaces" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Namespaces
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#networks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Networks
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#network-interfaces" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Network Interfaces
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#nodes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Nodes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#upload" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Upload
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2701,7 +2726,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../updating_docs/" class="md-nav__link">
+      <a href="../../../developer_guide/updating_docs/" class="md-nav__link">
         
   
   
@@ -2729,7 +2754,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../workflow/" class="md-nav__link">
+      <a href="../../../developer_guide/workflow/" class="md-nav__link">
         
   
   
@@ -2811,7 +2836,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/" class="md-nav__link">
+      <a href="../../../plans/" class="md-nav__link">
         
   
   
@@ -2839,7 +2864,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../../../plans/api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -2867,7 +2892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../../../plans/blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -2949,7 +2974,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/installation/" class="md-nav__link">
+      <a href="../../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -2977,7 +3002,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/artifacts/" class="md-nav__link">
+      <a href="../../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -3005,7 +3030,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/authentication/" class="md-nav__link">
+      <a href="../../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -3033,7 +3058,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/database/" class="md-nav__link">
+      <a href="../../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -3061,7 +3086,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/exception_tracking/" class="md-nav__link">
+      <a href="../../../operator_guide/exception_tracking/" class="md-nav__link">
         
   
   
@@ -3089,7 +3114,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/locks/" class="md-nav__link">
+      <a href="../../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -3117,7 +3142,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/networking/overview/" class="md-nav__link">
+      <a href="../../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -3145,7 +3170,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/power_states/" class="md-nav__link">
+      <a href="../../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -3173,7 +3198,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/python_versions/" class="md-nav__link">
+      <a href="../../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -3201,7 +3226,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/threads/" class="md-nav__link">
+      <a href="../../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -3229,7 +3254,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/upgrades/" class="md-nav__link">
+      <a href="../../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -3284,10 +3309,38 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#agent-operations" class="md-nav__link">
+  <a href="#the-problem" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Agent Operations
+        The Problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#real-world-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real-World Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-solution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Solution
       
     </span>
   </a>
@@ -3295,10 +3348,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#artifacts" class="md-nav__link">
+  <a href="#ustar-format-limits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Artifacts
+        USTAR Format Limits
       
     </span>
   </a>
@@ -3306,10 +3359,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#blobs" class="md-nav__link">
+  <a href="#implementation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Blobs
+        Implementation
       
     </span>
   </a>
@@ -3317,10 +3370,49 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#instances" class="md-nav__link">
+  <a href="#affected-components" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Instances
+        Affected Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Affected Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#filters-smart-format-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filters (Smart Format Selection)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-writers-direct-ustar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Writers (Direct USTAR)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compatibility
       
     </span>
   </a>
@@ -3328,54 +3420,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#namespaces" class="md-nav__link">
+  <a href="#verification" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Namespaces
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#networks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Networks
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#network-interfaces" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Network Interfaces
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#nodes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Nodes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#upload" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Upload
+        Verification
       
     </span>
   </a>
@@ -3402,279 +3450,169 @@
   
 
 
-<h1 id="shaken-fists-state-machine">Shaken Fist's State Machine<a class="headerlink" href="#shaken-fists-state-machine" title="Permanent link">&para;</a></h1>
-<p>Shaken Fist implements a state machine for each object type. This page documents
-the possible states for each object, and which transitions between states are
-valid.</p>
-<p>Shaken Fist rigidly enforces the state model defined for each object, and will
-raise an exception if an unexpected transition occurs. The state model for a
-given object is defined in the <code>state_targets</code> map in the object class for those
-keen on reading code.</p>
-<p>Objects marked as <code>deleted</code> are removed from etcd after sitting deleted for
-some period of time. This is called a "hard deletion" and the period of time is
-configured with the CLEANER_DELAY configuration option. Once an object is hard
-deleted it will no longer appear in any API request, as it no longer exists in
-the database. The exception is that it will still appear in relevant events that
-have not yet aged out.</p>
-<h2 id="agent-operations">Agent Operations<a class="headerlink" href="#agent-operations" title="Permanent link">&para;</a></h2>
+<h1 id="tar-format-selection">Tar Format Selection<a class="headerlink" href="#tar-format-selection" title="Permanent link">&para;</a></h1>
+<p>Occystrap uses smart tar format selection to minimize output size when
+re-creating layer tarballs. This document explains the problem, solution,
+and implementation details.</p>
+<h2 id="the-problem">The Problem<a class="headerlink" href="#the-problem" title="Permanent link">&para;</a></h2>
+<p>When occystrap filters modify container image layers (e.g., normalizing
+timestamps or excluding files), the layers must be re-tarred. Python's
+<code>tarfile</code> module defaults to PAX format (POSIX.1-2001), which adds extended
+header blocks for certain metadata.</p>
+<p>The issue arises with <strong>long filenames</strong>. Container images often contain
+deeply nested paths, especially those with Rust toolchains, Node.js modules,
+or similar dependencies. For example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>home/vscode/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/...
+</code></pre></div>
+<p>When a filename exceeds 100 characters, PAX format adds an extended header
+block (~1KB) for that file. In a typical Rust development container with
+~50,000 files where 98% have paths longer than 100 characters, this adds
+approximately <strong>50MB of overhead per layer</strong>.</p>
+<h3 id="real-world-example">Real-World Example<a class="headerlink" href="#real-world-example" title="Permanent link">&para;</a></h3>
+<p>Analysis of a <code>virtio-block-dev</code> container image:</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Total files</td>
+<td>51,008</td>
+</tr>
+<tr>
+<td>Files with paths &gt; 100 chars</td>
+<td>50,379 (98.8%)</td>
+</tr>
+<tr>
+<td>Original layer size</td>
+<td>1,315 MB</td>
+</tr>
+<tr>
+<td>PAX format output</td>
+<td>1,367 MB (+52 MB)</td>
+</tr>
+<tr>
+<td>USTAR format output</td>
+<td>1,315 MB (+6 KB)</td>
+</tr>
+</tbody>
+</table>
+<p>The difference is entirely due to PAX extended headers for long filenames.</p>
+<h2 id="the-solution">The Solution<a class="headerlink" href="#the-solution" title="Permanent link">&para;</a></h2>
+<p>Occystrap now uses <strong>USTAR format</strong> (POSIX.1-1988) by default, which handles
+long paths more efficiently using a prefix+name split:</p>
 <ul>
-<li><code>initial</code>: the first state for an agent operation. A UUID has been allocated,
-  and a placeholder database entry created.</li>
-<li><code>preflight</code>: some agent operations require additional queued steps such as
-  fetching <code>blob</code>s to the correct <code>node</code>. These operations will be in <code>preflight</code>
-  during this background work.</li>
-<li><code>queued</code>: awaiting execution on the <code>instance</code>.</li>
-<li><code>executing</code>: means the Agent Operation is now executing on the <code>instance</code>.</li>
-<li><code>complete</code>: the Agent Operation has finished executing on the <code>instance</code>.
-  Specifically, this means we have received a result from the agent for each
-  command. If the agent crashes or a command never returns, this means the Agent
-  Operation will never be marked as complete.</li>
-<li><code>deleted</code>: the Agent Operation has been deleted.</li>
-<li><code>error</code>: an error occurred while processing the Agent Operation.</li>
+<li><strong>name field</strong>: 100 bytes for the filename portion</li>
+<li><strong>prefix field</strong>: 155 bytes for the directory path</li>
+<li><strong>Total</strong>: Up to 256 characters without extra headers</li>
 </ul>
-<p>The following transitions are possible:</p>
-<pre class="mermaid"><code>stateDiagram-v2
-  [*] --&gt; initial
-  [*] --&gt; error
-
-  initial --&gt; preflight
-  initial --&gt; queued
-  initial --&gt; deleted
-  initial --&gt; error
-
-  preflight --&gt; queued
-  preflight --&gt; deleted
-  preflight --&gt; error
-
-  queued --&gt; executing
-  queued --&gt; deleted
-  queued --&gt; error
-
-  executing --&gt; complete
-  executing --&gt; deleted
-  executing --&gt; error
-
-  complete --&gt; deleted
-
-  error --&gt; deleted
-
-  deleted --&gt; [*]</code></pre>
-<h2 id="artifacts">Artifacts<a class="headerlink" href="#artifacts" title="Permanent link">&para;</a></h2>
+<p>USTAR format falls back to PAX only when content requires features that
+USTAR cannot represent.</p>
+<h2 id="ustar-format-limits">USTAR Format Limits<a class="headerlink" href="#ustar-format-limits" title="Permanent link">&para;</a></h2>
+<p>The following conditions trigger automatic fallback to PAX format:</p>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>USTAR Maximum</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Path length</td>
+<td>256 characters</td>
+<td>prefix (155) + '/' + name (100)</td>
+</tr>
+<tr>
+<td>Basename</td>
+<td>100 characters</td>
+<td>Filename portion after last '/'</td>
+</tr>
+<tr>
+<td>Symlink target</td>
+<td>100 characters</td>
+<td>The path the symlink points to</td>
+</tr>
+<tr>
+<td>File size</td>
+<td>8 GiB - 1 byte</td>
+<td>Octal representation limit</td>
+</tr>
+<tr>
+<td>UID/GID</td>
+<td>2,097,151</td>
+<td>Octal value 7777777</td>
+</tr>
+<tr>
+<td>Character encoding</td>
+<td>ASCII only</td>
+<td>Non-ASCII requires PAX</td>
+</tr>
+</tbody>
+</table>
+<h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
+<p>The format selection is implemented in <code>occystrap/tarformat.py</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">occystrap.tarformat</span><span class="w"> </span><span class="kn">import</span> <span class="n">select_tar_format_for_layer</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Scan layer and select optimal format</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">tar_format</span> <span class="o">=</span> <span class="n">select_tar_format_for_layer</span><span class="p">(</span><span class="n">layer_fileobj</span><span class="p">,</span> <span class="n">transform_fn</span><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># Use selected format when writing</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="k">with</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">fileobj</span><span class="o">=</span><span class="n">dest</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">tar_format</span><span class="p">)</span> <span class="k">as</span> <span class="n">tar</span><span class="p">:</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="o">...</span>
+</code></pre></div>
+<p>The <code>select_tar_format_for_layer()</code> function:</p>
+<ol>
+<li>Scans all members in the source tar</li>
+<li>Applies any transformation function (e.g., timestamp normalization)</li>
+<li>Checks each member against USTAR limits</li>
+<li>Returns <code>USTAR_FORMAT</code> if all members fit, <code>PAX_FORMAT</code> otherwise</li>
+<li>Short-circuits on first PAX-requiring member for efficiency</li>
+</ol>
+<h2 id="affected-components">Affected Components<a class="headerlink" href="#affected-components" title="Permanent link">&para;</a></h2>
+<h3 id="filters-smart-format-selection">Filters (Smart Format Selection)<a class="headerlink" href="#filters-smart-format-selection" title="Permanent link">&para;</a></h3>
+<p>The following filters use smart format selection, scanning layer contents to
+determine the optimal format:</p>
 <ul>
-<li><code>initial</code>: the first state for an artifact. A UUID has been allocated,
-  and a placeholder database entry created.</li>
-<li><code>created</code>: the artifact has at least one version.</li>
-<li><code>deleted</code>: the artifact has been deleted.</li>
-<li><code>error</code>: the artifact is in an error state.</li>
+<li><strong>TimestampNormalizer</strong>: Normalizes file timestamps for reproducible builds</li>
+<li><strong>ExcludeFilter</strong>: Removes files matching glob patterns</li>
 </ul>
-<p>The following transitions are possible:</p>
-<pre class="mermaid"><code>stateDiagram-v2
-  [*] --&gt; initial
-
-  initial --&gt; created
-  initial --&gt; deleted
-  initial --&gt; error
-
-  created --&gt; deleted
-  created --&gt; error
-
-  error --&gt; deleted
-
-  deleted --&gt; [*]</code></pre>
-<h2 id="blobs">Blobs<a class="headerlink" href="#blobs" title="Permanent link">&para;</a></h2>
+<p>Both filters now produce significantly smaller output when processing layers
+with many long-named files.</p>
+<h3 id="output-writers-direct-ustar">Output Writers (Direct USTAR)<a class="headerlink" href="#output-writers-direct-ustar" title="Permanent link">&para;</a></h3>
+<p>The following output writers create outer tarballs (containing layer blobs,
+config, and manifest). These always use USTAR format directly without scanning,
+since the outer tar only contains short paths (SHA256 hashes ~75 characters):</p>
 <ul>
-<li><code>initial</code>: the first state for an blob. A UUID has been allocated,
-  and a placeholder database entry created.</li>
-<li><code>created</code>: the blob has data associated with it.</li>
-<li><code>deleted</code>: the blob has been deleted.</li>
-<li><code>error</code>: the blob is in an error state.</li>
+<li><strong>TarWriter</strong>: Creates docker-loadable tarballs</li>
+<li><strong>DockerWriter</strong>: Loads images into the Docker daemon</li>
 </ul>
-<p>The following transitions are possible:</p>
-<pre class="mermaid"><code>stateDiagram-v2
-  [*] --&gt; initial
-
-  initial --&gt; created
-  initial --&gt; deleted
-  initial --&gt; error
-
-  created --&gt; deleted
-  created --&gt; error
-
-  error --&gt; deleted
-
-  deleted --&gt; [*]</code></pre>
-<h2 id="instances">Instances<a class="headerlink" href="#instances" title="Permanent link">&para;</a></h2>
+<p>The layer content itself (which may have long paths) is pre-built and added as
+a binary blob, so the outer tar format doesn't affect file paths within layers.</p>
+<h2 id="compatibility">Compatibility<a class="headerlink" href="#compatibility" title="Permanent link">&para;</a></h2>
+<p>USTAR format is universally supported:</p>
 <ul>
-<li><code>initial</code>: this is the first state for an instance. A UUID has been allocated,
-  a placeholder database entry created, and a request to create the instance has
-  been queued.</li>
-<li><code>preflight</code>: the instance creation request has been dequeued and is being
-  validated against the current state of the cluster by the scheduler. At this
-  point any required resources (transfers of blobs inside the cluster and
-  fetching of images from outside the cluster) also occurs.</li>
-<li><code>creating</code>: the instance is being created on the <code>node</code>.</li>
-<li><code>created</code>: the instance is now running.</li>
-<li><code>deleted</code>: the instance is now deleted.</li>
-<li><code>error</code>: the instance is unable to be used.</li>
+<li>Docker accepts both USTAR and PAX format layers</li>
+<li>OCI specification allows both formats</li>
+<li>All POSIX-compliant tar implementations support USTAR</li>
+<li>The format is automatically detected when reading</li>
 </ul>
-<p>Any instance may enter the <code>error</code> state, which happens when something bad has
-happened. That process involves the instance being moved to a transition state
-named for the instance's previous state, so for example an instance which was
-<code>created</code> that went into Error would transition through <code>created-error</code>. This is
-done because the <code>error</code> transition is a queue job and happens sometime later.
-Instances in the <code>error</code> state are not removed like those in the <code>deleted</code> state,
-as we assume a caller must acknowledge an error occurred. To remove them, delete
-the instance in <code>error</code> state.</p>
-<p>The following transitions are possible (note that hyphens have been replaced with
-underscores in some state names due to limitations in the diagram renderer):</p>
-<pre class="mermaid"><code>stateDiagram-v2
-  [*] --&gt; initial
-  [*] --&gt; error
-
-  initial --&gt; preflight
-  initial --&gt; delete_wait
-  initial --&gt; deleted
-  initial --&gt; initial_error
-
-  preflight --&gt; creating
-  preflight --&gt; delete_wait
-  preflight --&gt; deleted
-  preflight --&gt; preflight_error
-
-  creating --&gt; created
-  creating --&gt; delete_wait
-  creating --&gt; deleted
-  creating --&gt; creating_error
-
-  created --&gt; delete_wait
-  created --&gt; deleted
-  created --&gt; created_error
-
-  initial_error --&gt; error
-  preflight_error --&gt; error
-  creating_error --&gt; error
-  created_error --&gt; error
-  delete_wait_error --&gt; error
-
-  error --&gt; delete_wait
-  error --&gt; deleted
-
-  delete_wait --&gt; deleted
-  delete_wait --&gt; delete_wait_error
-
-  deleted --&gt; [*]</code></pre>
-<h2 id="namespaces">Namespaces<a class="headerlink" href="#namespaces" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>created</code>: the namespace exists.</li>
-<li><code>deleted</code>: the namespace has been deleted.</li>
-</ul>
-<p>The following transitions are possible:</p>
-<pre class="mermaid"><code>stateDiagram-v2
-  [*] --&gt; created
-  created --&gt; deleted
-  deleted --&gt; [*]</code></pre>
-<h2 id="networks">Networks<a class="headerlink" href="#networks" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>initial</code>: first state for a network. A UUID has been allocated, database entry
-  created, and a request to create the network on the <code>networknode</code> has been queued.</li>
-<li><code>created</code>: the network has been created on the <code>networknode</code>.</li>
-<li><code>delete-wait</code>: the network has been scheduled for deletion. Waiting for
-  instances on the network to be deleted.</li>
-<li><code>deleted</code>: the network is now deleted.</li>
-<li><code>error</code>: the network has encountered an error and cannot be used.</li>
-</ul>
-<p>A network is regarded as "dead" when it is in state <code>deleted</code>, <code>delete-wait</code> or
-<code>error</code>.</p>
-<p>The following transitions are possible (note that hyphens have been replaced with
-underscores in some state names due to limitations in the diagram renderer):</p>
-<pre class="mermaid"><code>stateDiagram-v2
-  [*] --&gt; initial
-
-  initial --&gt; created
-  initial --&gt; deleted
-  initial --&gt; error
-
-  created --&gt; deleted
-  created --&gt; delete_wait
-  created --&gt; error
-
-  delete_wait --&gt; deleted
-  delete_wait --&gt; error
-
-  error --&gt; deleted
-
-  deleted --&gt; [*]</code></pre>
-<h2 id="network-interfaces">Network Interfaces<a class="headerlink" href="#network-interfaces" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>initial</code>: the first state for a network interface. A UUID has been allocated,
-  and a placeholder database entry created.</li>
-<li><code>created</code>: the network interface has data associated with it.</li>
-<li><code>deleted</code>: the network interface has been deleted.</li>
-<li><code>error</code>: the network interface is in an error state.</li>
-</ul>
-<p>The following transitions are possible:</p>
-<pre class="mermaid"><code>stateDiagram-v2
-  [*] --&gt; initial
-
-  initial --&gt; created
-  initial --&gt; deleted
-  initial --&gt; error
-
-  created --&gt; deleted
-  created --&gt; error
-
-  error --&gt; deleted
-
-  deleted --&gt; [*]</code></pre>
-<h2 id="nodes">Nodes<a class="headerlink" href="#nodes" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>created</code>: on first check in, a node is created in the "created" state.</li>
-<li><code>stopping</code>: the node is gracefully shutting down.</li>
-<li><code>stopped</code>: the node has gracefully shut down.</li>
-<li><code>deleted</code>: the node was manually evacuated and removed. Note that the <code>node</code>
-  object is the only object type to never hard delete, although a <code>node</code> cannot
-  be undeleted.</li>
-<li><code>missing</code>: the node has not checked in within the NODE_CHECKIN_MAXIMUM deadline.</li>
-<li><code>error</code>: the node has not check in for ten times NODE_CHECKIN_MAXIMUM, and all
-  instances on this node have been declared to be in an error state. The <code>node</code>
-  object is the only object which can return from an <code>error</code> state to other states.</li>
-</ul>
-<p>The following transitions are possible:</p>
-<pre class="mermaid"><code>stateDiagram-v2
-  [*] --&gt; created
-  [*] --&gt; error
-  [*] --&gt; missing
-
-  created --&gt; deleted
-  created --&gt; error
-  created --&gt; missing
-  created --&gt; stopping
-
-  stopping --&gt; stopped
-  stopping --&gt; deleted
-  stopping --&gt; error
-  stopping --&gt; created
-
-  stopped --&gt; created
-  stopped --&gt; deleted
-  stopped --&gt; error
-
-  error --&gt; created
-  error --&gt; deleted
-
-  missing --&gt; created
-  missing --&gt; deleted
-  missing --&gt; error</code></pre>
-<h2 id="upload">Upload<a class="headerlink" href="#upload" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>created</code>: the upload has data associated with it.</li>
-<li><code>deleted</code>: the network interface has been deleted.</li>
-</ul>
-<p>The following transitions are possible:</p>
-<pre class="mermaid"><code>stateDiagram-v2
-  [*] --&gt; created
-  created --&gt; deleted
-  deleted --&gt; [*]</code></pre>
+<p>There is no compatibility impact from this change.</p>
+<h2 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h2>
+<p>To verify the format selection is working, enable debug logging:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;occystrap.tarformat&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+</code></pre></div>
+<p>You'll see messages like:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>DEBUG:occystrap.tarformat:Layer compatible with USTAR format
+</code></pre></div></p>
+<p>Or when PAX is required:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>DEBUG:occystrap.tarformat:Layer requires PAX format
+</code></pre></div></p>
 
 
 
@@ -3724,10 +3662,10 @@ underscores in some state names due to limitations in the diagram renderer):</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": [], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
