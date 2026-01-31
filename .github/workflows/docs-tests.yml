@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-docs:
-    runs-on: [self-hosted, vm]
+    runs-on: [self-hosted, static]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-lint
       cancel-in-progress: true
@@ -26,11 +26,15 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/shakenfist
 
-          mkdir -p /srv/github/artifacts/site
-          /usr/bin/tox -edocs -- --site-dir /srv/github/artifacts/site | tee /srv/github/artifacts/site/build.log
+          rm -rf ${GITHUB_WORKSPACE}/artifacts/site
+          mkdir -p ${GITHUB_WORKSPACE}/artifacts/site
 
-          cd /srv/github/artifacts/
-          zip -r /srv/github/artifacts/site.zip site
+          python3 -mvenv ${GITHUB_WORKSPACE}/tox-venv
+          ${GITHUB_WORKSPACE}/tox-venv/bin/pip3 install tox
+          ${GITHUB_WORKSPACE}/tox-venv/bin/tox -edocs -- --site-dir ${GITHUB_WORKSPACE}/artifacts/site | tee ${GITHUB_WORKSPACE}/artifacts/site/build.log
+
+          cd ${GITHUB_WORKSPACE}/artifacts
+          zip -r ${GITHUB_WORKSPACE}/artifacts/site.zip site
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -38,4 +42,4 @@ jobs:
           name: site
           retention-days: 90
           if-no-files-found: error
-          path: /srv/github/artifacts/site.zip
+          path: ${GITHUB_WORKSPACE}/artifacts/site.zip
