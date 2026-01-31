@@ -33,13 +33,10 @@ jobs:
           ${GITHUB_WORKSPACE}/tox-venv/bin/pip3 install tox
           ${GITHUB_WORKSPACE}/tox-venv/bin/tox -edocs -- --site-dir ${GITHUB_WORKSPACE}/artifacts/site | tee ${GITHUB_WORKSPACE}/artifacts/site/build.log
 
-          cd ${GITHUB_WORKSPACE}/artifacts
-          zip -r ${GITHUB_WORKSPACE}/artifacts/site.zip site
-
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: site
           retention-days: 30
           if-no-files-found: error
-          path: ${GITHUB_WORKSPACE}/artifacts/site.zip
+          path: ${{ github.workspace }}/artifacts/site

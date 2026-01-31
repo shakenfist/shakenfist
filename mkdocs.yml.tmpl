@@ -1,10 +1,12 @@
 site_name: Shaken Fist
 site_url: https://shakenfist.com
 repo_url: https://github.com/shakenfist/shakenfist
+repo_name: shakenfist/shakenfist
 site_description: A minimal cloud aimed at small and edge deployments
 
 theme:
   name: material
+  custom_dir: docs-overrides
   icon:
     annotation: material/arrow-right-circle
     admonition:
@@ -26,6 +28,13 @@ theme:
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
+
+plugins:
+  - search
+  - meta
+
+extra_css:
+  - stylesheets/extra.css
 
 markdown_extensions:
     - abbr
