@@ -40,7 +40,7 @@ from shakenfist.constants import GiB
 from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
-from shakenfist import eventlog
+from shakenfist.eventlog import add_event
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
 from shakenfist.exceptions import BlobDependencyMissing
@@ -161,8 +161,8 @@ class Blob(dbo):
             metadata['fetched_at'],
             metadata['version']
         )
-        eventlog.add_event(EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
-                           'db record created', extra=metadata)
+        add_event(EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
+                  'db record created', extra=metadata)
 
     @classmethod
     def _db_get(cls, object_uuid: str) -> BlobData | None:
@@ -193,7 +193,7 @@ class Blob(dbo):
         data = cls._db_get(object_uuid)
         if not data:
             if not suppress_failure_audit:
-                eventlog.add_event(
+                add_event(
                     EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
                     'attempt to lookup non-existent object',
                     extra={'caller': util_callstack.get_caller(offset=-3)},
