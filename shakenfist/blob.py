@@ -248,6 +248,11 @@ class Blob(dbo):
         )
         b = Blob(data)
         b.state = Blob.STATE_INITIAL  # type: ignore[misc]
+
+        # Record the depends_on relationship in the object_references table
+        if depends_on:
+            b.add_depends_on_reference(depends_on)
+
         return b
 
     def external_view(self) -> dict[str, Any]:
@@ -1055,11 +1060,6 @@ def snapshot_disk(
     # snapshot checksum here, as this makes large snapshots even slower for users.
     # The checksum will "catch up" when the scheduled verification occurs.
     b = Blob.new(blob_uuid, time.time(), time.time(), depends_on=depends_on)
-
-    # Record the depends_on reference in the object_references table
-    if depends_on:
-        b.add_depends_on_reference(depends_on)
-
     b.register()
     return b
 
