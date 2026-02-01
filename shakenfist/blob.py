@@ -165,9 +165,13 @@ class Blob(dbo):
                   'db record created', extra=metadata)
 
     @classmethod
-    def _db_get(cls, object_uuid: str) -> BlobData | None:
+    def _db_get(cls, object_uuid: Union[str, uuid.UUID]) -> BlobData | None:
         """Get blob static values from MariaDB instead of etcd."""
-        data = mariadb.get_blob(uuid.UUID(object_uuid))
+        if isinstance(object_uuid, uuid.UUID):
+            db_uuid = object_uuid
+        else:
+            db_uuid = uuid.UUID(object_uuid)
+        data = mariadb.get_blob(db_uuid)
         if not data:
             return None
 
@@ -179,7 +183,7 @@ class Blob(dbo):
         return data
 
     @classmethod
-    def from_db(cls, object_uuid: str,
+    def from_db(cls, object_uuid: Union[str, uuid.UUID],
                 suppress_failure_audit: bool = False) -> 'Blob | None':
         """Load a Blob from the database.
 
