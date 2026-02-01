@@ -1,0 +1,14 @@
+.md-content__report-issue {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+  font-size: 0.8rem;
+}
+
+.md-content__report-issue a {
+  color: var(--md-default-fg-color--light);
+}
+
+.md-content__report-issue a:hover {
+  color: var(--md-accent-fg-color);
+}
