@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+{{ super() }}
+
+{% set repo = page.meta.issue_repo | default(config.repo_url) %}
+{% set path = page.meta.issue_path | default(page.file.src_path) %}
+{% set title = "Docs issue: " ~ path %}
+{% set body = "**Source file:** `" ~ path ~ "`\n**Page URL:** " ~ page.canonical_url ~ "\n\n**Describe the issue:**\n" %}
+
+<p class="md-content__report-issue">
+  <a href="{{ repo }}/issues/new?title={{ title | urlencode }}&body={{ body | urlencode }}&labels=documentation" target="_blank" rel="noopener">
+    📝 Report an issue with this page
+  </a>
+</p>
+{% endblock %}
