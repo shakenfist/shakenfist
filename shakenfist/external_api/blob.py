@@ -20,7 +20,6 @@ from webargs.flaskparser import use_kwargs
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
-from shakenfist.blob import Blobs
 from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import mariadb
@@ -243,10 +242,11 @@ class BlobsEndpoint(api_base.Resource):
     def get(self, node=None):
         retval = []
 
-        for b in Blobs(filters=[], prefilter='active'):
-            if node and node in b.locations:
-                retval.append(b.external_view())
-            else:
+        for blob_uuid in mariadb.get_active_blob_uuids():
+            b = Blob.from_db(blob_uuid)
+            if not b:
+                continue
+            if not node or node in b.locations:
                 retval.append(b.external_view())
 
         return retval

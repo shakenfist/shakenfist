@@ -2,7 +2,6 @@ import json
 import os
 import pathlib
 import time
-from functools import partial
 
 from shakenfist_utilities import logs  # noreorder
 
@@ -11,8 +10,6 @@ from shakenfist import etcd
 from shakenfist import instance
 from shakenfist.network import network
 from shakenfist.blob import Blob
-from shakenfist.blob import Blobs
-from shakenfist.blob import placement_filter
 from shakenfist.config import config
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
@@ -59,28 +56,31 @@ def upgrade_blob_datastore():
                     blob_uuid = dest.split('/')[-1]
                     relocations[blob_uuid] = entpath
 
-        for b in Blobs([partial(placement_filter, config.NODE_NAME)]):
-            old_blob_path = os.path.join(config.STORAGE_PATH, 'blobs',
-                                         str(b.uuid))
-            new_blob_path = Blob.filepath(str(b.uuid))
+        n = Node.from_db(config.NODE_NAME)
+        if n:
+            for blob_uuid in n.blobs:
+                old_blob_path = os.path.join(config.STORAGE_PATH, 'blobs',
+                                             blob_uuid)
+                new_blob_path = Blob.filepath(blob_uuid)
 
-            if not os.path.exists(old_blob_path):
-                LOG.warning(
-                    'Not moving blob %s from %s to %s as it is missing from disk'
-                    % (b.uuid, old_blob_path, new_blob_path))
-            else:
-                LOG.info('Moving blob %s from %s to %s'
-                         % (b.uuid, old_blob_path, new_blob_path))
-                os.rename(old_blob_path, new_blob_path)
+                if not os.path.exists(old_blob_path):
+                    LOG.warning(
+                        'Not moving blob %s from %s to %s as it is missing '
+                        'from disk' % (blob_uuid, old_blob_path, new_blob_path))
+                else:
+                    LOG.info('Moving blob %s from %s to %s'
+                             % (blob_uuid, old_blob_path, new_blob_path))
+                    os.rename(old_blob_path, new_blob_path)
 
-                if str(b.uuid) in relocations:
-                    cache_entry = relocations[str(b.uuid)]
-                    LOG.info('Relocating image cache entry %s to new blob path %s'
-                             % (cache_entry, new_blob_path))
-                    os.unlink(cache_entry)
-                    os.symlink(new_blob_path, cache_entry)
+                    if blob_uuid in relocations:
+                        cache_entry = relocations[blob_uuid]
+                        LOG.info(
+                            'Relocating image cache entry %s to new blob '
+                            'path %s' % (cache_entry, new_blob_path))
+                        os.unlink(cache_entry)
+                        os.symlink(new_blob_path, cache_entry)
 
-            count += 1
+                count += 1
 
         if count > 0:
             LOG.info('Resharded %d blobs' % count)

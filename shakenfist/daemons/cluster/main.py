@@ -3,7 +3,6 @@
 # obtaining the lock to do work et cetera. There is only one active cluster
 # maintenance daemon per cluster.
 from collections import defaultdict
-from functools import partial
 import os
 import time
 
@@ -22,8 +21,6 @@ from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
-from shakenfist.blob import Blobs
-from shakenfist.blob import placement_filter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
@@ -207,7 +204,10 @@ class Monitor(daemon.Daemon):
 
         # We count fetches currently requested (or under way) as having completed
         # in order to stop over-replication for large blobs.
-        for b in Blobs([], prefilter='active'):
+        for blob_uuid in mariadb.get_active_blob_uuids():
+            b = Blob.from_db(blob_uuid)
+            if not b:
+                continue
             instances = instance.instance_usage_for_blob_uuid(b.uuid)
             if instances:
                 in_use_blobs[b.uuid] += 1
@@ -290,7 +290,10 @@ class Monitor(daemon.Daemon):
                 b.record_usage()
 
         # Find expired blobs
-        for b in Blobs([], prefilter='active'):
+        for blob_uuid in mariadb.get_active_blob_uuids():
+            b = Blob.from_db(blob_uuid)
+            if not b:
+                continue
             if b.expires_at > 0 and b.expires_at < time.time():
                 b.add_event(EVENT_TYPE_AUDIT, 'blob has expired')
                 b.state = dbo.STATE_DELETED
@@ -317,7 +320,10 @@ class Monitor(daemon.Daemon):
                 b.request_replication(allow_excess=excess)
 
         # Find transcodes of not recently used blobs and reap them
-        for b in Blobs([], prefilter='active'):
+        for blob_uuid in mariadb.get_active_blob_uuids():
+            b = Blob.from_db(blob_uuid)
+            if not b:
+                continue
             if not b.transcoded:
                 continue
 
@@ -365,16 +371,14 @@ class Monitor(daemon.Daemon):
                     for ni in interface.interfaces_for_instance(i):
                         ni.delete()
 
-                # Cleanup any blob locations
-                for b in Blobs([partial(placement_filter, n.fqdn)], prefilter='active'):
-                    n.add_event(
-                        EVENT_TYPE_AUDIT,
-                        'deleting blob location as hosting node has been deleted',
-                        extra={'blob_uuid': b.uuid})
-                    b.add_event(
-                        EVENT_TYPE_AUDIT,
-                        'deleting blob location as hosting node has been deleted',
-                        extra={'node_uuid': n.uuid})
+                # Cleanup any blob locations (use Node.blobs property)
+                for blob_uuid in n.blobs:
+                    b = Blob.from_db(blob_uuid)
+                    if not b:
+                        continue
+                    eventlog.add_event_multi(
+                        EVENT_TYPE_AUDIT, [n, b],
+                        'deleting blob location as hosting node has been deleted')
                     b.remove_location(n.fqdn)
                     b.request_replication()
 

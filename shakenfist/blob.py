@@ -11,7 +11,6 @@ import random
 import socket
 import time
 import uuid
-from collections.abc import Generator
 from typing import Any
 from typing import Optional
 from typing import Union
@@ -22,6 +21,7 @@ from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import etcd
 from shakenfist import mariadb
+from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.operations.baseclusteroperation \
@@ -31,7 +31,6 @@ from shakenfist.schema.operations.node_blob_op \
 from shakenfist.schema.operations.node_blob_op \
     import model_tasks as nbo_tasks
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -41,6 +40,7 @@ from shakenfist.constants import GiB
 from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
+from shakenfist.eventlog import add_event
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
 from shakenfist.exceptions import BlobDependencyMissing
@@ -69,7 +69,7 @@ LOG, _ = logs.setup(__name__)
 class Blob(dbo):
     object_type = ObjectType.BLOB
     initial_version = 2
-    current_version = 9
+    current_version = 10
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -80,14 +80,14 @@ class Blob(dbo):
         dbo.STATE_DELETED: (),
     }
 
-    def __init__(self, static_values: dict[str, Any]) -> None:
-        self.upgrade(static_values)
+    def __init__(self, data: BlobData) -> None:
+        # Apply lazy upgrades to the immutable Pydantic model if needed
+        data = self.upgrade_pydantic_data(data, BlobData)
 
-        super().__init__(static_values.get('uuid'), static_values.get('version'))
+        super().__init__(data.uuid, data.version)
 
-        self.__modified: float = static_values['modified']
-        self.__fetched_at: float = static_values['fetched_at']
-        self.__depends_on: Optional[str] = static_values.get('depends_on')
+        self.__modified: float = data.modified
+        self.__fetched_at: float = data.fetched_at
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values: dict[str, Any]) -> None:
@@ -141,6 +141,68 @@ class Blob(dbo):
         ...
 
     @classmethod
+    def _upgrade_step_9_to_10(cls, static_values: dict[str, Any]) -> None:
+        # Static values migration to MariaDB is handled by
+        # sf-ctl migrate-data-to-mariadb (blobs table)
+        ...
+
+    @classmethod
+    def _persist_pydantic_upgrade(  # type: ignore[override]
+            cls, data: BlobData) -> None:
+        """Persist an upgraded BlobData to MariaDB."""
+        mariadb.update_blob(data)
+
+    @classmethod
+    def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
+        """Create a blob record in MariaDB instead of etcd."""
+        mariadb.create_blob(
+            uuid.UUID(object_uuid),
+            metadata['modified'],
+            metadata['fetched_at'],
+            metadata['version']
+        )
+        add_event(EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
+                  'db record created', extra=metadata)
+
+    @classmethod
+    def _db_get(cls, object_uuid: str) -> BlobData | None:
+        """Get blob static values from MariaDB instead of etcd."""
+        data = mariadb.get_blob(uuid.UUID(object_uuid))
+        if not data:
+            return None
+
+        if data.version != cls.current_version:
+            if not cls.upgrade_supported:
+                from shakenfist import exceptions
+                raise exceptions.BadObjectVersion(
+                    f'Unsupported object version - {cls.object_type}: {data}')
+        return data
+
+    @classmethod
+    def from_db(cls, object_uuid: str,
+                suppress_failure_audit: bool = False) -> 'Blob | None':
+        """Load a Blob from the database.
+
+        Override the base class from_db because _db_get returns a Pydantic
+        BlobData model, not a dictionary. The base class from_db uses
+        dict methods (get, in) that don't work with Pydantic models.
+        """
+        if not object_uuid:
+            return None
+
+        data = cls._db_get(object_uuid)
+        if not data:
+            if not suppress_failure_audit:
+                add_event(
+                    EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
+                    'attempt to lookup non-existent object',
+                    extra={'caller': util_callstack.get_caller(offset=-3)},
+                    log_as_error=True)
+            return None
+
+        return cls(data)
+
+    @classmethod
     def normalize_timestamp(
             cls, timestamp: Union[float, int, str, None]
     ) -> float:
@@ -167,20 +229,30 @@ class Blob(dbo):
             fetched_at: float,
             depends_on: Optional[str] = None
     ) -> 'Blob':
-        Blob._db_create(
-            blob_uuid,
-            {
-                'uuid': blob_uuid,
-                'modified': cls.normalize_timestamp(modified),
-                'fetched_at': fetched_at,
-                'depends_on': depends_on,
+        normalized_modified = cls.normalize_timestamp(modified)
+        metadata: dict[str, Any] = {
+            'uuid': blob_uuid,
+            'modified': normalized_modified,
+            'fetched_at': fetched_at,
+            'depends_on': depends_on,
+            'version': cls.current_version
+        }
+        Blob._db_create(blob_uuid, metadata)
 
-                'version': cls.current_version
-            }
+        # Create BlobData for the new object
+        data = BlobData(
+            uuid=blob_uuid,  # type: ignore[arg-type]
+            modified=normalized_modified,
+            fetched_at=fetched_at,
+            version=cls.current_version
         )
+        b = Blob(data)
+        b.state = Blob.STATE_INITIAL  # type: ignore[misc]
 
-        b = Blob.from_db(blob_uuid)
-        b.state = Blob.STATE_INITIAL
+        # Record the depends_on relationship in the object_references table
+        if depends_on:
+            b.add_depends_on_reference(depends_on)
+
         return b
 
     def external_view(self) -> dict[str, Any]:
@@ -233,7 +305,16 @@ class Blob(dbo):
 
     @property
     def depends_on(self) -> Optional[str]:
-        return self.__depends_on
+        """Return the UUID of the blob this blob depends on, if any.
+
+        This queries the object_references table for a DEPENDS_ON relationship
+        from this blob to another blob.
+        """
+        refs = mariadb.get_references_from(
+            ObjectType.BLOB, self.uuid, RelationshipType.DEPENDS_ON)
+        if refs:
+            return str(refs[0].target_uuid)
+        return None
 
     # Values routed to attributes
     @property
@@ -852,6 +933,7 @@ class Blob(dbo):
     def hard_delete(self) -> None:
         mariadb.delete_blob_hashes(str(self.uuid))
         mariadb.delete_blob_transfers_for_blob(str(self.uuid))
+        mariadb.delete_blob(self.uuid)
         super().hard_delete()
 
     def verify_checksum(self, hash: Optional[str] = None, urgent: bool = True) -> bool:
@@ -978,11 +1060,6 @@ def snapshot_disk(
     # snapshot checksum here, as this makes large snapshots even slower for users.
     # The checksum will "catch up" when the scheduled verification occurs.
     b = Blob.new(blob_uuid, time.time(), time.time(), depends_on=depends_on)
-
-    # Record the depends_on reference in the object_references table
-    if depends_on:
-        b.add_depends_on_reference(depends_on)
-
     b.register()
     return b
 
@@ -1055,24 +1132,6 @@ def from_memory(content: bytes) -> Blob:
     b.observe()
     b.request_replication()
     return b
-
-
-class Blobs(dbo_iter):
-    base_object = Blob
-
-    def __iter__(self) -> Generator[Blob, None, None]:
-        for _, static_values in self.get_iterator():
-            b = Blob(static_values)
-            if not b:
-                continue
-
-            out = self.apply_filters(b)
-            if out:
-                yield out
-
-
-def placement_filter(node: str, b: Blob) -> bool:
-    return node in b.locations
 
 
 def observe_local_blobs() -> int:

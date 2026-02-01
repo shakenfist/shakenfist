@@ -1167,6 +1167,152 @@ class UpdateUploadRequest(google.protobuf.message.Message):
 global___UpdateUploadRequest = UpdateUploadRequest
 
 @typing.final
+class BlobData(google.protobuf.message.Message):
+    """Blob Operations (MariaDB)
+    These operations manage blob static values in MariaDB. Blobs are
+    immutable binary data objects (images, snapshots, etc.) that store
+    actual content on disk and track metadata in the database.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    MODIFIED_FIELD_NUMBER: builtins.int
+    FETCHED_AT_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """UUID as string (consistent with other messages)"""
+    modified: builtins.float
+    """Unix timestamp when blob source was last modified"""
+    fetched_at: builtins.float
+    """Unix timestamp when blob was fetched"""
+    version: builtins.int
+    """Object version number"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        modified: builtins.float = ...,
+        fetched_at: builtins.float = ...,
+        version: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["fetched_at", b"fetched_at", "modified", b"modified", "uuid", b"uuid", "version", b"version"]) -> None: ...
+
+global___BlobData = BlobData
+
+@typing.final
+class CreateBlobRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BLOB_FIELD_NUMBER: builtins.int
+    @property
+    def blob(self) -> global___BlobData: ...
+    def __init__(
+        self,
+        *,
+        blob: global___BlobData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["blob", b"blob"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["blob", b"blob"]) -> None: ...
+
+global___CreateBlobRequest = CreateBlobRequest
+
+@typing.final
+class GetBlobRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetBlobRequest = GetBlobRequest
+
+@typing.final
+class GetBlobReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    BLOB_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def blob(self) -> global___BlobData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        blob: global___BlobData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["blob", b"blob"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["blob", b"blob", "found", b"found"]) -> None: ...
+
+global___GetBlobReply = GetBlobReply
+
+@typing.final
+class GetAllBlobUuidsRequest(google.protobuf.message.Message):
+    """No filters currently needed - returns all blob UUIDs"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetAllBlobUuidsRequest = GetAllBlobUuidsRequest
+
+@typing.final
+class GetAllBlobUuidsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUIDS_FIELD_NUMBER: builtins.int
+    @property
+    def uuids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        uuids: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuids", b"uuids"]) -> None: ...
+
+global___GetAllBlobUuidsReply = GetAllBlobUuidsReply
+
+@typing.final
+class DeleteBlobRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteBlobRequest = DeleteBlobRequest
+
+@typing.final
+class UpdateBlobRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BLOB_FIELD_NUMBER: builtins.int
+    @property
+    def blob(self) -> global___BlobData: ...
+    def __init__(
+        self,
+        *,
+        blob: global___BlobData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["blob", b"blob"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["blob", b"blob"]) -> None: ...
+
+global___UpdateBlobRequest = UpdateBlobRequest
+
+@typing.final
 class DnsMasqData(google.protobuf.message.Message):
     """DnsMasq Operations (MariaDB)
     These operations manage DnsMasq objects in MariaDB. DnsMasq objects
