@@ -19,6 +19,7 @@
 # any necessary migrations. This follows the same pattern as eventlog.py.
 
 from ipaddress import IPv4Address
+import json
 import time
 import threading
 from typing import Any, Callable, cast, Optional
@@ -35,6 +36,7 @@ from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
@@ -70,6 +72,7 @@ _object_references_table: Optional[sa.Table] = None
 _blobs_table: Optional[sa.Table] = None
 _blob_hashes_table: Optional[sa.Table] = None
 _blob_transfers_table: Optional[sa.Table] = None
+_blob_attributes_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -84,6 +87,7 @@ OBJECT_REFERENCES_VERSION = 2
 BLOBS_VERSION = 2
 BLOB_HASHES_VERSION = 2
 BLOB_TRANSFERS_VERSION = 2
+BLOB_ATTRIBUTES_VERSION = 1
 
 
 def _use_database_service() -> bool:
@@ -775,6 +779,70 @@ def _ensure_blob_transfers_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _get_blob_attributes_table() -> sa.Table:
+    """Get or create the blob_attributes table definition.
+
+    This table stores mutable blob attributes, separate from the blobs
+    table which stores immutable static values. This follows the
+    architectural pattern of separating static values from attributes.
+
+    See docs/operator_guide/database.md for the rationale.
+    """
+    global _blob_attributes_table
+    if _blob_attributes_table is None:
+        metadata = _get_metadata()
+        _blob_attributes_table = sa.Table(
+            'blob_attributes',
+            metadata,
+            sa.Column('uuid', sa.Uuid(), primary_key=True),
+            sa.Column('size', sa.BigInteger(), nullable=False, default=0),
+            sa.Column('info', sa.JSON(), nullable=True),
+            sa.Column('last_used', sa.Double(), nullable=True),
+            sa.Column('expires_at', sa.Double(), nullable=False, default=0.0),
+            # Indexes for query optimization
+            sa.Index('idx_blob_attrs_last_used', 'last_used'),
+            sa.Index('idx_blob_attrs_expires_at', 'expires_at'),
+            # Note: Foreign key to blobs table not enforced to allow
+            # flexible migration ordering
+        )
+    return _blob_attributes_table
+
+
+def _ensure_blob_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the blob_attributes table schema is up to date.
+
+    Applies any necessary migrations based on the current version.
+    Returns a dict with migration status information.
+    """
+    table_name = 'blob_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_blob_attributes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        # Create indexes
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': BLOB_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def ensure_schema() -> list[dict[str, Any]]:
     """Ensure all MariaDB tables exist with current schema versions.
 
@@ -809,6 +877,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_object_references_schema(engine))
     results.append(_ensure_blob_hashes_schema(engine))
     results.append(_ensure_blob_transfers_schema(engine))
+    results.append(_ensure_blob_attributes_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -1576,6 +1645,99 @@ def _cleanup_etcd_blob_transfers(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _migrate_etcd_blob_attributes(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate blob attributes from etcd to MariaDB blob_attributes table.
+
+    This migration scans all blob UUIDs from the blobs table and migrates
+    their attributes (size, info, last_used, expires_at) from etcd to MariaDB.
+    After successful migration, the etcd entries are deleted.
+
+    The etcd attribute keys are:
+    - attribute/blob/{uuid}/size -> {'size': int}
+    - attribute/blob/{uuid}/info -> {...qemu-img metadata...}
+    - attribute/blob/{uuid}/last_used -> {'last_used': float|null}
+    - attribute/blob/{uuid}/retention -> {'expires_at': float}
+    """
+    from shakenfist import etcd
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    # Get all blob UUIDs from the blobs table
+    blobs_table = _get_blobs_table()
+    with engine.connect() as conn:
+        stmt = sa.select(blobs_table.c.uuid)
+        result = conn.execute(stmt)
+        blob_uuids = [str(row.uuid) for row in result]
+
+    LOG.info(f'Migrating attributes for {len(blob_uuids)} blobs...')
+
+    for blob_uuid in blob_uuids:
+        try:
+            # Check if attributes already exist in MariaDB
+            existing = _direct_get_blob_attributes(UUIDType(blob_uuid))
+            if existing:
+                skipped_count += 1
+                continue
+
+            # Read attributes from etcd
+            size_data = etcd.get('attribute/blob', blob_uuid, 'size')
+            info_data = etcd.get('attribute/blob', blob_uuid, 'info')
+            last_used_data = etcd.get('attribute/blob', blob_uuid, 'last_used')
+            retention_data = etcd.get('attribute/blob', blob_uuid, 'retention')
+
+            # Extract values with defaults
+            size = size_data.get('size', 0) if size_data else 0
+            info = info_data if info_data else {}
+            last_used = (last_used_data.get('last_used')
+                         if last_used_data else None)
+            expires_at = (retention_data.get('expires_at', 0.0)
+                          if retention_data else 0.0)
+
+            # Create blob_attributes record
+            attrs = BlobAttributesData(
+                uuid=UUIDType(blob_uuid),
+                size=size,
+                info=info,
+                last_used=last_used,
+                expires_at=expires_at
+            )
+            success = _direct_create_blob_attributes(attrs)
+
+            if success:
+                # Delete etcd attributes after successful migration
+                if size_data:
+                    etcd.delete('attribute/blob', blob_uuid, 'size')
+                if info_data:
+                    etcd.delete('attribute/blob', blob_uuid, 'info')
+                if last_used_data:
+                    etcd.delete('attribute/blob', blob_uuid, 'last_used')
+                if retention_data:
+                    etcd.delete('attribute/blob', blob_uuid, 'retention')
+                migrated_count += 1
+            else:
+                error_count += 1
+
+        except Exception as e:
+            LOG.warning(f'Failed to migrate attributes for blob {blob_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count + error_count) % 100 == 0:
+            LOG.info(f'  ... {migrated_count + skipped_count + error_count} '
+                     f'blobs processed')
+
+    LOG.info(f'Blob attribute migration: {migrated_count} migrated, '
+             f'{skipped_count} skipped, {error_count} errors')
+
+    return {
+        'migrated_count': migrated_count,
+        'skipped_count': skipped_count,
+        'error_count': error_count
+    }
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -1602,6 +1764,9 @@ DATA_MIGRATIONS.update({
     },
     'blob_transfers': {
         2: _cleanup_etcd_blob_transfers,
+    },
+    'blob_attributes': {
+        2: _migrate_etcd_blob_attributes,
     },
 })
 
@@ -5557,3 +5722,477 @@ def delete_blob_transfers_for_blob(blob_uuid: str) -> bool:
         result = _direct_delete_blob_transfers_for_blob(blob_uuid)
     # result is -1 on error, >= 0 (count of deleted records) on success
     return result >= 0
+
+
+# =============================================================================
+# Blob Attributes Direct Access Functions
+# These store mutable blob attributes, separate from static values.
+# =============================================================================
+
+def _direct_create_blob_attributes(data: BlobAttributesData) -> bool:
+    """Create a blob_attributes record in MariaDB.
+
+    This is typically called when a blob is first observed on a node,
+    after the blob static values are created in the blobs table.
+
+    Args:
+        data: The BlobAttributesData to insert.
+
+    Returns:
+        True if the record was created, False if it already exists or error.
+    """
+    engine = _get_engine()
+    table = _get_blob_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                size=data.size,
+                info=data.info,
+                last_used=data.last_used,
+                expires_at=data.expires_at
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(f'MariaDB create failed for blob_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_blob_attributes(
+    blob_uuid: UUID
+) -> Optional[BlobAttributesData]:
+    """Get blob attributes from MariaDB.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        BlobAttributesData if found, None otherwise.
+    """
+    engine = _get_engine()
+    table = _get_blob_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == blob_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return BlobAttributesData(
+                uuid=result.uuid,
+                size=result.size,
+                info=result.info if result.info else {},
+                last_used=result.last_used,
+                expires_at=result.expires_at
+            )
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get failed for blob_attributes {blob_uuid}: {e}')
+        return None
+
+
+def _direct_update_blob_attributes(data: BlobAttributesData) -> bool:
+    """Update blob attributes in MariaDB.
+
+    Args:
+        data: The BlobAttributesData with updated values.
+
+    Returns:
+        True if a row was updated, False otherwise.
+    """
+    engine = _get_engine()
+    table = _get_blob_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                size=data.size,
+                info=data.info,
+                last_used=data.last_used,
+                expires_at=data.expires_at
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB update failed for blob_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_update_blob_last_used(blob_uuid: UUID, last_used: float) -> bool:
+    """Update only the last_used attribute (optimized for frequent updates).
+
+    This avoids full row reads/writes for the common case of recording usage.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+        last_used: The new last_used timestamp.
+
+    Returns:
+        True if a row was updated, False otherwise.
+    """
+    engine = _get_engine()
+    table = _get_blob_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == blob_uuid
+            ).values(last_used=last_used)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB update last_used failed for {blob_uuid}: {e}')
+        return False
+
+
+def _direct_delete_blob_attributes(blob_uuid: UUID) -> bool:
+    """Delete blob attributes from MariaDB.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        True if a row was deleted, False otherwise.
+    """
+    engine = _get_engine()
+    table = _get_blob_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == blob_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for blob_attributes {blob_uuid}: {e}')
+        return False
+
+
+def _direct_get_expired_blob_uuids(
+        current_time: Optional[float] = None) -> list[str]:
+    """Get UUIDs of blobs that have expired.
+
+    Returns blobs where expires_at > 0 (has expiration) AND
+    expires_at < current_time (past expiration).
+
+    This pushes filtering to the database, avoiding loading each blob.
+
+    Args:
+        current_time: The current time to compare against. Defaults to now.
+
+    Returns:
+        List of blob UUID strings that have expired.
+    """
+    if current_time is None:
+        current_time = time.time()
+
+    engine = _get_engine()
+    table = _get_blob_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.uuid).where(
+                sa.and_(
+                    table.c.expires_at > 0,
+                    table.c.expires_at < current_time
+                )
+            )
+            result = conn.execute(stmt)
+            return [str(row.uuid) for row in result]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query for expired blobs failed: {e}')
+        return []
+
+
+def _direct_get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
+    """Get UUIDs of transcoded blobs not used recently.
+
+    Returns blobs that:
+    1. Have transcodes (exist in object_references as TRANSCODE source)
+    2. Have last_used older than (now - idle_seconds)
+
+    This pushes filtering to the database, avoiding loading each blob.
+
+    Args:
+        idle_seconds: Maximum seconds since last use.
+
+    Returns:
+        List of blob UUID strings that are stale transcodes.
+    """
+    cutoff_time = time.time() - idle_seconds
+
+    engine = _get_engine()
+    attrs_table = _get_blob_attributes_table()
+    refs_table = _get_object_references_table()
+
+    try:
+        with engine.connect() as conn:
+            # Subquery: blob UUIDs that have transcodes
+            transcoded_blobs = sa.select(refs_table.c.source_uuid).where(
+                sa.and_(
+                    refs_table.c.source_type == str(ObjectType.BLOB),
+                    refs_table.c.relationship == str(RelationshipType.TRANSCODE)
+                )
+            ).distinct()
+
+            # Main query: transcoded blobs with stale last_used
+            stmt = sa.select(attrs_table.c.uuid).where(
+                sa.and_(
+                    attrs_table.c.uuid.in_(transcoded_blobs),
+                    sa.or_(
+                        attrs_table.c.last_used.is_(None),
+                        attrs_table.c.last_used < cutoff_time
+                    )
+                )
+            )
+            result = conn.execute(stmt)
+            return [str(row.uuid) for row in result]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query for stale transcoded blobs failed: {e}')
+        return []
+
+
+# =============================================================================
+# Blob Attributes gRPC Client Functions
+# These call the database microservice for blob attribute operations.
+# =============================================================================
+
+def _grpc_create_blob_attributes(data: BlobAttributesData) -> bool:
+    """Create blob attributes via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateBlobAttributesRequest(
+            data=database_pb2.BlobAttributesData(
+                uuid=str(data.uuid),
+                size=data.size,
+                info_json=json.dumps(data.info) if data.info else '{}',
+                last_used=data.last_used if data.last_used is not None else 0,
+                has_last_used=data.last_used is not None,
+                expires_at=data.expires_at
+            )
+        )
+        reply = stub.CreateBlobAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC CreateBlobAttributes failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_blob_attributes(blob_uuid: UUID) -> Optional[BlobAttributesData]:
+    """Get blob attributes via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetBlobAttributesRequest(uuid=str(blob_uuid))
+        reply = stub.GetBlobAttributes(request)
+        if not reply.found:
+            return None
+        d = reply.data
+        return BlobAttributesData(
+            uuid=UUID(d.uuid),
+            size=d.size,
+            info=json.loads(d.info_json) if d.info_json else {},
+            last_used=d.last_used if d.has_last_used else None,
+            expires_at=d.expires_at
+        )
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetBlobAttributes failed for {blob_uuid}: {e}')
+        return None
+
+
+def _grpc_update_blob_attributes(data: BlobAttributesData) -> bool:
+    """Update blob attributes via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateBlobAttributesRequest(
+            data=database_pb2.BlobAttributesData(
+                uuid=str(data.uuid),
+                size=data.size,
+                info_json=json.dumps(data.info) if data.info else '{}',
+                last_used=data.last_used if data.last_used is not None else 0,
+                has_last_used=data.last_used is not None,
+                expires_at=data.expires_at
+            )
+        )
+        reply = stub.UpdateBlobAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC UpdateBlobAttributes failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_update_blob_last_used(blob_uuid: UUID, last_used: float) -> bool:
+    """Update blob last_used via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateBlobLastUsedRequest(
+            uuid=str(blob_uuid),
+            last_used=last_used
+        )
+        reply = stub.UpdateBlobLastUsed(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC UpdateBlobLastUsed failed for {blob_uuid}: {e}')
+        return False
+
+
+def _grpc_delete_blob_attributes(blob_uuid: UUID) -> bool:
+    """Delete blob attributes via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteBlobAttributesRequest(uuid=str(blob_uuid))
+        reply = stub.DeleteBlobAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC DeleteBlobAttributes failed for {blob_uuid}: {e}')
+        return False
+
+
+def _grpc_get_expired_blob_uuids(
+        current_time: Optional[float] = None) -> list[str]:
+    """Get expired blob UUIDs via the database microservice."""
+    if current_time is None:
+        current_time = time.time()
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetExpiredBlobUuidsRequest(
+            current_time=current_time
+        )
+        reply = stub.GetExpiredBlobUuids(request)
+        return list(reply.uuids)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetExpiredBlobUuids failed: {e}')
+        return []
+
+
+def _grpc_get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
+    """Get stale transcoded blob UUIDs via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetStaleTranscodedBlobUuidsRequest(
+            idle_seconds=idle_seconds
+        )
+        reply = stub.GetStaleTranscodedBlobUuids(request)
+        return list(reply.uuids)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetStaleTranscodedBlobUuids failed: {e}')
+        return []
+
+
+# =============================================================================
+# Blob Attributes Public API Functions
+# =============================================================================
+
+def create_blob_attributes(data: BlobAttributesData) -> bool:
+    """Create blob attributes record.
+
+    Args:
+        data: The BlobAttributesData to create.
+
+    Returns:
+        True if created successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_create_blob_attributes(data)
+    return _direct_create_blob_attributes(data)
+
+
+def get_blob_attributes(blob_uuid: UUID) -> Optional[BlobAttributesData]:
+    """Get blob attributes.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        BlobAttributesData if found, None otherwise.
+    """
+    if _use_database_service():
+        return _grpc_get_blob_attributes(blob_uuid)
+    return _direct_get_blob_attributes(blob_uuid)
+
+
+def update_blob_attributes(data: BlobAttributesData) -> bool:
+    """Update blob attributes.
+
+    Args:
+        data: The BlobAttributesData with updated values.
+
+    Returns:
+        True if updated successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_update_blob_attributes(data)
+    return _direct_update_blob_attributes(data)
+
+
+def update_blob_last_used(blob_uuid: UUID, last_used: float) -> bool:
+    """Update only the last_used attribute (optimized for frequent updates).
+
+    Args:
+        blob_uuid: The UUID of the blob.
+        last_used: The new last_used timestamp.
+
+    Returns:
+        True if updated successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_update_blob_last_used(blob_uuid, last_used)
+    return _direct_update_blob_last_used(blob_uuid, last_used)
+
+
+def delete_blob_attributes(blob_uuid: UUID) -> bool:
+    """Delete blob attributes.
+
+    Args:
+        blob_uuid: The UUID of the blob.
+
+    Returns:
+        True if deleted successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_delete_blob_attributes(blob_uuid)
+    return _direct_delete_blob_attributes(blob_uuid)
+
+
+def get_expired_blob_uuids(current_time: Optional[float] = None) -> list[str]:
+    """Get UUIDs of blobs that have expired.
+
+    Returns blobs where expires_at > 0 (has expiration) AND
+    expires_at < current_time (past expiration).
+
+    Args:
+        current_time: The current time to compare against. Defaults to now.
+
+    Returns:
+        List of blob UUID strings that have expired.
+    """
+    if _use_database_service():
+        return _grpc_get_expired_blob_uuids(current_time)
+    return _direct_get_expired_blob_uuids(current_time)
+
+
+def get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
+    """Get UUIDs of transcoded blobs not used recently.
+
+    Returns blobs that:
+    1. Have transcodes (exist in object_references as TRANSCODE source)
+    2. Have last_used older than (now - idle_seconds)
+
+    Args:
+        idle_seconds: Maximum seconds since last use.
+
+    Returns:
+        List of blob UUID strings that are stale transcodes.
+    """
+    if _use_database_service():
+        return _grpc_get_stale_transcoded_blob_uuids(idle_seconds)
+    return _direct_get_stale_transcoded_blob_uuids(idle_seconds)

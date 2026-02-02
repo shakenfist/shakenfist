@@ -289,12 +289,10 @@ class Monitor(daemon.Daemon):
             if b:
                 b.record_usage()
 
-        # Find expired blobs
-        for blob_uuid in mariadb.get_active_blob_uuids():
+        # Find expired blobs (database-level filtering)
+        for blob_uuid in mariadb.get_expired_blob_uuids():
             b = Blob.from_db(blob_uuid)
-            if not b:
-                continue
-            if b.expires_at > 0 and b.expires_at < time.time():
+            if b:
                 b.add_event(EVENT_TYPE_AUDIT, 'blob has expired')
                 b.state = dbo.STATE_DELETED
 
@@ -320,14 +318,11 @@ class Monitor(daemon.Daemon):
                 b.request_replication(allow_excess=excess)
 
         # Find transcodes of not recently used blobs and reap them
-        for blob_uuid in mariadb.get_active_blob_uuids():
+        # (database-level filtering)
+        for blob_uuid in mariadb.get_stale_transcoded_blob_uuids(
+                config.BLOB_TRANSCODE_MAXIMUM_IDLE_TIME):
             b = Blob.from_db(blob_uuid)
-            if not b:
-                continue
-            if not b.transcoded:
-                continue
-
-            if time.time() - b.last_used > config.BLOB_TRANSCODE_MAXIMUM_IDLE_TIME:
+            if b:
                 b.remove_transcodes()
 
         # Node management
