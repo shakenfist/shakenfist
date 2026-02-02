@@ -361,6 +361,44 @@ class DatabaseServiceStub:
         database_pb2.DeleteCountReply,
     ]
 
+    CreateBlobAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateBlobAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Blob Attributes Operations (MariaDB)
+    These store mutable blob attributes, separate from BlobData (static values).
+    """
+
+    GetBlobAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobAttributesRequest,
+        database_pb2.GetBlobAttributesReply,
+    ]
+
+    UpdateBlobAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateBlobAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateBlobLastUsed: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateBlobLastUsedRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteBlobAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteBlobAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    GetExpiredBlobUuids: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetExpiredBlobUuidsRequest,
+        database_pb2.GetExpiredBlobUuidsReply,
+    ]
+
+    GetStaleTranscodedBlobUuids: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetStaleTranscodedBlobUuidsRequest,
+        database_pb2.GetStaleTranscodedBlobUuidsReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -702,6 +740,44 @@ class DatabaseServiceAsyncStub:
     DeleteStaleTransfers: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteStaleTransfersRequest,
         database_pb2.DeleteCountReply,
+    ]
+
+    CreateBlobAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateBlobAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Blob Attributes Operations (MariaDB)
+    These store mutable blob attributes, separate from BlobData (static values).
+    """
+
+    GetBlobAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobAttributesRequest,
+        database_pb2.GetBlobAttributesReply,
+    ]
+
+    UpdateBlobAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateBlobAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateBlobLastUsed: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateBlobLastUsedRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteBlobAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteBlobAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    GetExpiredBlobUuids: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetExpiredBlobUuidsRequest,
+        database_pb2.GetExpiredBlobUuidsReply,
+    ]
+
+    GetStaleTranscodedBlobUuids: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetStaleTranscodedBlobUuidsRequest,
+        database_pb2.GetStaleTranscodedBlobUuidsReply,
     ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
@@ -1178,5 +1254,57 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteStaleTransfersRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
+
+    @abc.abstractmethod
+    def CreateBlobAttributes(
+        self,
+        request: database_pb2.CreateBlobAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Blob Attributes Operations (MariaDB)
+        These store mutable blob attributes, separate from BlobData (static values).
+        """
+
+    @abc.abstractmethod
+    def GetBlobAttributes(
+        self,
+        request: database_pb2.GetBlobAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetBlobAttributesReply, collections.abc.Awaitable[database_pb2.GetBlobAttributesReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateBlobAttributes(
+        self,
+        request: database_pb2.UpdateBlobAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateBlobLastUsed(
+        self,
+        request: database_pb2.UpdateBlobLastUsedRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteBlobAttributes(
+        self,
+        request: database_pb2.DeleteBlobAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def GetExpiredBlobUuids(
+        self,
+        request: database_pb2.GetExpiredBlobUuidsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetExpiredBlobUuidsReply, collections.abc.Awaitable[database_pb2.GetExpiredBlobUuidsReply]]: ...
+
+    @abc.abstractmethod
+    def GetStaleTranscodedBlobUuids(
+        self,
+        request: database_pb2.GetStaleTranscodedBlobUuidsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetStaleTranscodedBlobUuidsReply, collections.abc.Awaitable[database_pb2.GetStaleTranscodedBlobUuidsReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

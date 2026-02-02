@@ -364,6 +364,41 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteStaleTransfersRequest.SerializeToString,
                 response_deserializer=database__pb2.DeleteCountReply.FromString,
                 _registered_method=True)
+        self.CreateBlobAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateBlobAttributes',
+                request_serializer=database__pb2.CreateBlobAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetBlobAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetBlobAttributes',
+                request_serializer=database__pb2.GetBlobAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetBlobAttributesReply.FromString,
+                _registered_method=True)
+        self.UpdateBlobAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateBlobAttributes',
+                request_serializer=database__pb2.UpdateBlobAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.UpdateBlobLastUsed = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateBlobLastUsed',
+                request_serializer=database__pb2.UpdateBlobLastUsedRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteBlobAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteBlobAttributes',
+                request_serializer=database__pb2.DeleteBlobAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetExpiredBlobUuids = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetExpiredBlobUuids',
+                request_serializer=database__pb2.GetExpiredBlobUuidsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetExpiredBlobUuidsReply.FromString,
+                _registered_method=True)
+        self.GetStaleTranscodedBlobUuids = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetStaleTranscodedBlobUuids',
+                request_serializer=database__pb2.GetStaleTranscodedBlobUuidsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetStaleTranscodedBlobUuidsReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -777,6 +812,50 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateBlobAttributes(self, request, context):
+        """Blob Attributes Operations (MariaDB)
+        These store mutable blob attributes, separate from BlobData (static values).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBlobAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateBlobAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateBlobLastUsed(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteBlobAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetExpiredBlobUuids(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetStaleTranscodedBlobUuids(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1109,6 +1188,41 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.DeleteStaleTransfers,
                     request_deserializer=database__pb2.DeleteStaleTransfersRequest.FromString,
                     response_serializer=database__pb2.DeleteCountReply.SerializeToString,
+            ),
+            'CreateBlobAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateBlobAttributes,
+                    request_deserializer=database__pb2.CreateBlobAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetBlobAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBlobAttributes,
+                    request_deserializer=database__pb2.GetBlobAttributesRequest.FromString,
+                    response_serializer=database__pb2.GetBlobAttributesReply.SerializeToString,
+            ),
+            'UpdateBlobAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateBlobAttributes,
+                    request_deserializer=database__pb2.UpdateBlobAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'UpdateBlobLastUsed': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateBlobLastUsed,
+                    request_deserializer=database__pb2.UpdateBlobLastUsedRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteBlobAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteBlobAttributes,
+                    request_deserializer=database__pb2.DeleteBlobAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetExpiredBlobUuids': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetExpiredBlobUuids,
+                    request_deserializer=database__pb2.GetExpiredBlobUuidsRequest.FromString,
+                    response_serializer=database__pb2.GetExpiredBlobUuidsReply.SerializeToString,
+            ),
+            'GetStaleTranscodedBlobUuids': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetStaleTranscodedBlobUuids,
+                    request_deserializer=database__pb2.GetStaleTranscodedBlobUuidsRequest.FromString,
+                    response_serializer=database__pb2.GetStaleTranscodedBlobUuidsReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2893,6 +3007,195 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/DeleteStaleTransfers',
             database__pb2.DeleteStaleTransfersRequest.SerializeToString,
             database__pb2.DeleteCountReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateBlobAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateBlobAttributes',
+            database__pb2.CreateBlobAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetBlobAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetBlobAttributes',
+            database__pb2.GetBlobAttributesRequest.SerializeToString,
+            database__pb2.GetBlobAttributesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateBlobAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateBlobAttributes',
+            database__pb2.UpdateBlobAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateBlobLastUsed(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateBlobLastUsed',
+            database__pb2.UpdateBlobLastUsedRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteBlobAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteBlobAttributes',
+            database__pb2.DeleteBlobAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetExpiredBlobUuids(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetExpiredBlobUuids',
+            database__pb2.GetExpiredBlobUuidsRequest.SerializeToString,
+            database__pb2.GetExpiredBlobUuidsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetStaleTranscodedBlobUuids(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetStaleTranscodedBlobUuids',
+            database__pb2.GetStaleTranscodedBlobUuidsRequest.SerializeToString,
+            database__pb2.GetStaleTranscodedBlobUuidsReply.FromString,
             options,
             channel_credentials,
             insecure,

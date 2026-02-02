@@ -21,6 +21,7 @@ from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import etcd
 from shakenfist import mariadb
+from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
@@ -69,7 +70,7 @@ LOG, _ = logs.setup(__name__)
 class Blob(dbo):
     object_type = ObjectType.BLOB
     initial_version = 2
-    current_version = 10
+    current_version = 11
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -88,6 +89,27 @@ class Blob(dbo):
 
         self.__modified: float = data.modified
         self.__fetched_at: float = data.fetched_at
+
+        # Lazy-load attributes from MariaDB
+        self.__attributes: Optional[BlobAttributesData] = None
+        self.__attributes_loaded: bool = False
+
+    def _load_attributes(self) -> Optional[BlobAttributesData]:
+        """Load attributes from MariaDB."""
+        if not self.__attributes_loaded:
+            self.__attributes = mariadb.get_blob_attributes(
+                uuid.UUID(self.uuid))
+            self.__attributes_loaded = True
+        return self.__attributes
+
+    def _ensure_attributes(self) -> BlobAttributesData:
+        """Ensure attributes record exists, creating with defaults if needed."""
+        attrs = self._load_attributes()
+        if attrs is None:
+            attrs = BlobAttributesData(uuid=uuid.UUID(self.uuid))
+            mariadb.create_blob_attributes(attrs)
+            self.__attributes = attrs
+        return attrs
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values: dict[str, Any]) -> None:
@@ -144,6 +166,12 @@ class Blob(dbo):
     def _upgrade_step_9_to_10(cls, static_values: dict[str, Any]) -> None:
         # Static values migration to MariaDB is handled by
         # sf-ctl migrate-data-to-mariadb (blobs table)
+        ...
+
+    @classmethod
+    def _upgrade_step_10_to_11(cls, static_values: dict[str, Any]) -> None:
+        # Attributes migration to MariaDB blob_attributes table is handled by
+        # sf-ctl migrate-data-to-mariadb (blob_attributes table)
         ...
 
     @classmethod
@@ -320,21 +348,31 @@ class Blob(dbo):
             return str(refs[0].target_uuid)
         return None
 
-    # Values routed to attributes
+    # Values routed to attributes (stored in blob_attributes table)
     @property
     def size(self) -> int:
-        size = self._db_get_attribute('size', {'size': 0})
-        return size['size']
+        attrs = self._load_attributes()
+        return attrs.size if attrs else 0
 
     @size.setter
     def size(self, new_size: int) -> None:
         if new_size < 1:
             raise BlobsMustHaveContent()
 
-        size = self._db_get_attribute('size', None)
-        if size:
+        attrs = self._ensure_attributes()
+        if attrs.size > 0:
             raise BlobSizeCannotChange()
-        self._db_set_attribute('size', {'size': new_size})
+
+        # Update in MariaDB
+        new_attrs = BlobAttributesData(
+            uuid=attrs.uuid,
+            size=new_size,
+            info=attrs.info,
+            last_used=attrs.last_used,
+            expires_at=attrs.expires_at
+        )
+        mariadb.update_blob_attributes(new_attrs)
+        self.__attributes = new_attrs
 
     @property
     def locations(self) -> list[str]:
@@ -386,7 +424,8 @@ class Blob(dbo):
 
     @property
     def info(self) -> dict[str, Any]:
-        return self._db_get_attribute('info')
+        attrs = self._load_attributes()
+        return attrs.info if attrs else {}
 
     @property
     def ref_count(self) -> int:
@@ -531,19 +570,35 @@ class Blob(dbo):
 
     @property
     def last_used(self) -> Optional[float]:
-        last_used = self._db_get_attribute('last_used', {'last_used': None})
-        return last_used['last_used']
+        attrs = self._load_attributes()
+        return attrs.last_used if attrs else None
 
     def record_usage(self) -> None:
-        self._db_set_attribute('last_used', {'last_used': time.time()})
+        now = time.time()
+        self._ensure_attributes()
+        # Use optimized single-column update
+        mariadb.update_blob_last_used(uuid.UUID(self.uuid), now)
+        # Update local cache
+        if self.__attributes:
+            self.__attributes.last_used = now
 
     @property
     def expires_at(self) -> float:
-        retention = self._db_get_attribute('retention', {'expires_at': 0})
-        return retention['expires_at']
+        attrs = self._load_attributes()
+        return attrs.expires_at if attrs else 0.0
 
     def set_lifetime(self, seconds_from_now: float) -> None:
-        self._db_set_attribute('retention', {'expires_at': time.time() + seconds_from_now})
+        expires = time.time() + seconds_from_now
+        attrs = self._ensure_attributes()
+        new_attrs = BlobAttributesData(
+            uuid=attrs.uuid,
+            size=attrs.size,
+            info=attrs.info,
+            last_used=attrs.last_used,
+            expires_at=expires
+        )
+        mariadb.update_blob_attributes(new_attrs)
+        self.__attributes = new_attrs
 
     # Operations
     def add_node_location(self) -> None:
@@ -572,7 +627,18 @@ class Blob(dbo):
                     del info[key]
 
             info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
-            self._db_set_attribute('info', info)
+
+            # Store info in MariaDB blob_attributes table
+            attrs = self._ensure_attributes()
+            new_attrs = BlobAttributesData(
+                uuid=attrs.uuid,
+                size=attrs.size,
+                info=info,
+                last_used=attrs.last_used,
+                expires_at=attrs.expires_at
+            )
+            mariadb.update_blob_attributes(new_attrs)
+            self.__attributes = new_attrs
 
     def cascading_delete(self) -> None:
         self.state = self.STATE_DELETED
@@ -937,6 +1003,7 @@ class Blob(dbo):
     def hard_delete(self) -> None:
         mariadb.delete_blob_hashes(str(self.uuid))
         mariadb.delete_blob_transfers_for_blob(str(self.uuid))
+        mariadb.delete_blob_attributes(uuid.UUID(self.uuid))
         mariadb.delete_blob(self.uuid)
         super().hard_delete()
 

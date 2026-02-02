@@ -20,6 +20,34 @@ Before starting, ensure you understand:
 - Access patterns (how the data is queried/filtered)
 - Whether the data has high churn or requires atomic operations
 
+## Static Values vs Attributes
+
+Per the architecture documented in `docs/operator_guide/database.md`, data is
+stored in **separate tables** based on mutability:
+
+| Type | Table Pattern | Pydantic Config | Description |
+|------|---------------|-----------------|-------------|
+| Static Values | `{objects}` | `frozen=True` | Immutable after creation |
+| Attributes | `{object}_attributes` | `frozen=False` | Can change during lifetime |
+
+**When to use static values:**
+- UUID, version, created_at timestamps
+- Configuration set at creation time
+- Data that never changes after the object is created
+
+**When to use attributes:**
+- Usage timestamps (last_used, last_accessed)
+- Counters or metrics that update
+- Metadata discovered after creation (e.g., file size, image info)
+- Expiration times that can be extended
+
+**Why separate tables?**
+- Avoids wide generic tables - each type has exactly the columns it needs
+- Enables proper typing - native SQL types instead of JSON everywhere
+- Supports efficient indexes - can index frequently-queried attribute columns
+- Keeps queries simple - no joins needed for common operations
+- Separates concerns - static values are cacheable, attributes are not
+
 ## Migration Pattern Overview
 
 The standard migration involves these files (in order of implementation):
@@ -599,6 +627,311 @@ sf-ctl migrate-{objects}-to-mariadb
 
 Update the migration phases table and per-type tables section.
 
+---
+
+## Migrating Attributes (Separate Table Pattern)
+
+When migrating **mutable attributes** (as opposed to static values), use a
+separate `{object}_attributes` table. This section covers the differences
+from the static values pattern above.
+
+### Attribute Schema (Step 1 variation)
+
+Create `shakenfist/schema/{object}_attributes.py`:
+
+```python
+# Pydantic schema for {object} attributes storage in MariaDB.
+#
+# This schema defines the structure for storing {object} mutable attributes.
+# Attributes are values that can change during the object's lifetime, unlike
+# static values which are immutable after creation.
+#
+# This is separate from {Object}Data (static values) per the architecture
+# decision to keep mutable and immutable data in separate tables.
+
+from typing import Annotated, Any, Optional
+
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import Field
+from pydantic import UUID4
+
+from shakenfist.schema.sqlalchemy import SQLIndex
+from shakenfist.schema.sqlalchemy import SQLNativeUUID
+
+
+class {Object}AttributesData(BaseModel):
+    """Schema for {object} attributes in MariaDB.
+
+    This model represents the mutable attributes for a {object} object.
+    Unlike {Object}Data (static values), these can be updated after creation.
+
+    Table: {object}_attributes
+    Primary key: uuid (references {objects}.uuid)
+    """
+
+    # NOTE: Not frozen - attributes are mutable
+    model_config = ConfigDict(frozen=False)
+
+    # Primary key - references {objects}.uuid
+    uuid: Annotated[UUID4, SQLNativeUUID()]
+
+    # Example: timestamp attribute that updates frequently
+    last_used: Annotated[Optional[float], SQLIndex()] = None
+
+    # Example: JSON metadata discovered after creation
+    info: dict[str, Any] = Field(default_factory=dict)
+
+    # Example: expiration time (0 = never)
+    expires_at: Annotated[float, SQLIndex()] = 0.0
+```
+
+Key differences from static values:
+- `ConfigDict(frozen=False)` - model is mutable
+- Table name is `{object}_attributes` (not `{objects}`)
+- Primary key references the static values table
+- Fields have defaults for lazy creation
+
+### Attribute Table Definition (Step 3 variation)
+
+```python
+def _get_{object}_attributes_table() -> sa.Table:
+    """Get or create the {object}_attributes table definition.
+
+    This table stores mutable attributes, separate from the {objects}
+    table which stores immutable static values.
+    """
+    global _{object}_attributes_table
+    if _{object}_attributes_table is None:
+        metadata = _get_metadata()
+        _{object}_attributes_table = sa.Table(
+            '{object}_attributes',
+            metadata,
+            sa.Column('uuid', sa.Uuid(), primary_key=True),
+            sa.Column('last_used', sa.Double(), nullable=True),
+            sa.Column('info', sa.JSON(), nullable=True),
+            sa.Column('expires_at', sa.Double(), nullable=False, default=0.0),
+            # Indexes for query optimization
+            sa.Index('idx_{object}_attrs_last_used', 'last_used'),
+            sa.Index('idx_{object}_attrs_expires_at', 'expires_at'),
+            # Note: Foreign key not enforced for flexible migration ordering
+        )
+    return _{object}_attributes_table
+```
+
+### Optimized Single-Column Updates
+
+For frequently-updated attributes (like `last_used`), add optimized functions:
+
+```python
+def _direct_update_{object}_last_used(obj_uuid: UUID, last_used: float) -> bool:
+    """Update only the last_used attribute (optimized for frequent updates)."""
+    engine = _get_engine()
+    table = _get_{object}_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == obj_uuid
+            ).values(last_used=last_used)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB update last_used failed for {obj_uuid}: {e}')
+        return False
+```
+
+### Lazy Loading in Object Class (Step 5 variation)
+
+Attributes should be loaded lazily (on first access) rather than eagerly:
+
+```python
+class {Object}(dbo):
+    def __init__(self, data: {Object}Data, ...):
+        # ... existing static value handling ...
+
+        # Lazy-load attributes from MariaDB
+        self.__attributes: {Object}AttributesData | None = None
+        self.__attributes_loaded = False
+
+    def _load_attributes(self) -> {Object}AttributesData | None:
+        """Load attributes from MariaDB."""
+        if not self.__attributes_loaded:
+            self.__attributes = mariadb.get_{object}_attributes(
+                uuid.UUID(self.uuid))
+            self.__attributes_loaded = True
+        return self.__attributes
+
+    def _ensure_attributes(self) -> {Object}AttributesData:
+        """Ensure attributes record exists, creating with defaults if needed."""
+        attrs = self._load_attributes()
+        if attrs is None:
+            attrs = {Object}AttributesData(uuid=uuid.UUID(self.uuid))
+            mariadb.create_{object}_attributes(attrs)
+            self.__attributes = attrs
+        return attrs
+
+    @property
+    def last_used(self) -> Optional[float]:
+        attrs = self._load_attributes()
+        return attrs.last_used if attrs else None
+
+    def record_usage(self) -> None:
+        now = time.time()
+        self._ensure_attributes()
+        # Use optimized single-column update
+        mariadb.update_{object}_last_used(uuid.UUID(self.uuid), now)
+        # Update local cache
+        if self.__attributes:
+            self.__attributes.last_used = now  # Mutable model
+
+    def hard_delete(self) -> None:
+        # Delete attributes first (child record)
+        mariadb.delete_{object}_attributes(uuid.UUID(self.uuid))
+        # Delete static values
+        mariadb.delete_{object}(uuid.UUID(self.uuid))
+        super().hard_delete()
+```
+
+### Database-Level Query Functions
+
+One key benefit of attributes in MariaDB is pushing filtering to the database:
+
+```python
+def get_expired_{object}_uuids(current_time: float = None) -> list[str]:
+    """Get UUIDs of {objects} that have expired.
+
+    Returns {objects} where expires_at > 0 (has expiration) AND
+    expires_at < current_time (past expiration).
+
+    This pushes filtering to the database, avoiding loading each object.
+    """
+    if current_time is None:
+        current_time = time.time()
+
+    engine = _get_engine()
+    table = _get_{object}_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.uuid).where(
+                sa.and_(
+                    table.c.expires_at > 0,
+                    table.c.expires_at < current_time
+                )
+            )
+            result = conn.execute(stmt)
+            return [str(row.uuid) for row in result]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query for expired {objects} failed: {e}')
+        return []
+```
+
+This replaces patterns like:
+```python
+# Before (loads every object):
+for obj_uuid in mariadb.get_active_{object}_uuids():
+    obj = {Object}.from_db(obj_uuid)
+    if obj and obj.expires_at > 0 and time.time() > obj.expires_at:
+        obj.state = State({Object}.STATE_DELETED, 'expired')
+
+# After (database-level filtering):
+for obj_uuid in mariadb.get_expired_{object}_uuids():
+    obj = {Object}.from_db(obj_uuid)
+    if obj:
+        obj.state = State({Object}.STATE_DELETED, 'expired')
+```
+
+### Attribute Migration Function
+
+Attribute migration reads from etcd and creates rows in the attributes table:
+
+```python
+def _migrate_{object}_attributes_from_etcd(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate {object} attributes from etcd to MariaDB.
+
+    This creates {object}_attributes records for existing {objects}.
+    """
+    migrated_count = 0
+    skipped_count = 0
+    error_count = 0
+
+    # Get all {object} UUIDs from the static values table
+    static_table = _get_{objects}_table()
+    with engine.connect() as conn:
+        stmt = sa.select(static_table.c.uuid)
+        result = conn.execute(stmt)
+        obj_uuids = [str(row.uuid) for row in result]
+
+    for obj_uuid in obj_uuids:
+        try:
+            # Check if attributes already exist
+            existing = _direct_get_{object}_attributes(UUID(obj_uuid))
+            if existing:
+                skipped_count += 1
+                continue
+
+            # Read attributes from etcd
+            last_used_data = etcd.get('attribute/{object}', obj_uuid, 'last_used')
+            info_data = etcd.get('attribute/{object}', obj_uuid, 'info')
+            retention_data = etcd.get('attribute/{object}', obj_uuid, 'retention')
+
+            # Extract values with defaults
+            last_used = last_used_data.get('last_used') if last_used_data else None
+            info = info_data if info_data else {}
+            expires_at = (retention_data.get('expires_at', 0.0)
+                          if retention_data else 0.0)
+
+            # Create attributes record
+            attrs = {Object}AttributesData(
+                uuid=UUID(obj_uuid),
+                last_used=last_used,
+                info=info,
+                expires_at=expires_at
+            )
+            success = _direct_create_{object}_attributes(attrs)
+
+            if success:
+                # Delete etcd attributes after successful migration
+                etcd.delete('attribute/{object}', obj_uuid, 'last_used')
+                etcd.delete('attribute/{object}', obj_uuid, 'info')
+                etcd.delete('attribute/{object}', obj_uuid, 'retention')
+                migrated_count += 1
+            else:
+                error_count += 1
+
+        except Exception as e:
+            LOG.warning(
+                f'Failed to migrate attributes for {object} {obj_uuid}: {e}')
+            error_count += 1
+
+    return {
+        'migrated': migrated_count,
+        'skipped': skipped_count,
+        'errors': error_count
+    }
+```
+
+Register in `DATA_MIGRATIONS`:
+```python
+DATA_MIGRATIONS = {
+    # Static values migration
+    '{objects}': {
+        2: _migrate_etcd_{objects},
+    },
+    # Attributes migration (separate entry, also version 2)
+    '{object}_attributes': {
+        2: _migrate_{object}_attributes_from_etcd,
+    },
+}
+```
+
+Note: Both static values and attributes migrations use version 2 because version 1
+represents the table creation step (handled by `ensure_schema`).
+
+---
+
 ## Verification Checklist
 
 After implementation:
@@ -621,6 +954,8 @@ After implementation:
 - Bump the object's `current_version` when changing storage
 - Use atomic database operations where possible
 - Follow existing naming conventions (`_direct_*`, `_grpc_*`, public API)
+- Use `Optional[float]` for parameters with `None` defaults (mypy requires explicit
+  Optional for type safety - PEP 484 prohibits implicit Optional)
 
 ### Don't
 
@@ -628,6 +963,8 @@ After implementation:
 - Don't forget to update `hard_delete()` to clean up MariaDB records
 - Don't skip the migration command - existing deployments need it
 - Don't forget Prometheus counters for observability
+- Don't use `param: float = None` - this causes mypy errors; use
+  `param: Optional[float] = None` instead
 
 ## Related Documentation
 
