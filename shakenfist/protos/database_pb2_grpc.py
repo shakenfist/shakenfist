@@ -209,6 +209,31 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.UpdateUploadRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.CreateBlob = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateBlob',
+                request_serializer=database__pb2.CreateBlobRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetBlob = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetBlob',
+                request_serializer=database__pb2.GetBlobRequest.SerializeToString,
+                response_deserializer=database__pb2.GetBlobReply.FromString,
+                _registered_method=True)
+        self.GetAllBlobUuids = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllBlobUuids',
+                request_serializer=database__pb2.GetAllBlobUuidsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAllBlobUuidsReply.FromString,
+                _registered_method=True)
+        self.DeleteBlob = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteBlob',
+                request_serializer=database__pb2.DeleteBlobRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.UpdateBlob = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateBlob',
+                request_serializer=database__pb2.UpdateBlobRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
         self.CreateDnsMasq = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/CreateDnsMasq',
                 request_serializer=database__pb2.CreateDnsMasqRequest.SerializeToString,
@@ -561,6 +586,37 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateBlob(self, request, context):
+        """Blob Operations (MariaDB)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBlob(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAllBlobUuids(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteBlob(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateBlob(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def CreateDnsMasq(self, request, context):
         """DnsMasq Operations (MariaDB)
         """
@@ -897,6 +953,31 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'UpdateUpload': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateUpload,
                     request_deserializer=database__pb2.UpdateUploadRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateBlob': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateBlob,
+                    request_deserializer=database__pb2.CreateBlobRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetBlob': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBlob,
+                    request_deserializer=database__pb2.GetBlobRequest.FromString,
+                    response_serializer=database__pb2.GetBlobReply.SerializeToString,
+            ),
+            'GetAllBlobUuids': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllBlobUuids,
+                    request_deserializer=database__pb2.GetAllBlobUuidsRequest.FromString,
+                    response_serializer=database__pb2.GetAllBlobUuidsReply.SerializeToString,
+            ),
+            'DeleteBlob': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteBlob,
+                    request_deserializer=database__pb2.DeleteBlobRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'UpdateBlob': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateBlob,
+                    request_deserializer=database__pb2.UpdateBlobRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
             'CreateDnsMasq': grpc.unary_unary_rpc_method_handler(
@@ -1974,6 +2055,141 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/UpdateUpload',
             database__pb2.UpdateUploadRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateBlob(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateBlob',
+            database__pb2.CreateBlobRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetBlob(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetBlob',
+            database__pb2.GetBlobRequest.SerializeToString,
+            database__pb2.GetBlobReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAllBlobUuids(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllBlobUuids',
+            database__pb2.GetAllBlobUuidsRequest.SerializeToString,
+            database__pb2.GetAllBlobUuidsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteBlob(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteBlob',
+            database__pb2.DeleteBlobRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateBlob(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateBlob',
+            database__pb2.UpdateBlobRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,

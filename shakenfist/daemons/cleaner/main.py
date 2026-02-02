@@ -9,9 +9,9 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist import instance
+from shakenfist import mariadb
 from shakenfist import node
 from shakenfist.blob import Blob
-from shakenfist.blob import Blobs
 from shakenfist.blob import observe_local_blobs
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_STATUS
@@ -32,9 +32,7 @@ class Monitor(daemon.Daemon):
         cache_path = os.path.join(config.STORAGE_PATH, 'image_cache')
         os.makedirs(cache_path, exist_ok=True)
 
-        active_blob_uuids = []
-        for b in Blobs([], prefilter='active'):
-            active_blob_uuids.append(b.uuid)
+        active_blob_uuids = mariadb.get_active_blob_uuids()
         n = node.Node.from_db(config.NODE_NAME)
         if not n:
             # We have started up enough yet to exist in etcd

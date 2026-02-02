@@ -21,7 +21,7 @@ from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import send_systemd_stopping
 from shakenfist import etcd
-from shakenfist import eventlog
+from shakenfist.eventlog import add_event
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import NoSuchChannel
 from shakenfist import instance
@@ -587,7 +587,7 @@ class SideChannelExecutorJob(SideChannelJob):
                 b = blob.Blob.new(self._blob_uuid, time.time(), time.time())
                 ao = copy.copy(self.affected_objects)
                 ao.append(b)
-                eventlog.add_event_multi(
+                add_event_multi(
                     EVENT_TYPE_STATUS, ao, 'fetched content from instance',
                     extra={
                         'remote_stat_result': self._stat_result,
@@ -874,7 +874,7 @@ class Monitor(daemon.Daemon):
             'thread': sc_thread,
             'instance_uuid': instance_uuid
         }
-        eventlog.add_event(
+        add_event(
             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
             'side channel executor started',
             extra={
@@ -887,7 +887,7 @@ class Monitor(daemon.Daemon):
             t = self.executors[executor_id]
             if not t['thread'].is_alive():
                 t['thread'].join(1)
-                eventlog.add_event(
+                add_event(
                     EVENT_TYPE_AUDIT, 'instance', t['instance_uuid'],
                     'side channel executor ended',
                     extra={
@@ -911,7 +911,7 @@ class Monitor(daemon.Daemon):
     def _request_thread_exit(self, instance_uuid, t):
         daemon.set_abort_path(
             t['object'].abort_path, 'from _request_thread_exit')
-        eventlog.add_event(
+        add_event(
             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
             'side channel monitor instructed to exit')
         self.monitors[instance_uuid]['thread'].join(0.5)
@@ -919,7 +919,7 @@ class Monitor(daemon.Daemon):
         if not t['thread'].is_alive():
             del self.monitors[instance_uuid]
             daemon.clear_abort_path(t['object'].abort_path)
-            eventlog.add_event(
+            add_event(
                 EVENT_TYPE_AUDIT, 'instance', instance_uuid,
                 'side channel monitor finished')
 

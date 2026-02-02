@@ -201,6 +201,32 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateBlob: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateBlobRequest,
+        database_pb2.StatusReply,
+    ]
+    """Blob Operations (MariaDB)"""
+
+    GetBlob: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobRequest,
+        database_pb2.GetBlobReply,
+    ]
+
+    GetAllBlobUuids: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllBlobUuidsRequest,
+        database_pb2.GetAllBlobUuidsReply,
+    ]
+
+    DeleteBlob: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteBlobRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateBlob: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateBlobRequest,
+        database_pb2.StatusReply,
+    ]
+
     CreateDnsMasq: grpc.UnaryUnaryMultiCallable[
         database_pb2.CreateDnsMasqRequest,
         database_pb2.StatusReply,
@@ -515,6 +541,32 @@ class DatabaseServiceAsyncStub:
 
     UpdateUpload: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.UpdateUploadRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateBlob: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateBlobRequest,
+        database_pb2.StatusReply,
+    ]
+    """Blob Operations (MariaDB)"""
+
+    GetBlob: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetBlobRequest,
+        database_pb2.GetBlobReply,
+    ]
+
+    GetAllBlobUuids: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllBlobUuidsRequest,
+        database_pb2.GetAllBlobUuidsReply,
+    ]
+
+    DeleteBlob: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteBlobRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateBlob: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateBlobRequest,
         database_pb2.StatusReply,
     ]
 
@@ -902,6 +954,42 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def UpdateUpload(
         self,
         request: database_pb2.UpdateUploadRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateBlob(
+        self,
+        request: database_pb2.CreateBlobRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Blob Operations (MariaDB)"""
+
+    @abc.abstractmethod
+    def GetBlob(
+        self,
+        request: database_pb2.GetBlobRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetBlobReply, collections.abc.Awaitable[database_pb2.GetBlobReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllBlobUuids(
+        self,
+        request: database_pb2.GetAllBlobUuidsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllBlobUuidsReply, collections.abc.Awaitable[database_pb2.GetAllBlobUuidsReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteBlob(
+        self,
+        request: database_pb2.DeleteBlobRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateBlob(
+        self,
+        request: database_pb2.UpdateBlobRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
