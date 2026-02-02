@@ -1,3 +1,8 @@
+---
+issue_repo: https://github.com/shakenfist/cloudgood
+issue_path: docs/index.md
+---
+
 # Welcome to the Derek Zoolander Centre For Kids Who Want To Cloud Good
 
 This is essentially a set of working notes on cloud and distributed compute

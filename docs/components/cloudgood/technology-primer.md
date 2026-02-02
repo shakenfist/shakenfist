@@ -1,3 +1,8 @@
+---
+issue_repo: https://github.com/shakenfist/cloudgood
+issue_path: docs/technology-primer.md
+---
+
 # Technology Primer
 
 There is a fair bit of assumed knowledge embodied in modern cloud that

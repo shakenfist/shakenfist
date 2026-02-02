@@ -1,3 +1,8 @@
+---
+issue_repo: https://github.com/shakenfist/cloudgood
+issue_path: docs/memory-mapped-devices.md
+---
+
 # Memory mapped devices
 
 We've briefly discussed memory mapped devices in the
