@@ -2168,3 +2168,206 @@ class DeleteStaleTransfersRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["older_than", b"older_than"]) -> None: ...
 
 global___DeleteStaleTransfersRequest = DeleteStaleTransfersRequest
+
+@typing.final
+class BlobAttributesData(google.protobuf.message.Message):
+    """Blob Attributes Operations (MariaDB)
+    These store mutable blob attributes, separate from BlobData (static values).
+    See docs/operator_guide/database.md for the rationale.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    SIZE_FIELD_NUMBER: builtins.int
+    INFO_JSON_FIELD_NUMBER: builtins.int
+    LAST_USED_FIELD_NUMBER: builtins.int
+    HAS_LAST_USED_FIELD_NUMBER: builtins.int
+    EXPIRES_AT_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    size: builtins.int
+    info_json: builtins.str
+    """JSON-encoded dict"""
+    last_used: builtins.float
+    has_last_used: builtins.bool
+    """True if last_used is set (not null)"""
+    expires_at: builtins.float
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        size: builtins.int = ...,
+        info_json: builtins.str = ...,
+        last_used: builtins.float = ...,
+        has_last_used: builtins.bool = ...,
+        expires_at: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["expires_at", b"expires_at", "has_last_used", b"has_last_used", "info_json", b"info_json", "last_used", b"last_used", "size", b"size", "uuid", b"uuid"]) -> None: ...
+
+global___BlobAttributesData = BlobAttributesData
+
+@typing.final
+class CreateBlobAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___BlobAttributesData: ...
+    def __init__(
+        self,
+        *,
+        data: global___BlobAttributesData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateBlobAttributesRequest = CreateBlobAttributesRequest
+
+@typing.final
+class GetBlobAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetBlobAttributesRequest = GetBlobAttributesRequest
+
+@typing.final
+class GetBlobAttributesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___BlobAttributesData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___BlobAttributesData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetBlobAttributesReply = GetBlobAttributesReply
+
+@typing.final
+class UpdateBlobAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___BlobAttributesData: ...
+    def __init__(
+        self,
+        *,
+        data: global___BlobAttributesData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___UpdateBlobAttributesRequest = UpdateBlobAttributesRequest
+
+@typing.final
+class UpdateBlobLastUsedRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    LAST_USED_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    last_used: builtins.float
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        last_used: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["last_used", b"last_used", "uuid", b"uuid"]) -> None: ...
+
+global___UpdateBlobLastUsedRequest = UpdateBlobLastUsedRequest
+
+@typing.final
+class DeleteBlobAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteBlobAttributesRequest = DeleteBlobAttributesRequest
+
+@typing.final
+class GetExpiredBlobUuidsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CURRENT_TIME_FIELD_NUMBER: builtins.int
+    current_time: builtins.float
+    """Unix timestamp (0 = use server time)"""
+    def __init__(
+        self,
+        *,
+        current_time: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["current_time", b"current_time"]) -> None: ...
+
+global___GetExpiredBlobUuidsRequest = GetExpiredBlobUuidsRequest
+
+@typing.final
+class GetExpiredBlobUuidsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUIDS_FIELD_NUMBER: builtins.int
+    @property
+    def uuids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        uuids: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuids", b"uuids"]) -> None: ...
+
+global___GetExpiredBlobUuidsReply = GetExpiredBlobUuidsReply
+
+@typing.final
+class GetStaleTranscodedBlobUuidsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDLE_SECONDS_FIELD_NUMBER: builtins.int
+    idle_seconds: builtins.float
+    """Seconds since last use threshold"""
+    def __init__(
+        self,
+        *,
+        idle_seconds: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["idle_seconds", b"idle_seconds"]) -> None: ...
+
+global___GetStaleTranscodedBlobUuidsRequest = GetStaleTranscodedBlobUuidsRequest
+
+@typing.final
+class GetStaleTranscodedBlobUuidsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUIDS_FIELD_NUMBER: builtins.int
+    @property
+    def uuids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        uuids: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuids", b"uuids"]) -> None: ...
+
+global___GetStaleTranscodedBlobUuidsReply = GetStaleTranscodedBlobUuidsReply

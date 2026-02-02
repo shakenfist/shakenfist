@@ -94,6 +94,16 @@ service DatabaseService {
   rpc DeleteBlobTransfer (DeleteBlobTransferRequest) returns (StatusReply) {}
   rpc DeleteBlobTransfersForBlob (DeleteBlobTransfersForBlobRequest) returns (DeleteCountReply) {}
   rpc DeleteStaleTransfers (DeleteStaleTransfersRequest) returns (DeleteCountReply) {}
+
+  // Blob Attributes Operations (MariaDB)
+  // These store mutable blob attributes, separate from BlobData (static values).
+  rpc CreateBlobAttributes (CreateBlobAttributesRequest) returns (StatusReply) {}
+  rpc GetBlobAttributes (GetBlobAttributesRequest) returns (GetBlobAttributesReply) {}
+  rpc UpdateBlobAttributes (UpdateBlobAttributesRequest) returns (StatusReply) {}
+  rpc UpdateBlobLastUsed (UpdateBlobLastUsedRequest) returns (StatusReply) {}
+  rpc DeleteBlobAttributes (DeleteBlobAttributesRequest) returns (StatusReply) {}
+  rpc GetExpiredBlobUuids (GetExpiredBlobUuidsRequest) returns (GetExpiredBlobUuidsReply) {}
+  rpc GetStaleTranscodedBlobUuids (GetStaleTranscodedBlobUuidsRequest) returns (GetStaleTranscodedBlobUuidsReply) {}
 }
 
 // Generic status reply
@@ -692,4 +702,59 @@ message DeleteBlobTransfersForBlobRequest {
 
 message DeleteStaleTransfersRequest {
   double older_than = 1;  // Unix timestamp - delete transfers with updated_at < this
+}
+
+// Blob Attributes Operations (MariaDB)
+// These store mutable blob attributes, separate from BlobData (static values).
+// See docs/operator_guide/database.md for the rationale.
+
+message BlobAttributesData {
+  string uuid = 1;
+  int64 size = 2;
+  string info_json = 3;  // JSON-encoded dict
+  double last_used = 4;
+  bool has_last_used = 5;  // True if last_used is set (not null)
+  double expires_at = 6;
+}
+
+message CreateBlobAttributesRequest {
+  BlobAttributesData data = 1;
+}
+
+message GetBlobAttributesRequest {
+  string uuid = 1;
+}
+
+message GetBlobAttributesReply {
+  bool found = 1;
+  BlobAttributesData data = 2;
+}
+
+message UpdateBlobAttributesRequest {
+  BlobAttributesData data = 1;
+}
+
+message UpdateBlobLastUsedRequest {
+  string uuid = 1;
+  double last_used = 2;
+}
+
+message DeleteBlobAttributesRequest {
+  string uuid = 1;
+}
+
+message GetExpiredBlobUuidsRequest {
+  double current_time = 1;  // Unix timestamp (0 = use server time)
+}
+
+message GetExpiredBlobUuidsReply {
+  repeated string uuids = 1;
+}
+
+message GetStaleTranscodedBlobUuidsRequest {
+  double idle_seconds = 1;  // Seconds since last use threshold
+}
+
+message GetStaleTranscodedBlobUuidsReply {
+  repeated string uuids = 1;
 }
