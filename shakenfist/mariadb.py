@@ -5940,7 +5940,7 @@ def _direct_get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
             # Subquery: blob UUIDs that have transcodes
             transcoded_blobs = sa.select(refs_table.c.source_uuid).where(
                 sa.and_(
-                    refs_table.c.source_type == str(ObjectType.BLOB),
+                    refs_table.c.source_object_type == str(ObjectType.BLOB),
                     refs_table.c.relationship == str(RelationshipType.TRANSCODE)
                 )
             ).distinct()
