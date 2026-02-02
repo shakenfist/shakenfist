@@ -67,4 +67,8 @@ through some more fundamental things you would have learned in a university
 level operating systems class, but without taking six months of your life.
 There is also no exam, you're welcome.
 
+[Instance video](/components/cloudgood/instance-video/) is an exploration of how video inside
+instances works, why you would even want video from inside an instance,
+and the history of computer graphics for x86 computers.
+
 --8<-- "docs-include/abbreviations.md"
