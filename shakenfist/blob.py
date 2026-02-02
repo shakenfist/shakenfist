@@ -97,8 +97,7 @@ class Blob(dbo):
     def _load_attributes(self) -> Optional[BlobAttributesData]:
         """Load attributes from MariaDB."""
         if not self.__attributes_loaded:
-            self.__attributes = mariadb.get_blob_attributes(
-                uuid.UUID(self.uuid))
+            self.__attributes = mariadb.get_blob_attributes(self.uuid)
             self.__attributes_loaded = True
         return self.__attributes
 
@@ -106,7 +105,7 @@ class Blob(dbo):
         """Ensure attributes record exists, creating with defaults if needed."""
         attrs = self._load_attributes()
         if attrs is None:
-            attrs = BlobAttributesData(uuid=uuid.UUID(self.uuid))
+            attrs = BlobAttributesData(uuid=self.uuid)
             mariadb.create_blob_attributes(attrs)
             self.__attributes = attrs
         return attrs
@@ -577,7 +576,7 @@ class Blob(dbo):
         now = time.time()
         self._ensure_attributes()
         # Use optimized single-column update
-        mariadb.update_blob_last_used(uuid.UUID(self.uuid), now)
+        mariadb.update_blob_last_used(self.uuid, now)
         # Update local cache
         if self.__attributes:
             self.__attributes.last_used = now
@@ -1003,7 +1002,7 @@ class Blob(dbo):
     def hard_delete(self) -> None:
         mariadb.delete_blob_hashes(str(self.uuid))
         mariadb.delete_blob_transfers_for_blob(str(self.uuid))
-        mariadb.delete_blob_attributes(uuid.UUID(self.uuid))
+        mariadb.delete_blob_attributes(self.uuid)
         mariadb.delete_blob(self.uuid)
         super().hard_delete()
 
