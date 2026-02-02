@@ -1,3 +1,8 @@
+---
+issue_repo: https://github.com/shakenfist/cloudgood
+issue_path: docs/virtualization-history.md
+---
+
 # A slightly unreliable history of virtualization
 
 Virtualization of compute is a very old technology (1). IBM had something which looked a bit like modern virtualization on its mainframe platforms in the 1960s. Depending on your definition (is simulation virtualization?), the x86 platform has had virtualization since at least the mid-1990s. Then again, mainstream virtualization is really a mid-2000s development. Either way, you are grappling with at least 20 years of history when you try to understand the current state of virtualization platforms.

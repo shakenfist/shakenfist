@@ -1,3 +1,8 @@
+---
+issue_repo: https://github.com/shakenfist/cloudgood
+issue_path: docs/fundamentals.md
+---
+
 # Fundamentals
 
 Let's start back at the very very beginning. What even is a computer?
