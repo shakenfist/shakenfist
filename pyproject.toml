@@ -129,7 +129,7 @@ dependencies = [
     "oslo.utils==9.2.0",
     "packaging==25.0",
     "pylogrus==0.4.0",
-    "pyparsing==3.3.1",
+    "pyparsing==3.3.2",
     "referencing==0.37.0",
     "rfc3986==2.0.0",
     "rpds-py==0.30.0",
