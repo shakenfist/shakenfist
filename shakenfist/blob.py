@@ -943,7 +943,7 @@ class Blob(dbo):
         dest_path = self.filepath(self.uuid)
         os.link(dest_path + '.partial', dest_path)
 
-        if not self._db_get_attribute('size', None):
+        if self.size == 0:
             st = os.stat(dest_path + '.partial')
             self.size = st.st_size
 
