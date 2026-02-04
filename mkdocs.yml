@@ -79,6 +79,7 @@ nav:
             - "Virtualization history": components/cloudgood/virtualization-history.md
             - "Memory mapped devices": components/cloudgood/memory-mapped-devices.md
             - "Instance video": components/cloudgood/instance-video.md
+            - "Booting": components/cloudgood/booting.md
         - Clingwrap:
             - "Introduction": components/clingwrap/index.md
             - "Command Types": components/clingwrap/command-types.md
