@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/occystrap/installation/">
+        <link rel="canonical" href="https://shakenfist.com/components/cloudgood/booting/">
       
       
-        <link rel="prev" href="../command-reference/">
+        <link rel="prev" href="../instance-video/">
       
       
-        <link rel="next" href="../pipeline/">
+        <link rel="next" href="../../clingwrap/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Installation - Shaken Fist</title>
+        <title>Booting - Shaken Fist</title>
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installation" class="md-skip">
+        <a href="#lets-talk-more-about-the-boot-process-for-an-x86-computer" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Installation
+              Booting
             
           </span>
         </div>
@@ -411,18 +411,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" checked>
         
           
           <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
@@ -443,7 +445,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -461,7 +463,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -489,7 +491,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/technology-primer/" class="md-nav__link">
+      <a href="../technology-primer/" class="md-nav__link">
         
   
   
@@ -517,7 +519,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/fundamentals/" class="md-nav__link">
+      <a href="../fundamentals/" class="md-nav__link">
         
   
   
@@ -545,7 +547,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/virtualization-history/" class="md-nav__link">
+      <a href="../virtualization-history/" class="md-nav__link">
         
   
   
@@ -573,7 +575,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/memory-mapped-devices/" class="md-nav__link">
+      <a href="../memory-mapped-devices/" class="md-nav__link">
         
   
   
@@ -601,7 +603,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/instance-video/" class="md-nav__link">
+      <a href="../instance-video/" class="md-nav__link">
         
   
   
@@ -626,10 +628,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../cloudgood/booting/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Booting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -645,6 +674,353 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#hardware-power-sequencing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hardware power sequencing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-reset-vector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU reset vector
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-firmware-bios-or-uefi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform firmware (BIOS or UEFI)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Platform firmware (BIOS or UEFI)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#firmware-vendors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Firmware vendors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-processor-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security processor initialization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-microcode-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU microcode update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory-training-dram-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory training (DRAM initialization)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory training (DRAM initialization)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#server-class-memory-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server-class memory initialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-ras-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory RAS features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#post-power-on-self-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST (Power-On Self-Test)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#boot-device-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boot device selection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#standardization-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standardization summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-stage-bootloader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First stage bootloader
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kernel-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kernel initialization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-matters-for-virtualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this matters for virtualization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpus-cores-sockets-and-numa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPUs: cores, sockets, and NUMA
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#block-devices-and-disk-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Block devices and disk images
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Block devices and disk images">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-block-device" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a block device?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disk-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk images
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-and-other-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QCOW2 and other formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interrupts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interrupts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Interrupts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hardware-vs-software-interrupts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hardware vs software interrupts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-this-matters-for-virtualization_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this matters for virtualization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#device-drivers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Device drivers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Device drivers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-drivers-run-in-the-kernel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why drivers run in the kernel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#virtio-paravirtualized-drivers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Virtio -- paravirtualized drivers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#todo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TODO
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1276,20 +1652,18 @@
                 
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
         
           
           <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
@@ -1310,7 +1684,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1328,7 +1702,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../occystrap/" class="md-nav__link">
         
   
   
@@ -1356,7 +1730,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../command-reference/" class="md-nav__link">
+      <a href="../../occystrap/command-reference/" class="md-nav__link">
         
   
   
@@ -1381,37 +1755,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Installation
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../occystrap/installation/" class="md-nav__link">
         
   
   
@@ -1427,192 +1774,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Requirements
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#installation-from-pypi" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Installation from PyPI
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#installation-from-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Installation from Source
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#verifying-the-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verifying the Installation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dependencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dependencies
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#platform-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Platform Support
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#optional-dockerpodman-socket-access" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optional: Docker/Podman Socket Access
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Optional: Docker/Podman Socket Access">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#docker" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Docker
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#podman" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Podman
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#permission-denied-on-docker-socket" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Permission Denied on Docker Socket
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ssl-certificate-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SSL Certificate Errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#connection-refused-to-registry" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Connection Refused to Registry
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1625,7 +1786,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../pipeline/" class="md-nav__link">
+      <a href="../../occystrap/pipeline/" class="md-nav__link">
         
   
   
@@ -1653,7 +1814,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tar-format-selection/" class="md-nav__link">
+      <a href="../../occystrap/tar-format-selection/" class="md-nav__link">
         
   
   
@@ -1681,7 +1842,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../use-cases/" class="md-nav__link">
+      <a href="../../occystrap/use-cases/" class="md-nav__link">
         
   
   
@@ -3411,10 +3572,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
+  <a href="#hardware-power-sequencing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requirements
+        Hardware power sequencing
       
     </span>
   </a>
@@ -3422,10 +3583,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#installation-from-pypi" class="md-nav__link">
+  <a href="#cpu-reset-vector" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Installation from PyPI
+        CPU reset vector
       
     </span>
   </a>
@@ -3433,77 +3594,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#installation-from-source" class="md-nav__link">
+  <a href="#platform-firmware-bios-or-uefi" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Installation from Source
+        Platform firmware (BIOS or UEFI)
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#verifying-the-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verifying the Installation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dependencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dependencies
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#platform-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Platform Support
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#optional-dockerpodman-socket-access" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optional: Docker/Podman Socket Access
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Optional: Docker/Podman Socket Access">
+    <nav class="md-nav" aria-label="Platform firmware (BIOS or UEFI)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#docker" class="md-nav__link">
+  <a href="#firmware-vendors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Docker
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#podman" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Podman
+        Firmware vendors
       
     </span>
   </a>
@@ -3516,22 +3622,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
+  <a href="#security-processor-initialization" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Troubleshooting
+        Security processor initialization
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Troubleshooting">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-microcode-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU microcode update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory-training-dram-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory training (DRAM initialization)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory training (DRAM initialization)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#permission-denied-on-docker-socket" class="md-nav__link">
+  <a href="#server-class-memory-initialization" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Permission Denied on Docker Socket
+        Server-class memory initialization
       
     </span>
   </a>
@@ -3539,21 +3667,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#ssl-certificate-errors" class="md-nav__link">
+  <a href="#memory-ras-features" class="md-nav__link">
     <span class="md-ellipsis">
       
-        SSL Certificate Errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#connection-refused-to-registry" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Connection Refused to Registry
+        Memory RAS features
       
     </span>
   </a>
@@ -3566,10 +3683,215 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
+  <a href="#post-power-on-self-test" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Next Steps
+        POST (Power-On Self-Test)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#boot-device-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boot device selection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#standardization-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standardization summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-stage-bootloader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First stage bootloader
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kernel-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kernel initialization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-matters-for-virtualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this matters for virtualization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpus-cores-sockets-and-numa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPUs: cores, sockets, and NUMA
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#block-devices-and-disk-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Block devices and disk images
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Block devices and disk images">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-block-device" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a block device?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disk-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk images
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-and-other-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QCOW2 and other formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interrupts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interrupts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Interrupts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hardware-vs-software-interrupts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hardware vs software interrupts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-this-matters-for-virtualization_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this matters for virtualization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#device-drivers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Device drivers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Device drivers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-drivers-run-in-the-kernel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why drivers run in the kernel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#virtio-paravirtualized-drivers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Virtio -- paravirtualized drivers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#todo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TODO
       
     </span>
   </a>
@@ -3597,130 +3919,440 @@
   
 
 
-<h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
-<p>This guide covers installing Occy Strap and verifying it's working correctly.</p>
-<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<h1 id="lets-talk-more-about-the-boot-process-for-an-x86-computer">Let's talk more about the boot process for an x86 computer<a class="headerlink" href="#lets-talk-more-about-the-boot-process-for-an-x86-computer" title="Permanent link">&para;</a></h1>
+<p>There is a lot that happens from the moment power is applied to an x86
+computer until the fully configured operating system is running and ready to
+handle requests from users. This process is broken into stages: Power On Self
+Test (<abbr title="Power-On Self Test -- hardware diagnostics run during boot.">POST</abbr>); first stage bootloading; second stage bootloading; the Linux
+kernel loading; configuring device drives and filesystems; and then loading
+your userspace configuration. This page attempts to provide an overview of
+that entire process, with a focus on the hardware side of the story and only
+telling the story to the point where the kernel loads userspace. We'll talk
+about the userspace side of that store in a separate installment.</p>
+<h2 id="hardware-power-sequencing">Hardware power sequencing<a class="headerlink" href="#hardware-power-sequencing" title="Permanent link">&para;</a></h2>
+<p>Before any software runs, the power supply must stabilize. The PSU monitors its
+output voltages and asserts a "Power Good" signal to the motherboard when all
+rails are within specification. The chipset holds the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> in reset until this
+signal is received. This typically takes 100-500ms after the power button is
+pressed.</p>
+<h2 id="cpu-reset-vector"><abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> reset vector<a class="headerlink" href="#cpu-reset-vector" title="Permanent link">&para;</a></h2>
+<p>When reset is released, the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> starts execution in <strong>real mode</strong> (16-bit
+addressing, 1MB address space) and jumps to a hardcoded address called the
+"reset vector": <code>0xFFFFFFF0</code>. This is 16 bytes below the 4GB mark. The chipset
+maps this address to the platform firmware stored in SPI flash ROM, so the
+first instruction executed comes from the firmware image.</p>
+<h2 id="platform-firmware-bios-or-uefi">Platform firmware (<abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr> or <abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr>)<a class="headerlink" href="#platform-firmware-bios-or-uefi" title="Permanent link">&para;</a></h2>
+<p>The code at the reset vector is the <strong>platform firmware</strong>, stored in an SPI
+flash ROM chip soldered to the motherboard (typically 16-32MB in size). There
+are two main types:</p>
 <ul>
-<li>Python 3.7 or later</li>
-<li>pip (Python package manager)</li>
-<li>Network access to container registries (for downloading images)</li>
-<li>Optionally: Docker or Podman daemon (for local image operations)</li>
+<li>
+<p><strong><abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr></strong> (Basic Input/Output System): The traditional approach dating back to
+  the IBM PC. Runs in 16-bit real mode, with implementations largely
+  proprietary and based on reverse-engineering the original IBM <abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr>.</p>
+</li>
+<li>
+<p><strong><abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr></strong> (Unified Extensible Firmware Interface): The modern replacement,
+  defined by a formal specification from the <abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr> Forum. Runs in 32-bit or
+  64-bit mode, provides a richer pre-boot environment, and supports features
+  like Secure Boot.</p>
+</li>
 </ul>
-<h2 id="installation-from-pypi">Installation from PyPI<a class="headerlink" href="#installation-from-pypi" title="Permanent link">&para;</a></h2>
-<p>The simplest way to install Occy Strap is via pip:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>occystrap
-</code></pre></div>
-<h2 id="installation-from-source">Installation from Source<a class="headerlink" href="#installation-from-source" title="Permanent link">&para;</a></h2>
-<p>To install the latest development version:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/shakenfist/occystrap.git
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>occystrap
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
-</code></pre></div>
-<h2 id="verifying-the-installation">Verifying the Installation<a class="headerlink" href="#verifying-the-installation" title="Permanent link">&para;</a></h2>
-<p>After installation, verify that Occy Strap is working:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Check the version</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>occystrap<span class="w"> </span>--help
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Try downloading a small image</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/hello-world:latest<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span>tar://hello-world.tar
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Verify the tarball was created</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>ls<span class="w"> </span>-la<span class="w"> </span>hello-world.tar
-</code></pre></div>
-<h2 id="dependencies">Dependencies<a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h2>
-<p>Occy Strap depends on the following Python packages (installed automatically):</p>
+<p>Most modern systems ship with <abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr> firmware but include a "legacy <abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr>"
+compatibility mode (CSM - Compatibility Support Module) for booting older
+operating systems.</p>
+<h3 id="firmware-vendors">Firmware vendors<a class="headerlink" href="#firmware-vendors" title="Permanent link">&para;</a></h3>
+<p>Motherboard manufacturers typically don't write their own firmware. Instead,
+they license a base firmware implementation from vendors like AMI (American
+Megatrends), Phoenix, or Insyde, then customize it for their specific hardware.</p>
+<h2 id="security-processor-initialization">Security processor initialization<a class="headerlink" href="#security-processor-initialization" title="Permanent link">&para;</a></h2>
+<p>Modern x86 systems include a separate security processor that initializes
+<em>before</em> the main <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr>:</p>
+<ul>
+<li>
+<p><strong>Intel Management Engine (ME)</strong>: An embedded processor in the Platform
+  Controller Hub (PCH) running its own firmware. It handles security functions,
+  remote management (AMT), and parts of the boot process.</p>
+</li>
+<li>
+<p><strong>AMD Platform Security Processor (PSP)</strong>: AMD's equivalent, an ARM
+  Cortex-A5 core embedded in the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> package.</p>
+</li>
+</ul>
+<p>These processors have their own firmware stored in the same SPI flash as the
+main <abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr>/<abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr>, and they begin executing before the main <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> is released from
+reset. Their operation is largely opaque and has been a source of security
+research and concern.</p>
+<h2 id="cpu-microcode-update"><abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> microcode update<a class="headerlink" href="#cpu-microcode-update" title="Permanent link">&para;</a></h2>
+<p>Very early in the firmware execution, the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> microcode is updated. Modern x86
+CPUs are actually RISC processors internally, with a microcode layer that
+translates x86 instructions. This microcode can be patched to fix bugs
+discovered after the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> was manufactured.</p>
+<p>The firmware contains microcode update images and loads them into the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr>
+during early boot. Operating systems can also load microcode updates later, but
+the firmware update happens first and may be required for stable operation.</p>
+<h2 id="memory-training-dram-initialization">Memory training (<abbr title="Dynamic Random Access Memory -- the main memory technology used in computers.">DRAM</abbr> initialization)<a class="headerlink" href="#memory-training-dram-initialization" title="Permanent link">&para;</a></h2>
+<p>This is one of the most complex parts of early boot. Modern DDR memory requires
+precise calibration of:</p>
+<ul>
+<li>
+<p><strong>Signal timing</strong>: Data, address, and control signals must be precisely timed
+  relative to the clock. The memory controller runs training algorithms to find
+  optimal timing windows.</p>
+</li>
+<li>
+<p><strong>Voltage levels</strong>: Reference voltages and termination settings must be
+  calibrated for signal integrity.</p>
+</li>
+<li>
+<p><strong>Per-lane calibration</strong>: Each data lane may need individual adjustment to
+  account for trace length differences on the motherboard.</p>
+</li>
+</ul>
+<p>The training process involves writing patterns to memory and reading them back
+to verify correctness, adjusting parameters until reliable operation is
+achieved. This is why:</p>
+<ul>
+<li>First boot after installing new <abbr title="Random Access Memory -- fast, volatile storage used by the CPU for active data and instructions.">RAM</abbr> or clearing CMOS takes longer</li>
+<li>The firmware often caches training results in NVRAM to speed subsequent boots</li>
+<li>Memory overclocking can be unstable if training doesn't find good parameters</li>
+</ul>
+<p>The memory initialization code is highly complex and proprietary:</p>
+<ul>
+<li><strong>Intel Memory Reference Code (MRC)</strong>: Intel provides this as a binary blob
+  to firmware vendors.</li>
+<li><strong>AMD AGESA (AMD Generic Encapsulated Software Architecture)</strong>: AMD's
+  equivalent, also provided as binary blobs.</li>
+</ul>
+<p>Open source firmware projects like coreboot must reverse-engineer or obtain
+these components, which is a significant challenge.</p>
+<h3 id="server-class-memory-initialization">Server-class memory initialization<a class="headerlink" href="#server-class-memory-initialization" title="Permanent link">&para;</a></h3>
+<p>Server systems have significantly longer <abbr title="Power-On Self Test -- hardware diagnostics run during boot.">POST</abbr> times than consumer hardware,
+largely due to memory initialization. Several factors contribute:</p>
+<p><strong>More DIMMs and higher complexity</strong>: A consumer motherboard typically has 2-4
+DIMM slots. A dual-socket server might have 24-48 slots. Each DIMM requires
+individual training, and interactions between DIMMs on the same channel add
+complexity. Server systems also use more complex DIMM types:</p>
+<ul>
+<li>
+<p><strong>Registered DIMMs (RDIMMs)</strong>: Include a register chip that buffers address
+  and command signals, allowing more DIMMs per channel. The register must be
+  initialized and calibrated.</p>
+</li>
+<li>
+<p><strong>Load-Reduced DIMMs (LRDIMMs)</strong>: Include a memory buffer chip that buffers
+  all signals, allowing even higher capacity configurations. More components
+  means more calibration.</p>
+</li>
+<li>
+<p><strong>Higher rank counts</strong>: Server DIMMs are often quad-rank or octal-rank. Each
+  rank needs separate timing calibration, and inter-rank timing adds complexity.</p>
+</li>
+</ul>
+<p><strong>Conservative firmware philosophy</strong>: Server firmware prioritizes reliability
+over boot speed. It runs more thorough training algorithms and is less
+aggressive about using cached timing data. A consumer board might accept
+"good enough" timing; server firmware seeks optimal timing with safety margin.</p>
+<p><strong>Multi-socket coordination</strong>: In multi-<abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> systems, memory controllers across
+sockets must be coordinated, and NUMA (Non-Uniform Memory Access) topology must
+be configured so the operating system knows which memory is local to which <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr>.</p>
+<p><strong>ECC overhead</strong>: While ECC (Error Correcting Code) memory doesn't dramatically
+slow training itself, servers use ECC during training to validate results more
+thoroughly. The 72-bit bus width (64 data + 8 ECC) versus consumer's 64-bit bus
+adds a small overhead.</p>
+<h3 id="memory-ras-features">Memory RAS features<a class="headerlink" href="#memory-ras-features" title="Permanent link">&para;</a></h3>
+<p>Server systems implement Memory RAS (Reliability, Availability, Serviceability)
+features that affect both boot and runtime behavior:</p>
+<p><strong>ECC and error tracking</strong>: Every memory read is checked for errors. Single-bit
+errors are silently corrected and logged as Correctable Errors (CEs). Multi-bit
+errors that cannot be corrected are Uncorrectable Errors (UEs) and typically
+cause a system crash or targeted process termination.</p>
+<p><strong>Patrol scrubbing</strong>: During normal operation, the memory controller
+continuously reads and verifies all memory in the background. This catches and
+corrects single-bit errors before they can accumulate into uncorrectable
+multi-bit errors. This doesn't affect <abbr title="Power-On Self Test -- hardware diagnostics run during boot.">POST</abbr> time but is part of the overall
+memory reliability infrastructure.</p>
+<p><strong>Predictive Failure Analysis (PFA)</strong>: The system maintains per-DIMM CE
+counters. When CEs exceed a configurable threshold (often something like 24 CEs
+in 24 hours), the DIMM is flagged as potentially failing. This triggers:</p>
+<ol>
+<li>An alert to management software (logged via IPMI/Redfish)</li>
+<li>A request for memory retraining on the next boot</li>
+<li>Potentially marking the DIMM as degraded</li>
+</ol>
+<p>The "slower boot" that follows a PFA event is typically an Extended Memory Test
+or Memory RAS Recovery pass, where the firmware retrains and more thoroughly
+tests the flagged DIMM.</p>
+<p><strong>Why flagged DIMMs are often not actually defective</strong>: PFA thresholds are
+deliberately conservative. A DIMM flagged for excessive CEs may be experiencing:</p>
+<ul>
+<li>
+<p><strong>Timing drift</strong>: Component characteristics change with temperature and age.
+  The original training values may no longer be optimal, but retraining can
+  recalibrate successfully.</p>
+</li>
+<li>
+<p><strong>Seating issues</strong>: Slight oxidation or mechanical misalignment causes
+  intermittent signal integrity problems. The thermal cycling during a reboot
+  can shift contacts enough to resolve the issue.</p>
+</li>
+<li>
+<p><strong>Thermal stress</strong>: A DIMM running at elevated temperatures may have different
+  optimal timing than when it was originally trained at cooler temperatures.</p>
+</li>
+<li>
+<p><strong>Transient events</strong>: Cosmic ray bit flips, power supply noise, or EMI can
+  cause CEs without indicating hardware failure.</p>
+</li>
+</ul>
+<p>If retraining resolves the CE count, the DIMM wasn't defective - it was
+operating outside its calibrated timing window. Genuine hardware failures
+typically show CEs concentrated on specific memory addresses (indicating failed
+cells), progress to UEs, or fail retraining entirely.</p>
+<p><strong>Memory sparing and mirroring</strong>: High-end servers may support:</p>
+<ul>
+<li>
+<p><strong>Rank sparing</strong>: Reserve a memory rank as a hot spare. If a rank shows
+  excessive errors, data is migrated to the spare and the failing rank is
+  taken offline.</p>
+</li>
+<li>
+<p><strong>Memory mirroring</strong>: Duplicate all data across two memory channels. If one
+  channel fails, the system continues on the mirror. This halves usable memory
+  capacity but provides fault tolerance.</p>
+</li>
+</ul>
+<p>These features require additional firmware configuration during <abbr title="Power-On Self Test -- hardware diagnostics run during boot.">POST</abbr>.</p>
+<h2 id="post-power-on-self-test"><abbr title="Power-On Self Test -- hardware diagnostics run during boot.">POST</abbr> (Power-On Self-Test)<a class="headerlink" href="#post-power-on-self-test" title="Permanent link">&para;</a></h2>
+<p><abbr title="Power-On Self Test -- hardware diagnostics run during boot.">POST</abbr> is a series of diagnostic tests and initialization steps:</p>
+<ol>
+<li><strong><abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> self-test</strong>: Verify <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> registers and basic ALU operations</li>
+<li><strong>Memory test</strong>: At minimum, verify memory is accessible; optionally run
+   pattern tests (often skipped for speed on modern systems)</li>
+<li><strong>Chipset initialization</strong>: Configure the PCH/southbridge, set up interrupt
+   routing, initialize timers</li>
+<li><strong>PCI/<abbr title="PCI Express -- high-speed serial bus for connecting hardware components.">PCIe</abbr> enumeration</strong>: Discover all devices on the PCI buses, assign
+   memory and I/O resources</li>
+<li><strong>Video initialization</strong>: Find and initialize the display adapter so <abbr title="Power-On Self Test -- hardware diagnostics run during boot.">POST</abbr>
+   messages can be shown</li>
+<li><strong>Option ROM execution</strong>: Run firmware embedded in expansion cards (RAID
+   controllers, network cards, GPUs) to initialize those devices</li>
+<li><strong>USB initialization</strong>: Bring up USB controllers so keyboards work for <abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr>
+   setup</li>
+<li><strong>Storage initialization</strong>: Initialize storage controllers and detect
+   connected drives</li>
+</ol>
+<p><abbr title="Power-On Self Test -- hardware diagnostics run during boot.">POST</abbr> errors are typically indicated by:</p>
+<ul>
+<li><strong>Beep codes</strong>: Patterns of beeps from the motherboard speaker</li>
+<li><strong>LED codes</strong>: Diagnostic LEDs on some motherboards</li>
+<li><strong><abbr title="Power-On Self Test -- hardware diagnostics run during boot.">POST</abbr> codes</strong>: Two-digit hex codes shown on debug displays or sent to a
+  diagnostic port</li>
+</ul>
+<h2 id="boot-device-selection">Boot device selection<a class="headerlink" href="#boot-device-selection" title="Permanent link">&para;</a></h2>
+<p>After <abbr title="Power-On Self Test -- hardware diagnostics run during boot.">POST</abbr> completes, the firmware determines where to load the bootloader
+from:</p>
+<ul>
+<li>Consults the configured boot order (stored in NVRAM)</li>
+<li>For each boot device, checks if it contains a valid bootloader</li>
+<li>In <abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr> mode, looks for EFI executables in the EFI System Partition</li>
+<li>In legacy <abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr> mode, looks for a valid <abbr title="Master Boot Record -- legacy partitioning scheme limited to 2TB disks.">MBR</abbr> with boot signature</li>
+</ul>
+<p>Once a valid boot device is found, the firmware loads and executes the first
+stage bootloader, ending the pre-boot phase.</p>
+<h2 id="standardization-summary">Standardization summary<a class="headerlink" href="#standardization-summary" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Package</th>
-<th>Purpose</th>
+<th>Component</th>
+<th>Standardized?</th>
+<th>Notes</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>click</td>
-<td>Command-line interface framework</td>
+<td><abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> reset vector</td>
+<td>Yes</td>
+<td>Defined by Intel/AMD processor specifications</td>
 </tr>
 <tr>
-<td>requests</td>
-<td>HTTP client for registry API</td>
+<td><abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr> interface</td>
+<td>Yes</td>
+<td><abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr> Forum specification</td>
 </tr>
 <tr>
-<td>requests-unixsocket</td>
-<td>Unix socket support for Docker daemon</td>
+<td>Legacy <abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr></td>
+<td>No</td>
+<td>De facto IBM PC compatibility, no formal spec</td>
 </tr>
 <tr>
-<td>prettytable</td>
-<td>Formatted table output</td>
+<td>Memory training</td>
+<td>No</td>
+<td>Proprietary (Intel MRC, AMD AGESA)</td>
 </tr>
 <tr>
-<td>oslo.concurrency</td>
-<td>Concurrency utilities</td>
+<td><abbr title="Power-On Self Test -- hardware diagnostics run during boot.">POST</abbr> implementation</td>
+<td>No</td>
+<td>Vendor-specific</td>
 </tr>
 <tr>
-<td>shakenfist-utilities</td>
-<td>Shared utilities</td>
+<td>Security processors</td>
+<td>No</td>
+<td>Proprietary Intel ME / AMD PSP firmware</td>
 </tr>
 </tbody>
 </table>
-<h2 id="platform-support">Platform Support<a class="headerlink" href="#platform-support" title="Permanent link">&para;</a></h2>
-<p>Occy Strap is primarily designed for Linux systems. It may work on other
-platforms with Python support, but has been tested on:</p>
+<h2 id="first-stage-bootloader">First stage bootloader<a class="headerlink" href="#first-stage-bootloader" title="Permanent link">&para;</a></h2>
+<p>The bootloader's job is to load the operating system kernel into memory and start it. On Linux systems, this is typically <abbr title="GRand Unified Bootloader -- the most common Linux bootloader.">GRUB</abbr> (GRand Unified Bootloader). <abbr title="GRand Unified Bootloader -- the most common Linux bootloader.">GRUB</abbr>:</p>
+<ol>
+<li>Presents a menu of operating systems to boot (if configured)</li>
+<li>Loads the Linux kernel image into memory</li>
+<li>Loads an initial <abbr title="Random Access Memory -- fast, volatile storage used by the CPU for active data and instructions.">RAM</abbr> filesystem (<abbr title="Initial RAM Filesystem -- a temporary filesystem loaded at boot before the real root.">initramfs</abbr>) containing drivers and tools needed for early boot</li>
+<li>Passes control to the kernel with command-line parameters</li>
+</ol>
+<h2 id="kernel-initialization">Kernel initialization<a class="headerlink" href="#kernel-initialization" title="Permanent link">&para;</a></h2>
+<p>Once the kernel is running, it:</p>
+<ol>
+<li>Initializes its own data structures</li>
+<li>Detects and initializes hardware</li>
+<li>Mounts the root filesystem</li>
+<li>Starts the init process (<abbr title="Process ID -- a unique number identifying a running process.">PID</abbr> 1)</li>
+</ol>
+<p>The init process (systemd on modern Linux distributions) then starts all the other services and processes that make up a running system.</p>
+<h2 id="why-this-matters-for-virtualization">Why this matters for virtualization<a class="headerlink" href="#why-this-matters-for-virtualization" title="Permanent link">&para;</a></h2>
+<p>Virtual machines can boot in several ways:</p>
 <ul>
-<li>Ubuntu 20.04, 22.04</li>
-<li>CentOS 7, 8</li>
-<li>Debian 10, 11</li>
+<li><strong>Full emulation</strong>: The <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> firmware (like SeaBIOS or OVMF) runs and boots like a physical machine</li>
+<li><strong>Direct kernel boot</strong>: The hypervisor loads the kernel directly, skipping the firmware and bootloader</li>
+<li><strong>PVH boot</strong>: A paravirtualized boot protocol that's faster than full emulation but more compatible than direct kernel boot</li>
 </ul>
-<h2 id="optional-dockerpodman-socket-access">Optional: Docker/Podman Socket Access<a class="headerlink" href="#optional-dockerpodman-socket-access" title="Permanent link">&para;</a></h2>
-<p>To use Occy Strap with local Docker or Podman images, you need access to the
-daemon socket:</p>
-<h3 id="docker">Docker<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h3>
-<p>The Docker socket is typically at <code>/var/run/docker.sock</code>. Your user needs to be
-in the <code>docker</code> group:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># Log out and back in for group membership to take effect</span>
-</code></pre></div>
-<h3 id="podman">Podman<a class="headerlink" href="#podman" title="Permanent link">&para;</a></h3>
-<p>Podman doesn't run a daemon by default. Enable the socket service:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># For rootless Podman (recommended)</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>podman.socket
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># For rootful Podman</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>start<span class="w"> </span>podman.socket
-</code></pre></div>
-<p>The rootless socket is at <code>/run/user/&lt;uid&gt;/podman/podman.sock</code>, and the rootful
-socket is at <code>/run/podman/podman.sock</code>.</p>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<h3 id="permission-denied-on-docker-socket">Permission Denied on Docker Socket<a class="headerlink" href="#permission-denied-on-docker-socket" title="Permanent link">&para;</a></h3>
-<p>If you see "Permission denied" errors when accessing the Docker socket:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Add your user to the docker group</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Log out and back in, or use newgrp</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>newgrp<span class="w"> </span>docker
-</code></pre></div>
-<h3 id="ssl-certificate-errors">SSL Certificate Errors<a class="headerlink" href="#ssl-certificate-errors" title="Permanent link">&para;</a></h3>
-<p>If you encounter SSL certificate verification errors with private registries:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Use the --insecure flag</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>occystrap<span class="w"> </span>--insecure<span class="w"> </span>process<span class="w"> </span>registry://myregistry.local/image:tag<span class="w"> </span>tar://out.tar
-</code></pre></div>
-<h3 id="connection-refused-to-registry">Connection Refused to Registry<a class="headerlink" href="#connection-refused-to-registry" title="Permanent link">&para;</a></h3>
-<p>Ensure the registry hostname is correct and network access is available:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Test connectivity</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>curl<span class="w"> </span>-v<span class="w"> </span>https://registry-1.docker.io/v2/
-</code></pre></div>
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<p>The User Mode Linux example in the previous chapter used direct kernel boot -- we passed the kernel and root filesystem directly, without any <abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr> or bootloader.</p>
+<h2 id="cpus-cores-sockets-and-numa">CPUs: cores, sockets, and NUMA<a class="headerlink" href="#cpus-cores-sockets-and-numa" title="Permanent link">&para;</a></h2>
+<p>...</p>
+<h2 id="block-devices-and-disk-images">Block devices and disk images<a class="headerlink" href="#block-devices-and-disk-images" title="Permanent link">&para;</a></h2>
+<p>You've probably noticed that we use "disk images" when working with virtual machines. Understanding what these are requires understanding block devices.</p>
+<h3 id="what-is-a-block-device">What is a block device?<a class="headerlink" href="#what-is-a-block-device" title="Permanent link">&para;</a></h3>
+<p>A block device is the kernel's abstraction for storage hardware. It presents storage as a linear sequence of fixed-size blocks (typically 512 bytes or 4KB) that can be read or written randomly. Hard drives, SSDs, USB sticks, and SD cards are all block devices.</p>
+<p>In Linux, block devices appear as files in <code>/dev</code>:</p>
 <ul>
-<li><a href="/components/occystrap/command-reference/">Command Reference</a> - Learn the CLI commands</li>
-<li><a href="/components/occystrap/use-cases/">Use Cases</a> - Common scenarios and examples</li>
+<li><code>/dev/sda</code> -- first <abbr title="Small Computer System Interface -- a standard for connecting storage devices.">SCSI</abbr>/<abbr title="Serial ATA -- an interface for connecting storage devices.">SATA</abbr> disk</li>
+<li><code>/dev/sda1</code> -- first partition on that disk</li>
+<li><code>/dev/nvme0n1</code> -- first <abbr title="Non-Volatile Memory Express -- a protocol for accessing SSDs over PCIe.">NVMe</abbr> drive</li>
+<li><code>/dev/nvme0n1p1</code> -- first partition on that drive</li>
 </ul>
+<h3 id="disk-images">Disk images<a class="headerlink" href="#disk-images" title="Permanent link">&para;</a></h3>
+<p>A disk image is simply a file that contains the raw contents of a block device. If you copy every byte from <code>/dev/sda</code> into a file, you have a disk image of that drive.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Create a raw disk image (don&#39;t actually run this without thinking!)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>dd<span class="w"> </span><span class="k">if</span><span class="o">=</span>/dev/sda<span class="w"> </span><span class="nv">of</span><span class="o">=</span>disk.img<span class="w"> </span><span class="nv">bs</span><span class="o">=</span>4M
+</code></pre></div>
+<p>This "raw" format is simple but has downsides -- the image file is as large as the disk, even if the disk is mostly empty.</p>
+<h3 id="qcow2-and-other-formats"><abbr title="QEMU Copy-On-Write version 2 -- a disk image format supporting sparse allocation and snapshots.">QCOW2</abbr> and other formats<a class="headerlink" href="#qcow2-and-other-formats" title="Permanent link">&para;</a></h3>
+<p><abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr>'s <abbr title="QEMU Copy-On-Write version 2 -- a disk image format supporting sparse allocation and snapshots.">QCOW2</abbr> (<abbr title="Quick Emulator -- an open source machine emulator and virtualizer.">QEMU</abbr> Copy-On-Write version 2) format solves several problems:</p>
+<ul>
+<li><strong>Sparse allocation</strong>: Only stores blocks that have been written to, so a 100GB disk with 10GB of data only takes ~10GB of space</li>
+<li><strong>Snapshots</strong>: Can store multiple point-in-time snapshots within a single file</li>
+<li><strong>Compression</strong>: Can compress blocks to save space</li>
+<li><strong>Encryption</strong>: Can encrypt the disk contents</li>
+<li><strong>Backing files</strong>: Can use another image as a base, storing only the differences</li>
+</ul>
+<p>This is why cloud images are typically distributed in <abbr title="QEMU Copy-On-Write version 2 -- a disk image format supporting sparse allocation and snapshots.">QCOW2</abbr> format -- a minimal Debian install might be only 500MB as a <abbr title="QEMU Copy-On-Write version 2 -- a disk image format supporting sparse allocation and snapshots.">QCOW2</abbr>, versus several gigabytes as a raw image.</p>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>The <abbr title="Network Block Device -- a protocol for accessing block devices over a network.">NBD</abbr> (Network Block Device) protocol we used in the <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> example allows you to mount and manipulate disk images without needing a running <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>. The <code>qemu-nbd</code> command exposes a <abbr title="QEMU Copy-On-Write version 2 -- a disk image format supporting sparse allocation and snapshots.">QCOW2</abbr> or raw image as a block device that you can partition, format, and mount normally.</p>
+</div>
+<h2 id="interrupts">Interrupts<a class="headerlink" href="#interrupts" title="Permanent link">&para;</a></h2>
+<p>Interrupts are how hardware gets the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr>'s attention. Without interrupts, the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> would have to constantly check (poll) every device to see if it had data ready. With interrupts, devices can signal the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> when they need attention.</p>
+<p>When an interrupt occurs:</p>
+<ol>
+<li>The <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> stops what it's currently doing</li>
+<li>Saves its current state (registers, program counter, etc.)</li>
+<li>Jumps to an interrupt handler -- a piece of kernel code that deals with this type of interrupt</li>
+<li>The handler does whatever is needed (reads data from the device, etc.)</li>
+<li>The <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> restores its state and continues what it was doing</li>
+</ol>
+<h3 id="hardware-vs-software-interrupts">Hardware vs software interrupts<a class="headerlink" href="#hardware-vs-software-interrupts" title="Permanent link">&para;</a></h3>
+<p>Hardware interrupts come from external devices -- a keyboard key press, a network packet arriving, a disk completing a read operation.</p>
+<p>Software interrupts (also called traps or exceptions) come from the <abbr title="Central Processing Unit -- the component of a computer responsible for executing program instructions.">CPU</abbr> itself -- a division by zero, an invalid memory access, or a deliberate system call instruction.</p>
+<p>System calls, which we discussed earlier, are implemented as software interrupts. When a program executes the <code>syscall</code> instruction (or <code>int 0x80</code> on older systems), it triggers a software interrupt that transfers control to the kernel.</p>
+<h3 id="why-this-matters-for-virtualization_1">Why this matters for virtualization<a class="headerlink" href="#why-this-matters-for-virtualization_1" title="Permanent link">&para;</a></h3>
+<p>Virtualizing interrupts is one of the trickier parts of building a hypervisor:</p>
+<ul>
+<li>Hardware interrupts need to be delivered to the right <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> (or handled by the hypervisor)</li>
+<li>The guest kernel expects to receive and handle interrupts normally</li>
+<li>Timer interrupts need to be virtualized to give each <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> the illusion of time passing normally</li>
+</ul>
+<p>Hardware virtualization extensions (<abbr title="Intel Virtualization Technology -- Intel's hardware virtualization extensions for x86 processors.">VT-x</abbr>, <abbr title="AMD Virtualization -- AMD's hardware virtualization extensions for x86 processors.">AMD-V</abbr>) include features specifically for handling interrupts efficiently in virtualized environments.</p>
+<h2 id="device-drivers">Device drivers<a class="headerlink" href="#device-drivers" title="Permanent link">&para;</a></h2>
+<p>A device driver is kernel code that knows how to communicate with a specific piece of hardware. The kernel provides generic interfaces (block devices, network devices, etc.) and drivers translate between those interfaces and the actual hardware.</p>
+<p>For example, the kernel's block layer doesn't know anything about <abbr title="Serial ATA -- an interface for connecting storage devices.">SATA</abbr> commands or <abbr title="Non-Volatile Memory Express -- a protocol for accessing SSDs over PCIe.">NVMe</abbr> protocols. It just knows how to read and write blocks. The AHCI driver (for <abbr title="Serial ATA -- an interface for connecting storage devices.">SATA</abbr>) and nvme driver know how to talk to their respective hardware and present it as a generic block device.</p>
+<h3 id="why-drivers-run-in-the-kernel">Why drivers run in the kernel<a class="headerlink" href="#why-drivers-run-in-the-kernel" title="Permanent link">&para;</a></h3>
+<p>Drivers typically run in kernel mode because they need to:</p>
+<ul>
+<li>Access hardware directly (I/O ports, memory-mapped registers)</li>
+<li>Handle interrupts</li>
+<li>Have low latency (no context switches)</li>
+</ul>
+<p>This is also why a buggy driver can crash your entire system -- it's running with full kernel privileges.</p>
+<h3 id="virtio-paravirtualized-drivers">Virtio -- paravirtualized drivers<a class="headerlink" href="#virtio-paravirtualized-drivers" title="Permanent link">&para;</a></h3>
+<p>When running in a virtual machine, emulating real hardware is slow. The hypervisor has to intercept every access to the emulated hardware and simulate what real hardware would do.</p>
+<p>Virtio is a standard for paravirtualized devices -- instead of pretending to be real hardware, virtio devices use a simple, efficient protocol designed specifically for virtualization. A virtio network card doesn't emulate an Intel e1000 or Realtek <abbr title="Network Interface Card -- hardware for connecting a computer to a network.">NIC</abbr>; it uses a straightforward queue-based interface that both the guest driver and hypervisor understand.</p>
+<p>This is why you'll see virtio devices recommended for <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> performance -- they're not emulating anything, they're using a protocol designed from the ground up for the hypervisor-to-guest communication.</p>
+<div class="admonition info">
+<p class="admonition-title">Want to know more?</p>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Resource</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Virtio specification</td>
+<td>The <a href="https://docs.oasis-open.org/virtio/virtio/v1.2/virtio-v1.2.html">OASIS virtio specification</a> describes the standard in detail</td>
+</tr>
+<tr>
+<td>Linux device drivers</td>
+<td><a href="https://lwn.net/Kernel/LDD3/">Linux Device Drivers, 3rd Edition</a> is freely available and still relevant for understanding driver concepts</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="todo">TODO<a class="headerlink" href="#todo" title="Permanent link">&para;</a></h2>
+<ul>
+<li><abbr title="Basic Input/Output System -- legacy firmware for PC initialization and boot.">BIOS</abbr> boot</li>
+</ul>
+<p><a href="https://www.intel.com/content/www/us/en/content-details/772756/bios-boot-specification.html">https://www.intel.com/content/www/us/en/content-details/772756/bios-boot-specification.html</a>
+<a href="https://medium.com/@tunacici7/first-stage-loaders-bios-u-efi-iboot1-u-boot-spl-5c0bee7feb15">https://medium.com/@tunacici7/first-stage-loaders-bios-u-efi-iboot1-u-boot-spl-5c0bee7feb15</a></p>
+<p>◦ <abbr title="Unified Extensible Firmware Interface -- modern replacement for BIOS.">UEFI</abbr> boot
+◦ <abbr title="Preboot Execution Environment -- standard for network booting.">PXE</abbr> / TFTP boot
+◦ IPMI / Redfish / UCS</p>
+<!-- Shared abbreviations for cloudgood documentation pages -->
+<!-- Include at the bottom of cloudgood files with: --8<-- "docs-include/abbreviations.md" -->
+<!-- These definitions are invisible - they enable hover tooltips for the defined terms -->
+
+<!-- CPU and processor terms -->
+<!-- Memory terms -->
+<!-- Virtualization - CPU extensions -->
+<!-- Virtualization - memory -->
+<!-- Virtualization - general -->
+<!-- Networking -->
+<!-- Storage -->
+<!-- Boot and firmware -->
+<!-- Linux and OS concepts -->
+<!-- Containers -->
+<!-- x86 architecture -->
+<!-- APIs and interfaces -->
+<!-- Miscellaneous -->
 
 
 
 
 
 
+
+  
+  
 
 
 
@@ -3735,7 +4367,7 @@ socket is at <code>/run/podman/podman.sock</code>.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/occystrap/installation.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/occystrap/installation.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/occystrap/installation/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/cloudgood/issues/new?title=Docs%20issue%3A%20docs/more-booting.md&body=%2A%2ASource%20file%3A%2A%2A%20%60docs/more-booting.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/cloudgood/booting/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
