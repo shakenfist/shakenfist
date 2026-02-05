@@ -45,6 +45,13 @@ jobs:
           path: cloudgood
           fetch-depth: 0
 
+      - name: Checkout the development repository
+        uses: actions/checkout@v4
+        with:
+          repository: shakenfist/development
+          path: development
+          fetch-depth: 0
+
       - name: Checkout the kerbside repository
         uses: actions/checkout@v4
         with:
