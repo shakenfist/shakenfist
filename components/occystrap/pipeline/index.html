@@ -3893,6 +3893,9 @@ as search-only (prints results) or passthrough (searches AND forwards
 elements).</p>
 <p><strong>exclude</strong>: Removes files matching glob patterns from layers, recalculating
 hashes afterward.</p>
+<p><strong>inspect</strong>: Records layer metadata (digest, size, build history) to a JSONL
+file. This is a pure passthrough filter -- it does not modify image data. Place
+it between other filters to observe and measure their effect on layers.</p>
 <h3 id="chaining-filters">Chaining Filters<a class="headerlink" href="#chaining-filters" title="Permanent link">&para;</a></h3>
 <p>Multiple filters are chained together:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://...<span class="w"> </span>tar://output.tar<span class="w"> </span><span class="se">\</span>

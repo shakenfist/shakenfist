@@ -1633,6 +1633,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#inspect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inspect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#exclude" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3706,6 +3717,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#inspect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inspect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#exclude" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4075,18 +4097,56 @@ manifest is updated.</p>
 <a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Search with regex</span>
 <a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>-f<span class="w"> </span><span class="s2">&quot;search:pattern=.*\.py</span>$<span class="s2">,regex=true&quot;</span>
 </code></pre></div>
+<h3 id="inspect">inspect<a class="headerlink" href="#inspect" title="Permanent link">&para;</a></h3>
+<p>Record layer metadata to a JSONL file. This is a passthrough
+filter that does not modify the image data -- it only observes
+and records. Place it between other filters to measure their
+effect on layer digests and sizes.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>inspect:file=PATH
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file=PATH</code></td>
+<td>Path to the JSONL output file (required)</td>
+</tr>
+</tbody>
+</table>
+<p>Each invocation appends one JSON line containing the image
+name, tag, layer digests, sizes, and build history. Multiple
+images can be recorded to the same file.</p>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Record layer metadata before and after normalization</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=before.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=after.jsonl&quot;</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="c1"># Full pipeline with three observation points</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=as-built.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=post-normalize.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=post-exclude.jsonl&quot;</span>
+</code></pre></div>
 <h3 id="exclude">exclude<a class="headerlink" href="#exclude" title="Permanent link">&para;</a></h3>
 <p>Exclude files matching glob patterns from image layers.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>exclude:pattern=PATTERN[,PATTERN2,...]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>exclude:pattern=PATTERN[,PATTERN2,...]
 </code></pre></div>
 <p>Files matching the patterns are removed from layers. Layer hashes are
 recalculated after modification.</p>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Exclude git directories</span>
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**&quot;</span>
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="c1"># Exclude multiple patterns</span>
-<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Exclude git directories</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**&quot;</span>
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="c1"># Exclude multiple patterns</span>
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc&quot;</span>
 </code></pre></div>
 <h2 id="legacy-commands">Legacy Commands<a class="headerlink" href="#legacy-commands" title="Permanent link">&para;</a></h2>
 <p>The following commands are deprecated but still available for backwards
