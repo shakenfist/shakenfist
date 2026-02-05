@@ -319,6 +319,43 @@ When used as a filter, search prints matches AND passes elements to the output.
 -f "search:pattern=.*\.py$,regex=true"
 ```
 
+### inspect
+
+Record layer metadata to a JSONL file. This is a passthrough
+filter that does not modify the image data -- it only observes
+and records. Place it between other filters to measure their
+effect on layer digests and sizes.
+
+```
+inspect:file=PATH
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `file=PATH` | Path to the JSONL output file (required) |
+
+Each invocation appends one JSON line containing the image
+name, tag, layer digests, sizes, and build history. Multiple
+images can be recorded to the same file.
+
+**Examples:**
+
+```bash
+# Record layer metadata before and after normalization
+-f "inspect:file=before.jsonl" \
+-f normalize-timestamps \
+-f "inspect:file=after.jsonl"
+
+# Full pipeline with three observation points
+-f "inspect:file=as-built.jsonl" \
+-f normalize-timestamps \
+-f "inspect:file=post-normalize.jsonl" \
+-f "exclude:pattern=**/.git" \
+-f "inspect:file=post-exclude.jsonl"
+```
+
 ### exclude
 
 Exclude files matching glob patterns from image layers.
