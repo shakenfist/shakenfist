@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "gitAuthor": "shakenfist-bot <bot@shakenfist.com>",
-  "dependencyDashboard": "true",
+  "dependencyDashboard": true,
   "assignees": [
     "mikalstill"
   ],
@@ -20,29 +20,29 @@
     },
     {
       "description": "Group pydantic updates together",
-      "matchPackagePatterns": [
-        "pydantic"
-      ],
-      "groupName": "pydantic"
+      "groupName": "pydantic",
+      "matchPackageNames": [
+        "/pydantic/"
+      ]
     },
     {
       "description": "Group grpcio updates together",
-      "matchPackagePatterns": [
-        "grpcio",
-        "protobuf"
-      ],
-      "groupName": "grpcio"
+      "groupName": "grpcio",
+      "matchPackageNames": [
+        "/grpcio/",
+        "/protobuf/"
+      ]
     },
     {
       "description": "Group things entangled with wraps",
-      "matchPackagePatterns": [
-        "wraps",
-        "iters",
-        "async-extensions"
-      ],
-      "groupName": "entangled-wraps"
+      "groupName": "entangled-wraps",
+      "matchPackageNames": [
+        "/wraps/",
+        "/iters/",
+        "/async-extensions/"
+      ]
     }
   ],
   "minimumReleaseAge": "3 days",
-  "rollbackPrs": "true"
+  "rollbackPrs": true
 }
