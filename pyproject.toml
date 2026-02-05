@@ -124,7 +124,7 @@ dependencies = [
     "jsonschema-specifications==2025.9.1",
     "netaddr==1.3.0",
     "oslo.concurrency==7.2.0",
-    "oslo.config==10.1.0",
+    "oslo.config==10.2.0",
     "oslo.i18n==6.7.1",
     "oslo.utils==9.2.0",
     "packaging==25.0",
