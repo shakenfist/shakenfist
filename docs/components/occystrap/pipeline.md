@@ -117,6 +117,10 @@ elements).
 **exclude**: Removes files matching glob patterns from layers, recalculating
 hashes afterward.
 
+**inspect**: Records layer metadata (digest, size, build history) to a JSONL
+file. This is a pure passthrough filter -- it does not modify image data. Place
+it between other filters to observe and measure their effect on layers.
+
 ### Chaining Filters
 
 Multiple filters are chained together:
