@@ -103,6 +103,7 @@ nav:
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md
+            - "Docker Tarball Format Reference": components/occystrap/docker-tarball-formats.md
             - "Installation": components/occystrap/installation.md
             - "Pipeline Architecture": components/occystrap/pipeline.md
             - "Tar Format Selection": components/occystrap/tar-format-selection.md
