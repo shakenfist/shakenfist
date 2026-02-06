@@ -19,48 +19,48 @@ jobs:
           echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
 
       - name: Checkout the shakenfist repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: shakenfist
           fetch-depth: 0
 
       - name: Checkout the actions repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: shakenfist/actions
           path: actions
           fetch-depth: 0
 
       - name: Checkout the clingwrap repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: shakenfist/clingwrap
           path: clingwrap
           fetch-depth: 0
 
       - name: Checkout the cloudgood repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: shakenfist/cloudgood
           path: cloudgood
           fetch-depth: 0
 
       - name: Checkout the development repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: shakenfist/development
           path: development
           fetch-depth: 0
 
       - name: Checkout the kerbside repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: shakenfist/kerbside
           path: kerbside
           fetch-depth: 0
 
       - name: Checkout the occystrap repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: shakenfist/occystrap
           path: occystrap
