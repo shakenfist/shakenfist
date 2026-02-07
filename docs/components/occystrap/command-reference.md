@@ -17,6 +17,7 @@ name:
 | `--username USER` | `OCCYSTRAP_USERNAME` | Registry authentication username |
 | `--password PASS` | `OCCYSTRAP_PASSWORD` | Registry authentication password |
 | `--insecure` | | Use HTTP instead of HTTPS for registries |
+| `--compression TYPE` | `OCCYSTRAP_COMPRESSION` | Layer compression for registry output (gzip, zstd) |
 
 Example:
 
@@ -245,8 +246,15 @@ docker://myimage:v1?socket=/run/podman/podman.sock
 Push images to Docker/OCI registries.
 
 ```
-registry://HOST/IMAGE:TAG[?insecure=true]
+registry://HOST/IMAGE:TAG[?insecure=true&compression=TYPE]
 ```
+
+**Query Options:**
+
+| Option | Description |
+|--------|-------------|
+| `insecure=true` | Use HTTP instead of HTTPS |
+| `compression=TYPE` | Layer compression: gzip (default) or zstd |
 
 **Examples:**
 
@@ -256,6 +264,9 @@ registry://myregistry.example.com/myproject/myimage:v1
 
 # Push with insecure (HTTP)
 registry://internal.local/image:tag?insecure=true
+
+# Push with zstd compression (requires Docker 20.10+ or containerd 1.5+)
+registry://myregistry.example.com/myimage:v1?compression=zstd
 ```
 
 ## Filters
