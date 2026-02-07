@@ -3939,30 +3939,48 @@ images, allowing multiple images to share storage.</p>
 <p>Pushes images to Docker/OCI registries.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>registry://HOST/IMAGE:TAG
 </code></pre></div>
-<p>Uploads layers as blobs and creates the manifest.</p>
+<p>Uploads layers as blobs in parallel and creates the manifest.</p>
+<p><strong>Parallel Uploads:</strong></p>
+<p>Layer uploads use a thread pool for improved performance:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>process_image_element() called for each layer
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    └── Compress layer (synchronous - CPU bound)
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    └── Submit upload task to thread pool (non-blocking)
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    └── Record layer metadata immediately (preserves order)
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>finalize()
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    └── Wait for all uploads to complete
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    └── Push manifest only after all blobs uploaded
+</code></pre></div>
+<p>Key design aspects:
+- Compression happens synchronously before submitting uploads (CPU-bound work
+  benefits from predictable memory usage)
+- Layer metadata is recorded immediately to preserve ordering in the manifest
+- Authentication token updates are thread-safe
+- Default parallelism is 4 threads, configurable via <code>--parallel-uploads</code> or
+  <code>max_workers</code> URI option</p>
 <h3 id="docker-daemon-output">Docker Daemon Output<a class="headerlink" href="#docker-daemon-output" title="Permanent link">&para;</a></h3>
 <p>Loads images into local Docker or Podman.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>docker://IMAGE:TAG
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>docker://IMAGE:TAG
 </code></pre></div>
 <p>Uses the Docker Engine API to load the image.</p>
 <h2 id="data-flow-example">Data Flow Example<a class="headerlink" href="#data-flow-example" title="Permanent link">&para;</a></h2>
 <p>Consider this command:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">    </span>tar://busybox.tar<span class="w"> </span>-f<span class="w"> </span>normalize-timestamps
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span>tar://busybox.tar<span class="w"> </span>-f<span class="w"> </span>normalize-timestamps
 </code></pre></div>
 <p>The data flow is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>1. Registry Input fetches manifest from docker.io
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>2. Registry Input yields CONFIG_FILE element
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>   --&gt; TimestampNormalizer passes through unchanged
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>   --&gt; TarWriter writes to tarball
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>3. For each layer:
-<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>   a. Registry Input fetches layer blob
-<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>   b. Registry Input yields IMAGE_LAYER element
-<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>   c. TimestampNormalizer rewrites tarball with epoch timestamps
-<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>   d. TimestampNormalizer recalculates SHA256
-<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>   e. TimestampNormalizer yields modified element with new name
-<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>   f. TarWriter writes modified layer to tarball
-<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>4. TarWriter.finalize() writes manifest.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>1. Registry Input fetches manifest from docker.io
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>2. Registry Input yields CONFIG_FILE element
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>   --&gt; TimestampNormalizer passes through unchanged
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>   --&gt; TarWriter writes to tarball
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>3. For each layer:
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>   a. Registry Input fetches layer blob
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>   b. Registry Input yields IMAGE_LAYER element
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>   c. TimestampNormalizer rewrites tarball with epoch timestamps
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>   d. TimestampNormalizer recalculates SHA256
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>   e. TimestampNormalizer yields modified element with new name
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>   f. TarWriter writes modified layer to tarball
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>4. TarWriter.finalize() writes manifest.json
 </code></pre></div>
 <h2 id="key-concepts">Key Concepts<a class="headerlink" href="#key-concepts" title="Permanent link">&para;</a></h2>
 <h3 id="whiteout-files">Whiteout Files<a class="headerlink" href="#whiteout-files" title="Permanent link">&para;</a></h3>
