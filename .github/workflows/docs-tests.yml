@@ -33,7 +33,7 @@ jobs:
           ${GITHUB_WORKSPACE}/tox-venv/bin/pip3 install tox
           ${GITHUB_WORKSPACE}/tox-venv/bin/tox -edocs -- --site-dir ${GITHUB_WORKSPACE}/artifacts/site | tee ${GITHUB_WORKSPACE}/artifacts/site/build.log
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: site
