@@ -29,11 +29,10 @@ the `--dangerously-skip-permissions` flag for autonomous operation.
 │  │             │    │ Tests           │    │ (Claude Code)           │ │
 │  └─────────────┘    └─────────────────┘    └───────────┬─────────────┘ │
 │                                                         │               │
-│                                        ┌────────────────┴────────────┐  │
-│                                        │                             │  │
-│                                        ▼                             ▼  │
-│                              Upload review.json            Post markdown│
-│                              as artifact                   comment      │
+│                                                         ▼               │
+│                                              Post PR comment with       │
+│                                              markdown + embedded JSON   │
+│                                              (in <details> section)     │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -45,8 +44,8 @@ the `--dangerously-skip-permissions` flag for autonomous operation.
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                     PR Address Comments Workflow                        │
 │  ┌─────────────────────┐    ┌─────────────────────────────────────────┐│
-│  │ Download            │───▶│ Address Comments with Claude Code       ││
-│  │ review.json artifact│    │ (one commit per actionable item)        ││
+│  │ Extract JSON from   │───▶│ Address Comments with Claude Code       ││
+│  │ PR review comment   │    │ (one commit per actionable item)        ││
 │  └─────────────────────┘    └───────────┬─────────────────────────────┘│
 │                                         │                               │
 │                           ┌─────────────┴─────────────┐                 │
@@ -64,6 +63,11 @@ of parsing markdown. This provides:
 - **Clean data handoff** between reviewer and addresser
 - **No regex parsing** of natural language output
 - **Iteration until valid** - reviewer can retry if JSON is malformed
+- **Self-contained comments** - JSON is embedded in the PR comment itself
+
+The JSON is embedded in a collapsed `<details>` section at the end of the
+human-readable markdown. This keeps the comment clean while making the data
+easily extractable by the address-comments automation.
 
 ### Review Schema
 
@@ -131,9 +135,13 @@ Comment on a PR with these commands (requires write access to the repository):
 
 | Command | Description |
 |---------|-------------|
+| `@shakenfist-bot please retest` | Re-run the functional test suite |
 | `@shakenfist-bot please re-review` | Request a fresh automated code review |
 | `@shakenfist-bot please attempt to fix` | Have Claude attempt to fix failing tests |
 | `@shakenfist-bot please address comments` | Address automated review comments |
+
+These commands are processed by GitHub Actions workflows that use shared actions
+from the [shakenfist/actions](https://github.com/shakenfist/actions) repository.
 
 ## How the Reviewer Works
 
@@ -144,12 +152,14 @@ The automated reviewer (`tools/review-pr-with-claude.sh`):
 3. Prompts Claude Code to review the changes
 4. Requests JSON output following the schema
 5. Validates JSON against the schema using `tools/render-review.py --validate`
-6. Renders JSON to human-readable markdown
-7. Posts markdown as a PR comment
-8. Uploads `review.json` as a workflow artifact
+6. Renders JSON to human-readable markdown with `--embed-json` flag
+7. Posts the combined markdown (human-readable + embedded JSON) as a PR comment
 
 The validation step ensures the output is parseable. If validation fails, the
 script can retry (in practice, Claude Code follows the schema reliably).
+
+The embedded JSON appears in a collapsed `<details>` section at the end of the
+comment, keeping the review readable while preserving machine-parseable data.
 
 ### Example Prompt Structure
 
@@ -181,9 +191,10 @@ Diff:
 
 The comment addresser (`tools/address-comments-with-claude.sh`):
 
-1. Downloads `review.json` artifact from the sanity-checks workflow
-2. Validates JSON against the schema
-3. Extracts items where `action == "fix"` or `action == "document"`
+1. Fetches PR review comments and finds the most recent automated review
+2. Extracts JSON from the `<details>` section in the review comment
+3. Validates JSON against the schema
+4. Extracts items where `action == "fix"` or `action == "document"`
 4. For each actionable item:
    - Prompts Claude Code with the specific issue details
    - Claude either makes a fix or explains why it disagrees
@@ -219,10 +230,48 @@ This is tracked in the summary table posted to the PR.
 
 ## Workflow Files
 
-- `.github/workflows/sanity-checks.yml` - Main CI with automated review
+- `.github/workflows/sanity-checks.yml` or `functional-tests.yml` - Main CI with
+  automated review
+- `.github/workflows/pr-retest.yml` - Manual re-run of functional tests
 - `.github/workflows/pr-re-review.yml` - Manual re-review trigger
-- `.github/workflows/pr-fix-tests.yml` - Test failure fixing
+- `.github/workflows/pr-fix-tests.yml` - Test failure fixing trigger
+- `.github/workflows/test-drift-fix.yml` - Test failure fixing implementation
 - `.github/workflows/pr-address-comments.yml` - Review comment addressing
+
+## Shared Actions
+
+The trigger logic for bot commands is extracted into a reusable action in the
+[shakenfist/actions](https://github.com/shakenfist/actions) repository:
+
+### pr-bot-trigger
+
+This composite action handles the common pattern of:
+- Checking if a comment matches a trigger phrase
+- Verifying commenter has write/admin permissions
+- Adding a reaction to the comment
+- Posting unauthorized/starting messages
+- Outputting PR details for downstream use
+
+**Usage in workflows:**
+
+```yaml
+- uses: shakenfist/actions/pr-bot-trigger@main
+  id: trigger
+  with:
+    trigger-phrase: 'please retest'
+    reaction: 'rocket'
+    starting-message: |
+      Starting tests on branch `{pr_ref}`...
+      [View workflow run]({run_url})
+
+- name: Do something if authorized
+  if: steps.trigger.outputs.authorized == 'true'
+  run: |
+    echo "PR branch: ${{ steps.trigger.outputs.pr-ref }}"
+```
+
+This reduces duplication across projects and ensures consistent security checks
+and user experience.
 
 ## Scripts
 
@@ -288,6 +337,20 @@ tools/address-comments-with-claude.sh --pr 123 --review-json review.json --dry-r
 # Address comments for real
 tools/address-comments-with-claude.sh --pr 123 --review-json review.json
 ```
+
+## Projects Using This System
+
+The following Shaken Fist projects have implemented this automation:
+
+- **[imago](https://github.com/shakenfist/imago)** - Disk image management tool
+  (Rust). The original implementation, with sophisticated structured review
+  output and issue creation.
+- **[occystrap](https://github.com/shakenfist/occystrap)** - Container image
+  tools (Python). Adapted from imago with Python-specific test commands.
+
+Each project has its own `tools/` directory with the scripts, customized for
+the project's build system and test framework. The shared action handles the
+common trigger logic.
 
 ## Future Improvements
 
