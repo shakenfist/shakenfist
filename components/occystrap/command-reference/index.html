@@ -3825,6 +3825,11 @@ name:</p>
 <td></td>
 <td>Use HTTP instead of HTTPS for registries</td>
 </tr>
+<tr>
+<td><code>--compression TYPE</code></td>
+<td><code>OCCYSTRAP_COMPRESSION</code></td>
+<td>Layer compression for registry output (gzip, zstd)</td>
+</tr>
 </tbody>
 </table>
 <p>Example:</p>
@@ -4021,14 +4026,36 @@ name:</p>
 </code></pre></div>
 <h3 id="registry_1">registry://<a class="headerlink" href="#registry_1" title="Permanent link">&para;</a></h3>
 <p>Push images to Docker/OCI registries.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>registry://HOST/IMAGE:TAG[?insecure=true]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>registry://HOST/IMAGE:TAG[?insecure=true&amp;compression=TYPE]
 </code></pre></div>
+<p><strong>Query Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>insecure=true</code></td>
+<td>Use HTTP instead of HTTPS</td>
+</tr>
+<tr>
+<td><code>compression=TYPE</code></td>
+<td>Layer compression: gzip (default) or zstd</td>
+</tr>
+</tbody>
+</table>
 <p><strong>Examples:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Push to private registry</span>
 <a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>registry://myregistry.example.com/myproject/myimage:v1
 <a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
 <a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Push with insecure (HTTP)</span>
 <a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>registry://internal.local/image:tag?insecure<span class="o">=</span><span class="nb">true</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="c1"># Push with zstd compression (requires Docker 20.10+ or containerd 1.5+)</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>registry://myregistry.example.com/myimage:v1?compression<span class="o">=</span>zstd
 </code></pre></div>
 <h2 id="filters">Filters<a class="headerlink" href="#filters" title="Permanent link">&para;</a></h2>
 <p>Filters transform or inspect image elements as they pass through the pipeline.
