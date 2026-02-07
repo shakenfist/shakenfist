@@ -3362,6 +3362,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#shared-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared Actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Shared Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pr-bot-trigger" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pr-bot-trigger
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scripts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3410,6 +3438,17 @@
     <span class="md-ellipsis">
       
         Local Development
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projects-using-this-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Projects Using This System
       
     </span>
   </a>
@@ -3473,30 +3512,29 @@ the <code>--dangerously-skip-permissions</code> flag for autonomous operation.</
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│  │             │    │ Tests           │    │ (Claude Code)           │ │
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│  └─────────────┘    └─────────────────┘    └───────────┬─────────────┘ │
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│                                                         │               │
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│                                        ┌────────────────┴────────────┐  │
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│                                        │                             │  │
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│                                        ▼                             ▼  │
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│                              Upload review.json            Post markdown│
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│                              as artifact                   comment      │
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>└─────────────────────────────────────────────────────────────────────────┘
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                                    │
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>                                    ▼
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>┌─────────────────────────────────────────────────────────────────────────┐
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│            User comments: &quot;@shakenfist-bot please address comments&quot;     │
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>└─────────────────────────────────────────────────────────────────────────┘
-<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>                                    │
-<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>                                    ▼
-<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>┌─────────────────────────────────────────────────────────────────────────┐
-<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│                     PR Address Comments Workflow                        │
-<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│  ┌─────────────────────┐    ┌─────────────────────────────────────────┐│
-<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>│  │ Download            │───▶│ Address Comments with Claude Code       ││
-<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>│  │ review.json artifact│    │ (one commit per actionable item)        ││
-<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>│  └─────────────────────┘    └───────────┬─────────────────────────────┘│
-<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>│                                         │                               │
-<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>│                           ┌─────────────┴─────────────┐                 │
-<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>│                           ▼                           ▼                 │
-<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>│                    Push commits              Post summary comment       │
-<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>└─────────────────────────────────────────────────────────────────────────┘
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│                                                         ▼               │
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│                                              Post PR comment with       │
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│                                              markdown + embedded JSON   │
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│                                              (in &lt;details&gt; section)     │
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>└─────────────────────────────────────────────────────────────────────────┘
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                                    │
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                                    ▼
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>┌─────────────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│            User comments: &quot;@shakenfist-bot please address comments&quot;     │
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>└─────────────────────────────────────────────────────────────────────────┘
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>                                    │
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>                                    ▼
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>┌─────────────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│                     PR Address Comments Workflow                        │
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│  ┌─────────────────────┐    ┌─────────────────────────────────────────┐│
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│  │ Extract JSON from   │───▶│ Address Comments with Claude Code       ││
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>│  │ PR review comment   │    │ (one commit per actionable item)        ││
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>│  └─────────────────────┘    └───────────┬─────────────────────────────┘│
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>│                                         │                               │
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>│                           ┌─────────────┴─────────────┐                 │
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>│                           ▼                           ▼                 │
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>│                    Push commits              Post summary comment       │
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>└─────────────────────────────────────────────────────────────────────────┘
 </code></pre></div>
 <h2 id="json-based-review-format">JSON-Based Review Format<a class="headerlink" href="#json-based-review-format" title="Permanent link">&para;</a></h2>
 <p>The key design decision is using structured JSON output from the reviewer instead
@@ -3506,7 +3544,11 @@ of parsing markdown. This provides:</p>
 <li><strong>Clean data handoff</strong> between reviewer and addresser</li>
 <li><strong>No regex parsing</strong> of natural language output</li>
 <li><strong>Iteration until valid</strong> - reviewer can retry if JSON is malformed</li>
+<li><strong>Self-contained comments</strong> - JSON is embedded in the PR comment itself</li>
 </ul>
+<p>The JSON is embedded in a collapsed <code>&lt;details&gt;</code> section at the end of the
+human-readable markdown. This keeps the comment clean while making the data
+easily extractable by the address-comments automation.</p>
 <h3 id="review-schema">Review Schema<a class="headerlink" href="#review-schema" title="Permanent link">&para;</a></h3>
 <p>The review output follows a strict JSON schema (<code>tools/review-schema.json</code>):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
@@ -3594,6 +3636,10 @@ of parsing markdown. This provides:</p>
 </thead>
 <tbody>
 <tr>
+<td><code>@shakenfist-bot please retest</code></td>
+<td>Re-run the functional test suite</td>
+</tr>
+<tr>
 <td><code>@shakenfist-bot please re-review</code></td>
 <td>Request a fresh automated code review</td>
 </tr>
@@ -3607,6 +3653,8 @@ of parsing markdown. This provides:</p>
 </tr>
 </tbody>
 </table>
+<p>These commands are processed by GitHub Actions workflows that use shared actions
+from the <a href="https://github.com/shakenfist/actions">shakenfist/actions</a> repository.</p>
 <h2 id="how-the-reviewer-works">How the Reviewer Works<a class="headerlink" href="#how-the-reviewer-works" title="Permanent link">&para;</a></h2>
 <p>The automated reviewer (<code>tools/review-pr-with-claude.sh</code>):</p>
 <ol>
@@ -3615,12 +3663,13 @@ of parsing markdown. This provides:</p>
 <li>Prompts Claude Code to review the changes</li>
 <li>Requests JSON output following the schema</li>
 <li>Validates JSON against the schema using <code>tools/render-review.py --validate</code></li>
-<li>Renders JSON to human-readable markdown</li>
-<li>Posts markdown as a PR comment</li>
-<li>Uploads <code>review.json</code> as a workflow artifact</li>
+<li>Renders JSON to human-readable markdown with <code>--embed-json</code> flag</li>
+<li>Posts the combined markdown (human-readable + embedded JSON) as a PR comment</li>
 </ol>
 <p>The validation step ensures the output is parseable. If validation fails, the
 script can retry (in practice, Claude Code follows the schema reliably).</p>
+<p>The embedded JSON appears in a collapsed <code>&lt;details&gt;</code> section at the end of the
+comment, keeping the review readable while preserving machine-parseable data.</p>
 <h3 id="example-prompt-structure">Example Prompt Structure<a class="headerlink" href="#example-prompt-structure" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>You are reviewing PR #123 for the Shaken Fist imago project.
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
@@ -3647,7 +3696,8 @@ script can retry (in practice, Claude Code follows the schema reliably).</p>
 <h2 id="how-the-comment-addresser-works">How the Comment Addresser Works<a class="headerlink" href="#how-the-comment-addresser-works" title="Permanent link">&para;</a></h2>
 <p>The comment addresser (<code>tools/address-comments-with-claude.sh</code>):</p>
 <ol>
-<li>Downloads <code>review.json</code> artifact from the sanity-checks workflow</li>
+<li>Fetches PR review comments and finds the most recent automated review</li>
+<li>Extracts JSON from the <code>&lt;details&gt;</code> section in the review comment</li>
 <li>Validates JSON against the schema</li>
 <li>Extracts items where <code>action == "fix"</code> or <code>action == "document"</code></li>
 <li>For each actionable item:</li>
@@ -3680,11 +3730,41 @@ script can retry (in practice, Claude Code follows the schema reliably).</p>
 This is tracked in the summary table posted to the PR.</p>
 <h2 id="workflow-files">Workflow Files<a class="headerlink" href="#workflow-files" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>.github/workflows/sanity-checks.yml</code> - Main CI with automated review</li>
+<li><code>.github/workflows/sanity-checks.yml</code> or <code>functional-tests.yml</code> - Main CI with
+  automated review</li>
+<li><code>.github/workflows/pr-retest.yml</code> - Manual re-run of functional tests</li>
 <li><code>.github/workflows/pr-re-review.yml</code> - Manual re-review trigger</li>
-<li><code>.github/workflows/pr-fix-tests.yml</code> - Test failure fixing</li>
+<li><code>.github/workflows/pr-fix-tests.yml</code> - Test failure fixing trigger</li>
+<li><code>.github/workflows/test-drift-fix.yml</code> - Test failure fixing implementation</li>
 <li><code>.github/workflows/pr-address-comments.yml</code> - Review comment addressing</li>
 </ul>
+<h2 id="shared-actions">Shared Actions<a class="headerlink" href="#shared-actions" title="Permanent link">&para;</a></h2>
+<p>The trigger logic for bot commands is extracted into a reusable action in the
+<a href="https://github.com/shakenfist/actions">shakenfist/actions</a> repository:</p>
+<h3 id="pr-bot-trigger">pr-bot-trigger<a class="headerlink" href="#pr-bot-trigger" title="Permanent link">&para;</a></h3>
+<p>This composite action handles the common pattern of:
+- Checking if a comment matches a trigger phrase
+- Verifying commenter has write/admin permissions
+- Adding a reaction to the comment
+- Posting unauthorized/starting messages
+- Outputting PR details for downstream use</p>
+<p><strong>Usage in workflows:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shakenfist/actions/pr-bot-trigger@main</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">trigger</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">trigger-phrase</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;please</span><span class="nv"> </span><span class="s">retest&#39;</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">reaction</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;rocket&#39;</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">starting-message</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">      </span><span class="no">Starting tests on branch `{pr_ref}`...</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">      </span><span class="no">[View workflow run]({run_url})</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Do something if authorized</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">steps.trigger.outputs.authorized == &#39;true&#39;</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="no">echo &quot;PR branch: ${{ steps.trigger.outputs.pr-ref }}&quot;</span>
+</code></pre></div>
+<p>This reduces duplication across projects and ensures consistent security checks
+and user experience.</p>
 <h2 id="scripts">Scripts<a class="headerlink" href="#scripts" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3745,21 +3825,33 @@ costs:</p>
 </ul>
 <h2 id="local-development">Local Development<a class="headerlink" href="#local-development" title="Permanent link">&para;</a></h2>
 <p>You can run the tools locally for testing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Review a PR</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tools/review-pr-with-claude.sh<span class="w"> </span>--pr<span class="w"> </span><span class="m">123</span><span class="w"> </span>--output-dir<span class="w"> </span>./review-output
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Validate review JSON</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>tools/render-review.py<span class="w"> </span>--validate<span class="w"> </span>review.json
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Render review JSON to markdown</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>tools/render-review.py<span class="w"> </span>review.json
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># Address comments (dry run)</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>tools/address-comments-with-claude.sh<span class="w"> </span>--pr<span class="w"> </span><span class="m">123</span><span class="w"> </span>--review-json<span class="w"> </span>review.json<span class="w"> </span>--dry-run
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="c1"># Address comments for real</span>
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>tools/address-comments-with-claude.sh<span class="w"> </span>--pr<span class="w"> </span><span class="m">123</span><span class="w"> </span>--review-json<span class="w"> </span>review.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Review a PR</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>tools/review-pr-with-claude.sh<span class="w"> </span>--pr<span class="w"> </span><span class="m">123</span><span class="w"> </span>--output-dir<span class="w"> </span>./review-output
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Validate review JSON</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>tools/render-review.py<span class="w"> </span>--validate<span class="w"> </span>review.json
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Render review JSON to markdown</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>tools/render-review.py<span class="w"> </span>review.json
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># Address comments (dry run)</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>tools/address-comments-with-claude.sh<span class="w"> </span>--pr<span class="w"> </span><span class="m">123</span><span class="w"> </span>--review-json<span class="w"> </span>review.json<span class="w"> </span>--dry-run
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="c1"># Address comments for real</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>tools/address-comments-with-claude.sh<span class="w"> </span>--pr<span class="w"> </span><span class="m">123</span><span class="w"> </span>--review-json<span class="w"> </span>review.json
 </code></pre></div>
+<h2 id="projects-using-this-system">Projects Using This System<a class="headerlink" href="#projects-using-this-system" title="Permanent link">&para;</a></h2>
+<p>The following Shaken Fist projects have implemented this automation:</p>
+<ul>
+<li><strong><a href="https://github.com/shakenfist/imago">imago</a></strong> - Disk image management tool
+  (Rust). The original implementation, with sophisticated structured review
+  output and issue creation.</li>
+<li><strong><a href="https://github.com/shakenfist/occystrap">occystrap</a></strong> - Container image
+  tools (Python). Adapted from imago with Python-specific test commands.</li>
+</ul>
+<p>Each project has its own <code>tools/</code> directory with the scripts, customized for
+the project's build system and test framework. The shared action handles the
+common trigger logic.</p>
 <h2 id="future-improvements">Future Improvements<a class="headerlink" href="#future-improvements" title="Permanent link">&para;</a></h2>
 <p>Potential enhancements to consider:</p>
 <ul>
