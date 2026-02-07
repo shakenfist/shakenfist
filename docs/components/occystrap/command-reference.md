@@ -18,6 +18,7 @@ name:
 | `--password PASS` | `OCCYSTRAP_PASSWORD` | Registry authentication password |
 | `--insecure` | | Use HTTP instead of HTTPS for registries |
 | `--compression TYPE` | `OCCYSTRAP_COMPRESSION` | Layer compression for registry output (gzip, zstd) |
+| `--parallel-uploads N`, `-j N` | `OCCYSTRAP_PARALLEL_UPLOADS` | Number of parallel upload threads (default: 4) |
 
 Example:
 
@@ -246,7 +247,7 @@ docker://myimage:v1?socket=/run/podman/podman.sock
 Push images to Docker/OCI registries.
 
 ```
-registry://HOST/IMAGE:TAG[?insecure=true&compression=TYPE]
+registry://HOST/IMAGE:TAG[?insecure=true&compression=TYPE&max_workers=N]
 ```
 
 **Query Options:**
@@ -255,6 +256,10 @@ registry://HOST/IMAGE:TAG[?insecure=true&compression=TYPE]
 |--------|-------------|
 | `insecure=true` | Use HTTP instead of HTTPS |
 | `compression=TYPE` | Layer compression: gzip (default) or zstd |
+| `max_workers=N` | Number of parallel upload threads (default: 4) |
+
+Layers are uploaded in parallel using a thread pool for improved performance.
+The `max_workers` option controls the number of concurrent uploads.
 
 **Examples:**
 
@@ -267,6 +272,9 @@ registry://internal.local/image:tag?insecure=true
 
 # Push with zstd compression (requires Docker 20.10+ or containerd 1.5+)
 registry://myregistry.example.com/myimage:v1?compression=zstd
+
+# Push with 8 parallel upload threads
+registry://myregistry.example.com/myimage:v1?max_workers=8
 ```
 
 ## Filters
