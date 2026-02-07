@@ -30,7 +30,7 @@ jobs:
       is_bot: ${{ steps.check.outputs.is_bot }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -60,7 +60,7 @@ jobs:
 
     steps:
       - name: Checkout code with two commits
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -210,7 +210,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           # Use DEPENDENCIES_TOKEN (a PAT) instead of GITHUB_TOKEN so that
@@ -613,7 +613,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           # Use DEPENDENCIES_TOKEN (a PAT) instead of GITHUB_TOKEN so that
@@ -673,7 +673,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 

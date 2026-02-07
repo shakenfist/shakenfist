@@ -81,7 +81,7 @@ jobs:
             echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
 
         - name: Checkout the actions repository
-          uses: actions/checkout@v4
+          uses: actions/checkout@v6
           with:
             repository: shakenfist/actions
             path: actions
