@@ -45,6 +45,24 @@ Capabilities:
 - Multi-architecture image selection
 - Manifest parsing (v1, v2, OCI formats)
 - Individual layer blob fetching
+- Parallel layer downloads for improved throughput
+
+**Parallel Downloads:**
+
+Layer blobs are downloaded in parallel using a thread pool:
+
+```
+fetch() generator
+    └── Yield config file first (synchronous)
+    └── Submit all layer downloads to thread pool
+    └── Yield layers in order as downloads complete
+```
+
+Key aspects:
+- All layers download simultaneously to maximize throughput
+- Layers are yielded in order despite parallel download
+- Authentication is thread-safe
+- Default parallelism is 4 threads, configurable via `--parallel`
 
 ### Docker Daemon Input
 
@@ -54,12 +72,34 @@ Fetches images from local Docker or Podman daemons.
 docker://IMAGE:TAG
 ```
 
-Uses the Docker Engine API over Unix socket. The entire image is streamed
-(equivalent to `docker save`), then parsed on the fly.
+Uses the Docker Engine API over Unix socket to stream the image tarball
+(equivalent to `docker save`).
 
 **Note:** The Docker Engine API only provides complete image export - there's
 no way to fetch individual layers separately. This is a limitation of the API
 design.
+
+**Hybrid Streaming:**
+
+To minimize disk usage for large images, the Docker input uses a hybrid
+streaming approach:
+
+```
+fetch() generator
+    └── Stream tarball sequentially (mode='r|')
+    └── Read manifest.json to get expected layer order
+    └── For each file in stream:
+        ├── If next expected layer: yield directly (zero disk I/O)
+        └── If out-of-order: buffer to temp file for later
+    └── After stream: yield remaining buffered layers in order
+```
+
+Key aspects:
+- In the optimistic case (layers in order), no temp files are used
+- Out-of-order layers are buffered to individual temp files
+- Temp files are deleted immediately after yielding
+- For a 26GB image with in-order layers, disk usage is near zero
+- Temp file location is configurable via `--temp-dir` option
 
 ### Tarball Input
 
@@ -145,6 +185,14 @@ Each filter wraps the next, forming a chain that processes elements in order.
 Output writers implement the `ImageOutput` interface and handle the final
 destination of processed elements.
 
+All output writers log a summary line at the end of processing:
+
+```
+Processed 12345678 bytes in 5 layers in 3.2 seconds
+```
+
+This shows the total bytes processed, layer count, and elapsed time.
+
 ### Tarball Output
 
 Creates docker-loadable tarballs in v1.2 format.
@@ -197,28 +245,41 @@ registry://HOST/IMAGE:TAG
 
 Uploads layers as blobs in parallel and creates the manifest.
 
-**Parallel Uploads:**
+**Parallel Compression and Uploads:**
 
-Layer uploads use a thread pool for improved performance:
+Both layer compression and uploads run in a thread pool for improved performance:
 
 ```
 process_image_element() called for each layer
-    └── Compress layer (synchronous - CPU bound)
-    └── Submit upload task to thread pool (non-blocking)
-    └── Record layer metadata immediately (preserves order)
+    └── Read layer data
+    └── Submit (compress + upload) to thread pool (non-blocking)
+    └── Main thread continues to next layer
 
 finalize()
-    └── Wait for all uploads to complete
+    └── Wait for all compression/upload tasks to complete
+    └── Collect layer metadata from futures (in order)
     └── Push manifest only after all blobs uploaded
 ```
 
 Key design aspects:
-- Compression happens synchronously before submitting uploads (CPU-bound work
-  benefits from predictable memory usage)
-- Layer metadata is recorded immediately to preserve ordering in the manifest
+- Multiple layers can compress simultaneously, utilizing multiple CPU cores
+- While one layer is compressing, others can be uploading
+- Layer order is preserved by collecting futures in submission order
 - Authentication token updates are thread-safe
-- Default parallelism is 4 threads, configurable via `--parallel-uploads` or
-  `max_workers` URI option
+- Progress is reported every 10 seconds during finalize
+- Default parallelism is 4 threads, configurable via `--parallel` or `-j`,
+  or the `max_workers` URI option
+
+**Blob Deduplication:**
+
+Before uploading a layer blob, the registry output checks whether the blob
+already exists in the target registry using `HEAD /v2/<name>/blobs/<digest>`.
+If the blob exists, the upload is skipped. This is particularly effective when
+pushing images that share base layers with images already in the registry.
+
+For this check to work, the compressed blob must have the same SHA256 digest
+as the existing blob. This requires deterministic compression -- see
+[Deterministic Compression](#deterministic-compression) below.
 
 ### Docker Daemon Output
 
@@ -276,6 +337,36 @@ When downloading multiple images:
 2. Subsequent images check if layers already exist
 3. Shared layers are referenced, not duplicated
 4. `catalog.json` maps images to their layers
+
+### Deterministic Compression
+
+When pushing layers to a registry, Occy Strap compresses them before upload.
+For blob deduplication to work (skipping uploads of layers that already
+exist), the compressed output must be identical for identical input. This
+is called deterministic compression.
+
+**gzip:** The gzip format includes a timestamp in its header by default,
+which means compressing the same data twice produces different output.
+Occy Strap suppresses this by setting `mtime=0` in the gzip header,
+making gzip compression fully deterministic.
+
+**zstd:** The zstd format does not embed timestamps, so it is inherently
+deterministic. Compressing the same data with the same settings always
+produces identical output.
+
+This determinism works together with filters like `normalize-timestamps`
+and `exclude` to maximize layer deduplication:
+
+1. The `normalize-timestamps` filter sets all file modification times in
+   layer tarballs to a consistent value (epoch 0 by default)
+2. The `exclude` filter removes unwanted files from layers
+3. Deterministic compression ensures the compressed output has a stable
+   SHA256 digest
+4. The registry output checks for existing blobs before uploading,
+   skipping any that already exist
+
+This means that if two images share identical layers (after filtering),
+the second push will skip uploading those layers entirely.
 
 ### Hash Recalculation
 
