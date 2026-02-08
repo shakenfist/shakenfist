@@ -3831,9 +3831,14 @@ name:</p>
 <td>Layer compression for registry output (gzip, zstd)</td>
 </tr>
 <tr>
-<td><code>--parallel-uploads N</code>, <code>-j N</code></td>
-<td><code>OCCYSTRAP_PARALLEL_UPLOADS</code></td>
-<td>Number of parallel upload threads (default: 4)</td>
+<td><code>--parallel N</code>, <code>-j N</code></td>
+<td><code>OCCYSTRAP_PARALLEL</code></td>
+<td>Number of parallel download/upload threads (default: 4)</td>
+</tr>
+<tr>
+<td><code>--temp-dir PATH</code></td>
+<td><code>OCCYSTRAP_TEMP_DIR</code></td>
+<td>Directory for temporary files (default: system temp)</td>
 </tr>
 </tbody>
 </table>
@@ -3917,8 +3922,13 @@ name:</p>
 <td><code>insecure=true</code></td>
 <td>Use HTTP instead of HTTPS</td>
 </tr>
+<tr>
+<td><code>max_workers=N</code></td>
+<td>Number of parallel download threads (default: 4)</td>
+</tr>
 </tbody>
 </table>
+<p>Layers are downloaded in parallel using a thread pool for improved performance.</p>
 <p><strong>Examples:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Docker Hub</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>registry://docker.io/library/busybox:latest
