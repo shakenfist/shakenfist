@@ -181,6 +181,27 @@ occystrap process registry://docker.io/library/python:3.11 \
     -f "exclude:pattern=**/__pycache__/**,**/*.pyc,**/.git/**"
 ```
 
+### Efficient Registry Pushes with Deduplication
+
+When pushing images that share base layers, Occy Strap skips uploading
+blobs that already exist in the target registry. Combining this with
+`normalize-timestamps` maximizes the chance of layer deduplication:
+
+```bash
+# Push multiple Python versions -- shared base layers upload once
+for version in 3.9 3.10 3.11; do
+    occystrap process \
+        "registry://docker.io/library/python:$version" \
+        "registry://myregistry.example.com/python:$version" \
+        -f normalize-timestamps
+done
+```
+
+Compression is deterministic (gzip suppresses header timestamps, zstd
+is inherently deterministic), so identical layers always produce the
+same compressed digest. The second and third pushes will skip uploading
+any layers shared with earlier pushes.
+
 ## OCI Runtime Integration
 
 Create runtime bundles for runc.
