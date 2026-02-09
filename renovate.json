@@ -41,6 +41,14 @@
         "/iters/",
         "/async-extensions/"
       ]
+    },
+    {
+      "description": "Group zope updates together",
+      "groupName": "zope",
+      "matchPackageNames": [
+        "zope.event",
+        "zope.interface"
+      ]
     }
   ],
   "minimumReleaseAge": "3 days",
