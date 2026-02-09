@@ -112,7 +112,7 @@ dependencies = [
     "typing-extensions==4.15.0",
     "verboselogs==1.7",
     "zipp==3.23.0",
-    "zope.event==5.1.1",
+    "zope.event==6.1",
     "zope.interface==7.2",
     "wraps==0.15.0",
     "certifi==2026.1.4",
