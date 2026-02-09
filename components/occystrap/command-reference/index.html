@@ -1632,6 +1632,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#layer-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer Cache
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layer Cache">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-awareness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Awareness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cache-growth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache Growth
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cache-file-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache File Format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#legacy-commands" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3744,6 +3816,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#layer-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer Cache
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layer Cache">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-awareness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Awareness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cache-growth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache Growth
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cache-file-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache File Format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#legacy-commands" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3839,6 +3983,11 @@ name:</p>
 <td><code>--temp-dir PATH</code></td>
 <td><code>OCCYSTRAP_TEMP_DIR</code></td>
 <td>Directory for temporary files (default: system temp)</td>
+</tr>
+<tr>
+<td><code>--layer-cache PATH</code></td>
+<td><code>OCCYSTRAP_LAYER_CACHE</code></td>
+<td>JSON file for cross-invocation layer caching</td>
 </tr>
 </tbody>
 </table>
@@ -4199,6 +4348,100 @@ recalculated after modification.</p>
 <a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="c1"># Exclude multiple patterns</span>
 <a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc&quot;</span>
 </code></pre></div>
+<h2 id="layer-cache">Layer Cache<a class="headerlink" href="#layer-cache" title="Permanent link">&para;</a></h2>
+<p>The <code>--layer-cache</code> option enables a persistent cache that tracks which
+layers have already been processed and uploaded to a registry. This is
+particularly useful in CI environments where multiple images sharing
+common base layers are pushed in sequence.</p>
+<h3 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<p>When pushing an image to a registry, occystrap normally fetches each
+layer, applies any filters, compresses the result, and uploads it.
+With <code>--layer-cache</code>, occystrap records the mapping from each input
+layer to its compressed output after a successful upload. On subsequent
+runs, if a layer's input DiffID is found in the cache (with matching
+filter configuration), occystrap verifies the compressed blob still
+exists in the target registry via a HEAD request. If it does, the
+entire layer is skipped -- no fetch, no filter, no compress, no upload.</p>
+<h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># First push: all layers processed normally, results cached</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="w">    </span>process<span class="w"> </span>docker://app1:v1<span class="w"> </span>registry://myregistry/app1:v1
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="c1"># Second push: shared base layers are skipped</span>
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a><span class="w">    </span>process<span class="w"> </span>docker://app2:v1<span class="w"> </span>registry://myregistry/app2:v1
+</code></pre></div>
+<p>The cache path can also be set via the <code>OCCYSTRAP_LAYER_CACHE</code>
+environment variable.</p>
+<h3 id="pipeline-awareness">Pipeline Awareness<a class="headerlink" href="#pipeline-awareness" title="Permanent link">&para;</a></h3>
+<p>Cache entries are keyed by the input layer DiffID and a hash of the
+active pipeline configuration (filter chain <strong>and</strong> compression type).
+This means layers processed with different filter configurations
+(e.g., with vs. without <code>normalize-timestamps</code>) or different
+compression formats (gzip vs. zstd) get separate cache entries and
+will not incorrectly reuse results from a different pipeline.</p>
+<h3 id="cache-growth">Cache Growth<a class="headerlink" href="#cache-growth" title="Permanent link">&para;</a></h3>
+<p>The cache currently has no automatic eviction or size limit. For
+typical container image workloads the file stays small (one entry per
+unique layer), but long-lived caches spanning many unrelated images
+may grow over time. You can safely delete the cache file at any point
+to start fresh -- the only cost is re-processing layers on the next
+push.</p>
+<h3 id="cache-file-format">Cache File Format<a class="headerlink" href="#cache-file-format" title="Permanent link">&para;</a></h3>
+<p>The cache is stored as a JSON file:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="p">{</span>
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="w">  </span><span class="nt">&quot;layers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="w">    </span><span class="nt">&quot;sha256:abc123...&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="w">      </span><span class="nt">&quot;compressed_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:def456...&quot;</span><span class="p">,</span>
+<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="w">      </span><span class="nt">&quot;compressed_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">45678901</span><span class="p">,</span>
+<a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a><span class="w">      </span><span class="nt">&quot;media_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;application/vnd.docker.image.rootfs.diff.tar.gzip&quot;</span><span class="p">,</span>
+<a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a><span class="w">      </span><span class="nt">&quot;filters_hash&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;none&quot;</span><span class="p">,</span>
+<a id="__codelineno-29-9" name="__codelineno-29-9" href="#__codelineno-29-9"></a><span class="w">      </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-02-09T12:34:56.789012+00:00&quot;</span>
+<a id="__codelineno-29-10" name="__codelineno-29-10" href="#__codelineno-29-10"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-29-11" name="__codelineno-29-11" href="#__codelineno-29-11"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-29-12" name="__codelineno-29-12" href="#__codelineno-29-12"></a><span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>version</code></td>
+<td>Cache format version (currently 1)</td>
+</tr>
+<tr>
+<td><code>layers</code></td>
+<td>Map from input DiffID to cached metadata</td>
+</tr>
+<tr>
+<td><code>compressed_digest</code></td>
+<td>SHA256 digest of the compressed blob</td>
+</tr>
+<tr>
+<td><code>compressed_size</code></td>
+<td>Size of the compressed blob in bytes</td>
+</tr>
+<tr>
+<td><code>media_type</code></td>
+<td>OCI/Docker media type of the compressed layer</td>
+</tr>
+<tr>
+<td><code>filters_hash</code></td>
+<td>SHA256 of the pipeline config (filters + compression), or <code>"none"</code></td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>ISO 8601 timestamp of when the entry was recorded</td>
+</tr>
+</tbody>
+</table>
+<p>The cache file is written atomically (via temporary file and rename)
+to prevent corruption if the process is interrupted.</p>
 <h2 id="legacy-commands">Legacy Commands<a class="headerlink" href="#legacy-commands" title="Permanent link">&para;</a></h2>
 <p>The following commands are deprecated but still available for backwards
 compatibility. Use the <code>process</code> and <code>search</code> commands instead.</p>

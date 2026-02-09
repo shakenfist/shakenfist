@@ -3962,13 +3962,23 @@ it between other filters to observe and measure their effect on layers.</p>
 <h2 id="output-writers">Output Writers<a class="headerlink" href="#output-writers" title="Permanent link">&para;</a></h2>
 <p>Output writers implement the <code>ImageOutput</code> interface and handle the final
 destination of processed elements.</p>
-<p>All output writers log a summary line at the end of processing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Processed 12345678 bytes in 5 layers in 3.2 seconds
+<p>All output writers log a summary line at the end of processing.</p>
+<p>The registry output provides a detailed breakdown of where time was spent:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Processed 40 layers in 34.7s (compress: 15.8s, upload: 4.5s,
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  upload_skipped: 22), 980.0 MB in, 326.3 MB out (33%)
 </code></pre></div>
-<p>This shows the total bytes processed, layer count, and elapsed time.</p>
+<p>This shows:
+- <strong>compress</strong> - total CPU time spent compressing layers (summed across threads)
+- <strong>upload</strong> - total time spent on upload HTTP requests (summed across threads)
+- <strong>upload_skipped</strong> - number of blobs that already existed in the registry
+- <strong>MB in / MB out</strong> - uncompressed input size vs compressed output size
+- <strong>ratio</strong> - compression ratio (compressed / uncompressed as percentage)</p>
+<p>Other outputs log a simpler summary:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Processed 12345678 bytes in 5 layers in 3.2 seconds
+</code></pre></div>
 <h3 id="tarball-output">Tarball Output<a class="headerlink" href="#tarball-output" title="Permanent link">&para;</a></h3>
 <p>Creates docker-loadable tarballs in v1.2 format.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>tar:///path/to/output.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>tar:///path/to/output.tar
 </code></pre></div>
 <p>The tarball contains:
 - <code>manifest.json</code> - Image manifest
@@ -3977,7 +3987,7 @@ destination of processed elements.</p>
 <p>Can be loaded with <code>docker load -i output.tar</code>.</p>
 <h3 id="directory-output">Directory Output<a class="headerlink" href="#directory-output" title="Permanent link">&para;</a></h3>
 <p>Extracts images to directories.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>dir:///path/to/directory
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>dir:///path/to/directory
 </code></pre></div>
 <p>Options:
 - <code>unique_names=true</code> - Enable layer deduplication by prefixing filenames
@@ -3986,27 +3996,27 @@ destination of processed elements.</p>
 images, allowing multiple images to share storage.</p>
 <h3 id="oci-bundle-output">OCI Bundle Output<a class="headerlink" href="#oci-bundle-output" title="Permanent link">&para;</a></h3>
 <p>Creates OCI runtime bundles for runc.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>oci:///path/to/bundle
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>oci:///path/to/bundle
 </code></pre></div>
 <p>Produces:
 - <code>config.json</code> - OCI runtime configuration
 - <code>rootfs/</code> - Merged filesystem from all layers</p>
 <h3 id="registry-output">Registry Output<a class="headerlink" href="#registry-output" title="Permanent link">&para;</a></h3>
 <p>Pushes images to Docker/OCI registries.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>registry://HOST/IMAGE:TAG
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>registry://HOST/IMAGE:TAG
 </code></pre></div>
 <p>Uploads layers as blobs in parallel and creates the manifest.</p>
 <p><strong>Parallel Compression and Uploads:</strong></p>
 <p>Both layer compression and uploads run in a thread pool for improved performance:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>process_image_element() called for each layer
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>    └── Read layer data
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    └── Submit (compress + upload) to thread pool (non-blocking)
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    └── Main thread continues to next layer
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>
-<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>finalize()
-<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    └── Wait for all compression/upload tasks to complete
-<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>    └── Collect layer metadata from futures (in order)
-<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>    └── Push manifest only after all blobs uploaded
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>process_image_element() called for each layer
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>    └── Read layer data
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    └── Submit (compress + upload) to thread pool (non-blocking)
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>    └── Main thread continues to next layer
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>finalize()
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>    └── Wait for all compression/upload tasks to complete
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>    └── Collect layer metadata from futures (in order)
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>    └── Push manifest only after all blobs uploaded
 </code></pre></div>
 <p>Key design aspects:
 - Multiple layers can compress simultaneously, utilizing multiple CPU cores
@@ -4016,6 +4026,23 @@ images, allowing multiple images to share storage.</p>
 - Progress is reported every 10 seconds during finalize
 - Default parallelism is 4 threads, configurable via <code>--parallel</code> or <code>-j</code>,
   or the <code>max_workers</code> URI option</p>
+<p><strong>Cross-Invocation Layer Cache:</strong></p>
+<p>When pushing multiple images that share base layers (common in CI), the
+<code>--layer-cache</code> option enables persistent caching of layer processing results:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>fetch_callback(digest)
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    └── Check cache for (digest, filters_hash)
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    └── If found: HEAD request to verify registry still has blob
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    └── If registry has blob: skip layer (no fetch/filter/compress/upload)
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    └── If not: process normally and record result to cache
+</code></pre></div>
+<p>Cache entries are keyed by <code>(input_diffid, filters_hash)</code> so that the same
+layer processed with different filter configurations gets separate entries.
+The cache is stored as a JSON file with one entry per layer, recording
+the compressed digest, size, media type, and filter hash. The cache is
+saved atomically to disk (via temporary file and rename) after each
+successful push. Cache hits are reported in the summary line.</p>
+<p>See <a href="/components/occystrap/command-reference/#layer-cache">Command Reference</a> for the full
+cache file format and usage examples.</p>
 <p><strong>Blob Deduplication:</strong></p>
 <p>Before uploading a layer blob, the registry output checks whether the blob
 already exists in the target registry using <code>HEAD /v2/&lt;name&gt;/blobs/&lt;digest&gt;</code>.
@@ -4026,27 +4053,27 @@ as the existing blob. This requires deterministic compression -- see
 <a href="#deterministic-compression">Deterministic Compression</a> below.</p>
 <h3 id="docker-daemon-output">Docker Daemon Output<a class="headerlink" href="#docker-daemon-output" title="Permanent link">&para;</a></h3>
 <p>Loads images into local Docker or Podman.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>docker://IMAGE:TAG
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>docker://IMAGE:TAG
 </code></pre></div>
 <p>Uses the Docker Engine API to load the image.</p>
 <h2 id="data-flow-example">Data Flow Example<a class="headerlink" href="#data-flow-example" title="Permanent link">&para;</a></h2>
 <p>Consider this command:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">    </span>tar://busybox.tar<span class="w"> </span>-f<span class="w"> </span>normalize-timestamps
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">    </span>tar://busybox.tar<span class="w"> </span>-f<span class="w"> </span>normalize-timestamps
 </code></pre></div>
 <p>The data flow is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>1. Registry Input fetches manifest from docker.io
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>2. Registry Input yields CONFIG_FILE element
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>   --&gt; TimestampNormalizer passes through unchanged
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>   --&gt; TarWriter writes to tarball
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>3. For each layer:
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>   a. Registry Input fetches layer blob
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>   b. Registry Input yields IMAGE_LAYER element
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>   c. TimestampNormalizer rewrites tarball with epoch timestamps
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>   d. TimestampNormalizer recalculates SHA256
-<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>   e. TimestampNormalizer yields modified element with new name
-<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>   f. TarWriter writes modified layer to tarball
-<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>4. TarWriter.finalize() writes manifest.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>1. Registry Input fetches manifest from docker.io
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>2. Registry Input yields CONFIG_FILE element
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>   --&gt; TimestampNormalizer passes through unchanged
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>   --&gt; TarWriter writes to tarball
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>3. For each layer:
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>   a. Registry Input fetches layer blob
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>   b. Registry Input yields IMAGE_LAYER element
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>   c. TimestampNormalizer rewrites tarball with epoch timestamps
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>   d. TimestampNormalizer recalculates SHA256
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>   e. TimestampNormalizer yields modified element with new name
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>   f. TarWriter writes modified layer to tarball
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>4. TarWriter.finalize() writes manifest.json
 </code></pre></div>
 <h2 id="key-concepts">Key Concepts<a class="headerlink" href="#key-concepts" title="Permanent link">&para;</a></h2>
 <h3 id="whiteout-files">Whiteout Files<a class="headerlink" href="#whiteout-files" title="Permanent link">&para;</a></h3>
