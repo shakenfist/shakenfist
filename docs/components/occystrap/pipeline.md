@@ -185,13 +185,27 @@ Each filter wraps the next, forming a chain that processes elements in order.
 Output writers implement the `ImageOutput` interface and handle the final
 destination of processed elements.
 
-All output writers log a summary line at the end of processing:
+All output writers log a summary line at the end of processing.
+
+The registry output provides a detailed breakdown of where time was spent:
+
+```
+Processed 40 layers in 34.7s (compress: 15.8s, upload: 4.5s,
+  upload_skipped: 22), 980.0 MB in, 326.3 MB out (33%)
+```
+
+This shows:
+- **compress** - total CPU time spent compressing layers (summed across threads)
+- **upload** - total time spent on upload HTTP requests (summed across threads)
+- **upload_skipped** - number of blobs that already existed in the registry
+- **MB in / MB out** - uncompressed input size vs compressed output size
+- **ratio** - compression ratio (compressed / uncompressed as percentage)
+
+Other outputs log a simpler summary:
 
 ```
 Processed 12345678 bytes in 5 layers in 3.2 seconds
 ```
-
-This shows the total bytes processed, layer count, and elapsed time.
 
 ### Tarball Output
 
@@ -269,6 +283,29 @@ Key design aspects:
 - Progress is reported every 10 seconds during finalize
 - Default parallelism is 4 threads, configurable via `--parallel` or `-j`,
   or the `max_workers` URI option
+
+**Cross-Invocation Layer Cache:**
+
+When pushing multiple images that share base layers (common in CI), the
+`--layer-cache` option enables persistent caching of layer processing results:
+
+```
+fetch_callback(digest)
+    └── Check cache for (digest, filters_hash)
+    └── If found: HEAD request to verify registry still has blob
+    └── If registry has blob: skip layer (no fetch/filter/compress/upload)
+    └── If not: process normally and record result to cache
+```
+
+Cache entries are keyed by `(input_diffid, filters_hash)` so that the same
+layer processed with different filter configurations gets separate entries.
+The cache is stored as a JSON file with one entry per layer, recording
+the compressed digest, size, media type, and filter hash. The cache is
+saved atomically to disk (via temporary file and rename) after each
+successful push. Cache hits are reported in the summary line.
+
+See [Command Reference](/components/occystrap/command-reference/#layer-cache) for the full
+cache file format and usage examples.
 
 **Blob Deduplication:**
 
