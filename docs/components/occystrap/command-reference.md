@@ -20,6 +20,7 @@ name:
 | `--compression TYPE` | `OCCYSTRAP_COMPRESSION` | Layer compression for registry output (gzip, zstd) |
 | `--parallel N`, `-j N` | `OCCYSTRAP_PARALLEL` | Number of parallel download/upload threads (default: 4) |
 | `--temp-dir PATH` | `OCCYSTRAP_TEMP_DIR` | Directory for temporary files (default: system temp) |
+| `--layer-cache PATH` | `OCCYSTRAP_LAYER_CACHE` | JSON file for cross-invocation layer caching |
 
 Example:
 
@@ -399,6 +400,89 @@ recalculated after modification.
 # Exclude multiple patterns
 -f "exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc"
 ```
+
+## Layer Cache
+
+The `--layer-cache` option enables a persistent cache that tracks which
+layers have already been processed and uploaded to a registry. This is
+particularly useful in CI environments where multiple images sharing
+common base layers are pushed in sequence.
+
+### How It Works
+
+When pushing an image to a registry, occystrap normally fetches each
+layer, applies any filters, compresses the result, and uploads it.
+With `--layer-cache`, occystrap records the mapping from each input
+layer to its compressed output after a successful upload. On subsequent
+runs, if a layer's input DiffID is found in the cache (with matching
+filter configuration), occystrap verifies the compressed blob still
+exists in the target registry via a HEAD request. If it does, the
+entire layer is skipped -- no fetch, no filter, no compress, no upload.
+
+### Usage
+
+```bash
+# First push: all layers processed normally, results cached
+occystrap --layer-cache /tmp/cache.json \
+    process docker://app1:v1 registry://myregistry/app1:v1
+
+# Second push: shared base layers are skipped
+occystrap --layer-cache /tmp/cache.json \
+    process docker://app2:v1 registry://myregistry/app2:v1
+```
+
+The cache path can also be set via the `OCCYSTRAP_LAYER_CACHE`
+environment variable.
+
+### Pipeline Awareness
+
+Cache entries are keyed by the input layer DiffID and a hash of the
+active pipeline configuration (filter chain **and** compression type).
+This means layers processed with different filter configurations
+(e.g., with vs. without `normalize-timestamps`) or different
+compression formats (gzip vs. zstd) get separate cache entries and
+will not incorrectly reuse results from a different pipeline.
+
+### Cache Growth
+
+The cache currently has no automatic eviction or size limit. For
+typical container image workloads the file stays small (one entry per
+unique layer), but long-lived caches spanning many unrelated images
+may grow over time. You can safely delete the cache file at any point
+to start fresh -- the only cost is re-processing layers on the next
+push.
+
+### Cache File Format
+
+The cache is stored as a JSON file:
+
+```json
+{
+  "version": 1,
+  "layers": {
+    "sha256:abc123...": {
+      "compressed_digest": "sha256:def456...",
+      "compressed_size": 45678901,
+      "media_type": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "filters_hash": "none",
+      "timestamp": "2026-02-09T12:34:56.789012+00:00"
+    }
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `version` | Cache format version (currently 1) |
+| `layers` | Map from input DiffID to cached metadata |
+| `compressed_digest` | SHA256 digest of the compressed blob |
+| `compressed_size` | Size of the compressed blob in bytes |
+| `media_type` | OCI/Docker media type of the compressed layer |
+| `filters_hash` | SHA256 of the pipeline config (filters + compression), or `"none"` |
+| `timestamp` | ISO 8601 timestamp of when the entry was recorded |
+
+The cache file is written atomically (via temporary file and rename)
+to prevent corruption if the process is interrupted.
 
 ## Legacy Commands
 
