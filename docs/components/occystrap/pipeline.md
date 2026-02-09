@@ -17,7 +17,17 @@ Input Source  -->  Filter Chain (optional)  -->  Output Writer  -->  Files
 
 ## Image Elements
 
-Container images consist of two types of elements:
+Container images consist of two types of elements, represented as
+`ImageElement` dataclass instances:
+
+```python
+@dataclasses.dataclass
+class ImageElement:
+    element_type: str   # CONFIG_FILE or IMAGE_LAYER
+    name: str           # Filename or digest hash
+    data: object        # File-like object or None (skipped)
+    layer_index: int | None = None  # Manifest position
+```
 
 | Element Type | Description |
 |--------------|-------------|
@@ -25,7 +35,9 @@ Container images consist of two types of elements:
 | `IMAGE_LAYER` | Tarball containing a filesystem layer |
 
 Each element flows through the pipeline independently, allowing streaming
-processing without loading entire images into memory.
+processing without loading entire images into memory. The `layer_index`
+field is set when layers are delivered out of order (see
+[Out-of-Order Delivery](#out-of-order-layer-delivery) below).
 
 ## Input Sources
 
@@ -55,12 +67,16 @@ Layer blobs are downloaded in parallel using a thread pool:
 fetch() generator
     └── Yield config file first (synchronous)
     └── Submit all layer downloads to thread pool
-    └── Yield layers in order as downloads complete
+    └── If ordered=True: yield layers in manifest order
+    └── If ordered=False: yield layers as downloads complete
+        (each with layer_index for reordering)
 ```
 
 Key aspects:
 - All layers download simultaneously to maximize throughput
-- Layers are yielded in order despite parallel download
+- When `ordered=True`, layers are yielded in manifest order
+- When `ordered=False`, layers are yielded via `as_completed()` with
+  `layer_index` set, eliminating unnecessary waiting
 - Authentication is thread-safe
 - Default parallelism is 4 threads, configurable via `--parallel`
 
@@ -124,15 +140,22 @@ class MyFilter(ImageFilter):
     def __init__(self, wrapped_output):
         self.wrapped = wrapped_output
 
-    def process_image_element(self, element_type, name, data):
+    def process_image_element(self, element):
         # Transform the element
-        modified_data = transform(data)
+        modified_data = transform(element.data)
         modified_name = new_name_if_changed
 
-        # Pass to wrapped output
-        self.wrapped.process_image_element(element_type, modified_name,
-                                           modified_data)
+        # Pass to wrapped output with a new ImageElement
+        self.wrapped.process_image_element(
+            constants.ImageElement(
+                element.element_type, modified_name,
+                modified_data,
+                layer_index=element.layer_index))
 ```
+
+Filters propagate the `requires_ordered_layers` property from their
+wrapped output, so the pipeline respects the final output's ordering
+needs.
 
 ### Filter Capabilities
 
@@ -278,7 +301,8 @@ finalize()
 Key design aspects:
 - Multiple layers can compress simultaneously, utilizing multiple CPU cores
 - While one layer is compressing, others can be uploading
-- Layer order is preserved by collecting futures in submission order
+- Layer order is preserved by tracking `layer_index` and sorting at
+  finalize time
 - Authentication token updates are thread-safe
 - Progress is reported every 10 seconds during finalize
 - Default parallelism is 4 threads, configurable via `--parallel` or `-j`,
@@ -404,6 +428,26 @@ and `exclude` to maximize layer deduplication:
 
 This means that if two images share identical layers (after filtering),
 the second push will skip uploading those layers entirely.
+
+### Out-of-Order Layer Delivery
+
+The pipeline supports out-of-order layer delivery to maximize throughput
+when the output doesn't require manifest ordering. Each output declares
+its ordering needs via the `requires_ordered_layers` property:
+
+- **Order-dependent** (`True`): `dir` with `expand=True`, `oci`
+- **Order-independent** (`False`): `registry`, `tar`, `docker`,
+  `dir` (expand=False), `mounts`
+
+When `requires_ordered_layers` is `False`:
+1. The input's `fetch()` receives `ordered=False`
+2. Layers are yielded as they become available with `layer_index` set
+3. The output stores layers with their indices
+4. `finalize()` sorts by index to reconstruct the correct manifest order
+
+This is particularly beneficial for the registry-to-registry pipeline,
+where layers can start uploading as soon as they finish downloading
+rather than waiting for earlier layers to complete first.
 
 ### Hash Recalculation
 
