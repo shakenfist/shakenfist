@@ -136,7 +136,7 @@ dependencies = [
     "six==1.17.0",
     "stevedore==5.6.0",
     "tzdata==2025.3",
-    "wrapt==1.17.3",
+    "wrapt==2.1.1",
     # END_OF_INDIRECT_DEPS
 ]
 
