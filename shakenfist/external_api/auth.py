@@ -157,6 +157,17 @@ class AuthNamespacesEndpoint(api_base.Resource):
         if Namespace.from_db(namespace, suppress_failure_audit=True):
             return sf_api.error(403, 'namespace exists')
 
+        if key_name:
+            if not key:
+                return sf_api.error(400, 'no key specified')
+            if not isinstance(key, str):
+                # Must be a string to encode()
+                return sf_api.error(400, 'key is not a string')
+            if key_name == 'service_key':
+                return sf_api.error(403, 'illegal key name')
+            if len(key) > 72:
+                return sf_api.error(422, 'keys cannot be longer than 72 characters')
+
         ns = Namespace.new(namespace)
         ns.add_event(EVENT_TYPE_AUDIT, 'creation request from REST API')
 
@@ -188,14 +199,6 @@ class AuthNamespacesEndpoint(api_base.Resource):
 
         # Allow shortcut of creating key at same time as the namespace
         if key_name:
-            if not key:
-                return sf_api.error(400, 'no key specified')
-            if not isinstance(key, str):
-                # Must be a string to encode()
-                return sf_api.error(400, 'key is not a string')
-            if key_name == 'service_key':
-                return sf_api.error(403, 'illegal key name')
-
             ns.add_key(key_name, key)
 
         return ns.external_view()
@@ -284,6 +287,8 @@ def _namespace_keys_putpost(ns=None, key_name=None, key=None):
         return sf_api.error(400, 'no key specified')
     if key_name.startswith('_service_key'):
         return sf_api.error(403, 'illegal key name')
+    if len(key) > 72:
+        return sf_api.error(422, 'keys cannot be longer than 72 characters')
 
     ns.add_key(key_name, key)
     return key_name
