@@ -1733,6 +1733,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#out-of-order-layer-delivery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out-of-Order Layer Delivery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#hash-recalculation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3783,6 +3794,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#out-of-order-layer-delivery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out-of-Order Layer Delivery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#hash-recalculation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3832,7 +3854,15 @@ document explains how the pipeline works and how its components interact.</p>
 <li><strong>Output Writer</strong> writes the processed elements to their destination</li>
 </ol>
 <h2 id="image-elements">Image Elements<a class="headerlink" href="#image-elements" title="Permanent link">&para;</a></h2>
-<p>Container images consist of two types of elements:</p>
+<p>Container images consist of two types of elements, represented as
+<code>ImageElement</code> dataclass instances:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@dataclasses</span><span class="o">.</span><span class="n">dataclass</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">ImageElement</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">element_type</span><span class="p">:</span> <span class="nb">str</span>   <span class="c1"># CONFIG_FILE or IMAGE_LAYER</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>           <span class="c1"># Filename or digest hash</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">data</span><span class="p">:</span> <span class="nb">object</span>        <span class="c1"># File-like object or None (skipped)</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">layer_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Manifest position</span>
+</code></pre></div>
 <table>
 <thead>
 <tr>
@@ -3852,13 +3882,15 @@ document explains how the pipeline works and how its components interact.</p>
 </tbody>
 </table>
 <p>Each element flows through the pipeline independently, allowing streaming
-processing without loading entire images into memory.</p>
+processing without loading entire images into memory. The <code>layer_index</code>
+field is set when layers are delivered out of order (see
+<a href="#out-of-order-layer-delivery">Out-of-Order Delivery</a> below).</p>
 <h2 id="input-sources">Input Sources<a class="headerlink" href="#input-sources" title="Permanent link">&para;</a></h2>
 <p>Input sources implement the <code>ImageInput</code> interface and provide image elements
 from various sources.</p>
 <h3 id="registry-input">Registry Input<a class="headerlink" href="#registry-input" title="Permanent link">&para;</a></h3>
 <p>Fetches images from Docker/OCI registries using the HTTP API.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>registry://HOST/IMAGE:TAG
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>registry://HOST/IMAGE:TAG
 </code></pre></div>
 <p>Capabilities:
 - Token-based and basic authentication
@@ -3868,19 +3900,23 @@ from various sources.</p>
 - Parallel layer downloads for improved throughput</p>
 <p><strong>Parallel Downloads:</strong></p>
 <p>Layer blobs are downloaded in parallel using a thread pool:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>fetch() generator
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    └── Yield config file first (synchronous)
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    └── Submit all layer downloads to thread pool
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    └── Yield layers in order as downloads complete
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>fetch() generator
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    └── Yield config file first (synchronous)
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    └── Submit all layer downloads to thread pool
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    └── If ordered=True: yield layers in manifest order
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    └── If ordered=False: yield layers as downloads complete
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        (each with layer_index for reordering)
 </code></pre></div>
 <p>Key aspects:
 - All layers download simultaneously to maximize throughput
-- Layers are yielded in order despite parallel download
+- When <code>ordered=True</code>, layers are yielded in manifest order
+- When <code>ordered=False</code>, layers are yielded via <code>as_completed()</code> with
+  <code>layer_index</code> set, eliminating unnecessary waiting
 - Authentication is thread-safe
 - Default parallelism is 4 threads, configurable via <code>--parallel</code></p>
 <h3 id="docker-daemon-input">Docker Daemon Input<a class="headerlink" href="#docker-daemon-input" title="Permanent link">&para;</a></h3>
 <p>Fetches images from local Docker or Podman daemons.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker://IMAGE:TAG
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker://IMAGE:TAG
 </code></pre></div>
 <p>Uses the Docker Engine API over Unix socket to stream the image tarball
 (equivalent to <code>docker save</code>).</p>
@@ -3890,13 +3926,13 @@ design.</p>
 <p><strong>Hybrid Streaming:</strong></p>
 <p>To minimize disk usage for large images, the Docker input uses a hybrid
 streaming approach:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>fetch() generator
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    └── Stream tarball sequentially (mode=&#39;r|&#39;)
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    └── Read manifest.json to get expected layer order
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    └── For each file in stream:
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>        ├── If next expected layer: yield directly (zero disk I/O)
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        └── If out-of-order: buffer to temp file for later
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    └── After stream: yield remaining buffered layers in order
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>fetch() generator
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    └── Stream tarball sequentially (mode=&#39;r|&#39;)
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    └── Read manifest.json to get expected layer order
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    └── For each file in stream:
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        ├── If next expected layer: yield directly (zero disk I/O)
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        └── If out-of-order: buffer to temp file for later
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    └── After stream: yield remaining buffered layers in order
 </code></pre></div>
 <p>Key aspects:
 - In the optimistic case (layers in order), no temp files are used
@@ -3906,27 +3942,33 @@ streaming approach:</p>
 - Temp file location is configurable via <code>--temp-dir</code> option</p>
 <h3 id="tarball-input">Tarball Input<a class="headerlink" href="#tarball-input" title="Permanent link">&para;</a></h3>
 <p>Reads images from existing docker-save format tarballs.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tar:///path/to/file.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tar:///path/to/file.tar
 </code></pre></div>
 <p>Parses <code>manifest.json</code> to locate config files and layers within the tarball.</p>
 <h2 id="filters">Filters<a class="headerlink" href="#filters" title="Permanent link">&para;</a></h2>
 <p>Filters implement the decorator pattern, wrapping outputs (or other filters)
 to transform or inspect elements. They inherit from <code>ImageFilter</code>.</p>
 <h3 id="how-filters-work">How Filters Work<a class="headerlink" href="#how-filters-work" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Conceptual filter structure</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyFilter</span><span class="p">(</span><span class="n">ImageFilter</span><span class="p">):</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wrapped_output</span><span class="p">):</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">wrapped</span> <span class="o">=</span> <span class="n">wrapped_output</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">process_image_element</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element_type</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        <span class="c1"># Transform the element</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>        <span class="n">modified_data</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>        <span class="n">modified_name</span> <span class="o">=</span> <span class="n">new_name_if_changed</span>
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>        <span class="c1"># Pass to wrapped output</span>
-<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">wrapped</span><span class="o">.</span><span class="n">process_image_element</span><span class="p">(</span><span class="n">element_type</span><span class="p">,</span> <span class="n">modified_name</span><span class="p">,</span>
-<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>                                           <span class="n">modified_data</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Conceptual filter structure</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyFilter</span><span class="p">(</span><span class="n">ImageFilter</span><span class="p">):</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wrapped_output</span><span class="p">):</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">wrapped</span> <span class="o">=</span> <span class="n">wrapped_output</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">process_image_element</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>        <span class="c1"># Transform the element</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>        <span class="n">modified_data</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>        <span class="n">modified_name</span> <span class="o">=</span> <span class="n">new_name_if_changed</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>        <span class="c1"># Pass to wrapped output with a new ImageElement</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">wrapped</span><span class="o">.</span><span class="n">process_image_element</span><span class="p">(</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>            <span class="n">constants</span><span class="o">.</span><span class="n">ImageElement</span><span class="p">(</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>                <span class="n">element</span><span class="o">.</span><span class="n">element_type</span><span class="p">,</span> <span class="n">modified_name</span><span class="p">,</span>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>                <span class="n">modified_data</span><span class="p">,</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>                <span class="n">layer_index</span><span class="o">=</span><span class="n">element</span><span class="o">.</span><span class="n">layer_index</span><span class="p">))</span>
 </code></pre></div>
+<p>Filters propagate the <code>requires_ordered_layers</code> property from their
+wrapped output, so the pipeline respects the final output's ordering
+needs.</p>
 <h3 id="filter-capabilities">Filter Capabilities<a class="headerlink" href="#filter-capabilities" title="Permanent link">&para;</a></h3>
 <p>Filters can:</p>
 <ul>
@@ -3950,13 +3992,13 @@ file. This is a pure passthrough filter -- it does not modify image data. Place
 it between other filters to observe and measure their effect on layers.</p>
 <h3 id="chaining-filters">Chaining Filters<a class="headerlink" href="#chaining-filters" title="Permanent link">&para;</a></h3>
 <p>Multiple filters are chained together:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://...<span class="w"> </span>tar://output.tar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span>-f<span class="w"> </span><span class="s2">&quot;search:pattern=*.conf&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://...<span class="w"> </span>tar://output.tar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>-f<span class="w"> </span><span class="s2">&quot;search:pattern=*.conf&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**&quot;</span>
 </code></pre></div>
 <p>The pipeline becomes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>Input --&gt; normalize-timestamps --&gt; search --&gt; exclude --&gt; Output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Input --&gt; normalize-timestamps --&gt; search --&gt; exclude --&gt; Output
 </code></pre></div>
 <p>Each filter wraps the next, forming a chain that processes elements in order.</p>
 <h2 id="output-writers">Output Writers<a class="headerlink" href="#output-writers" title="Permanent link">&para;</a></h2>
@@ -3964,8 +4006,8 @@ it between other filters to observe and measure their effect on layers.</p>
 destination of processed elements.</p>
 <p>All output writers log a summary line at the end of processing.</p>
 <p>The registry output provides a detailed breakdown of where time was spent:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Processed 40 layers in 34.7s (compress: 15.8s, upload: 4.5s,
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  upload_skipped: 22), 980.0 MB in, 326.3 MB out (33%)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Processed 40 layers in 34.7s (compress: 15.8s, upload: 4.5s,
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  upload_skipped: 22), 980.0 MB in, 326.3 MB out (33%)
 </code></pre></div>
 <p>This shows:
 - <strong>compress</strong> - total CPU time spent compressing layers (summed across threads)
@@ -3974,11 +4016,11 @@ destination of processed elements.</p>
 - <strong>MB in / MB out</strong> - uncompressed input size vs compressed output size
 - <strong>ratio</strong> - compression ratio (compressed / uncompressed as percentage)</p>
 <p>Other outputs log a simpler summary:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Processed 12345678 bytes in 5 layers in 3.2 seconds
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Processed 12345678 bytes in 5 layers in 3.2 seconds
 </code></pre></div>
 <h3 id="tarball-output">Tarball Output<a class="headerlink" href="#tarball-output" title="Permanent link">&para;</a></h3>
 <p>Creates docker-loadable tarballs in v1.2 format.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>tar:///path/to/output.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>tar:///path/to/output.tar
 </code></pre></div>
 <p>The tarball contains:
 - <code>manifest.json</code> - Image manifest
@@ -3987,7 +4029,7 @@ destination of processed elements.</p>
 <p>Can be loaded with <code>docker load -i output.tar</code>.</p>
 <h3 id="directory-output">Directory Output<a class="headerlink" href="#directory-output" title="Permanent link">&para;</a></h3>
 <p>Extracts images to directories.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>dir:///path/to/directory
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>dir:///path/to/directory
 </code></pre></div>
 <p>Options:
 - <code>unique_names=true</code> - Enable layer deduplication by prefixing filenames
@@ -3996,32 +4038,33 @@ destination of processed elements.</p>
 images, allowing multiple images to share storage.</p>
 <h3 id="oci-bundle-output">OCI Bundle Output<a class="headerlink" href="#oci-bundle-output" title="Permanent link">&para;</a></h3>
 <p>Creates OCI runtime bundles for runc.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>oci:///path/to/bundle
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>oci:///path/to/bundle
 </code></pre></div>
 <p>Produces:
 - <code>config.json</code> - OCI runtime configuration
 - <code>rootfs/</code> - Merged filesystem from all layers</p>
 <h3 id="registry-output">Registry Output<a class="headerlink" href="#registry-output" title="Permanent link">&para;</a></h3>
 <p>Pushes images to Docker/OCI registries.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>registry://HOST/IMAGE:TAG
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>registry://HOST/IMAGE:TAG
 </code></pre></div>
 <p>Uploads layers as blobs in parallel and creates the manifest.</p>
 <p><strong>Parallel Compression and Uploads:</strong></p>
 <p>Both layer compression and uploads run in a thread pool for improved performance:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>process_image_element() called for each layer
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>    └── Read layer data
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    └── Submit (compress + upload) to thread pool (non-blocking)
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>    └── Main thread continues to next layer
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>finalize()
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>    └── Wait for all compression/upload tasks to complete
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>    └── Collect layer metadata from futures (in order)
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>    └── Push manifest only after all blobs uploaded
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>process_image_element() called for each layer
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    └── Read layer data
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    └── Submit (compress + upload) to thread pool (non-blocking)
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    └── Main thread continues to next layer
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>finalize()
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>    └── Wait for all compression/upload tasks to complete
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>    └── Collect layer metadata from futures (in order)
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>    └── Push manifest only after all blobs uploaded
 </code></pre></div>
 <p>Key design aspects:
 - Multiple layers can compress simultaneously, utilizing multiple CPU cores
 - While one layer is compressing, others can be uploading
-- Layer order is preserved by collecting futures in submission order
+- Layer order is preserved by tracking <code>layer_index</code> and sorting at
+  finalize time
 - Authentication token updates are thread-safe
 - Progress is reported every 10 seconds during finalize
 - Default parallelism is 4 threads, configurable via <code>--parallel</code> or <code>-j</code>,
@@ -4029,11 +4072,11 @@ images, allowing multiple images to share storage.</p>
 <p><strong>Cross-Invocation Layer Cache:</strong></p>
 <p>When pushing multiple images that share base layers (common in CI), the
 <code>--layer-cache</code> option enables persistent caching of layer processing results:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>fetch_callback(digest)
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    └── Check cache for (digest, filters_hash)
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    └── If found: HEAD request to verify registry still has blob
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    └── If registry has blob: skip layer (no fetch/filter/compress/upload)
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    └── If not: process normally and record result to cache
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>fetch_callback(digest)
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    └── Check cache for (digest, filters_hash)
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    └── If found: HEAD request to verify registry still has blob
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    └── If registry has blob: skip layer (no fetch/filter/compress/upload)
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    └── If not: process normally and record result to cache
 </code></pre></div>
 <p>Cache entries are keyed by <code>(input_diffid, filters_hash)</code> so that the same
 layer processed with different filter configurations gets separate entries.
@@ -4053,27 +4096,27 @@ as the existing blob. This requires deterministic compression -- see
 <a href="#deterministic-compression">Deterministic Compression</a> below.</p>
 <h3 id="docker-daemon-output">Docker Daemon Output<a class="headerlink" href="#docker-daemon-output" title="Permanent link">&para;</a></h3>
 <p>Loads images into local Docker or Podman.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>docker://IMAGE:TAG
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>docker://IMAGE:TAG
 </code></pre></div>
 <p>Uses the Docker Engine API to load the image.</p>
 <h2 id="data-flow-example">Data Flow Example<a class="headerlink" href="#data-flow-example" title="Permanent link">&para;</a></h2>
 <p>Consider this command:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">    </span>tar://busybox.tar<span class="w"> </span>-f<span class="w"> </span>normalize-timestamps
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">    </span>tar://busybox.tar<span class="w"> </span>-f<span class="w"> </span>normalize-timestamps
 </code></pre></div>
 <p>The data flow is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>1. Registry Input fetches manifest from docker.io
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>2. Registry Input yields CONFIG_FILE element
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>   --&gt; TimestampNormalizer passes through unchanged
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>   --&gt; TarWriter writes to tarball
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>3. For each layer:
-<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>   a. Registry Input fetches layer blob
-<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>   b. Registry Input yields IMAGE_LAYER element
-<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>   c. TimestampNormalizer rewrites tarball with epoch timestamps
-<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>   d. TimestampNormalizer recalculates SHA256
-<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>   e. TimestampNormalizer yields modified element with new name
-<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>   f. TarWriter writes modified layer to tarball
-<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>4. TarWriter.finalize() writes manifest.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>1. Registry Input fetches manifest from docker.io
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>2. Registry Input yields CONFIG_FILE element
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>   --&gt; TimestampNormalizer passes through unchanged
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>   --&gt; TarWriter writes to tarball
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>3. For each layer:
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>   a. Registry Input fetches layer blob
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>   b. Registry Input yields IMAGE_LAYER element
+<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>   c. TimestampNormalizer rewrites tarball with epoch timestamps
+<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>   d. TimestampNormalizer recalculates SHA256
+<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>   e. TimestampNormalizer yields modified element with new name
+<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>   f. TarWriter writes modified layer to tarball
+<a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a>4. TarWriter.finalize() writes manifest.json
 </code></pre></div>
 <h2 id="key-concepts">Key Concepts<a class="headerlink" href="#key-concepts" title="Permanent link">&para;</a></h2>
 <h3 id="whiteout-files">Whiteout Files<a class="headerlink" href="#whiteout-files" title="Permanent link">&para;</a></h3>
@@ -4117,6 +4160,23 @@ and <code>exclude</code> to maximize layer deduplication:</p>
 </ol>
 <p>This means that if two images share identical layers (after filtering),
 the second push will skip uploading those layers entirely.</p>
+<h3 id="out-of-order-layer-delivery">Out-of-Order Layer Delivery<a class="headerlink" href="#out-of-order-layer-delivery" title="Permanent link">&para;</a></h3>
+<p>The pipeline supports out-of-order layer delivery to maximize throughput
+when the output doesn't require manifest ordering. Each output declares
+its ordering needs via the <code>requires_ordered_layers</code> property:</p>
+<ul>
+<li><strong>Order-dependent</strong> (<code>True</code>): <code>dir</code> with <code>expand=True</code>, <code>oci</code></li>
+<li><strong>Order-independent</strong> (<code>False</code>): <code>registry</code>, <code>tar</code>, <code>docker</code>,
+  <code>dir</code> (expand=False), <code>mounts</code></li>
+</ul>
+<p>When <code>requires_ordered_layers</code> is <code>False</code>:
+1. The input's <code>fetch()</code> receives <code>ordered=False</code>
+2. Layers are yielded as they become available with <code>layer_index</code> set
+3. The output stores layers with their indices
+4. <code>finalize()</code> sorts by index to reconstruct the correct manifest order</p>
+<p>This is particularly beneficial for the registry-to-registry pipeline,
+where layers can start uploading as soon as they finish downloading
+rather than waiting for earlier layers to complete first.</p>
 <h3 id="hash-recalculation">Hash Recalculation<a class="headerlink" href="#hash-recalculation" title="Permanent link">&para;</a></h3>
 <p>When filters modify layer content (timestamps, file exclusion), the SHA256
 hash changes. Filters that modify content:</p>
