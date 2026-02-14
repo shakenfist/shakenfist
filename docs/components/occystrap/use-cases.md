@@ -117,6 +117,11 @@ occystrap --username destuser --password desttoken \
 occystrap --username myuser --password mytoken \
     process docker://myapp:v1 \
     registry://ghcr.io/myorg/myapp:v1
+
+# Copy from local Docker to registry (faster for multi-layer images)
+occystrap --username myuser --password mytoken \
+    process dockerpush://myapp:v1 \
+    registry://ghcr.io/myorg/myapp:v1
 ```
 
 ## Multi-Architecture Images
@@ -286,6 +291,25 @@ for image in python:3.11 node:18 postgres:15; do
             "tar://$CACHE_DIR/$name.tar" -f normalize-timestamps
     fi
 done
+```
+
+### Fast Local-to-Registry Push with Layer Cache
+
+```bash
+#!/bin/bash
+# ci-push.sh - Push locally-built images to registry with layer cache
+# Uses dockerpush:// for fast transfer from local Docker and
+# --layer-cache to skip re-processing shared base layers.
+
+CACHE="/tmp/occystrap-cache.json"
+
+for image in app-web app-api app-worker; do
+    occystrap --layer-cache "$CACHE" \
+        process "dockerpush://$image:latest" \
+        "registry://myregistry.example.com/$image:latest" \
+        -f normalize-timestamps
+done
+# Second and third images skip uploading shared base layers
 ```
 
 ### Verify Image Contents

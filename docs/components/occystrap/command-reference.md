@@ -156,6 +156,36 @@ docker://myimage:v1?socket=/run/podman/podman.sock
 docker://myimage:v1?socket=/run/user/1000/podman/podman.sock
 ```
 
+### dockerpush://
+
+Fetch images from the local Docker or Podman daemon using an embedded registry.
+This is faster than `docker://` for multi-layer images because Docker pushes
+layers in parallel using the Registry V2 protocol, rather than exporting the
+entire image as a single sequential tarball.
+
+```
+dockerpush://IMAGE:TAG[?socket=/path/to/socket]
+```
+
+**Query Options:**
+
+| Option | Description |
+|--------|-------------|
+| `socket=/path` | Custom daemon socket path |
+
+**Examples:**
+
+```bash
+# Docker daemon (default socket)
+dockerpush://myimage:v1
+
+# Podman (rootful)
+dockerpush://myimage:v1?socket=/run/podman/podman.sock
+
+# Compare speed with docker:// for multi-layer images
+dockerpush://python:3.11
+```
+
 ### tar://
 
 Read images from docker-save format tarballs.
@@ -433,6 +463,29 @@ occystrap --layer-cache /tmp/cache.json \
 
 The cache path can also be set via the `OCCYSTRAP_LAYER_CACHE`
 environment variable.
+
+### `dockerpush://` Integration
+
+When using `dockerpush://` as the input source with `--layer-cache`, occystrap
+enables a HEAD optimization that skips cached layers *before Docker even
+uploads them*. On the first run, all layers are transferred normally. On
+subsequent runs, the embedded registry returns `200` for HEAD checks on cached
+layers, causing Docker to skip the upload entirely. This means cached layers
+have zero local transfer overhead.
+
+A digest mapping file (`{cache_path}.digests`) is created alongside the
+cache to translate between Docker's compressed digests and the DiffIDs used
+as cache keys.
+
+```bash
+# First push: all layers transferred and cached
+occystrap --layer-cache /tmp/cache.json \
+    process dockerpush://app:v1 registry://myregistry/app:v1
+
+# Second push: Docker skips uploading shared layers entirely
+occystrap --layer-cache /tmp/cache.json \
+    process dockerpush://app:v2 registry://myregistry/app:v2
+```
 
 ### Pipeline Awareness
 

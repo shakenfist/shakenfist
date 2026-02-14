@@ -117,6 +117,88 @@ Key aspects:
 - For a 26GB image with in-order layers, disk usage is near zero
 - Temp file location is configurable via `--temp-dir` option
 
+### Docker Push Input
+
+Fetches images from local Docker or Podman daemons using an embedded registry.
+
+```
+dockerpush://IMAGE:TAG
+```
+
+**Why use `dockerpush://` instead of `docker://`?**
+
+The Docker Engine API (`/images/{name}/get`) exports images as a single
+sequential tarball. This is fundamentally slow for multi-layer images because
+it serializes all layers into one stream, with no opportunity for
+parallelization. The entire tarball must be read before the manifest becomes
+available.
+
+Docker's own `push` command, however, uses the Registry V2 HTTP API, which
+transfers layers individually and in parallel. The `dockerpush://` input
+exploits this by starting a minimal HTTP server on localhost that implements
+the V2 push-path endpoints. Docker pushes layers to this server just as it
+would push to any registry, but the received data feeds directly into the
+occystrap pipeline.
+
+Since Docker 1.3.2, the entire `127.0.0.0/8` range is implicitly trusted as
+insecure, so no daemon.json changes or TLS certificates are needed.
+
+**How it works:**
+
+```
+1. Start ThreadingHTTPServer on 127.0.0.1 (ephemeral port)
+2. Tag image for localhost push (POST /images/{name}/tag)
+3. Push image (POST /images/{name}/push)
+   - Docker uploads layers in parallel to embedded registry
+   - Server thread handles uploads, stores blobs as temp files
+4. Wait for manifest from Docker push
+5. Parse manifest + config to get layer DiffIDs
+6. Yield config element
+7. For each layer: read blob, decompress, yield ImageElement
+8. Cleanup: untag temp tag, stop server, delete temp files
+```
+
+**Threading model:**
+
+The embedded registry runs in a daemon thread handling Docker's parallel
+uploads. The main thread waits for the manifest to arrive, then reads the
+received blobs and yields pipeline elements. Shared state between threads
+is protected by a threading lock.
+
+**Layer cache integration:**
+
+When `--layer-cache` is used with a `registry://` output and a `dockerpush://`
+input, the embedded registry uses a HEAD optimization to skip cached layers
+*before Docker even uploads them*. On the first run, Docker uploads all layers
+normally and occystrap records a mapping between Docker's compressed digests
+and the uncompressed DiffIDs. On subsequent runs, the embedded registry returns
+`200` for HEAD checks on cached layers, causing Docker to skip the upload
+entirely. This means cached layers consume zero local transfer time.
+
+The digest mapping is stored alongside the layer cache as
+`{cache_path}.digests`. This file maps Docker's compressed layer digests to
+the uncompressed DiffIDs used as cache keys. It is updated automatically
+after each push.
+
+**Limitations:**
+
+- Only supports single-platform V2 manifests. If Docker pushes a manifest
+  list (fat manifest) for a multi-arch image, parsing will fail. Use the
+  `registry://` input for multi-arch images.
+- The manifest wait timeout defaults to 300 seconds (`MANIFEST_TIMEOUT`
+  constant in `dockerpush.py`). Very large images on slow systems may
+  need this value increased.
+
+**When to use:**
+
+- Use `dockerpush://` when the source image is in a local Docker daemon
+  and the image has multiple layers. The speed advantage grows with the
+  number and size of layers.
+- Use `docker://` for single-layer images or when minimal overhead is
+  preferred (the embedded registry adds a small amount of setup time).
+- Use `dockerpush://` with `--layer-cache` for maximum performance in CI
+  workflows pushing multiple images that share base layers.
+
 ### Tarball Input
 
 Reads images from existing docker-save format tarballs.

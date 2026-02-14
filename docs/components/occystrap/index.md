@@ -60,6 +60,7 @@ occystrap process SOURCE DESTINATION [-f FILTER]...
 Input URIs specify where to get images:
 - `registry://docker.io/library/busybox:latest` - Docker/OCI registry
 - `docker://myimage:v1` - Local Docker daemon
+- `dockerpush://myimage:v1` - Local Docker via push (fast)
 - `tar:///path/to/image.tar` - Existing tarball
 
 Output URIs specify where to write images:
