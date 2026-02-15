@@ -182,7 +182,7 @@ test = [
     "mock==5.2.0",              # bsd
     "stestr==4.2.0",            # apache2
     "flake8==7.3.0",            # mit
-    "tox==4.34.1",              # mit
+    "tox==4.35.0",              # mit
     "mkdocs==1.6.1",            # bsd
     "mkdocs-material==9.7.1",   # mit
     "testscenarios==0.5.0",     # bsd
