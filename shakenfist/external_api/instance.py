@@ -1534,7 +1534,7 @@ class InstanceAgentPutEndpoint(api_base.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'agent operation put-blob request from REST API')
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
-                               instance_from_db.uuid, commands)
+                               str(instance_from_db.uuid), commands)
         instance_from_db.agent_operation_enqueue(o.uuid)
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'queued agent command requiring preflight',
@@ -1579,7 +1579,7 @@ class InstanceAgentGetEndpoint(api_base.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'agent operation get-file request from REST API')
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
-                               instance_from_db.uuid, commands)
+                               str(instance_from_db.uuid), commands)
         instance_from_db.agent_operation_enqueue(o.uuid)
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'queued agent command not requiring preflight',
@@ -1619,7 +1619,7 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'agent operation execute request from REST API')
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
-                               instance_from_db.uuid, commands)
+                               str(instance_from_db.uuid), commands)
         instance_from_db.agent_operation_enqueue(o.uuid)
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'queued agent command not requiring preflight',

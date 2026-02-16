@@ -38,6 +38,7 @@ from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
+from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
@@ -1655,6 +1656,150 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteBlobTransfersForBlob failed', e)
             return database_pb2.DeleteCountReply(count=-1)
 
+    # Blob Attributes Operations (MariaDB)
+
+    def CreateBlobAttributes(
+        self,
+        request: database_pb2.CreateBlobAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create blob attributes in MariaDB."""
+        try:
+            self.monitor.counters['create_blob_attributes'].inc()
+            data = BlobAttributesData(
+                uuid=UUID(request.data.uuid),
+                size=request.data.size,
+                info=(json.loads(request.data.info_json)
+                      if request.data.info_json else {}),
+                last_used=(request.data.last_used
+                           if request.data.has_last_used else None),
+                expires_at=request.data.expires_at
+            )
+            success = mariadb._direct_create_blob_attributes(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateBlobAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetBlobAttributes(
+        self,
+        request: database_pb2.GetBlobAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetBlobAttributesReply:
+        """Get blob attributes from MariaDB."""
+        try:
+            self.monitor.counters['get_blob_attributes'].inc()
+            data = mariadb._direct_get_blob_attributes(UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetBlobAttributesReply(found=False)
+            return database_pb2.GetBlobAttributesReply(
+                found=True,
+                data=database_pb2.BlobAttributesData(
+                    uuid=str(data.uuid),
+                    size=data.size,
+                    info_json=json.dumps(data.info) if data.info else '{}',
+                    last_used=data.last_used if data.last_used else 0,
+                    has_last_used=data.last_used is not None,
+                    expires_at=data.expires_at
+                )
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetBlobAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetBlobAttributesReply(found=False)
+
+    def UpdateBlobAttributes(
+        self,
+        request: database_pb2.UpdateBlobAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update blob attributes in MariaDB."""
+        try:
+            self.monitor.counters['update_blob_attributes'].inc()
+            data = BlobAttributesData(
+                uuid=UUID(request.data.uuid),
+                size=request.data.size,
+                info=(json.loads(request.data.info_json)
+                      if request.data.info_json else {}),
+                last_used=(request.data.last_used
+                           if request.data.has_last_used else None),
+                expires_at=request.data.expires_at
+            )
+            success = mariadb._direct_update_blob_attributes(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateBlobAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def UpdateBlobLastUsed(
+        self,
+        request: database_pb2.UpdateBlobLastUsedRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update blob last_used in MariaDB (optimized single-column update)."""
+        try:
+            self.monitor.counters['update_blob_last_used'].inc()
+            success = mariadb._direct_update_blob_last_used(
+                UUID(request.uuid), request.last_used)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateBlobLastUsed failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def DeleteBlobAttributes(
+        self,
+        request: database_pb2.DeleteBlobAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete blob attributes from MariaDB."""
+        try:
+            self.monitor.counters['delete_blob_attributes'].inc()
+            success = mariadb._direct_delete_blob_attributes(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteBlobAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetExpiredBlobUuids(
+        self,
+        request: database_pb2.GetExpiredBlobUuidsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetExpiredBlobUuidsReply:
+        """Get UUIDs of expired blobs."""
+        try:
+            self.monitor.counters['get_expired_blob_uuids'].inc()
+            current_time = (request.current_time
+                            if request.current_time > 0 else None)
+            uuids = mariadb._direct_get_expired_blob_uuids(current_time)
+            return database_pb2.GetExpiredBlobUuidsReply(uuids=uuids)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetExpiredBlobUuids failed', e)
+            return database_pb2.GetExpiredBlobUuidsReply(uuids=[])
+
+    def GetStaleTranscodedBlobUuids(
+        self,
+        request: database_pb2.GetStaleTranscodedBlobUuidsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetStaleTranscodedBlobUuidsReply:
+        """Get UUIDs of stale transcoded blobs."""
+        try:
+            self.monitor.counters['get_stale_transcoded_blob_uuids'].inc()
+            uuids = mariadb._direct_get_stale_transcoded_blob_uuids(
+                request.idle_seconds)
+            return database_pb2.GetStaleTranscodedBlobUuidsReply(uuids=uuids)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetStaleTranscodedBlobUuids failed', e)
+            return database_pb2.GetStaleTranscodedBlobUuidsReply(uuids=[])
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -1703,7 +1848,12 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_blob_transfer', 'get_blob_transfer',
             'get_blob_transfers_for_node', 'get_blob_transfers_for_blob',
             'update_blob_transfer', 'delete_blob_transfer',
-            'delete_stale_transfers', 'delete_blob_transfers_for_blob'
+            'delete_stale_transfers', 'delete_blob_transfers_for_blob',
+            # MariaDB blob attributes operations
+            'create_blob_attributes', 'get_blob_attributes',
+            'update_blob_attributes', 'update_blob_last_used',
+            'delete_blob_attributes', 'get_expired_blob_uuids',
+            'get_stale_transcoded_blob_uuids'
         ]
         for op in operations:
             self.counters[op] = Counter(
