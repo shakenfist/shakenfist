@@ -21,6 +21,7 @@ name:
 | `--parallel N`, `-j N` | `OCCYSTRAP_PARALLEL` | Number of parallel download/upload threads (default: 4) |
 | `--temp-dir PATH` | `OCCYSTRAP_TEMP_DIR` | Directory for temporary files (default: system temp) |
 | `--layer-cache PATH` | `OCCYSTRAP_LAYER_CACHE` | JSON file for cross-invocation layer caching |
+| `-O`, `--output-format` | | Output format for `info`/`check`: `text` (default) or `json` |
 
 Example:
 
@@ -88,6 +89,53 @@ occystrap search --regex docker://python:3.11 ".*\.py$"
 
 # Machine-parseable output
 occystrap search --script-friendly tar://image.tar "*.conf"
+```
+
+### info
+
+Display information about a container image without downloading layer
+blobs. Shows metadata from the manifest and config: architecture, OS,
+layer count, compressed sizes, compression formats, history entries,
+labels, environment variables, entrypoint/cmd, and more.
+
+```bash
+occystrap info SOURCE
+```
+
+**Arguments:**
+
+- `SOURCE` - Input URI specifying the image to inspect
+
+**Output format** is controlled by the global `-O` / `--output-format`
+option (`text` or `json`).
+
+**What's shown depends on the input source:**
+
+| Source | Manifest data | Config data |
+|--------|--------------|-------------|
+| `registry://` | Yes (compressed sizes, mediaTypes) | Yes |
+| `docker://` | No | Yes |
+| `tar://` | No | Yes |
+| `dockerpush://` | No | No |
+
+**Examples:**
+
+```bash
+# Human-readable output from registry
+occystrap info registry://docker.io/library/busybox:latest
+
+# JSON output
+occystrap -O json info registry://docker.io/library/busybox:latest
+
+# From local Docker daemon
+occystrap info docker://myimage:v1
+
+# From tarball
+occystrap info tar://image.tar
+
+# Specific architecture
+occystrap --architecture arm64 --variant v8 \
+    info registry://docker.io/library/busybox:latest
 ```
 
 ## Input URI Schemes
