@@ -157,7 +157,7 @@ class UpgradePydanticDataBlobTestCase(base.ShakenFistTestCase):
             current_version = blob.Blob.current_version
 
             @classmethod
-            def _upgrade_step_9_to_10(cls, values: dict[str, Any]) -> None:
+            def _upgrade_step_10_to_11(cls, values: dict[str, Any]) -> None:
                 # No-op upgrade step
                 pass
 
