@@ -38,6 +38,7 @@ from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
+from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
@@ -1665,7 +1666,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Create blob attributes in MariaDB."""
         try:
             self.monitor.counters['create_blob_attributes'].inc()
-            from shakenfist.schema.blob_attributes import BlobAttributesData
             data = BlobAttributesData(
                 uuid=UUID(request.data.uuid),
                 size=request.data.size,
@@ -1719,7 +1719,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Update blob attributes in MariaDB."""
         try:
             self.monitor.counters['update_blob_attributes'].inc()
-            from shakenfist.schema.blob_attributes import BlobAttributesData
             data = BlobAttributesData(
                 uuid=UUID(request.data.uuid),
                 size=request.data.size,

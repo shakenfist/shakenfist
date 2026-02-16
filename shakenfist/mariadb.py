@@ -5896,21 +5896,35 @@ def _direct_get_expired_blob_uuids(
     if current_time is None:
         current_time = time.time()
 
+    active_states = ['initial', 'created']
+
     engine = _get_engine()
-    table = _get_blob_attributes_table()
+    attrs_table = _get_blob_attributes_table()
+    states_table = _get_object_states_table()
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(table.c.uuid).where(
+            stmt = sa.select(attrs_table.c.uuid).select_from(
+                attrs_table.join(
+                    states_table,
+                    sa.and_(
+                        states_table.c.object_uuid
+                        == sa.cast(attrs_table.c.uuid, sa.String),
+                        states_table.c.object_type == ObjectType.BLOB
+                    )
+                )
+            ).where(
                 sa.and_(
-                    table.c.expires_at > 0,
-                    table.c.expires_at < current_time
+                    attrs_table.c.expires_at > 0,
+                    attrs_table.c.expires_at < current_time,
+                    states_table.c.state_value.in_(active_states)
                 )
             )
             result = conn.execute(stmt)
             return [str(row.uuid) for row in result]
     except OperationalError as e:
-        LOG.warning(f'MariaDB query for expired blobs failed: {e}')
+        LOG.warning(
+            f'MariaDB query for expired blobs failed: {e}')
         return []
 
 
@@ -5930,35 +5944,59 @@ def _direct_get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
         List of blob UUID strings that are stale transcodes.
     """
     cutoff_time = time.time() - idle_seconds
+    active_states = ['initial', 'created']
 
     engine = _get_engine()
     attrs_table = _get_blob_attributes_table()
     refs_table = _get_object_references_table()
+    states_table = _get_object_states_table()
 
     try:
         with engine.connect() as conn:
             # Subquery: blob UUIDs that have transcodes
-            transcoded_blobs = sa.select(refs_table.c.source_uuid).where(
+            transcoded_blobs = sa.select(
+                refs_table.c.source_uuid
+            ).where(
                 sa.and_(
-                    refs_table.c.source_object_type == str(ObjectType.BLOB),
-                    refs_table.c.relationship == str(RelationshipType.TRANSCODE)
+                    refs_table.c.source_object_type
+                    == str(ObjectType.BLOB),
+                    refs_table.c.relationship
+                    == str(RelationshipType.TRANSCODE)
                 )
             ).distinct()
 
-            # Main query: transcoded blobs with stale last_used
-            stmt = sa.select(attrs_table.c.uuid).where(
+            # Main query: transcoded blobs with stale last_used,
+            # filtered to active states only
+            stmt = sa.select(
+                attrs_table.c.uuid
+            ).select_from(
+                attrs_table.join(
+                    states_table,
+                    sa.and_(
+                        states_table.c.object_uuid
+                        == sa.cast(
+                            attrs_table.c.uuid, sa.String),
+                        states_table.c.object_type
+                        == ObjectType.BLOB
+                    )
+                )
+            ).where(
                 sa.and_(
                     attrs_table.c.uuid.in_(transcoded_blobs),
                     sa.or_(
                         attrs_table.c.last_used.is_(None),
                         attrs_table.c.last_used < cutoff_time
-                    )
+                    ),
+                    states_table.c.state_value.in_(
+                        active_states)
                 )
             )
             result = conn.execute(stmt)
             return [str(row.uuid) for row in result]
     except OperationalError as e:
-        LOG.warning(f'MariaDB query for stale transcoded blobs failed: {e}')
+        LOG.warning(
+            'MariaDB query for stale transcoded blobs '
+            f'failed: {e}')
         return []
 
 
