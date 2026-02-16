@@ -107,6 +107,8 @@ nav:
             - "Pipeline Architecture": components/occystrap/pipeline.md
             - "Tar Format Selection": components/occystrap/tar-format-selection.md
             - "Use Cases": components/occystrap/use-cases.md
+            - Plans:
+                - "Implementing `info` and `check` subcommands for occystrap": components/occystrap/plans/PLAN-info-check.md
     - Features: features.md
     - Release notes:
         - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
