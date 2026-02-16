@@ -10,31 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/kerbside/scancodes/">
+        <link rel="canonical" href="https://shakenfist.com/components/occystrap/plans/PLAN-info-check/">
       
       
-        <link rel="prev" href="../proxy-architecture/">
+        <link rel="prev" href="../../use-cases/">
       
       
-        <link rel="next" href="../capabilities/">
+        <link rel="next" href="../../../../features/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
-        <title>Keyboard Scancodes - Shaken Fist</title>
+        <title>Implementing `info` and `check` subcommands for occystrap - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
   
@@ -74,9 +74,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#keyboard-scancodes" class="md-skip">
+        <a href="#implementing-info-and-check-subcommands-for-occystrap" class="md-skip">
           Skip to content
         </a>
       
@@ -117,7 +117,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Keyboard Scancodes
+              Implementing `info` and `check` subcommands for occystrap
             
           </span>
         </div>
@@ -253,7 +253,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -283,7 +283,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../../../.." class="md-nav__link">
         
   
   
@@ -310,7 +310,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../manifesto/" class="md-nav__link">
+      <a href="../../../../manifesto/" class="md-nav__link">
         
   
   
@@ -386,7 +386,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../overview/" class="md-nav__link">
+      <a href="../../../overview/" class="md-nav__link">
         
   
   
@@ -461,7 +461,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/" class="md-nav__link">
+      <a href="../../../cloudgood/" class="md-nav__link">
         
   
   
@@ -489,7 +489,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/technology-primer/" class="md-nav__link">
+      <a href="../../../cloudgood/technology-primer/" class="md-nav__link">
         
   
   
@@ -517,7 +517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/fundamentals/" class="md-nav__link">
+      <a href="../../../cloudgood/fundamentals/" class="md-nav__link">
         
   
   
@@ -545,7 +545,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/virtualization-history/" class="md-nav__link">
+      <a href="../../../cloudgood/virtualization-history/" class="md-nav__link">
         
   
   
@@ -573,7 +573,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/memory-mapped-devices/" class="md-nav__link">
+      <a href="../../../cloudgood/memory-mapped-devices/" class="md-nav__link">
         
   
   
@@ -601,7 +601,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/instance-video/" class="md-nav__link">
+      <a href="../../../cloudgood/instance-video/" class="md-nav__link">
         
   
   
@@ -684,7 +684,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/" class="md-nav__link">
+      <a href="../../../clingwrap/" class="md-nav__link">
         
   
   
@@ -712,7 +712,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/command-types/" class="md-nav__link">
+      <a href="../../../clingwrap/command-types/" class="md-nav__link">
         
   
   
@@ -740,7 +740,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/configuration/" class="md-nav__link">
+      <a href="../../../clingwrap/configuration/" class="md-nav__link">
         
   
   
@@ -768,7 +768,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/examples/" class="md-nav__link">
+      <a href="../../../clingwrap/examples/" class="md-nav__link">
         
   
   
@@ -796,7 +796,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/installation/" class="md-nav__link">
+      <a href="../../../clingwrap/installation/" class="md-nav__link">
         
   
   
@@ -804,6 +804,425 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kerbside
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuring Kerbside
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/console-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Console Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/proxy-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside Proxy Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/scancodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Scancodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/channel-protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Channel Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/compression-protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Compression Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/spice-link-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Link Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/protocol-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Protocol Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/usb-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    USB Redirection Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/vd-agent-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VD Agent Protocol
   
 
     
@@ -842,766 +1261,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Kerbside
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3_4">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Kerbside
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Introduction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../configuration/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuring Kerbside
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../console-sources/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Console Sources
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../schema/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Database Schema
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../proxy-architecture/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Kerbside Proxy Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Keyboard Scancodes
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Keyboard Scancodes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#scancode-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scancode Format
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Scancode Format">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#simple-scancodes-key_downkey_up-messages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Simple Scancodes (key_down/key_up messages)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#raw-scancodes-key_scancode-message" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Raw Scancodes (key_scancode message)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#standard-scancodes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Standard Scancodes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Standard Scancodes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#main-keyboard-row-1-function-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Main Keyboard - Row 1 (Function Keys)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#main-keyboard-row-2-number-row" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Main Keyboard - Row 2 (Number Row)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#main-keyboard-row-3-qwerty" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Main Keyboard - Row 3 (QWERTY)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#main-keyboard-row-4-asdf" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Main Keyboard - Row 4 (ASDF)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#main-keyboard-row-5-zxcv" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Main Keyboard - Row 5 (ZXCV)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#main-keyboard-row-6-bottom" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Main Keyboard - Row 6 (Bottom)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#numeric-keypad" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Numeric Keypad
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#lock-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Lock Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#extended-function-keys-f13-f24" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Extended Function Keys (F13-F24)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#international-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        International Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#extended-scancodes-e0-prefix" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Extended Scancodes (E0 Prefix)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Extended Scancodes (E0 Prefix)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#navigation-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Navigation Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#arrow-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Arrow Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#right-side-modifier-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Right-Side Modifier Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#numpad-extended-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Numpad Extended Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#media-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Media Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#browser-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Browser Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#application-launch-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Application Launch Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example-typing-hello" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example: Typing "Hello"
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#references" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        References
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related-documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../capabilities/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    SPICE Capabilities
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../channel-protocols/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    SPICE Channel Protocols
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../compression-protocols/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    SPICE Compression Protocols
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../spice-link-protocol/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    SPICE Link Protocol
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../protocol-overview/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    SPICE Protocol Overview
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../usb-redirection/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    USB Redirection Protocol
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../vd-agent-protocol/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    VD Agent Protocol
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" checked>
         
           
           <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
@@ -1622,7 +1282,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1640,7 +1300,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/" class="md-nav__link">
+      <a href="../../" class="md-nav__link">
         
   
   
@@ -1668,7 +1328,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/command-reference/" class="md-nav__link">
+      <a href="../../command-reference/" class="md-nav__link">
         
   
   
@@ -1696,7 +1356,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/docker-tarball-formats/" class="md-nav__link">
+      <a href="../../docker-tarball-formats/" class="md-nav__link">
         
   
   
@@ -1724,7 +1384,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/installation/" class="md-nav__link">
+      <a href="../../installation/" class="md-nav__link">
         
   
   
@@ -1752,7 +1412,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/pipeline/" class="md-nav__link">
+      <a href="../../pipeline/" class="md-nav__link">
         
   
   
@@ -1780,7 +1440,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/tar-format-selection/" class="md-nav__link">
+      <a href="../../tar-format-selection/" class="md-nav__link">
         
   
   
@@ -1808,7 +1468,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/use-cases/" class="md-nav__link">
+      <a href="../../use-cases/" class="md-nav__link">
         
   
   
@@ -1833,18 +1493,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_8" checked>
         
           
           <label class="md-nav__link" for="__nav_3_5_8" id="__nav_3_5_8_label" tabindex="0">
@@ -1865,7 +1527,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_5_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1880,10 +1542,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementing `info` and `check` subcommands for occystrap
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1899,6 +1588,270 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#situation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Situation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mission and problem statement
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mission and problem statement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#occystrap-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        occystrap info
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#occystrap-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        occystrap check
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Open questions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#do-existing-tools-already-cover-info-and-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Do existing tools already cover info and check?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-information-should-info-display" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What information should info display?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-things-should-check-validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What things should check validate?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#should-process-be-called-convert" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Should process be called convert?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shared-prerequisite-output-formatting-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared prerequisite: output formatting (done)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-plan-for-info-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation plan for info (done)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-plan-for-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation plan for check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testing-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration-and-logistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration and logistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration and logistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs fixed during this work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1934,7 +1887,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../features/" class="md-nav__link">
+      <a href="../../../../features/" class="md-nav__link">
         
   
   
@@ -2008,7 +1961,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../release_notes/v07-v08/" class="md-nav__link">
+      <a href="../../../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -2043,7 +1996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/" class="md-nav__link">
+      <a href="../../../../community/" class="md-nav__link">
         
   
   
@@ -2117,7 +2070,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/usage/" class="md-nav__link">
+      <a href="../../../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -2145,7 +2098,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/authentication/" class="md-nav__link">
+      <a href="../../../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -2173,7 +2126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/ansible/" class="md-nav__link">
+      <a href="../../../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -2201,7 +2154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/artifacts/" class="md-nav__link">
+      <a href="../../../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -2229,7 +2182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/affinity/" class="md-nav__link">
+      <a href="../../../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -2257,7 +2210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/consoles/" class="md-nav__link">
+      <a href="../../../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -2285,7 +2238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/events/" class="md-nav__link">
+      <a href="../../../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -2313,7 +2266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/objects/" class="md-nav__link">
+      <a href="../../../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -2341,7 +2294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/metadata/" class="md-nav__link">
+      <a href="../../../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -2470,7 +2423,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/admin/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/admin/" class="md-nav__link">
         
   
   
@@ -2498,7 +2451,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
         
   
   
@@ -2526,7 +2479,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
         
   
   
@@ -2554,7 +2507,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/authentication/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/authentication/" class="md-nav__link">
         
   
   
@@ -2582,7 +2535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
         
   
   
@@ -2610,7 +2563,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/blobs/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/blobs/" class="md-nav__link">
         
   
   
@@ -2638,7 +2591,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
         
   
   
@@ -2666,7 +2619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/instances/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/instances/" class="md-nav__link">
         
   
   
@@ -2694,7 +2647,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/label/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/label/" class="md-nav__link">
         
   
   
@@ -2722,7 +2675,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/networks/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/networks/" class="md-nav__link">
         
   
   
@@ -2750,7 +2703,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
         
   
   
@@ -2778,7 +2731,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/nodes/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/nodes/" class="md-nav__link">
         
   
   
@@ -2806,7 +2759,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/upload/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/upload/" class="md-nav__link">
         
   
   
@@ -2842,7 +2795,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/agent_protocol/" class="md-nav__link">
+      <a href="../../../../developer_guide/agent_protocol/" class="md-nav__link">
         
   
   
@@ -2870,7 +2823,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/authentication/" class="md-nav__link">
+      <a href="../../../../developer_guide/authentication/" class="md-nav__link">
         
   
   
@@ -2898,7 +2851,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/ci_api_coverage/" class="md-nav__link">
+      <a href="../../../../developer_guide/ci_api_coverage/" class="md-nav__link">
         
   
   
@@ -2926,7 +2879,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/mypy/" class="md-nav__link">
+      <a href="../../../../developer_guide/mypy/" class="md-nav__link">
         
   
   
@@ -2954,7 +2907,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/release_process/" class="md-nav__link">
+      <a href="../../../../developer_guide/release_process/" class="md-nav__link">
         
   
   
@@ -2982,7 +2935,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/standards/" class="md-nav__link">
+      <a href="../../../../developer_guide/standards/" class="md-nav__link">
         
   
   
@@ -3010,7 +2963,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/state_machine/" class="md-nav__link">
+      <a href="../../../../developer_guide/state_machine/" class="md-nav__link">
         
   
   
@@ -3038,7 +2991,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/updating_docs/" class="md-nav__link">
+      <a href="../../../../developer_guide/updating_docs/" class="md-nav__link">
         
   
   
@@ -3066,7 +3019,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/workflow/" class="md-nav__link">
+      <a href="../../../../developer_guide/workflow/" class="md-nav__link">
         
   
   
@@ -3148,7 +3101,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/" class="md-nav__link">
+      <a href="../../../../plans/" class="md-nav__link">
         
   
   
@@ -3176,7 +3129,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../../../../plans/api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -3204,7 +3157,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../../../../plans/blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -3286,7 +3239,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/installation/" class="md-nav__link">
+      <a href="../../../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -3314,7 +3267,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/artifacts/" class="md-nav__link">
+      <a href="../../../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -3342,7 +3295,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/authentication/" class="md-nav__link">
+      <a href="../../../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -3370,7 +3323,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/database/" class="md-nav__link">
+      <a href="../../../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -3398,7 +3351,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/exception_tracking/" class="md-nav__link">
+      <a href="../../../../operator_guide/exception_tracking/" class="md-nav__link">
         
   
   
@@ -3426,7 +3379,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/locks/" class="md-nav__link">
+      <a href="../../../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -3454,7 +3407,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/networking/overview/" class="md-nav__link">
+      <a href="../../../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -3482,7 +3435,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/power_states/" class="md-nav__link">
+      <a href="../../../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -3510,7 +3463,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/python_versions/" class="md-nav__link">
+      <a href="../../../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -3538,7 +3491,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/threads/" class="md-nav__link">
+      <a href="../../../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -3566,7 +3519,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/upgrades/" class="md-nav__link">
+      <a href="../../../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -3621,22 +3574,44 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#scancode-format" class="md-nav__link">
+  <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Scancode Format
+        Prompt
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Scancode Format">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#situation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Situation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mission and problem statement
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mission and problem statement">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#simple-scancodes-key_downkey_up-messages" class="md-nav__link">
+  <a href="#occystrap-info" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Simple Scancodes (key_down/key_up messages)
+        occystrap info
       
     </span>
   </a>
@@ -3644,10 +3619,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#raw-scancodes-key_scancode-message" class="md-nav__link">
+  <a href="#occystrap-check" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Raw Scancodes (key_scancode message)
+        occystrap check
       
     </span>
   </a>
@@ -3660,22 +3635,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#standard-scancodes" class="md-nav__link">
+  <a href="#open-questions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Standard Scancodes
+        Open questions
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Standard Scancodes">
+    <nav class="md-nav" aria-label="Open questions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#main-keyboard-row-1-function-keys" class="md-nav__link">
+  <a href="#do-existing-tools-already-cover-info-and-check" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Main Keyboard - Row 1 (Function Keys)
+        Do existing tools already cover info and check?
       
     </span>
   </a>
@@ -3683,10 +3658,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#main-keyboard-row-2-number-row" class="md-nav__link">
+  <a href="#what-information-should-info-display" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Main Keyboard - Row 2 (Number Row)
+        What information should info display?
       
     </span>
   </a>
@@ -3694,10 +3669,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#main-keyboard-row-3-qwerty" class="md-nav__link">
+  <a href="#what-things-should-check-validate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Main Keyboard - Row 3 (QWERTY)
+        What things should check validate?
       
     </span>
   </a>
@@ -3705,76 +3680,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#main-keyboard-row-4-asdf" class="md-nav__link">
+  <a href="#should-process-be-called-convert" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Main Keyboard - Row 4 (ASDF)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#main-keyboard-row-5-zxcv" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Main Keyboard - Row 5 (ZXCV)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#main-keyboard-row-6-bottom" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Main Keyboard - Row 6 (Bottom)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#numeric-keypad" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Numeric Keypad
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#lock-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Lock Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#extended-function-keys-f13-f24" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Extended Function Keys (F13-F24)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#international-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        International Keys
+        Should process be called convert?
       
     </span>
   </a>
@@ -3787,22 +3696,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#extended-scancodes-e0-prefix" class="md-nav__link">
+  <a href="#execution" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Extended Scancodes (E0 Prefix)
+        Execution
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Extended Scancodes (E0 Prefix)">
+    <nav class="md-nav" aria-label="Execution">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#navigation-keys" class="md-nav__link">
+  <a href="#shared-prerequisite-output-formatting-done" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Navigation Keys
+        Shared prerequisite: output formatting (done)
       
     </span>
   </a>
@@ -3810,10 +3719,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#arrow-keys" class="md-nav__link">
+  <a href="#implementation-plan-for-info-done" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Arrow Keys
+        Implementation plan for info (done)
       
     </span>
   </a>
@@ -3821,10 +3730,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#right-side-modifier-keys" class="md-nav__link">
+  <a href="#implementation-plan-for-check" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Right-Side Modifier Keys
+        Implementation plan for check
       
     </span>
   </a>
@@ -3832,43 +3741,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#numpad-extended-keys" class="md-nav__link">
+  <a href="#testing-strategy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Numpad Extended Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#media-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Media Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#browser-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Browser Keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#application-launch-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Application Launch Keys
+        Testing strategy
       
     </span>
   </a>
@@ -3881,35 +3757,63 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-typing-hello" class="md-nav__link">
+  <a href="#administration-and-logistics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example: Typing "Hello"
+        Administration and logistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration and logistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#references" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        References
+        Future work
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#related-documentation" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related Documentation
+        Bugs fixed during this work
       
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3934,987 +3838,366 @@
   
 
 
-<h1 id="keyboard-scancodes">Keyboard Scancodes<a class="headerlink" href="#keyboard-scancodes" title="Permanent link">&para;</a></h1>
-<p>This document provides a reference for the keyboard scancodes used by the SPICE
-protocol's inputs channel. SPICE uses IBM PC XT-compatible scancodes (Set 1).</p>
-<h2 id="scancode-format">Scancode Format<a class="headerlink" href="#scancode-format" title="Permanent link">&para;</a></h2>
-<p>SPICE supports two scancode formats:</p>
-<h3 id="simple-scancodes-key_downkey_up-messages">Simple Scancodes (key_down/key_up messages)<a class="headerlink" href="#simple-scancodes-key_downkey_up-messages" title="Permanent link">&para;</a></h3>
-<p>The <code>key_down</code> (ID 101) and <code>key_up</code> (ID 102) messages use a 32-bit scancode
-field. For standard keys, only the low byte is used.</p>
-<h3 id="raw-scancodes-key_scancode-message">Raw Scancodes (key_scancode message)<a class="headerlink" href="#raw-scancodes-key_scancode-message" title="Permanent link">&para;</a></h3>
-<p>The <code>key_scancode</code> (ID 104) message sends raw XT scancodes as a byte array.
-This format is more efficient for extended keys and supports:</p>
-<ul>
-<li><strong>Key press</strong>: Scancode byte as-is</li>
-<li><strong>Key release</strong>: Scancode byte OR'd with 0x80 (high bit set)</li>
-<li><strong>Extended keys</strong>: Prefixed with 0xE0 byte</li>
-</ul>
-<p>For example:
-- Press 'A': <code>[0x1E]</code>
-- Release 'A': <code>[0x9E]</code> (0x1E | 0x80)
-- Press Right Ctrl: <code>[0xE0, 0x1D]</code>
-- Release Right Ctrl: <code>[0xE0, 0x9D]</code></p>
-<h2 id="standard-scancodes">Standard Scancodes<a class="headerlink" href="#standard-scancodes" title="Permanent link">&para;</a></h2>
-<h3 id="main-keyboard-row-1-function-keys">Main Keyboard - Row 1 (Function Keys)<a class="headerlink" href="#main-keyboard-row-1-function-keys" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Scancode</th>
-<th>Hex</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Escape</td>
-<td>1</td>
-<td>0x01</td>
-</tr>
-<tr>
-<td>F1</td>
-<td>59</td>
-<td>0x3B</td>
-</tr>
-<tr>
-<td>F2</td>
-<td>60</td>
-<td>0x3C</td>
-</tr>
-<tr>
-<td>F3</td>
-<td>61</td>
-<td>0x3D</td>
-</tr>
-<tr>
-<td>F4</td>
-<td>62</td>
-<td>0x3E</td>
-</tr>
-<tr>
-<td>F5</td>
-<td>63</td>
-<td>0x3F</td>
-</tr>
-<tr>
-<td>F6</td>
-<td>64</td>
-<td>0x40</td>
-</tr>
-<tr>
-<td>F7</td>
-<td>65</td>
-<td>0x41</td>
-</tr>
-<tr>
-<td>F8</td>
-<td>66</td>
-<td>0x42</td>
-</tr>
-<tr>
-<td>F9</td>
-<td>67</td>
-<td>0x43</td>
-</tr>
-<tr>
-<td>F10</td>
-<td>68</td>
-<td>0x44</td>
-</tr>
-<tr>
-<td>F11</td>
-<td>87</td>
-<td>0x57</td>
-</tr>
-<tr>
-<td>F12</td>
-<td>88</td>
-<td>0x58</td>
-</tr>
-</tbody>
-</table>
-<h3 id="main-keyboard-row-2-number-row">Main Keyboard - Row 2 (Number Row)<a class="headerlink" href="#main-keyboard-row-2-number-row" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Scancode</th>
-<th>Hex</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>` (Backquote)</td>
-<td>41</td>
-<td>0x29</td>
-</tr>
-<tr>
-<td>1</td>
-<td>2</td>
-<td>0x02</td>
-</tr>
-<tr>
-<td>2</td>
-<td>3</td>
-<td>0x03</td>
-</tr>
-<tr>
-<td>3</td>
-<td>4</td>
-<td>0x04</td>
-</tr>
-<tr>
-<td>4</td>
-<td>5</td>
-<td>0x05</td>
-</tr>
-<tr>
-<td>5</td>
-<td>6</td>
-<td>0x06</td>
-</tr>
-<tr>
-<td>6</td>
-<td>7</td>
-<td>0x07</td>
-</tr>
-<tr>
-<td>7</td>
-<td>8</td>
-<td>0x08</td>
-</tr>
-<tr>
-<td>8</td>
-<td>9</td>
-<td>0x09</td>
-</tr>
-<tr>
-<td>9</td>
-<td>10</td>
-<td>0x0A</td>
-</tr>
-<tr>
-<td>0</td>
-<td>11</td>
-<td>0x0B</td>
-</tr>
-<tr>
-<td>- (Minus)</td>
-<td>12</td>
-<td>0x0C</td>
-</tr>
-<tr>
-<td>= (Equal)</td>
-<td>13</td>
-<td>0x0D</td>
-</tr>
-<tr>
-<td>Backspace</td>
-<td>14</td>
-<td>0x0E</td>
-</tr>
-</tbody>
-</table>
-<h3 id="main-keyboard-row-3-qwerty">Main Keyboard - Row 3 (QWERTY)<a class="headerlink" href="#main-keyboard-row-3-qwerty" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Scancode</th>
-<th>Hex</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Tab</td>
-<td>15</td>
-<td>0x0F</td>
-</tr>
-<tr>
-<td>Q</td>
-<td>16</td>
-<td>0x10</td>
-</tr>
-<tr>
-<td>W</td>
-<td>17</td>
-<td>0x11</td>
-</tr>
-<tr>
-<td>E</td>
-<td>18</td>
-<td>0x12</td>
-</tr>
-<tr>
-<td>R</td>
-<td>19</td>
-<td>0x13</td>
-</tr>
-<tr>
-<td>T</td>
-<td>20</td>
-<td>0x14</td>
-</tr>
-<tr>
-<td>Y</td>
-<td>21</td>
-<td>0x15</td>
-</tr>
-<tr>
-<td>U</td>
-<td>22</td>
-<td>0x16</td>
-</tr>
-<tr>
-<td>I</td>
-<td>23</td>
-<td>0x17</td>
-</tr>
-<tr>
-<td>O</td>
-<td>24</td>
-<td>0x18</td>
-</tr>
-<tr>
-<td>P</td>
-<td>25</td>
-<td>0x19</td>
-</tr>
-<tr>
-<td>[ (BracketLeft)</td>
-<td>26</td>
-<td>0x1A</td>
-</tr>
-<tr>
-<td>] (BracketRight)</td>
-<td>27</td>
-<td>0x1B</td>
-</tr>
-<tr>
-<td>\ (Backslash)</td>
-<td>43</td>
-<td>0x2B</td>
-</tr>
-</tbody>
-</table>
-<h3 id="main-keyboard-row-4-asdf">Main Keyboard - Row 4 (ASDF)<a class="headerlink" href="#main-keyboard-row-4-asdf" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Scancode</th>
-<th>Hex</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Caps Lock</td>
-<td>58</td>
-<td>0x3A</td>
-</tr>
-<tr>
-<td>A</td>
-<td>30</td>
-<td>0x1E</td>
-</tr>
-<tr>
-<td>S</td>
-<td>31</td>
-<td>0x1F</td>
-</tr>
-<tr>
-<td>D</td>
-<td>32</td>
-<td>0x20</td>
-</tr>
-<tr>
-<td>F</td>
-<td>33</td>
-<td>0x21</td>
-</tr>
-<tr>
-<td>G</td>
-<td>34</td>
-<td>0x22</td>
-</tr>
-<tr>
-<td>H</td>
-<td>35</td>
-<td>0x23</td>
-</tr>
-<tr>
-<td>J</td>
-<td>36</td>
-<td>0x24</td>
-</tr>
-<tr>
-<td>K</td>
-<td>37</td>
-<td>0x25</td>
-</tr>
-<tr>
-<td>L</td>
-<td>38</td>
-<td>0x26</td>
-</tr>
-<tr>
-<td>; (Semicolon)</td>
-<td>39</td>
-<td>0x27</td>
-</tr>
-<tr>
-<td>' (Quote)</td>
-<td>40</td>
-<td>0x28</td>
-</tr>
-<tr>
-<td>Enter</td>
-<td>28</td>
-<td>0x1C</td>
-</tr>
-</tbody>
-</table>
-<h3 id="main-keyboard-row-5-zxcv">Main Keyboard - Row 5 (ZXCV)<a class="headerlink" href="#main-keyboard-row-5-zxcv" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Scancode</th>
-<th>Hex</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Left Shift</td>
-<td>42</td>
-<td>0x2A</td>
-</tr>
-<tr>
-<td>Z</td>
-<td>44</td>
-<td>0x2C</td>
-</tr>
-<tr>
-<td>X</td>
-<td>45</td>
-<td>0x2D</td>
-</tr>
-<tr>
-<td>C</td>
-<td>46</td>
-<td>0x2E</td>
-</tr>
-<tr>
-<td>V</td>
-<td>47</td>
-<td>0x2F</td>
-</tr>
-<tr>
-<td>B</td>
-<td>48</td>
-<td>0x30</td>
-</tr>
-<tr>
-<td>N</td>
-<td>49</td>
-<td>0x31</td>
-</tr>
-<tr>
-<td>M</td>
-<td>50</td>
-<td>0x32</td>
-</tr>
-<tr>
-<td>, (Comma)</td>
-<td>51</td>
-<td>0x33</td>
-</tr>
-<tr>
-<td>. (Period)</td>
-<td>52</td>
-<td>0x34</td>
-</tr>
-<tr>
-<td>/ (Slash)</td>
-<td>53</td>
-<td>0x35</td>
-</tr>
-<tr>
-<td>Right Shift</td>
-<td>54</td>
-<td>0x36</td>
-</tr>
-</tbody>
-</table>
-<h3 id="main-keyboard-row-6-bottom">Main Keyboard - Row 6 (Bottom)<a class="headerlink" href="#main-keyboard-row-6-bottom" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Scancode</th>
-<th>Hex</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Left Ctrl</td>
-<td>29</td>
-<td>0x1D</td>
-</tr>
-<tr>
-<td>Left Alt</td>
-<td>56</td>
-<td>0x38</td>
-</tr>
-<tr>
-<td>Space</td>
-<td>57</td>
-<td>0x39</td>
-</tr>
-</tbody>
-</table>
-<h3 id="numeric-keypad">Numeric Keypad<a class="headerlink" href="#numeric-keypad" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Scancode</th>
-<th>Hex</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Numpad 7 (Home)</td>
-<td>71</td>
-<td>0x47</td>
-</tr>
-<tr>
-<td>Numpad 8 (Up)</td>
-<td>72</td>
-<td>0x48</td>
-</tr>
-<tr>
-<td>Numpad 9 (PgUp)</td>
-<td>73</td>
-<td>0x49</td>
-</tr>
-<tr>
-<td>Numpad -</td>
-<td>74</td>
-<td>0x4A</td>
-</tr>
-<tr>
-<td>Numpad 4 (Left)</td>
-<td>75</td>
-<td>0x4B</td>
-</tr>
-<tr>
-<td>Numpad 5</td>
-<td>76</td>
-<td>0x4C</td>
-</tr>
-<tr>
-<td>Numpad 6 (Right)</td>
-<td>77</td>
-<td>0x4D</td>
-</tr>
-<tr>
-<td>Numpad +</td>
-<td>78</td>
-<td>0x4E</td>
-</tr>
-<tr>
-<td>Numpad 1 (End)</td>
-<td>79</td>
-<td>0x4F</td>
-</tr>
-<tr>
-<td>Numpad 2 (Down)</td>
-<td>80</td>
-<td>0x50</td>
-</tr>
-<tr>
-<td>Numpad 3 (PgDn)</td>
-<td>81</td>
-<td>0x51</td>
-</tr>
-<tr>
-<td>Numpad 0 (Ins)</td>
-<td>82</td>
-<td>0x52</td>
-</tr>
-<tr>
-<td>Numpad . (Del)</td>
-<td>83</td>
-<td>0x53</td>
-</tr>
-<tr>
-<td>Numpad *</td>
-<td>55</td>
-<td>0x37</td>
-</tr>
-<tr>
-<td>Numpad =</td>
-<td>89</td>
-<td>0x59</td>
-</tr>
-<tr>
-<td>Numpad ,</td>
-<td>126</td>
-<td>0x7E</td>
-</tr>
-</tbody>
-</table>
-<h3 id="lock-keys">Lock Keys<a class="headerlink" href="#lock-keys" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Scancode</th>
-<th>Hex</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Caps Lock</td>
-<td>58</td>
-<td>0x3A</td>
-</tr>
-<tr>
-<td>Scroll Lock</td>
-<td>70</td>
-<td>0x46</td>
-</tr>
-<tr>
-<td>Pause</td>
-<td>69</td>
-<td>0x45</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extended-function-keys-f13-f24">Extended Function Keys (F13-F24)<a class="headerlink" href="#extended-function-keys-f13-f24" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Scancode</th>
-<th>Hex</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>F13</td>
-<td>100</td>
-<td>0x64</td>
-</tr>
-<tr>
-<td>F14</td>
-<td>101</td>
-<td>0x65</td>
-</tr>
-<tr>
-<td>F15</td>
-<td>102</td>
-<td>0x66</td>
-</tr>
-<tr>
-<td>F16</td>
-<td>103</td>
-<td>0x67</td>
-</tr>
-<tr>
-<td>F17</td>
-<td>104</td>
-<td>0x68</td>
-</tr>
-<tr>
-<td>F18</td>
-<td>105</td>
-<td>0x69</td>
-</tr>
-<tr>
-<td>F19</td>
-<td>106</td>
-<td>0x6A</td>
-</tr>
-<tr>
-<td>F20</td>
-<td>107</td>
-<td>0x6B</td>
-</tr>
-<tr>
-<td>F21</td>
-<td>108</td>
-<td>0x6C</td>
-</tr>
-<tr>
-<td>F22</td>
-<td>109</td>
-<td>0x6D</td>
-</tr>
-<tr>
-<td>F23</td>
-<td>110</td>
-<td>0x6E</td>
-</tr>
-<tr>
-<td>F24</td>
-<td>118</td>
-<td>0x76</td>
-</tr>
-</tbody>
-</table>
-<h3 id="international-keys">International Keys<a class="headerlink" href="#international-keys" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Scancode</th>
-<th>Hex</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>IntlBackslash</td>
-<td>86</td>
-<td>0x56</td>
-</tr>
-<tr>
-<td>IntlRo</td>
-<td>115</td>
-<td>0x73</td>
-</tr>
-<tr>
-<td>IntlYen</td>
-<td>125</td>
-<td>0x7D</td>
-</tr>
-<tr>
-<td>KanaMode</td>
-<td>112</td>
-<td>0x70</td>
-</tr>
-<tr>
-<td>Convert</td>
-<td>121</td>
-<td>0x79</td>
-</tr>
-<tr>
-<td>NonConvert</td>
-<td>123</td>
-<td>0x7B</td>
-</tr>
-</tbody>
-</table>
-<h2 id="extended-scancodes-e0-prefix">Extended Scancodes (E0 Prefix)<a class="headerlink" href="#extended-scancodes-e0-prefix" title="Permanent link">&para;</a></h2>
-<p>Extended keys require a 0xE0 prefix byte. When using the <code>key_scancode</code> message,
-send <code>[0xE0, scancode]</code> for press and <code>[0xE0, scancode | 0x80]</code> for release.</p>
-<p>When using <code>key_down</code>/<code>key_up</code> messages, the scancode is encoded as:
-<code>0xE0 | (scancode &lt;&lt; 8)</code></p>
-<h3 id="navigation-keys">Navigation Keys<a class="headerlink" href="#navigation-keys" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Extended Code</th>
-<th>Bytes (Press)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Insert</td>
-<td>0x52</td>
-<td>E0 52</td>
-</tr>
-<tr>
-<td>Delete</td>
-<td>0x53</td>
-<td>E0 53</td>
-</tr>
-<tr>
-<td>Home</td>
-<td>0x47</td>
-<td>E0 47</td>
-</tr>
-<tr>
-<td>End</td>
-<td>0x4F</td>
-<td>E0 4F</td>
-</tr>
-<tr>
-<td>Page Up</td>
-<td>0x49</td>
-<td>E0 49</td>
-</tr>
-<tr>
-<td>Page Down</td>
-<td>0x51</td>
-<td>E0 51</td>
-</tr>
-</tbody>
-</table>
-<h3 id="arrow-keys">Arrow Keys<a class="headerlink" href="#arrow-keys" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Extended Code</th>
-<th>Bytes (Press)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Up Arrow</td>
-<td>0x48</td>
-<td>E0 48</td>
-</tr>
-<tr>
-<td>Down Arrow</td>
-<td>0x50</td>
-<td>E0 50</td>
-</tr>
-<tr>
-<td>Left Arrow</td>
-<td>0x4B</td>
-<td>E0 4B</td>
-</tr>
-<tr>
-<td>Right Arrow</td>
-<td>0x4D</td>
-<td>E0 4D</td>
-</tr>
-</tbody>
-</table>
-<h3 id="right-side-modifier-keys">Right-Side Modifier Keys<a class="headerlink" href="#right-side-modifier-keys" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Extended Code</th>
-<th>Bytes (Press)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Right Ctrl</td>
-<td>0x1D</td>
-<td>E0 1D</td>
-</tr>
-<tr>
-<td>Right Alt</td>
-<td>0x38</td>
-<td>E0 38</td>
-</tr>
-<tr>
-<td>Left Meta (Windows)</td>
-<td>0x5B</td>
-<td>E0 5B</td>
-</tr>
-<tr>
-<td>Right Meta (Windows)</td>
-<td>0x5C</td>
-<td>E0 5C</td>
-</tr>
-<tr>
-<td>Context Menu</td>
-<td>0x5D</td>
-<td>E0 5D</td>
-</tr>
-</tbody>
-</table>
-<h3 id="numpad-extended-keys">Numpad Extended Keys<a class="headerlink" href="#numpad-extended-keys" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Extended Code</th>
-<th>Bytes (Press)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Numpad Enter</td>
-<td>0x1C</td>
-<td>E0 1C</td>
-</tr>
-<tr>
-<td>Numpad /</td>
-<td>0x35</td>
-<td>E0 35</td>
-</tr>
-<tr>
-<td>Num Lock</td>
-<td>0x45</td>
-<td>E0 45</td>
-</tr>
-<tr>
-<td>Pause</td>
-<td>0x46</td>
-<td>E0 46</td>
-</tr>
-<tr>
-<td>Print Screen</td>
-<td>0x37</td>
-<td>E0 37</td>
-</tr>
-</tbody>
-</table>
-<h3 id="media-keys">Media Keys<a class="headerlink" href="#media-keys" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Extended Code</th>
-<th>Bytes (Press)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Volume Mute</td>
-<td>0x20</td>
-<td>E0 20</td>
-</tr>
-<tr>
-<td>Volume Down</td>
-<td>0x2E</td>
-<td>E0 2E</td>
-</tr>
-<tr>
-<td>Volume Up</td>
-<td>0x30</td>
-<td>E0 30</td>
-</tr>
-<tr>
-<td>Media Play/Pause</td>
-<td>0x22</td>
-<td>E0 22</td>
-</tr>
-<tr>
-<td>Media Stop</td>
-<td>0x24</td>
-<td>E0 24</td>
-</tr>
-<tr>
-<td>Media Previous</td>
-<td>0x10</td>
-<td>E0 10</td>
-</tr>
-<tr>
-<td>Media Next</td>
-<td>0x19</td>
-<td>E0 19</td>
-</tr>
-<tr>
-<td>Media Select</td>
-<td>0x6D</td>
-<td>E0 6D</td>
-</tr>
-</tbody>
-</table>
-<h3 id="browser-keys">Browser Keys<a class="headerlink" href="#browser-keys" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Extended Code</th>
-<th>Bytes (Press)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Browser Home</td>
-<td>0x32</td>
-<td>E0 32</td>
-</tr>
-<tr>
-<td>Browser Back</td>
-<td>0x6A</td>
-<td>E0 6A</td>
-</tr>
-<tr>
-<td>Browser Forward</td>
-<td>0x69</td>
-<td>E0 69</td>
-</tr>
-<tr>
-<td>Browser Refresh</td>
-<td>0x67</td>
-<td>E0 67</td>
-</tr>
-<tr>
-<td>Browser Stop</td>
-<td>0x68</td>
-<td>E0 68</td>
-</tr>
-<tr>
-<td>Browser Search</td>
-<td>0x65</td>
-<td>E0 65</td>
-</tr>
-<tr>
-<td>Browser Favorites</td>
-<td>0x66</td>
-<td>E0 66</td>
-</tr>
-</tbody>
-</table>
-<h3 id="application-launch-keys">Application Launch Keys<a class="headerlink" href="#application-launch-keys" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Extended Code</th>
-<th>Bytes (Press)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Launch App 1 (My Computer)</td>
-<td>0x6B</td>
-<td>E0 6B</td>
-</tr>
-<tr>
-<td>Launch App 2 (Calculator)</td>
-<td>0x21</td>
-<td>E0 21</td>
-</tr>
-<tr>
-<td>Launch Mail</td>
-<td>0x6C</td>
-<td>E0 6C</td>
-</tr>
-<tr>
-<td>Power</td>
-<td>0x5E</td>
-<td>E0 5E</td>
-</tr>
-</tbody>
-</table>
-<h2 id="example-typing-hello">Example: Typing "Hello"<a class="headerlink" href="#example-typing-hello" title="Permanent link">&para;</a></h2>
-<p>Using <code>key_scancode</code> messages:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>H press:   [0x2A, 0x23]     (Shift down, H down)
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>H release: [0xA3, 0xAA]     (H up, Shift up)
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>e press:   [0x12]           (E down)
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>e release: [0x92]           (E up)
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>l press:   [0x26]           (L down)
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>l release: [0xA6]           (L up)
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>l press:   [0x26]           (L down)
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>l release: [0xA6]           (L up)
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>o press:   [0x18]           (O down)
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>o release: [0x98]           (O up)
+<h1 id="implementing-info-and-check-subcommands-for-occystrap">Implementing <code>info</code> and <code>check</code> subcommands for occystrap<a class="headerlink" href="#implementing-info-and-check-subcommands-for-occystrap" title="Permanent link">&para;</a></h1>
+<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
+<p>Before responding to questions or discussion points in this
+document, explore the occystrap codebase thoroughly. Read relevant
+source files, understand existing patterns (project structure,
+command-line argument handling, input source abstractions, output
+formatting, error handling), and ground your answers in what the
+code actually does today. Do not speculate about the codebase when
+you could read it instead. Where a question touches on external
+concepts (OCI image specs, Docker/Podman compatibility, registry
+APIs), research as needed to give a confident answer. Flag any
+uncertainty explicitly rather than guessing.</p>
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p>I am trying something new with this document -- having a
+conversation with Claude in a document instead of chat, and then
+using the document as the implementation plan instead of having
+Claude generate one to execute. Perhaps this is more "human in
+the loop", but perhaps it is also "weird and inefficient". We'll
+see I suppose.</p>
+<p>This document is partially modelled on the western military
+process of SMEAC OPORDs because I think the structure looks super
+useful in general.</p>
+<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p><code>occystrap</code>'s <code>process</code> command now supports some fairly
+complicated content manipulation features like filtering and
+changing timestamps. I'd like to implement more of those as the
+need arises, but I am left thinking that its hard to catch bugs
+in <code>occystrap</code>'s output. Its not a simple container converter
+any more.</p>
+<p>A recent example which raised this concern for me is this error
+I am seeing in CI when using a docker local API -&gt; filtration -&gt;
+registry push flow:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Unknown error message: wrong diff id
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>&quot;sha256:9002b1c0c97baaa58d3bd29d02114743adaee9b3e601ededf6f65b138aae01df&quot;
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>calculated on extraction
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>&quot;sha256:123a078714d5ea9382d4d9f550753aefce8b34ec5ae11ae8273038d3bcbb943f&quot;,
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>desc &quot;sha256:2914167652f8241cc96f909543ca0f525f067170ff80482695d1094d84abefea&quot;
 </code></pre></div>
-<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<p>Now we could fix that one specific bug, but I am more interested
+in ways we could ensure we don't have bugs like this <strong>ever</strong>. We
+could for example pull the image we just pushed to the registry
+in this example and then validate that the image is correct.</p>
+<p>I am therefore proposing <code>occystrap</code>'s expansion to have two more
+subcommands apart from <code>process</code>, at least partially inspired by
+<code>qemu-img</code>.</p>
+<h3 id="occystrap-info"><code>occystrap info</code><a class="headerlink" href="#occystrap-info" title="Permanent link">&para;</a></h3>
+<p>This subcommand would dump information about a given image to the
+console in one of two formats -- human readable, and machine
+friendly JSON depending on a global output flag. That output flag
+should also be retrofitted to <code>process</code> so might well exist at
+the logging layer.</p>
+<p>The subcommand would support all of the input sources that
+<code>process</code> currently supports.</p>
+<h3 id="occystrap-check"><code>occystrap check</code><a class="headerlink" href="#occystrap-check" title="Permanent link">&para;</a></h3>
+<p>This command would perform an in-depth check of the validity of
+the image: whether compression is supported; if the image will
+only work on certain versions of Docker or Podman; if the manifest
+elements all exist; etc etc. Literally everything we can think of.
+It too would support both human and JSON output, and reuse the
+<code>process</code> input sources.</p>
+<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<h3 id="do-existing-tools-already-cover-info-and-check">Do existing tools already cover info and check?<a class="headerlink" href="#do-existing-tools-already-cover-info-and-check" title="Permanent link">&para;</a></h3>
+<p><strong>Inspection tools:</strong> <code>skopeo inspect</code> dumps image metadata as
+JSON (digests, tags, creation date, architecture, layers).
+<code>crane manifest</code> and <code>crane config</code> dump raw manifest and config
+blobs. <code>regctl image inspect</code> is similar. These are adequate for
+raw data but none present a concise human-readable summary
+tailored to occystrap's use cases (e.g., "this image has 5
+layers, 2 of which use zstd compression, total uncompressed size
+is 340MB").</p>
+<p><strong>Validation tools:</strong> <code>crane validate</code> is the strongest existing
+validator. It checks compressed layer digests against manifest
+entries, uncompressed layer digests (diff_ids) against the config
+blob, and the config blob's own digest against the manifest's
+config descriptor. However, it has gaps that matter for
+occystrap's layer manipulation:</p>
 <ul>
-<li><a href="https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values">MDN Keyboard Event Code Values</a></li>
-<li><a href="https://gitlab.freedesktop.org/nicholasbishop/nicholasbishop-spice-html5/-/blob/main/src/code_to_scancode.js">spice-html5 scancode mapping</a></li>
-<li><a href="/components/kerbside/channel-protocols/#inputs-channel-type-3">Inputs Channel Protocol</a></li>
+<li>It does not check that the history array in the config is
+  consistent with the layer count (non-empty history entries
+  should equal the number of layers). When occystrap filters
+  layers, it must also filter history entries -- no tool
+  validates this.</li>
+<li>It does not verify that the declared mediaType matches the
+  actual compression format of the blob (e.g., manifest says
+  gzip but blob is actually zstd). This is a real-world
+  interoperability trap.</li>
+<li>It does not check whiteout file preservation -- if occystrap's
+  exclude filter accidentally removes <code>.wh.*</code> entries, the
+  filesystem semantics are silently corrupted.</li>
+<li>It does not warn about Docker-vs-Podman compatibility issues
+  (media type differences, <code>ArgsEscaped</code> deprecation, zstd
+  support requirements).</li>
 </ul>
-<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
+<p><strong>Conclusion:</strong> Implementing <code>info</code> and <code>check</code> in occystrap is
+justified. <code>crane validate</code> should be used in the test suite as
+a baseline sanity check on occystrap's output, while
+<code>occystrap check</code> adds the deeper, manipulation-aware checks
+that crane misses. <code>diffoci</code> (a semantic image comparison tool)
+could also be useful for regression testing.</p>
+<h3 id="what-information-should-info-display">What information should info display?<a class="headerlink" href="#what-information-should-info-display" title="Permanent link">&para;</a></h3>
 <ul>
-<li><a href="/components/kerbside/channel-protocols/">Channel Protocols</a> - Inputs channel message formats</li>
-<li><a href="/components/kerbside/capabilities/">Capabilities</a> - KeyScancode capability negotiation</li>
-<li><a href="/components/kerbside/protocol-overview/">Protocol Overview</a> - High-level SPICE protocol</li>
+<li>Image name and tag</li>
+<li>Manifest digest and schema version</li>
+<li>Media type (Docker v2 vs OCI) and what that implies for
+  compatibility</li>
+<li>Architecture, OS, and variant</li>
+<li>Config digest and creation timestamp</li>
+<li>Number of layers, total compressed size, total uncompressed
+  size</li>
+<li>Per-layer summary: index, compressed digest, diff_id,
+  compressed size, compression format (detected from mediaType
+  and/or blob magic bytes), and the corresponding history
+  entry's <code>created_by</code> command (if present)</li>
+<li>Number of history entries and how many are <code>empty_layer: true</code></li>
+<li>Labels, environment variables, entrypoint/cmd, working
+  directory, exposed ports, volumes</li>
 </ul>
+<h3 id="what-things-should-check-validate">What things should check validate?<a class="headerlink" href="#what-things-should-check-validate" title="Permanent link">&para;</a></h3>
+<p><strong>Structural integrity (things that make an image invalid):</strong></p>
+<ol>
+<li><code>len(manifest.layers) == len(config.rootfs.diff_ids)</code> --
+   layer count matches diff_id count</li>
+<li>For each layer:
+   <code>sha256(compressed_blob) == manifest.layers[i].digest</code> --
+   compressed digest matches</li>
+<li>For each layer:
+   <code>sha256(uncompressed_blob) == config.rootfs.diff_ids[i]</code> --
+   diff_id matches</li>
+<li><code>sha256(config_blob) == manifest.config.digest</code> and
+   <code>len(config_blob) == manifest.config.size</code> -- config
+   descriptor is correct</li>
+<li><code>config.rootfs.type == "layers"</code></li>
+<li><code>manifest.schemaVersion == 2</code></li>
+</ol>
+<p><strong>History consistency (things that cause subtle runtime bugs):</strong></p>
+<ol>
+<li>Number of history entries with <code>empty_layer != true</code> equals
+   <code>len(manifest.layers)</code></li>
+<li>History entries are in the same order as layers</li>
+</ol>
+<p><strong>Compression and compatibility (interoperability failures):</strong></p>
+<ol>
+<li>Declared mediaType matches actual compression format of each
+   layer blob (detect gzip vs zstd vs uncompressed from magic
+   bytes)</li>
+<li>If any layer uses zstd: warn that Docker Engine &lt; 20.10 and
+    containerd &lt; 1.5 will not be able to pull this image</li>
+<li>If manifest uses OCI media types: note that older Docker
+    versions may not handle this correctly</li>
+<li>If manifest uses Docker v2 media types: note that some
+    OCI-only tooling may not handle this</li>
+</ol>
+<p><strong>Filesystem integrity (corrupt container filesystem view):</strong></p>
+<ol>
+<li>Whiteout files (<code>.wh.*</code> and <code>.wh..wh..opq</code>) are well-formed</li>
+<li>Layer tar entries have consistent headers (no negative
+    timestamps, reasonable permissions)</li>
+</ol>
+<p><strong>Warnings (not errors, but worth reporting):</strong></p>
+<ol>
+<li>Unreasonably large layers (&gt; 1GB compressed)</li>
+<li>Duplicate files across layers that could indicate missed
+    deduplication opportunities</li>
+<li><code>config.ArgsEscaped</code> is set (Docker-specific, deprecated
+    in OCI)</li>
+</ol>
+<h3 id="should-process-be-called-convert">Should process be called convert?<a class="headerlink" href="#should-process-be-called-convert" title="Permanent link">&para;</a></h3>
+<p>No. <code>process</code> is more accurate -- it does filtering, timestamp
+normalization, searching, and inspection, not just format
+conversion. Renaming would also break existing users. The
+<code>qemu-img</code> analogy is useful for <code>info</code> and <code>check</code> but doesn't
+need to extend to renaming <code>process</code>.</p>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<h3 id="shared-prerequisite-output-formatting-done">Shared prerequisite: output formatting (done)<a class="headerlink" href="#shared-prerequisite-output-formatting-done" title="Permanent link">&para;</a></h3>
+<p>Both <code>info</code> and <code>check</code> need human-readable and JSON output
+modes. The <code>search</code> command already has <code>--script-friendly</code> but
+it's implemented ad-hoc with <code>click.echo</code> calls. We should
+introduce a lightweight output abstraction before implementing
+either command.</p>
+<p><strong>Approach:</strong> Add a <code>--output-format</code> / <code>-O</code> option to the CLI
+group in <code>main.py</code> (choices: <code>text</code>, <code>json</code>; default: <code>text</code>).
+Store it in the Click context so subcommands can access it via
+<code>ctx.obj</code>. This also makes it available to <code>process</code> and <code>search</code>
+if we want to retrofit them later.</p>
+<p>The formatting logic itself can be minimal -- a helper function
+that takes a dict/list and either pretty-prints it as a table
+(using <code>prettytable</code>, already a dependency) or dumps it as JSON.
+No need for a class hierarchy.</p>
+<p><strong>Files touched:</strong> <code>occystrap/main.py</code> (add option to <code>cli</code>
+group).</p>
+<p><strong>Status:</strong> Implemented. The <code>-O</code>/<code>--output-format</code> option is on
+the <code>cli</code> group, stored in <code>ctx.obj['OUTPUT_FORMAT']</code>. No
+existing commands use it yet -- <code>info</code> will be the first
+consumer.</p>
+<h3 id="implementation-plan-for-info-done">Implementation plan for <code>info</code> (done)<a class="headerlink" href="#implementation-plan-for-info-done" title="Permanent link">&para;</a></h3>
+<p><strong>Step 1:</strong> Add <code>info</code> command to <code>main.py</code>. It takes a single
+<code>SOURCE</code> argument (URI string) using the same pattern as
+<code>process</code>. Reuse <code>uri.parse_uri()</code> and <code>pipeline.py</code>'s
+<code>build_input()</code> to construct an <code>ImageInput</code>.</p>
+<p><strong>Step 2:</strong> Add <code>get_manifest()</code> and <code>get_config()</code> methods to
+the <code>ImageInput</code> base class (default: return <code>None</code>). These
+fetch metadata without downloading layer blobs.</p>
+<p><strong>Step 3:</strong> Implement <code>get_manifest()</code> and <code>get_config()</code> in
+each input source:</p>
+<ul>
+<li><strong>Registry:</strong> <code>get_manifest()</code> fetches the distribution
+  manifest via HTTP (resolving multi-arch manifest lists).
+  <code>get_config()</code> fetches the config blob using the digest
+  from the manifest. Both are cached on the input object.</li>
+<li><strong>Tarfile:</strong> <code>get_config()</code> reads the config blob from
+  the tarball without extracting layers. <code>get_manifest()</code>
+  returns <code>None</code> (docker-save format has no distribution
+  manifest).</li>
+<li><strong>Docker:</strong> <code>get_config()</code> calls the Docker inspect API
+  and transforms the result to OCI config format.
+  <code>get_manifest()</code> returns <code>None</code>.</li>
+<li><strong>Dockerpush:</strong> Both return <code>None</code> (not meaningful
+  without performing a full push).</li>
+</ul>
+<p><strong>Step 4:</strong> Format and display the output using the shared
+output formatting helper. Human-readable output uses
+<code>prettytable</code> for the per-layer table and plain text for
+summary fields. JSON output is a single dict with all fields.</p>
+<p><strong>Files touched:</strong> <code>occystrap/main.py</code> (new command,
+<code>_build_info</code>, <code>_format_size</code>, <code>_print_info_text</code> helpers),
+<code>occystrap/inputs/base.py</code> (add <code>get_manifest()</code> and
+<code>get_config()</code>), <code>occystrap/inputs/registry.py</code> (implement
+both), <code>occystrap/inputs/docker.py</code> (implement <code>get_config()</code>),
+<code>occystrap/inputs/tarfile.py</code> (implement <code>get_config()</code>).</p>
+<p><strong>Scope decision:</strong> <code>info</code> does not download layer blobs. It
+works from the manifest and config alone. This means it reports
+compressed sizes from manifest descriptors but cannot report
+uncompressed sizes (those would require downloading and
+decompressing every layer). This is the same trade-off
+<code>crane validate --fast</code> makes.</p>
+<p><strong>Status:</strong> Implemented. The <code>info</code> command works with
+<code>registry://</code>, <code>docker://</code>, and <code>tar://</code> sources. Registry
+sources show full detail (compressed sizes, mediaTypes,
+compression format). Docker and tarball sources show
+config-derived info (architecture, OS, diff_ids, history,
+labels, env, etc.). 19 unit tests cover the implementation.</p>
+<h3 id="implementation-plan-for-check">Implementation plan for <code>check</code><a class="headerlink" href="#implementation-plan-for-check" title="Permanent link">&para;</a></h3>
+<p><strong>Step 1:</strong> Add <code>check</code> command to <code>main.py</code>. Same <code>SOURCE</code>
+argument and input selection as <code>info</code>.</p>
+<p><strong>Step 2:</strong> Implement a <code>CheckResult</code> dataclass or simple dict
+structure to accumulate errors, warnings, and informational
+messages. Each check produces entries tagged with a severity
+(error, warning, info) and a human-readable description.</p>
+<p><strong>Step 3:</strong> Implement the structural integrity checks (items 1-6
+from the check list above). These require both the manifest and
+the config blob. Items 2-3 (digest verification) require
+downloading and hashing every layer -- this makes <code>check</code> a slow
+operation by design. Add a <code>--fast</code> flag that skips layer
+download and only checks metadata consistency (items 1, 4, 5, 6,
+7, 8, and the compatibility warnings).</p>
+<p><strong>Step 4:</strong> Implement the history consistency checks (items 7-8).</p>
+<p><strong>Step 5:</strong> Implement the compression and compatibility checks
+(items 9-12). Item 9 requires reading the first few bytes of
+each layer blob to detect the actual compression format (gzip
+magic: <code>\x1f\x8b</code>, zstd magic: <code>\x28\xb5\x2f\xfd</code>). This can
+piggyback on the layer download in step 3.</p>
+<p><strong>Step 6:</strong> Implement the filesystem integrity checks
+(items 13-14). These require decompressing layers and scanning
+tar entries. This also piggybacks on the layer download.</p>
+<p><strong>Step 7:</strong> Implement the warnings (items 15-17). These are
+derived from data already collected in earlier steps.</p>
+<p><strong>Step 8:</strong> Format and display results using the shared output
+formatting helper. Human-readable output should group by severity
+(errors first, then warnings, then info). JSON output should be
+a structured list of check results. Exit code should be non-zero
+if any errors were found (useful for CI integration).</p>
+<p><strong>Files touched:</strong> <code>occystrap/main.py</code> (new command), potentially
+a new <code>occystrap/check.py</code> module for the check logic if it grows
+large enough to warrant separation from <code>main.py</code>.</p>
+<h3 id="testing-strategy">Testing strategy<a class="headerlink" href="#testing-strategy" title="Permanent link">&para;</a></h3>
+<p><strong>For <code>info</code>:</strong> Create test images with known properties (specific
+layer counts, compression formats, labels, history entries) and
+verify <code>info</code>'s JSON output matches expected values. The JSON
+output mode makes this straightforward -- parse the output and
+assert on fields.</p>
+<p><strong>For <code>check</code>:</strong> We need images with known defects. Create these
+programmatically in test fixtures:</p>
+<ul>
+<li>An image where <code>manifest.layers</code> has more entries than
+  <code>config.rootfs.diff_ids</code> (layer count mismatch)</li>
+<li>An image where a layer's compressed digest doesn't match the
+  manifest (corrupt digest)</li>
+<li>An image where the config blob's digest doesn't match the
+  manifest's config descriptor (stale config reference)</li>
+<li>An image where history entries don't align with layers</li>
+<li>An image with mismatched mediaType vs actual compression</li>
+</ul>
+<p>Also run <code>check</code> against known-good images produced by <code>process</code>
+to verify they pass cleanly. This is the CI integration use case
+from the problem statement -- after <code>process</code> produces an image,
+<code>check</code> validates it.</p>
+<p><strong>Existing test infrastructure:</strong> The project uses
+testtools/stestr with tox. New tests should follow the existing
+patterns in <code>occystrap/tests/</code>. Functional tests that require
+actual Docker/registry interaction go in
+<code>deploy/occystrap_ci/tests/</code>.</p>
+<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
+<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
+<p>We will know when this plan has been successfully implemented
+because the following statements will be true:</p>
+<ul>
+<li>There are unit and functional tests for these features.</li>
+<li>There are a test suite of sample container images in
+  <code>shakenfist/occystrap-testdata</code> that exercises these features
+  and ensures they work correctly, including that their output
+  agrees with other comparable tooling.</li>
+<li>Functional testing leverages these new commands to ensure
+  that other <code>occystrap</code> commands produce valid output.</li>
+<li>Unit and functional tests pass.</li>
+<li>Documentation in <code>docs/</code> has been updated to describe these
+  new features and how we use them.</li>
+</ul>
+<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
+<p>We should list obvious extensions, known issues, unrelated bugs
+we encountered, and anything else we should one day do but have
+chosen to defer to here so that we don't forget them.</p>
+<ul>
+<li><strong>Multi-architecture index validation:</strong> <code>check</code> initially
+  targets single-platform manifests. Validating image indexes
+  (fat manifests) -- ensuring all platform entries point to valid
+  manifests with matching architecture/OS fields -- is a natural
+  extension.</li>
+<li><strong>Retrofit <code>--output-format</code> to <code>process</code> and <code>search</code>:</strong> Once
+  the output formatting infrastructure exists, the <code>search</code>
+  command's ad-hoc <code>--script-friendly</code> flag could be replaced
+  with the shared mechanism, and <code>process</code> could gain structured
+  JSON progress reporting.</li>
+<li><strong><code>check</code> as a post-<code>process</code> pipeline stage:</strong> Consider
+  allowing <code>process</code> to automatically run <code>check</code> on its output
+  (e.g., <code>--verify</code> flag). This directly addresses the CI use
+  case from the problem statement without requiring a separate
+  invocation.</li>
+<li><strong>Remote-only fast checks for registries:</strong> When the input is
+  a registry, <code>check --fast</code> could use HEAD requests to verify
+  blob existence without downloading anything, similar to how
+  the registry output's <code>fetch_callback</code> already works.</li>
+<li><strong><code>regctl image mod</code> as a reference comparison:</strong> <code>regctl</code>
+  provides similar manipulation capabilities (timestamps,
+  compression, format conversion). Its output could be used as
+  a reference in tests to verify occystrap produces equivalent
+  results.</li>
+</ul>
+<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Flaky <code>test_upload_blob_new</code>:</strong> <code>test_process_config_file</code>
+  submitted config upload to a <code>ThreadPoolExecutor</code> but never
+  called <code>finalize()</code> or shut down the executor. Under certain
+  timing, the upload thread outlived its mock scope and inflated
+  call counts in subsequent tests. Fixed by adding
+  <code>writer._executor.shutdown(wait=True)</code> to the test.</li>
+</ul>
+<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
+<p>Before executing any step of this plan, please back brief the
+operator as to your understanding of the plan and how the work
+you intend to do aligns with that plan.</p>
 
 
 
@@ -4935,7 +4218,7 @@ send <code>[0xE0, scancode]</code> for press and <code>[0xE0, scancode | 0x80]</
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/kerbside/scancodes.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/kerbside/scancodes.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/kerbside/scancodes/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/occystrap/plans/PLAN-info-check.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/occystrap/plans/PLAN-info-check.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/occystrap/plans/PLAN-info-check/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
@@ -4976,10 +4259,10 @@ send <code>[0xE0, scancode]</code> for press and <code>[0xE0, scancode | 0x80]</
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": [], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
