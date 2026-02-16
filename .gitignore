@@ -145,5 +145,5 @@ deploy/gitrepos/
 # Generated version file
 shakenfist/_version.py
 
-# Claude planning files
-PLAN-*.md
+# Claude planning files (root only, not synced docs)
+/PLAN-*.md
