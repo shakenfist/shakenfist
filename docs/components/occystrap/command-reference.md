@@ -138,6 +138,76 @@ occystrap --architecture arm64 --variant v8 \
     info registry://docker.io/library/busybox:latest
 ```
 
+### check
+
+Check validity of a container image. Validates structural integrity,
+history consistency, compression compatibility, and filesystem
+correctness. Use `--fast` to skip layer downloads and only check
+metadata consistency.
+
+```bash
+occystrap check SOURCE [--fast]
+```
+
+**Arguments:**
+
+- `SOURCE` - Input URI specifying the image to check
+
+**Options:**
+
+- `--fast` - Skip layer download, check metadata only (manifest and
+  config consistency)
+
+**Output format** is controlled by the global `-O` / `--output-format`
+option (`text` or `json`).
+
+**Exit code** is non-zero if any errors are found (useful for CI).
+
+**Fast mode checks** (metadata only, no layer download):
+
+| Check | Description |
+|-------|-------------|
+| Schema version | `schemaVersion` must be 2 |
+| Rootfs type | `rootfs.type` must be `"layers"` |
+| Layer count | Manifest layer count must match config diff_id count |
+| Config descriptor | Manifest must have a config descriptor |
+| History count | Non-empty history entries must equal layer count |
+| zstd compatibility | Warns if zstd layers present (needs Docker 20.10+) |
+| Media type info | Reports OCI vs Docker v2 media types |
+| Large layers | Warns if any layer exceeds 1 GB compressed |
+| ArgsEscaped | Warns if deprecated `ArgsEscaped` is set |
+
+**Full mode** (default, downloads all layers) adds:
+
+| Check | Description |
+|-------|-------------|
+| Config digest | Config blob SHA256 matches manifest descriptor |
+| Config size | Config blob size matches manifest descriptor |
+| Diff IDs | Decompressed layer SHA256 matches config diff_ids |
+| Tar validity | Each layer is a valid tar archive |
+| Whiteout files | `.wh.*` entries are well-formed |
+| Tar headers | No negative timestamps or dangerous permissions |
+| Duplicate files | Warns about files appearing in multiple layers |
+
+**Examples:**
+
+```bash
+# Full check from registry
+occystrap check registry://docker.io/library/busybox:latest
+
+# Fast metadata-only check
+occystrap check --fast registry://docker.io/library/busybox:latest
+
+# JSON output for CI integration
+occystrap -O json check registry://docker.io/library/busybox:latest
+
+# Check a tarball
+occystrap check tar://image.tar
+
+# Check local Docker image
+occystrap check docker://myimage:v1
+```
+
 ## Input URI Schemes
 
 ### registry://

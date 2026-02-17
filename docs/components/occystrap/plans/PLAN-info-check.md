@@ -278,7 +278,7 @@ compression format). Docker and tarball sources show
 config-derived info (architecture, OS, diff_ids, history,
 labels, env, etc.). 19 unit tests cover the implementation.
 
-### Implementation plan for `check`
+### Implementation plan for `check` (done)
 
 **Step 1:** Add `check` command to `main.py`. Same `SOURCE`
 argument and input selection as `info`.
@@ -317,11 +317,21 @@ formatting helper. Human-readable output should group by severity
 a structured list of check results. Exit code should be non-zero
 if any errors were found (useful for CI integration).
 
-**Files touched:** `occystrap/main.py` (new command), potentially
-a new `occystrap/check.py` module for the check logic if it grows
-large enough to warrant separation from `main.py`.
+**Files touched:** `occystrap/main.py` (new command),
+`occystrap/check.py` (check logic module).
 
-### Testing strategy
+**Status:** Implemented (steps 1-8). The `check` command works
+with `registry://`, `docker://`, and `tar://` sources. Fast mode
+checks metadata consistency (schema version, rootfs type, layer
+count, history count, compression compatibility, ArgsEscaped).
+Full mode additionally verifies config digest/size, layer
+diff_ids, tar validity, whiteout files, and tar headers. Checks
+not yet implemented: compressed blob digest verification (item 2,
+already handled by input sources during download) and compression
+magic vs mediaType verification (item 9, requires raw blob
+access). 30 unit tests cover the implementation.
+
+### Testing strategy (done)
 
 **For `info`:** Create test images with known properties (specific
 layer counts, compression formats, labels, history entries) and
@@ -351,6 +361,18 @@ testtools/stestr with tox. New tests should follow the existing
 patterns in `occystrap/tests/`. Functional tests that require
 actual Docker/registry interaction go in
 `deploy/occystrap_ci/tests/`.
+
+**Status:** Implemented. Unit tests cover both `info` (19 tests
+in `occystrap/tests/test_info.py`) and `check` (30 tests in
+`occystrap/tests/test_check.py`) with synthetic images
+containing known properties and defects. Functional tests in
+`deploy/occystrap_ci/tests/test_info.py` (6 tests) and
+`deploy/occystrap_ci/tests/test_check.py` (12 tests) validate
+against real images (busybox, ubuntu) in the CI local registry.
+The functional check tests include the core CI use case:
+process with filters (normalize-timestamps, exclude, combined),
+then check the output passes full validation. Registry
+roundtrip validation is also covered.
 
 ## Administration and logistics
 
@@ -400,9 +422,36 @@ chosen to defer to here so that we don't forget them.
   compression, format conversion). Its output could be used as
   a reference in tests to verify occystrap produces equivalent
   results.
+* **Compressed blob digest verification (check item 2):**
+  `check` does not independently verify that
+  `sha256(compressed_blob) == manifest.layers[i].digest`
+  because the input sources already verify this during
+  download. If we want `check` to be a standalone validator
+  (e.g., for images not fetched by occystrap), we'd need raw
+  blob access before the input source decompresses them.
+* **Compression magic vs mediaType verification (check item
+  9):** Verifying that a layer's actual compression format
+  (detected from magic bytes) matches the declared mediaType
+  requires reading the first few bytes of the raw compressed
+  blob. The current `fetch()` interface yields decompressed
+  data, so this check needs either a new raw-blob accessor or
+  integration at the input source level.
 
 ### Bugs fixed during this work
 
+* **Config diff_ids not updated after filtering:** When
+  `process` applies content-modifying filters (e.g.,
+  `normalize-timestamps`, `exclude`), the layer data changes
+  (and thus its SHA256 diff_id), but the config blob was passed
+  through with the original diff_ids. `check` correctly
+  detected this as a diff-id mismatch. Fixed by adding config
+  buffering and diff_id tracking to the `ImageFilter` base
+  class (`occystrap/filters/base.py`). Content-modifying
+  filters now buffer the config element, record new diff_ids
+  as layers are processed, and forward the updated config in
+  `finalize()`. This is the exact class of bug that motivated
+  the `check` command in the first place (see the "wrong
+  diff id" error in the problem statement).
 * **Flaky `test_upload_blob_new`:** `test_process_config_file`
   submitted config upload to a `ThreadPoolExecutor` but never
   called `finalize()` or shut down the executor. Under certain

@@ -334,6 +334,35 @@ done
 echo "Image passed security check"
 ```
 
+### Validate Image Integrity in CI
+
+```bash
+#!/bin/bash
+# validate-image.sh - Validate image after processing
+
+# Process image with filters
+occystrap process docker://myapp:v1 tar://output.tar \
+    -f normalize-timestamps \
+    -f "exclude:pattern=**/__pycache__/**"
+
+# Fast metadata check (no layer download)
+occystrap check --fast tar://output.tar
+
+# Full integrity check (verifies diff_ids, tar validity)
+occystrap -O json check tar://output.tar | jq .errors
+# Exit code is non-zero if errors found
+```
+
+### Inspect Image Metadata
+
+```bash
+# Quick overview of a registry image
+occystrap info registry://docker.io/library/python:3.11
+
+# JSON output for scripting
+occystrap -O json info docker://myapp:v1 | jq '.layer_count, .architecture'
+```
+
 ## Debugging
 
 Troubleshoot issues with verbose output.
