@@ -1761,10 +1761,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#implementation-plan-for-check" class="md-nav__link">
+  <a href="#implementation-plan-for-check-done" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation plan for check
+        Implementation plan for check (done)
       
     </span>
   </a>
@@ -1772,10 +1772,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#testing-strategy" class="md-nav__link">
+  <a href="#testing-strategy-done" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing strategy
+        Testing strategy (done)
       
     </span>
   </a>
@@ -3730,10 +3730,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#implementation-plan-for-check" class="md-nav__link">
+  <a href="#implementation-plan-for-check-done" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation plan for check
+        Implementation plan for check (done)
       
     </span>
   </a>
@@ -3741,10 +3741,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#testing-strategy" class="md-nav__link">
+  <a href="#testing-strategy-done" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing strategy
+        Testing strategy (done)
       
     </span>
   </a>
@@ -4079,7 +4079,7 @@ sources show full detail (compressed sizes, mediaTypes,
 compression format). Docker and tarball sources show
 config-derived info (architecture, OS, diff_ids, history,
 labels, env, etc.). 19 unit tests cover the implementation.</p>
-<h3 id="implementation-plan-for-check">Implementation plan for <code>check</code><a class="headerlink" href="#implementation-plan-for-check" title="Permanent link">&para;</a></h3>
+<h3 id="implementation-plan-for-check-done">Implementation plan for <code>check</code> (done)<a class="headerlink" href="#implementation-plan-for-check-done" title="Permanent link">&para;</a></h3>
 <p><strong>Step 1:</strong> Add <code>check</code> command to <code>main.py</code>. Same <code>SOURCE</code>
 argument and input selection as <code>info</code>.</p>
 <p><strong>Step 2:</strong> Implement a <code>CheckResult</code> dataclass or simple dict
@@ -4109,10 +4109,19 @@ formatting helper. Human-readable output should group by severity
 (errors first, then warnings, then info). JSON output should be
 a structured list of check results. Exit code should be non-zero
 if any errors were found (useful for CI integration).</p>
-<p><strong>Files touched:</strong> <code>occystrap/main.py</code> (new command), potentially
-a new <code>occystrap/check.py</code> module for the check logic if it grows
-large enough to warrant separation from <code>main.py</code>.</p>
-<h3 id="testing-strategy">Testing strategy<a class="headerlink" href="#testing-strategy" title="Permanent link">&para;</a></h3>
+<p><strong>Files touched:</strong> <code>occystrap/main.py</code> (new command),
+<code>occystrap/check.py</code> (check logic module).</p>
+<p><strong>Status:</strong> Implemented (steps 1-8). The <code>check</code> command works
+with <code>registry://</code>, <code>docker://</code>, and <code>tar://</code> sources. Fast mode
+checks metadata consistency (schema version, rootfs type, layer
+count, history count, compression compatibility, ArgsEscaped).
+Full mode additionally verifies config digest/size, layer
+diff_ids, tar validity, whiteout files, and tar headers. Checks
+not yet implemented: compressed blob digest verification (item 2,
+already handled by input sources during download) and compression
+magic vs mediaType verification (item 9, requires raw blob
+access). 30 unit tests cover the implementation.</p>
+<h3 id="testing-strategy-done">Testing strategy (done)<a class="headerlink" href="#testing-strategy-done" title="Permanent link">&para;</a></h3>
 <p><strong>For <code>info</code>:</strong> Create test images with known properties (specific
 layer counts, compression formats, labels, history entries) and
 verify <code>info</code>'s JSON output matches expected values. The JSON
@@ -4139,6 +4148,17 @@ testtools/stestr with tox. New tests should follow the existing
 patterns in <code>occystrap/tests/</code>. Functional tests that require
 actual Docker/registry interaction go in
 <code>deploy/occystrap_ci/tests/</code>.</p>
+<p><strong>Status:</strong> Implemented. Unit tests cover both <code>info</code> (19 tests
+in <code>occystrap/tests/test_info.py</code>) and <code>check</code> (30 tests in
+<code>occystrap/tests/test_check.py</code>) with synthetic images
+containing known properties and defects. Functional tests in
+<code>deploy/occystrap_ci/tests/test_info.py</code> (6 tests) and
+<code>deploy/occystrap_ci/tests/test_check.py</code> (12 tests) validate
+against real images (busybox, ubuntu) in the CI local registry.
+The functional check tests include the core CI use case:
+process with filters (normalize-timestamps, exclude, combined),
+then check the output passes full validation. Registry
+roundtrip validation is also covered.</p>
 <h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
 <h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
 <p>We will know when this plan has been successfully implemented
@@ -4184,9 +4204,36 @@ chosen to defer to here so that we don't forget them.</p>
   compression, format conversion). Its output could be used as
   a reference in tests to verify occystrap produces equivalent
   results.</li>
+<li><strong>Compressed blob digest verification (check item 2):</strong>
+  <code>check</code> does not independently verify that
+  <code>sha256(compressed_blob) == manifest.layers[i].digest</code>
+  because the input sources already verify this during
+  download. If we want <code>check</code> to be a standalone validator
+  (e.g., for images not fetched by occystrap), we'd need raw
+  blob access before the input source decompresses them.</li>
+<li><strong>Compression magic vs mediaType verification (check item
+  9):</strong> Verifying that a layer's actual compression format
+  (detected from magic bytes) matches the declared mediaType
+  requires reading the first few bytes of the raw compressed
+  blob. The current <code>fetch()</code> interface yields decompressed
+  data, so this check needs either a new raw-blob accessor or
+  integration at the input source level.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Config diff_ids not updated after filtering:</strong> When
+  <code>process</code> applies content-modifying filters (e.g.,
+  <code>normalize-timestamps</code>, <code>exclude</code>), the layer data changes
+  (and thus its SHA256 diff_id), but the config blob was passed
+  through with the original diff_ids. <code>check</code> correctly
+  detected this as a diff-id mismatch. Fixed by adding config
+  buffering and diff_id tracking to the <code>ImageFilter</code> base
+  class (<code>occystrap/filters/base.py</code>). Content-modifying
+  filters now buffer the config element, record new diff_ids
+  as layers are processed, and forward the updated config in
+  <code>finalize()</code>. This is the exact class of bug that motivated
+  the <code>check</code> command in the first place (see the "wrong
+  diff id" error in the problem statement).</li>
 <li><strong>Flaky <code>test_upload_blob_new</code>:</strong> <code>test_process_config_file</code>
   submitted config upload to a <code>ThreadPoolExecutor</code> but never
   called <code>finalize()</code> or shut down the executor. Under certain

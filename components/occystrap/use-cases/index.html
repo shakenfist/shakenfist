@@ -1917,6 +1917,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#validate-image-integrity-in-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validate Image Integrity in CI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inspect-image-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspect Image Metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4151,6 +4173,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#validate-image-integrity-in-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validate Image Integrity in CI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inspect-image-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspect Image Metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4464,21 +4508,44 @@ any layers shared with earlier pushes.</p>
 <a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a>
 <a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Image passed security check&quot;</span>
 </code></pre></div>
+<h3 id="validate-image-integrity-in-ci">Validate Image Integrity in CI<a class="headerlink" href="#validate-image-integrity-in-ci" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="ch">#!/bin/bash</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="c1"># validate-image.sh - Validate image after processing</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="c1"># Process image with filters</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>occystrap<span class="w"> </span>process<span class="w"> </span>docker://myapp:v1<span class="w"> </span>tar://output.tar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="w">    </span>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/__pycache__/**&quot;</span>
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>
+<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="c1"># Fast metadata check (no layer download)</span>
+<a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a>occystrap<span class="w"> </span>check<span class="w"> </span>--fast<span class="w"> </span>tar://output.tar
+<a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a>
+<a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a><span class="c1"># Full integrity check (verifies diff_ids, tar validity)</span>
+<a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a>occystrap<span class="w"> </span>-O<span class="w"> </span>json<span class="w"> </span>check<span class="w"> </span>tar://output.tar<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.errors
+<a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a><span class="c1"># Exit code is non-zero if errors found</span>
+</code></pre></div>
+<h3 id="inspect-image-metadata">Inspect Image Metadata<a class="headerlink" href="#inspect-image-metadata" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Quick overview of a registry image</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>occystrap<span class="w"> </span>info<span class="w"> </span>registry://docker.io/library/python:3.11
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># JSON output for scripting</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>occystrap<span class="w"> </span>-O<span class="w"> </span>json<span class="w"> </span>info<span class="w"> </span>docker://myapp:v1<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.layer_count, .architecture&#39;</span>
+</code></pre></div>
 <h2 id="debugging">Debugging<a class="headerlink" href="#debugging" title="Permanent link">&para;</a></h2>
 <p>Troubleshoot issues with verbose output.</p>
 <h3 id="enable-debug-logging">Enable Debug Logging<a class="headerlink" href="#enable-debug-logging" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>occystrap<span class="w"> </span>--verbose<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">    </span>tar://busybox.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>occystrap<span class="w"> </span>--verbose<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">    </span>tar://busybox.tar
 </code></pre></div>
 <h3 id="inspect-layer-contents">Inspect Layer Contents<a class="headerlink" href="#inspect-layer-contents" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Extract layers without merging</span>
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/python:3.11<span class="w"> </span>dir://python-layers
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Each layer is a separate tarball</span>
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>ls<span class="w"> </span>python-layers/*.tar
-<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>
-<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="c1"># Inspect a specific layer</span>
-<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>tar<span class="w"> </span>-tvf<span class="w"> </span>python-layers/&lt;layer-hash&gt;.tar<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-50
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Extract layers without merging</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/python:3.11<span class="w"> </span>dir://python-layers
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="c1"># Each layer is a separate tarball</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>ls<span class="w"> </span>python-layers/*.tar
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="c1"># Inspect a specific layer</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>tar<span class="w"> </span>-tvf<span class="w"> </span>python-layers/&lt;layer-hash&gt;.tar<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-50
 </code></pre></div>
 
 
