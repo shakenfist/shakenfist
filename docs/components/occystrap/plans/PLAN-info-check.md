@@ -452,6 +452,19 @@ chosen to defer to here so that we don't forget them.
   `finalize()`. This is the exact class of bug that motivated
   the `check` command in the first place (see the "wrong
   diff id" error in the problem statement).
+* **Empty config when chained filter leaves hash unchanged:**
+  When two content-modifying filters are chained (e.g.,
+  `normalize-timestamps` -> `exclude`) and the second filter
+  doesn't actually change the layer content (nothing matches
+  the exclusion pattern), the layer hash stays the same. In
+  `_forward_buffered_config()`, the `updated_ids == original_ids`
+  path forwarded the buffered config's BytesIO with the file
+  position at the end (after parsing it to check diff_ids).
+  `TarWriter` then read 0 bytes and wrote a 0-byte config
+  entry, causing `check` to crash with `JSONDecodeError`. The
+  same bug existed in the `not self._new_diff_ids` early-return
+  path. Fixed by adding `seek(0)` before forwarding in both
+  unchanged-config paths.
 * **Flaky `test_upload_blob_new`:** `test_process_config_file`
   submitted config upload to a `ThreadPoolExecutor` but never
   called `finalize()` or shut down the executor. Under certain

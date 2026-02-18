@@ -10,7 +10,8 @@ name:
 
 | Option | Environment Variable | Description |
 |--------|---------------------|-------------|
-| `--verbose` | | Enable debug logging |
+| `--verbose` | | Enable debug logging for occystrap modules |
+| `--debug` | | Enable debug logging for all modules (includes library output) |
 | `--os OSNAME` | | Target operating system (default: linux) |
 | `--architecture ARCH` | | Target CPU architecture (default: amd64) |
 | `--variant VARIANT` | | CPU variant (e.g., v8 for ARM) |

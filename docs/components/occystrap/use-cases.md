@@ -365,14 +365,26 @@ occystrap -O json info docker://myapp:v1 | jq '.layer_count, .architecture'
 
 ## Debugging
 
-Troubleshoot issues with verbose output.
+Troubleshoot issues with verbose output. By default, occystrap only
+logs milestones (start/end, summary statistics). Use `--verbose` to
+see per-layer detail from occystrap, or `--debug` to also include
+library output (requests, urllib3, etc.).
 
 ### Enable Debug Logging
 
 ```bash
+# Debug logging for occystrap modules only
 occystrap --verbose process registry://docker.io/library/busybox:latest \
     tar://busybox.tar
+
+# Debug logging for all modules (includes library output)
+occystrap --debug process registry://docker.io/library/busybox:latest \
+    tar://busybox.tar
 ```
+
+When running in a terminal, registry downloads and uploads display
+interactive progress bars. In non-TTY environments (CI, pipes),
+periodic log messages are emitted instead.
 
 ### Inspect Layer Contents
 

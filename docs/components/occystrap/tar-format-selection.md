@@ -124,11 +124,12 @@ There is no compatibility impact from this change.
 
 ## Verification
 
-To verify the format selection is working, enable debug logging:
+To verify the format selection is working, enable debug logging
+with the `--verbose` flag:
 
-```python
-import logging
-logging.getLogger('occystrap.tarformat').setLevel(logging.DEBUG)
+```bash
+occystrap --verbose process registry://docker.io/library/busybox:latest \
+    tar://busybox.tar
 ```
 
 You'll see messages like:
