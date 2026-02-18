@@ -108,6 +108,7 @@ nav:
             - "Tar Format Selection": components/occystrap/tar-format-selection.md
             - "Use Cases": components/occystrap/use-cases.md
             - Plans:
+                - "A more structured and less verbose approach to logging": components/occystrap/plans/PLAN-structured-logging.md
                 - "Implementing `info` and `check` subcommands for occystrap": components/occystrap/plans/PLAN-info-check.md
     - Features: features.md
     - Release notes:
