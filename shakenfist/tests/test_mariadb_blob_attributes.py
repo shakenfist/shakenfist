@@ -437,8 +437,9 @@ class BlobAttributesDataSchemaTestCase(base.ShakenFistTestCase):
     def test_uuid_validation(self):
         from pydantic import ValidationError
 
-        with self.assertRaises(ValidationError):
-            BlobAttributesData(uuid='not-a-valid-uuid')
+        self.assertRaises(
+            ValidationError, BlobAttributesData,
+            uuid='not-a-valid-uuid')
 
     def test_info_defaults_to_empty_dict(self):
         attrs1 = BlobAttributesData(uuid=TEST_UUID)

@@ -31,6 +31,13 @@ jobs:
           path: actions
           fetch-depth: 0
 
+      - name: Checkout the agent-python repository
+        uses: actions/checkout@v6
+        with:
+          repository: shakenfist/agent-python
+          path: agent-python
+          fetch-depth: 0
+
       - name: Checkout the clingwrap repository
         uses: actions/checkout@v6
         with:
