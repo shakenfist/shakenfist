@@ -16,14 +16,14 @@
         <link rel="prev" href="../tar-format-selection/">
       
       
-        <link rel="next" href="../plans/PLAN-info-check/">
+        <link rel="next" href="../plans/PLAN-structured-logging/">
       
       
         
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
     
     
       
@@ -2038,6 +2038,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-structured-logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A more structured and less verbose approach to logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -4532,11 +4560,22 @@ any layers shared with earlier pushes.</p>
 <a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>occystrap<span class="w"> </span>-O<span class="w"> </span>json<span class="w"> </span>info<span class="w"> </span>docker://myapp:v1<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.layer_count, .architecture&#39;</span>
 </code></pre></div>
 <h2 id="debugging">Debugging<a class="headerlink" href="#debugging" title="Permanent link">&para;</a></h2>
-<p>Troubleshoot issues with verbose output.</p>
+<p>Troubleshoot issues with verbose output. By default, occystrap only
+logs milestones (start/end, summary statistics). Use <code>--verbose</code> to
+see per-layer detail from occystrap, or <code>--debug</code> to also include
+library output (requests, urllib3, etc.).</p>
 <h3 id="enable-debug-logging">Enable Debug Logging<a class="headerlink" href="#enable-debug-logging" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>occystrap<span class="w"> </span>--verbose<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">    </span>tar://busybox.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Debug logging for occystrap modules only</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>occystrap<span class="w"> </span>--verbose<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">    </span>tar://busybox.tar
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="c1"># Debug logging for all modules (includes library output)</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>occystrap<span class="w"> </span>--debug<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="w">    </span>tar://busybox.tar
 </code></pre></div>
+<p>When running in a terminal, registry downloads and uploads display
+interactive progress bars. In non-TTY environments (CI, pipes),
+periodic log messages are emitted instead.</p>
 <h3 id="inspect-layer-contents">Inspect Layer Contents<a class="headerlink" href="#inspect-layer-contents" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Extract layers without merging</span>
 <a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/python:3.11<span class="w"> </span>dir://python-layers

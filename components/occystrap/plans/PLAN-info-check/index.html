@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/occystrap/plans/PLAN-info-check/">
       
       
-        <link rel="prev" href="../../use-cases/">
+        <link rel="prev" href="../PLAN-structured-logging/">
       
       
         <link rel="next" href="../../../../features/">
@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
     
     
       
@@ -1537,6 +1537,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-structured-logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A more structured and less verbose approach to logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -4234,6 +4262,19 @@ chosen to defer to here so that we don't forget them.</p>
   <code>finalize()</code>. This is the exact class of bug that motivated
   the <code>check</code> command in the first place (see the "wrong
   diff id" error in the problem statement).</li>
+<li><strong>Empty config when chained filter leaves hash unchanged:</strong>
+  When two content-modifying filters are chained (e.g.,
+  <code>normalize-timestamps</code> -&gt; <code>exclude</code>) and the second filter
+  doesn't actually change the layer content (nothing matches
+  the exclusion pattern), the layer hash stays the same. In
+  <code>_forward_buffered_config()</code>, the <code>updated_ids == original_ids</code>
+  path forwarded the buffered config's BytesIO with the file
+  position at the end (after parsing it to check diff_ids).
+  <code>TarWriter</code> then read 0 bytes and wrote a 0-byte config
+  entry, causing <code>check</code> to crash with <code>JSONDecodeError</code>. The
+  same bug existed in the <code>not self._new_diff_ids</code> early-return
+  path. Fixed by adding <code>seek(0)</code> before forwarding in both
+  unchanged-config paths.</li>
 <li><strong>Flaky <code>test_upload_blob_new</code>:</strong> <code>test_process_config_file</code>
   submitted config upload to a <code>ThreadPoolExecutor</code> but never
   called <code>finalize()</code> or shut down the executor. Under certain
