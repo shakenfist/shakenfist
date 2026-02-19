@@ -222,8 +222,15 @@ Flask app (external_api/app.py)
 
 ### GitHub Actions
 
-- **functional-tests.yml**: Main CI workflow with merge queue support
-- **export-repo-config.yml**: Exports GitHub settings for version control
+- **functional-tests.yml**: Main CI workflow with merge queue support.
+  Includes automated reviewer (via shared action), delinter, and
+  exception fixer jobs.
+- **export-repo-config.yml**: Exports GitHub settings for version
+  control (uses shared reusable workflow from `actions/` repo).
+- **pr-re-review.yml**: Bot-triggered PR re-review.
+- **pr-address-comments.yml**: Bot-triggered comment addressing.
+- **pr-fix-tests.yml** / **test-drift-fix.yml**: Bot-triggered unit
+  test fixing.
 
 ### Branch Protection
 

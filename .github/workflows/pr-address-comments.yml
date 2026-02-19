@@ -1,0 +1,233 @@
+# Triggers Claude Code to address automated review comments when an
+# authorized user comments "@shakenfist-bot please address comments"
+#
+# SECURITY CONSIDERATIONS:
+# This workflow uses issue_comment trigger which runs with write
+# permissions. We implement multiple layers of defense:
+#
+# 1. Authorization: Only repository maintainers can trigger (enforced
+#    by shakenfist/actions/pr-bot-trigger before any code checkout)
+# 2. Trusted tools: Scripts are checked out from the base branch, not
+#    the PR, preventing execution of malicious code from the PR
+# 3. No credential persistence: persist-credentials: false prevents
+#    the GITHUB_TOKEN from being stored in the checked-out repository
+# 4. Git hooks disabled: core.hooksPath=/dev/null prevents malicious
+#    git hooks
+# 5. No pre-commit: We skip pre-commit as it executes code from the
+#    repository
+# 6. Just-in-time auth: We use 'gh auth setup-git' only when pushing
+# 7. Self-hosted runners: Provides isolation from production systems
+#
+# The PR code IS checked out (for Claude to read/modify), but no code
+# FROM the PR is executed. Claude operates on the files but doesn't
+# run them.
+#
+# See: https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+#
+# Template source: shakenfist/development/templates/ci-review-automation/
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+name: PR Address Review Comments
+
+jobs:
+  trigger-address:
+    name: "Trigger comment addressing"
+    # Only run on PR comments (not issue comments)
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '@shakenfist-bot please address comments')
+    runs-on: [self-hosted, static]
+    outputs:
+      authorized: ${{ steps.trigger.outputs.authorized }}
+      pr_ref: ${{ steps.trigger.outputs.pr-ref }}
+      pr_number: ${{ github.event.issue.number }}
+
+    steps:
+      - name: Handle trigger
+        id: trigger
+        uses: shakenfist/actions/pr-bot-trigger@main
+        with:
+          trigger-phrase: 'please address comments'
+          reaction: 'rocket'
+          starting-message: |
+            Starting to address automated review comments...
+
+            [View workflow run]({run_url})
+
+  address-comments:
+    needs: trigger-address
+    if: needs.trigger-address.outputs.authorized == 'true'
+    runs-on: [self-hosted, claude-code]
+    timeout-minutes: 120
+    concurrency:
+      group: address-comments-${{ github.event.issue.number }}
+      cancel-in-progress: true
+
+    env:
+      PR_NUMBER: ${{ needs.trigger-address.outputs.pr_number }}
+      PR_REF: ${{ needs.trigger-address.outputs.pr_ref }}
+
+    steps:
+      # SECURITY: First checkout the base branch to get trusted tools
+      - name: Checkout trusted tools from base branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: trusted-tools
+          sparse-checkout: |
+            tools
+          sparse-checkout-cone-mode: false
+
+      # Now checkout the PR branch for the actual code
+      # SECURITY: We use persist-credentials: false to prevent the
+      # token from being available in the checked-out repository's
+      # git config
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.trigger-address.outputs.pr_ref }}
+          fetch-depth: 0
+          path: pr-code
+          persist-credentials: false
+
+      - name: Configure git
+        run: |
+          git config --global user.name "Michael Still"
+          git config --global user.email "mikal@stillhq.com"
+          # SECURITY: Disable git hooks to prevent execution of
+          # malicious hooks from the PR code
+          git config --global core.hooksPath /dev/null
+
+      - name: Run address comments script
+        id: address
+        working-directory: pr-code
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TOOLS_DIR: ${{ github.workspace }}/trusted-tools/tools
+          WORK_DIR: ${{ github.workspace }}/pr-code
+        run: |
+          mkdir -p ${{ github.workspace }}/address-output
+
+          # Run the trusted tools, not the PR's potentially modified
+          # version
+          set +e
+          "${TOOLS_DIR}/address-comments-with-claude.sh" \
+            --ci \
+            --pr ${{ env.PR_NUMBER }} \
+            --output-dir ${{ github.workspace }}/address-output \
+            2>&1 | tee ${{ github.workspace }}/address-log.txt
+          exit_code=${PIPESTATUS[0]}
+          set -e
+          if [ ${exit_code} -ne 0 ]; then
+            echo "Address comments script failed with exit code ${exit_code}"
+            exit ${exit_code}
+          fi
+
+          # Extract summary file path (last line of output)
+          summary_file=$(tail -1 ${{ github.workspace }}/address-log.txt)
+          if [ -f "${summary_file}" ]; then
+            cp "${summary_file}" ${{ github.workspace }}/summary.md
+          fi
+
+          # Extract counts from CI output
+          addressed=$(grep "^items_addressed=" \
+            ${{ github.workspace }}/address-log.txt | \
+            cut -d= -f2 || echo "0")
+          skipped=$(grep "^items_skipped=" \
+            ${{ github.workspace }}/address-log.txt | \
+            cut -d= -f2 || echo "0")
+
+          echo "addressed=${addressed}" >> $GITHUB_OUTPUT
+          echo "skipped=${skipped}" >> $GITHUB_OUTPUT
+
+      # NOTE: We intentionally do NOT run pre-commit here because:
+      # 1. This is a privileged workflow (issue_comment trigger with
+      #    write permissions)
+      # 2. Pre-commit hooks execute code from the repository
+      # 3. The normal CI pipeline (pull_request trigger) will catch
+      #    any issues
+      # See: https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+
+      - name: Push commits
+        id: push
+        working-directory: pr-code
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ env.PR_REF }}
+        run: |
+          commit_count=$(git rev-list --count \
+            "origin/${BRANCH_NAME}"..HEAD 2>/dev/null || echo "0")
+          echo "commit_count=${commit_count}" >> $GITHUB_OUTPUT
+
+          if [ "${commit_count}" -gt 0 ]; then
+            echo "Pushing ${commit_count} commits..."
+            # SECURITY: Use gh CLI for push since
+            # persist-credentials: false prevents git from having
+            # stored credentials
+            gh auth setup-git
+            git push origin "HEAD:refs/heads/${BRANCH_NAME}"
+          else
+            echo "No commits to push"
+          fi
+
+      - name: Post success comment
+        if: steps.push.outputs.commit_count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f "${{ github.workspace }}/summary.md" ]; then
+            summary=$(cat ${{ github.workspace }}/summary.md)
+          else
+            summary="See workflow logs for details."
+          fi
+
+          gh pr comment ${{ env.PR_NUMBER }} \
+            --body "$(cat <<EOF
+          Addressed automated review comments and pushed ${{ steps.push.outputs.commit_count }} commit(s).
+
+          ${summary}
+
+          [View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+          )"
+
+      - name: Post no-changes comment
+        if: steps.push.outputs.commit_count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f "${{ github.workspace }}/summary.md" ]; then
+            summary=$(cat ${{ github.workspace }}/summary.md)
+          else
+            summary="No actionable items found or all items were skipped."
+          fi
+
+          gh pr comment ${{ env.PR_NUMBER }} \
+            --body "$(cat <<EOF
+          No changes were made after reviewing automated comments.
+
+          ${summary}
+
+          [View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+          )"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: address-comments-logs-${{ env.PR_NUMBER }}
+          path: |
+            ${{ github.workspace }}/address-output/
+            ${{ github.workspace }}/address-log.txt
+            ${{ github.workspace }}/summary.md
+          retention-days: 14

@@ -663,9 +663,15 @@ jobs:
 
   automated_reviewer:
     name: "Automated reviewer"
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     runs-on: [self-hosted, claude-code]
-    needs: [sanity_checks, functional_matrix_pr]
-    if: github.event_name == 'pull_request'
+    needs: [sanity_checks, functional_matrix_pr, check_bot_commit]
+    if: |
+      github.event_name == 'pull_request' &&
+      needs.check_bot_commit.outputs.is_bot != 'true'
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-reviewer
       cancel-in-progress: true
@@ -677,10 +683,9 @@ jobs:
           fetch-depth: 0
 
       - name: Run automated reviewer
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tools/review-pr-with-claude.sh --ci --pr ${{ github.event.pull_request.number }}
+        uses: shakenfist/actions/review-pr-with-claude@main
+        with:
+          pr-number: ${{ github.event.pull_request.number }}
 
   functional_matrix_merge:
     name: "${{ matrix.merge.name }}"

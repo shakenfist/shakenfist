@@ -1,7 +1,14 @@
-name: PR Re-review
-
 # Triggers a re-review of a PR when an authorized user comments
 # "@shakenfist-bot please re-review"
+#
+# Template source: shakenfist/development/templates/ci-review-automation/
+
+name: PR Re-review
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 
 on:
   issue_comment:
@@ -22,14 +29,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get the commenter's permission level for this repository
           permission=$(gh api \
             repos/${{ github.repository }}/collaborators/${{ github.event.comment.user.login }}/permission \
             --jq '.permission' 2>/dev/null || echo "none")
 
           echo "User ${{ github.event.comment.user.login }} has permission: ${permission}"
 
-          # Check if user has write or admin permission (can merge PRs)
           if [[ "${permission}" == "admin" || "${permission}" == "write" ]]; then
             echo "authorized=true" >> $GITHUB_OUTPUT
             echo "User is authorized to request re-review"
@@ -43,7 +48,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Add a reaction to acknowledge the request
           gh api \
             repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
             -f content='+1' \
@@ -65,7 +69,7 @@ jobs:
 
       - name: Run automated reviewer
         if: steps.check_permission.outputs.authorized == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tools/review-pr-with-claude.sh --ci --force --pr ${{ github.event.issue.number }}
+        uses: shakenfist/actions/review-pr-with-claude@main
+        with:
+          pr-number: ${{ github.event.issue.number }}
+          force: 'true'

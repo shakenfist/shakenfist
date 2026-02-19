@@ -1,0 +1,446 @@
+# Fix test failures with Claude Code
+#
+# SECURITY CONSIDERATIONS:
+# This workflow can be triggered in two ways:
+#
+# 1. workflow_dispatch (manual): Safe - only users with write access
+#    can trigger
+# 2. workflow_call (from pr-fix-tests.yml): Requires careful
+#    consideration
+#
+# When called from issue_comment-triggered workflows:
+# - Code from the PR is checked out and tests are executed
+# - This intentionally runs untrusted code in a privileged context
+# - Security is enforced by:
+#   a) Authorization check in the calling workflow (pr-fix-tests.yml)
+#      Only repository maintainers can trigger via
+#      shakenfist/actions/pr-bot-trigger
+#   b) Self-hosted runners provide isolation from production systems
+#   c) GITHUB_TOKEN scope is limited to this repository
+#   d) The runner is ephemeral/disposable
+#
+# Risk acceptance: The benefit of automated test fixes outweighs the
+# risk because only trusted maintainers can trigger execution.
+#
+# See: https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+#
+# Template source: shakenfist/development/templates/ci-review-automation/
+
+name: Fix test failures with Claude Code
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_turns:
+        description: 'Maximum Claude turns'
+        required: false
+        default: '200'
+        type: string
+      dry_run:
+        description: 'Dry run (test only, no commits)'
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Branch to checkout (for PR-triggered runs)'
+        required: false
+        type: string
+      pr_number:
+        description: 'PR number (for PR-triggered runs)'
+        required: false
+        type: string
+      max_turns:
+        description: 'Maximum Claude turns'
+        required: false
+        default: '50'
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  test-and-fix:
+    runs-on: [self-hosted, claude-code]
+    timeout-minutes: 120
+    concurrency:
+      group: ${{ github.workflow }}-${{ inputs.pr_number || github.ref }}
+      cancel-in-progress: true
+
+    env:
+      IS_PR_RUN: ${{ inputs.pr_number != '' }}
+      PR_NUMBER: ${{ inputs.pr_number }}
+      PR_REF: ${{ inputs.ref }}
+
+    steps:
+      - name: Set environment variables
+        run: |
+          {
+            echo "DATESTAMP=$(date '+%Y%m%d')"
+            echo "DATEPRETTY=$(date '+%-d %B %Y')"
+          } >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || '' }}
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config --global user.name "shakenfist-bot"
+          git config --global user.email "bot@shakenfist.com"
+
+      - name: Create working branch
+        if: env.IS_PR_RUN != 'true'
+        run: |
+          git branch -D test-drift-fix-${DATESTAMP} 2>/dev/null || true
+          git checkout -b test-drift-fix-${DATESTAMP}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libmariadb-dev python3-dev python3-mysqldb
+
+      - name: Install project dependencies
+        run: |
+          python3 -mvenv ~/sf-venv
+          . ~/sf-venv/bin/activate
+          pip3 install uv
+          uv pip install tox tox-uv
+
+      - name: Run initial tests
+        id: initial_test
+        continue-on-error: true
+        run: |
+          . ~/sf-venv/bin/activate
+          set +e
+          tox -ecover \
+            2>&1 | tee ${{ github.workspace }}/test-output.txt
+          test_exit_code=${PIPESTATUS[0]}
+          set -e
+
+          if [ ${test_exit_code} -eq 0 ]; then
+            echo "tests_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "tests_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+          exit ${test_exit_code}
+
+      - name: Exit early if nothing to do
+        if: steps.initial_test.outputs.tests_passed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "All tests pass. Nothing to do."
+          if [ "${IS_PR_RUN}" == "true" ]; then
+            gh pr comment ${PR_NUMBER} \
+              --repo ${{ github.repository }} \
+              --body "All tests pass! No fixes needed."
+          fi
+          exit 0
+
+      - name: Prepare Claude prompt
+        if: steps.initial_test.outputs.tests_passed == 'false'
+        run: |
+          cat > ${{ github.workspace }}/claude-prompt.txt << 'PROMPT_EOF'
+          The shakenfist unit test suite has failures. Please analyze
+          and fix them.
+
+          ## Context
+
+          Shaken Fist is an opinionated, minimal cloud orchestration
+          platform for VM and network management. Read AGENTS.md and
+          ARCHITECTURE.md to understand the project structure.
+
+          Unit tests are in shakenfist/tests/ and use testtools/stestr.
+
+          ## Test Failures
+
+          PROMPT_EOF
+
+          cat ${{ github.workspace }}/test-output.txt \
+            >> ${{ github.workspace }}/claude-prompt.txt
+
+          cat >> ${{ github.workspace }}/claude-prompt.txt << 'PROMPT_EOF'
+
+          ## Your Task
+
+          1. Diagnose what's causing the test failures
+          2. Fix the code if needed
+          3. Run `pre-commit run --all-files` to check formatting
+          4. Re-run the tests to verify fixes:
+             ```bash
+             . ~/sf-venv/bin/activate
+             tox -ecover
+             ```
+          5. Stage all changes with git add (do NOT commit)
+          6. Output a commit summary (see below)
+
+          ## REQUIRED: Commit Summary Output
+
+          After completing your work and staging changes, you MUST
+          output a commit summary in the following exact format:
+
+          ```
+          COMMIT_SUMMARY_START
+          <First line: 50 chars max, imperative mood, ends with period.>
+
+          <Body: Wrap at 72 chars. Explain WHAT changed and WHY.>
+          COMMIT_SUMMARY_END
+          ```
+
+          ## Important Notes
+
+          - This is a Python project
+          - Unit tests are in shakenfist/tests/
+          - Use single quotes for strings, double quotes for docstrings
+          - Wrap lines at 80 characters
+          - Use `pre-commit run --all-files` before staging
+          - Do NOT modify test expectations unless the old behavior
+            was genuinely wrong
+          PROMPT_EOF
+
+          echo "Prompt prepared:"
+          cat ${{ github.workspace }}/claude-prompt.txt
+
+      - name: Run Claude Code to fix issues
+        id: claude_fix
+        if: steps.initial_test.outputs.tests_passed == 'false'
+        continue-on-error: true
+        run: |
+          if ! command -v claude &> /dev/null; then
+            echo "claude_available=false" >> $GITHUB_OUTPUT
+            echo "Error: Claude Code CLI not found"
+            exit 1
+          fi
+
+          echo "claude_available=true" >> $GITHUB_OUTPUT
+
+          start_time=$(date +%s)
+
+          claude -p "$(cat ${{ github.workspace }}/claude-prompt.txt)" \
+            --dangerously-skip-permissions \
+            --max-turns ${{ inputs.max_turns || '50' }} \
+            --output-format text \
+            2>&1 | tee ${{ github.workspace }}/claude-output.txt \
+            || true
+
+          mkdir -p ${{ github.workspace }}/claude-logs
+          find ~/.claude/projects -name "*.jsonl" \
+            -newermt "@${start_time}" \
+            -exec cp {} ${{ github.workspace }}/claude-logs/ \; \
+            2>/dev/null || true
+
+          echo "=== Git Status ===" \
+            > ${{ github.workspace }}/claude-changes.txt
+          git status \
+            >> ${{ github.workspace }}/claude-changes.txt 2>&1
+          echo "" >> ${{ github.workspace }}/claude-changes.txt
+          echo "=== Staged Changes ===" \
+            >> ${{ github.workspace }}/claude-changes.txt
+          git diff --cached \
+            >> ${{ github.workspace }}/claude-changes.txt 2>&1
+
+      - name: Extract commit summary
+        id: extract_summary
+        if: steps.claude_fix.outputs.claude_available == 'true'
+        run: |
+          if grep -q "COMMIT_SUMMARY_START" \
+              ${{ github.workspace }}/claude-output.txt
+          then
+            sed -n '/COMMIT_SUMMARY_START/,/COMMIT_SUMMARY_END/p' \
+              ${{ github.workspace }}/claude-output.txt | \
+              grep -v "COMMIT_SUMMARY_START" | \
+              grep -v "COMMIT_SUMMARY_END" | \
+              sed 's/^```$//' | \
+              sed '/^$/N;/^\n$/d' \
+              > ${{ github.workspace }}/commit-summary.txt
+
+            if [ -s ${{ github.workspace }}/commit-summary.txt ]; then
+              echo "summary_found=true" >> $GITHUB_OUTPUT
+              echo "Extracted commit summary:"
+              cat ${{ github.workspace }}/commit-summary.txt
+            else
+              echo "summary_found=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "summary_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Verify fixes
+        id: verify
+        if: steps.claude_fix.outputs.claude_available == 'true'
+        continue-on-error: true
+        run: |
+          . ~/sf-venv/bin/activate
+          set +e
+          tox -ecover \
+            2>&1 | tee ${{ github.workspace }}/verify-output.txt
+          verify_exit_code=${PIPESTATUS[0]}
+          set -e
+
+          if [ ${verify_exit_code} -eq 0 ]; then
+            echo "fix_succeeded=true" >> $GITHUB_OUTPUT
+          else
+            echo "fix_succeeded=false" >> $GITHUB_OUTPUT
+          fi
+
+          exit ${verify_exit_code}
+
+      - name: Commit changes
+        if: |
+          steps.verify.outputs.fix_succeeded == 'true' &&
+          inputs.dry_run != true
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+
+            if [ "${{ steps.extract_summary.outputs.summary_found }}" == "true" ] && \
+               [ -s ${{ github.workspace }}/commit-summary.txt ]; then
+              {
+                cat ${{ github.workspace }}/commit-summary.txt
+                echo ""
+                if [ "${IS_PR_RUN}" == "true" ]; then
+                  echo "Triggered-By: @shakenfist-bot please attempt to fix on PR #${PR_NUMBER}"
+                fi
+                echo ""
+                echo "Signed-off-by: Michael Still <mikal@stillhq.com>"
+                echo "Assisted-By: Claude Code"
+                echo "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+              } > ${{ github.workspace }}/commit-message.txt
+
+              git commit -F ${{ github.workspace }}/commit-message.txt
+            else
+              if [ "${IS_PR_RUN}" == "true" ]; then
+                git commit -m "$(cat <<EOF
+          Fix test failures on PR #${PR_NUMBER}.
+
+          Claude Code automatically fixed test failures.
+
+          Triggered-By: @shakenfist-bot please attempt to fix on PR #${PR_NUMBER}
+
+          Signed-off-by: Michael Still <mikal@stillhq.com>
+          Assisted-By: Claude Code
+          Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+          EOF
+          )"
+              else
+                git commit -m "$(cat <<EOF
+          Fix test suite drift for ${DATESTAMP}.
+
+          Claude Code automatically fixed test failures.
+
+          Signed-off-by: Michael Still <mikal@stillhq.com>
+          Assisted-By: Claude Code
+          Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+          EOF
+          )"
+              fi
+            fi
+          fi
+
+      - name: Push changes (PR mode)
+        if: |
+          env.IS_PR_RUN == 'true' &&
+          steps.verify.outputs.fix_succeeded == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git push origin ${PR_REF}
+
+          gh pr comment ${PR_NUMBER} \
+            --repo ${{ github.repository }} \
+            --body "Claude Code fixed the test failures and pushed the changes.
+
+          Please review the new commits."
+
+      - name: Push and create PR (scheduled/manual mode)
+        if: |
+          env.IS_PR_RUN != 'true' &&
+          steps.verify.outputs.fix_succeeded == 'true' &&
+          inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git push -f origin test-drift-fix-${DATESTAMP}
+          sleep 5
+
+          if [ "${{ steps.extract_summary.outputs.summary_found }}" == "true" ] && \
+             [ -s ${{ github.workspace }}/commit-summary.txt ]; then
+            PR_TITLE=$(head -1 \
+              ${{ github.workspace }}/commit-summary.txt | \
+              sed 's/\.$//')
+            COMMIT_BODY=$(tail -n +3 \
+              ${{ github.workspace }}/commit-summary.txt)
+          else
+            PR_TITLE="Fix test suite drift (${DATESTAMP})"
+            COMMIT_BODY="Claude Code automatically fixed test failures."
+          fi
+
+          gh pr create \
+            --assignee mikalstill \
+            --reviewer mikalstill \
+            --title "${PR_TITLE}" \
+            --body "$(cat <<EOF
+          ## Summary
+
+          ${COMMIT_BODY}
+
+          ## Changes
+
+          $(git diff --stat HEAD~1)
+
+          ## Verification
+
+          All tests pass after these changes.
+
+          ---
+          Generated with [Claude Code](https://claude.com/claude-code)
+          EOF
+          )" \
+            --head $(git branch --show-current)
+
+      - name: Report failure (PR mode)
+        if: |
+          env.IS_PR_RUN == 'true' &&
+          steps.initial_test.outputs.tests_passed == 'false' &&
+          (steps.claude_fix.outputs.claude_available != 'true' ||
+           steps.verify.outputs.fix_succeeded == 'false')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TEST_OUTPUT=$(tail -c 2000 \
+            ${{ github.workspace }}/test-output.txt \
+            2>/dev/null || echo "See workflow logs for details.")
+
+          gh pr comment ${PR_NUMBER} \
+            --repo ${{ github.repository }} \
+            --body "Claude Code was unable to fix the test failures automatically.
+
+          [View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          **Last 2KB of test output:**
+          \`\`\`
+          ${TEST_OUTPUT}
+          \`\`\`"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ inputs.pr_number != '' && format('pr-fix-logs-{0}', inputs.pr_number) || format('test-drift-fix-logs-{0}', github.run_id) }}
+          path: |
+            ${{ github.workspace }}/test-output.txt
+            ${{ github.workspace }}/verify-output.txt
+            ${{ github.workspace }}/claude-output.txt
+            ${{ github.workspace }}/claude-prompt.txt
+            ${{ github.workspace }}/claude-changes.txt
+            ${{ github.workspace }}/commit-summary.txt
+            ${{ github.workspace }}/commit-message.txt
+            ${{ github.workspace }}/claude-logs/
+          retention-days: 14
