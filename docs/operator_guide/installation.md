@@ -14,6 +14,8 @@ Shaken Fist only supports Ubuntu 24.04, and Debian 12, so if you're running on l
     older versions of ansible became burdensome. Debian 12 support was added
     in v0.8.
 
+    This means the minimum supported Python version for Shaken Fist is now 3.11.
+
 Each machine in the cluster should match this description:
 
 * Have virtualization extensions enabled in the BIOS.

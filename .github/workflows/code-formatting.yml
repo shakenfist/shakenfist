@@ -15,7 +15,7 @@ on:
 
 jobs:
   code-formatters:
-    runs-on: [self-hosted, vm]
+    runs-on: [self-hosted, vm, debian-12]
     timeout-minutes: 60
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
@@ -71,4 +71,4 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/shakenfist
           . /srv/ci/venv/bin/activate
-          ${GITHUB_WORKSPACE}/actions/tools/ci_code_formatting.sh 39
+          ${GITHUB_WORKSPACE}/actions/tools/ci_code_formatting.sh 311

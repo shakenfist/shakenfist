@@ -70,7 +70,7 @@ jobs:
                 'baseuser': 'ubuntu',
                 'outputlabel': 'ci-images/ubuntu-2204',
                 'scheduled': True,
-                'runs_on': 'debian-11'
+                'runs_on': 'debian-12'
             },
             {
                 'name': 'ubuntu-2404',
