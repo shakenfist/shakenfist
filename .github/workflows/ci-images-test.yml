@@ -31,7 +31,7 @@ jobs:
                 'baseuser': 'debian',
                 'outputlabel': 'ci-images/debian-12',
                 'scheduled': True,
-                'runs_on': 'debian-11'
+                'runs_on': 'debian-12'
             },
             {
                 'name': 'rocky-9',
@@ -63,7 +63,7 @@ jobs:
                 'baseuser': 'ubuntu',
                 'outputlabel': 'ci-images/ubuntu-2204',
                 'scheduled': True,
-                'runs_on': 'debian-11'
+                'runs_on': 'debian-12'
             },
             {
                 'name': 'ubuntu-2404',
@@ -71,7 +71,7 @@ jobs:
                 'baseuser': 'ubuntu',
                 'outputlabel': 'ci-images/ubuntu-2404',
                 'scheduled': True,
-                'runs_on': 'debian-11'
+                'runs_on': 'debian-12'
             },
         ]
     runs-on: [self-hosted, vm, '${{ matrix.os.runs_on }}']
@@ -90,6 +90,12 @@ jobs:
             repository: shakenfist/actions
             path: actions
             fetch-depth: 0
+
+        - name: Checkout the shakenfist repository
+          uses: actions/checkout@v6
+          with:
+            path: shakenfist
+            fetch-depth: 1
 
         - name: Build image
           run: |
