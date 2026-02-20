@@ -5,6 +5,9 @@
 
 name: Pin indirect dependencies
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   schedule:

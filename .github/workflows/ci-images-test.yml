@@ -1,5 +1,9 @@
 name: Rebuild CI images (test)
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   pull_request:
     paths:

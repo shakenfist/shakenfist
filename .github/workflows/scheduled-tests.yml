@@ -1,5 +1,8 @@
 name: Scheduled tests
 
+permissions:
+  contents: read
+
 # NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
 # which is available as GITHUB_WORKSPACE. You can find other environment
 # variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables

@@ -1,4 +1,8 @@
 name: Renovate dependency updater
+
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   schedule:

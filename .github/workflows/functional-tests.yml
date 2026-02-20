@@ -1,5 +1,8 @@
 name: Functional tests
 
+permissions:
+  contents: read
+
 # The can_enqueue / can_merge scheme is as described at:
 # https://boinkor.net/2023/11/neat-github-actions-patterns-for-github-merge-queues/
 
@@ -50,6 +53,9 @@ jobs:
   # to save a little time and reduce CI runner churn.
   sanity_checks:
     name: "Sanity checks"
+    permissions:
+      contents: read
+      pull-requests: write
     runs-on: [self-hosted, vm, debian-12]
     needs: enqueue_pr_comment
     outputs:
@@ -600,6 +606,9 @@ jobs:
   # Skip if the last commit was from the bot (checked by check_bot_commit job).
   automated_exception_fixer:
     name: "Automated exception fixer"
+    permissions:
+      contents: read
+      actions: read
     runs-on: [self-hosted, claude-code]
     needs: [functional_matrix_pr, check_bot_commit]
     if: >-
@@ -1092,6 +1101,8 @@ jobs:
   # visibility. Fixes should be made in the PR stage, not the merge queue.
   display_merge_exceptions:
     name: "Display merge exceptions"
+    permissions:
+      actions: read
     runs-on: [self-hosted, vm, debian-12]
     needs: [functional_matrix_merge]
     if: >-

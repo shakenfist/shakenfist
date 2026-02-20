@@ -1,5 +1,9 @@
 # With thanks to https://bluegenes.github.io/mkdocs-github-actions/
 name: Build and publish shakenfist.com
+
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
