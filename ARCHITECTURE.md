@@ -247,6 +247,11 @@ traffic through local caches:
 CI VMs provisioned by the `shakenfist/actions` Ansible playbooks also
 get system-level config files (`/etc/apt/apt.conf.d/01proxy` and
 `/etc/pip.conf`) so that getsf and other tools use the caches.
+- **Proxy bypass**: `no_proxy`/`NO_PROXY` set to
+  `localhost,127.0.0.1,10.0.0.0/8` to prevent local service traffic
+  (e.g. etcd API calls) from being routed through the proxy.
+  Additionally, `WrappedEtcdClient` sets `trust_env = False` on its
+  requests session as defense in depth.
 
 ### Branch Protection
 
