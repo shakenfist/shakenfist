@@ -9,6 +9,12 @@ on:
   schedule:
     - cron: '11 0 * * *'        # utc
 
+
+env:
+  http_proxy: http://192.168.1.15:3128
+  https_proxy: http://192.168.1.15:3128
+  PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
+
 jobs:
   image_build_matrix:
     name: "${{ matrix.os.name }}"

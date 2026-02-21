@@ -232,6 +232,22 @@ Flask app (external_api/app.py)
 - **pr-fix-tests.yml** / **test-drift-fix.yml**: Bot-triggered unit
   test fixing.
 
+### CI Caching
+
+Workflows that download packages use environment variables to route
+traffic through local caches:
+
+- **HTTP proxy**: `http_proxy`/`https_proxy` set to
+  `http://192.168.1.15:3128` (Squid cache) for apt, curl, and
+  general HTTP downloads.
+- **PyPI mirror**: `PIP_INDEX_URL` set to
+  `https://devpi.home.stillhq.com/root/pypi/+simple/` (devpi) for
+  pip and uv package installs.
+
+CI VMs provisioned by the `shakenfist/actions` Ansible playbooks also
+get system-level config files (`/etc/apt/apt.conf.d/01proxy` and
+`/etc/pip.conf`) so that getsf and other tools use the caches.
+
 ### Branch Protection
 
 The develop branch uses:

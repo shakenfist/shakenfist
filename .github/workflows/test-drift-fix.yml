@@ -62,6 +62,12 @@ permissions:
   issues: write
   pull-requests: write
 
+
+env:
+  http_proxy: http://192.168.1.15:3128
+  https_proxy: http://192.168.1.15:3128
+  PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
+
 jobs:
   test-and-fix:
     runs-on: [self-hosted, claude-code]
