@@ -98,6 +98,11 @@ jobs:
             git commit -a -m "Update pinned dependencies."
             git push -f origin pin-dependencies-${datestamp}
             echo
+            # Ensure the label exists before creating the PR
+            gh label create dependencies --color 0075ca \
+                --description "Pull requests that update a dependency file" \
+                2>/dev/null || true
+
             gh pr create \
                 --assignee mikalstill \
                 --reviewer mikalstill \
