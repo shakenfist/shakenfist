@@ -178,7 +178,7 @@ write_to = "shakenfist/_version.py"
 [project.optional-dependencies]
 test = [
     "coverage==7.13.4",          # apache2
-    "testtools==2.6.0",         # mit -- pinned <2.7.0, stestr 4.2.0
+    "testtools==2.8.4",         # mit -- pinned <2.7.0, stestr 4.2.0
                                 #        imports _b removed in 2.7.0
     "mock==5.2.0",              # bsd
     "stestr==4.2.0",            # apache2
