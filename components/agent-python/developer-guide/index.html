@@ -10,13 +10,9 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/occystrap/pipeline/">
+        <link rel="canonical" href="https://shakenfist.com/components/agent-python/developer-guide/">
       
       
-        <link rel="prev" href="../installation/">
-      
-      
-        <link rel="next" href="../tar-format-selection/">
       
       
         
@@ -27,7 +23,7 @@
     
     
       
-        <title>Pipeline Architecture - Shaken Fist</title>
+        <title>Developer Guide - Shaken Fist</title>
       
     
     
@@ -101,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#pipeline-architecture" class="md-skip">
+        <a href="#developer-guide" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Pipeline Architecture
+              Developer Guide
             
           </span>
         </div>
@@ -334,20 +330,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -368,7 +362,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1248,20 +1242,18 @@
                 
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
         
           
           <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
@@ -1282,7 +1274,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1300,7 +1292,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../occystrap/" class="md-nav__link">
         
   
   
@@ -1328,7 +1320,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../command-reference/" class="md-nav__link">
+      <a href="../../occystrap/command-reference/" class="md-nav__link">
         
   
   
@@ -1356,7 +1348,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../docker-tarball-formats/" class="md-nav__link">
+      <a href="../../occystrap/docker-tarball-formats/" class="md-nav__link">
         
   
   
@@ -1384,7 +1376,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../installation/" class="md-nav__link">
+      <a href="../../occystrap/installation/" class="md-nav__link">
         
   
   
@@ -1409,37 +1401,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pipeline Architecture
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../occystrap/pipeline/" class="md-nav__link">
         
   
   
@@ -1455,325 +1420,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#image-elements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Image Elements
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#input-sources" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Input Sources
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Input Sources">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#registry-input" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Registry Input
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docker-daemon-input" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Docker Daemon Input
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docker-push-input" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Docker Push Input
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tarball-input" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tarball Input
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#filters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Filters
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Filters">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#how-filters-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How Filters Work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#filter-capabilities" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Filter Capabilities
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#available-filters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Available Filters
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#chaining-filters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Chaining Filters
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#output-writers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Output Writers
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Output Writers">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tarball-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tarball Output
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#directory-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Directory Output
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#oci-bundle-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        OCI Bundle Output
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#registry-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Registry Output
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docker-daemon-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Docker Daemon Output
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#data-flow-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Data Flow Example
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#key-concepts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Concepts
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Key Concepts">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#whiteout-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Whiteout Files
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#layer-deduplication" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Layer Deduplication
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#deterministic-compression" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Deterministic Compression
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#out-of-order-layer-delivery" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Out-of-Order Layer Delivery
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#hash-recalculation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Hash Recalculation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1786,7 +1432,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tar-format-selection/" class="md-nav__link">
+      <a href="../../occystrap/tar-format-selection/" class="md-nav__link">
         
   
   
@@ -1814,7 +1460,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../use-cases/" class="md-nav__link">
+      <a href="../../occystrap/use-cases/" class="md-nav__link">
         
   
   
@@ -1889,7 +1535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-structured-logging/" class="md-nav__link">
+      <a href="../../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
         
   
   
@@ -1917,7 +1563,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-info-check/" class="md-nav__link">
+      <a href="../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
         
   
   
@@ -3655,10 +3301,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Prerequisites
       
     </span>
   </a>
@@ -3666,10 +3312,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#image-elements" class="md-nav__link">
+  <a href="#project-layout" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Image Elements
+        Project Layout
       
     </span>
   </a>
@@ -3677,204 +3323,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#input-sources" class="md-nav__link">
+  <a href="#building" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Input Sources
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Input Sources">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#registry-input" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Registry Input
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docker-daemon-input" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Docker Daemon Input
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docker-push-input" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Docker Push Input
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tarball-input" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tarball Input
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#filters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Filters
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Filters">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#how-filters-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How Filters Work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#filter-capabilities" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Filter Capabilities
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#available-filters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Available Filters
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#chaining-filters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Chaining Filters
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#output-writers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Output Writers
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Output Writers">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tarball-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tarball Output
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#directory-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Directory Output
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#oci-bundle-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        OCI Bundle Output
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#registry-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Registry Output
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docker-daemon-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Docker Daemon Output
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#data-flow-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Data Flow Example
+        Building
       
     </span>
   </a>
@@ -3882,74 +3334,35 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#key-concepts" class="md-nav__link">
+  <a href="#running-tests" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key Concepts
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Key Concepts">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#whiteout-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Whiteout Files
+        Running Tests
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#layer-deduplication" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-new-command" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Layer Deduplication
+        Adding a New Command
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#deterministic-compression" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Deterministic Compression
+        Dependencies
       
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#out-of-order-layer-delivery" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Out-of-Order Layer Delivery
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#hash-recalculation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Hash Recalculation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -3974,422 +3387,111 @@
   
 
 
-<h1 id="pipeline-architecture">Pipeline Architecture<a class="headerlink" href="#pipeline-architecture" title="Permanent link">&para;</a></h1>
-<p>Occy Strap processes container images using a flexible pipeline pattern. This
-document explains how the pipeline works and how its components interact.</p>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>The pipeline follows a simple flow:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Input Source  --&gt;  Filter Chain (optional)  --&gt;  Output Writer  --&gt;  Files
+<h1 id="developer-guide">Developer Guide<a class="headerlink" href="#developer-guide" title="Permanent link">&para;</a></h1>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Python 3.10 or later</li>
+<li><code>tox</code> for running tests and linting</li>
+</ul>
+<h2 id="project-layout">Project Layout<a class="headerlink" href="#project-layout" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>shakenfist_agent/
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    main.py              # CLI entry point
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    log.py               # Console logging
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    commandline/
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        daemon.py        # vsock listener and command handlers
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    protos/
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        agent.proto      # Protobuf definitions
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        common.proto     # Shared protobuf definitions
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        *_pb2.py         # Generated stubs (do not edit)
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    tests/
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        test_daemon.py   # Unit tests
 </code></pre></div>
+<h2 id="building">Building<a class="headerlink" href="#building" title="Permanent link">&para;</a></h2>
+<p>The project uses <code>pyproject.toml</code> with <code>setuptools_scm</code> for
+version management. Versions are derived from git tags:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+</code></pre></div>
+<h2 id="running-tests">Running Tests<a class="headerlink" href="#running-tests" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Unit tests</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>tox<span class="w"> </span>-epy3
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Linting</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>tox<span class="w"> </span>-eflake8
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Coverage report</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>tox<span class="w"> </span>-ecover
+</code></pre></div>
+<h2 id="adding-a-new-command">Adding a New Command<a class="headerlink" href="#adding-a-new-command" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>Input Source</strong> reads image elements (config and layers) from a source</li>
-<li><strong>Filters</strong> transform or inspect elements as they pass through</li>
-<li><strong>Output Writer</strong> writes the processed elements to their destination</li>
+<li>
+<p><strong>Define the protobuf messages.</strong> Add request and reply
+   message types to <code>shakenfist_agent/protos/agent.proto</code>. Add
+   the request to the <code>HypervisorToAgentCommand.request</code> oneof
+   and the reply to <code>AgentToHypervisorCommand.reply</code>.</p>
+</li>
+<li>
+<p><strong>Regenerate stubs.</strong> The proto files and generated stubs are
+   maintained in the main
+   <a href="https://github.com/shakenfist/shakenfist">shakenfist</a>
+   repository. Use <code>_copy_stubs.sh</code> to sync them.</p>
+</li>
+<li>
+<p><strong>Implement the handler.</strong> Add a <code>_handle_&lt;command&gt;</code> method
+   to <code>VSockAgentJob</code> in <code>commandline/daemon.py</code>. Use
+   <code>self._send_responses()</code> to send the reply.</p>
+</li>
+<li>
+<p><strong>Register the dispatch.</strong> Add a <code>HasField</code> check for your
+   new request type in <code>_attempt_decode()</code>.</p>
+</li>
+<li>
+<p><strong>Write tests.</strong> Add a test method to <code>DaemonAgentV2TestCase</code>
+   in <code>tests/test_daemon.py</code>. Tests construct protobuf messages,
+   serialize them into the job's buffer, call <code>_attempt_decode()</code>,
+   and verify the mocked <code>_send_responses()</code> calls.</p>
+</li>
 </ol>
-<h2 id="image-elements">Image Elements<a class="headerlink" href="#image-elements" title="Permanent link">&para;</a></h2>
-<p>Container images consist of two types of elements, represented as
-<code>ImageElement</code> dataclass instances:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@dataclasses</span><span class="o">.</span><span class="n">dataclass</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">ImageElement</span><span class="p">:</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">element_type</span><span class="p">:</span> <span class="nb">str</span>   <span class="c1"># CONFIG_FILE or IMAGE_LAYER</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>           <span class="c1"># Filename or digest hash</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">data</span><span class="p">:</span> <span class="nb">object</span>        <span class="c1"># File-like object or None (skipped)</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">layer_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Manifest position</span>
-</code></pre></div>
+<h2 id="dependencies">Dependencies<a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h2>
+<p>The agent runs inside guest VMs with minimal environments, so
+the dependency list is kept deliberately small:</p>
 <table>
 <thead>
 <tr>
-<th>Element Type</th>
-<th>Description</th>
+<th>Package</th>
+<th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>CONFIG_FILE</code></td>
-<td>JSON file containing image metadata and configuration</td>
+<td>click</td>
+<td>CLI framework</td>
 </tr>
 <tr>
-<td><code>IMAGE_LAYER</code></td>
-<td>Tarball containing a filesystem layer</td>
+<td>distro</td>
+<td>OS distribution detection</td>
+</tr>
+<tr>
+<td>psutil</td>
+<td>Boot time, I/O priority</td>
+</tr>
+<tr>
+<td>symbolicmode</td>
+<td>Symbolic chmod (e.g. <code>ugo+rw</code>)</td>
+</tr>
+<tr>
+<td>setproctitle</td>
+<td>Set process name in <code>ps</code> output</td>
+</tr>
+<tr>
+<td>protobuf / grpcio</td>
+<td>Protocol buffer serialization</td>
 </tr>
 </tbody>
 </table>
-<p>Each element flows through the pipeline independently, allowing streaming
-processing without loading entire images into memory. The <code>layer_index</code>
-field is set when layers are delivered out of order (see
-<a href="#out-of-order-layer-delivery">Out-of-Order Delivery</a> below).</p>
-<h2 id="input-sources">Input Sources<a class="headerlink" href="#input-sources" title="Permanent link">&para;</a></h2>
-<p>Input sources implement the <code>ImageInput</code> interface and provide image elements
-from various sources.</p>
-<h3 id="registry-input">Registry Input<a class="headerlink" href="#registry-input" title="Permanent link">&para;</a></h3>
-<p>Fetches images from Docker/OCI registries using the HTTP API.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>registry://HOST/IMAGE:TAG
-</code></pre></div>
-<p>Capabilities:
-- Token-based and basic authentication
-- Multi-architecture image selection
-- Manifest parsing (v1, v2, OCI formats)
-- Individual layer blob fetching
-- Parallel layer downloads for improved throughput</p>
-<p><strong>Parallel Downloads:</strong></p>
-<p>Layer blobs are downloaded in parallel using a thread pool:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>fetch() generator
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    └── Yield config file first (synchronous)
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    └── Submit all layer downloads to thread pool
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    └── If ordered=True: yield layers in manifest order
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    └── If ordered=False: yield layers as downloads complete
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        (each with layer_index for reordering)
-</code></pre></div>
-<p>Key aspects:
-- All layers download simultaneously to maximize throughput
-- When <code>ordered=True</code>, layers are yielded in manifest order
-- When <code>ordered=False</code>, layers are yielded via <code>as_completed()</code> with
-  <code>layer_index</code> set, eliminating unnecessary waiting
-- Authentication is thread-safe
-- Default parallelism is 4 threads, configurable via <code>--parallel</code></p>
-<h3 id="docker-daemon-input">Docker Daemon Input<a class="headerlink" href="#docker-daemon-input" title="Permanent link">&para;</a></h3>
-<p>Fetches images from local Docker or Podman daemons.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker://IMAGE:TAG
-</code></pre></div>
-<p>Uses the Docker Engine API over Unix socket to stream the image tarball
-(equivalent to <code>docker save</code>).</p>
-<p><strong>Note:</strong> The Docker Engine API only provides complete image export - there's
-no way to fetch individual layers separately. This is a limitation of the API
-design.</p>
-<p><strong>Hybrid Streaming:</strong></p>
-<p>To minimize disk usage for large images, the Docker input uses a hybrid
-streaming approach:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>fetch() generator
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    └── Stream tarball sequentially (mode=&#39;r|&#39;)
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    └── Read manifest.json to get expected layer order
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    └── For each file in stream:
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        ├── If next expected layer: yield directly (zero disk I/O)
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        └── If out-of-order: buffer to temp file for later
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    └── After stream: yield remaining buffered layers in order
-</code></pre></div>
-<p>Key aspects:
-- In the optimistic case (layers in order), no temp files are used
-- Out-of-order layers are buffered to individual temp files
-- Temp files are deleted immediately after yielding
-- For a 26GB image with in-order layers, disk usage is near zero
-- Temp file location is configurable via <code>--temp-dir</code> option</p>
-<h3 id="docker-push-input">Docker Push Input<a class="headerlink" href="#docker-push-input" title="Permanent link">&para;</a></h3>
-<p>Fetches images from local Docker or Podman daemons using an embedded registry.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>dockerpush://IMAGE:TAG
-</code></pre></div>
-<p><strong>Why use <code>dockerpush://</code> instead of <code>docker://</code>?</strong></p>
-<p>The Docker Engine API (<code>/images/{name}/get</code>) exports images as a single
-sequential tarball. This is fundamentally slow for multi-layer images because
-it serializes all layers into one stream, with no opportunity for
-parallelization. The entire tarball must be read before the manifest becomes
-available.</p>
-<p>Docker's own <code>push</code> command, however, uses the Registry V2 HTTP API, which
-transfers layers individually and in parallel. The <code>dockerpush://</code> input
-exploits this by starting a minimal HTTPS server on localhost (with an
-ephemeral self-signed certificate) that implements the V2 push-path
-endpoints. Docker pushes layers to this server just as it would push to
-any registry, but the received data feeds directly into the occystrap
-pipeline.</p>
-<p>Docker treats the <code>127.0.0.0/8</code> range as insecure (skipping certificate
-verification), so the self-signed certificate is accepted without any
-daemon.json changes. The server uses HTTPS rather than plain HTTP because
-some Docker versions do not fall back from HTTPS to HTTP for loopback
-addresses.</p>
-<p><strong>How it works:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>1. Generate ephemeral self-signed TLS certificate (via openssl)
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>2. Start ThreadingHTTPServer on 127.0.0.1 (ephemeral port, TLS-wrapped)
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>3. Tag image for localhost push (POST /images/{name}/tag)
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>4. Push image (POST /images/{name}/push)
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>   - Docker uploads layers in parallel to embedded registry
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>   - Server thread handles uploads, stores blobs as temp files
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>5. Wait for manifest from Docker push
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>6. Parse manifest + config to get layer DiffIDs
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>7. Yield config element
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>8. For each layer: read blob, decompress, yield ImageElement
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>9. Cleanup: untag temp tag, stop server, delete temp files
-</code></pre></div>
-<p><strong>Threading model:</strong></p>
-<p>The embedded registry runs in a daemon thread handling Docker's parallel
-uploads. The main thread waits for the manifest to arrive, then reads the
-received blobs and yields pipeline elements. Shared state between threads
-is protected by a threading lock.</p>
-<p><strong>Layer cache integration:</strong></p>
-<p>When <code>--layer-cache</code> is used with a <code>registry://</code> output and a <code>dockerpush://</code>
-input, the embedded registry uses a HEAD optimization to skip cached layers
-<em>before Docker even uploads them</em>. On the first run, Docker uploads all layers
-normally and occystrap records a mapping between Docker's compressed digests
-and the uncompressed DiffIDs. On subsequent runs, the embedded registry returns
-<code>200</code> for HEAD checks on cached layers, causing Docker to skip the upload
-entirely. This means cached layers consume zero local transfer time.</p>
-<p>The digest mapping is stored alongside the layer cache as
-<code>{cache_path}.digests</code>. This file maps Docker's compressed layer digests to
-the uncompressed DiffIDs used as cache keys. It is updated automatically
-after each push.</p>
-<p><strong>Limitations:</strong></p>
-<ul>
-<li>Only supports single-platform V2 manifests. If Docker pushes a manifest
-  list (fat manifest) for a multi-arch image, parsing will fail. Use the
-  <code>registry://</code> input for multi-arch images.</li>
-<li>The manifest wait timeout defaults to 300 seconds (<code>MANIFEST_TIMEOUT</code>
-  constant in <code>dockerpush.py</code>). Very large images on slow systems may
-  need this value increased.</li>
-</ul>
-<p><strong>When to use:</strong></p>
-<ul>
-<li>Use <code>dockerpush://</code> when the source image is in a local Docker daemon
-  and the image has multiple layers. The speed advantage grows with the
-  number and size of layers.</li>
-<li>Use <code>docker://</code> for single-layer images or when minimal overhead is
-  preferred (the embedded registry adds a small amount of setup time).</li>
-<li>Use <code>dockerpush://</code> with <code>--layer-cache</code> for maximum performance in CI
-  workflows pushing multiple images that share base layers.</li>
-</ul>
-<h3 id="tarball-input">Tarball Input<a class="headerlink" href="#tarball-input" title="Permanent link">&para;</a></h3>
-<p>Reads images from existing docker-save format tarballs.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>tar:///path/to/file.tar
-</code></pre></div>
-<p>Parses <code>manifest.json</code> to locate config files and layers within the tarball.</p>
-<h2 id="filters">Filters<a class="headerlink" href="#filters" title="Permanent link">&para;</a></h2>
-<p>Filters implement the decorator pattern, wrapping outputs (or other filters)
-to transform or inspect elements. They inherit from <code>ImageFilter</code>.</p>
-<h3 id="how-filters-work">How Filters Work<a class="headerlink" href="#how-filters-work" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Conceptual filter structure</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyFilter</span><span class="p">(</span><span class="n">ImageFilter</span><span class="p">):</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wrapped_output</span><span class="p">):</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">wrapped</span> <span class="o">=</span> <span class="n">wrapped_output</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">process_image_element</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        <span class="c1"># Transform the element</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>        <span class="n">modified_data</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>        <span class="n">modified_name</span> <span class="o">=</span> <span class="n">new_name_if_changed</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>        <span class="c1"># Pass to wrapped output with a new ImageElement</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">wrapped</span><span class="o">.</span><span class="n">process_image_element</span><span class="p">(</span>
-<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>            <span class="n">constants</span><span class="o">.</span><span class="n">ImageElement</span><span class="p">(</span>
-<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>                <span class="n">element</span><span class="o">.</span><span class="n">element_type</span><span class="p">,</span> <span class="n">modified_name</span><span class="p">,</span>
-<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>                <span class="n">modified_data</span><span class="p">,</span>
-<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>                <span class="n">layer_index</span><span class="o">=</span><span class="n">element</span><span class="o">.</span><span class="n">layer_index</span><span class="p">))</span>
-</code></pre></div>
-<p>Filters propagate the <code>requires_ordered_layers</code> property from their
-wrapped output, so the pipeline respects the final output's ordering
-needs.</p>
-<h3 id="filter-capabilities">Filter Capabilities<a class="headerlink" href="#filter-capabilities" title="Permanent link">&para;</a></h3>
-<p>Filters can:</p>
-<ul>
-<li><strong>Transform data</strong> - Modify element content (e.g., normalize timestamps)</li>
-<li><strong>Transform names</strong> - Rename elements (e.g., after hash changes)</li>
-<li><strong>Inspect elements</strong> - Read without modification (e.g., search)</li>
-<li><strong>Skip elements</strong> - Exclude elements from output</li>
-<li><strong>Accumulate state</strong> - Track information across elements</li>
-</ul>
-<h3 id="available-filters">Available Filters<a class="headerlink" href="#available-filters" title="Permanent link">&para;</a></h3>
-<p><strong>normalize-timestamps</strong>: Rewrites layer tarballs to set all file modification
-times to a consistent value. Since this changes content, SHA256 hashes are
-recalculated.</p>
-<p><strong>search</strong>: Searches layer contents for files matching patterns. Can operate
-as search-only (prints results) or passthrough (searches AND forwards
-elements).</p>
-<p><strong>exclude</strong>: Removes files matching glob patterns from layers, recalculating
-hashes afterward.</p>
-<p><strong>inspect</strong>: Records layer metadata (digest, size, build history) to a JSONL
-file. This is a pure passthrough filter -- it does not modify image data. Place
-it between other filters to observe and measure their effect on layers.</p>
-<h3 id="chaining-filters">Chaining Filters<a class="headerlink" href="#chaining-filters" title="Permanent link">&para;</a></h3>
-<p>Multiple filters are chained together:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://...<span class="w"> </span>tar://output.tar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span>-f<span class="w"> </span><span class="s2">&quot;search:pattern=*.conf&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**&quot;</span>
-</code></pre></div>
-<p>The pipeline becomes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Input --&gt; normalize-timestamps --&gt; search --&gt; exclude --&gt; Output
-</code></pre></div>
-<p>Each filter wraps the next, forming a chain that processes elements in order.</p>
-<h2 id="output-writers">Output Writers<a class="headerlink" href="#output-writers" title="Permanent link">&para;</a></h2>
-<p>Output writers implement the <code>ImageOutput</code> interface and handle the final
-destination of processed elements.</p>
-<p>All output writers log a summary line at the end of processing.</p>
-<p>The registry output provides a detailed breakdown of where time was spent:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>Processed 40 layers in 34.7s (compress: 15.8s, upload: 4.5s,
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>  upload_skipped: 22), 980.0 MB in, 326.3 MB out (33%)
-</code></pre></div>
-<p>This shows:
-- <strong>compress</strong> - total CPU time spent compressing layers (summed across threads)
-- <strong>upload</strong> - total time spent on upload HTTP requests (summed across threads)
-- <strong>upload_skipped</strong> - number of blobs that already existed in the registry
-- <strong>MB in / MB out</strong> - uncompressed input size vs compressed output size
-- <strong>ratio</strong> - compression ratio (compressed / uncompressed as percentage)</p>
-<p>Other outputs log a simpler summary:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>Processed 12345678 bytes in 5 layers in 3.2 seconds
-</code></pre></div>
-<h3 id="tarball-output">Tarball Output<a class="headerlink" href="#tarball-output" title="Permanent link">&para;</a></h3>
-<p>Creates docker-loadable tarballs in v1.2 format.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>tar:///path/to/output.tar
-</code></pre></div>
-<p>The tarball contains:
-- <code>manifest.json</code> - Image manifest
-- <code>&lt;hash&gt;.json</code> - Config file
-- <code>&lt;hash&gt;/layer.tar</code> - Layer tarballs</p>
-<p>Can be loaded with <code>docker load -i output.tar</code>.</p>
-<h3 id="directory-output">Directory Output<a class="headerlink" href="#directory-output" title="Permanent link">&para;</a></h3>
-<p>Extracts images to directories.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>dir:///path/to/directory
-</code></pre></div>
-<p>Options:
-- <code>unique_names=true</code> - Enable layer deduplication by prefixing filenames
-- <code>expand=true</code> - Extract layer tarballs to filesystem</p>
-<p>With <code>unique_names</code>, a <code>catalog.json</code> tracks which layers belong to which
-images, allowing multiple images to share storage.</p>
-<h3 id="oci-bundle-output">OCI Bundle Output<a class="headerlink" href="#oci-bundle-output" title="Permanent link">&para;</a></h3>
-<p>Creates OCI runtime bundles for runc.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>oci:///path/to/bundle
-</code></pre></div>
-<p>Produces:
-- <code>config.json</code> - OCI runtime configuration
-- <code>rootfs/</code> - Merged filesystem from all layers</p>
-<h3 id="registry-output">Registry Output<a class="headerlink" href="#registry-output" title="Permanent link">&para;</a></h3>
-<p>Pushes images to Docker/OCI registries.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>registry://HOST/IMAGE:TAG
-</code></pre></div>
-<p>Uploads layers as blobs in parallel and creates the manifest.</p>
-<p><strong>Parallel Compression and Uploads:</strong></p>
-<p>Both layer compression and uploads run in a thread pool for improved performance:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>process_image_element() called for each layer
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    └── Read layer data
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    └── Submit (compress + upload) to thread pool (non-blocking)
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    └── Main thread continues to next layer
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>finalize()
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>    └── Wait for all compression/upload tasks to complete
-<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    └── Collect layer metadata from futures (in order)
-<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>    └── Push manifest only after all blobs uploaded
-</code></pre></div>
-<p>Key design aspects:
-- Multiple layers can compress simultaneously, utilizing multiple CPU cores
-- While one layer is compressing, others can be uploading
-- Layer order is preserved by tracking <code>layer_index</code> and sorting at
-  finalize time
-- Authentication token updates are thread-safe
-- Progress is reported every 10 seconds during finalize
-- Default parallelism is 4 threads, configurable via <code>--parallel</code> or <code>-j</code>,
-  or the <code>max_workers</code> URI option</p>
-<p><strong>Cross-Invocation Layer Cache:</strong></p>
-<p>When pushing multiple images that share base layers (common in CI), the
-<code>--layer-cache</code> option enables persistent caching of layer processing results:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>fetch_callback(digest)
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>    └── Check cache for (digest, filters_hash)
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>    └── If found: HEAD request to verify registry still has blob
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    └── If registry has blob: skip layer (no fetch/filter/compress/upload)
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    └── If not: process normally and record result to cache
-</code></pre></div>
-<p>Cache entries are keyed by <code>(input_diffid, filters_hash)</code> so that the same
-layer processed with different filter configurations gets separate entries.
-The cache is stored as a JSON file with one entry per layer, recording
-the compressed digest, size, media type, and filter hash. The cache is
-saved atomically to disk (via temporary file and rename) after each
-successful push. Cache hits are reported in the summary line.</p>
-<p>See <a href="/components/occystrap/command-reference/#layer-cache">Command Reference</a> for the full
-cache file format and usage examples.</p>
-<p><strong>Blob Deduplication:</strong></p>
-<p>Before uploading a layer blob, the registry output checks whether the blob
-already exists in the target registry using <code>HEAD /v2/&lt;name&gt;/blobs/&lt;digest&gt;</code>.
-If the blob exists, the upload is skipped. This is particularly effective when
-pushing images that share base layers with images already in the registry.</p>
-<p>For this check to work, the compressed blob must have the same SHA256 digest
-as the existing blob. This requires deterministic compression -- see
-<a href="#deterministic-compression">Deterministic Compression</a> below.</p>
-<h3 id="docker-daemon-output">Docker Daemon Output<a class="headerlink" href="#docker-daemon-output" title="Permanent link">&para;</a></h3>
-<p>Loads images into local Docker or Podman.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>docker://IMAGE:TAG
-</code></pre></div>
-<p>Uses the Docker Engine API to load the image.</p>
-<h2 id="data-flow-example">Data Flow Example<a class="headerlink" href="#data-flow-example" title="Permanent link">&para;</a></h2>
-<p>Consider this command:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">    </span>tar://busybox.tar<span class="w"> </span>-f<span class="w"> </span>normalize-timestamps
-</code></pre></div>
-<p>The data flow is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>1. Registry Input fetches manifest from docker.io
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>2. Registry Input yields CONFIG_FILE element
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>   --&gt; TimestampNormalizer passes through unchanged
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>   --&gt; TarWriter writes to tarball
-<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>3. For each layer:
-<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>   a. Registry Input fetches layer blob
-<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>   b. Registry Input yields IMAGE_LAYER element
-<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>   c. TimestampNormalizer rewrites tarball with epoch timestamps
-<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>   d. TimestampNormalizer recalculates SHA256
-<a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a>   e. TimestampNormalizer yields modified element with new name
-<a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a>   f. TarWriter writes modified layer to tarball
-<a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a>4. TarWriter.finalize() writes manifest.json
-</code></pre></div>
-<h2 id="key-concepts">Key Concepts<a class="headerlink" href="#key-concepts" title="Permanent link">&para;</a></h2>
-<h3 id="whiteout-files">Whiteout Files<a class="headerlink" href="#whiteout-files" title="Permanent link">&para;</a></h3>
-<p>OCI layers use special files to mark deletions:</p>
-<ul>
-<li><code>.wh.&lt;filename&gt;</code> - Marks a specific file as deleted</li>
-<li><code>.wh..wh..opq</code> - Marks entire directory as opaque (replaced)</li>
-</ul>
-<p>These are processed when extracting layers with <code>expand=true</code>.</p>
-<h3 id="layer-deduplication">Layer Deduplication<a class="headerlink" href="#layer-deduplication" title="Permanent link">&para;</a></h3>
-<p>With <code>unique_names=true</code>, layers are stored with content-addressed names.
-When downloading multiple images:</p>
-<ol>
-<li>First image stores layers normally</li>
-<li>Subsequent images check if layers already exist</li>
-<li>Shared layers are referenced, not duplicated</li>
-<li><code>catalog.json</code> maps images to their layers</li>
-</ol>
-<h3 id="deterministic-compression">Deterministic Compression<a class="headerlink" href="#deterministic-compression" title="Permanent link">&para;</a></h3>
-<p>When pushing layers to a registry, Occy Strap compresses them before upload.
-For blob deduplication to work (skipping uploads of layers that already
-exist), the compressed output must be identical for identical input. This
-is called deterministic compression.</p>
-<p><strong>gzip:</strong> The gzip format includes a timestamp in its header by default,
-which means compressing the same data twice produces different output.
-Occy Strap suppresses this by setting <code>mtime=0</code> in the gzip header,
-making gzip compression fully deterministic.</p>
-<p><strong>zstd:</strong> The zstd format does not embed timestamps, so it is inherently
-deterministic. Compressing the same data with the same settings always
-produces identical output.</p>
-<p>This determinism works together with filters like <code>normalize-timestamps</code>
-and <code>exclude</code> to maximize layer deduplication:</p>
-<ol>
-<li>The <code>normalize-timestamps</code> filter sets all file modification times in
-   layer tarballs to a consistent value (epoch 0 by default)</li>
-<li>The <code>exclude</code> filter removes unwanted files from layers</li>
-<li>Deterministic compression ensures the compressed output has a stable
-   SHA256 digest</li>
-<li>The registry output checks for existing blobs before uploading,
-   skipping any that already exist</li>
-</ol>
-<p>This means that if two images share identical layers (after filtering),
-the second push will skip uploading those layers entirely.</p>
-<h3 id="out-of-order-layer-delivery">Out-of-Order Layer Delivery<a class="headerlink" href="#out-of-order-layer-delivery" title="Permanent link">&para;</a></h3>
-<p>The pipeline supports out-of-order layer delivery to maximize throughput
-when the output doesn't require manifest ordering. Each output declares
-its ordering needs via the <code>requires_ordered_layers</code> property:</p>
-<ul>
-<li><strong>Order-dependent</strong> (<code>True</code>): <code>dir</code> with <code>expand=True</code>, <code>oci</code></li>
-<li><strong>Order-independent</strong> (<code>False</code>): <code>registry</code>, <code>tar</code>, <code>docker</code>,
-  <code>dir</code> (expand=False), <code>mounts</code></li>
-</ul>
-<p>When <code>requires_ordered_layers</code> is <code>False</code>:
-1. The input's <code>fetch()</code> receives <code>ordered=False</code>
-2. Layers are yielded as they become available with <code>layer_index</code> set
-3. The output stores layers with their indices
-4. <code>finalize()</code> sorts by index to reconstruct the correct manifest order</p>
-<p>This is particularly beneficial for the registry-to-registry pipeline,
-where layers can start uploading as soon as they finish downloading
-rather than waiting for earlier layers to complete first.</p>
-<h3 id="hash-recalculation">Hash Recalculation<a class="headerlink" href="#hash-recalculation" title="Permanent link">&para;</a></h3>
-<p>When filters modify layer content (timestamps, file exclusion), the SHA256
-hash changes. Filters that modify content:</p>
-<ol>
-<li>Process the layer tarball</li>
-<li>Calculate the new SHA256 hash</li>
-<li>Update the layer name to use the new hash</li>
-<li>Update the manifest to reference the new hash</li>
-</ol>
+<p>Several dependencies that were previously used (<code>linux-utils</code>,
+<code>oslo.concurrency</code>, <code>shakenfist-utilities</code>) have been replaced
+with lightweight inline implementations to reduce install size
+and improve compatibility with newer Python versions.</p>
 
 
 
@@ -4410,7 +3512,7 @@ hash changes. Filters that modify content:</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/occystrap/pipeline.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/occystrap/pipeline.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/occystrap/pipeline/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/agent-python/developer-guide.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/agent-python/developer-guide.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/agent-python/developer-guide/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
