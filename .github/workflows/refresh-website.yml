@@ -1,5 +1,8 @@
 name: Refresh shakenfist.com daily
 
+permissions:
+  pages: write
+
 on:
   workflow_dispatch:
   schedule:

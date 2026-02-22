@@ -62,10 +62,15 @@ class WrappedEtcdClient(Etcd3Client):
 
         if config.LOG_ETCD_CONNECTIONS:
             LOG.info('Building new etcd connection')
-        return super().__init__(
+        super().__init__(
             host=host, port=port, protocol=protocol, ca_cert=ca_cert,
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
             api_path=api_path)
+
+        # Never use HTTP proxies for etcd connections. etcd is always on
+        # the local network and proxies cause timeouts (e.g. squid
+        # returning 503).
+        self.session.trust_env = False
 
     # Wrap post() to retry on errors. These errors are caused by our long lived
     # connections sometimes being dropped.
@@ -76,6 +81,7 @@ class WrappedEtcdClient(Etcd3Client):
             LOG.info('Retrying after receiving etcd error: %s' % e)
 
             self.session = requests.Session()
+            self.session.trust_env = False
             if self.timeout is not None:
                 self.session.timeout = self.timeout
             if self.ca_cert is not None:

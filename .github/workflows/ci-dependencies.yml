@@ -1,13 +1,23 @@
 name: Rebuild CI dependencies
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   workflow_dispatch:
   schedule:
     - cron: '00 00 * * *'        # utc
 
+
+env:
+  http_proxy: http://192.168.1.15:3128
+  https_proxy: http://192.168.1.15:3128
+  PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
+
 jobs:
   ci-dependencies:
-    runs-on: [self-hosted, vm]
+    runs-on: [self-hosted, vm, debian-12]
     timeout-minutes: 120
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,6 +34,12 @@ jobs:
           repository: shakenfist/actions
           path: actions
           fetch-depth: 0
+
+      - name: Checkout the shakenfist repository
+        uses: actions/checkout@v6
+        with:
+          path: shakenfist
+          fetch-depth: 1
 
       - name: Install the github command line
         run: |

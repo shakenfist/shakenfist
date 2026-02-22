@@ -1,5 +1,8 @@
 name: Functional tests
 
+permissions:
+  contents: read
+
 # The can_enqueue / can_merge scheme is as described at:
 # https://boinkor.net/2023/11/neat-github-actions-patterns-for-github-merge-queues/
 
@@ -18,6 +21,12 @@ on:
       - 'docs/**'
       - mkdocs.yml
       - mkdocs.yml.tmpl
+
+
+env:
+  http_proxy: http://192.168.1.15:3128
+  https_proxy: http://192.168.1.15:3128
+  PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
 
 jobs:
   # Check if the last commit was from the bot to prevent infinite loops in
@@ -50,6 +59,9 @@ jobs:
   # to save a little time and reduce CI runner churn.
   sanity_checks:
     name: "Sanity checks"
+    permissions:
+      contents: read
+      pull-requests: write
     runs-on: [self-hosted, vm, debian-12]
     needs: enqueue_pr_comment
     outputs:
@@ -600,6 +612,9 @@ jobs:
   # Skip if the last commit was from the bot (checked by check_bot_commit job).
   automated_exception_fixer:
     name: "Automated exception fixer"
+    permissions:
+      contents: read
+      actions: read
     runs-on: [self-hosted, claude-code]
     needs: [functional_matrix_pr, check_bot_commit]
     if: >-
@@ -663,9 +678,15 @@ jobs:
 
   automated_reviewer:
     name: "Automated reviewer"
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     runs-on: [self-hosted, claude-code]
-    needs: [sanity_checks, functional_matrix_pr]
-    if: github.event_name == 'pull_request'
+    needs: [sanity_checks, functional_matrix_pr, check_bot_commit]
+    if: |
+      github.event_name == 'pull_request' &&
+      needs.check_bot_commit.outputs.is_bot != 'true'
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-reviewer
       cancel-in-progress: true
@@ -677,10 +698,9 @@ jobs:
           fetch-depth: 0
 
       - name: Run automated reviewer
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tools/review-pr-with-claude.sh --ci --pr ${{ github.event.pull_request.number }}
+        uses: shakenfist/actions/review-pr-with-claude@main
+        with:
+          pr-number: ${{ github.event.pull_request.number }}
 
   functional_matrix_merge:
     name: "${{ matrix.merge.name }}"
@@ -1087,6 +1107,8 @@ jobs:
   # visibility. Fixes should be made in the PR stage, not the merge queue.
   display_merge_exceptions:
     name: "Display merge exceptions"
+    permissions:
+      actions: read
     runs-on: [self-hosted, vm, debian-12]
     needs: [functional_matrix_merge]
     if: >-

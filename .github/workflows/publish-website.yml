@@ -1,10 +1,20 @@
 # With thanks to https://bluegenes.github.io/mkdocs-github-actions/
 name: Build and publish shakenfist.com
+
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
     branches:
       - develop
+
+
+env:
+  http_proxy: http://192.168.1.15:3128
+  https_proxy: http://192.168.1.15:3128
+  PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
 
 jobs:
   deploy:

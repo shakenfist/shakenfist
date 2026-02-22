@@ -20,6 +20,10 @@ The repository uses several GitHub Actions workflows:
 | `documentation-tests.yml` | Build and test documentation | PR |
 | `pin-indirect-dependencies.yml` | Keep indirect dependencies pinned | Daily schedule |
 | `export-repo-config.yml` | Export GitHub repo settings to version control | Daily schedule |
+| `pr-re-review.yml` | Re-review PR on bot command | `@shakenfist-bot please re-review` |
+| `pr-address-comments.yml` | Address review comments on bot command | `@shakenfist-bot please address comments` |
+| `pr-fix-tests.yml` | Fix test failures on bot command | `@shakenfist-bot please attempt to fix` |
+| `test-drift-fix.yml` | Unit test fixer (called by pr-fix-tests) | workflow_call, workflow_dispatch |
 
 ### Merge Queue Pattern
 
@@ -60,8 +64,24 @@ issues.
 
 ### Automated Reviewer
 
-After successful tests, the `automated_reviewer` job runs Claude Code to review
-the PR changes.
+After successful tests, the `automated_reviewer` job uses the shared
+`shakenfist/actions/review-pr-with-claude@main` action to review the PR.
+The reviewer produces structured JSON reviews, creates GitHub issues for
+actionable items, and embeds the JSON in the PR comment for automation.
+
+### Developer Automation (Bot Commands)
+
+Authorized users can trigger automation by commenting on PRs:
+
+- **`@shakenfist-bot please re-review`** - Triggers a fresh automated
+  review of the PR using the shared review action.
+- **`@shakenfist-bot please address comments`** - Runs Claude Code to
+  address actionable items from the automated review. Uses
+  `tools/address-comments-with-claude.sh` with dual-checkout security
+  (trusted tools from base branch, PR code separately).
+- **`@shakenfist-bot please attempt to fix`** - Runs Claude Code to fix
+  unit test failures (`tox -ecover`). Uses `test-drift-fix.yml` with
+  structured commit summaries.
 
 ## Working with This Codebase
 

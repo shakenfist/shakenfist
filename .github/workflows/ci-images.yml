@@ -1,9 +1,19 @@
 name: Rebuild CI images
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   workflow_dispatch:
   schedule:
     - cron: '11 0 * * *'        # utc
+
+
+env:
+  http_proxy: http://192.168.1.15:3128
+  https_proxy: http://192.168.1.15:3128
+  PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
 
 jobs:
   image_build_matrix:
@@ -66,7 +76,7 @@ jobs:
                 'baseuser': 'ubuntu',
                 'outputlabel': 'ci-images/ubuntu-2204',
                 'scheduled': True,
-                'runs_on': 'debian-11'
+                'runs_on': 'debian-12'
             },
             {
                 'name': 'ubuntu-2404',

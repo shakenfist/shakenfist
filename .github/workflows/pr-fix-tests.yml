@@ -1,0 +1,52 @@
+# Triggers Claude Code to fix test failures when an authorized user
+# comments "@shakenfist-bot please attempt to fix"
+#
+# Delegates to test-drift-fix.yml for the actual fix logic.
+#
+# Template source: shakenfist/development/templates/ci-review-automation/
+
+name: PR Fix Tests
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  trigger-fix:
+    name: "Trigger test fix"
+    # Only run on PR comments (not issue comments)
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '@shakenfist-bot please attempt to fix')
+    runs-on: [self-hosted, static]
+    outputs:
+      authorized: ${{ steps.trigger.outputs.authorized }}
+      pr_ref: ${{ steps.trigger.outputs.pr-ref }}
+      pr_number: ${{ github.event.issue.number }}
+
+    steps:
+      - name: Handle trigger
+        id: trigger
+        uses: shakenfist/actions/pr-bot-trigger@main
+        with:
+          trigger-phrase: 'please attempt to fix'
+          reaction: 'rocket'
+          starting-message: |
+            Starting Claude Code test fix run...
+
+            [View workflow run]({run_url})
+
+  fix-tests:
+    needs: trigger-fix
+    if: needs.trigger-fix.outputs.authorized == 'true'
+    uses: ./.github/workflows/test-drift-fix.yml
+    with:
+      ref: ${{ needs.trigger-fix.outputs.pr_ref }}
+      pr_number: ${{ needs.trigger-fix.outputs.pr_number }}
+      max_turns: '50'
+    secrets: inherit

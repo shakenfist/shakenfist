@@ -1,5 +1,8 @@
 name: Sync docs from affiliated projects for web publication
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   schedule:

@@ -222,8 +222,36 @@ Flask app (external_api/app.py)
 
 ### GitHub Actions
 
-- **functional-tests.yml**: Main CI workflow with merge queue support
-- **export-repo-config.yml**: Exports GitHub settings for version control
+- **functional-tests.yml**: Main CI workflow with merge queue support.
+  Includes automated reviewer (via shared action), delinter, and
+  exception fixer jobs.
+- **export-repo-config.yml**: Exports GitHub settings for version
+  control (uses shared reusable workflow from `actions/` repo).
+- **pr-re-review.yml**: Bot-triggered PR re-review.
+- **pr-address-comments.yml**: Bot-triggered comment addressing.
+- **pr-fix-tests.yml** / **test-drift-fix.yml**: Bot-triggered unit
+  test fixing.
+
+### CI Caching
+
+Workflows that download packages use environment variables to route
+traffic through local caches:
+
+- **HTTP proxy**: `http_proxy`/`https_proxy` set to
+  `http://192.168.1.15:3128` (Squid cache) for apt, curl, and
+  general HTTP downloads.
+- **PyPI mirror**: `PIP_INDEX_URL` set to
+  `https://devpi.home.stillhq.com/root/pypi/+simple/` (devpi) for
+  pip and uv package installs.
+
+CI VMs provisioned by the `shakenfist/actions` Ansible playbooks also
+get system-level config files (`/etc/apt/apt.conf.d/01proxy` and
+`/etc/pip.conf`) so that getsf and other tools use the caches.
+- **Proxy bypass**: `no_proxy`/`NO_PROXY` set to
+  `localhost,127.0.0.1,10.0.0.0/8` to prevent local service traffic
+  (e.g. etcd API calls) from being routed through the proxy.
+  Additionally, `WrappedEtcdClient` sets `trust_env = False` on its
+  requests session as defense in depth.
 
 ### Branch Protection
 

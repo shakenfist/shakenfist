@@ -8,6 +8,9 @@
 
 name: Release
 
+permissions:
+  contents: read
+
 on:
   push:
     tags:
@@ -15,6 +18,12 @@ on:
 
   # Allow manual trigger for testing (won't publish without a tag)
   workflow_dispatch:
+
+
+env:
+  http_proxy: http://192.168.1.15:3128
+  https_proxy: http://192.168.1.15:3128
+  PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
 
 jobs:
   build:
