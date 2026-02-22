@@ -135,27 +135,32 @@ available.
 
 Docker's own `push` command, however, uses the Registry V2 HTTP API, which
 transfers layers individually and in parallel. The `dockerpush://` input
-exploits this by starting a minimal HTTP server on localhost that implements
-the V2 push-path endpoints. Docker pushes layers to this server just as it
-would push to any registry, but the received data feeds directly into the
-occystrap pipeline.
+exploits this by starting a minimal HTTPS server on localhost (with an
+ephemeral self-signed certificate) that implements the V2 push-path
+endpoints. Docker pushes layers to this server just as it would push to
+any registry, but the received data feeds directly into the occystrap
+pipeline.
 
-Since Docker 1.3.2, the entire `127.0.0.0/8` range is implicitly trusted as
-insecure, so no daemon.json changes or TLS certificates are needed.
+Docker treats the `127.0.0.0/8` range as insecure (skipping certificate
+verification), so the self-signed certificate is accepted without any
+daemon.json changes. The server uses HTTPS rather than plain HTTP because
+some Docker versions do not fall back from HTTPS to HTTP for loopback
+addresses.
 
 **How it works:**
 
 ```
-1. Start ThreadingHTTPServer on 127.0.0.1 (ephemeral port)
-2. Tag image for localhost push (POST /images/{name}/tag)
-3. Push image (POST /images/{name}/push)
+1. Generate ephemeral self-signed TLS certificate (via openssl)
+2. Start ThreadingHTTPServer on 127.0.0.1 (ephemeral port, TLS-wrapped)
+3. Tag image for localhost push (POST /images/{name}/tag)
+4. Push image (POST /images/{name}/push)
    - Docker uploads layers in parallel to embedded registry
    - Server thread handles uploads, stores blobs as temp files
-4. Wait for manifest from Docker push
-5. Parse manifest + config to get layer DiffIDs
-6. Yield config element
-7. For each layer: read blob, decompress, yield ImageElement
-8. Cleanup: untag temp tag, stop server, delete temp files
+5. Wait for manifest from Docker push
+6. Parse manifest + config to get layer DiffIDs
+7. Yield config element
+8. For each layer: read blob, decompress, yield ImageElement
+9. Cleanup: untag temp tag, stop server, delete temp files
 ```
 
 **Threading model:**
