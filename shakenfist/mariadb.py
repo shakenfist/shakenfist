@@ -35,7 +35,7 @@ from shakenfist_utilities import logs
 from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
-from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.protos from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.blob_hash import BlobHash
