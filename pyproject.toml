@@ -185,7 +185,7 @@ test = [
     "python-subunit==1.4.4",    # apache2 -- pinned <1.4.5, 1.4.5+
                                 #            requires testtools>=2.7
     "flake8==7.3.0",            # mit
-    "tox==4.35.0",              # mit
+    "tox==4.42.0",              # mit
     "mkdocs==1.6.1",            # bsd
     "mkdocs-material==9.7.1",   # mit
     "testscenarios==0.5.0",     # bsd
