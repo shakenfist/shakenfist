@@ -79,6 +79,10 @@ nav:
             - "Virtualization history": components/cloudgood/virtualization-history.md
             - "Memory mapped devices": components/cloudgood/memory-mapped-devices.md
             - "Instance video": components/cloudgood/instance-video.md
+            - "Virtual networking": components/cloudgood/virtual-networking.md
+            - "Shaken Fist networking": components/cloudgood/networking-shakenfist.md
+            - "Neutron with Linux bridge": components/cloudgood/neutron-linuxbridge.md
+            - "Neutron legacy routers": components/cloudgood/neutron-legacy.md
         - Clingwrap:
             - "Introduction": components/clingwrap/index.md
             - "Command Types": components/clingwrap/command-types.md
