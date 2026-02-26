@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#virtual-networking-incomplete" class="md-skip">
+        <a href="#virtual-networking" class="md-skip">
           Skip to content
         </a>
       
@@ -689,6 +689,39 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-building-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The building blocks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-design-spectrum" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The design spectrum
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementations
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#planned-topics" class="md-nav__link">
@@ -3479,6 +3512,39 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#the-building-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The building blocks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-design-spectrum" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The design spectrum
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#planned-topics" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3510,26 +3576,191 @@
   
 
 
-<h1 id="virtual-networking-incomplete">Virtual Networking (incomplete)<a class="headerlink" href="#virtual-networking-incomplete" title="Permanent link">&para;</a></h1>
-<p>This chapter will explore how virtual machines communicate with each other and
-the outside world.</p>
+<h1 id="virtual-networking">Virtual networking<a class="headerlink" href="#virtual-networking" title="Permanent link">&para;</a></h1>
+<p>Virtual machines need to communicate -- with each other, with services on
+the network, and with the outside world. But cloud providers can't just
+plug every <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> into a physical switch: tenants need isolated networks,
+overlapping IP ranges, and the ability to create and destroy network
+topologies on demand. Virtual networking exists to solve this problem.</p>
+<p class="annotate">That said, the very first version of cloud computing <em>did</em> just plug VMs
+into a shared network. When Amazon EC2 launched in August 2006, all
+customer instances shared a single flat 10.0.0.0/8 network (1). There
+were no per-tenant virtual networks, no VLANs, no isolation at the
+network layer. The only thing preventing one customer's instance from
+reaching another's was <em>security groups</em> -- a hypervisor-level packet
+filter enforced in Xen's Dom0, configured as default-deny-all, active
+before the guest OS even booted. Security groups were not a convenience
+feature; they were the entire isolation mechanism for a shared network
+segment.</p>
+<ol>
+<li>Werner Vogels described EC2-Classic as "one giant network of
+   10.0.0.0/8" in his <a href="https://www.allthingsdistributed.com/2023/09/farewell-ec2-classic.html">farewell post for EC2-Classic</a>
+   when the last Classic instance was shut down in August 2023,
+   seventeen years after launch.</li>
+</ol>
+<p>This worked, but it meant that a bug in the security group
+implementation would expose every instance to every other instance on
+the platform. Amazon introduced <abbr title="Virtual Private Cloud -- an isolated virtual network within a cloud provider.">VPC</abbr> (Virtual Private Cloud) in 2009,
+adding actual per-tenant network isolation, and made it the default for
+new accounts in 2013. The lesson was clear: defense in depth matters,
+and network-level isolation should not depend on a single enforcement
+point.</p>
+<p>The core challenge is deceptively simple: make a group of VMs on
+potentially different physical hosts behave as if they're all plugged into
+the same Ethernet switch, while keeping that switch completely invisible
+to VMs on other virtual networks. Every virtual networking implementation
+is, at its heart, an answer to this question.</p>
+<h2 id="the-building-blocks">The building blocks<a class="headerlink" href="#the-building-blocks" title="Permanent link">&para;</a></h2>
+<p>Before examining specific implementations, it's worth understanding
+the Linux primitives they all share. Every system we'll look at --
+from the simplest to the most complex -- builds on the same kernel
+features.</p>
+<p><strong>Linux bridges</strong> are the kernel's built-in virtual switch. A bridge
+accepts multiple network interfaces as "ports" and forwards Ethernet
+frames between them based on MAC addresses, just like a physical switch.
+When a <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>'s TAP interface and a <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> tunnel endpoint are both attached to
+the same bridge, the <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> can communicate with remote VMs as if they were on
+the same physical segment.</p>
+<p><strong><abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr></strong> (Virtual eXtensible LAN) is an overlay protocol that
+encapsulates Ethernet frames inside UDP packets. Each virtual network gets
+a 24-bit VNI (<abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> Network Identifier), allowing up to ~16 million
+isolated networks. The encapsulated frames travel over the physical
+network infrastructure without any special switch configuration --
+the physical network just sees ordinary UDP traffic. This decouples
+virtual network topology from physical network topology entirely.</p>
+<p><strong>Network namespaces</strong> provide isolated network stacks within a single
+Linux host. Each namespace has its own interfaces, routing table, iptables
+rules, and ARP table. Virtual routers, DHCP servers, and NAT gateways
+are typically implemented as processes running inside dedicated namespaces,
+giving each tenant's network services complete isolation from others on
+the same host.</p>
+<p><strong>veth pairs</strong> are virtual Ethernet cables -- creating one gives you two
+interfaces that are directly connected. Whatever goes in one end comes out
+the other. They're the standard mechanism for connecting a network
+namespace to a bridge or to another namespace, since interfaces can be
+moved between namespaces but bridges cannot span them.</p>
+<p><strong>iptables</strong> (and its successor nftables) provides packet filtering, NAT,
+and traffic mangling. SNAT (Source NAT) rewrites source addresses to allow
+instances to share a public IP for outbound traffic. DNAT (Destination
+NAT) rewrites destination addresses to direct incoming traffic to the
+right instance, which is how floating IPs work.</p>
+<div class="admonition info">
+<p class="admonition-title">Want to know more?</p>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Resource</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linux bridge</td>
+<td><a href="https://man7.org/linux/man-pages/man8/bridge.8.html">bridge(8) man page</a></td>
+</tr>
+<tr>
+<td><abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> encapsulation</td>
+<td><a href="https://www.rfc-editor.org/rfc/rfc7348">RFC 7348: <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr></a></td>
+</tr>
+<tr>
+<td>Network namespaces</td>
+<td><a href="https://man7.org/linux/man-pages/man7/network_namespaces.7.html">network_namespaces(7)</a></td>
+</tr>
+<tr>
+<td>veth pairs</td>
+<td><a href="https://www.man7.org/linux/man-pages/man4/veth.4.html">veth(4) man page</a></td>
+</tr>
+<tr>
+<td>netfilter/iptables</td>
+<td><a href="https://www.netfilter.org/">netfilter.org</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="the-design-spectrum">The design spectrum<a class="headerlink" href="#the-design-spectrum" title="Permanent link">&para;</a></h2>
+<p>Virtual networking implementations sit on a spectrum between two
+philosophies:</p>
+<p><strong>One bridge per network</strong>: Create a separate Linux bridge for each
+virtual network on each host. Each bridge gets its own <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> interface
+with a unique VNI. Isolation is structural -- traffic from different
+networks is on physically separate bridges and can never mix. This is
+simple to understand and debug with standard Linux tools (<code>brctl show</code>,
+<code>bridge fdb</code>, <code>tcpdump</code>), but creates more kernel objects as the number
+of networks grows.</p>
+<p><strong>One shared bridge per host</strong>: Create a single bridge (or virtual
+switch) that carries traffic for all virtual networks. Traffic is
+distinguished using internal tags (typically VLAN IDs) that are local
+to the bridge and translated to globally-unique identifiers (<abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> VNIs)
+at the tunnel boundary. This requires programmable flow rules (OpenFlow)
+to manage the multiplexing, but keeps the number of kernel objects
+constant regardless of how many networks exist.</p>
+<p>Neither approach is inherently superior. The bridge-per-network model is
+simpler and provides stronger isolation, while the shared-bridge model
+scales better in the number of kernel objects and enables more
+sophisticated traffic engineering. The implementations we'll examine in
+the following chapters illustrate this trade-off concretely.</p>
+<h2 id="implementations">Implementations<a class="headerlink" href="#implementations" title="Permanent link">&para;</a></h2>
+<p>The following chapters walk through a progression of virtual networking
+implementations, from the simplest to the most complex. Each builds on
+the same Linux primitives but makes different trade-offs in complexity,
+performance, and capability.</p>
+<table>
+<thead>
+<tr>
+<th>Chapter</th>
+<th>Approach</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="/components/cloudgood/networking-shakenfist/">Shaken Fist networking</a></td>
+<td>Bridge per network, kernel <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr>, single network node</td>
+<td>In production</td>
+</tr>
+<tr>
+<td><a href="/components/cloudgood/neutron-linuxbridge/">Neutron with Linux bridge</a></td>
+<td>Bridge per network, kernel <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr>, within OpenStack</td>
+<td>Removed in 2025.1</td>
+</tr>
+<tr>
+<td><a href="/components/cloudgood/neutron-legacy/">Neutron legacy routers (<abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr>)</a></td>
+<td>Shared <abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr> bridges, OpenFlow, centralized routing</td>
+<td>Supported</td>
+</tr>
+<tr>
+<td><a href="/components/cloudgood/neutron-ha/">Neutron HA routers</a></td>
+<td>Legacy + keepalived failover</td>
+<td>Supported</td>
+</tr>
+<tr>
+<td><a href="/components/cloudgood/neutron-dvr/">Neutron DVR</a></td>
+<td>Distributed routing on compute nodes</td>
+<td>Supported</td>
+</tr>
+</tbody>
+</table>
+<p>Reading them in order shows how each step adds complexity to solve a
+specific limitation of the previous approach -- and why simpler designs
+remain perfectly valid for deployments that don't need the additional
+capabilities.</p>
 <h2 id="planned-topics">Planned topics<a class="headerlink" href="#planned-topics" title="Permanent link">&para;</a></h2>
+<p>These topics will be covered in future revisions of this chapter or as
+separate chapters in the series:</p>
 <ul>
-<li>Linux bridge basics</li>
-<li>Open vSwitch (<abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr>) and why it exists</li>
-<li>Overlay networks (<abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr>, Geneve)</li>
-<li>Software-defined networking concepts</li>
+<li>Open vSwitch (<abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr>) internals and why it exists</li>
+<li>Software-defined networking concepts and OpenFlow</li>
+<li>Geneve and the evolution of overlay protocols</li>
 <li>eBPF and its role in modern networking</li>
 <li>Security groups and connection tracking</li>
-<li>Network namespaces</li>
-<li><abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr> and hardware passthrough</li>
-<li>
-<p>The performance costs of virtual networking (linking to <abbr title="Data Processing Unit -- a programmable processor for infrastructure offload.">DPU</abbr> discussion)</p>
-</li>
-<li>
-<p>Is Cisco ACI virtual networking? Is it a red herring? What about other forms of physical network software orchestration?</p>
-</li>
-<li>What about OpenFlow?</li>
+<li><abbr title="Single Root I/O Virtualization -- hardware support for sharing a device among VMs.">SR-IOV</abbr> and hardware passthrough for networking</li>
+<li>The performance costs of virtual networking</li>
+<li>OVN as the successor to Neutron's <abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr> agent</li>
+<li>Physical network orchestration (Cisco ACI and similar)</li>
+<li>Neutron's other extension points: ML2 mechanism drivers, L3 service
+  plugins, L2 agent extensions, and how vendors (Cisco ACI, VMware NSX,
+  Juniper, OpenDaylight, Calico) integrate at different layers rather
+  than using the L3 agent extension <abbr title="Application Programming Interface -- a defined interface for software interaction.">API</abbr></li>
 </ul>
 <!-- Shared abbreviations for cloudgood documentation pages -->
 <!-- Include at the bottom of cloudgood files with: --8<-- "docs-include/abbreviations.md" -->
