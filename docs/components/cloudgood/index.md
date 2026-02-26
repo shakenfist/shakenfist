@@ -71,4 +71,14 @@ There is also no exam, you're welcome.
 instances works, why you would even want video from inside an instance,
 and the history of computer graphics for x86 computers.
 
+Next we move on to talking about virtual networking, with
+[virtual networking](/components/cloudgood/virtual-networking/) is an overview of virtual
+networking in general, and then we walk through a series of real world
+examples of incrementing complexity starting with
+[Shaken Fist's implementation](/components/cloudgood/networking-shakenfist/), the now
+obsolete [OpenStack Neutron Linux Bridge networking](/components/cloudgood/neutron-linuxbridge/),
+then [OpenStack Neutron's Legacy non-high availability routing](/components/cloudgood/neutron-legacy/),
+with a solid intention to one day cover OpenStack Neutron's HA and DVR
+options at a future date.
+
 --8<-- "docs-include/abbreviations.md"
