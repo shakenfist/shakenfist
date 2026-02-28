@@ -66,7 +66,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
-              base_image=sf://label/ci-images/debian-11 base_image_user=debian \
+              base_image=sf://label/ci-images/debian-12 base_image_user=debian \
               label=ci-images/dependencies actions_url=$GITHUB_ACTIONS_URL" \
             ansible/ci-dependencies.yml
 

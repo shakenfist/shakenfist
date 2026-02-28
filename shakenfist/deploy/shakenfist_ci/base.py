@@ -21,7 +21,7 @@ LOG = logging.getLogger()
 TRACE_PATH = '/srv/ci/traces'
 
 
-CLUSTER_CI_IMAGE = 'sf://upload/system/debian-11'
+CLUSTER_CI_IMAGE = 'sf://upload/system/debian-12'
 
 
 class TimeoutException(Exception):
