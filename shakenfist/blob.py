@@ -19,7 +19,6 @@ import magic
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
-from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
@@ -69,7 +68,7 @@ LOG, _ = logs.setup(__name__)
 # creation.
 class Blob(dbo):
     object_type = ObjectType.BLOB
-    initial_version = 2
+    initial_version = 8
     current_version = 11
 
     # docs/developer_guide/state_machine.md has a description of these states.
@@ -109,52 +108,6 @@ class Blob(dbo):
             mariadb.create_blob_attributes(attrs)
             self.__attributes = attrs
         return attrs
-
-    @classmethod
-    def _upgrade_step_2_to_3(cls, static_values: dict[str, Any]) -> None:
-        static_values['depends_on'] = None
-
-    @classmethod
-    def _upgrade_step_3_to_4(cls, static_values: dict[str, Any]) -> None:
-        static_values['modified'] = cls.normalize_timestamp(
-                static_values.get('modified'))
-
-    @classmethod
-    def _upgrade_step_4_to_5(cls, static_values: dict[str, Any]) -> None:
-        try:
-            cls._upgrade_metadata_to_attribute(static_values['uuid'])
-        except KeyError as e:
-            # I am currently unsure why you'd end up here, but am seeing it in
-            # CI. Let's gather some more information so we can chase it down.
-            LOG.with_fields(static_values).error(
-                'KeyError while upgrading metadata (v4 to v5): %s' % e)
-
-    @classmethod
-    def _upgrade_step_5_to_6(cls, static_values: dict[str, Any]) -> None:
-        try:
-            etcd.put('attribute/blob', static_values['uuid'], 'retention',
-                     {'expires_at': 0})
-        except KeyError as e:
-            # I am currently unsure why you'd end up here, but am seeing it in
-            # CI. Let's gather some more information so we can chase it down.
-            LOG.with_fields(static_values).error(
-                'KeyError while upgrading retention (v5 to v6): %s' % e)
-
-    @classmethod
-    def _upgrade_step_6_to_7(cls, static_values: dict[str, Any]) -> None:
-        try:
-            etcd.put('attribute/blob', static_values['uuid'], 'size',
-                     {'size': static_values['size']})
-        except KeyError as e:
-            # I am currently unsure why you'd end up here, but am seeing it in
-            # CI. Let's gather some more information so we can chase it down.
-            LOG.with_fields(static_values).error(
-                'KeyError while upgrading retention (v6 to v7): %s' % e)
-
-    @classmethod
-    def _upgrade_step_7_to_8(cls, static_values: dict[str, Any]) -> None:
-        # We added the concept of "incomplete locations".
-        ...
 
     @classmethod
     def _upgrade_step_8_to_9(cls, static_values: dict[str, Any]) -> None:
