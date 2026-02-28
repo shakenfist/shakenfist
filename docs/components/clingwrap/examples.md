@@ -287,6 +287,11 @@ This collects:
 - Docker containers with inspection and logs
 - Container pip package lists
 - Package manager configurations
+- Docker daemon diagnostics (version, disk usage, images,
+  recent events, journalctl logs for docker and containerd,
+  process info, file descriptor counts, memory usage,
+  socket connections, storage driver state, and temp
+  directory state)
 
 ## Running Examples
 
