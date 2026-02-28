@@ -2057,6 +2057,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#batch-image-builds-with-filtering-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Image Builds with Filtering Proxy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Batch Image Builds with Filtering Proxy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#start-proxy-before-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start Proxy Before Build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-use-the-proxy-instead-of-dockerpush" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Use the Proxy Instead of dockerpush://
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#push-multiple-images-with-layer-dedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push Multiple Images with Layer Dedup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#debugging" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2194,6 +2244,34 @@
     
   
     Implementing `info` and `check` subcommands for occystrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-registry-proxy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registry Proxy Mode (dockerpush as persistent registry)
   
 
     
@@ -4341,6 +4419,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#batch-image-builds-with-filtering-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Image Builds with Filtering Proxy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Batch Image Builds with Filtering Proxy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#start-proxy-before-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start Proxy Before Build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-use-the-proxy-instead-of-dockerpush" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Use the Proxy Instead of dockerpush://
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#push-multiple-images-with-layer-dedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push Multiple Images with Layer Dedup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#debugging" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4671,32 +4799,84 @@ any layers shared with earlier pushes.</p>
 <a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># JSON output for scripting</span>
 <a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>occystrap<span class="w"> </span>-O<span class="w"> </span>json<span class="w"> </span>info<span class="w"> </span>docker://myapp:v1<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.layer_count, .architecture&#39;</span>
 </code></pre></div>
+<h2 id="batch-image-builds-with-filtering-proxy">Batch Image Builds with Filtering Proxy<a class="headerlink" href="#batch-image-builds-with-filtering-proxy" title="Permanent link">&para;</a></h2>
+<p>When building many container images (e.g., OpenStack Kolla), the proxy
+command lets build and push overlap, and deduplicates shared base layers
+across images.</p>
+<h3 id="start-proxy-before-build">Start Proxy Before Build<a class="headerlink" href="#start-proxy-before-build" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Start the proxy in the background</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">    </span>--downstream<span class="w"> </span>ghcr.io/myorg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">    </span>--layer-cache<span class="w"> </span>/tmp/layer-cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="p">&amp;</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="c1"># Configure the build tool to push to the proxy</span>
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>kolla-build<span class="w"> </span>--registry<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span>--push<span class="w"> </span>...
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>
+<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a><span class="c1"># Or push individual images as they&#39;re built</span>
+<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>docker<span class="w"> </span>tag<span class="w"> </span>nova-api:latest<span class="w"> </span>localhost:5050/kolla/nova-api:latest
+<a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a>docker<span class="w"> </span>push<span class="w"> </span>localhost:5050/kolla/nova-api:latest
+<a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a>
+<a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a>docker<span class="w"> </span>tag<span class="w"> </span>keystone:latest<span class="w"> </span>localhost:5050/kolla/keystone:latest
+<a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a>docker<span class="w"> </span>push<span class="w"> </span>localhost:5050/kolla/keystone:latest
+</code></pre></div>
+<h3 id="why-use-the-proxy-instead-of-dockerpush">Why Use the Proxy Instead of <code>dockerpush://</code><a class="headerlink" href="#why-use-the-proxy-instead-of-dockerpush" title="Permanent link">&para;</a></h3>
+<p>The <code>dockerpush://</code> input processes one image per invocation. For a
+build producing many images (Kolla builds ~100), each invocation
+starts a fresh embedded registry and cannot share state across images.</p>
+<p>The proxy:</p>
+<ul>
+<li>Runs once, receives all images as they are built</li>
+<li>Maintains a single <code>LayerCache</code> across all images, so the first
+  image pays the full cost and subsequent images skip shared base
+  layers entirely</li>
+<li>Overlaps build and push (images push as soon as they are built,
+  rather than waiting for the entire build to complete)</li>
+</ul>
+<h3 id="push-multiple-images-with-layer-dedup">Push Multiple Images with Layer Dedup<a class="headerlink" href="#push-multiple-images-with-layer-dedup" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="ch">#!/bin/bash</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="c1"># Start proxy with layer cache</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span>-l<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">    </span>-d<span class="w"> </span>myregistry.example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">    </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="p">&amp;</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="nv">PROXY_PID</span><span class="o">=</span><span class="nv">$!</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>
+<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a><span class="c1"># Push images -- shared base layers are uploaded only once</span>
+<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a><span class="k">for</span><span class="w"> </span>img<span class="w"> </span><span class="k">in</span><span class="w"> </span>app-web<span class="w"> </span>app-api<span class="w"> </span>app-worker<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a><span class="w">    </span>docker<span class="w"> </span>tag<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$img</span><span class="s2">:latest&quot;</span><span class="w"> </span><span class="s2">&quot;localhost:5050/</span><span class="nv">$img</span><span class="s2">:latest&quot;</span>
+<a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a><span class="w">    </span>docker<span class="w"> </span>push<span class="w"> </span><span class="s2">&quot;localhost:5050/</span><span class="nv">$img</span><span class="s2">:latest&quot;</span>
+<a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a><span class="k">done</span>
+<a id="__codelineno-25-14" name="__codelineno-25-14" href="#__codelineno-25-14"></a>
+<a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a><span class="c1"># Stop proxy</span>
+<a id="__codelineno-25-16" name="__codelineno-25-16" href="#__codelineno-25-16"></a><span class="nb">kill</span><span class="w"> </span><span class="nv">$PROXY_PID</span>
+</code></pre></div>
 <h2 id="debugging">Debugging<a class="headerlink" href="#debugging" title="Permanent link">&para;</a></h2>
 <p>Troubleshoot issues with verbose output. By default, occystrap only
 logs milestones (start/end, summary statistics). Use <code>--verbose</code> to
 see per-layer detail from occystrap, or <code>--debug</code> to also include
 library output (requests, urllib3, etc.).</p>
 <h3 id="enable-debug-logging">Enable Debug Logging<a class="headerlink" href="#enable-debug-logging" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Debug logging for occystrap modules only</span>
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>occystrap<span class="w"> </span>--verbose<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">    </span>tar://busybox.tar
-<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>
-<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="c1"># Debug logging for all modules (includes library output)</span>
-<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>occystrap<span class="w"> </span>--debug<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="w">    </span>tar://busybox.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># Debug logging for occystrap modules only</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>occystrap<span class="w"> </span>--verbose<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="w">    </span>tar://busybox.tar
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="c1"># Debug logging for all modules (includes library output)</span>
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>occystrap<span class="w"> </span>--debug<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="w">    </span>tar://busybox.tar
 </code></pre></div>
 <p>When running in a terminal, registry downloads and uploads display
 interactive progress bars. In non-TTY environments (CI, pipes),
 periodic log messages are emitted instead.</p>
 <h3 id="inspect-layer-contents">Inspect Layer Contents<a class="headerlink" href="#inspect-layer-contents" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Extract layers without merging</span>
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/python:3.11<span class="w"> </span>dir://python-layers
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="c1"># Each layer is a separate tarball</span>
-<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>ls<span class="w"> </span>python-layers/*.tar
-<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>
-<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="c1"># Inspect a specific layer</span>
-<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>tar<span class="w"> </span>-tvf<span class="w"> </span>python-layers/&lt;layer-hash&gt;.tar<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-50
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Extract layers without merging</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>occystrap<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/python:3.11<span class="w"> </span>dir://python-layers
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="c1"># Each layer is a separate tarball</span>
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>ls<span class="w"> </span>python-layers/*.tar
+<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>
+<a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a><span class="c1"># Inspect a specific layer</span>
+<a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>tar<span class="w"> </span>-tvf<span class="w"> </span>python-layers/&lt;layer-hash&gt;.tar<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-50
 </code></pre></div>
 
 

@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/occystrap/plans/PLAN-info-check/">
+        <link rel="canonical" href="https://shakenfist.com/components/occystrap/plans/PLAN-registry-proxy/">
       
       
-        <link rel="prev" href="../PLAN-structured-logging/">
+        <link rel="prev" href="../PLAN-info-check/">
       
       
-        <link rel="next" href="../PLAN-registry-proxy/">
+        <link rel="next" href="../../../../features/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Implementing `info` and `check` subcommands for occystrap - Shaken Fist</title>
+        <title>Registry Proxy Mode (dockerpush as persistent registry) - Shaken Fist</title>
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#implementing-info-and-check-subcommands-for-occystrap" class="md-skip">
+        <a href="#registry-proxy-mode-dockerpush-as-persistent-registry" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Implementing `info` and `check` subcommands for occystrap
+              Registry Proxy Mode (dockerpush as persistent registry)
             
           </span>
         </div>
@@ -1682,6 +1682,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-info-check/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementing `info` and `check` subcommands for occystrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1701,7 +1729,7 @@
   <span class="md-ellipsis">
     
   
-    Implementing `info` and `check` subcommands for occystrap
+    Registry Proxy Mode (dockerpush as persistent registry)
   
 
     
@@ -1719,7 +1747,7 @@
   <span class="md-ellipsis">
     
   
-    Implementing `info` and `check` subcommands for occystrap
+    Registry Proxy Mode (dockerpush as persistent registry)
   
 
     
@@ -1775,14 +1803,25 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Mission and problem statement">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-constraints-why-this-doesnt-work-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current Constraints (Why This Doesn't Work Today)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Current Constraints (Why This Doesn&#39;t Work Today)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#occystrap-info" class="md-nav__link">
+  <a href="#1-_registrystatemanifest_data-is-a-scalar" class="md-nav__link">
     <span class="md-ellipsis">
       
-        occystrap info
+        1. _RegistryState.manifest_data is a scalar
       
     </span>
   </a>
@@ -1790,10 +1829,54 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#occystrap-check" class="md-nav__link">
+  <a href="#2-single-threadingevent-for-manifest-arrival" class="md-nav__link">
     <span class="md-ellipsis">
       
-        occystrap check
+        2. Single threading.Event for manifest arrival
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-multi-arch-manifests-are-explicitly-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Multi-arch manifests are explicitly rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-the-fetch-flow-is-one-shot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. The fetch() flow is one-shot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-blob-lifecycle-is-per-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Blob lifecycle is per-session
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-docker-api-coupling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Docker API coupling
       
     </span>
   </a>
@@ -1806,22 +1889,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
+  <a href="#key-design-insights" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Open questions
+        Key Design Insights
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Open questions">
+    <nav class="md-nav" aria-label="Key Design Insights">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#do-existing-tools-already-cover-info-and-check" class="md-nav__link">
+  <a href="#the-existing-pipeline-is-already-reusable" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Do existing tools already cover info and check?
+        The existing pipeline is already reusable
       
     </span>
   </a>
@@ -1829,10 +1912,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-information-should-info-display" class="md-nav__link">
+  <a href="#layercache-is-the-key-to-cross-image-dedup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What information should info display?
+        LayerCache is the key to cross-image dedup
       
     </span>
   </a>
@@ -1840,21 +1923,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-things-should-check-validate" class="md-nav__link">
+  <a href="#blocking-manifest-processing-solves-error-propagation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What things should check validate?
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#should-process-be-called-convert" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Should process be called convert?
+        Blocking manifest processing solves error propagation
       
     </span>
   </a>
@@ -1879,10 +1951,22 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#shared-prerequisite-output-formatting-done" class="md-nav__link">
+  <a href="#phase-1-persistent-proxy-mvp" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Shared prerequisite: output formatting (done)
+        Phase 1: Persistent proxy (MVP)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 1: Persistent proxy (MVP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-cli-subcommand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New CLI subcommand
       
     </span>
   </a>
@@ -1890,10 +1974,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#implementation-plan-for-info-done" class="md-nav__link">
+  <a href="#decouple-from-docker-engine-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation plan for info (done)
+        Decouple from Docker Engine API
       
     </span>
   </a>
@@ -1901,10 +1985,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#implementation-plan-for-check-done" class="md-nav__link">
+  <a href="#repository-name-mapping" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation plan for check (done)
+        Repository name mapping
       
     </span>
   </a>
@@ -1912,10 +1996,59 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#testing-strategy-done" class="md-nav__link">
+  <a href="#manifest-processing-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing strategy (done)
+        Manifest processing flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#blob-lifecycle-sequential-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Blob lifecycle (sequential mode)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tls-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TLS considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-concurrent-image-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Concurrent image support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-pull-through-full-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Pull-through / full proxy
       
     </span>
   </a>
@@ -1928,15 +2061,48 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
+  <a href="#design-decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Administration and logistics
+        Design Decisions
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Administration and logistics">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Priority
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#files-likely-affected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files Likely Affected
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Files Likely Affected">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1955,17 +2121,6 @@
     <span class="md-ellipsis">
       
         Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
       
     </span>
   </a>
@@ -1992,34 +2147,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-registry-proxy/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Registry Proxy Mode (dockerpush as persistent registry)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -3772,14 +3899,25 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Mission and problem statement">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-constraints-why-this-doesnt-work-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current Constraints (Why This Doesn't Work Today)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Current Constraints (Why This Doesn&#39;t Work Today)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#occystrap-info" class="md-nav__link">
+  <a href="#1-_registrystatemanifest_data-is-a-scalar" class="md-nav__link">
     <span class="md-ellipsis">
       
-        occystrap info
+        1. _RegistryState.manifest_data is a scalar
       
     </span>
   </a>
@@ -3787,10 +3925,54 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#occystrap-check" class="md-nav__link">
+  <a href="#2-single-threadingevent-for-manifest-arrival" class="md-nav__link">
     <span class="md-ellipsis">
       
-        occystrap check
+        2. Single threading.Event for manifest arrival
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-multi-arch-manifests-are-explicitly-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Multi-arch manifests are explicitly rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-the-fetch-flow-is-one-shot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. The fetch() flow is one-shot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-blob-lifecycle-is-per-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Blob lifecycle is per-session
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-docker-api-coupling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Docker API coupling
       
     </span>
   </a>
@@ -3803,22 +3985,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
+  <a href="#key-design-insights" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Open questions
+        Key Design Insights
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Open questions">
+    <nav class="md-nav" aria-label="Key Design Insights">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#do-existing-tools-already-cover-info-and-check" class="md-nav__link">
+  <a href="#the-existing-pipeline-is-already-reusable" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Do existing tools already cover info and check?
+        The existing pipeline is already reusable
       
     </span>
   </a>
@@ -3826,10 +4008,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-information-should-info-display" class="md-nav__link">
+  <a href="#layercache-is-the-key-to-cross-image-dedup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What information should info display?
+        LayerCache is the key to cross-image dedup
       
     </span>
   </a>
@@ -3837,21 +4019,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-things-should-check-validate" class="md-nav__link">
+  <a href="#blocking-manifest-processing-solves-error-propagation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What things should check validate?
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#should-process-be-called-convert" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Should process be called convert?
+        Blocking manifest processing solves error propagation
       
     </span>
   </a>
@@ -3876,10 +4047,22 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#shared-prerequisite-output-formatting-done" class="md-nav__link">
+  <a href="#phase-1-persistent-proxy-mvp" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Shared prerequisite: output formatting (done)
+        Phase 1: Persistent proxy (MVP)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 1: Persistent proxy (MVP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-cli-subcommand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New CLI subcommand
       
     </span>
   </a>
@@ -3887,10 +4070,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#implementation-plan-for-info-done" class="md-nav__link">
+  <a href="#decouple-from-docker-engine-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation plan for info (done)
+        Decouple from Docker Engine API
       
     </span>
   </a>
@@ -3898,10 +4081,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#implementation-plan-for-check-done" class="md-nav__link">
+  <a href="#repository-name-mapping" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation plan for check (done)
+        Repository name mapping
       
     </span>
   </a>
@@ -3909,10 +4092,59 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#testing-strategy-done" class="md-nav__link">
+  <a href="#manifest-processing-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing strategy (done)
+        Manifest processing flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#blob-lifecycle-sequential-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Blob lifecycle (sequential mode)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tls-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TLS considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-concurrent-image-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Concurrent image support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-pull-through-full-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Pull-through / full proxy
       
     </span>
   </a>
@@ -3925,15 +4157,48 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
+  <a href="#design-decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Administration and logistics
+        Design Decisions
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Administration and logistics">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Priority
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#files-likely-affected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files Likely Affected
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Files Likely Affected">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3952,17 +4217,6 @@
     <span class="md-ellipsis">
       
         Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
       
     </span>
   </a>
@@ -4006,7 +4260,7 @@
   
 
 
-<h1 id="implementing-info-and-check-subcommands-for-occystrap">Implementing <code>info</code> and <code>check</code> subcommands for occystrap<a class="headerlink" href="#implementing-info-and-check-subcommands-for-occystrap" title="Permanent link">&para;</a></h1>
+<h1 id="registry-proxy-mode-dockerpush-as-persistent-registry">Registry Proxy Mode (dockerpush as persistent registry)<a class="headerlink" href="#registry-proxy-mode-dockerpush-as-persistent-registry" title="Permanent link">&para;</a></h1>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the occystrap codebase thoroughly. Read relevant
@@ -4019,408 +4273,318 @@ concepts (OCI image specs, Docker/Podman compatibility, registry
 APIs), research as needed to give a confident answer. Flag any
 uncertainty explicitly rather than guessing.</p>
 <h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>I am trying something new with this document -- having a
-conversation with Claude in a document instead of chat, and then
-using the document as the implementation plan instead of having
-Claude generate one to execute. Perhaps this is more "human in
-the loop", but perhaps it is also "weird and inefficient". We'll
-see I suppose.</p>
-<p>This document is partially modelled on the western military
-process of SMEAC OPORDs because I think the structure looks super
-useful in general.</p>
+<p>The <code>dockerpush://</code> input provides fast parallel layer transfer from the
+local Docker daemon, and filters allow transforming image contents before
+pushing to a real registry. However, the current architecture requires
+one occystrap invocation per image. The idea is to run occystrap as a
+<strong>persistent registry proxy</strong>: Docker (or any V2 client) pushes images
+to it, occystrap applies filters, and forwards the result to a real
+downstream registry. This would allow processing multiple images through
+a single long-running instance.</p>
 <h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
-<p><code>occystrap</code>'s <code>process</code> command now supports some fairly
-complicated content manipulation features like filtering and
-changing timestamps. I'd like to implement more of those as the
-need arises, but I am left thinking that its hard to catch bugs
-in <code>occystrap</code>'s output. Its not a simple container converter
-any more.</p>
-<p>A recent example which raised this concern for me is this error
-I am seeing in CI when using a docker local API -&gt; filtration -&gt;
-registry push flow:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Unknown error message: wrong diff id
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>&quot;sha256:9002b1c0c97baaa58d3bd29d02114743adaee9b3e601ededf6f65b138aae01df&quot;
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>calculated on extraction
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>&quot;sha256:123a078714d5ea9382d4d9f550753aefce8b34ec5ae11ae8273038d3bcbb943f&quot;,
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>desc &quot;sha256:2914167652f8241cc96f909543ca0f525f067170ff80482695d1094d84abefea&quot;
+<p>While <code>dockerpush://</code> is faster than the previous <code>tar://</code> and <code>docker://</code>
+implementations of filtration, it is still not sufficiently performant
+for the Kolla image build process I have been working on this tooling
+for. A representative summary of the build process with timestamps would
+be:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>2026-02-24T21:51:10.9035078Z OCI registry health check
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>2026-02-24T21:51:13.3251419Z Download artifacts
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>2026-02-24T21:52:59.1839497Z Extract source and move to correct location
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>2026-02-24T21:53:01.5069043Z Build container images
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>2026-02-24T22:15:44.7926037Z Image build complete, push starts
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>2026-02-25T00:50:08.0620979Z Incomplete CI workflow terminated for having taken too long
 </code></pre></div>
-<p>Now we could fix that one specific bug, but I am more interested
-in ways we could ensure we don't have bugs like this <strong>ever</strong>. We
-could for example pull the image we just pushed to the registry
-in this example and then validate that the image is correct.</p>
-<p>I am therefore proposing <code>occystrap</code>'s expansion to have two more
-subcommands apart from <code>process</code>, at least partially inspired by
-<code>qemu-img</code>.</p>
-<h3 id="occystrap-info"><code>occystrap info</code><a class="headerlink" href="#occystrap-info" title="Permanent link">&para;</a></h3>
-<p>This subcommand would dump information about a given image to the
-console in one of two formats -- human readable, and machine
-friendly JSON depending on a global output flag. That output flag
-should also be retrofitted to <code>process</code> so might well exist at
-the logging layer.</p>
-<p>The subcommand would support all of the input sources that
-<code>process</code> currently supports.</p>
-<h3 id="occystrap-check"><code>occystrap check</code><a class="headerlink" href="#occystrap-check" title="Permanent link">&para;</a></h3>
-<p>This command would perform an in-depth check of the validity of
-the image: whether compression is supported; if the image will
-only work on certain versions of Docker or Podman; if the manifest
-elements all exist; etc etc. Literally everything we can think of.
-It too would support both human and JSON output, and reuse the
-<code>process</code> input sources.</p>
-<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
-<h3 id="do-existing-tools-already-cover-info-and-check">Do existing tools already cover info and check?<a class="headerlink" href="#do-existing-tools-already-cover-info-and-check" title="Permanent link">&para;</a></h3>
-<p><strong>Inspection tools:</strong> <code>skopeo inspect</code> dumps image metadata as
-JSON (digests, tags, creation date, architecture, layers).
-<code>crane manifest</code> and <code>crane config</code> dump raw manifest and config
-blobs. <code>regctl image inspect</code> is similar. These are adequate for
-raw data but none present a concise human-readable summary
-tailored to occystrap's use cases (e.g., "this image has 5
-layers, 2 of which use zstd compression, total uncompressed size
-is 340MB").</p>
-<p><strong>Validation tools:</strong> <code>crane validate</code> is the strongest existing
-validator. It checks compressed layer digests against manifest
-entries, uncompressed layer digests (diff_ids) against the config
-blob, and the config blob's own digest against the manifest's
-config descriptor. However, it has gaps that matter for
-occystrap's layer manipulation:</p>
+<p>It is hoped (but unproven) that a persistent proxy would be able to detect
+duplicated layers better, and act as a shock absorber between image uploads.
+If such a proxy was configured before build, then <code>kolla-build</code> could also
+be configured to push as images were completed, and the build and upload
+processes could therefore overlap.</p>
+<h2 id="current-constraints-why-this-doesnt-work-today">Current Constraints (Why This Doesn't Work Today)<a class="headerlink" href="#current-constraints-why-this-doesnt-work-today" title="Permanent link">&para;</a></h2>
+<p>The embedded registry in <code>dockerpush.py</code> has a single-image-per-session
+design. Specifically:</p>
+<h3 id="1-_registrystatemanifest_data-is-a-scalar">1. <code>_RegistryState.manifest_data</code> is a scalar<a class="headerlink" href="#1-_registrystatemanifest_data-is-a-scalar" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">_RegistryState</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">temp_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">manifest_data</span> <span class="o">=</span> <span class="kc">None</span>          <span class="c1"># single manifest, not a list</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">manifest_event</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Event</span><span class="p">()</span>  <span class="c1"># single event, set once</span>
+</code></pre></div>
+<p>When <code>_handle_manifest_put()</code> fires, it overwrites <code>self.manifest_data</code>.
+A second image push would silently clobber the first manifest.</p>
+<h3 id="2-single-threadingevent-for-manifest-arrival">2. Single <code>threading.Event</code> for manifest arrival<a class="headerlink" href="#2-single-threadingevent-for-manifest-arrival" title="Permanent link">&para;</a></h3>
+<p><code>fetch()</code> calls <code>manifest_event.wait()</code> exactly once, parses that one
+manifest, yields its layers, then tears everything down. There is no
+loop or queue to handle subsequent manifests.</p>
+<h3 id="3-multi-arch-manifests-are-explicitly-rejected">3. Multi-arch manifests are explicitly rejected<a class="headerlink" href="#3-multi-arch-manifests-are-explicitly-rejected" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">if</span> <span class="s1">&#39;manifests&#39;</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        <span class="s1">&#39;Received a manifest list (multi-arch) instead of ...&#39;</span><span class="p">)</span>
+</code></pre></div>
+<p>A full registry proxy would eventually need to handle manifest lists.
+However, kolla-build produces single-platform images (it builds on the
+host architecture), so this can be deferred -- rejecting manifest lists
+initially is acceptable.</p>
+<h3 id="4-the-fetch-flow-is-one-shot">4. The <code>fetch()</code> flow is one-shot<a class="headerlink" href="#4-the-fetch-flow-is-one-shot" title="Permanent link">&para;</a></h3>
+<p>The entire lifecycle is linear and non-repeatable:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tag one image -&gt; start server -&gt; push one image -&gt; wait for one manifest
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>-&gt; yield config + layers -&gt; untag -&gt; stop server -&gt; cleanup temp files
+</code></pre></div>
+<p>The server is started and stopped within a single <code>fetch()</code> call. There
+is no mechanism to keep the server running across multiple pushes.</p>
+<h3 id="5-blob-lifecycle-is-per-session">5. Blob lifecycle is per-session<a class="headerlink" href="#5-blob-lifecycle-is-per-session" title="Permanent link">&para;</a></h3>
+<p>All blobs land in <code>state.blobs</code> keyed by digest hex. The flat namespace
+is actually desirable: Docker content-addresses blobs, so two images
+sharing a base layer push the same digest -- having one copy is correct
+and gives us cross-image dedup for free. The real issue is lifecycle:
+all blobs are cleaned up when the single <code>fetch()</code> call completes.
+If processing image A deletes its blobs, and image B (still uploading)
+shares some of them, those shared blobs are gone. With concurrent
+pushes, blob deletion must be deferred until no pending manifest
+references a given digest.</p>
+<h3 id="6-docker-api-coupling">6. Docker API coupling<a class="headerlink" href="#6-docker-api-coupling" title="Permanent link">&para;</a></h3>
+<p>The current flow uses the Docker Engine API (<code>/images/{name}/tag</code>,
+<code>/images/{name}/push</code>) to initiate pushes. In proxy mode, the client
+(Docker, Podman, Buildkit, Skopeo, etc.) initiates the push itself --
+occystrap just needs to be a listening registry, not an orchestrator.</p>
+<h2 id="key-design-insights">Key Design Insights<a class="headerlink" href="#key-design-insights" title="Permanent link">&para;</a></h2>
+<h3 id="the-existing-pipeline-is-already-reusable">The existing pipeline is already reusable<a class="headerlink" href="#the-existing-pipeline-is-already-reusable" title="Permanent link">&para;</a></h3>
+<p><code>PipelineBuilder.build_pipeline()</code> creates fresh input/output/filter
+instances on each call. There is no global or module-level state that
+would prevent running the pipeline multiple times in one process. The
+core loop in <code>main.py</code> <code>_fetch()</code> (line ~100) is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">img</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>        <span class="n">fetch_callback</span><span class="o">=</span><span class="n">output</span><span class="o">.</span><span class="n">fetch_callback</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">output</span><span class="o">.</span><span class="n">process_image_element</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">output</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+</code></pre></div>
+<p>The proxy's processing loop can call <code>build_pipeline()</code> per received
+manifest, using a synthetic input that yields <code>ImageElement</code>s from the
+already-received blobs. Each invocation gets fresh filters and output
+state.</p>
+<h3 id="layercache-is-the-key-to-cross-image-dedup">LayerCache is the key to cross-image dedup<a class="headerlink" href="#layercache-is-the-key-to-cross-image-dedup" title="Permanent link">&para;</a></h3>
+<p>If the proxy keeps a single <code>LayerCache</code> instance across images,
+<code>RegistryWriter.fetch_callback()</code> will find layers already pushed to
+the downstream registry and skip them entirely -- no filtering, no
+compression, no upload. For Kolla images sharing base layers, the first
+image pays the full cost and all subsequent images skip those layers.
+This is the "shock absorber" effect.</p>
+<h3 id="blocking-manifest-processing-solves-error-propagation">Blocking manifest processing solves error propagation<a class="headerlink" href="#blocking-manifest-processing-solves-error-propagation" title="Permanent link">&para;</a></h3>
+<p>Rather than returning 201 on the manifest PUT immediately and processing
+asynchronously (which leaves the client unaware of downstream failures),
+the handler should <strong>block the HTTP response until downstream processing
+completes</strong>. This:</p>
 <ul>
-<li>It does not check that the history array in the config is
-  consistent with the layer count (non-empty history entries
-  should equal the number of layers). When occystrap filters
-  layers, it must also filter history entries -- no tool
-  validates this.</li>
-<li>It does not verify that the declared mediaType matches the
-  actual compression format of the blob (e.g., manifest says
-  gzip but blob is actually zstd). This is a real-world
-  interoperability trap.</li>
-<li>It does not check whiteout file preservation -- if occystrap's
-  exclude filter accidentally removes <code>.wh.*</code> entries, the
-  filesystem semantics are silently corrupted.</li>
-<li>It does not warn about Docker-vs-Podman compatibility issues
-  (media type differences, <code>ArgsEscaped</code> deprecation, zstd
-  support requirements).</li>
+<li>Provides natural backpressure -- Docker won't start the next push
+  until the current one is processed</li>
+<li>Lets kolla-build detect push failures via Docker's exit code</li>
+<li>Eliminates the need for a separate error-reporting channel</li>
+<li>Simplifies the design: no processing thread or queue needed for the
+  initial implementation</li>
 </ul>
-<p><strong>Conclusion:</strong> Implementing <code>info</code> and <code>check</code> in occystrap is
-justified. <code>crane validate</code> should be used in the test suite as
-a baseline sanity check on occystrap's output, while
-<code>occystrap check</code> adds the deeper, manipulation-aware checks
-that crane misses. <code>diffoci</code> (a semantic image comparison tool)
-could also be useful for regression testing.</p>
-<h3 id="what-information-should-info-display">What information should info display?<a class="headerlink" href="#what-information-should-info-display" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Image name and tag</li>
-<li>Manifest digest and schema version</li>
-<li>Media type (Docker v2 vs OCI) and what that implies for
-  compatibility</li>
-<li>Architecture, OS, and variant</li>
-<li>Config digest and creation timestamp</li>
-<li>Number of layers, total compressed size, total uncompressed
-  size</li>
-<li>Per-layer summary: index, compressed digest, diff_id,
-  compressed size, compression format (detected from mediaType
-  and/or blob magic bytes), and the corresponding history
-  entry's <code>created_by</code> command (if present)</li>
-<li>Number of history entries and how many are <code>empty_layer: true</code></li>
-<li>Labels, environment variables, entrypoint/cmd, working
-  directory, exposed ports, volumes</li>
-</ul>
-<h3 id="what-things-should-check-validate">What things should check validate?<a class="headerlink" href="#what-things-should-check-validate" title="Permanent link">&para;</a></h3>
-<p><strong>Structural integrity (things that make an image invalid):</strong></p>
-<ol>
-<li><code>len(manifest.layers) == len(config.rootfs.diff_ids)</code> --
-   layer count matches diff_id count</li>
-<li>For each layer:
-   <code>sha256(compressed_blob) == manifest.layers[i].digest</code> --
-   compressed digest matches</li>
-<li>For each layer:
-   <code>sha256(uncompressed_blob) == config.rootfs.diff_ids[i]</code> --
-   diff_id matches</li>
-<li><code>sha256(config_blob) == manifest.config.digest</code> and
-   <code>len(config_blob) == manifest.config.size</code> -- config
-   descriptor is correct</li>
-<li><code>config.rootfs.type == "layers"</code></li>
-<li><code>manifest.schemaVersion == 2</code></li>
-</ol>
-<p><strong>History consistency (things that cause subtle runtime bugs):</strong></p>
-<ol>
-<li>Number of history entries with <code>empty_layer != true</code> equals
-   <code>len(manifest.layers)</code></li>
-<li>History entries are in the same order as layers</li>
-</ol>
-<p><strong>Compression and compatibility (interoperability failures):</strong></p>
-<ol>
-<li>Declared mediaType matches actual compression format of each
-   layer blob (detect gzip vs zstd vs uncompressed from magic
-   bytes)</li>
-<li>If any layer uses zstd: warn that Docker Engine &lt; 20.10 and
-    containerd &lt; 1.5 will not be able to pull this image</li>
-<li>If manifest uses OCI media types: note that older Docker
-    versions may not handle this correctly</li>
-<li>If manifest uses Docker v2 media types: note that some
-    OCI-only tooling may not handle this</li>
-</ol>
-<p><strong>Filesystem integrity (corrupt container filesystem view):</strong></p>
-<ol>
-<li>Whiteout files (<code>.wh.*</code> and <code>.wh..wh..opq</code>) are well-formed</li>
-<li>Layer tar entries have consistent headers (no negative
-    timestamps, reasonable permissions)</li>
-</ol>
-<p><strong>Warnings (not errors, but worth reporting):</strong></p>
-<ol>
-<li>Unreasonably large layers (&gt; 1GB compressed)</li>
-<li>Duplicate files across layers that could indicate missed
-    deduplication opportunities</li>
-<li><code>config.ArgsEscaped</code> is set (Docker-specific, deprecated
-    in OCI)</li>
-</ol>
-<h3 id="should-process-be-called-convert">Should process be called convert?<a class="headerlink" href="#should-process-be-called-convert" title="Permanent link">&para;</a></h3>
-<p>No. <code>process</code> is more accurate -- it does filtering, timestamp
-normalization, searching, and inspection, not just format
-conversion. Renaming would also break existing users. The
-<code>qemu-img</code> analogy is useful for <code>info</code> and <code>check</code> but doesn't
-need to extend to renaming <code>process</code>.</p>
+<p>Docker's push client is tolerant of slow registries (it already waits
+for large blob uploads), so the timeout risk is manageable.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<h3 id="shared-prerequisite-output-formatting-done">Shared prerequisite: output formatting (done)<a class="headerlink" href="#shared-prerequisite-output-formatting-done" title="Permanent link">&para;</a></h3>
-<p>Both <code>info</code> and <code>check</code> need human-readable and JSON output
-modes. The <code>search</code> command already has <code>--script-friendly</code> but
-it's implemented ad-hoc with <code>click.echo</code> calls. We should
-introduce a lightweight output abstraction before implementing
-either command.</p>
-<p><strong>Approach:</strong> Add a <code>--output-format</code> / <code>-O</code> option to the CLI
-group in <code>main.py</code> (choices: <code>text</code>, <code>json</code>; default: <code>text</code>).
-Store it in the Click context so subcommands can access it via
-<code>ctx.obj</code>. This also makes it available to <code>process</code> and <code>search</code>
-if we want to retrofit them later.</p>
-<p>The formatting logic itself can be minimal -- a helper function
-that takes a dict/list and either pretty-prints it as a table
-(using <code>prettytable</code>, already a dependency) or dumps it as JSON.
-No need for a class hierarchy.</p>
-<p><strong>Files touched:</strong> <code>occystrap/main.py</code> (add option to <code>cli</code>
-group).</p>
-<p><strong>Status:</strong> Implemented. The <code>-O</code>/<code>--output-format</code> option is on
-the <code>cli</code> group, stored in <code>ctx.obj['OUTPUT_FORMAT']</code>. No
-existing commands use it yet -- <code>info</code> will be the first
-consumer.</p>
-<h3 id="implementation-plan-for-info-done">Implementation plan for <code>info</code> (done)<a class="headerlink" href="#implementation-plan-for-info-done" title="Permanent link">&para;</a></h3>
-<p><strong>Step 1:</strong> Add <code>info</code> command to <code>main.py</code>. It takes a single
-<code>SOURCE</code> argument (URI string) using the same pattern as
-<code>process</code>. Reuse <code>uri.parse_uri()</code> and <code>pipeline.py</code>'s
-<code>build_input()</code> to construct an <code>ImageInput</code>.</p>
-<p><strong>Step 2:</strong> Add <code>get_manifest()</code> and <code>get_config()</code> methods to
-the <code>ImageInput</code> base class (default: return <code>None</code>). These
-fetch metadata without downloading layer blobs.</p>
-<p><strong>Step 3:</strong> Implement <code>get_manifest()</code> and <code>get_config()</code> in
-each input source:</p>
+<h3 id="phase-1-persistent-proxy-mvp">Phase 1: Persistent proxy (MVP)<a class="headerlink" href="#phase-1-persistent-proxy-mvp" title="Permanent link">&para;</a></h3>
+<p><strong>Goal</strong>: occystrap runs as a long-lived process, receives pushes from
+Docker, applies filters, and forwards to a downstream registry. Images
+are processed sequentially (one at a time, blocking on manifest PUT).</p>
+<h4 id="new-cli-subcommand">New CLI subcommand<a class="headerlink" href="#new-cli-subcommand" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span>--downstream<span class="w"> </span>registry://registry.example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span>-f<span class="w"> </span>exclude:/tmp
+</code></pre></div>
+<p>Usage:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Start proxy before kolla-build</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span>--downstream<span class="w"> </span>registry://ghcr.io/myorg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span>--layer-cache<span class="w"> </span>/tmp/layer-cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="p">&amp;</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Configure kolla-build to push to the proxy</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>kolla-build<span class="w"> </span>--registry<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span>--push<span class="w"> </span>...
+</code></pre></div>
+<h4 id="decouple-from-docker-engine-api">Decouple from Docker Engine API<a class="headerlink" href="#decouple-from-docker-engine-api" title="Permanent link">&para;</a></h4>
+<p>In proxy mode, occystrap does <strong>not</strong> call the Docker Engine API at all.
+It is purely a receiving registry. The client (Docker, Podman, Skopeo,
+Buildkit) pushes to occystrap's address directly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>docker<span class="w"> </span>tag<span class="w"> </span>myimage:latest<span class="w"> </span>localhost:5050/myimage:latest
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>docker<span class="w"> </span>push<span class="w"> </span>localhost:5050/myimage:latest
+</code></pre></div>
+<p>The <code>_tag_image()</code>, <code>_push_image()</code>, and <code>_untag_image()</code> methods from
+<code>dockerpush.py</code> are not used. The server just listens and processes
+whatever arrives.</p>
+<h4 id="repository-name-mapping">Repository name mapping<a class="headerlink" href="#repository-name-mapping" title="Permanent link">&para;</a></h4>
+<p>When Docker pushes to <code>localhost:5050/kolla/nova-api:latest</code>, the proxy
+forwards to the downstream registry preserving the repository path:
+<code>registry.example.com/kolla/nova-api:latest</code>. The repository name is
+passed through as-is for the initial implementation. A <code>--prefix</code> flag
+could be added later if rewriting is needed.</p>
+<h4 id="manifest-processing-flow">Manifest processing flow<a class="headerlink" href="#manifest-processing-flow" title="Permanent link">&para;</a></h4>
+<p><code>_handle_manifest_put()</code> blocks the HTTP response while processing:</p>
+<ol>
+<li>Parse the manifest</li>
+<li>Resolve blobs from <code>state.blobs</code> (Docker pushes blobs before
+   the manifest, so they should already be present)</li>
+<li>Build a fresh pipeline via <code>PipelineBuilder</code> using a synthetic
+   input that yields <code>ImageElement</code>s from the received blobs</li>
+<li>Run the filter chain and push to the downstream registry</li>
+<li>On success: return 201 to the client</li>
+<li>On failure: return 500 to the client (Docker will report the
+   push as failed)</li>
+<li>Clean up blobs referenced only by this manifest</li>
+</ol>
+<h4 id="blob-lifecycle-sequential-mode">Blob lifecycle (sequential mode)<a class="headerlink" href="#blob-lifecycle-sequential-mode" title="Permanent link">&para;</a></h4>
+<p>With sequential processing (blocking manifest PUT), blob lifecycle is
+simple: after processing a manifest, delete the blobs it referenced.
+Shared layers between images are content-addressed, so if image B
+pushes the same blob as image A, Docker's HEAD check will find it
+already present (from image A's push) and skip the upload. The
+<code>LayerCache</code> + <code>RegistryWriter.fetch_callback()</code> will also skip the
+downstream push.</p>
+<h4 id="tls-considerations">TLS considerations<a class="headerlink" href="#tls-considerations" title="Permanent link">&para;</a></h4>
+<p>For our use case, occystrap binds to <code>127.0.0.1</code> and relies on Docker's
+implicit insecure trust for <code>127.0.0.0/8</code>. No TLS needed.</p>
+<h3 id="phase-2-concurrent-image-support">Phase 2: Concurrent image support<a class="headerlink" href="#phase-2-concurrent-image-support" title="Permanent link">&para;</a></h3>
+<p><strong>Goal</strong>: Handle multiple images being pushed simultaneously (e.g.,
+kolla-build pushing several images in parallel).</p>
+<p>This requires:</p>
 <ul>
-<li><strong>Registry:</strong> <code>get_manifest()</code> fetches the distribution
-  manifest via HTTP (resolving multi-arch manifest lists).
-  <code>get_config()</code> fetches the config blob using the digest
-  from the manifest. Both are cached on the input object.</li>
-<li><strong>Tarfile:</strong> <code>get_config()</code> reads the config blob from
-  the tarball without extracting layers. <code>get_manifest()</code>
-  returns <code>None</code> (docker-save format has no distribution
-  manifest).</li>
-<li><strong>Docker:</strong> <code>get_config()</code> calls the Docker inspect API
-  and transforms the result to OCI config format.
-  <code>get_manifest()</code> returns <code>None</code>.</li>
-<li><strong>Dockerpush:</strong> Both return <code>None</code> (not meaningful
-  without performing a full push).</li>
+<li>Per-repository upload tracking (the V2 API already namespaces uploads
+  by repository name in the URL path)</li>
+<li>Manifest processing in a thread pool (one image's filter pipeline
+  should not block another's)</li>
+<li>Backpressure: if the downstream registry is slow, limit how many
+  images are being processed concurrently (a semaphore on the thread
+  pool)</li>
+<li>Blob reference counting: shared blobs between concurrent pushes
+  must not be deleted until all referencing manifests are processed</li>
 </ul>
-<p><strong>Step 4:</strong> Format and display the output using the shared
-output formatting helper. Human-readable output uses
-<code>prettytable</code> for the per-layer table and plain text for
-summary fields. JSON output is a single dict with all fields.</p>
-<p><strong>Files touched:</strong> <code>occystrap/main.py</code> (new command,
-<code>_build_info</code>, <code>_format_size</code>, <code>_print_info_text</code> helpers),
-<code>occystrap/inputs/base.py</code> (add <code>get_manifest()</code> and
-<code>get_config()</code>), <code>occystrap/inputs/registry.py</code> (implement
-both), <code>occystrap/inputs/docker.py</code> (implement <code>get_config()</code>),
-<code>occystrap/inputs/tarfile.py</code> (implement <code>get_config()</code>).</p>
-<p><strong>Scope decision:</strong> <code>info</code> does not download layer blobs. It
-works from the manifest and config alone. This means it reports
-compressed sizes from manifest descriptors but cannot report
-uncompressed sizes (those would require downloading and
-decompressing every layer). This is the same trade-off
-<code>crane validate --fast</code> makes.</p>
-<p><strong>Status:</strong> Implemented. The <code>info</code> command works with
-<code>registry://</code>, <code>docker://</code>, and <code>tar://</code> sources. Registry
-sources show full detail (compressed sizes, mediaTypes,
-compression format). Docker and tarball sources show
-config-derived info (architecture, OS, diff_ids, history,
-labels, env, etc.). 19 unit tests cover the implementation.</p>
-<h3 id="implementation-plan-for-check-done">Implementation plan for <code>check</code> (done)<a class="headerlink" href="#implementation-plan-for-check-done" title="Permanent link">&para;</a></h3>
-<p><strong>Step 1:</strong> Add <code>check</code> command to <code>main.py</code>. Same <code>SOURCE</code>
-argument and input selection as <code>info</code>.</p>
-<p><strong>Step 2:</strong> Implement a <code>CheckResult</code> dataclass or simple dict
-structure to accumulate errors, warnings, and informational
-messages. Each check produces entries tagged with a severity
-(error, warning, info) and a human-readable description.</p>
-<p><strong>Step 3:</strong> Implement the structural integrity checks (items 1-6
-from the check list above). These require both the manifest and
-the config blob. Items 2-3 (digest verification) require
-downloading and hashing every layer -- this makes <code>check</code> a slow
-operation by design. Add a <code>--fast</code> flag that skips layer
-download and only checks metadata consistency (items 1, 4, 5, 6,
-7, 8, and the compatibility warnings).</p>
-<p><strong>Step 4:</strong> Implement the history consistency checks (items 7-8).</p>
-<p><strong>Step 5:</strong> Implement the compression and compatibility checks
-(items 9-12). Item 9 requires reading the first few bytes of
-each layer blob to detect the actual compression format (gzip
-magic: <code>\x1f\x8b</code>, zstd magic: <code>\x28\xb5\x2f\xfd</code>). This can
-piggyback on the layer download in step 3.</p>
-<p><strong>Step 6:</strong> Implement the filesystem integrity checks
-(items 13-14). These require decompressing layers and scanning
-tar entries. This also piggybacks on the layer download.</p>
-<p><strong>Step 7:</strong> Implement the warnings (items 15-17). These are
-derived from data already collected in earlier steps.</p>
-<p><strong>Step 8:</strong> Format and display results using the shared output
-formatting helper. Human-readable output should group by severity
-(errors first, then warnings, then info). JSON output should be
-a structured list of check results. Exit code should be non-zero
-if any errors were found (useful for CI integration).</p>
-<p><strong>Files touched:</strong> <code>occystrap/main.py</code> (new command),
-<code>occystrap/check.py</code> (check logic module).</p>
-<p><strong>Status:</strong> Implemented (steps 1-8). The <code>check</code> command works
-with <code>registry://</code>, <code>docker://</code>, and <code>tar://</code> sources. Fast mode
-checks metadata consistency (schema version, rootfs type, layer
-count, history count, compression compatibility, ArgsEscaped).
-Full mode additionally verifies config digest/size, layer
-diff_ids, tar validity, whiteout files, and tar headers. Checks
-not yet implemented: compressed blob digest verification (item 2,
-already handled by input sources during download) and compression
-magic vs mediaType verification (item 9, requires raw blob
-access). 30 unit tests cover the implementation.</p>
-<h3 id="testing-strategy-done">Testing strategy (done)<a class="headerlink" href="#testing-strategy-done" title="Permanent link">&para;</a></h3>
-<p><strong>For <code>info</code>:</strong> Create test images with known properties (specific
-layer counts, compression formats, labels, history entries) and
-verify <code>info</code>'s JSON output matches expected values. The JSON
-output mode makes this straightforward -- parse the output and
-assert on fields.</p>
-<p><strong>For <code>check</code>:</strong> We need images with known defects. Create these
-programmatically in test fixtures:</p>
-<ul>
-<li>An image where <code>manifest.layers</code> has more entries than
-  <code>config.rootfs.diff_ids</code> (layer count mismatch)</li>
-<li>An image where a layer's compressed digest doesn't match the
-  manifest (corrupt digest)</li>
-<li>An image where the config blob's digest doesn't match the
-  manifest's config descriptor (stale config reference)</li>
-<li>An image where history entries don't align with layers</li>
-<li>An image with mismatched mediaType vs actual compression</li>
-</ul>
-<p>Also run <code>check</code> against known-good images produced by <code>process</code>
-to verify they pass cleanly. This is the CI integration use case
-from the problem statement -- after <code>process</code> produces an image,
-<code>check</code> validates it.</p>
-<p><strong>Existing test infrastructure:</strong> The project uses
-testtools/stestr with tox. New tests should follow the existing
-patterns in <code>occystrap/tests/</code>. Functional tests that require
-actual Docker/registry interaction go in
-<code>deploy/occystrap_ci/tests/</code>.</p>
-<p><strong>Status:</strong> Implemented. Unit tests cover both <code>info</code> (19 tests
-in <code>occystrap/tests/test_info.py</code>) and <code>check</code> (30 tests in
-<code>occystrap/tests/test_check.py</code>) with synthetic images
-containing known properties and defects. Functional tests in
-<code>deploy/occystrap_ci/tests/test_info.py</code> (6 tests) and
-<code>deploy/occystrap_ci/tests/test_check.py</code> (12 tests) validate
-against real images (busybox, ubuntu) in the CI local registry.
-The functional check tests include the core CI use case:
-process with filters (normalize-timestamps, exclude, combined),
-then check the output passes full validation. Registry
-roundtrip validation is also covered.</p>
-<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># After manifest arrives, snapshot which blobs it references</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">manifest_blobs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;layers&#39;</span><span class="p">]:</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">manifest_blobs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">layer</span><span class="p">[</span><span class="s1">&#39;digest&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">manifest_blobs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">][</span><span class="s1">&#39;digest&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+</code></pre></div>
+<p>Only delete blobs when no pending manifest references them.</p>
+<p>Note: even without Phase 2, Docker pushes a single image's <em>layers</em>
+in parallel to the embedded registry -- the existing
+<code>ThreadingHTTPServer</code> already handles that. Phase 2 is about
+processing multiple <em>images'</em> manifests concurrently.</p>
+<h3 id="phase-3-pull-through-full-proxy">Phase 3: Pull-through / full proxy<a class="headerlink" href="#phase-3-pull-through-full-proxy" title="Permanent link">&para;</a></h3>
+<p><strong>Goal</strong>: Also serve pulls, making occystrap a full filtering proxy.</p>
+<p>When a client pulls from occystrap:</p>
+<ol>
+<li>occystrap pulls from the upstream registry</li>
+<li>Applies filters</li>
+<li>Serves the filtered result to the client</li>
+<li>Optionally caches the filtered layers</li>
+</ol>
+<p>This is a significantly larger scope and may warrant a separate design.</p>
+<h2 id="design-decisions">Design Decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>Manifest list handling</strong>: Reject manifest lists initially (same as
+   <code>dockerpush://</code> today). kolla-build produces single-platform images.
+   Revisit if multi-arch support is needed later.</p>
+</li>
+<li>
+<p><strong>Garbage collection</strong>: With blocking manifest processing (Phase 1),
+   blob cleanup is deterministic -- delete after the referencing
+   manifest is processed. No timeout needed. Phase 2 (concurrent)
+   adds reference counting.</p>
+</li>
+<li>
+<p><strong>Authentication</strong>: Network-level only (localhost binding). No
+   token-based auth for the initial implementation.</p>
+</li>
+<li>
+<p><strong>Catalog API</strong>: Not implemented. Docker push does not query it.</p>
+</li>
+<li>
+<p><strong>Error propagation</strong>: Blocking manifest processing means the HTTP
+   response reflects the downstream result: 201 on success, 500 on
+   failure. Docker reports the failure to the pushing client.</p>
+</li>
+<li>
+<p><strong>Resumability</strong>: Not needed for initial version. If occystrap
+   crashes, re-push. kolla-build can be configured to retry.</p>
+</li>
+</ol>
+<h2 id="open-questions">Open Questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>Repository name rewriting</strong>: Is pass-through sufficient for all
+   use cases, or do we need <code>--prefix</code>/<code>--strip-prefix</code> flags from
+   the start?</p>
+</li>
+<li>
+<p><strong>Graceful shutdown</strong>: When the proxy receives SIGTERM, should it
+   finish processing the current image before exiting, or abort
+   immediately? (Finish is safer but may delay shutdown.)</p>
+</li>
+</ol>
+<h2 id="implementation-priority">Implementation Priority<a class="headerlink" href="#implementation-priority" title="Permanent link">&para;</a></h2>
+<p>Phase 1 (persistent proxy with sequential processing) is the MVP. It
+delivers the two key wins for Kolla: build/push overlap, and
+cross-image layer dedup via the shared <code>LayerCache</code>. Sequential
+processing is acceptable because the first few images pay the full
+cost (uploading base layers) and subsequent images are fast (cache
+hits for shared layers).</p>
+<p>Phase 2 (concurrent image support) is valuable for CI/CD pipelines
+that push multiple images in parallel, but not essential for the
+initial Kolla use case.</p>
+<p>Phase 3 (pull-through) is a separate project.</p>
+<h2 id="files-likely-affected">Files Likely Affected<a class="headerlink" href="#files-likely-affected" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>occystrap/proxy.py</code></td>
+<td><strong>New</strong>: persistent registry server, reuses <code>EmbeddedRegistryHandler</code> patterns from <code>dockerpush.py</code> but with blocking manifest processing and no Docker Engine API coupling</td>
+</tr>
+<tr>
+<td><code>occystrap/main.py</code></td>
+<td>New <code>proxy</code> subcommand with <code>--listen</code>, <code>--downstream</code>, <code>--layer-cache</code>, <code>-f</code> flags</td>
+</tr>
+<tr>
+<td><code>occystrap/pipeline.py</code></td>
+<td>Possibly minor changes to expose <code>build_pipeline()</code> for use with a synthetic input; may need no changes if the proxy builds pipelines directly</td>
+</tr>
+<tr>
+<td><code>occystrap/inputs/dockerpush.py</code></td>
+<td>Unchanged (existing <code>dockerpush://</code> input continues to work as before)</td>
+</tr>
+<tr>
+<td>Tests, docs</td>
+<td>Corresponding updates</td>
+</tr>
+</tbody>
+</table>
 <h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
 <p>We will know when this plan has been successfully implemented
 because the following statements will be true:</p>
 <ul>
 <li>There are unit and functional tests for these features.</li>
-<li>There are a test suite of sample container images in
-  <code>shakenfist/occystrap-testdata</code> that exercises these features
-  and ensures they work correctly, including that their output
-  agrees with other comparable tooling.</li>
-<li>Functional testing leverages these new commands to ensure
-  that other <code>occystrap</code> commands produce valid output.</li>
 <li>Unit and functional tests pass.</li>
 <li>Documentation in <code>docs/</code> has been updated to describe these
   new features and how we use them.</li>
 </ul>
 <h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
-<p>We should list obvious extensions, known issues, unrelated bugs
-we encountered, and anything else we should one day do but have
-chosen to defer to here so that we don't forget them.</p>
 <ul>
-<li><strong>Multi-architecture index validation:</strong> <code>check</code> initially
-  targets single-platform manifests. Validating image indexes
-  (fat manifests) -- ensuring all platform entries point to valid
-  manifests with matching architecture/OS fields -- is a natural
-  extension.</li>
-<li><strong>Retrofit <code>--output-format</code> to <code>process</code> and <code>search</code>:</strong> Once
-  the output formatting infrastructure exists, the <code>search</code>
-  command's ad-hoc <code>--script-friendly</code> flag could be replaced
-  with the shared mechanism, and <code>process</code> could gain structured
-  JSON progress reporting.</li>
-<li><strong><code>check</code> as a post-<code>process</code> pipeline stage:</strong> Consider
-  allowing <code>process</code> to automatically run <code>check</code> on its output
-  (e.g., <code>--verify</code> flag). This directly addresses the CI use
-  case from the problem statement without requiring a separate
-  invocation.</li>
-<li><strong>Remote-only fast checks for registries:</strong> When the input is
-  a registry, <code>check --fast</code> could use HEAD requests to verify
-  blob existence without downloading anything, similar to how
-  the registry output's <code>fetch_callback</code> already works.</li>
-<li><strong><code>regctl image mod</code> as a reference comparison:</strong> <code>regctl</code>
-  provides similar manipulation capabilities (timestamps,
-  compression, format conversion). Its output could be used as
-  a reference in tests to verify occystrap produces equivalent
-  results.</li>
-<li><strong>Compressed blob digest verification (check item 2):</strong>
-  <code>check</code> does not independently verify that
-  <code>sha256(compressed_blob) == manifest.layers[i].digest</code>
-  because the input sources already verify this during
-  download. If we want <code>check</code> to be a standalone validator
-  (e.g., for images not fetched by occystrap), we'd need raw
-  blob access before the input source decompresses them.</li>
-<li><strong>Compression magic vs mediaType verification (check item
-  9):</strong> Verifying that a layer's actual compression format
-  (detected from magic bytes) matches the declared mediaType
-  requires reading the first few bytes of the raw compressed
-  blob. The current <code>fetch()</code> interface yields decompressed
-  data, so this check needs either a new raw-blob accessor or
-  integration at the input source level.</li>
-</ul>
-<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Config diff_ids not updated after filtering:</strong> When
-  <code>process</code> applies content-modifying filters (e.g.,
-  <code>normalize-timestamps</code>, <code>exclude</code>), the layer data changes
-  (and thus its SHA256 diff_id), but the config blob was passed
-  through with the original diff_ids. <code>check</code> correctly
-  detected this as a diff-id mismatch. Fixed by adding config
-  buffering and diff_id tracking to the <code>ImageFilter</code> base
-  class (<code>occystrap/filters/base.py</code>). Content-modifying
-  filters now buffer the config element, record new diff_ids
-  as layers are processed, and forward the updated config in
-  <code>finalize()</code>. This is the exact class of bug that motivated
-  the <code>check</code> command in the first place (see the "wrong
-  diff id" error in the problem statement).</li>
-<li><strong>Empty config when chained filter leaves hash unchanged:</strong>
-  When two content-modifying filters are chained (e.g.,
-  <code>normalize-timestamps</code> -&gt; <code>exclude</code>) and the second filter
-  doesn't actually change the layer content (nothing matches
-  the exclusion pattern), the layer hash stays the same. In
-  <code>_forward_buffered_config()</code>, the <code>updated_ids == original_ids</code>
-  path forwarded the buffered config's BytesIO with the file
-  position at the end (after parsing it to check diff_ids).
-  <code>TarWriter</code> then read 0 bytes and wrote a 0-byte config
-  entry, causing <code>check</code> to crash with <code>JSONDecodeError</code>. The
-  same bug existed in the <code>not self._new_diff_ids</code> early-return
-  path. Fixed by adding <code>seek(0)</code> before forwarding in both
-  unchanged-config paths.</li>
-<li><strong>Flaky <code>test_upload_blob_new</code>:</strong> <code>test_process_config_file</code>
-  submitted config upload to a <code>ThreadPoolExecutor</code> but never
-  called <code>finalize()</code> or shut down the executor. Under certain
-  timing, the upload thread outlived its mock scope and inflated
-  call counts in subsequent tests. Fixed by adding
-  <code>writer._executor.shutdown(wait=True)</code> to the test.</li>
+<li>Phase 2: concurrent image support (thread pool, blob refcounting,
+  backpressure)</li>
+<li>Phase 3: pull-through proxy (separate design)</li>
+<li>Manifest list (multi-arch) support</li>
+<li>Repository name rewriting (<code>--prefix</code>/<code>--strip-prefix</code>)</li>
+<li>Token-based authentication for non-localhost deployments</li>
+<li>TLS support or reverse proxy documentation</li>
+<li>Graceful shutdown (finish current image on SIGTERM)</li>
 </ul>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief the
@@ -4446,7 +4610,7 @@ you intend to do aligns with that plan.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/occystrap/plans/PLAN-info-check.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/occystrap/plans/PLAN-info-check.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/occystrap/plans/PLAN-info-check/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/occystrap/plans/PLAN-registry-proxy.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/occystrap/plans/PLAN-registry-proxy.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/occystrap/plans/PLAN-registry-proxy/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

@@ -1867,10 +1867,60 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pipeline-reuse-in-proxy-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Reuse in Proxy Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#hash-recalculation" class="md-nav__link">
     <span class="md-ellipsis">
       
         Hash Recalculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-sanitization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Sanitization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Security Sanitization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#http-response-splitting-cwe-113" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP Response Splitting (CWE-113)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#path-traversal-cwe-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path Traversal (CWE-22)
       
     </span>
   </a>
@@ -2037,6 +2087,34 @@
     
   
     Implementing `info` and `check` subcommands for occystrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-registry-proxy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registry Proxy Mode (dockerpush as persistent registry)
   
 
     
@@ -4050,10 +4128,60 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pipeline-reuse-in-proxy-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Reuse in Proxy Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#hash-recalculation" class="md-nav__link">
     <span class="md-ellipsis">
       
         Hash Recalculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-sanitization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Sanitization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Security Sanitization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#http-response-splitting-cwe-113" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP Response Splitting (CWE-113)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#path-traversal-cwe-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path Traversal (CWE-22)
       
     </span>
   </a>
@@ -4493,6 +4621,27 @@ its ordering needs via the <code>requires_ordered_layers</code> property:</p>
 <p>This is particularly beneficial for the registry-to-registry pipeline,
 where layers can start uploading as soon as they finish downloading
 rather than waiting for earlier layers to complete first.</p>
+<h3 id="pipeline-reuse-in-proxy-mode">Pipeline Reuse in Proxy Mode<a class="headerlink" href="#pipeline-reuse-in-proxy-mode" title="Permanent link">&para;</a></h3>
+<p>The <code>proxy</code> command demonstrates that the pipeline is fully reusable.
+Each received image gets a fresh pipeline built by <code>PipelineBuilder</code>,
+and multiple images can be processed concurrently:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>Proxy receives image push
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>    └── _handle_manifest_put() blocks HTTP response
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>    └── Increment blob refcounts (protects shared blobs)
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>    └── Acquire processing semaphore (backpressure)
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>    └── Create _ProxyInput (synthetic ImageInput from received blobs)
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>    └── PipelineBuilder builds fresh output + filters
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>    └── Run pipeline: fetch() → filters → RegistryWriter
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>    └── Decrement refcounts, delete blobs at refcount 0
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>    └── Return 201/500 to client
+</code></pre></div>
+<p><code>PipelineBuilder.build_pipeline()</code> creates new input/output/filter
+instances on each call with no shared mutable state, so running the
+pipeline multiple times in one process is safe. The proxy keeps a
+single <code>LayerCache</code> (internally thread-safe) across images for
+cross-image layer dedup. Blob reference counting ensures shared
+blobs are not deleted while another concurrent manifest still
+references them.</p>
 <h3 id="hash-recalculation">Hash Recalculation<a class="headerlink" href="#hash-recalculation" title="Permanent link">&para;</a></h3>
 <p>When filters modify layer content (timestamps, file exclusion), the SHA256
 hash changes. Filters that modify content:</p>
@@ -4502,6 +4651,26 @@ hash changes. Filters that modify content:</p>
 <li>Update the layer name to use the new hash</li>
 <li>Update the manifest to reference the new hash</li>
 </ol>
+<h2 id="security-sanitization">Security Sanitization<a class="headerlink" href="#security-sanitization" title="Permanent link">&para;</a></h2>
+<p>Occystrap includes two security helpers in <code>occystrap/util.py</code>
+for preventing common injection attacks when handling
+user-controlled data from HTTP requests and file paths.</p>
+<h3 id="http-response-splitting-cwe-113">HTTP Response Splitting (CWE-113)<a class="headerlink" href="#http-response-splitting-cwe-113" title="Permanent link">&para;</a></h3>
+<p>HTTP handler classes (<code>EmbeddedRegistryHandler</code>,
+<code>ProxyRegistryHandler</code>) inherit from <code>SafeHeaderMixin</code>,
+which overrides <code>send_header()</code> to strip <code>\r</code> and <code>\n</code>
+from header values. Additionally, <code>sanitize_header_value()</code>
+is called at each call site where user-controlled data
+flows into headers, satisfying CodeQL's taint analysis.</p>
+<h3 id="path-traversal-cwe-22">Path Traversal (CWE-22)<a class="headerlink" href="#path-traversal-cwe-22" title="Permanent link">&para;</a></h3>
+<p>Output writers that construct file paths from image names,
+tags, digests, or layer paths use <code>safe_path_join()</code> instead
+of bare <code>os.path.join()</code>. This resolves the joined path via
+<code>os.path.realpath()</code> and validates it stays within the
+intended base directory, raising <code>PathEscapeError</code> if
+traversal is detected.</p>
+<p>See <code>PLAN-header-safety.md</code> in the project root for full
+design rationale.</p>
 
 
 
