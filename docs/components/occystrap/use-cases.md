@@ -363,6 +363,68 @@ occystrap info registry://docker.io/library/python:3.11
 occystrap -O json info docker://myapp:v1 | jq '.layer_count, .architecture'
 ```
 
+## Batch Image Builds with Filtering Proxy
+
+When building many container images (e.g., OpenStack Kolla), the proxy
+command lets build and push overlap, and deduplicates shared base layers
+across images.
+
+### Start Proxy Before Build
+
+```bash
+# Start the proxy in the background
+occystrap proxy --listen 127.0.0.1:5050 \
+    --downstream ghcr.io/myorg \
+    --layer-cache /tmp/layer-cache.json \
+    -f normalize-timestamps &
+
+# Configure the build tool to push to the proxy
+kolla-build --registry 127.0.0.1:5050 --push ...
+
+# Or push individual images as they're built
+docker tag nova-api:latest localhost:5050/kolla/nova-api:latest
+docker push localhost:5050/kolla/nova-api:latest
+
+docker tag keystone:latest localhost:5050/kolla/keystone:latest
+docker push localhost:5050/kolla/keystone:latest
+```
+
+### Why Use the Proxy Instead of `dockerpush://`
+
+The `dockerpush://` input processes one image per invocation. For a
+build producing many images (Kolla builds ~100), each invocation
+starts a fresh embedded registry and cannot share state across images.
+
+The proxy:
+
+- Runs once, receives all images as they are built
+- Maintains a single `LayerCache` across all images, so the first
+  image pays the full cost and subsequent images skip shared base
+  layers entirely
+- Overlaps build and push (images push as soon as they are built,
+  rather than waiting for the entire build to complete)
+
+### Push Multiple Images with Layer Dedup
+
+```bash
+#!/bin/bash
+# Start proxy with layer cache
+occystrap proxy -l 127.0.0.1:5050 \
+    -d myregistry.example.com \
+    --layer-cache /tmp/cache.json \
+    -f normalize-timestamps &
+PROXY_PID=$!
+
+# Push images -- shared base layers are uploaded only once
+for img in app-web app-api app-worker; do
+    docker tag "$img:latest" "localhost:5050/$img:latest"
+    docker push "localhost:5050/$img:latest"
+done
+
+# Stop proxy
+kill $PROXY_PID
+```
+
 ## Debugging
 
 Troubleshoot issues with verbose output. By default, occystrap only

@@ -536,6 +536,32 @@ This is particularly beneficial for the registry-to-registry pipeline,
 where layers can start uploading as soon as they finish downloading
 rather than waiting for earlier layers to complete first.
 
+### Pipeline Reuse in Proxy Mode
+
+The `proxy` command demonstrates that the pipeline is fully reusable.
+Each received image gets a fresh pipeline built by `PipelineBuilder`,
+and multiple images can be processed concurrently:
+
+```
+Proxy receives image push
+    └── _handle_manifest_put() blocks HTTP response
+    └── Increment blob refcounts (protects shared blobs)
+    └── Acquire processing semaphore (backpressure)
+    └── Create _ProxyInput (synthetic ImageInput from received blobs)
+    └── PipelineBuilder builds fresh output + filters
+    └── Run pipeline: fetch() → filters → RegistryWriter
+    └── Decrement refcounts, delete blobs at refcount 0
+    └── Return 201/500 to client
+```
+
+`PipelineBuilder.build_pipeline()` creates new input/output/filter
+instances on each call with no shared mutable state, so running the
+pipeline multiple times in one process is safe. The proxy keeps a
+single `LayerCache` (internally thread-safe) across images for
+cross-image layer dedup. Blob reference counting ensures shared
+blobs are not deleted while another concurrent manifest still
+references them.
+
 ### Hash Recalculation
 
 When filters modify layer content (timestamps, file exclusion), the SHA256
@@ -545,3 +571,30 @@ hash changes. Filters that modify content:
 2. Calculate the new SHA256 hash
 3. Update the layer name to use the new hash
 4. Update the manifest to reference the new hash
+
+## Security Sanitization
+
+Occystrap includes two security helpers in `occystrap/util.py`
+for preventing common injection attacks when handling
+user-controlled data from HTTP requests and file paths.
+
+### HTTP Response Splitting (CWE-113)
+
+HTTP handler classes (`EmbeddedRegistryHandler`,
+`ProxyRegistryHandler`) inherit from `SafeHeaderMixin`,
+which overrides `send_header()` to strip `\r` and `\n`
+from header values. Additionally, `sanitize_header_value()`
+is called at each call site where user-controlled data
+flows into headers, satisfying CodeQL's taint analysis.
+
+### Path Traversal (CWE-22)
+
+Output writers that construct file paths from image names,
+tags, digests, or layer paths use `safe_path_join()` instead
+of bare `os.path.join()`. This resolves the joined path via
+`os.path.realpath()` and validates it stays within the
+intended base directory, raising `PathEscapeError` if
+traversal is detected.
+
+See `PLAN-header-safety.md` in the project root for full
+design rationale.
