@@ -438,6 +438,22 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             -1, data.find('02:00:00:ea:3a:28'),
             'Interface not found in `ip -json link` output:\n%s' % data)
 
+        # Determine which interface the new one is post reboot
+        d = json.loads(data)
+        new_interface_after_reboot = None
+        for i in d:
+            if i['address'] == '02:00:00:ea:3a:28':
+                new_interface_after_reboot = i['ifname']
+        self.assertNotEqual(None, new_interface_after_reboot)
+        self.assertEqual(
+            new_interface,
+            new_interface_after_reboot,
+            (
+                f'The interface name changed from {new_interface} to '
+                f'{new_interface_after_reboot} across the reboot!'
+            )
+        )
+
         # Collect the config drive network configuration to ensure that the new
         # device is listed
         self.test_client.await_agent_command(
