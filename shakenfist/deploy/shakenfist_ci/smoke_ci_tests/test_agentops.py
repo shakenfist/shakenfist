@@ -390,6 +390,44 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         # Wait for the instance agent to report in
         self._await_instance_ready(inst['uuid'])
 
+        # Debug: check that predictable interface naming is
+        # disabled inside the instance
+        _, cmdline = self.test_client.await_agent_command(
+            inst['uuid'], 'cat /proc/cmdline')
+        self.assertIn(
+            'net.ifnames=0', cmdline,
+            'net.ifnames=0 not in kernel cmdline: '
+            '%s' % cmdline)
+
+        _, udev_rule = self.test_client.await_agent_command(
+            inst['uuid'],
+            'ls -la /etc/udev/rules.d/'
+            '80-net-setup-link.rules',
+            ignore_stderr=True)
+        _, systemd_link = self.test_client.await_agent_command(
+            inst['uuid'],
+            'ls -la /etc/systemd/network/'
+            '99-default.link',
+            ignore_stderr=True)
+        _, ifaces = self.test_client.await_agent_command(
+            inst['uuid'], 'ip -json link')
+        iface_names = [
+            i['ifname'] for i in json.loads(ifaces)
+            if i['ifname'] != 'lo'
+        ]
+        for name in iface_names:
+            self.assertTrue(
+                name.startswith('eth'),
+                'Interface %s does not use eth naming. '
+                'All interfaces: %s. '
+                'Kernel cmdline: %s. '
+                'udev rule: %s. '
+                'systemd link: %s.'
+                % (name, iface_names,
+                   cmdline.strip(),
+                   udev_rule.strip(),
+                   systemd_link.strip()))
+
         # Hot plug an interface in
         netdesc = {
             'network_uuid': hotnet['uuid'],
