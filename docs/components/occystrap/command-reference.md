@@ -139,6 +139,92 @@ occystrap --architecture arm64 --variant v8 \
     info registry://docker.io/library/busybox:latest
 ```
 
+### proxy
+
+Run a persistent filtering registry proxy that receives Docker pushes,
+applies filters, and forwards images to a downstream registry. The proxy
+runs until interrupted (Ctrl+C or SIGTERM).
+
+```bash
+occystrap proxy --downstream REGISTRY [-f FILTER]... [--listen HOST:PORT] [--concurrency N]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--downstream REGISTRY`, `-d` | Downstream registry host (required, e.g., `ghcr.io/myorg`) |
+| `--upstream REGISTRY`, `-u` | Upstream registry for pull-through (e.g., `docker.io`, `user:pass@registry.example.com`) |
+| `--listen HOST:PORT`, `-l` | Listen address (default: `127.0.0.1:5050`) |
+| `-f FILTER` | Filter(s) to apply (can be specified multiple times) |
+| `--concurrency N`, `-c` | Max concurrent image processing (default: 4) |
+
+The proxy also respects global options `--layer-cache`, `--temp-dir`,
+`--username`, `--password`, `--insecure`, `--compression`, and
+`--parallel`.
+
+**Behavior:**
+
+- The proxy implements the Docker Registry V2 push-path API
+- When a manifest is received, the proxy blocks the HTTP response
+  while processing the image through the filter pipeline and pushing
+  to the downstream registry
+- Multiple images are processed concurrently (limited by `--concurrency`)
+- Docker sees 201 on success and 500 on failure
+- Repository names from the push are passed through to the downstream
+  registry as-is (e.g., `localhost:5050/kolla/nova-api:latest` becomes
+  `REGISTRY/kolla/nova-api:latest`)
+- Manifest lists (multi-arch) are rejected (single-platform only)
+- On shutdown, the proxy waits for in-flight processing to complete
+  (up to 5 minutes), saves the layer cache, and cleans up temporary
+  files
+- When `--upstream` is specified, the proxy also serves pull requests:
+  - `GET /v2/{name}/manifests/{ref}` checks the downstream registry
+    first; on a miss, fetches from upstream, applies filters, pushes
+    to downstream, then serves the result
+  - `GET /v2/{name}/blobs/sha256:{digest}` proxies blobs from
+    downstream
+  - `HEAD` requests check downstream for existence
+  - Upstream credentials can be embedded: `user:pass@host`
+  - Per-image locks prevent duplicate upstream fetches for concurrent
+    requests
+
+**Examples:**
+
+```bash
+# Start proxy with timestamp normalization
+occystrap proxy --listen 127.0.0.1:5050 \
+    --downstream ghcr.io/myorg \
+    -f normalize-timestamps
+
+# Start with layer cache for cross-image dedup
+occystrap proxy --listen 127.0.0.1:5050 \
+    --downstream ghcr.io/myorg \
+    --layer-cache /tmp/layer-cache.json \
+    -f normalize-timestamps
+
+# Push to the proxy from Docker
+docker tag myimage:latest localhost:5050/myimage:latest
+docker push localhost:5050/myimage:latest
+
+# Use with kolla-build
+kolla-build --registry 127.0.0.1:5050 --push ...
+
+# Pull-through proxy with Docker Hub as upstream
+occystrap proxy --listen 127.0.0.1:5050 \
+    --downstream ghcr.io/myorg \
+    --upstream docker.io \
+    -f normalize-timestamps
+
+# Pull through the proxy
+docker pull localhost:5050/library/busybox:latest
+
+# Pull-through with authenticated upstream
+occystrap proxy --listen 127.0.0.1:5050 \
+    --downstream ghcr.io/myorg \
+    --upstream user:token@registry.example.com
+```
+
 ### check
 
 Check validity of a container image. Validates structural integrity,

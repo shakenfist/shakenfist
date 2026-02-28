@@ -14,6 +14,7 @@ container images.
 - **Export images** to tarballs, directories, OCI runtime bundles, or push to
   registries
 - **Search images** for files matching glob or regex patterns
+- **Proxy pushes** via a persistent filtering registry proxy for batch builds
 
 ## Quick Example
 

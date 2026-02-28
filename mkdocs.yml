@@ -114,6 +114,7 @@ nav:
             - Plans:
                 - "A more structured and less verbose approach to logging": components/occystrap/plans/PLAN-structured-logging.md
                 - "Implementing `info` and `check` subcommands for occystrap": components/occystrap/plans/PLAN-info-check.md
+                - "Registry Proxy Mode (dockerpush as persistent registry)": components/occystrap/plans/PLAN-registry-proxy.md
     - Features: features.md
     - Release notes:
         - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
