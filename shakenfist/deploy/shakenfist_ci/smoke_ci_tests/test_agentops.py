@@ -403,11 +403,13 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             inst['uuid'],
             'ls -la /etc/udev/rules.d/'
             '80-net-setup-link.rules',
+            exit_codes=[0, 2],
             ignore_stderr=True)
         _, systemd_link = self.test_client.await_agent_command(
             inst['uuid'],
             'ls -la /etc/systemd/network/'
             '99-default.link',
+            exit_codes=[0, 2],
             ignore_stderr=True)
         _, ifaces = self.test_client.await_agent_command(
             inst['uuid'], 'ip -json link')

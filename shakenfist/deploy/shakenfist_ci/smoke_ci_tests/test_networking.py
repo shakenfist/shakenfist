@@ -281,17 +281,26 @@ class TestNetworking(base.BaseNamespacedTestCase):
                         f'cloud-init.log contained warnings:\n\n{data}\n\n'
                         f'"cloud-init schema --system" says:\n\n{schema_warnings}')
 
-        # Ensure the gateway is set as the DNS server in /etc/resolv.conf
+        # Ensure the gateway is set as the DNS server. Debian 12 uses
+        # systemd-resolved, so /etc/resolv.conf may point to the local
+        # stub resolver (127.0.0.53). In that case, check the real
+        # upstream config at /run/systemd/resolve/resolv.conf.
         data = self.test_client.await_agent_fetch(
             inst1['uuid'], '/etc/resolv.conf')
         if data.find('192.168.242.1') == -1:
-            self.fail(
-                '/etc/resolv.conf did not have the gateway set as the '
-                f'DNS address:\n\n{data}')
+            if data.find('127.0.0.53') != -1:
+                data = self.test_client.await_agent_fetch(
+                    inst1['uuid'],
+                    '/run/systemd/resolve/resolv.conf')
+            if data.find('192.168.242.1') == -1:
+                self.fail(
+                    '/etc/resolv.conf (or systemd-resolved '
+                    'upstream) did not have the gateway set '
+                    f'as the DNS address:\n\n{data}')
         if data.find(f'{self.namespace}.bonkerslab') == -1:
             self.fail(
-                '/etc/resolv.conf did not have the namespace set as the '
-                f'DNS search domain:\n\n{data}')
+                'resolv.conf did not have the namespace set '
+                f'as the DNS search domain:\n\n{data}')
 
         # Lookup our addresses
         nics = self.test_client.get_instance_interfaces(inst1['uuid'])
