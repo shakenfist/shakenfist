@@ -2371,3 +2371,332 @@ class GetStaleTranscodedBlobUuidsReply(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["uuids", b"uuids"]) -> None: ...
 
 global___GetStaleTranscodedBlobUuidsReply = GetStaleTranscodedBlobUuidsReply
+
+@typing.final
+class NodeStaticData(google.protobuf.message.Message):
+    """Node Operations (MariaDB)
+    These manage node static values in MariaDB. Nodes represent physical or
+    virtual machines in the cluster. They now use real UUID4 identifiers with
+    FQDN as a separate indexed column for efficient lookups.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    FQDN_FIELD_NUMBER: builtins.int
+    IP_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """UUID as string (real UUID4, not FQDN)"""
+    fqdn: builtins.str
+    """Fully qualified domain name (unique)"""
+    ip: builtins.str
+    """Mesh network IP address"""
+    version: builtins.int
+    """Object version number"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        fqdn: builtins.str = ...,
+        ip: builtins.str = ...,
+        version: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["fqdn", b"fqdn", "ip", b"ip", "uuid", b"uuid", "version", b"version"]) -> None: ...
+
+global___NodeStaticData = NodeStaticData
+
+@typing.final
+class CreateNodeRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_FIELD_NUMBER: builtins.int
+    @property
+    def node(self) -> global___NodeStaticData: ...
+    def __init__(
+        self,
+        *,
+        node: global___NodeStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["node", b"node"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["node", b"node"]) -> None: ...
+
+global___CreateNodeRequest = CreateNodeRequest
+
+@typing.final
+class GetNodeRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetNodeRequest = GetNodeRequest
+
+@typing.final
+class GetNodeByFqdnRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FQDN_FIELD_NUMBER: builtins.int
+    fqdn: builtins.str
+    def __init__(
+        self,
+        *,
+        fqdn: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["fqdn", b"fqdn"]) -> None: ...
+
+global___GetNodeByFqdnRequest = GetNodeByFqdnRequest
+
+@typing.final
+class GetNodeReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    NODE_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def node(self) -> global___NodeStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        node: global___NodeStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["node", b"node"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["found", b"found", "node", b"node"]) -> None: ...
+
+global___GetNodeReply = GetNodeReply
+
+@typing.final
+class GetAllNodeUuidsRequest(google.protobuf.message.Message):
+    """No filters currently needed - returns all node UUIDs"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetAllNodeUuidsRequest = GetAllNodeUuidsRequest
+
+@typing.final
+class GetAllNodeUuidsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUIDS_FIELD_NUMBER: builtins.int
+    @property
+    def uuids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        uuids: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuids", b"uuids"]) -> None: ...
+
+global___GetAllNodeUuidsReply = GetAllNodeUuidsReply
+
+@typing.final
+class DeleteNodeRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteNodeRequest = DeleteNodeRequest
+
+@typing.final
+class UpdateNodeRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_FIELD_NUMBER: builtins.int
+    @property
+    def node(self) -> global___NodeStaticData: ...
+    def __init__(
+        self,
+        *,
+        node: global___NodeStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["node", b"node"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["node", b"node"]) -> None: ...
+
+global___UpdateNodeRequest = UpdateNodeRequest
+
+@typing.final
+class NodeAttributesProto(google.protobuf.message.Message):
+    """Node Attributes Operations (MariaDB)
+    These store mutable node attributes, separate from NodeStaticData.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    LAST_SEEN_FIELD_NUMBER: builtins.int
+    INSTALLED_VERSION_FIELD_NUMBER: builtins.int
+    HAS_INSTALLED_VERSION_FIELD_NUMBER: builtins.int
+    IS_ETCD_MASTER_FIELD_NUMBER: builtins.int
+    IS_HYPERVISOR_FIELD_NUMBER: builtins.int
+    IS_NETWORK_NODE_FIELD_NUMBER: builtins.int
+    IS_EVENTLOG_NODE_FIELD_NUMBER: builtins.int
+    INSTANCES_JSON_FIELD_NUMBER: builtins.int
+    DAEMONS_JSON_FIELD_NUMBER: builtins.int
+    DAEMON_STATES_JSON_FIELD_NUMBER: builtins.int
+    QEMU_VERSION_JSON_FIELD_NUMBER: builtins.int
+    HAS_QEMU_VERSION_FIELD_NUMBER: builtins.int
+    LIBVIRT_VERSION_JSON_FIELD_NUMBER: builtins.int
+    HAS_LIBVIRT_VERSION_FIELD_NUMBER: builtins.int
+    PYTHON_VERSION_JSON_FIELD_NUMBER: builtins.int
+    HAS_PYTHON_VERSION_FIELD_NUMBER: builtins.int
+    PYTHON_IMPLEMENTATION_FIELD_NUMBER: builtins.int
+    HAS_PYTHON_IMPLEMENTATION_FIELD_NUMBER: builtins.int
+    DEPENDENCY_VERSIONS_JSON_FIELD_NUMBER: builtins.int
+    PROCESS_METRICS_JSON_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    last_seen: builtins.float
+    """Observation data"""
+    installed_version: builtins.str
+    has_installed_version: builtins.bool
+    is_etcd_master: builtins.bool
+    """Roles"""
+    is_hypervisor: builtins.bool
+    is_network_node: builtins.bool
+    is_eventlog_node: builtins.bool
+    instances_json: builtins.str
+    """Instance and daemon tracking (JSON-encoded lists)"""
+    daemons_json: builtins.str
+    daemon_states_json: builtins.str
+    qemu_version_json: builtins.str
+    """Software versions (JSON-encoded lists)"""
+    has_qemu_version: builtins.bool
+    libvirt_version_json: builtins.str
+    has_libvirt_version: builtins.bool
+    python_version_json: builtins.str
+    has_python_version: builtins.bool
+    python_implementation: builtins.str
+    has_python_implementation: builtins.bool
+    dependency_versions_json: builtins.str
+    """Complex dicts (JSON-encoded)"""
+    process_metrics_json: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        last_seen: builtins.float = ...,
+        installed_version: builtins.str = ...,
+        has_installed_version: builtins.bool = ...,
+        is_etcd_master: builtins.bool = ...,
+        is_hypervisor: builtins.bool = ...,
+        is_network_node: builtins.bool = ...,
+        is_eventlog_node: builtins.bool = ...,
+        instances_json: builtins.str = ...,
+        daemons_json: builtins.str = ...,
+        daemon_states_json: builtins.str = ...,
+        qemu_version_json: builtins.str = ...,
+        has_qemu_version: builtins.bool = ...,
+        libvirt_version_json: builtins.str = ...,
+        has_libvirt_version: builtins.bool = ...,
+        python_version_json: builtins.str = ...,
+        has_python_version: builtins.bool = ...,
+        python_implementation: builtins.str = ...,
+        has_python_implementation: builtins.bool = ...,
+        dependency_versions_json: builtins.str = ...,
+        process_metrics_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["daemon_states_json", b"daemon_states_json", "daemons_json", b"daemons_json", "dependency_versions_json", b"dependency_versions_json", "has_installed_version", b"has_installed_version", "has_libvirt_version", b"has_libvirt_version", "has_python_implementation", b"has_python_implementation", "has_python_version", b"has_python_version", "has_qemu_version", b"has_qemu_version", "installed_version", b"installed_version", "instances_json", b"instances_json", "is_etcd_master", b"is_etcd_master", "is_eventlog_node", b"is_eventlog_node", "is_hypervisor", b"is_hypervisor", "is_network_node", b"is_network_node", "last_seen", b"last_seen", "libvirt_version_json", b"libvirt_version_json", "process_metrics_json", b"process_metrics_json", "python_implementation", b"python_implementation", "python_version_json", b"python_version_json", "qemu_version_json", b"qemu_version_json", "uuid", b"uuid"]) -> None: ...
+
+global___NodeAttributesProto = NodeAttributesProto
+
+@typing.final
+class CreateNodeAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___NodeAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___NodeAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateNodeAttributesRequest = CreateNodeAttributesRequest
+
+@typing.final
+class GetNodeAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetNodeAttributesRequest = GetNodeAttributesRequest
+
+@typing.final
+class GetNodeAttributesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___NodeAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___NodeAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetNodeAttributesReply = GetNodeAttributesReply
+
+@typing.final
+class UpdateNodeAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___NodeAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___NodeAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___UpdateNodeAttributesRequest = UpdateNodeAttributesRequest
+
+@typing.final
+class DeleteNodeAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteNodeAttributesRequest = DeleteNodeAttributesRequest

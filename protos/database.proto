@@ -104,6 +104,23 @@ service DatabaseService {
   rpc DeleteBlobAttributes (DeleteBlobAttributesRequest) returns (StatusReply) {}
   rpc GetExpiredBlobUuids (GetExpiredBlobUuidsRequest) returns (GetExpiredBlobUuidsReply) {}
   rpc GetStaleTranscodedBlobUuids (GetStaleTranscodedBlobUuidsRequest) returns (GetStaleTranscodedBlobUuidsReply) {}
+
+  // Node Operations (MariaDB)
+  // These manage node static values (uuid, fqdn, ip) in MariaDB.
+  // Nodes now use real UUID4 identifiers; FQDN is a separate indexed column.
+  rpc CreateNode (CreateNodeRequest) returns (StatusReply) {}
+  rpc GetNode (GetNodeRequest) returns (GetNodeReply) {}
+  rpc GetNodeByFqdn (GetNodeByFqdnRequest) returns (GetNodeReply) {}
+  rpc GetAllNodeUuids (GetAllNodeUuidsRequest) returns (GetAllNodeUuidsReply) {}
+  rpc DeleteNode (DeleteNodeRequest) returns (StatusReply) {}
+  rpc UpdateNode (UpdateNodeRequest) returns (StatusReply) {}
+
+  // Node Attributes Operations (MariaDB)
+  // These store mutable node attributes, separate from NodeData (static values).
+  rpc CreateNodeAttributes (CreateNodeAttributesRequest) returns (StatusReply) {}
+  rpc GetNodeAttributes (GetNodeAttributesRequest) returns (GetNodeAttributesReply) {}
+  rpc UpdateNodeAttributes (UpdateNodeAttributesRequest) returns (StatusReply) {}
+  rpc DeleteNodeAttributes (DeleteNodeAttributesRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -757,4 +774,107 @@ message GetStaleTranscodedBlobUuidsRequest {
 
 message GetStaleTranscodedBlobUuidsReply {
   repeated string uuids = 1;
+}
+
+// Node Operations (MariaDB)
+// These manage node static values in MariaDB. Nodes represent physical or
+// virtual machines in the cluster. They now use real UUID4 identifiers with
+// FQDN as a separate indexed column for efficient lookups.
+
+message NodeStaticData {
+  string uuid = 1;       // UUID as string (real UUID4, not FQDN)
+  string fqdn = 2;       // Fully qualified domain name (unique)
+  string ip = 3;         // Mesh network IP address
+  int32 version = 4;     // Object version number
+}
+
+message CreateNodeRequest {
+  NodeStaticData node = 1;
+}
+
+message GetNodeRequest {
+  string uuid = 1;
+}
+
+message GetNodeByFqdnRequest {
+  string fqdn = 1;
+}
+
+message GetNodeReply {
+  bool found = 1;
+  NodeStaticData node = 2;
+}
+
+message GetAllNodeUuidsRequest {
+  // No filters currently needed - returns all node UUIDs
+}
+
+message GetAllNodeUuidsReply {
+  repeated string uuids = 1;
+}
+
+message DeleteNodeRequest {
+  string uuid = 1;
+}
+
+message UpdateNodeRequest {
+  NodeStaticData node = 1;
+}
+
+// Node Attributes Operations (MariaDB)
+// These store mutable node attributes, separate from NodeStaticData.
+
+message NodeAttributesProto {
+  string uuid = 1;
+
+  // Observation data
+  double last_seen = 2;
+  string installed_version = 3;
+  bool has_installed_version = 4;
+
+  // Roles
+  bool is_etcd_master = 5;
+  bool is_hypervisor = 6;
+  bool is_network_node = 7;
+  bool is_eventlog_node = 8;
+
+  // Instance and daemon tracking (JSON-encoded lists)
+  string instances_json = 9;
+  string daemons_json = 10;
+  string daemon_states_json = 11;
+
+  // Software versions (JSON-encoded lists)
+  string qemu_version_json = 12;
+  bool has_qemu_version = 13;
+  string libvirt_version_json = 14;
+  bool has_libvirt_version = 15;
+  string python_version_json = 16;
+  bool has_python_version = 17;
+  string python_implementation = 18;
+  bool has_python_implementation = 19;
+
+  // Complex dicts (JSON-encoded)
+  string dependency_versions_json = 20;
+  string process_metrics_json = 21;
+}
+
+message CreateNodeAttributesRequest {
+  NodeAttributesProto data = 1;
+}
+
+message GetNodeAttributesRequest {
+  string uuid = 1;
+}
+
+message GetNodeAttributesReply {
+  bool found = 1;
+  NodeAttributesProto data = 2;
+}
+
+message UpdateNodeAttributesRequest {
+  NodeAttributesProto data = 1;
+}
+
+message DeleteNodeAttributesRequest {
+  string uuid = 1;
 }

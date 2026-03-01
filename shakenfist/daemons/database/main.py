@@ -40,6 +40,8 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
+from shakenfist.schema.node_attributes import NodeAttributesData
+from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
@@ -1800,6 +1802,362 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetStaleTranscodedBlobUuids failed', e)
             return database_pb2.GetStaleTranscodedBlobUuidsReply(uuids=[])
 
+    # =====================================================================
+    # Node Operations (MariaDB)
+    # =====================================================================
+
+    def CreateNode(
+        self,
+        request: database_pb2.CreateNodeRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create a node record in MariaDB."""
+        try:
+            self.monitor.counters['create_node'].inc()
+            success = mariadb._direct_create_node(
+                UUID(request.node.uuid),
+                request.node.fqdn,
+                request.node.ip,
+                request.node.version
+            )
+            return database_pb2.StatusReply(
+                success=success, error=''
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateNode failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e)
+            )
+
+    def GetNode(
+        self,
+        request: database_pb2.GetNodeRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNodeReply:
+        """Get node static values from MariaDB."""
+        try:
+            self.monitor.counters['get_node'].inc()
+            data = mariadb._direct_get_node(
+                UUID(request.uuid)
+            )
+            if data is None:
+                return database_pb2.GetNodeReply(found=False)
+            return database_pb2.GetNodeReply(
+                found=True,
+                node=database_pb2.NodeStaticData(
+                    uuid=str(data.uuid),
+                    fqdn=data.fqdn,
+                    ip=data.ip,
+                    version=data.version
+                )
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNode failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNodeReply(found=False)
+
+    def GetNodeByFqdn(
+        self,
+        request: database_pb2.GetNodeByFqdnRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNodeReply:
+        """Get node static values by FQDN from MariaDB."""
+        try:
+            self.monitor.counters['get_node_by_fqdn'].inc()
+            data = mariadb._direct_get_node_by_fqdn(
+                request.fqdn
+            )
+            if data is None:
+                return database_pb2.GetNodeReply(found=False)
+            return database_pb2.GetNodeReply(
+                found=True,
+                node=database_pb2.NodeStaticData(
+                    uuid=str(data.uuid),
+                    fqdn=data.fqdn,
+                    ip=data.ip,
+                    version=data.version
+                )
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNodeByFqdn failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNodeReply(found=False)
+
+    def GetAllNodeUuids(
+        self,
+        request: database_pb2.GetAllNodeUuidsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllNodeUuidsReply:
+        """Get all node UUIDs from MariaDB."""
+        try:
+            self.monitor.counters['get_all_node_uuids'].inc()
+            uuids = mariadb._direct_get_all_node_uuids()
+            return database_pb2.GetAllNodeUuidsReply(
+                uuids=uuids
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllNodeUuids failed', e)
+            return database_pb2.GetAllNodeUuidsReply(uuids=[])
+
+    def DeleteNode(
+        self,
+        request: database_pb2.DeleteNodeRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a node record from MariaDB."""
+        try:
+            self.monitor.counters['delete_node'].inc()
+            success = mariadb._direct_delete_node(
+                UUID(request.uuid)
+            )
+            return database_pb2.StatusReply(
+                success=success, error=''
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteNode failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e)
+            )
+
+    def UpdateNode(
+        self,
+        request: database_pb2.UpdateNodeRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update a node record in MariaDB."""
+        try:
+            self.monitor.counters['update_node'].inc()
+            data = NodeData(
+                uuid=UUID(request.node.uuid),
+                fqdn=request.node.fqdn,
+                ip=request.node.ip,
+                version=request.node.version
+            )
+            success = mariadb._direct_update_node(data)
+            return database_pb2.StatusReply(
+                success=success, error=''
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateNode failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e)
+            )
+
+    # =====================================================================
+    # Node Attributes Operations (MariaDB)
+    # =====================================================================
+
+    def _node_attrs_from_proto(
+        self,
+        d: database_pb2.NodeAttributesProto
+    ) -> NodeAttributesData:
+        """Convert a proto NodeAttributesProto to a Pydantic model."""
+        return NodeAttributesData(
+            uuid=UUID(d.uuid),
+            last_seen=d.last_seen,
+            installed_version=(
+                d.installed_version
+                if d.has_installed_version else None
+            ),
+            is_etcd_master=d.is_etcd_master,
+            is_hypervisor=d.is_hypervisor,
+            is_network_node=d.is_network_node,
+            is_eventlog_node=d.is_eventlog_node,
+            instances=(
+                json.loads(d.instances_json)
+                if d.instances_json else []
+            ),
+            daemons=(
+                json.loads(d.daemons_json)
+                if d.daemons_json else []
+            ),
+            daemon_states=(
+                json.loads(d.daemon_states_json)
+                if d.daemon_states_json else {}
+            ),
+            qemu_version=(
+                json.loads(d.qemu_version_json)
+                if d.has_qemu_version else None
+            ),
+            libvirt_version=(
+                json.loads(d.libvirt_version_json)
+                if d.has_libvirt_version else None
+            ),
+            python_version=(
+                json.loads(d.python_version_json)
+                if d.has_python_version else None
+            ),
+            python_implementation=(
+                d.python_implementation
+                if d.has_python_implementation else None
+            ),
+            dependency_versions=(
+                json.loads(d.dependency_versions_json)
+                if d.dependency_versions_json else {}
+            ),
+            process_metrics=(
+                json.loads(d.process_metrics_json)
+                if d.process_metrics_json else {}
+            ),
+        )
+
+    def _node_attrs_to_proto(
+        self,
+        data: NodeAttributesData
+    ) -> database_pb2.NodeAttributesProto:
+        """Convert a Pydantic NodeAttributesData to proto."""
+        return database_pb2.NodeAttributesProto(
+            uuid=str(data.uuid),
+            last_seen=data.last_seen,
+            installed_version=(
+                data.installed_version or ''
+            ),
+            has_installed_version=(
+                data.installed_version is not None
+            ),
+            is_etcd_master=data.is_etcd_master,
+            is_hypervisor=data.is_hypervisor,
+            is_network_node=data.is_network_node,
+            is_eventlog_node=data.is_eventlog_node,
+            instances_json=json.dumps(data.instances),
+            daemons_json=json.dumps(data.daemons),
+            daemon_states_json=json.dumps(data.daemon_states),
+            qemu_version_json=(
+                json.dumps(data.qemu_version)
+                if data.qemu_version is not None else ''
+            ),
+            has_qemu_version=(
+                data.qemu_version is not None
+            ),
+            libvirt_version_json=(
+                json.dumps(data.libvirt_version)
+                if data.libvirt_version is not None else ''
+            ),
+            has_libvirt_version=(
+                data.libvirt_version is not None
+            ),
+            python_version_json=(
+                json.dumps(data.python_version)
+                if data.python_version is not None else ''
+            ),
+            has_python_version=(
+                data.python_version is not None
+            ),
+            python_implementation=(
+                data.python_implementation or ''
+            ),
+            has_python_implementation=(
+                data.python_implementation is not None
+            ),
+            dependency_versions_json=(
+                json.dumps(data.dependency_versions)
+            ),
+            process_metrics_json=(
+                json.dumps(data.process_metrics)
+            ),
+        )
+
+    def CreateNodeAttributes(
+        self,
+        request: database_pb2.CreateNodeAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create node attributes in MariaDB."""
+        try:
+            self.monitor.counters['create_node_attributes'].inc()
+            data = self._node_attrs_from_proto(request.data)
+            success = mariadb._direct_create_node_attributes(
+                data
+            )
+            return database_pb2.StatusReply(
+                success=success, error=''
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateNodeAttributes failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e)
+            )
+
+    def GetNodeAttributes(
+        self,
+        request: database_pb2.GetNodeAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNodeAttributesReply:
+        """Get node attributes from MariaDB."""
+        try:
+            self.monitor.counters['get_node_attributes'].inc()
+            data = mariadb._direct_get_node_attributes(
+                UUID(request.uuid)
+            )
+            if data is None:
+                return database_pb2.GetNodeAttributesReply(
+                    found=False
+                )
+            return database_pb2.GetNodeAttributesReply(
+                found=True,
+                data=self._node_attrs_to_proto(data)
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNodeAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNodeAttributesReply(
+                found=False
+            )
+
+    def UpdateNodeAttributes(
+        self,
+        request: database_pb2.UpdateNodeAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update node attributes in MariaDB."""
+        try:
+            self.monitor.counters['update_node_attributes'].inc()
+            data = self._node_attrs_from_proto(request.data)
+            success = mariadb._direct_update_node_attributes(
+                data
+            )
+            return database_pb2.StatusReply(
+                success=success, error=''
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateNodeAttributes failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e)
+            )
+
+    def DeleteNodeAttributes(
+        self,
+        request: database_pb2.DeleteNodeAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete node attributes from MariaDB."""
+        try:
+            self.monitor.counters['delete_node_attributes'].inc()
+            success = mariadb._direct_delete_node_attributes(
+                UUID(request.uuid)
+            )
+            return database_pb2.StatusReply(
+                success=success, error=''
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteNodeAttributes failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e)
+            )
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -1853,7 +2211,13 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_blob_attributes', 'get_blob_attributes',
             'update_blob_attributes', 'update_blob_last_used',
             'delete_blob_attributes', 'get_expired_blob_uuids',
-            'get_stale_transcoded_blob_uuids'
+            'get_stale_transcoded_blob_uuids',
+            # MariaDB node operations
+            'create_node', 'get_node', 'get_node_by_fqdn',
+            'get_all_node_uuids', 'delete_node', 'update_node',
+            # MariaDB node attributes operations
+            'create_node_attributes', 'get_node_attributes',
+            'update_node_attributes', 'delete_node_attributes'
         ]
         for op in operations:
             self.counters[op] = Counter(
