@@ -32,8 +32,8 @@ jobs:
         os: [
           {
             description: 'develop branch on debian 11 single machine',
-            job_name: 'develop-debian-11-localhost',
-            base_image: 'sf://label/ci-images/debian-11',
+            job_name: 'develop-debian-12-localhost',
+            base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
             topology: 'localhost',
             concurrency: 3,
@@ -182,9 +182,6 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
               "${setup} ubuntu-2004 /srv/ci/ubuntu:20.04 --shared --no-checksum"
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
-              "${setup} debian-11 /srv/ci/debian:11 --shared --no-checksum"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.os.base_image_user }}@${UPLOAD_TARGET} \
               "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"

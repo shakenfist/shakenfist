@@ -37,7 +37,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': 'sf://upload/system/debian-12',
                     'type': 'disk'
                 }
             ], None, None)
@@ -63,7 +63,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': 'sf://upload/system/debian-12',
                     'type': 'disk'
                 }
             ], None, None,
@@ -209,7 +209,7 @@ class TestDetectReboot(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': 'sf://upload/system/debian-12',
                     'type': 'disk'
                 }
             ], None, None)

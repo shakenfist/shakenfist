@@ -122,7 +122,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': 'sf://upload/system/debian-12',
                     'type': 'disk'
                 }
             ], None, None)
@@ -274,7 +274,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': 'sf://upload/system/debian-12',
                     'type': 'disk'
                 }
             ], None, None)
@@ -294,7 +294,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': 'sf://upload/system/debian-12',
                     'type': 'disk'
                 }
             ], None, None)
@@ -318,7 +318,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': 'sf://upload/system/debian-12',
                     'type': 'disk'
                 }
             ], None, None)
@@ -382,13 +382,53 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-11',
+                    'base': 'sf://upload/system/debian-12',
                     'type': 'disk'
                 }
             ], None, None)
 
         # Wait for the instance agent to report in
         self._await_instance_ready(inst['uuid'])
+
+        # Debug: check that predictable interface naming is
+        # disabled inside the instance
+        _, cmdline = self.test_client.await_agent_command(
+            inst['uuid'], 'cat /proc/cmdline')
+        self.assertIn(
+            'net.ifnames=0', cmdline,
+            'net.ifnames=0 not in kernel cmdline: '
+            '%s' % cmdline)
+
+        _, udev_rule = self.test_client.await_agent_command(
+            inst['uuid'],
+            'ls -la /etc/udev/rules.d/'
+            '80-net-setup-link.rules',
+            exit_codes=[0, 2],
+            ignore_stderr=True)
+        _, systemd_link = self.test_client.await_agent_command(
+            inst['uuid'],
+            'ls -la /etc/systemd/network/'
+            '99-default.link',
+            exit_codes=[0, 2],
+            ignore_stderr=True)
+        _, ifaces = self.test_client.await_agent_command(
+            inst['uuid'], 'ip -json link')
+        iface_names = [
+            i['ifname'] for i in json.loads(ifaces)
+            if i['ifname'] != 'lo'
+        ]
+        for name in iface_names:
+            self.assertTrue(
+                name.startswith('eth'),
+                'Interface %s does not use eth naming. '
+                'All interfaces: %s. '
+                'Kernel cmdline: %s. '
+                'udev rule: %s. '
+                'systemd link: %s.'
+                % (name, iface_names,
+                   cmdline.strip(),
+                   udev_rule.strip(),
+                   systemd_link.strip()))
 
         # Hot plug an interface in
         netdesc = {
@@ -437,6 +477,22 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self.assertNotEqual(
             -1, data.find('02:00:00:ea:3a:28'),
             'Interface not found in `ip -json link` output:\n%s' % data)
+
+        # Determine which interface the new one is post reboot
+        d = json.loads(data)
+        new_interface_after_reboot = None
+        for i in d:
+            if i['address'] == '02:00:00:ea:3a:28':
+                new_interface_after_reboot = i['ifname']
+        self.assertNotEqual(None, new_interface_after_reboot)
+        self.assertEqual(
+            new_interface,
+            new_interface_after_reboot,
+            (
+                f'The interface name changed from {new_interface} to '
+                f'{new_interface_after_reboot} across the reboot!'
+            )
+        )
 
         # Collect the config drive network configuration to ensure that the new
         # device is listed

@@ -83,7 +83,7 @@ jobs:
             dep=$(echo ${depver} | sed 's/==.*//')
 
             if [ $(egrep -ic "${dep}==" pyproject.toml) -lt 1 ]; then
-              sed -i pyproject.toml "s/    # END_OF_INDIRECT_DEPS/    \"${depver}\",\n    # END_OF_INDIRECT_DEPS/"
+              sed -i "s/    # END_OF_INDIRECT_DEPS/    \"${depver}\",\n    # END_OF_INDIRECT_DEPS/" pyproject.toml
             fi
           done
 

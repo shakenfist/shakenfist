@@ -21,14 +21,14 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
     def test_disappearing_source_cache(self):
         p = subprocess.run(
             ['sudo /srv/shakenfist/venv/bin/sf-client '
-             'artifact download debian-11 '
-             '/var/www/html/debian-11-disappearing-cache'],
+             'artifact download debian-12 '
+             '/var/www/html/debian-12-disappearing-cache'],
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
             f'Command failed:\n\tstdout = {p.stdout}\n\tstderr = {p.stderr}\n')
 
-        url = 'http://10.0.0.10/debian-11-disappearing-cache'
+        url = 'http://10.0.0.10/debian-12-disappearing-cache'
         img = self.system_client.cache_artifact(url)
 
         # Get all artifacts once to make sure we get added to the list
@@ -53,7 +53,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
 
         # Remove the source image
         p = subprocess.run(
-            ['sudo rm /var/www/html/debian-11-disappearing-cache'],
+            ['sudo rm /var/www/html/debian-12-disappearing-cache'],
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
@@ -78,14 +78,14 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
 
         p = subprocess.run(
             ['sudo /srv/shakenfist/venv/bin/sf-client '
-             'artifact download debian-11 '
-             '/var/www/html/debian-11-disappearing-instance'],
+             'artifact download debian-12 '
+             '/var/www/html/debian-12-disappearing-instance'],
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
             f'Command failed:\n\tstdout = {p.stdout}\n\tstderr = {p.stderr}\n')
 
-        url = 'http://10.0.0.10/debian-11-disappearing-instance'
+        url = 'http://10.0.0.10/debian-12-disappearing-instance'
         inst = self.test_client.create_instance(
             'inst1', 1, 1024, None,
             [
@@ -101,7 +101,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
 
         # Remove the source image
         p = subprocess.run(
-            ['sudo rm /var/www/html/debian-11-disappearing-instance'],
+            ['sudo rm /var/www/html/debian-12-disappearing-instance'],
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
             0, p.returncode,
