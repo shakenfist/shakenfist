@@ -371,7 +371,7 @@ jobs:
           setup="${setup} /srv/shakenfist/venv/bin/sf-client artifact upload"
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.pr.base_image_user }}@${UPLOAD_TARGET} \
-              "${setup} debian-12 /srv/ci/debian:11 --shared --no-checksum"
+              "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
 
       - name: Make the traces directory
         run: |
@@ -848,7 +848,7 @@ jobs:
           # The cluster CI image, used by all CI types
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                 ${{ matrix.merge.base_image_user }}@${UPLOAD_TARGET} \
-                "${setup} debian-12 /srv/ci/debian:11 --shared --no-checksum"
+                "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
 
           # Additional images used only by guest CI
           if [ "${{ matrix.merge.stestr_config }}" == "guest-ci.conf" ]; then
@@ -1338,7 +1338,7 @@ jobs:
           # The cluster CI image, used by all CI types
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                 debian@${UPLOAD_TARGET} \
-                "${setup} debian-12 /srv/ci/debian:11 --shared --no-checksum"
+                "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
 
       - name: Run ansible module tests
         timeout-minutes: 60
@@ -1528,7 +1528,7 @@ jobs:
 
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@${UPLOAD_TARGET} \
-              "${setup} debian-12 /srv/ci/debian:11 --shared --no-checksum"
+              "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
 
       - name: Run node lifecycle tests
         timeout-minutes: 60
