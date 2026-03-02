@@ -41,7 +41,7 @@ class NodeBlobsTestCase(base.ShakenFistTestCase):
         ]
 
         node = Node.__new__(Node)
-        node._Node__node_fqdn = 'node1.example.com'
+        node._Node__fqdn = 'node1.example.com'
 
         blobs = node.blobs
 
@@ -56,7 +56,7 @@ class NodeBlobsTestCase(base.ShakenFistTestCase):
         mock_get_refs.return_value = []
 
         node = Node.__new__(Node)
-        node._Node__node_fqdn = 'node1.example.com'
+        node._Node__fqdn = 'node1.example.com'
 
         blobs = node.blobs
 

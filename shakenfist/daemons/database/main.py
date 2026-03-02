@@ -2237,8 +2237,13 @@ class Monitor(daemon.WorkerPoolDaemon):
         eventlog.set_force_event_dlq(True)
         try:
             n = Node.from_db(config.NODE_NAME)
-            n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_RUNNING)
-            n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon starting')
+            if n:
+                n.set_daemon_state(
+                    self.daemon_name,
+                    Node.DAEMON_STATE_RUNNING)
+                n.add_event(
+                    EVENT_TYPE_AUDIT,
+                    f'{self.daemon_name} daemon starting')
         finally:
             set_force_direct_etcd(False)
             eventlog.set_force_event_dlq(False)
@@ -2251,13 +2256,19 @@ class Monitor(daemon.WorkerPoolDaemon):
         eventlog.set_force_event_dlq(True)
         try:
             n = Node.from_db(config.NODE_NAME)
-            try:
-                n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPED)
-            except InvalidStateException as e:
-                if not str(e).startswith(
-                        'Invalid state change from stopping to degraded'):
-                    raise e
-            n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon stopped')
+            if n:
+                try:
+                    n.set_daemon_state(
+                        self.daemon_name,
+                        Node.DAEMON_STATE_STOPPED)
+                except InvalidStateException as e:
+                    if not str(e).startswith(
+                            'Invalid state change from '
+                            'stopping to degraded'):
+                        raise e
+                n.add_event(
+                    EVENT_TYPE_AUDIT,
+                    f'{self.daemon_name} daemon stopped')
         finally:
             set_force_direct_etcd(False)
             eventlog.set_force_event_dlq(False)

@@ -24,8 +24,10 @@ QEMU_REQUIRES_BACKING_FORMAT = semver.Version(major=6, minor=0, patch=0)
 
 
 def _qemu_requires_backing_format(node_name: str) -> bool:
-    qemu_version = Node.from_db(config.NODE_NAME).qemu_version
-    return qemu_version >= QEMU_REQUIRES_BACKING_FORMAT
+    n = Node.from_db(config.NODE_NAME)
+    if not n:
+        return True
+    return n.qemu_version >= QEMU_REQUIRES_BACKING_FORMAT
 
 
 def convert_numeric_qemu_value(qemu_value: str | float | int) -> float | str:

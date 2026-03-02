@@ -50,20 +50,34 @@ def get_active_node_metrics():
 
     for n in Nodes([], prefilter='active'):
         try:
-            new_metrics = etcd.get('metrics', n.uuid, None)
+            # Metrics are stored under the node FQDN
+            new_metrics = etcd.get(
+                'metrics', n.fqdn, None)
             if new_metrics:
-                if time.time() - new_metrics.get('timestamp', 0) < 120:
-                    new_metrics = new_metrics.get('metrics', {})
+                if (time.time()
+                        - new_metrics.get('timestamp', 0)
+                        < 120):
+                    new_metrics = new_metrics.get(
+                        'metrics', {})
                 else:
-                    n.add_event(EVENT_TYPE_AUDIT, 'stale metrics from database for node')
+                    n.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'stale metrics from database '
+                        'for node')
                     new_metrics = {}
             else:
-                n.add_event(EVENT_TYPE_AUDIT, 'empty metrics from database for node')
+                n.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'empty metrics from database '
+                    'for node')
                 new_metrics = {}
-            metrics[n.uuid] = new_metrics
+            metrics[n.fqdn] = new_metrics
 
         except exceptions.ReadException:
-            n.add_event(EVENT_TYPE_AUDIT, 'refreshing metrics for node failed')
+            n.add_event(
+                EVENT_TYPE_AUDIT,
+                'refreshing metrics for node '
+                'failed')
 
     return metrics
 
