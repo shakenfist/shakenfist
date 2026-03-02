@@ -115,7 +115,10 @@ class Node(dbo):
         attrs = self._load_attributes()
         if attrs is None:
             attrs = NodeAttributesData(uuid=self.uuid)
-            mariadb.create_node_attributes(attrs)
+            if not mariadb.create_node_attributes(attrs):
+                # Another thread/process created the record first;
+                # reload the actual data from MariaDB.
+                attrs = mariadb.get_node_attributes(self.uuid)
             self.__attributes = attrs
         return attrs
 
