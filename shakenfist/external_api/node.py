@@ -173,7 +173,10 @@ class NodeEventsEndpoint(api_base.Resource):
     @api_base.redirect_to_eventlog_node
     @api_base.log_token_use
     def get(self, node=None, event_type=None, limit=100):
-        with eventlog.EventLog('node', node) as eventdb:
+        n = Node.from_db(node, suppress_failure_audit=True)
+        if not n:
+            return sf_api.error(404, 'node not found')
+        with eventlog.EventLog('node', str(n.uuid)) as eventdb:
             return list(eventdb.read_events(limit=limit, event_type=event_type))
 
 
