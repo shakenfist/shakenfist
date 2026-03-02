@@ -1747,6 +1747,20 @@ def _migrate_etcd_blob_attributes(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _migrate_node_state_key(fqdn: str, new_uuid: str) -> None:
+    """Re-key a node's object_states entry from FQDN to UUID4.
+
+    The object_states migration runs before the node migration, so node
+    state entries are stored with the FQDN as the object_uuid.  After
+    the node migration assigns a real UUID4, we must update the state
+    entry to use the new key so that subsequent lookups succeed.
+    """
+    old_state = get_state(ObjectType.NODE, fqdn)
+    if old_state and old_state.value is not None:
+        set_state(ObjectType.NODE, new_uuid, old_state)
+        delete_state(ObjectType.NODE, fqdn)
+
+
 def _migrate_etcd_nodes(engine: sa.Engine) -> dict[str, Any]:
     """Migrate node static values from etcd to MariaDB.
 
@@ -1773,10 +1787,18 @@ def _migrate_etcd_nodes(engine: sa.Engine) -> dict[str, Any]:
 
             success = create_node(node_uuid, fqdn, node_ip, node_version)
             if success:
+                # Update the object_states entry from the old FQDN key
+                # to the new UUID4 key. The earlier object_states
+                # migration stored node state keyed by FQDN.
+                _migrate_node_state_key(fqdn, str(node_uuid))
                 etcd_mod.delete('node', None, fqdn)
                 migrated_count += 1
             else:
-                # Already exists (by FQDN unique index)
+                # Already exists (by FQDN unique index); look up the
+                # existing UUID and re-key the state entry.
+                existing = get_node_by_fqdn(fqdn)
+                if existing:
+                    _migrate_node_state_key(fqdn, existing.uuid)
                 etcd_mod.delete('node', None, fqdn)
                 skipped_count += 1
         except Exception as e:
