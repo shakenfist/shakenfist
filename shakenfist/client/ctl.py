@@ -279,6 +279,9 @@ def register_daemon(daemon: tuple[str, ...], node_name: Optional[str]) -> None:
 @click.argument('daemon', nargs=-1)
 def deregister_daemon(daemon: tuple[str, ...]) -> None:
     n = Node.from_db(config.NODE_NAME)
+    if not n:
+        raise click.ClickException(
+            f'Node "{config.NODE_NAME}" not found.')
     for d in daemon:
         click.echo(f'Deregistering {d} on node...')
         n.deregister_daemon(d)
@@ -289,12 +292,16 @@ def deregister_daemon(daemon: tuple[str, ...]) -> None:
 @click.argument('daemon')
 def stop(daemon: str) -> None:
     click.echo(
-        f'Gracefully stopping Shaken Fist {daemon} daemon on this node...')
+        f'Gracefully stopping Shaken Fist {daemon} daemon '
+        f'on this node...')
     n = Node.from_db(config.NODE_NAME)
+    if not n:
+        raise click.ClickException(
+            f'Node "{config.NODE_NAME}" not found.')
 
     # If we were missing, we're not any more
     if n.state.value == Node.STATE_MISSING:
-        n.state = Node.STATE_DEGRADED
+        n.state = Node.STATE_DEGRADED  # type: ignore[misc]
 
     n.set_daemon_state(daemon, Node.DAEMON_STATE_STOPPING)
 
