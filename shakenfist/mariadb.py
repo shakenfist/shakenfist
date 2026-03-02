@@ -24,6 +24,7 @@ import time
 import threading
 from typing import Any, Callable, cast, Optional
 from uuid import UUID
+from uuid import uuid4
 
 import grpc
 import sqlalchemy as sa
@@ -92,8 +93,8 @@ BLOBS_VERSION = 2
 BLOB_HASHES_VERSION = 2
 BLOB_TRANSFERS_VERSION = 2
 BLOB_ATTRIBUTES_VERSION = 1
-NODES_VERSION = 1
-NODE_ATTRIBUTES_VERSION = 1
+NODES_VERSION = 2
+NODE_ATTRIBUTES_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -1746,6 +1747,256 @@ def _migrate_etcd_blob_attributes(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _migrate_etcd_nodes(
+    engine: sa.Engine,
+) -> dict[str, Any]:
+    """Migrate node static values from etcd to MariaDB.
+
+    Old etcd format: key='node/None/{fqdn}', value={
+        'uuid': fqdn, 'fqdn': fqdn, 'ip': ip,
+        'version': int
+    }
+
+    New MariaDB format: real UUID4 with FQDN as a separate
+    indexed column.
+    """
+    from shakenfist import etcd as etcd_mod
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating nodes from etcd...')
+
+    for objkey, data in etcd_mod.get_all('node', None):
+        fqdn = objkey.split('/')[-1]
+
+        try:
+            # Generate a real UUID for this node
+            node_uuid = uuid4()
+            node_ip = data.get('ip', '')
+            node_version = 11  # Current version
+
+            success = create_node(
+                node_uuid, fqdn, node_ip, node_version)
+            if success:
+                etcd_mod.delete('node', None, fqdn)
+                migrated_count += 1
+            else:
+                # Already exists (by FQDN unique index)
+                etcd_mod.delete('node', None, fqdn)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(
+                f'Error migrating node {fqdn}: {e}')
+            error_count += 1
+
+        total = migrated_count + skipped_count + error_count
+        if total % 100 == 0:
+            LOG.info(f'  ... {total} nodes processed')
+
+    LOG.info(
+        f'Node migration: {migrated_count} migrated, '
+        f'{skipped_count} skipped, {error_count} errors')
+
+    return {
+        'migrated_count': migrated_count,
+        'skipped_count': skipped_count,
+        'error_count': error_count
+    }
+
+
+def _migrate_etcd_node_attributes(
+    engine: sa.Engine,
+) -> dict[str, Any]:
+    """Migrate node attributes from etcd to MariaDB.
+
+    Consolidates multiple etcd attribute keys per node into
+    a single node_attributes row. Must run after
+    _migrate_etcd_nodes so that node UUIDs exist in MariaDB.
+
+    Old etcd attributes (at 'attribute/node/{fqdn}/'):
+    - observed: {at: float, release: str}
+    - roles: {is_etcd_master: bool, ...}
+    - daemons: {daemons: [str, ...]}
+    - daemon:{name}: {value: str, update_time: float, ...}
+    - instances: {instances: [str, ...]}
+    - dependency_versions: {dep: ver, ...}
+    - qemu_version: [int, ...]
+    - libvirt_version: [int, ...]
+    - python_version: [int, ...]
+    - python_implementation: str
+    - process_metrics: {metric: value, ...}
+    """
+    from shakenfist import etcd as etcd_mod
+    from shakenfist.schema.node_attributes import (
+        NodeAttributesData,
+    )
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating node attributes from etcd...')
+
+    # Get all nodes from MariaDB (they must have been
+    # migrated already by _migrate_etcd_nodes)
+    all_uuids = get_all_node_uuids()
+
+    for node_uuid_str in all_uuids:
+        parsed_uuid = UUID(node_uuid_str)
+        node_data = get_node(parsed_uuid)
+        if not node_data:
+            continue
+
+        fqdn = node_data.fqdn
+
+        try:
+            # Read old etcd attributes
+            observed = etcd_mod.get(
+                'attribute/node', fqdn, 'observed')
+            roles = etcd_mod.get(
+                'attribute/node', fqdn, 'roles')
+            daemons_data = etcd_mod.get(
+                'attribute/node', fqdn, 'daemons')
+            instances_data = etcd_mod.get(
+                'attribute/node', fqdn, 'instances')
+            dep_versions = etcd_mod.get(
+                'attribute/node', fqdn,
+                'dependency_versions')
+            qemu_ver = etcd_mod.get(
+                'attribute/node', fqdn, 'qemu_version')
+            libvirt_ver = etcd_mod.get(
+                'attribute/node', fqdn, 'libvirt_version')
+            python_ver = etcd_mod.get(
+                'attribute/node', fqdn, 'python_version')
+            python_impl = etcd_mod.get(
+                'attribute/node', fqdn,
+                'python_implementation')
+            proc_metrics = etcd_mod.get(
+                'attribute/node', fqdn, 'process_metrics')
+
+            # Collect daemon states from individual keys
+            daemon_states: dict[str, Any] = {}
+            daemons_list = []
+            if daemons_data:
+                daemons_list = daemons_data.get(
+                    'daemons', [])
+            for daemon_name in daemons_list:
+                ds = etcd_mod.get(
+                    'attribute/node', fqdn,
+                    f'daemon:{daemon_name}')
+                if ds:
+                    daemon_states[daemon_name] = ds
+
+            # Build the attributes model
+            attrs = NodeAttributesData(
+                uuid=parsed_uuid,
+                last_seen=(
+                    observed.get('at', 0)
+                    if observed else 0),
+                installed_version=(
+                    observed.get('release')
+                    if observed else None),
+                is_etcd_master=(
+                    roles.get('is_etcd_master', False)
+                    if roles else False),
+                is_hypervisor=(
+                    roles.get('is_hypervisor', False)
+                    if roles else False),
+                is_network_node=(
+                    roles.get('is_network_node', False)
+                    if roles else False),
+                is_eventlog_node=(
+                    roles.get('is_eventlog_node', False)
+                    if roles else False),
+                instances=(
+                    instances_data.get('instances', [])
+                    if instances_data else []),
+                daemons=daemons_list,
+                daemon_states=daemon_states,
+                qemu_version=(
+                    qemu_ver if isinstance(
+                        qemu_ver, list) else None),
+                libvirt_version=(
+                    libvirt_ver if isinstance(
+                        libvirt_ver, list) else None),
+                python_version=(
+                    python_ver if isinstance(
+                        python_ver, list) else None),
+                python_implementation=(
+                    python_impl if isinstance(
+                        python_impl, str) else None),
+                dependency_versions=(
+                    dep_versions
+                    if isinstance(dep_versions, dict)
+                    else {}),
+                process_metrics=(
+                    proc_metrics
+                    if isinstance(proc_metrics, dict)
+                    else {}),
+            )
+
+            success = create_node_attributes(attrs)
+            if success:
+                # Clean up old etcd attributes
+                for attr in [
+                    'observed', 'roles', 'daemons',
+                    'instances', 'dependency_versions',
+                    'qemu_version', 'libvirt_version',
+                    'python_version',
+                    'python_implementation',
+                    'process_metrics',
+                ]:
+                    etcd_mod.delete(
+                        'attribute/node', fqdn, attr)
+                for daemon_name in daemons_list:
+                    etcd_mod.delete(
+                        'attribute/node', fqdn,
+                        f'daemon:{daemon_name}')
+                migrated_count += 1
+            else:
+                # Already exists, just clean up etcd
+                for attr in [
+                    'observed', 'roles', 'daemons',
+                    'instances', 'dependency_versions',
+                    'qemu_version', 'libvirt_version',
+                    'python_version',
+                    'python_implementation',
+                    'process_metrics',
+                ]:
+                    etcd_mod.delete(
+                        'attribute/node', fqdn, attr)
+                for daemon_name in daemons_list:
+                    etcd_mod.delete(
+                        'attribute/node', fqdn,
+                        f'daemon:{daemon_name}')
+                skipped_count += 1
+
+        except Exception as e:
+            LOG.warning(
+                f'Failed to migrate attributes for '
+                f'node {fqdn}: {e}')
+            error_count += 1
+
+        total = migrated_count + skipped_count + error_count
+        if total % 100 == 0:
+            LOG.info(
+                f'  ... {total} node attributes processed')
+
+    LOG.info(
+        f'Node attribute migration: '
+        f'{migrated_count} migrated, '
+        f'{skipped_count} skipped, '
+        f'{error_count} errors')
+
+    return {
+        'migrated_count': migrated_count,
+        'skipped_count': skipped_count,
+        'error_count': error_count
+    }
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -1775,6 +2026,12 @@ DATA_MIGRATIONS.update({
     },
     'blob_attributes': {
         2: _migrate_etcd_blob_attributes,
+    },
+    'nodes': {
+        2: _migrate_etcd_nodes,
+    },
+    'node_attributes': {
+        2: _migrate_etcd_node_attributes,
     },
 })
 
