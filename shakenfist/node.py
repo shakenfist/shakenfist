@@ -364,8 +364,8 @@ class Node(dbo):
             retval[f'daemon-{daemon}-state'] = \
                 self.get_daemon_state(daemon).value
 
-        # Add object references. During migration transition,
-        # references may still be keyed by FQDN.
+        # Object references use FQDN as the node identifier
+        # in the object_references table.
         refs_to = mariadb.get_references_to(
             ObjectType.NODE, self.fqdn)
         refs_from = mariadb.get_references_from(
@@ -534,7 +534,6 @@ class Node(dbo):
         BLOB_LOCATION relationships where this node is
         the source.
         """
-        # References are keyed by FQDN during migration
         refs = mariadb.get_references_from(
             ObjectType.NODE, self.fqdn,
             RelationshipType.BLOB_LOCATION)

@@ -1495,7 +1495,7 @@ def _migrate_etcd_object_references(engine: sa.Engine) -> dict[str, Any]:
 
         locations = locations_data.get('locations', [])
         for node_name in locations:
-            # Node UUIDs are node names (strings like "sf-1"), not UUIDs
+            # Legacy blob locations use node FQDNs as identifiers
             success = record_relationship(
                 ObjectType.NODE, node_name,
                 RelationshipType.BLOB_LOCATION, None,

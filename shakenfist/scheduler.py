@@ -22,10 +22,9 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 
 
-# Lookup of the FQDN (called a UUID by the node object) is expensive,
-# and the network node doesn't move around, so just do it once here
-# and cache the result. This can't be done until config is loaded, so
-# the cache is populated by the first caller.
+# The network node doesn't move around, so just look it up once
+# and cache the result. This can't be done until config is loaded,
+# so the cache is populated by the first caller.
 CACHED_NETWORK_NODE = None
 
 UNREASONABLE_QUEUE_LENGTH = 20
