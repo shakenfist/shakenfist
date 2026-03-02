@@ -404,6 +404,17 @@ The proxy:
 - Overlaps build and push (images push as soon as they are built,
   rather than waiting for the entire build to complete)
 
+**TLS behavior difference:** The `dockerpush://` input starts an
+embedded HTTPS server with a self-signed certificate. Docker skips
+certificate verification for `127.0.0.0/8`, so it works without any
+daemon.json changes. The proxy, on the other hand, listens on plain
+HTTP. Docker normally allows insecure access to localhost, but when
+`containerd-snapshotter: true` is enabled in daemon.json this
+exception is not honored and `insecure-registries` in daemon.json
+is not propagated to containerd's push path. You must configure
+containerd's host-based registry config directly. See the
+[proxy command reference](/components/occystrap/command-reference/#proxy) for details.
+
 ### Push Multiple Images with Layer Dedup
 
 ```bash

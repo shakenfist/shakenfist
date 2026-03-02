@@ -189,6 +189,51 @@ The proxy also respects global options `--layer-cache`, `--temp-dir`,
   - Per-image locks prevent duplicate upstream fetches for concurrent
     requests
 
+**Docker insecure-registry configuration:**
+
+The proxy listens on plain HTTP. Docker normally allows insecure
+(non-TLS) access to `127.0.0.0/8` and `::1` without extra
+configuration. However, when the Docker daemon is configured with
+`containerd-snapshotter: true` in `daemon.json` (the default on some
+distributions), this localhost exception is **not honored** and Docker
+will attempt HTTPS, producing errors like:
+
+```
+tls: first record does not look like a TLS handshake
+```
+
+The `insecure-registries` setting in `daemon.json` is also not
+propagated to containerd's push path. To fix this, configure
+containerd's host-based registry config directly:
+
+```bash
+sudo mkdir -p /etc/containerd/certs.d/127.0.0.1:5050
+cat <<'TOML' | sudo tee /etc/containerd/certs.d/127.0.0.1:5050/hosts.toml
+server = "http://127.0.0.1:5050"
+
+[host."http://127.0.0.1:5050"]
+  capabilities = ["pull", "resolve", "push"]
+TOML
+```
+
+Then tell containerd where the host configs live by adding this to
+`/etc/containerd/config.toml` (containerd 2.x syntax):
+
+```toml
+[plugins."io.containerd.cri.v1.images".registry]
+  config_path = "/etc/containerd/certs.d"
+```
+
+Restart containerd and Docker after making these changes.
+
+This differs from the `dockerpush://` input, which uses HTTPS with an
+ephemeral self-signed certificate. Docker skips certificate
+verification for `127.0.0.0/8` addresses regardless of the
+containerd-snapshotter setting, so `dockerpush://` works without any
+daemon.json changes. The proxy uses plain HTTP because it is a
+standard registry server, not an embedded shim inside the occystrap
+process.
+
 **Examples:**
 
 ```bash
