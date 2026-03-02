@@ -4833,6 +4833,16 @@ starts a fresh embedded registry and cannot share state across images.</p>
 <li>Overlaps build and push (images push as soon as they are built,
   rather than waiting for the entire build to complete)</li>
 </ul>
+<p><strong>TLS behavior difference:</strong> The <code>dockerpush://</code> input starts an
+embedded HTTPS server with a self-signed certificate. Docker skips
+certificate verification for <code>127.0.0.0/8</code>, so it works without any
+daemon.json changes. The proxy, on the other hand, listens on plain
+HTTP. Docker normally allows insecure access to localhost, but when
+<code>containerd-snapshotter: true</code> is enabled in daemon.json this
+exception is not honored and <code>insecure-registries</code> in daemon.json
+is not propagated to containerd's push path. You must configure
+containerd's host-based registry config directly. See the
+<a href="/components/occystrap/command-reference/#proxy">proxy command reference</a> for details.</p>
 <h3 id="push-multiple-images-with-layer-dedup">Push Multiple Images with Layer Dedup<a class="headerlink" href="#push-multiple-images-with-layer-dedup" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="ch">#!/bin/bash</span>
 <a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="c1"># Start proxy with layer cache</span>

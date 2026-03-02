@@ -4540,45 +4540,78 @@ runs until interrupted (Ctrl+C or SIGTERM).</p>
 <li>Per-image locks prevent duplicate upstream fetches for concurrent
     requests</li>
 </ul>
+<p><strong>Docker insecure-registry configuration:</strong></p>
+<p>The proxy listens on plain HTTP. Docker normally allows insecure
+(non-TLS) access to <code>127.0.0.0/8</code> and <code>::1</code> without extra
+configuration. However, when the Docker daemon is configured with
+<code>containerd-snapshotter: true</code> in <code>daemon.json</code> (the default on some
+distributions), this localhost exception is <strong>not honored</strong> and Docker
+will attempt HTTPS, producing errors like:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>tls: first record does not look like a TLS handshake
+</code></pre></div>
+<p>The <code>insecure-registries</code> setting in <code>daemon.json</code> is also not
+propagated to containerd's push path. To fix this, configure
+containerd's host-based registry config directly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sudo<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/etc/containerd/certs.d/127.0.0.1:5050
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>cat<span class="w"> </span><span class="s">&lt;&lt;&#39;TOML&#39; | sudo tee /etc/containerd/certs.d/127.0.0.1:5050/hosts.toml</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="s">server = &quot;http://127.0.0.1:5050&quot;</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="s">[host.&quot;http://127.0.0.1:5050&quot;]</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="s">  capabilities = [&quot;pull&quot;, &quot;resolve&quot;, &quot;push&quot;]</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="s">TOML</span>
+</code></pre></div>
+<p>Then tell containerd where the host configs live by adding this to
+<code>/etc/containerd/config.toml</code> (containerd 2.x syntax):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">[plugins.</span><span class="s2">&quot;io.containerd.cri.v1.images&quot;</span><span class="k">.registry]</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="n">config_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/etc/containerd/certs.d&quot;</span>
+</code></pre></div>
+<p>Restart containerd and Docker after making these changes.</p>
+<p>This differs from the <code>dockerpush://</code> input, which uses HTTPS with an
+ephemeral self-signed certificate. Docker skips certificate
+verification for <code>127.0.0.0/8</code> addresses regardless of the
+containerd-snapshotter setting, so <code>dockerpush://</code> works without any
+daemon.json changes. The proxy uses plain HTTP because it is a
+standard registry server, not an embedded shim inside the occystrap
+process.</p>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Start proxy with timestamp normalization</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>--downstream<span class="w"> </span>ghcr.io/myorg<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="c1"># Start with layer cache for cross-image dedup</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span>--downstream<span class="w"> </span>ghcr.io/myorg<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span>--layer-cache<span class="w"> </span>/tmp/layer-cache.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="c1"># Push to the proxy from Docker</span>
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>docker<span class="w"> </span>tag<span class="w"> </span>myimage:latest<span class="w"> </span>localhost:5050/myimage:latest
-<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>docker<span class="w"> </span>push<span class="w"> </span>localhost:5050/myimage:latest
-<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>
-<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="c1"># Use with kolla-build</span>
-<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>kolla-build<span class="w"> </span>--registry<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span>--push<span class="w"> </span>...
-<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>
-<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="c1"># Pull-through proxy with Docker Hub as upstream</span>
-<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a><span class="w">    </span>--downstream<span class="w"> </span>ghcr.io/myorg<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a><span class="w">    </span>--upstream<span class="w"> </span>docker.io<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps
-<a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a>
-<a id="__codelineno-8-25" name="__codelineno-8-25" href="#__codelineno-8-25"></a><span class="c1"># Pull through the proxy</span>
-<a id="__codelineno-8-26" name="__codelineno-8-26" href="#__codelineno-8-26"></a>docker<span class="w"> </span>pull<span class="w"> </span>localhost:5050/library/busybox:latest
-<a id="__codelineno-8-27" name="__codelineno-8-27" href="#__codelineno-8-27"></a>
-<a id="__codelineno-8-28" name="__codelineno-8-28" href="#__codelineno-8-28"></a><span class="c1"># Pull-through with authenticated upstream</span>
-<a id="__codelineno-8-29" name="__codelineno-8-29" href="#__codelineno-8-29"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-30" name="__codelineno-8-30" href="#__codelineno-8-30"></a><span class="w">    </span>--downstream<span class="w"> </span>ghcr.io/myorg<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-31" name="__codelineno-8-31" href="#__codelineno-8-31"></a><span class="w">    </span>--upstream<span class="w"> </span>user:token@registry.example.com
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Start proxy with timestamp normalization</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span>--downstream<span class="w"> </span>ghcr.io/myorg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="c1"># Start with layer cache for cross-image dedup</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">    </span>--downstream<span class="w"> </span>ghcr.io/myorg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">    </span>--layer-cache<span class="w"> </span>/tmp/layer-cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="c1"># Push to the proxy from Docker</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>docker<span class="w"> </span>tag<span class="w"> </span>myimage:latest<span class="w"> </span>localhost:5050/myimage:latest
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>docker<span class="w"> </span>push<span class="w"> </span>localhost:5050/myimage:latest
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="c1"># Use with kolla-build</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>kolla-build<span class="w"> </span>--registry<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span>--push<span class="w"> </span>...
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="c1"># Pull-through proxy with Docker Hub as upstream</span>
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">    </span>--downstream<span class="w"> </span>ghcr.io/myorg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="w">    </span>--upstream<span class="w"> </span>docker.io<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="w">    </span>-f<span class="w"> </span>normalize-timestamps
+<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a>
+<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="c1"># Pull through the proxy</span>
+<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a>docker<span class="w"> </span>pull<span class="w"> </span>localhost:5050/library/busybox:latest
+<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a>
+<a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a><span class="c1"># Pull-through with authenticated upstream</span>
+<a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a>occystrap<span class="w"> </span>proxy<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:5050<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a><span class="w">    </span>--downstream<span class="w"> </span>ghcr.io/myorg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a><span class="w">    </span>--upstream<span class="w"> </span>user:token@registry.example.com
 </code></pre></div>
 <h3 id="check">check<a class="headerlink" href="#check" title="Permanent link">&para;</a></h3>
 <p>Check validity of a container image. Validates structural integrity,
 history consistency, compression compatibility, and filesystem
 correctness. Use <code>--fast</code> to skip layer downloads and only check
 metadata consistency.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>occystrap<span class="w"> </span>check<span class="w"> </span>SOURCE<span class="w"> </span><span class="o">[</span>--fast<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>occystrap<span class="w"> </span>check<span class="w"> </span>SOURCE<span class="w"> </span><span class="o">[</span>--fast<span class="o">]</span>
 </code></pre></div>
 <p><strong>Arguments:</strong></p>
 <ul>
@@ -4679,25 +4712,25 @@ option (<code>text</code> or <code>json</code>).</p>
 </tbody>
 </table>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Full check from registry</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>occystrap<span class="w"> </span>check<span class="w"> </span>registry://docker.io/library/busybox:latest
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Fast metadata-only check</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>occystrap<span class="w"> </span>check<span class="w"> </span>--fast<span class="w"> </span>registry://docker.io/library/busybox:latest
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># JSON output for CI integration</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>occystrap<span class="w"> </span>-O<span class="w"> </span>json<span class="w"> </span>check<span class="w"> </span>registry://docker.io/library/busybox:latest
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="c1"># Check a tarball</span>
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>occystrap<span class="w"> </span>check<span class="w"> </span>tar://image.tar
-<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
-<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="c1"># Check local Docker image</span>
-<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>occystrap<span class="w"> </span>check<span class="w"> </span>docker://myimage:v1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Full check from registry</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>occystrap<span class="w"> </span>check<span class="w"> </span>registry://docker.io/library/busybox:latest
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># Fast metadata-only check</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>occystrap<span class="w"> </span>check<span class="w"> </span>--fast<span class="w"> </span>registry://docker.io/library/busybox:latest
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="c1"># JSON output for CI integration</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>occystrap<span class="w"> </span>-O<span class="w"> </span>json<span class="w"> </span>check<span class="w"> </span>registry://docker.io/library/busybox:latest
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="c1"># Check a tarball</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>occystrap<span class="w"> </span>check<span class="w"> </span>tar://image.tar
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="c1"># Check local Docker image</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>occystrap<span class="w"> </span>check<span class="w"> </span>docker://myimage:v1
 </code></pre></div>
 <h2 id="input-uri-schemes">Input URI Schemes<a class="headerlink" href="#input-uri-schemes" title="Permanent link">&para;</a></h2>
 <h3 id="registry">registry://<a class="headerlink" href="#registry" title="Permanent link">&para;</a></h3>
 <p>Fetch images from Docker/OCI registries via HTTP API.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>registry://[user:pass@]HOST/IMAGE:TAG[?options]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>registry://[user:pass@]HOST/IMAGE:TAG[?options]
 </code></pre></div>
 <p><strong>Query Options:</strong></p>
 <table>
@@ -4732,22 +4765,22 @@ option (<code>text</code> or <code>json</code>).</p>
 </table>
 <p>Layers are downloaded in parallel using a thread pool for improved performance.</p>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Docker Hub</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>registry://docker.io/library/busybox:latest
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>registry://registry-1.docker.io/library/python:3.11
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># GitHub Container Registry</span>
-<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>registry://ghcr.io/myorg/myimage:v1
-<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
-<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="c1"># Private registry</span>
-<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>registry://myregistry.example.com/myproject/myimage:latest
-<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>
-<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="c1"># With architecture selection</span>
-<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>registry://docker.io/library/busybox:latest?os<span class="o">=</span>linux<span class="p">&amp;</span><span class="nv">arch</span><span class="o">=</span>arm64<span class="p">&amp;</span><span class="nv">variant</span><span class="o">=</span>v8
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Docker Hub</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>registry://docker.io/library/busybox:latest
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>registry://registry-1.docker.io/library/python:3.11
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="c1"># GitHub Container Registry</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>registry://ghcr.io/myorg/myimage:v1
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="c1"># Private registry</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>registry://myregistry.example.com/myproject/myimage:latest
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="c1"># With architecture selection</span>
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>registry://docker.io/library/busybox:latest?os<span class="o">=</span>linux<span class="p">&amp;</span><span class="nv">arch</span><span class="o">=</span>arm64<span class="p">&amp;</span><span class="nv">variant</span><span class="o">=</span>v8
 </code></pre></div>
 <h3 id="docker">docker://<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h3>
 <p>Fetch images from the local Docker or Podman daemon.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>docker://IMAGE:TAG[?socket=/path/to/socket]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>docker://IMAGE:TAG[?socket=/path/to/socket]
 </code></pre></div>
 <p><strong>Query Options:</strong></p>
 <table>
@@ -4765,21 +4798,21 @@ option (<code>text</code> or <code>json</code>).</p>
 </tbody>
 </table>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Docker daemon (default socket)</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>docker://myimage:v1
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># Podman (rootful)</span>
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>docker://myimage:v1?socket<span class="o">=</span>/run/podman/podman.sock
-<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
-<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="c1"># Podman (rootless)</span>
-<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>docker://myimage:v1?socket<span class="o">=</span>/run/user/1000/podman/podman.sock
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Docker daemon (default socket)</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>docker://myimage:v1
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Podman (rootful)</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>docker://myimage:v1?socket<span class="o">=</span>/run/podman/podman.sock
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># Podman (rootless)</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>docker://myimage:v1?socket<span class="o">=</span>/run/user/1000/podman/podman.sock
 </code></pre></div>
 <h3 id="dockerpush">dockerpush://<a class="headerlink" href="#dockerpush" title="Permanent link">&para;</a></h3>
 <p>Fetch images from the local Docker or Podman daemon using an embedded registry.
 This is faster than <code>docker://</code> for multi-layer images because Docker pushes
 layers in parallel using the Registry V2 protocol, rather than exporting the
 entire image as a single sequential tarball.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>dockerpush://IMAGE:TAG[?socket=/path/to/socket]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>dockerpush://IMAGE:TAG[?socket=/path/to/socket]
 </code></pre></div>
 <p><strong>Query Options:</strong></p>
 <table>
@@ -4797,32 +4830,32 @@ entire image as a single sequential tarball.</p>
 </tbody>
 </table>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Docker daemon (default socket)</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>dockerpush://myimage:v1
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># Podman (rootful)</span>
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>dockerpush://myimage:v1?socket<span class="o">=</span>/run/podman/podman.sock
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="c1"># Compare speed with docker:// for multi-layer images</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>dockerpush://python:3.11
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Docker daemon (default socket)</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>dockerpush://myimage:v1
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Podman (rootful)</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>dockerpush://myimage:v1?socket<span class="o">=</span>/run/podman/podman.sock
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="c1"># Compare speed with docker:// for multi-layer images</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>dockerpush://python:3.11
 </code></pre></div>
 <h3 id="tar">tar://<a class="headerlink" href="#tar" title="Permanent link">&para;</a></h3>
 <p>Read images from docker-save format tarballs.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>tar:///path/to/file.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>tar:///path/to/file.tar
 </code></pre></div>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>tar:///home/user/images/busybox.tar
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>tar://./local-image.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>tar:///home/user/images/busybox.tar
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>tar://./local-image.tar
 </code></pre></div>
 <h2 id="output-uri-schemes">Output URI Schemes<a class="headerlink" href="#output-uri-schemes" title="Permanent link">&para;</a></h2>
 <h3 id="tar_1">tar://<a class="headerlink" href="#tar_1" title="Permanent link">&para;</a></h3>
 <p>Create docker-loadable tarballs (v1.2 format).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>tar:///path/to/output.tar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>tar:///path/to/output.tar
 </code></pre></div>
 <p>The resulting tarball can be loaded with <code>docker load -i output.tar</code>.</p>
 <h3 id="dir">dir://<a class="headerlink" href="#dir" title="Permanent link">&para;</a></h3>
 <p>Extract images to a directory.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>dir:///path/to/directory[?options]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>dir:///path/to/directory[?options]
 </code></pre></div>
 <p><strong>Query Options:</strong></p>
 <table>
@@ -4844,38 +4877,38 @@ entire image as a single sequential tarball.</p>
 </tbody>
 </table>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Simple extraction</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>dir://./extracted
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="c1"># With layer deduplication (for multiple images)</span>
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>dir://./shared?unique_names<span class="o">=</span><span class="nb">true</span>
-<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>
-<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="c1"># Expanded layers for inspection</span>
-<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>dir://./inspect?expand<span class="o">=</span><span class="nb">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Simple extraction</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>dir://./extracted
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="c1"># With layer deduplication (for multiple images)</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>dir://./shared?unique_names<span class="o">=</span><span class="nb">true</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="c1"># Expanded layers for inspection</span>
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>dir://./inspect?expand<span class="o">=</span><span class="nb">true</span>
 </code></pre></div>
 <h3 id="oci">oci://<a class="headerlink" href="#oci" title="Permanent link">&para;</a></h3>
 <p>Create OCI runtime bundles for use with runc.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>oci:///path/to/bundle
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>oci:///path/to/bundle
 </code></pre></div>
 <p>The bundle can be run with <code>runc run &lt;container-id&gt;</code>.</p>
 <h3 id="mounts">mounts://<a class="headerlink" href="#mounts" title="Permanent link">&para;</a></h3>
 <p>Create overlay mount-based extraction using extended attributes.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>mounts:///path/to/directory
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>mounts:///path/to/directory
 </code></pre></div>
 <h3 id="docker_1">docker://<a class="headerlink" href="#docker_1" title="Permanent link">&para;</a></h3>
 <p>Load images into the local Docker or Podman daemon.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>docker://IMAGE:TAG[?socket=/path/to/socket]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>docker://IMAGE:TAG[?socket=/path/to/socket]
 </code></pre></div>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Load into Docker</span>
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>docker://myimage:v1
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="c1"># Load into Podman</span>
-<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>docker://myimage:v1?socket<span class="o">=</span>/run/podman/podman.sock
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># Load into Docker</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>docker://myimage:v1
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="c1"># Load into Podman</span>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>docker://myimage:v1?socket<span class="o">=</span>/run/podman/podman.sock
 </code></pre></div>
 <h3 id="registry_1">registry://<a class="headerlink" href="#registry_1" title="Permanent link">&para;</a></h3>
 <p>Push images to Docker/OCI registries.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>registry://HOST/IMAGE:TAG[?insecure=true&amp;compression=TYPE&amp;max_workers=N]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>registry://HOST/IMAGE:TAG[?insecure=true&amp;compression=TYPE&amp;max_workers=N]
 </code></pre></div>
 <p><strong>Query Options:</strong></p>
 <table>
@@ -4903,25 +4936,25 @@ entire image as a single sequential tarball.</p>
 <p>Layers are uploaded in parallel using a thread pool for improved performance.
 The <code>max_workers</code> option controls the number of concurrent uploads.</p>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Push to private registry</span>
-<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>registry://myregistry.example.com/myproject/myimage:v1
-<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>
-<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="c1"># Push with insecure (HTTP)</span>
-<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>registry://internal.local/image:tag?insecure<span class="o">=</span><span class="nb">true</span>
-<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>
-<a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a><span class="c1"># Push with zstd compression (requires Docker 20.10+ or containerd 1.5+)</span>
-<a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>registry://myregistry.example.com/myimage:v1?compression<span class="o">=</span>zstd
-<a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a>
-<a id="__codelineno-27-10" name="__codelineno-27-10" href="#__codelineno-27-10"></a><span class="c1"># Push with 8 parallel upload threads</span>
-<a id="__codelineno-27-11" name="__codelineno-27-11" href="#__codelineno-27-11"></a>registry://myregistry.example.com/myimage:v1?max_workers<span class="o">=</span><span class="m">8</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="c1"># Push to private registry</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>registry://myregistry.example.com/myproject/myimage:v1
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="c1"># Push with insecure (HTTP)</span>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>registry://internal.local/image:tag?insecure<span class="o">=</span><span class="nb">true</span>
+<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a>
+<a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a><span class="c1"># Push with zstd compression (requires Docker 20.10+ or containerd 1.5+)</span>
+<a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a>registry://myregistry.example.com/myimage:v1?compression<span class="o">=</span>zstd
+<a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a>
+<a id="__codelineno-30-10" name="__codelineno-30-10" href="#__codelineno-30-10"></a><span class="c1"># Push with 8 parallel upload threads</span>
+<a id="__codelineno-30-11" name="__codelineno-30-11" href="#__codelineno-30-11"></a>registry://myregistry.example.com/myimage:v1?max_workers<span class="o">=</span><span class="m">8</span>
 </code></pre></div>
 <h2 id="filters">Filters<a class="headerlink" href="#filters" title="Permanent link">&para;</a></h2>
 <p>Filters transform or inspect image elements as they pass through the pipeline.
 Multiple filters can be chained using multiple <code>-f</code> options.</p>
 <h3 id="normalize-timestamps">normalize-timestamps<a class="headerlink" href="#normalize-timestamps" title="Permanent link">&para;</a></h3>
 <p>Normalize file modification times in layer tarballs for reproducible builds.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>normalize-timestamps
-<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>normalize-timestamps:ts=TIMESTAMP
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>normalize-timestamps
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>normalize-timestamps:ts=TIMESTAMP
 </code></pre></div>
 <p><strong>Options:</strong></p>
 <table>
@@ -4941,15 +4974,15 @@ Multiple filters can be chained using multiple <code>-f</code> options.</p>
 <p>When timestamps are normalized, layer SHA256 hashes are recalculated and the
 manifest is updated.</p>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="c1"># Normalize to Unix epoch</span>
-<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>-f<span class="w"> </span>normalize-timestamps
-<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>
-<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="c1"># Normalize to specific timestamp (Jan 1, 2021)</span>
-<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>-f<span class="w"> </span><span class="s2">&quot;normalize-timestamps:ts=1609459200&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="c1"># Normalize to Unix epoch</span>
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>-f<span class="w"> </span>normalize-timestamps
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="c1"># Normalize to specific timestamp (Jan 1, 2021)</span>
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>-f<span class="w"> </span><span class="s2">&quot;normalize-timestamps:ts=1609459200&quot;</span>
 </code></pre></div>
 <h3 id="search_1">search<a class="headerlink" href="#search_1" title="Permanent link">&para;</a></h3>
 <p>Search for files matching a pattern while processing.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>search:pattern=PATTERN[,regex=true][,script_friendly=true]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>search:pattern=PATTERN[,regex=true][,script_friendly=true]
 </code></pre></div>
 <p><strong>Options:</strong></p>
 <table>
@@ -4976,18 +5009,18 @@ manifest is updated.</p>
 </table>
 <p>When used as a filter, search prints matches AND passes elements to the output.</p>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="c1"># Search while creating tarball</span>
-<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>-f<span class="w"> </span><span class="s2">&quot;search:pattern=*.conf&quot;</span>
-<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>
-<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="c1"># Search with regex</span>
-<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a>-f<span class="w"> </span><span class="s2">&quot;search:pattern=.*\.py</span>$<span class="s2">,regex=true&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="c1"># Search while creating tarball</span>
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>-f<span class="w"> </span><span class="s2">&quot;search:pattern=*.conf&quot;</span>
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>
+<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="c1"># Search with regex</span>
+<a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a>-f<span class="w"> </span><span class="s2">&quot;search:pattern=.*\.py</span>$<span class="s2">,regex=true&quot;</span>
 </code></pre></div>
 <h3 id="inspect">inspect<a class="headerlink" href="#inspect" title="Permanent link">&para;</a></h3>
 <p>Record layer metadata to a JSONL file. This is a passthrough
 filter that does not modify the image data -- it only observes
 and records. Place it between other filters to measure their
 effect on layer digests and sizes.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>inspect:file=PATH
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>inspect:file=PATH
 </code></pre></div>
 <p><strong>Options:</strong></p>
 <table>
@@ -5008,30 +5041,30 @@ effect on layer digests and sizes.</p>
 name, tag, layer digests, sizes, and build history. Multiple
 images can be recorded to the same file.</p>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="c1"># Record layer metadata before and after normalization</span>
-<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=before.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=after.jsonl&quot;</span>
-<a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>
-<a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="c1"># Full pipeline with three observation points</span>
-<a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=as-built.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=post-normalize.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=post-exclude.jsonl&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="c1"># Record layer metadata before and after normalization</span>
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=before.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=after.jsonl&quot;</span>
+<a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a>
+<a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a><span class="c1"># Full pipeline with three observation points</span>
+<a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=as-built.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a>-f<span class="w"> </span>normalize-timestamps<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-9" name="__codelineno-36-9" href="#__codelineno-36-9"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=post-normalize.jsonl&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-10" name="__codelineno-36-10" href="#__codelineno-36-10"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-11" name="__codelineno-36-11" href="#__codelineno-36-11"></a>-f<span class="w"> </span><span class="s2">&quot;inspect:file=post-exclude.jsonl&quot;</span>
 </code></pre></div>
 <h3 id="exclude">exclude<a class="headerlink" href="#exclude" title="Permanent link">&para;</a></h3>
 <p>Exclude files matching glob patterns from image layers.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>exclude:pattern=PATTERN[,PATTERN2,...]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>exclude:pattern=PATTERN[,PATTERN2,...]
 </code></pre></div>
 <p>Files matching the patterns are removed from layers. Layer hashes are
 recalculated after modification.</p>
 <p><strong>Examples:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="c1"># Exclude git directories</span>
-<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**&quot;</span>
-<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>
-<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="c1"># Exclude multiple patterns</span>
-<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="c1"># Exclude git directories</span>
+<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**&quot;</span>
+<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>
+<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a><span class="c1"># Exclude multiple patterns</span>
+<a id="__codelineno-38-5" name="__codelineno-38-5" href="#__codelineno-38-5"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc&quot;</span>
 </code></pre></div>
 <h2 id="layer-cache">Layer Cache<a class="headerlink" href="#layer-cache" title="Permanent link">&para;</a></h2>
 <p>The <code>--layer-cache</code> option enables a persistent cache that tracks which
@@ -5048,13 +5081,13 @@ filter configuration), occystrap verifies the compressed blob still
 exists in the target registry via a HEAD request. If it does, the
 entire layer is skipped -- no fetch, no filter, no compress, no upload.</p>
 <h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="c1"># First push: all layers processed normally, results cached</span>
-<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="w">    </span>process<span class="w"> </span>docker://app1:v1<span class="w"> </span>registry://myregistry/app1:v1
-<a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a>
-<a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a><span class="c1"># Second push: shared base layers are skipped</span>
-<a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a><span class="w">    </span>process<span class="w"> </span>docker://app2:v1<span class="w"> </span>registry://myregistry/app2:v1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="c1"># First push: all layers processed normally, results cached</span>
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="w">    </span>process<span class="w"> </span>docker://app1:v1<span class="w"> </span>registry://myregistry/app1:v1
+<a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a>
+<a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a><span class="c1"># Second push: shared base layers are skipped</span>
+<a id="__codelineno-39-6" name="__codelineno-39-6" href="#__codelineno-39-6"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a><span class="w">    </span>process<span class="w"> </span>docker://app2:v1<span class="w"> </span>registry://myregistry/app2:v1
 </code></pre></div>
 <p>The cache path can also be set via the <code>OCCYSTRAP_LAYER_CACHE</code>
 environment variable.</p>
@@ -5068,13 +5101,13 @@ have zero local transfer overhead.</p>
 <p>A digest mapping file (<code>{cache_path}.digests</code>) is created alongside the
 cache to translate between Docker's compressed digests and the DiffIDs used
 as cache keys.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="c1"># First push: all layers transferred and cached</span>
-<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="w">    </span>process<span class="w"> </span>dockerpush://app:v1<span class="w"> </span>registry://myregistry/app:v1
-<a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a>
-<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a><span class="c1"># Second push: Docker skips uploading shared layers entirely</span>
-<a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-37-7" name="__codelineno-37-7" href="#__codelineno-37-7"></a><span class="w">    </span>process<span class="w"> </span>dockerpush://app:v2<span class="w"> </span>registry://myregistry/app:v2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="c1"># First push: all layers transferred and cached</span>
+<a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a><span class="w">    </span>process<span class="w"> </span>dockerpush://app:v1<span class="w"> </span>registry://myregistry/app:v1
+<a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a>
+<a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a><span class="c1"># Second push: Docker skips uploading shared layers entirely</span>
+<a id="__codelineno-40-6" name="__codelineno-40-6" href="#__codelineno-40-6"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-40-7" name="__codelineno-40-7" href="#__codelineno-40-7"></a><span class="w">    </span>process<span class="w"> </span>dockerpush://app:v2<span class="w"> </span>registry://myregistry/app:v2
 </code></pre></div>
 <h3 id="pipeline-awareness">Pipeline Awareness<a class="headerlink" href="#pipeline-awareness" title="Permanent link">&para;</a></h3>
 <p>Cache entries are keyed by the input layer DiffID and a hash of the
@@ -5092,18 +5125,18 @@ to start fresh -- the only cost is re-processing layers on the next
 push.</p>
 <h3 id="cache-file-format">Cache File Format<a class="headerlink" href="#cache-file-format" title="Permanent link">&para;</a></h3>
 <p>The cache is stored as a JSON file:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="p">{</span>
-<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a><span class="w">  </span><span class="nt">&quot;layers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a><span class="w">    </span><span class="nt">&quot;sha256:abc123...&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-38-5" name="__codelineno-38-5" href="#__codelineno-38-5"></a><span class="w">      </span><span class="nt">&quot;compressed_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:def456...&quot;</span><span class="p">,</span>
-<a id="__codelineno-38-6" name="__codelineno-38-6" href="#__codelineno-38-6"></a><span class="w">      </span><span class="nt">&quot;compressed_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">45678901</span><span class="p">,</span>
-<a id="__codelineno-38-7" name="__codelineno-38-7" href="#__codelineno-38-7"></a><span class="w">      </span><span class="nt">&quot;media_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;application/vnd.docker.image.rootfs.diff.tar.gzip&quot;</span><span class="p">,</span>
-<a id="__codelineno-38-8" name="__codelineno-38-8" href="#__codelineno-38-8"></a><span class="w">      </span><span class="nt">&quot;filters_hash&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;none&quot;</span><span class="p">,</span>
-<a id="__codelineno-38-9" name="__codelineno-38-9" href="#__codelineno-38-9"></a><span class="w">      </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-02-09T12:34:56.789012+00:00&quot;</span>
-<a id="__codelineno-38-10" name="__codelineno-38-10" href="#__codelineno-38-10"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-38-11" name="__codelineno-38-11" href="#__codelineno-38-11"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-38-12" name="__codelineno-38-12" href="#__codelineno-38-12"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="p">{</span>
+<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a><span class="w">  </span><span class="nt">&quot;layers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a><span class="w">    </span><span class="nt">&quot;sha256:abc123...&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a><span class="w">      </span><span class="nt">&quot;compressed_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:def456...&quot;</span><span class="p">,</span>
+<a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a><span class="w">      </span><span class="nt">&quot;compressed_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">45678901</span><span class="p">,</span>
+<a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a><span class="w">      </span><span class="nt">&quot;media_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;application/vnd.docker.image.rootfs.diff.tar.gzip&quot;</span><span class="p">,</span>
+<a id="__codelineno-41-8" name="__codelineno-41-8" href="#__codelineno-41-8"></a><span class="w">      </span><span class="nt">&quot;filters_hash&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;none&quot;</span><span class="p">,</span>
+<a id="__codelineno-41-9" name="__codelineno-41-9" href="#__codelineno-41-9"></a><span class="w">      </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-02-09T12:34:56.789012+00:00&quot;</span>
+<a id="__codelineno-41-10" name="__codelineno-41-10" href="#__codelineno-41-10"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-41-11" name="__codelineno-41-11" href="#__codelineno-41-11"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-41-12" name="__codelineno-41-12" href="#__codelineno-41-12"></a><span class="p">}</span>
 </code></pre></div>
 <table>
 <thead>
