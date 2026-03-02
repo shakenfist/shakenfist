@@ -50,7 +50,7 @@ Each object type has a dedicated key prefix:
 | Network Interface | `/sf/object/networkinterface/` |
 | Blob | `/sf/object/blob/` |
 | Artifact | `/sf/object/artifact/` |
-| Node | `/sf/object/node/` |
+| Node | MariaDB `nodes` table (migrated from etcd) |
 | Namespace | `/sf/object/namespace/` |
 
 ## MariaDB
@@ -578,9 +578,11 @@ The migration is happening in phases:
 | 1 | Object state | Complete - `object_states` table |
 | 2 | IPAM reservations | Complete - `ipam_reservations` table |
 | 3 | Upload objects | Complete - `uploads` table |
-| 4 | DnsMasq objects | Planned |
-| 5 | Other object types | Future |
-| 6 | Object attributes | Future |
+| 4 | Blob objects | Complete - `blobs`, `blob_attributes`, `blob_hashes` tables |
+| 5 | Node objects | Complete - `nodes`, `node_attributes` tables |
+| 6 | DnsMasq objects | Complete - `dnsmasq` table |
+| 7 | Other object types | Future |
+| 8 | Object attributes | Future |
 
 ### Table Architecture
 
@@ -624,13 +626,25 @@ values (immutable data set at creation time):
 |-------|-------------|--------|
 | `uploads` | Upload | uuid, node, created_at, version |
 | `dnsmasq` | DnsMasq | uuid, namespace, owner_type, owner_uuid, provide_dhcp, provide_dns, version |
+| `blobs` | Blob | uuid, modified, fetched_at, version |
+| `nodes` | Node | uuid, fqdn (unique index), ip, version |
 
 These tables use the object's UUID as the primary key.
 
-#### Per-Type Attribute Tables (Future)
+#### Per-Type Attribute Tables
 
-Mutable attributes that are specific to an object type will be stored in
+Mutable attributes that are specific to an object type are stored in
 dedicated attribute tables:
+
+| Table | Object Type | Key Fields |
+|-------|-------------|------------|
+| `blob_attributes` | Blob | uuid, size, info, last_used, retention |
+| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, daemon_states, versions, metrics |
+
+Node attributes consolidate many separate etcd keys (observed, roles,
+daemons, daemon:{name}, instances, versions, etc.) into a single row.
+
+Future attribute tables will follow the same pattern:
 
 ```sql
 -- Example: instance_attributes (future)
