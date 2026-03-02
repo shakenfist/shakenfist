@@ -239,7 +239,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         # wants to delete a large number of old events from these databases and
         # we want that to occur at a predictable time.
         for n in node.Nodes([]):
-            with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
+            with eventlog.EventLog(n.object_type, n.fqdn) as eventdb:
                 pass
 
         while daemon.check_abort_path(self.abort_path):

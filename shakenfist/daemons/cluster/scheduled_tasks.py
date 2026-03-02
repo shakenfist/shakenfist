@@ -185,7 +185,7 @@ def _process_per_instance_queue(execution_limit=10):
             continue
 
         nio_schema.create_and_enqueue(
-            node.uuid,
+            node.fqdn,
             inst.uuid,
             [
                 nio_schema.model_tasks.collect_billing_statistics,

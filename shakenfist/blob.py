@@ -696,12 +696,13 @@ class Blob(dbo):
         with open(partial_path, 'wb') as f:
             locations = self.locations
             for n in Nodes([], prefilter='inactive'):
-                if n.uuid in locations:
+                if n.fqdn in locations:
                     LOG.with_fields({
                         'node': n,
                         'state': n.state.value}).debug(
-                        'Node is inactive, ignoring blob location')
-                    locations.remove(n.uuid)
+                        'Node is inactive, ignoring '
+                        'blob location')
+                    locations.remove(n.fqdn)
             if len(locations) == 0:
                 add_event_multi(
                     EVENT_TYPE_AUDIT, affected_objects,
