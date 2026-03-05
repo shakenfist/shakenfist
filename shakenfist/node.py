@@ -320,20 +320,29 @@ class Node(dbo):
                         path, e)
 
     @classmethod
+    def this_node(cls, suppress_failure_audit=False):
+        """Look up the current node, using persisted UUID if available.
+
+        This is more efficient than from_db(config.NODE_NAME) as it
+        avoids the FQDN-to-UUID indirection when the UUID is persisted
+        locally.
+        """
+        persisted = cls._load_persisted_uuid()
+        if persisted:
+            n = cls.from_db(
+                persisted,
+                suppress_failure_audit=suppress_failure_audit)
+            if n and n.fqdn == config.NODE_NAME:
+                return n
+
+        return cls.from_db(
+            config.NODE_NAME,
+            suppress_failure_audit=suppress_failure_audit)
+
+    @classmethod
     def observe_this_node(cls):
         """Upsert this node and update its attributes."""
-        # Try to use a persisted UUID for direct lookup
-        persisted = cls._load_persisted_uuid()
-        n = None
-        if persisted:
-            n = cls.from_db(persisted, suppress_failure_audit=True)
-            if n and n.fqdn != config.NODE_NAME:
-                LOG.warning(
-                    'Persisted UUID %s belongs to %s, not %s. '
-                    'Ignoring persisted UUID.',
-                    persisted, n.fqdn, config.NODE_NAME)
-                n = None
-
+        n = cls.this_node(suppress_failure_audit=True)
         if not n:
             n = cls.new(config.NODE_NAME, config.NODE_MESH_IP)
             cls._persist_uuid(n.uuid)
@@ -346,23 +355,6 @@ class Node(dbo):
         attrs.is_network_node = config.NODE_IS_NETWORK_NODE
         attrs.is_eventlog_node = config.NODE_IS_EVENTLOG_NODE
         n._save_attributes()
-
-    @classmethod
-    def this_node(cls, suppress_failure_audit=False):
-        """Look up the current node, using persisted UUID if available.
-
-        This is more efficient than from_db(config.NODE_NAME) as it
-        avoids the FQDN-to-UUID indirection when the UUID is persisted
-        locally.
-        """
-        persisted = cls._load_persisted_uuid()
-        if persisted:
-            n = cls.from_db(persisted, suppress_failure_audit=suppress_failure_audit)
-            if n and n.fqdn == config.NODE_NAME:
-                return n
-
-        return cls.from_db(config.NODE_NAME,
-                           suppress_failure_audit=suppress_failure_audit)
 
     def external_view(self):
         """Build a dict of node state for the API."""

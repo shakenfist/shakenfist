@@ -588,6 +588,34 @@ dedicated attribute tables:
 Node attributes consolidate many separate etcd keys (observed, roles,
 daemons, daemon:{name}, instances, versions, etc.) into a single row.
 
+#### Node Identity and UUID Persistence
+
+Each node in the cluster is assigned a real UUID (UUID version 4) when it
+first registers with the cluster. Previously, nodes used their FQDN as a
+fake UUID, but all nodes now have proper UUIDs stored in the `nodes`
+MariaDB table with the FQDN as a separate uniquely-indexed column.
+
+To avoid an FQDN-to-UUID database lookup on every daemon startup, the
+node UUID is persisted locally to `{STORAGE_PATH}/node_uuid` (typically
+`/srv/shakenfist/node_uuid`). On subsequent daemon starts, the UUID is
+read from this local file for a direct database lookup by primary key.
+
+The node UUID can also be set explicitly via the `SHAKENFIST_NODE_UUID`
+environment variable or the `NODE_UUID` configuration field, which takes
+precedence over the local file. This is useful for disaster recovery
+scenarios where local storage has been lost but the node's UUID is known.
+
+The lookup precedence order is:
+
+1. `NODE_UUID` configuration field / `SHAKENFIST_NODE_UUID` environment
+   variable
+2. Local file at `{STORAGE_PATH}/node_uuid`
+3. FQDN-based lookup in the `nodes` table (fallback)
+
+If the persisted UUID does not match the current node's FQDN, it is
+ignored and the FQDN-based fallback is used. This guards against stale
+UUID files left over from a previous node installation.
+
 Future attribute tables will follow the same pattern:
 
 ```sql

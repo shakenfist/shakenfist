@@ -9,7 +9,11 @@
 # - Daemon state management
 # - Lazy-load attribute pattern
 # - Node.blobs property
+# - UUID persistence (this_node, observe_this_node, _load_persisted_uuid,
+#   _persist_uuid)
 
+import os
+import tempfile
 from unittest import mock
 from uuid import UUID
 
@@ -792,3 +796,319 @@ class NodesDegradedTestCase(base.ShakenFistTestCase):
         n = self._make_node()
         degraded = n.get_degraded_daemons()
         self.assertIn('api', degraded)
+
+
+class NodeUUIDPersistenceTestCase(base.ShakenFistTestCase):
+    """Tests for node UUID persistence (_load_persisted_uuid,
+    _persist_uuid)."""
+
+    def setUp(self):
+        super().setUp()
+        self.tmpdir = tempfile.mkdtemp()
+        self.addCleanup(
+            lambda: os.path.exists(self.tmpdir) and
+            __import__('shutil').rmtree(self.tmpdir))
+
+    @mock.patch('shakenfist.node.config')
+    def test_persist_uuid_creates_file(self, mock_config):
+        """Test _persist_uuid writes UUID to the expected file."""
+        mock_config.STORAGE_PATH = self.tmpdir
+        Node._persist_uuid(TEST_UUID)
+
+        path = os.path.join(self.tmpdir, 'node_uuid')
+        self.assertTrue(os.path.exists(path))
+        with open(path, 'r') as f:
+            self.assertEqual(f.read(), TEST_UUID_STR)
+
+    @mock.patch('shakenfist.node.config')
+    def test_load_persisted_uuid_from_file(self, mock_config):
+        """Test _load_persisted_uuid reads from local file."""
+        mock_config.STORAGE_PATH = self.tmpdir
+        mock_config.NODE_UUID = None
+
+        path = os.path.join(self.tmpdir, 'node_uuid')
+        with open(path, 'w') as f:
+            f.write(TEST_UUID_STR)
+
+        result = Node._load_persisted_uuid()
+        self.assertEqual(result, TEST_UUID_STR)
+
+    @mock.patch('shakenfist.node.config')
+    def test_load_persisted_uuid_config_takes_precedence(
+            self, mock_config):
+        """Test NODE_UUID config overrides local file."""
+        other_uuid = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+        mock_config.STORAGE_PATH = self.tmpdir
+        mock_config.NODE_UUID = other_uuid
+
+        # Write a different UUID to the file
+        path = os.path.join(self.tmpdir, 'node_uuid')
+        with open(path, 'w') as f:
+            f.write(TEST_UUID_STR)
+
+        result = Node._load_persisted_uuid()
+        self.assertEqual(result, other_uuid)
+
+    @mock.patch('shakenfist.node.config')
+    def test_load_persisted_uuid_invalid_config_ignored(
+            self, mock_config):
+        """Test invalid NODE_UUID config falls back to file."""
+        mock_config.STORAGE_PATH = self.tmpdir
+        mock_config.NODE_UUID = 'not-a-uuid'
+
+        path = os.path.join(self.tmpdir, 'node_uuid')
+        with open(path, 'w') as f:
+            f.write(TEST_UUID_STR)
+
+        result = Node._load_persisted_uuid()
+        self.assertEqual(result, TEST_UUID_STR)
+
+    @mock.patch('shakenfist.node.config')
+    def test_load_persisted_uuid_no_file_no_config(
+            self, mock_config):
+        """Test returns None when nothing is persisted."""
+        mock_config.STORAGE_PATH = self.tmpdir
+        mock_config.NODE_UUID = None
+
+        result = Node._load_persisted_uuid()
+        self.assertIsNone(result)
+
+    @mock.patch('shakenfist.node.config')
+    def test_load_persisted_uuid_invalid_file_content(
+            self, mock_config):
+        """Test invalid UUID in file returns None."""
+        mock_config.STORAGE_PATH = self.tmpdir
+        mock_config.NODE_UUID = None
+
+        path = os.path.join(self.tmpdir, 'node_uuid')
+        with open(path, 'w') as f:
+            f.write('garbage-content')
+
+        result = Node._load_persisted_uuid()
+        self.assertIsNone(result)
+
+    @mock.patch('shakenfist.node.config')
+    def test_persist_uuid_handles_missing_directory(
+            self, mock_config):
+        """Test _persist_uuid creates parent dirs if needed."""
+        nested = os.path.join(self.tmpdir, 'sub', 'dir')
+        mock_config.STORAGE_PATH = nested
+        Node._persist_uuid(TEST_UUID)
+
+        path = os.path.join(nested, 'node_uuid')
+        self.assertTrue(os.path.exists(path))
+
+
+class NodeThisNodeTestCase(base.ShakenFistTestCase):
+    """Tests for Node.this_node() convenience method."""
+
+    @mock.patch('shakenfist.node.add_event')
+    @mock.patch(
+        'shakenfist.baseobject.get_minimum_object_version',
+        return_value=Node.current_version)
+    @mock.patch(
+        'shakenfist.mariadb.get_state',
+        return_value=State(
+            value='created', update_time=1234567890.0))
+    @mock.patch('shakenfist.node.mariadb.get_node')
+    @mock.patch('shakenfist.node.Node._load_persisted_uuid')
+    @mock.patch('shakenfist.node.config')
+    def test_this_node_uses_persisted_uuid(
+            self, mock_config, mock_load_uuid,
+            mock_get_node, mock_get_state, mock_get_min,
+            mock_add_event):
+        """Test this_node() uses persisted UUID for lookup."""
+        mock_config.NODE_NAME = TEST_FQDN
+        mock_load_uuid.return_value = TEST_UUID_STR
+
+        node_data = NodeData(
+            uuid=TEST_UUID_STR, fqdn=TEST_FQDN,
+            ip=TEST_IP, version=Node.current_version
+        )
+        mock_get_node.return_value = node_data
+
+        n = Node.this_node()
+        self.assertIsNotNone(n)
+        self.assertEqual(n.fqdn, TEST_FQDN)
+        mock_get_node.assert_called_once_with(TEST_UUID)
+
+    @mock.patch('shakenfist.node.add_event')
+    @mock.patch(
+        'shakenfist.baseobject.get_minimum_object_version',
+        return_value=Node.current_version)
+    @mock.patch(
+        'shakenfist.mariadb.get_state',
+        return_value=State(
+            value='created', update_time=1234567890.0))
+    @mock.patch('shakenfist.node.mariadb.get_node_by_fqdn')
+    @mock.patch('shakenfist.node.mariadb.get_node')
+    @mock.patch('shakenfist.node.Node._load_persisted_uuid')
+    @mock.patch('shakenfist.node.config')
+    def test_this_node_falls_back_to_fqdn(
+            self, mock_config, mock_load_uuid,
+            mock_get_node, mock_get_by_fqdn,
+            mock_get_state, mock_get_min, mock_add_event):
+        """Test this_node() falls back to FQDN when no UUID."""
+        mock_config.NODE_NAME = TEST_FQDN
+        mock_load_uuid.return_value = None
+        mock_get_node.return_value = None
+
+        node_data = NodeData(
+            uuid=TEST_UUID_STR, fqdn=TEST_FQDN,
+            ip=TEST_IP, version=Node.current_version
+        )
+        mock_get_by_fqdn.return_value = node_data
+
+        n = Node.this_node()
+        self.assertIsNotNone(n)
+        mock_get_by_fqdn.assert_called_once_with(TEST_FQDN)
+
+    @mock.patch('shakenfist.node.add_event')
+    @mock.patch(
+        'shakenfist.baseobject.get_minimum_object_version',
+        return_value=Node.current_version)
+    @mock.patch(
+        'shakenfist.mariadb.get_state',
+        return_value=State(
+            value='created', update_time=1234567890.0))
+    @mock.patch('shakenfist.node.mariadb.get_node_by_fqdn')
+    @mock.patch('shakenfist.node.mariadb.get_node')
+    @mock.patch('shakenfist.node.Node._load_persisted_uuid')
+    @mock.patch('shakenfist.node.config')
+    def test_this_node_ignores_uuid_with_wrong_fqdn(
+            self, mock_config, mock_load_uuid,
+            mock_get_node, mock_get_by_fqdn,
+            mock_get_state, mock_get_min, mock_add_event):
+        """Test this_node() ignores persisted UUID if FQDN mismatch."""
+        mock_config.NODE_NAME = 'other.example.com'
+        mock_load_uuid.return_value = TEST_UUID_STR
+
+        # Persisted UUID points to a different node
+        wrong_node = NodeData(
+            uuid=TEST_UUID_STR, fqdn=TEST_FQDN,
+            ip=TEST_IP, version=Node.current_version
+        )
+        mock_get_node.return_value = wrong_node
+
+        # FQDN lookup finds the correct node
+        correct_uuid = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+        correct_node = NodeData(
+            uuid=correct_uuid, fqdn='other.example.com',
+            ip='10.0.0.2', version=Node.current_version
+        )
+        mock_get_by_fqdn.return_value = correct_node
+
+        n = Node.this_node()
+        self.assertIsNotNone(n)
+        self.assertEqual(n.fqdn, 'other.example.com')
+        mock_get_by_fqdn.assert_called_once_with(
+            'other.example.com')
+
+
+class NodeObserveThisNodeTestCase(base.ShakenFistTestCase):
+    """Tests for Node.observe_this_node()."""
+
+    @mock.patch('shakenfist.node.Node._save_attributes')
+    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
+    @mock.patch('shakenfist.node.mariadb.create_node_attributes')
+    @mock.patch('shakenfist.node.add_event')
+    @mock.patch(
+        'shakenfist.baseobject.get_minimum_object_version',
+        return_value=Node.current_version)
+    @mock.patch(
+        'shakenfist.mariadb.get_state',
+        return_value=State(
+            value='created', update_time=1234567890.0))
+    @mock.patch('shakenfist.node.mariadb.get_node')
+    @mock.patch('shakenfist.node.Node._load_persisted_uuid')
+    @mock.patch('shakenfist.node.config')
+    def test_observe_uses_persisted_uuid(
+            self, mock_config, mock_load_uuid,
+            mock_get_node, mock_get_state, mock_get_min,
+            mock_add_event, mock_create_attrs,
+            mock_get_attrs, mock_save_attrs):
+        """Test observe_this_node uses this_node() for lookup."""
+        mock_config.NODE_NAME = TEST_FQDN
+        mock_config.NODE_MESH_IP = TEST_IP
+        mock_config.NODE_IS_ETCD_MASTER = False
+        mock_config.NODE_IS_HYPERVISOR = True
+        mock_config.NODE_IS_NETWORK_NODE = False
+        mock_config.NODE_IS_EVENTLOG_NODE = False
+        mock_load_uuid.return_value = TEST_UUID_STR
+
+        node_data = NodeData(
+            uuid=TEST_UUID_STR, fqdn=TEST_FQDN,
+            ip=TEST_IP, version=Node.current_version
+        )
+        mock_get_node.return_value = node_data
+
+        attrs = NodeAttributesData(uuid=TEST_UUID)
+        mock_get_attrs.return_value = attrs
+
+        Node.observe_this_node()
+
+        self.assertTrue(attrs.is_hypervisor)
+        self.assertFalse(attrs.is_etcd_master)
+        mock_save_attrs.assert_called_once()
+
+    @mock.patch('shakenfist.node.Node._persist_uuid')
+    @mock.patch('shakenfist.node.Node._save_attributes')
+    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
+    @mock.patch('shakenfist.node.mariadb.create_node_attributes')
+    @mock.patch('shakenfist.node.add_event')
+    @mock.patch('shakenfist.mariadb.set_state')
+    @mock.patch(
+        'shakenfist.baseobject.get_minimum_object_version',
+        return_value=Node.current_version)
+    @mock.patch(
+        'shakenfist.mariadb.get_state',
+        return_value=State(
+            value='initial', update_time=1234567890.0))
+    @mock.patch('shakenfist.node.mariadb.get_node_by_fqdn')
+    @mock.patch('shakenfist.node.mariadb.get_node')
+    @mock.patch('shakenfist.node.mariadb.create_node')
+    @mock.patch('shakenfist.node.Node._load_persisted_uuid')
+    @mock.patch('shakenfist.node.config')
+    def test_observe_creates_and_persists_new_node(
+            self, mock_config, mock_load_uuid,
+            mock_create_node, mock_get_node,
+            mock_get_by_fqdn, mock_get_state,
+            mock_get_min, mock_set_state,
+            mock_add_event, mock_create_attrs,
+            mock_get_attrs, mock_save_attrs,
+            mock_persist_uuid):
+        """Test observe_this_node creates node and persists UUID."""
+        mock_config.NODE_NAME = TEST_FQDN
+        mock_config.NODE_MESH_IP = TEST_IP
+        mock_config.NODE_IS_ETCD_MASTER = False
+        mock_config.NODE_IS_HYPERVISOR = False
+        mock_config.NODE_IS_NETWORK_NODE = False
+        mock_config.NODE_IS_EVENTLOG_NODE = False
+        mock_load_uuid.return_value = None
+
+        # this_node() returns None (no persisted UUID, FQDN not found)
+        mock_get_node.return_value = None
+        mock_get_by_fqdn.return_value = None
+
+        # After Node.new() creates the node, from_db(uuid_str) finds it
+        node_data = NodeData(
+            uuid=TEST_UUID_STR, fqdn=TEST_FQDN,
+            ip=TEST_IP, version=Node.current_version
+        )
+
+        def get_node_side_effect(u):
+            if str(u) == TEST_UUID_STR:
+                return node_data
+            return None
+        mock_get_node.side_effect = get_node_side_effect
+
+        attrs = NodeAttributesData(uuid=TEST_UUID)
+        mock_get_attrs.return_value = attrs
+        mock_create_node.return_value = True
+
+        with mock.patch('shakenfist.node.uuid.uuid4',
+                        return_value=TEST_UUID):
+            Node.observe_this_node()
+
+        mock_persist_uuid.assert_called_once()
+        mock_save_attrs.assert_called_once()
