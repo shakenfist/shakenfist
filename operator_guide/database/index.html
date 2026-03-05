@@ -3640,32 +3640,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#migrate-state-to-mariadb" class="md-nav__link">
+  <a href="#data-migrations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        migrate-state-to-mariadb
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#migrate-ipam-to-mariadb" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        migrate-ipam-to-mariadb
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#migrate-uploads-to-mariadb" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        migrate-uploads-to-mariadb
+        Data Migrations
       
     </span>
   </a>
@@ -3835,10 +3813,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#per-type-attribute-tables-future" class="md-nav__link">
+  <a href="#per-type-attribute-tables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Per-Type Attribute Tables (Future)
+        Per-Type Attribute Tables
       
     </span>
   </a>
@@ -3895,10 +3873,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#migration-commands" class="md-nav__link">
+  <a href="#automatic-data-migrations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migration Commands
+        Automatic Data Migrations
       
     </span>
   </a>
@@ -4533,32 +4511,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#migrate-state-to-mariadb" class="md-nav__link">
+  <a href="#data-migrations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        migrate-state-to-mariadb
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#migrate-ipam-to-mariadb" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        migrate-ipam-to-mariadb
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#migrate-uploads-to-mariadb" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        migrate-uploads-to-mariadb
+        Data Migrations
       
     </span>
   </a>
@@ -4728,10 +4684,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#per-type-attribute-tables-future" class="md-nav__link">
+  <a href="#per-type-attribute-tables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Per-Type Attribute Tables (Future)
+        Per-Type Attribute Tables
       
     </span>
   </a>
@@ -4788,10 +4744,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#migration-commands" class="md-nav__link">
+  <a href="#automatic-data-migrations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migration Commands
+        Automatic Data Migrations
       
     </span>
   </a>
@@ -4889,7 +4845,7 @@ system works.</p>
 </tr>
 <tr>
 <td>Node</td>
-<td><code>/sf/object/node/</code></td>
+<td>MariaDB <code>nodes</code> table (migrated from etcd)</td>
 </tr>
 <tr>
 <td>Namespace</td>
@@ -5137,17 +5093,12 @@ class. It provides the same interface for backwards compatibility:</p>
 <a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">obj_dict</span><span class="p">())</span>   <span class="c1"># {&#39;value&#39;: &#39;created&#39;, &#39;update_time&#39;: 1234567890.123}</span>
 </code></pre></div>
 <h3 id="migration-from-etcd">Migration from etcd<a class="headerlink" href="#migration-from-etcd" title="Permanent link">&para;</a></h3>
-<p>For existing deployments that stored state in etcd, use the migration command:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Stop all Shaken Fist services first</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>sf-ctl<span class="w"> </span>migrate-state-to-mariadb
-</code></pre></div>
-<p>This command:
-1. Reads state from etcd for all object types
-2. Writes the state to MariaDB
-3. Removes the state entries from etcd</p>
-<p>Use <code>--dry-run</code> to preview what would be migrated without making changes.</p>
-<p>MariaDB is now required for all deployments - state is stored only in MariaDB,
-not in etcd.</p>
+<p>For existing deployments that stored state in etcd, migration happens
+automatically when the database daemon starts. The migration reads state
+from etcd for all object types, writes it to MariaDB, and removes the old
+etcd entries.</p>
+<p>MariaDB is now required for all deployments - state is stored only in
+MariaDB, not in etcd.</p>
 <h2 id="ipam-reservation-storage">IPAM Reservation Storage<a class="headerlink" href="#ipam-reservation-storage" title="Permanent link">&para;</a></h2>
 <p>IPAM (IP Address Manager) reservations are stored in MariaDB for atomic address
 allocation. This provides:</p>
@@ -5160,25 +5111,25 @@ allocation. This provides:</p>
 </ul>
 <h3 id="the-ipam_reservations-table">The ipam_reservations Table<a class="headerlink" href="#the-ipam_reservations-table" title="Permanent link">&para;</a></h3>
 <p>The <code>ipam_reservations</code> table uses a composite primary key on (ipam_uuid, address):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ipaddress</span><span class="w"> </span><span class="kn">import</span> <span class="n">IPv4Address</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">IPAMReservation</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>        <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>            <span class="s1">&#39;sql_indexes&#39;</span><span class="p">:</span> <span class="p">[</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>                <span class="p">[</span><span class="s1">&#39;ipam_uuid&#39;</span><span class="p">,</span> <span class="s1">&#39;address&#39;</span><span class="p">],</span>      <span class="c1"># Composite unique key</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>                <span class="p">[</span><span class="s1">&#39;user_type&#39;</span><span class="p">,</span> <span class="s1">&#39;user_uuid&#39;</span><span class="p">],</span>    <span class="c1"># Query by user</span>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>            <span class="p">]</span>
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>        <span class="p">}</span>
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    <span class="p">)</span>
-<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
-<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>    <span class="n">ipam_uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">36</span><span class="p">)]</span>
-<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>    <span class="n">address</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">IPv4Address</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>  <span class="c1"># Maps to INET4 column</span>
-<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>    <span class="n">reservation_type</span><span class="p">:</span> <span class="n">ReservationType</span>            <span class="c1"># Enum stored as VARCHAR</span>
-<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>    <span class="n">user_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
-<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a>    <span class="n">user_uuid</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">36</span><span class="p">)</span>
-<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>    <span class="n">reserved_at</span><span class="p">:</span> <span class="nb">float</span>
-<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a>    <span class="n">comment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ipaddress</span><span class="w"> </span><span class="kn">import</span> <span class="n">IPv4Address</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">IPAMReservation</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>        <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>            <span class="s1">&#39;sql_indexes&#39;</span><span class="p">:</span> <span class="p">[</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>                <span class="p">[</span><span class="s1">&#39;ipam_uuid&#39;</span><span class="p">,</span> <span class="s1">&#39;address&#39;</span><span class="p">],</span>      <span class="c1"># Composite unique key</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>                <span class="p">[</span><span class="s1">&#39;user_type&#39;</span><span class="p">,</span> <span class="s1">&#39;user_uuid&#39;</span><span class="p">],</span>    <span class="c1"># Query by user</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>            <span class="p">]</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>        <span class="p">}</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="p">)</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="n">ipam_uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">36</span><span class="p">)]</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>    <span class="n">address</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">IPv4Address</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>  <span class="c1"># Maps to INET4 column</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>    <span class="n">reservation_type</span><span class="p">:</span> <span class="n">ReservationType</span>            <span class="c1"># Enum stored as VARCHAR</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>    <span class="n">user_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>    <span class="n">user_uuid</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">36</span><span class="p">)</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>    <span class="n">reserved_at</span><span class="p">:</span> <span class="nb">float</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>    <span class="n">comment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
 </code></pre></div>
 <p>The <code>address</code> field uses Python's <code>ipaddress.IPv4Address</code> type, which maps to
 MariaDB's <code>INET4</code> column type. This provides efficient 4-byte storage and native
@@ -5224,83 +5175,51 @@ IP address comparison operations.</p>
 </tbody>
 </table>
 <h3 id="migration-from-etcd_1">Migration from etcd<a class="headerlink" href="#migration-from-etcd_1" title="Permanent link">&para;</a></h3>
-<p>For existing deployments that stored IPAM reservations in etcd, use the
-migration command:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Stop all Shaken Fist services first</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>sf-ctl<span class="w"> </span>migrate-ipam-to-mariadb<span class="w"> </span>--dry-run
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Perform the migration</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>sf-ctl<span class="w"> </span>migrate-ipam-to-mariadb
-</code></pre></div>
-<p>This command:
-1. Reads all reservations from <code>/sf/ipam_reservations/</code> in etcd
-2. Writes each reservation to the MariaDB ipam_reservations table
-3. Removes the reservation entries from etcd</p>
+<p>For existing deployments that stored IPAM reservations in etcd, migration
+happens automatically when the database daemon starts. The migration reads
+all reservations from etcd, writes them to the MariaDB <code>ipam_reservations</code>
+table, and removes the original etcd entries.</p>
 <h2 id="administrative-commands">Administrative Commands<a class="headerlink" href="#administrative-commands" title="Permanent link">&para;</a></h2>
 <p>The <code>sf-ctl</code> command provides several database-related administrative functions.
 These commands are typically used during cluster bootstrap and maintenance.</p>
 <h3 id="ensure-mariadb-schema">ensure-mariadb-schema<a class="headerlink" href="#ensure-mariadb-schema" title="Permanent link">&para;</a></h3>
 <p>Ensures the MariaDB schema exists and is up to date. This command must be run
 on an etcd_master node (which has <code>MARIADB_HOST</code> configured):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>sf-ctl<span class="w"> </span>ensure-mariadb-schema
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sf-ctl<span class="w"> </span>ensure-mariadb-schema
 </code></pre></div>
 <p>This is automatically run during cluster deployment before any nodes are
 initialized.</p>
 <h3 id="initialise-node">initialise-node<a class="headerlink" href="#initialise-node" title="Permanent link">&para;</a></h3>
 <p>Creates a node record in the database. By default, it uses the local node's
 configuration:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>sf-ctl<span class="w"> </span>initialise-node
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sf-ctl<span class="w"> </span>initialise-node
 </code></pre></div>
 <p>For cluster bootstrap, this command can initialize any node when run from an
 etcd_master with direct database access:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Run on etcd_master to initialize a remote node</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nv">SHAKENFIST_DATABASE_USE_DIRECT_ETCD</span><span class="o">=</span>True<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>sf-ctl<span class="w"> </span>initialise-node<span class="w"> </span>--node-name<span class="w"> </span>sf-2<span class="w"> </span>--node-mesh-ip<span class="w"> </span><span class="m">10</span>.0.0.2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Run on etcd_master to initialize a remote node</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nv">SHAKENFIST_DATABASE_USE_DIRECT_ETCD</span><span class="o">=</span>True<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>sf-ctl<span class="w"> </span>initialise-node<span class="w"> </span>--node-name<span class="w"> </span>sf-2<span class="w"> </span>--node-mesh-ip<span class="w"> </span><span class="m">10</span>.0.0.2
 </code></pre></div>
 <p>This is useful during deployment when the database service isn't running yet.</p>
 <h3 id="register-daemon">register-daemon<a class="headerlink" href="#register-daemon" title="Permanent link">&para;</a></h3>
 <p>Registers one or more daemons on a node. By default, it registers on the local
 node:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>sf-ctl<span class="w"> </span>register-daemon<span class="w"> </span>sentinel-first<span class="w"> </span>privexec<span class="w"> </span>nodelock
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>sf-ctl<span class="w"> </span>register-daemon<span class="w"> </span>sentinel-first<span class="w"> </span>privexec<span class="w"> </span>nodelock
 </code></pre></div>
 <p>For cluster bootstrap, daemons can be registered on any node when run from an
 etcd_master with direct database access:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Run on etcd_master to register daemons on a remote node</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="nv">SHAKENFIST_DATABASE_USE_DIRECT_ETCD</span><span class="o">=</span>True<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>sf-ctl<span class="w"> </span>register-daemon<span class="w"> </span>database<span class="w"> </span>--node-name<span class="w"> </span>sf-1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Run on etcd_master to register daemons on a remote node</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nv">SHAKENFIST_DATABASE_USE_DIRECT_ETCD</span><span class="o">=</span>True<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>sf-ctl<span class="w"> </span>register-daemon<span class="w"> </span>database<span class="w"> </span>--node-name<span class="w"> </span>sf-1
 </code></pre></div>
 <p>This allows all node and daemon registration to happen before the database
 service starts, avoiding chicken-and-egg problems during bootstrap.</p>
-<h3 id="migrate-state-to-mariadb">migrate-state-to-mariadb<a class="headerlink" href="#migrate-state-to-mariadb" title="Permanent link">&para;</a></h3>
-<p>Migrates object state from etcd to MariaDB for existing deployments:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Preview what would be migrated</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>sf-ctl<span class="w"> </span>migrate-state-to-mariadb<span class="w"> </span>--dry-run
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Perform the migration</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>sf-ctl<span class="w"> </span>migrate-state-to-mariadb
-</code></pre></div>
-<h3 id="migrate-ipam-to-mariadb">migrate-ipam-to-mariadb<a class="headerlink" href="#migrate-ipam-to-mariadb" title="Permanent link">&para;</a></h3>
-<p>Migrates IPAM reservations from etcd to MariaDB for existing deployments:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Preview what would be migrated</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>sf-ctl<span class="w"> </span>migrate-ipam-to-mariadb<span class="w"> </span>--dry-run
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># Perform the migration</span>
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>sf-ctl<span class="w"> </span>migrate-ipam-to-mariadb
-</code></pre></div>
-<p>This command scans all <code>/sf/ipam_reservations/</code> entries in etcd, converts them
-to the new IPAMReservation format, writes them to MariaDB, and removes the
-original entries from etcd.</p>
-<h3 id="migrate-uploads-to-mariadb">migrate-uploads-to-mariadb<a class="headerlink" href="#migrate-uploads-to-mariadb" title="Permanent link">&para;</a></h3>
-<p>Migrates upload objects from etcd to MariaDB for existing deployments:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Preview what would be migrated</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>sf-ctl<span class="w"> </span>migrate-uploads-to-mariadb<span class="w"> </span>--dry-run
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Perform the migration</span>
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>sf-ctl<span class="w"> </span>migrate-uploads-to-mariadb
-</code></pre></div>
-<p>This command scans all upload objects in etcd, writes them to the MariaDB
-uploads table, and removes the original entries from etcd. Uploads are
-temporary objects used during artifact creation.</p>
+<h3 id="data-migrations">Data Migrations<a class="headerlink" href="#data-migrations" title="Permanent link">&para;</a></h3>
+<p>Data migrations from etcd to MariaDB (for object states, IPAM reservations,
+uploads, blobs, nodes, and other types) run automatically when the database
+daemon starts. No manual commands are needed -- simply upgrade and restart
+the <code>sf-database</code> service. See the
+<a href="#automatic-data-migrations">Automatic Data Migrations</a> section for details.</p>
 <h2 id="upload-object-storage">Upload Object Storage<a class="headerlink" href="#upload-object-storage" title="Permanent link">&para;</a></h2>
 <p>Upload objects (temporary objects that receive streamed data during artifact
 creation) are stored in MariaDB. This provides:</p>
@@ -5412,16 +5331,26 @@ of the cluster through Galera replication.</p>
 </tr>
 <tr>
 <td>4</td>
-<td>DnsMasq objects</td>
-<td>Planned</td>
+<td>Blob objects</td>
+<td>Complete - <code>blobs</code>, <code>blob_attributes</code>, <code>blob_hashes</code> tables</td>
 </tr>
 <tr>
 <td>5</td>
+<td>Node objects</td>
+<td>Complete - <code>nodes</code>, <code>node_attributes</code> tables</td>
+</tr>
+<tr>
+<td>6</td>
+<td>DnsMasq objects</td>
+<td>Complete - <code>dnsmasq</code> table</td>
+</tr>
+<tr>
+<td>7</td>
 <td>Other object types</td>
 <td>Future</td>
 </tr>
 <tr>
-<td>6</td>
+<td>8</td>
 <td>Object attributes</td>
 <td>Future</td>
 </tr>
@@ -5495,25 +5424,59 @@ values (immutable data set at creation time):</p>
 <td>DnsMasq</td>
 <td>uuid, namespace, owner_type, owner_uuid, provide_dhcp, provide_dns, version</td>
 </tr>
+<tr>
+<td><code>blobs</code></td>
+<td>Blob</td>
+<td>uuid, modified, fetched_at, version</td>
+</tr>
+<tr>
+<td><code>nodes</code></td>
+<td>Node</td>
+<td>uuid, fqdn (unique index), ip, version</td>
+</tr>
 </tbody>
 </table>
 <p>These tables use the object's UUID as the primary key.</p>
-<h4 id="per-type-attribute-tables-future">Per-Type Attribute Tables (Future)<a class="headerlink" href="#per-type-attribute-tables-future" title="Permanent link">&para;</a></h4>
-<p>Mutable attributes that are specific to an object type will be stored in
+<h4 id="per-type-attribute-tables">Per-Type Attribute Tables<a class="headerlink" href="#per-type-attribute-tables" title="Permanent link">&para;</a></h4>
+<p>Mutable attributes that are specific to an object type are stored in
 dedicated attribute tables:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1">-- Example: instance_attributes (future)</span>
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">instance_attributes</span><span class="w"> </span><span class="p">(</span>
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">    </span><span class="n">instance_uuid</span><span class="w"> </span><span class="n">UUID</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">    </span><span class="n">kvm_pid</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span>
-<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="w">    </span><span class="n">power_state</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">),</span>
-<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="w">    </span><span class="n">power_state_previous</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">),</span>
-<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="w">    </span><span class="n">console_port</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span>
-<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="w">    </span><span class="n">vdi_port</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span>
-<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="w">    </span><span class="c1">-- Complex structures as JSON</span>
-<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="w">    </span><span class="n">placement</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
-<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="w">    </span><span class="n">block_devices</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
-<a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a><span class="w">    </span><span class="n">interfaces</span><span class="w"> </span><span class="n">JSON</span>
-<a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a><span class="p">);</span>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Object Type</th>
+<th>Key Fields</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>blob_attributes</code></td>
+<td>Blob</td>
+<td>uuid, size, info, last_used, retention</td>
+</tr>
+<tr>
+<td><code>node_attributes</code></td>
+<td>Node</td>
+<td>uuid, last_seen, installed_version, roles, daemons, daemon_states, versions, metrics</td>
+</tr>
+</tbody>
+</table>
+<p>Node attributes consolidate many separate etcd keys (observed, roles,
+daemons, daemon:{name}, instances, versions, etc.) into a single row.</p>
+<p>Future attribute tables will follow the same pattern:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1">-- Example: instance_attributes (future)</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">instance_attributes</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span><span class="n">instance_uuid</span><span class="w"> </span><span class="n">UUID</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="n">kvm_pid</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="n">power_state</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">),</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">    </span><span class="n">power_state_previous</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">),</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">    </span><span class="n">console_port</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">    </span><span class="n">vdi_port</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">    </span><span class="c1">-- Complex structures as JSON</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span><span class="n">placement</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">    </span><span class="n">block_devices</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">    </span><span class="n">interfaces</span><span class="w"> </span><span class="n">JSON</span>
+<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="p">);</span>
 </code></pre></div>
 <p>This approach:</p>
 <ul>
@@ -5533,29 +5496,29 @@ have tables. For example:</p>
 <h3 id="pydantic-models-as-schema-source">Pydantic Models as Schema Source<a class="headerlink" href="#pydantic-models-as-schema-source" title="Permanent link">&para;</a></h3>
 <p>Each table is defined by a Pydantic model that serves as the single source of
 truth:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">UUID4</span>
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLIndex</span><span class="p">,</span> <span class="n">SQLNativeUUID</span>
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">DnsMasqData</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Schema for DnsMasq static values in MariaDB.&quot;&quot;&quot;</span>
-<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>
-<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>    <span class="n">uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">UUID4</span><span class="p">,</span> <span class="n">SQLNativeUUID</span><span class="p">()]</span>
-<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>    <span class="n">namespace</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
-<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>    <span class="n">owner_type</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
-<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>    <span class="n">owner_uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
-<a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>    <span class="n">version</span><span class="p">:</span> <span class="nb">int</span>
-<a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>    <span class="n">provide_dhcp</span><span class="p">:</span> <span class="nb">bool</span>
-<a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a>    <span class="n">provide_dns</span><span class="p">:</span> <span class="nb">bool</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">UUID4</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLIndex</span><span class="p">,</span> <span class="n">SQLNativeUUID</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">DnsMasqData</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Schema for DnsMasq static values in MariaDB.&quot;&quot;&quot;</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>    <span class="n">uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">UUID4</span><span class="p">,</span> <span class="n">SQLNativeUUID</span><span class="p">()]</span>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>    <span class="n">namespace</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>    <span class="n">owner_type</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
+<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>    <span class="n">owner_uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
+<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>    <span class="n">version</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>    <span class="n">provide_dhcp</span><span class="p">:</span> <span class="nb">bool</span>
+<a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>    <span class="n">provide_dns</span><span class="p">:</span> <span class="nb">bool</span>
 </code></pre></div>
 <p>The table is then generated from this model:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">pydantic_to_sqlalchemy_table</span>
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="n">table</span> <span class="o">=</span> <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">(</span>
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>    <span class="n">DnsMasqData</span><span class="p">,</span> <span class="s1">&#39;dnsmasq&#39;</span><span class="p">,</span> <span class="n">metadata</span><span class="p">,</span>
-<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>    <span class="n">primary_key_field</span><span class="o">=</span><span class="s1">&#39;uuid&#39;</span><span class="p">,</span> <span class="n">include_id_column</span><span class="o">=</span><span class="kc">False</span>
-<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">pydantic_to_sqlalchemy_table</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">table</span> <span class="o">=</span> <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">(</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">DnsMasqData</span><span class="p">,</span> <span class="s1">&#39;dnsmasq&#39;</span><span class="p">,</span> <span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="n">primary_key_field</span><span class="o">=</span><span class="s1">&#39;uuid&#39;</span><span class="p">,</span> <span class="n">include_id_column</span><span class="o">=</span><span class="kc">False</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="p">)</span>
 </code></pre></div>
 <h3 id="adding-new-attributes">Adding New Attributes<a class="headerlink" href="#adding-new-attributes" title="Permanent link">&para;</a></h3>
 <p>When adding a new attribute to an object type:</p>
@@ -5583,15 +5546,14 @@ read from the database with an older version:</p>
 </ol>
 <p>This allows rolling upgrades without requiring all objects to be migrated
 immediately.</p>
-<h3 id="migration-commands">Migration Commands<a class="headerlink" href="#migration-commands" title="Permanent link">&para;</a></h3>
-<p>Each migration has a corresponding <code>sf-ctl</code> command:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Preview what would be migrated</span>
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>sf-ctl<span class="w"> </span>migrate-<span class="o">{</span>type<span class="o">}</span>-to-mariadb<span class="w"> </span>--dry-run
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Perform the migration</span>
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>sf-ctl<span class="w"> </span>migrate-<span class="o">{</span>type<span class="o">}</span>-to-mariadb
-</code></pre></div>
-<p>Migrations are idempotent - running them multiple times is safe.</p>
+<h3 id="automatic-data-migrations">Automatic Data Migrations<a class="headerlink" href="#automatic-data-migrations" title="Permanent link">&para;</a></h3>
+<p>Data migrations from etcd to MariaDB run automatically when the database
+daemon starts. The <code>ensure_data_migrations()</code> function checks each table's
+version and runs any pending migrations. This includes migrations for object
+states, IPAM reservations, uploads, blobs, nodes, and other object types.</p>
+<p>No manual <code>sf-ctl</code> commands are needed for data migration -- simply
+upgrading and restarting the database daemon is sufficient. Migrations are
+idempotent and safe to re-run if the daemon restarts during migration.</p>
 
 
 
