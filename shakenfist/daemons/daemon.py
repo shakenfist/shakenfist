@@ -220,7 +220,7 @@ class Daemon:
         if sig == signal.SIGTERM:
             self.log.info('Caught SIGTERM, terminating')
             try:
-                n = Node.from_db(config.NODE_NAME)
+                n = Node.this_node()
                 n.set_daemon_state(
                     self.daemon_name, Node.DAEMON_STATE_STOPPING)
             except ValueError:
@@ -230,20 +230,20 @@ class Daemon:
             set_abort_path(self.abort_path, 'from exit_gracefully')
 
     def check_daemon_state(self):
-        n = Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
+        n = Node.this_node(suppress_failure_audit=True)
         daemon_state = n.get_daemon_state(self.daemon_name).value
         if daemon_state in [Node.DAEMON_STATE_STOPPED,
                             Node.DAEMON_STATE_STOPPING]:
             set_abort_path(self.abort_path, 'from check_daemon_state')
 
     def record_start(self):
-        n = Node.from_db(config.NODE_NAME)
+        n = Node.this_node()
         n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_RUNNING)
         n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon starting')
         send_systemd_ready()
 
     def record_exit(self):
-        n = Node.from_db(config.NODE_NAME)
+        n = Node.this_node()
         try:
             n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPED)
         except InvalidStateException as e:

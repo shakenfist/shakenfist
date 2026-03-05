@@ -195,6 +195,15 @@ Key configuration sources:
 - etcd `/sf/config` - Cluster-wide configuration
 - Environment variables (highest priority)
 
+### Node Identity
+
+Each node has a real UUID (not FQDN-based) stored in MariaDB. The UUID is
+persisted locally to `{STORAGE_PATH}/node_uuid` on first run so that
+subsequent daemon starts can look up the node directly by UUID rather than
+performing an FQDN-to-UUID indirection. The UUID can also be set explicitly
+via the `NODE_UUID` config field or `SHAKENFIST_NODE_UUID` environment
+variable.
+
 ## API Architecture
 
 REST API built with Flask-RESTful:

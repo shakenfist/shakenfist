@@ -1,3 +1,4 @@
+import os
 import time
 import uuid
 from collections import defaultdict
@@ -272,9 +273,71 @@ class Node(dbo):
         return n
 
     @classmethod
+    def _node_uuid_path(cls):
+        """Return the path to the local node UUID file."""
+        return os.path.join(config.STORAGE_PATH, 'node_uuid')
+
+    @classmethod
+    def _load_persisted_uuid(cls):
+        """Load node UUID from config or local file.
+
+        Returns the UUID string if found and valid, else None.
+        """
+        # Config / environment variable takes precedence
+        if config.NODE_UUID:
+            try:
+                uuid.UUID(config.NODE_UUID)
+                return config.NODE_UUID
+            except ValueError:
+                LOG.warning('Invalid NODE_UUID in config, ignoring: %s',
+                            config.NODE_UUID)
+
+        # Fall back to local file
+        path = cls._node_uuid_path()
+        if os.path.exists(path):
+            try:
+                with open(path, 'r') as f:
+                    stored = f.read().strip()
+                uuid.UUID(stored)
+                return stored
+            except (ValueError, OSError) as e:
+                LOG.warning('Failed to read node UUID from %s: %s',
+                            path, e)
+
+        return None
+
+    @classmethod
+    def _persist_uuid(cls, node_uuid):
+        """Write node UUID to local file for fast startup."""
+        path = cls._node_uuid_path()
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w') as f:
+                f.write(str(node_uuid))
+            LOG.info('Persisted node UUID to %s', path)
+        except OSError as e:
+            LOG.warning('Failed to persist node UUID to %s: %s',
+                        path, e)
+
+    @classmethod
     def observe_this_node(cls):
         """Upsert this node and update its attributes."""
-        n = cls.new(config.NODE_NAME, config.NODE_MESH_IP)
+        # Try to use a persisted UUID for direct lookup
+        persisted = cls._load_persisted_uuid()
+        n = None
+        if persisted:
+            n = cls.from_db(persisted, suppress_failure_audit=True)
+            if n and n.fqdn != config.NODE_NAME:
+                LOG.warning(
+                    'Persisted UUID %s belongs to %s, not %s. '
+                    'Ignoring persisted UUID.',
+                    persisted, n.fqdn, config.NODE_NAME)
+                n = None
+
+        if not n:
+            n = cls.new(config.NODE_NAME, config.NODE_MESH_IP)
+            cls._persist_uuid(n.uuid)
+
         attrs = n._ensure_attributes()
         attrs.last_seen = time.time()
         attrs.installed_version = util_general.get_version()
@@ -283,6 +346,23 @@ class Node(dbo):
         attrs.is_network_node = config.NODE_IS_NETWORK_NODE
         attrs.is_eventlog_node = config.NODE_IS_EVENTLOG_NODE
         n._save_attributes()
+
+    @classmethod
+    def this_node(cls, suppress_failure_audit=False):
+        """Look up the current node, using persisted UUID if available.
+
+        This is more efficient than from_db(config.NODE_NAME) as it
+        avoids the FQDN-to-UUID indirection when the UUID is persisted
+        locally.
+        """
+        persisted = cls._load_persisted_uuid()
+        if persisted:
+            n = cls.from_db(persisted, suppress_failure_audit=suppress_failure_audit)
+            if n and n.fqdn == config.NODE_NAME:
+                return n
+
+        return cls.from_db(config.NODE_NAME,
+                           suppress_failure_audit=suppress_failure_audit)
 
     def external_view(self):
         """Build a dict of node state for the API."""
