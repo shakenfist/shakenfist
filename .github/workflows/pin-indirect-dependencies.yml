@@ -6,7 +6,8 @@
 name: Pin indirect dependencies
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 on:
   workflow_dispatch:
@@ -40,6 +41,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          token: ${{ secrets.DEPENDENCIES_TOKEN }}
 
       - name: Install the github command line
         run: |
