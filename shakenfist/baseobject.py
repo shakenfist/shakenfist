@@ -70,34 +70,40 @@ def _maintain_version_cache(max_cache_age):
 
     metrics = {}
 
-    # Ignore metrics for deleted nodes, but include nodes in an error state
-    # as they may return.
+    # Ignore metrics for deleted nodes, but include nodes in an
+    # error state as they may return.
     target_states = [DatabaseBackedObject.STATE_INITIAL,
                      DatabaseBackedObject.STATE_CREATED,
                      'degraded']
-    for node_key, n in etcd.get_all('node', None):
-        # node_key is the full etcd path, extract the node name (fqdn)
-        node_name = node_key.split('/')[-1]
-        state = mariadb.get_state(ObjectType.NODE, node_name)
+    for node_uuid_str in mariadb.get_all_node_uuids():
+        node_data = mariadb.get_node(uuid.UUID(node_uuid_str))
+        if not node_data:
+            continue
+        node_fqdn = node_data.fqdn
+
+        state = mariadb.get_state(
+            ObjectType.NODE, node_uuid_str)
         if not state or state.value not in target_states:
             continue
-        d = etcd.get('metrics', node_name, None)
+        d = etcd.get('metrics', node_fqdn, None)
         if not d:
             continue
 
         d['metrics']['metrics_age'] = \
             round(time.time() - d.get('timestamp', 0), 2)
         log = LOG.with_fields({
-            'node_name': node_name,
+            'node_name': node_fqdn,
             'metrics_age': d['metrics']['metrics_age']
         })
 
         # Discard very old metrics
         if d['metrics']['metrics_age'] > 300:
-            log.warning('Ignoring very old metrics entry for active node')
+            log.warning(
+                'Ignoring very old metrics entry '
+                'for active node')
             continue
 
-        metrics[node_name] = d['metrics']
+        metrics[node_fqdn] = d['metrics']
         log.debug('Considering metrics entry')
 
     for possible_objname in ObjectType:

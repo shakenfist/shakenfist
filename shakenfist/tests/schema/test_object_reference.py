@@ -150,9 +150,10 @@ class ObjectReferenceModelTestCase(base.ShakenFistTestCase):
     def test_node_fqdn_as_source(self):
         """Test that Node FQDNs work as source identifiers.
 
-        Nodes use their FQDN (e.g., 'localhost', 'node1.example.com') as
-        their identifier rather than a UUID. This is the use case that
-        requires source_uuid to be a string rather than UUID.
+        Node references in the object_references table use the FQDN
+        (e.g., 'localhost', 'node1.example.com') as their identifier.
+        This is one of the use cases that requires source_uuid to be a
+        string rather than UUID (Namespace is the other).
         """
         node_fqdn = 'node1.example.com'
         ref = ObjectReference(

@@ -22,10 +22,9 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 
 
-# Lookup of the FQDN (called a UUID by the node object) is expensive,
-# and the network node doesn't move around, so just do it once here
-# and cache the result. This can't be done until config is loaded, so
-# the cache is populated by the first caller.
+# The network node doesn't move around, so just look it up once
+# and cache the result. This can't be done until config is loaded,
+# so the cache is populated by the first caller.
 CACHED_NETWORK_NODE = None
 
 UNREASONABLE_QUEUE_LENGTH = 20
@@ -50,20 +49,34 @@ def get_active_node_metrics():
 
     for n in Nodes([], prefilter='active'):
         try:
-            new_metrics = etcd.get('metrics', n.uuid, None)
+            # Metrics are stored under the node FQDN
+            new_metrics = etcd.get(
+                'metrics', n.fqdn, None)
             if new_metrics:
-                if time.time() - new_metrics.get('timestamp', 0) < 120:
-                    new_metrics = new_metrics.get('metrics', {})
+                if (time.time()
+                        - new_metrics.get('timestamp', 0)
+                        < 120):
+                    new_metrics = new_metrics.get(
+                        'metrics', {})
                 else:
-                    n.add_event(EVENT_TYPE_AUDIT, 'stale metrics from database for node')
+                    n.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'stale metrics from database '
+                        'for node')
                     new_metrics = {}
             else:
-                n.add_event(EVENT_TYPE_AUDIT, 'empty metrics from database for node')
+                n.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'empty metrics from database '
+                    'for node')
                 new_metrics = {}
-            metrics[n.uuid] = new_metrics
+            metrics[n.fqdn] = new_metrics
 
         except exceptions.ReadException:
-            n.add_event(EVENT_TYPE_AUDIT, 'refreshing metrics for node failed')
+            n.add_event(
+                EVENT_TYPE_AUDIT,
+                'refreshing metrics for node '
+                'failed')
 
     return metrics
 

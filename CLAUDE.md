@@ -411,17 +411,9 @@ performance. This is required for all deployments - MariaDB must be configured.
 
 ### Migrating Existing Deployments
 
-When upgrading an existing deployment to use MariaDB:
-
-1. Stop all Shaken Fist services on all nodes
-2. Run the appropriate migration commands:
-   - `sf-ctl migrate-state-to-mariadb` - Migrate object state from etcd
-   - `sf-ctl migrate-ipam-to-mariadb` - Migrate IPAM reservations from etcd
-   - `sf-ctl migrate-uploads-to-mariadb` - Migrate upload objects from etcd
-3. Start services via getsf
-
-Each migration command copies data from etcd to MariaDB and removes the old
-etcd entries. Use `--dry-run` to preview what would be migrated.
+Data migrations from etcd to MariaDB run automatically when the database
+daemon starts. Simply upgrade and restart the `sf-database` service.
+Migrations are idempotent and safe to re-run.
 
 ### State Class
 

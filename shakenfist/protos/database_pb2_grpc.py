@@ -399,6 +399,56 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetStaleTranscodedBlobUuidsRequest.SerializeToString,
                 response_deserializer=database__pb2.GetStaleTranscodedBlobUuidsReply.FromString,
                 _registered_method=True)
+        self.CreateNode = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateNode',
+                request_serializer=database__pb2.CreateNodeRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetNode = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNode',
+                request_serializer=database__pb2.GetNodeRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNodeReply.FromString,
+                _registered_method=True)
+        self.GetNodeByFqdn = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNodeByFqdn',
+                request_serializer=database__pb2.GetNodeByFqdnRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNodeReply.FromString,
+                _registered_method=True)
+        self.GetAllNodeUuids = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllNodeUuids',
+                request_serializer=database__pb2.GetAllNodeUuidsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAllNodeUuidsReply.FromString,
+                _registered_method=True)
+        self.DeleteNode = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteNode',
+                request_serializer=database__pb2.DeleteNodeRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.UpdateNode = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateNode',
+                request_serializer=database__pb2.UpdateNodeRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.CreateNodeAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateNodeAttributes',
+                request_serializer=database__pb2.CreateNodeAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetNodeAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNodeAttributes',
+                request_serializer=database__pb2.GetNodeAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNodeAttributesReply.FromString,
+                _registered_method=True)
+        self.UpdateNodeAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateNodeAttributes',
+                request_serializer=database__pb2.UpdateNodeAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteNodeAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteNodeAttributes',
+                request_serializer=database__pb2.DeleteNodeAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -856,6 +906,71 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateNode(self, request, context):
+        """Node Operations (MariaDB)
+        These manage node static values (uuid, fqdn, ip) in MariaDB.
+        Nodes now use real UUID4 identifiers; FQDN is a separate indexed column.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNode(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNodeByFqdn(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAllNodeUuids(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteNode(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateNode(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateNodeAttributes(self, request, context):
+        """Node Attributes Operations (MariaDB)
+        These store mutable node attributes, separate from NodeData (static values).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNodeAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateNodeAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteNodeAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1223,6 +1338,56 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetStaleTranscodedBlobUuids,
                     request_deserializer=database__pb2.GetStaleTranscodedBlobUuidsRequest.FromString,
                     response_serializer=database__pb2.GetStaleTranscodedBlobUuidsReply.SerializeToString,
+            ),
+            'CreateNode': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateNode,
+                    request_deserializer=database__pb2.CreateNodeRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetNode': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNode,
+                    request_deserializer=database__pb2.GetNodeRequest.FromString,
+                    response_serializer=database__pb2.GetNodeReply.SerializeToString,
+            ),
+            'GetNodeByFqdn': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNodeByFqdn,
+                    request_deserializer=database__pb2.GetNodeByFqdnRequest.FromString,
+                    response_serializer=database__pb2.GetNodeReply.SerializeToString,
+            ),
+            'GetAllNodeUuids': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllNodeUuids,
+                    request_deserializer=database__pb2.GetAllNodeUuidsRequest.FromString,
+                    response_serializer=database__pb2.GetAllNodeUuidsReply.SerializeToString,
+            ),
+            'DeleteNode': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteNode,
+                    request_deserializer=database__pb2.DeleteNodeRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'UpdateNode': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateNode,
+                    request_deserializer=database__pb2.UpdateNodeRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateNodeAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateNodeAttributes,
+                    request_deserializer=database__pb2.CreateNodeAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetNodeAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNodeAttributes,
+                    request_deserializer=database__pb2.GetNodeAttributesRequest.FromString,
+                    response_serializer=database__pb2.GetNodeAttributesReply.SerializeToString,
+            ),
+            'UpdateNodeAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateNodeAttributes,
+                    request_deserializer=database__pb2.UpdateNodeAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteNodeAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteNodeAttributes,
+                    request_deserializer=database__pb2.DeleteNodeAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -3196,6 +3361,276 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetStaleTranscodedBlobUuids',
             database__pb2.GetStaleTranscodedBlobUuidsRequest.SerializeToString,
             database__pb2.GetStaleTranscodedBlobUuidsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateNode(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateNode',
+            database__pb2.CreateNodeRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNode(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNode',
+            database__pb2.GetNodeRequest.SerializeToString,
+            database__pb2.GetNodeReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNodeByFqdn(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNodeByFqdn',
+            database__pb2.GetNodeByFqdnRequest.SerializeToString,
+            database__pb2.GetNodeReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAllNodeUuids(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllNodeUuids',
+            database__pb2.GetAllNodeUuidsRequest.SerializeToString,
+            database__pb2.GetAllNodeUuidsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteNode(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteNode',
+            database__pb2.DeleteNodeRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateNode(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateNode',
+            database__pb2.UpdateNodeRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateNodeAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateNodeAttributes',
+            database__pb2.CreateNodeAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNodeAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNodeAttributes',
+            database__pb2.GetNodeAttributesRequest.SerializeToString,
+            database__pb2.GetNodeAttributesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateNodeAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateNodeAttributes',
+            database__pb2.UpdateNodeAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteNodeAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteNodeAttributes',
+            database__pb2.DeleteNodeAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
             insecure,

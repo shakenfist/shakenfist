@@ -1,5 +1,7 @@
 import time
+import uuid
 from collections import defaultdict
+from typing import Any, Optional, Union
 
 import semver
 from shakenfist_utilities import logs  # noreorder
@@ -11,11 +13,16 @@ from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import GiB
+from shakenfist.eventlog import add_event
 from shakenfist.exceptions import NoSuchDaemon
 from shakenfist.exceptions import NoSuchDaemonState
+from shakenfist.schema.node_attributes import NodeAttributesData
+from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.object_reference import references_to_grouped_dict
+from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
+from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 
 
@@ -25,7 +32,7 @@ LOG, _ = logs.setup(__name__)
 class Node(dbo):
     object_type = ObjectType.NODE
     initial_version = 2
-    current_version = 10
+    current_version = 11
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
@@ -33,74 +40,99 @@ class Node(dbo):
     STATE_STOPPED = 'stopped'
     STATE_DEGRADED = 'degraded'
 
-    # Note that this list of active states is duplicated in baseobject as well to
-    # avoid a circular import, and if changed must be updated there as well.
+    # Note that this list of active states is duplicated in baseobject as well to avoid
+    # a circular import, and if changed must be updated there as well.
     ACTIVE_STATES = {dbo.STATE_INITIAL, dbo.STATE_CREATED, STATE_DEGRADED}
     INACTIVE_STATES = {dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING}
 
-    # Remember that this list must align with what sf-ctl is called with in
-    # deploy.yml.
-    VALID_DAEMONS = ['database', 'eventlog', 'net', 'resources', 'sidechannel',
-                     'queues', 'api', 'checksums', 'cleaner', 'cluster',
-                     'transfers', 'privexec', 'nodelock', 'sentinel-first',
-                     'sentinel-last']
+    # Remember that this list must align with what sf-ctl is called with in deploy.yml.
+    VALID_DAEMONS = [
+        'database', 'eventlog', 'net', 'resources', 'sidechannel', 'queues',
+        'api', 'checksums', 'cleaner', 'cluster', 'transfers', 'privexec',
+        'nodelock', 'sentinel-first', 'sentinel-last'
+    ]
 
     DAEMON_STATE_RUNNING = 'daemon-running'
     DAEMON_STATE_STOPPING = 'daemon-stopping'
     DAEMON_STATE_STOPPED = 'daemon-stopped'
-    VALID_DAEMON_STATES = [DAEMON_STATE_RUNNING, DAEMON_STATE_STOPPING,
-                           DAEMON_STATE_STOPPED]
+    VALID_DAEMON_STATES = [
+        DAEMON_STATE_RUNNING, DAEMON_STATE_STOPPING, DAEMON_STATE_STOPPED
+    ]
 
     state_targets = {
         None: (dbo.STATE_INITIAL),
-        dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING,
-                            STATE_DEGRADED),
-        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING,
-                            STATE_STOPPING, STATE_DEGRADED),
-        STATE_STOPPING: (STATE_STOPPED, dbo.STATE_DELETED, dbo.STATE_ERROR,
-                         STATE_DEGRADED, dbo.STATE_CREATED),
-        STATE_STOPPED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR,
-                        STATE_DEGRADED),
+        dbo.STATE_INITIAL: (
+            dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING, STATE_DEGRADED),
+        dbo.STATE_CREATED: (
+            dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING, STATE_STOPPING,
+            STATE_DEGRADED),
+        STATE_STOPPING: (
+            STATE_STOPPED, dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_DEGRADED,
+            dbo.STATE_CREATED),
+        STATE_STOPPED: (
+            dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_DEGRADED),
 
         # Some (but not all) components are not running correctly on the node
-        STATE_DEGRADED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR,
-                         STATE_MISSING, STATE_STOPPING),
+        STATE_DEGRADED: (
+            dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING,
+            STATE_STOPPING),
 
         # A node can return from the dead...
         dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED, STATE_DEGRADED),
-        STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR,
-                        STATE_DEGRADED),
+        STATE_MISSING: (
+            dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_DEGRADED),
 
-        # And even from being deleted. This is because you need to delete the
-        # node to get the instances on the node to be marked as gone, but then
-        # you might repair the node and return it to service.
+        # And even from being deleted. This is because you need to delete the node to
+        # get the instances on the node to be marked as gone, but then you might repair
+        # the node and return it to service.
         dbo.STATE_DELETED: (dbo.STATE_CREATED),
     }
 
-    def __init__(self, static_values):
-        self.upgrade(static_values)
+    def __init__(self, data: NodeData) -> None:
+        # Apply lazy upgrades to the immutable Pydantic model
+        data = self.upgrade_pydantic_data(data, NodeData)
+        super().__init__(data.uuid, data.version)
 
-        # Node uses the FQDN as its identifier for historical reasons instead
-        # of a proper UUID. We store it directly to avoid UUID conversion.
-        # The uuid property is overridden to return a string.
-        self.__node_fqdn = static_values['fqdn']
-        self._DatabaseBackedObject__uuid = self.__node_fqdn  # type: ignore
-        self._DatabaseBackedObject__version = static_values.get('version')
-        self._DatabaseBackedObject__in_memory_only = False
-        self.log = LOG.with_fields({self.object_type: self.__node_fqdn})
+        self.__fqdn: str = data.fqdn
+        self.__ip: str = data.ip
 
-        self.__ip = static_values['ip']
-        self.__fqdn = static_values['fqdn']
+        # Override log field to use fqdn for readability
+        self.log = LOG.with_fields({self.object_type: self.__fqdn})
 
-    @property
-    def uuid(self) -> str:
-        """Return the Node's identifier (FQDN) as a string.
+        # Lazy-load attributes from MariaDB
+        self.__attributes: Optional[NodeAttributesData] = None
+        self.__attributes_loaded: bool = False
 
-        This overrides the base class to return a string instead of uuid.UUID
-        because nodes use their FQDN as their identifier for historical reasons.
-        """
-        return self.__node_fqdn
+    def _load_attributes(self) -> Optional[NodeAttributesData]:
+        """Load attributes from MariaDB."""
+        if not self.__attributes_loaded:
+            self.__attributes = mariadb.get_node_attributes(self.uuid)
+            self.__attributes_loaded = True
+        return self.__attributes
 
+    def _ensure_attributes(self) -> NodeAttributesData:
+        """Ensure attributes record exists, creating defaults if needed."""
+        attrs = self._load_attributes()
+        if attrs is None:
+            attrs = NodeAttributesData(uuid=self.uuid)
+            if not mariadb.create_node_attributes(attrs):
+                # Another thread/process created the record first;
+                # reload the actual data from MariaDB.
+                attrs = mariadb.get_node_attributes(self.uuid)
+            self.__attributes = attrs
+        return attrs
+
+    def _save_attributes(self) -> None:
+        """Persist current attributes to MariaDB."""
+        if self.__attributes is not None:
+            mariadb.update_node_attributes(self.__attributes)
+
+    def _invalidate_attributes(self) -> None:
+        """Force reload of attributes on next access."""
+        self.__attributes_loaded = False
+        self.__attributes = None
+
+    # Upgrade steps (2-10 are etcd dict-based, retained for migration tool compatibility)
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values):
         ...
@@ -119,7 +151,7 @@ class Node(dbo):
 
     @classmethod
     def _upgrade_step_6_to_7(cls, static_values):
-        etcd.delete('attribute/node',  static_values['fqdn'], 'instances-active')
+        etcd.delete('attribute/node', static_values['fqdn'], 'instances-active')
 
     @classmethod
     def _upgrade_step_7_to_8(cls, static_values):
@@ -137,107 +169,225 @@ class Node(dbo):
         etcd.delete('attribute/node', static_values['fqdn'], 'blobs')
 
     @classmethod
+    def _upgrade_step_10_to_11(cls, static_values):
+        # Migration to MariaDB nodes/node_attributes tables is handled by
+        # sf-ctl migrate-data-to-mariadb.
+        ...
+
+    @classmethod
+    def _persist_pydantic_upgrade(  # type: ignore[override]
+            cls, data: NodeData) -> None:
+        """Persist an upgraded NodeData to MariaDB."""
+        mariadb.update_node(data)
+
+    @classmethod
+    def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
+        """Create a node record in MariaDB."""
+        node_uuid = metadata.get('uuid', object_uuid)
+        if isinstance(node_uuid, str):
+            node_uuid = uuid.UUID(node_uuid)
+
+        mariadb.create_node(
+            node_uuid, metadata['fqdn'], metadata['ip'], metadata['version'])
+        add_event(
+            EVENT_TYPE_AUDIT, cls.object_type, str(node_uuid), 'db record created',
+            extra={
+                'fqdn': metadata['fqdn'],
+                'ip': metadata['ip'],
+                'version': metadata['version']
+            })
+
+    @classmethod
+    def _db_get(cls, identifier: Union[str, uuid.UUID]) -> Optional[NodeData]:
+        """Get node static values from MariaDB.
+
+        Supports lookup by UUID or FQDN for backwards compatibility.
+        """
+        data = None
+
+        if isinstance(identifier, uuid.UUID):
+            data = mariadb.get_node(identifier)
+        else:
+            # Try parsing as UUID string first
+            try:
+                parsed = uuid.UUID(str(identifier))
+                data = mariadb.get_node(parsed)
+            except ValueError:
+                pass
+
+            # Fall back to FQDN lookup
+            if data is None:
+                data = mariadb.get_node_by_fqdn(str(identifier))
+
+        if data is None:
+            return None
+
+        if data.version != cls.current_version:
+            if not cls.upgrade_supported:
+                from shakenfist import exceptions
+                raise exceptions.BadObjectVersion(
+                    f'Unsupported object version - {cls.object_type}: {data}')
+        return data
+
+    @classmethod
+    def from_db(cls, identifier: Union[str, uuid.UUID],
+                suppress_failure_audit: bool = False) -> Optional['Node']:
+        """Load a Node from the database.
+
+        Supports lookup by UUID or FQDN.
+        """
+        if not identifier:
+            return None
+
+        data = cls._db_get(identifier)
+        if not data:
+            if not suppress_failure_audit:
+                add_event(
+                    EVENT_TYPE_AUDIT, cls.object_type, str(identifier),
+                    'attempt to lookup non-existent object',
+                    extra={'caller': util_callstack.get_caller(offset=-3)},
+                    log_as_error=True)
+            return None
+
+        return cls(data)
+
+    @classmethod
     def new(cls, name, ip):
+        # Try to find existing node by FQDN
         n = Node.from_db(name, suppress_failure_audit=True)
         if n:
             return n
 
-        Node._db_create(name, {
+        # Generate a real UUID4 for the new node
+        node_uuid = uuid.uuid4()
+        Node._db_create(str(node_uuid), {
+            'uuid': node_uuid,
             'fqdn': name,
             'ip': ip,
             'version': cls.current_version
         })
-        n = Node.from_db(name)
+        n = Node.from_db(str(node_uuid))
         n.state = cls.STATE_INITIAL
         n.add_event(EVENT_TYPE_AUDIT, 'node created')
         return n
 
     @classmethod
     def observe_this_node(cls):
-        # We use Node.new here because it acts like a "upsert". It will create
-        # the node object if it doesn't already exist, and otherwise use the
-        # existing one.
+        """Upsert this node and update its attributes."""
         n = cls.new(config.NODE_NAME, config.NODE_MESH_IP)
-        n._db_set_attribute('observed',
-                            {
-                                'at': time.time(),
-                                'release': util_general.get_version()
-                            })
-
-        roles = {
-            'is_etcd_master': config.NODE_IS_ETCD_MASTER,
-            'is_hypervisor': config.NODE_IS_HYPERVISOR,
-            'is_network_node': config.NODE_IS_NETWORK_NODE,
-            'is_eventlog_node': config.NODE_IS_EVENTLOG_NODE
-        }
-        if n._db_get_attribute('roles') != roles:
-            n._db_set_attribute('roles', roles)
+        attrs = n._ensure_attributes()
+        attrs.last_seen = time.time()
+        attrs.installed_version = util_general.get_version()
+        attrs.is_etcd_master = config.NODE_IS_ETCD_MASTER
+        attrs.is_hypervisor = config.NODE_IS_HYPERVISOR
+        attrs.is_network_node = config.NODE_IS_NETWORK_NODE
+        attrs.is_eventlog_node = config.NODE_IS_EVENTLOG_NODE
+        n._save_attributes()
 
     def external_view(self):
-        # If this is an external view, then mix back in attributes that users
-        # expect
+        """Build a dict of node state for the API."""
         retval = self._external_view()
         retval.update({
+            'fqdn': self.fqdn,
             'name': self.fqdn,
             'ip': self.ip,
             'lastseen': self.last_seen,
             'release': self.installed_version
         })
-        retval.update(self._db_get_attribute('roles', {}))
 
-        # And the states of the various daemons
+        # Add role flags from attributes
+        attrs = self._load_attributes()
+        if attrs:
+            retval['is_etcd_master'] = attrs.is_etcd_master
+            retval['is_hypervisor'] = attrs.is_hypervisor
+            retval['is_network_node'] = attrs.is_network_node
+            retval['is_eventlog_node'] = attrs.is_eventlog_node
+
+        # Add daemon states
         for daemon in self.VALID_DAEMONS:
-            retval[f'daemon-{daemon}-state'] = \
-                self.get_daemon_state(daemon).value
+            retval[f'daemon-{daemon}-state'] = self.get_daemon_state(daemon).value
 
-        # Add object references (what references this node and what this node
-        # references). Note: Node uuid is actually the FQDN.
-        refs_to = mariadb.get_references_to(ObjectType.NODE, self.uuid)
-        refs_from = mariadb.get_references_from(ObjectType.NODE, self.uuid)
+        # Object references use FQDN as the node identifier in the
+        # object_references table.
+        refs_to = mariadb.get_references_to(ObjectType.NODE, self.fqdn)
+        refs_from = mariadb.get_references_from(ObjectType.NODE, self.fqdn)
         retval['references_to'] = references_to_grouped_dict(refs_to)
         retval['references_from'] = references_to_grouped_dict(refs_from)
 
         return retval
 
     def get_registered_daemons(self):
-        return self._db_get_attribute('daemons').get('daemons', [])
+        attrs = self._load_attributes()
+        if attrs is None:
+            return []
+        return list(attrs.daemons)
 
     def register_daemon(self, daemon):
         if daemon not in self.VALID_DAEMONS:
-            raise NoSuchDaemon(f'Cannot register daemon "{daemon}" on node '
-                               f'{self.uuid}, as that daemon is unknown.')
-        self._add_item_in_attribute_list('daemons', daemon)
+            raise NoSuchDaemon(
+                f'Cannot register daemon "{daemon}" on node {self.fqdn}, '
+                f'as that daemon is unknown.')
+        with self.get_lock_attr('daemons', 'Register daemon'):
+            self._invalidate_attributes()
+            attrs = self._ensure_attributes()
+            if daemon not in attrs.daemons:
+                attrs.daemons.append(daemon)
+                self._save_attributes()
         self.set_daemon_state(daemon, self.DAEMON_STATE_STOPPED)
         self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon registered')
 
     def deregister_daemon(self, daemon):
         if daemon not in self.VALID_DAEMONS:
-            raise NoSuchDaemon(f'Cannot deregister daemon "{daemon}" on node '
-                               f'{self.uuid}, as that daemon is unknown.')
-        self._remove_item_in_attribute_list('daemons', daemon)
-        self._db_delete_attribute(f'daemon:{daemon}')
+            raise NoSuchDaemon(
+                f'Cannot deregister daemon "{daemon}" on node {self.fqdn}, '
+                f'as that daemon is unknown.')
+        with self.get_lock_attr('daemons', 'Deregister daemon'):
+            self._invalidate_attributes()
+            attrs = self._ensure_attributes()
+            if daemon in attrs.daemons:
+                attrs.daemons.remove(daemon)
+            if daemon in attrs.daemon_states:
+                del attrs.daemon_states[daemon]
+            self._save_attributes()
         self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon deregistered')
 
     def set_daemon_state(self, daemon, state, message=None):
         if daemon not in self.VALID_DAEMONS:
-            raise NoSuchDaemon(f'Cannot set daemon state for "{daemon}" on node '
-                               f'{self.uuid}, as that daemon is unknown.')
+            raise NoSuchDaemon(
+                f'Cannot set daemon state for "{daemon}" on node {self.fqdn}, '
+                f'as that daemon is unknown.')
         if state not in self.VALID_DAEMON_STATES:
             raise NoSuchDaemonState(f'The daemon state {state} does not exist')
-        self._state_update(state, state_attribute_name=f'daemon:{daemon}',
-                           message=message)
+
+        changed = False
+        with self.get_lock_attr('daemon_states', f'Set {daemon} state'):
+            self._invalidate_attributes()
+            attrs = self._ensure_attributes()
+            current = attrs.daemon_states.get(daemon, {})
+            if current.get('value') != state:
+                attrs.daemon_states[daemon] = {
+                    'value': state,
+                    'update_time': time.time(),
+                    'message': message
+                }
+                self._save_attributes()
+                changed = True
+
+        if not changed:
+            return
 
         # Determine if the node should transition state based on this update
         degraded = self.get_degraded_daemons()
-        degraded_or_stopping = [self.STATE_DEGRADED, self.STATE_STOPPING,
-                                self.STATE_STOPPED]
+        degraded_or_stopping = [
+            self.STATE_DEGRADED, self.STATE_STOPPING, self.STATE_STOPPED]
         node_state = self.state.value
 
         if node_state not in degraded_or_stopping and degraded:
             self.add_event(
                 EVENT_TYPE_AUDIT,
                 'node is not stopping or stopped, but a daemon is not running '
-                'so entering degraded state', extra={'degraded': degraded})
+                'so entering degraded state',
+                extra={'degraded': degraded})
             self.state = self.STATE_DEGRADED
         elif node_state == self.STATE_DEGRADED and not degraded:
             self.add_event(EVENT_TYPE_AUDIT, 'node is no longer degraded')
@@ -245,9 +395,16 @@ class Node(dbo):
 
     def get_daemon_state(self, daemon):
         if daemon not in self.VALID_DAEMONS:
-            raise NoSuchDaemon(f'Cannot get daemon state for "{daemon}" on node '
-                               f'{self.uuid}, as that daemon is unknown.')
-        return self._state_read(state_attribute_name=f'daemon:{daemon}')
+            raise NoSuchDaemon(
+                f'Cannot get daemon state for "{daemon}" on node {self.fqdn}, '
+                f'as that daemon is unknown.')
+        attrs = self._load_attributes()
+        if attrs is None:
+            return State(value=None, update_time=0)
+        ds = attrs.daemon_states.get(daemon)
+        if not ds:
+            return State(value=None, update_time=0)
+        return State(**ds)
 
     def get_degraded_daemons(self):
         degraded = []
@@ -255,12 +412,11 @@ class Node(dbo):
             daemon_state = self.get_daemon_state(daemon).value
             if not daemon_state:
                 degraded.append(daemon)
-            if daemon_state in [self.DAEMON_STATE_STOPPING,
-                                self.DAEMON_STATE_STOPPED]:
+            if daemon_state in [self.DAEMON_STATE_STOPPING, self.DAEMON_STATE_STOPPED]:
                 degraded.append(daemon)
         return degraded
 
-    # Static values
+    # Static values (immutable, from NodeData)
     @property
     def ip(self):
         return self.__ip
@@ -269,48 +425,76 @@ class Node(dbo):
     def fqdn(self):
         return self.__fqdn
 
-    # Values routed to attributes, writes are via helper methods.
+    # Attribute-backed properties (from NodeAttributesData in MariaDB)
     @property
     def last_seen(self):
-        return self._db_get_attribute('observed').get('at', 0)
+        attrs = self._load_attributes()
+        if attrs is None:
+            return 0
+        return attrs.last_seen
 
     @property
     def installed_version(self):
-        return self._db_get_attribute('observed').get('release')
+        attrs = self._load_attributes()
+        if attrs is None:
+            return None
+        return attrs.installed_version
 
     @property
     def blobs(self):
         """Return list of blob UUIDs present on this node.
 
-        This queries the object_references table for BLOB_LOCATION relationships
-        where this node is the source (meaning the node has the blob).
+        Queries the object_references table for BLOB_LOCATION relationships
+        where this node is the source.
         """
         refs = mariadb.get_references_from(
-            ObjectType.NODE, self.uuid, RelationshipType.BLOB_LOCATION)
+            ObjectType.NODE, self.fqdn, RelationshipType.BLOB_LOCATION)
         return [str(ref.target_uuid) for ref in refs]
 
     @property
     def instances(self):
-        return self._db_get_attribute('instances').get('instances', [])
+        attrs = self._load_attributes()
+        if attrs is None:
+            return []
+        return list(attrs.instances)
 
     @instances.setter
     def instances(self, value):
-        self._db_set_attribute('instances', {'instances': value})
+        attrs = self._ensure_attributes()
+        attrs.instances = list(value)
+        self._save_attributes()
 
     def add_instance(self, instance_uuid):
-        self._add_item_in_attribute_list('instances', str(instance_uuid))
+        with self.get_lock_attr('instances', 'Add instance'):
+            self._invalidate_attributes()
+            attrs = self._ensure_attributes()
+            instance_str = str(instance_uuid)
+            if instance_str not in attrs.instances:
+                attrs.instances.append(instance_str)
+                self._save_attributes()
 
     def remove_instance(self, instance_uuid):
-        self._remove_item_in_attribute_list('instances', str(instance_uuid))
+        with self.get_lock_attr('instances', 'Remove instance'):
+            self._invalidate_attributes()
+            attrs = self._ensure_attributes()
+            instance_str = str(instance_uuid)
+            if instance_str in attrs.instances:
+                attrs.instances.remove(instance_str)
+                self._save_attributes()
 
     @property
     def dependency_versions(self):
-        return self._db_get_attribute('dependency_versions')
+        attrs = self._load_attributes()
+        if attrs is None:
+            return {}
+        return dict(attrs.dependency_versions)
 
     @dependency_versions.setter
     def dependency_versions(self, value):
-        if value != self.dependency_versions:
-            self._db_set_attribute('dependency_versions', value)
+        attrs = self._ensure_attributes()
+        if value != attrs.dependency_versions:
+            attrs.dependency_versions = dict(value)
+            self._save_attributes()
 
     def _version_tuple_to_semver(self, t):
         while len(t) < 3:
@@ -319,56 +503,81 @@ class Node(dbo):
 
     @property
     def qemu_version(self):
-        v = self._db_get_attribute('qemu_version')
-        return self._version_tuple_to_semver(v)
+        attrs = self._load_attributes()
+        if attrs is None or attrs.qemu_version is None:
+            return self._version_tuple_to_semver([0, 0, 0])
+        return self._version_tuple_to_semver(list(attrs.qemu_version))
 
     @qemu_version.setter
     def qemu_version(self, value):
-        if list(value) != self._db_get_attribute('qemu_version'):
-            self._db_set_attribute('qemu_version', value)
+        attrs = self._ensure_attributes()
+        new_val = list(value)
+        if new_val != (attrs.qemu_version or []):
+            attrs.qemu_version = new_val
+            self._save_attributes()
 
     @property
     def libvirt_version(self):
-        v = self._db_get_attribute('libvirt_version')
-        return self._version_tuple_to_semver(v)
+        attrs = self._load_attributes()
+        if attrs is None or attrs.libvirt_version is None:
+            return self._version_tuple_to_semver([0, 0, 0])
+        return self._version_tuple_to_semver(list(attrs.libvirt_version))
 
     @libvirt_version.setter
     def libvirt_version(self, value):
-        if list(value) != self._db_get_attribute('libvirt_version'):
-            self._db_set_attribute('libvirt_version', value)
+        attrs = self._ensure_attributes()
+        new_val = list(value)
+        if new_val != (attrs.libvirt_version or []):
+            attrs.libvirt_version = new_val
+            self._save_attributes()
 
     @property
     def python_version(self):
-        v = self._db_get_attribute('python_version')
-        return self._version_tuple_to_semver(v)
+        attrs = self._load_attributes()
+        if attrs is None or attrs.python_version is None:
+            return self._version_tuple_to_semver([0, 0, 0])
+        return self._version_tuple_to_semver(list(attrs.python_version))
 
     @python_version.setter
     def python_version(self, value):
-        if list(value) != self._db_get_attribute('python_version'):
-            self._db_set_attribute('python_version', value)
+        attrs = self._ensure_attributes()
+        new_val = list(value)
+        if new_val != (attrs.python_version or []):
+            attrs.python_version = new_val
+            self._save_attributes()
 
     @property
     def python_implementation(self):
-        return self._db_get_attribute('python_implementation')
+        attrs = self._load_attributes()
+        if attrs is None:
+            return None
+        return attrs.python_implementation
 
     @python_implementation.setter
     def python_implementation(self, value):
-        if value != self._db_get_attribute('python_implementation'):
-            self._db_set_attribute('python_implementation', value)
+        attrs = self._ensure_attributes()
+        if value != attrs.python_implementation:
+            attrs.python_implementation = value
+            self._save_attributes()
 
     @property
     def process_metrics(self):
-        return self._db_get_attribute('process_metrics')
+        attrs = self._load_attributes()
+        if attrs is None:
+            return {}
+        return dict(attrs.process_metrics)
 
     @process_metrics.setter
     def process_metrics(self, value):
-        if value != self.process_metrics:
-            self._db_set_attribute('process_metrics', value)
+        attrs = self._ensure_attributes()
+        if value != attrs.process_metrics:
+            attrs.process_metrics = dict(value)
+            self._save_attributes()
 
     def delete(self):
-        # NOTE(mikal): the remainder of the cleanup of deleted nodes happens
-        # in the cluster maintenance daemon because otherwise we end up in a
-        # tangled mess of circular python imports here.
+        # NOTE(mikal): the remainder of the cleanup of deleted nodes happens in
+        # the cluster maintenance daemon because otherwise we end up in a tangled
+        # mess of circular python imports here.
         self.state = self.STATE_DELETED
 
     def hard_delete(self):
@@ -380,14 +589,28 @@ class Nodes(dbo_iter):
     base_object = Node
 
     def __iter__(self):
-        for _, static_values in self.get_iterator():
-            uniq = static_values.get('uuid')
-            if not uniq:
-                uniq = static_values.get('fqdn')
-            if not uniq:
-                continue
+        all_uuids = mariadb.get_all_node_uuids()
 
-            n = Node.from_db(uniq)
+        # Apply state prefilter if specified
+        if self.prefilter:
+            if self.prefilter == 'active':
+                target_states = self.base_object.ACTIVE_STATES
+            elif self.prefilter == 'deleted':
+                target_states = [dbo.STATE_DELETED]
+            elif self.prefilter == 'healthy':
+                target_states = self.base_object.HEALTHY_STATES
+            elif self.prefilter == 'inactive':
+                target_states = self.base_object.INACTIVE_STATES
+            else:
+                from shakenfist import exceptions
+                raise exceptions.InvalidObjectPrefilter(self.prefilter)
+
+            matching = set(mariadb.get_objects_by_state(
+                ObjectType.NODE, list(target_states)))
+            all_uuids = [u for u in all_uuids if u in matching]
+
+        for node_uuid in all_uuids:
+            n = Node.from_db(node_uuid)
             if not n:
                 continue
 

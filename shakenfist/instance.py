@@ -1941,7 +1941,9 @@ this_node_filter = partial(placement_filter, config.NODE_NAME)
 
 # Convenience helpers
 def healthy_instances_on_node(n):
-    return Instances([partial(placement_filter, n.uuid)], prefilter='healthy')
+    return Instances(
+        [partial(placement_filter, n.fqdn)],
+        prefilter='healthy')
 
 
 def instances_in_namespace(namespace):

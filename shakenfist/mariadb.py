@@ -24,6 +24,7 @@ import time
 import threading
 from typing import Any, Callable, cast, Optional
 from uuid import UUID
+from uuid import uuid4
 
 import grpc
 import sqlalchemy as sa
@@ -38,6 +39,8 @@ from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
+from shakenfist.schema.node_attributes import NodeAttributesData
+from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.dnsmasq import DnsMasqData
@@ -73,6 +76,8 @@ _blobs_table: Optional[sa.Table] = None
 _blob_hashes_table: Optional[sa.Table] = None
 _blob_transfers_table: Optional[sa.Table] = None
 _blob_attributes_table: Optional[sa.Table] = None
+_nodes_table: Optional[sa.Table] = None
+_node_attributes_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -88,6 +93,8 @@ BLOBS_VERSION = 2
 BLOB_HASHES_VERSION = 2
 BLOB_TRANSFERS_VERSION = 2
 BLOB_ATTRIBUTES_VERSION = 1
+NODES_VERSION = 2
+NODE_ATTRIBUTES_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -878,6 +885,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_blob_hashes_schema(engine))
     results.append(_ensure_blob_transfers_schema(engine))
     results.append(_ensure_blob_attributes_schema(engine))
+    results.append(_ensure_nodes_schema(engine))
+    results.append(_ensure_node_attributes_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -1487,7 +1496,7 @@ def _migrate_etcd_object_references(engine: sa.Engine) -> dict[str, Any]:
 
         locations = locations_data.get('locations', [])
         for node_name in locations:
-            # Node UUIDs are node names (strings like "sf-1"), not UUIDs
+            # Legacy blob locations use node FQDNs as identifiers
             success = record_relationship(
                 ObjectType.NODE, node_name,
                 RelationshipType.BLOB_LOCATION, None,
@@ -1738,6 +1747,204 @@ def _migrate_etcd_blob_attributes(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _migrate_node_state_key(fqdn: str, new_uuid: str) -> None:
+    """Re-key a node's object_states entry from FQDN to UUID4.
+
+    The object_states migration runs before the node migration, so node
+    state entries are stored with the FQDN as the object_uuid.  After
+    the node migration assigns a real UUID4, we must update the state
+    entry to use the new key so that subsequent lookups succeed.
+    """
+    old_state = get_state(ObjectType.NODE, fqdn)
+    if old_state and old_state.value is not None:
+        set_state(ObjectType.NODE, new_uuid, old_state)
+        delete_state(ObjectType.NODE, fqdn)
+
+
+def _migrate_etcd_nodes(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate node static values from etcd to MariaDB.
+
+    Old etcd format: key='node/None/{fqdn}', value={'uuid': fqdn, 'fqdn': fqdn,
+    'ip': ip, 'version': int}
+
+    New MariaDB format: real UUID4 with FQDN as a separate indexed column.
+    """
+    from shakenfist import etcd as etcd_mod
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating nodes from etcd...')
+
+    for objkey, data in etcd_mod.get_all('node', None):
+        fqdn = objkey.split('/')[-1]
+
+        try:
+            node_uuid = uuid4()
+            node_ip = data.get('ip', '')
+            node_version = 11  # Current version
+
+            success = create_node(node_uuid, fqdn, node_ip, node_version)
+            if success:
+                # Update the object_states entry from the old FQDN key
+                # to the new UUID4 key. The earlier object_states
+                # migration stored node state keyed by FQDN.
+                _migrate_node_state_key(fqdn, str(node_uuid))
+                etcd_mod.delete('node', None, fqdn)
+                migrated_count += 1
+            else:
+                # Already exists (by FQDN unique index); look up the
+                # existing UUID and re-key the state entry.
+                existing = get_node_by_fqdn(fqdn)
+                if existing:
+                    _migrate_node_state_key(fqdn, str(existing.uuid))
+                etcd_mod.delete('node', None, fqdn)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(f'Error migrating node {fqdn}: {e}')
+            error_count += 1
+
+        total = migrated_count + skipped_count + error_count
+        if total % 100 == 0:
+            LOG.info(f'  ... {total} nodes processed')
+
+    LOG.info(f'Node migration: {migrated_count} migrated, '
+             f'{skipped_count} skipped, {error_count} errors')
+
+    return {
+        'migrated_count': migrated_count,
+        'skipped_count': skipped_count,
+        'error_count': error_count
+    }
+
+
+def _migrate_etcd_node_attributes(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate node attributes from etcd to MariaDB.
+
+    Consolidates multiple etcd attribute keys per node into a single
+    node_attributes row. Must run after _migrate_etcd_nodes so that node UUIDs
+    exist in MariaDB.
+
+    Old etcd attributes (at 'attribute/node/{fqdn}/'):
+    - observed: {at: float, release: str}
+    - roles: {is_etcd_master: bool, ...}
+    - daemons: {daemons: [str, ...]}
+    - daemon:{name}: {value: str, update_time: float, ...}
+    - instances: {instances: [str, ...]}
+    - dependency_versions, qemu_version, libvirt_version, python_version,
+      python_implementation, process_metrics
+    """
+    from shakenfist import etcd as etcd_mod
+    from shakenfist.schema.node_attributes import NodeAttributesData
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating node attributes from etcd...')
+
+    # Get all nodes from MariaDB (must have been migrated by _migrate_etcd_nodes)
+    all_uuids = get_all_node_uuids()
+
+    for node_uuid_str in all_uuids:
+        parsed_uuid = UUID(node_uuid_str)
+        node_data = get_node(parsed_uuid)
+        if not node_data:
+            continue
+
+        fqdn = node_data.fqdn
+
+        try:
+            # Read old etcd attributes
+            observed = etcd_mod.get('attribute/node', fqdn, 'observed')
+            roles = etcd_mod.get('attribute/node', fqdn, 'roles')
+            daemons_data = etcd_mod.get('attribute/node', fqdn, 'daemons')
+            instances_data = etcd_mod.get('attribute/node', fqdn, 'instances')
+            dep_versions = etcd_mod.get(
+                'attribute/node', fqdn, 'dependency_versions')
+            qemu_ver = etcd_mod.get('attribute/node', fqdn, 'qemu_version')
+            libvirt_ver = etcd_mod.get('attribute/node', fqdn, 'libvirt_version')
+            python_ver = etcd_mod.get('attribute/node', fqdn, 'python_version')
+            python_impl = etcd_mod.get(
+                'attribute/node', fqdn, 'python_implementation')
+            proc_metrics = etcd_mod.get('attribute/node', fqdn, 'process_metrics')
+
+            # Collect daemon states from individual etcd keys
+            daemon_states: dict[str, Any] = {}
+            daemons_list = []
+            if daemons_data:
+                daemons_list = daemons_data.get('daemons', [])
+            for daemon_name in daemons_list:
+                ds = etcd_mod.get(
+                    'attribute/node', fqdn, f'daemon:{daemon_name}')
+                if ds:
+                    daemon_states[daemon_name] = ds
+
+            # Build the consolidated attributes model
+            attrs = NodeAttributesData(
+                uuid=parsed_uuid,
+                last_seen=observed.get('at', 0) if observed else 0,
+                installed_version=observed.get('release') if observed else None,
+                is_etcd_master=roles.get('is_etcd_master', False) if roles else False,
+                is_hypervisor=roles.get('is_hypervisor', False) if roles else False,
+                is_network_node=roles.get('is_network_node', False) if roles else False,
+                is_eventlog_node=(
+                    roles.get('is_eventlog_node', False) if roles else False),
+                instances=(
+                    instances_data.get('instances', []) if instances_data else []),
+                daemons=daemons_list,
+                daemon_states=daemon_states,
+                qemu_version=qemu_ver if isinstance(qemu_ver, list) else None,
+                libvirt_version=libvirt_ver if isinstance(libvirt_ver, list) else None,
+                python_version=python_ver if isinstance(python_ver, list) else None,
+                python_implementation=(
+                    python_impl if isinstance(python_impl, str) else None),
+                dependency_versions=(
+                    dep_versions if isinstance(dep_versions, dict) else {}),
+                process_metrics=(
+                    proc_metrics if isinstance(proc_metrics, dict) else {}),
+            )
+
+            success = create_node_attributes(attrs)
+            if success:
+                migrated_count += 1
+            else:
+                skipped_count += 1
+
+            # Clean up old etcd attributes regardless of whether we created or
+            # skipped (already existed).
+            _etcd_attrs = [
+                'observed', 'roles', 'daemons', 'instances',
+                'dependency_versions', 'qemu_version', 'libvirt_version',
+                'python_version', 'python_implementation', 'process_metrics',
+            ]
+            for attr in _etcd_attrs:
+                etcd_mod.delete('attribute/node', fqdn, attr)
+            for daemon_name in daemons_list:
+                etcd_mod.delete('attribute/node', fqdn, f'daemon:{daemon_name}')
+
+        except Exception as e:
+            LOG.warning(f'Failed to migrate attributes for node {fqdn}: {e}')
+            error_count += 1
+
+        total = migrated_count + skipped_count + error_count
+        if total % 100 == 0:
+            LOG.info(f'  ... {total} node attributes processed')
+
+    LOG.info(
+        f'Node attribute migration: '
+        f'{migrated_count} migrated, '
+        f'{skipped_count} skipped, '
+        f'{error_count} errors')
+
+    return {
+        'migrated_count': migrated_count,
+        'skipped_count': skipped_count,
+        'error_count': error_count
+    }
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -1767,6 +1974,12 @@ DATA_MIGRATIONS.update({
     },
     'blob_attributes': {
         2: _migrate_etcd_blob_attributes,
+    },
+    'nodes': {
+        2: _migrate_etcd_nodes,
+    },
+    'node_attributes': {
+        2: _migrate_etcd_node_attributes,
     },
 })
 
@@ -6234,3 +6447,959 @@ def get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
     if _use_database_service():
         return _grpc_get_stale_transcoded_blob_uuids(idle_seconds)
     return _direct_get_stale_transcoded_blob_uuids(idle_seconds)
+
+
+# =============================================================================
+# Node Operations (MariaDB)
+# =============================================================================
+
+def _get_nodes_table() -> sa.Table:
+    """Get or create the nodes table definition."""
+    global _nodes_table
+    if _nodes_table is None:
+        metadata = _get_metadata()
+        _nodes_table = pydantic_to_sqlalchemy_table(
+            NodeData,
+            'nodes',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+    return _nodes_table
+
+
+def _get_node_attributes_table() -> sa.Table:
+    """Get or create the node_attributes table definition."""
+    global _node_attributes_table
+    if _node_attributes_table is None:
+        metadata = _get_metadata()
+        _node_attributes_table = sa.Table(
+            'node_attributes',
+            metadata,
+            sa.Column('uuid', sa.Uuid(), primary_key=True),
+            sa.Column(
+                'last_seen', sa.Double(),
+                nullable=False, default=0.0
+            ),
+            sa.Column(
+                'installed_version', sa.String(255),
+                nullable=True
+            ),
+            sa.Column(
+                'is_etcd_master', sa.Boolean(),
+                nullable=False, default=False
+            ),
+            sa.Column(
+                'is_hypervisor', sa.Boolean(),
+                nullable=False, default=False
+            ),
+            sa.Column(
+                'is_network_node', sa.Boolean(),
+                nullable=False, default=False
+            ),
+            sa.Column(
+                'is_eventlog_node', sa.Boolean(),
+                nullable=False, default=False
+            ),
+            sa.Column('instances', sa.JSON(), nullable=True),
+            sa.Column('daemons', sa.JSON(), nullable=True),
+            sa.Column('daemon_states', sa.JSON(), nullable=True),
+            sa.Column('qemu_version', sa.JSON(), nullable=True),
+            sa.Column(
+                'libvirt_version', sa.JSON(), nullable=True
+            ),
+            sa.Column(
+                'python_version', sa.JSON(), nullable=True
+            ),
+            sa.Column(
+                'python_implementation', sa.String(255),
+                nullable=True
+            ),
+            sa.Column(
+                'dependency_versions', sa.JSON(), nullable=True
+            ),
+            sa.Column(
+                'process_metrics', sa.JSON(), nullable=True
+            ),
+            sa.Index(
+                'idx_node_attrs_last_seen', 'last_seen'
+            ),
+        )
+    return _node_attributes_table
+
+
+def _ensure_nodes_schema(
+    engine: sa.Engine,
+) -> dict[str, Any]:
+    """Ensure the nodes table schema is up to date."""
+    table_name = 'nodes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_nodes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True
+        )
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(
+                        f'Index {idx.name} creation '
+                        f'skipped: {e}'
+                    )
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NODES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_node_attributes_schema(
+    engine: sa.Engine,
+) -> dict[str, Any]:
+    """Ensure the node_attributes table schema is up to date."""
+    table_name = 'node_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_node_attributes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True
+        )
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(
+                        f'Index {idx.name} creation '
+                        f'skipped: {e}'
+                    )
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NODE_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+# --- Direct node access functions ---
+
+def _direct_create_node(
+    node_uuid: UUID, fqdn: str, ip: str, version: int
+) -> bool:
+    """Create a node record in MariaDB."""
+    engine = _get_engine()
+    table = _get_nodes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=node_uuid,
+                fqdn=fqdn,
+                ip=ip,
+                version=version
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB create failed for node '
+            f'{node_uuid}: {e}'
+        )
+        return False
+
+
+def _direct_get_node(
+    node_uuid: UUID,
+) -> Optional[NodeData]:
+    """Get node static values from MariaDB."""
+    engine = _get_engine()
+    table = _get_nodes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.uuid == node_uuid
+            )
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return NodeData(
+                uuid=result.uuid,
+                fqdn=result.fqdn,
+                ip=result.ip,
+                version=result.version
+            )
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB get failed for node '
+            f'{node_uuid}: {e}'
+        )
+        return None
+
+
+def _direct_get_node_by_fqdn(
+    fqdn: str,
+) -> Optional[NodeData]:
+    """Get node static values by FQDN from MariaDB."""
+    engine = _get_engine()
+    table = _get_nodes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.fqdn == fqdn
+            )
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return NodeData(
+                uuid=result.uuid,
+                fqdn=result.fqdn,
+                ip=result.ip,
+                version=result.version
+            )
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB get by fqdn failed for node '
+            f'{fqdn}: {e}'
+        )
+        return None
+
+
+def _direct_get_all_node_uuids() -> list[str]:
+    """Get all node UUIDs from MariaDB."""
+    engine = _get_engine()
+    table = _get_nodes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.uuid)
+            result = conn.execute(stmt).fetchall()
+            return [str(row.uuid) for row in result]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for node UUIDs: {e}'
+        )
+        return []
+
+
+def _direct_delete_node(node_uuid: UUID) -> bool:
+    """Delete a node record from MariaDB."""
+    engine = _get_engine()
+    table = _get_nodes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.uuid == node_uuid
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB delete failed for node '
+            f'{node_uuid}: {e}'
+        )
+        return False
+
+
+def _direct_update_node(data: NodeData) -> bool:
+    """Update a node record in MariaDB."""
+    engine = _get_engine()
+    table = _get_nodes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                fqdn=data.fqdn,
+                ip=data.ip,
+                version=data.version
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB update failed for node '
+            f'{data.uuid}: {e}'
+        )
+        return False
+
+
+# --- Direct node attributes access functions ---
+
+def _direct_create_node_attributes(
+    data: NodeAttributesData,
+) -> bool:
+    """Create a node_attributes record in MariaDB."""
+    engine = _get_engine()
+    table = _get_node_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                last_seen=data.last_seen,
+                installed_version=data.installed_version,
+                is_etcd_master=data.is_etcd_master,
+                is_hypervisor=data.is_hypervisor,
+                is_network_node=data.is_network_node,
+                is_eventlog_node=data.is_eventlog_node,
+                instances=data.instances,
+                daemons=data.daemons,
+                daemon_states=data.daemon_states,
+                qemu_version=data.qemu_version,
+                libvirt_version=data.libvirt_version,
+                python_version=data.python_version,
+                python_implementation=(
+                    data.python_implementation
+                ),
+                dependency_versions=(
+                    data.dependency_versions
+                ),
+                process_metrics=data.process_metrics,
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB create failed for '
+            f'node_attributes {data.uuid}: {e}'
+        )
+        return False
+
+
+def _direct_get_node_attributes(
+    node_uuid: UUID,
+) -> Optional[NodeAttributesData]:
+    """Get node attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_node_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.uuid == node_uuid
+            )
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return NodeAttributesData(
+                uuid=result.uuid,
+                last_seen=result.last_seen,
+                installed_version=result.installed_version,
+                is_etcd_master=result.is_etcd_master,
+                is_hypervisor=result.is_hypervisor,
+                is_network_node=result.is_network_node,
+                is_eventlog_node=result.is_eventlog_node,
+                instances=(
+                    result.instances
+                    if result.instances else []
+                ),
+                daemons=(
+                    result.daemons
+                    if result.daemons else []
+                ),
+                daemon_states=(
+                    result.daemon_states
+                    if result.daemon_states else {}
+                ),
+                qemu_version=result.qemu_version,
+                libvirt_version=result.libvirt_version,
+                python_version=result.python_version,
+                python_implementation=(
+                    result.python_implementation
+                ),
+                dependency_versions=(
+                    result.dependency_versions
+                    if result.dependency_versions else {}
+                ),
+                process_metrics=(
+                    result.process_metrics
+                    if result.process_metrics else {}
+                ),
+            )
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB get failed for '
+            f'node_attributes {node_uuid}: {e}'
+        )
+        return None
+
+
+def _direct_update_node_attributes(
+    data: NodeAttributesData,
+) -> bool:
+    """Update node attributes in MariaDB."""
+    engine = _get_engine()
+    table = _get_node_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                last_seen=data.last_seen,
+                installed_version=data.installed_version,
+                is_etcd_master=data.is_etcd_master,
+                is_hypervisor=data.is_hypervisor,
+                is_network_node=data.is_network_node,
+                is_eventlog_node=data.is_eventlog_node,
+                instances=data.instances,
+                daemons=data.daemons,
+                daemon_states=data.daemon_states,
+                qemu_version=data.qemu_version,
+                libvirt_version=data.libvirt_version,
+                python_version=data.python_version,
+                python_implementation=(
+                    data.python_implementation
+                ),
+                dependency_versions=(
+                    data.dependency_versions
+                ),
+                process_metrics=data.process_metrics,
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB update failed for '
+            f'node_attributes {data.uuid}: {e}'
+        )
+        return False
+
+
+def _direct_delete_node_attributes(
+    node_uuid: UUID,
+) -> bool:
+    """Delete node attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_node_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.uuid == node_uuid
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB delete failed for '
+            f'node_attributes {node_uuid}: {e}'
+        )
+        return False
+
+
+# --- gRPC node client functions ---
+
+def _grpc_create_node(
+    node_uuid: UUID, fqdn: str, ip: str, version: int
+) -> bool:
+    """Create a node record via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateNodeRequest(
+            node=database_pb2.NodeStaticData(
+                uuid=str(node_uuid),
+                fqdn=fqdn,
+                ip=ip,
+                version=version
+            )
+        )
+        reply = stub.CreateNode(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateNode failed for {node_uuid}: {e}'
+        )
+        return False
+
+
+def _grpc_get_node(
+    node_uuid: UUID,
+) -> Optional[NodeData]:
+    """Get node static values via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNodeRequest(
+            uuid=str(node_uuid)
+        )
+        reply = stub.GetNode(request)
+        if not reply.found:
+            return None
+        return NodeData(
+            uuid=reply.node.uuid,
+            fqdn=reply.node.fqdn,
+            ip=reply.node.ip,
+            version=reply.node.version
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetNode failed for {node_uuid}: {e}'
+        )
+        return None
+
+
+def _grpc_get_node_by_fqdn(
+    fqdn: str,
+) -> Optional[NodeData]:
+    """Get node static values by FQDN via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNodeByFqdnRequest(
+            fqdn=fqdn
+        )
+        reply = stub.GetNodeByFqdn(request)
+        if not reply.found:
+            return None
+        return NodeData(
+            uuid=reply.node.uuid,
+            fqdn=reply.node.fqdn,
+            ip=reply.node.ip,
+            version=reply.node.version
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetNodeByFqdn failed for {fqdn}: {e}'
+        )
+        return None
+
+
+def _grpc_get_all_node_uuids() -> list[str]:
+    """Get all node UUIDs via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllNodeUuidsRequest()
+        reply = stub.GetAllNodeUuids(request)
+        return list(reply.uuids)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetAllNodeUuids failed: {e}'
+        )
+        return []
+
+
+def _grpc_delete_node(node_uuid: UUID) -> bool:
+    """Delete a node record via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNodeRequest(
+            uuid=str(node_uuid)
+        )
+        reply = stub.DeleteNode(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteNode failed for {node_uuid}: {e}'
+        )
+        return False
+
+
+def _grpc_update_node(data: NodeData) -> bool:
+    """Update a node record via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateNodeRequest(
+            node=database_pb2.NodeStaticData(
+                uuid=str(data.uuid),
+                fqdn=data.fqdn,
+                ip=data.ip,
+                version=data.version
+            )
+        )
+        reply = stub.UpdateNode(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC UpdateNode failed for {data.uuid}: {e}'
+        )
+        return False
+
+
+# --- gRPC node attributes client functions ---
+
+def _grpc_create_node_attributes(
+    data: NodeAttributesData,
+) -> bool:
+    """Create node attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateNodeAttributesRequest(
+            data=_node_attrs_to_proto(data)
+        )
+        reply = stub.CreateNodeAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            'gRPC CreateNodeAttributes failed for '
+            f'{data.uuid}: {e}'
+        )
+        return False
+
+
+def _grpc_get_node_attributes(
+    node_uuid: UUID,
+) -> Optional[NodeAttributesData]:
+    """Get node attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNodeAttributesRequest(
+            uuid=str(node_uuid)
+        )
+        reply = stub.GetNodeAttributes(request)
+        if not reply.found:
+            return None
+        return _node_attrs_from_proto(reply.data)
+    except grpc.RpcError as e:
+        LOG.warning(
+            'gRPC GetNodeAttributes failed for '
+            f'{node_uuid}: {e}'
+        )
+        return None
+
+
+def _grpc_update_node_attributes(
+    data: NodeAttributesData,
+) -> bool:
+    """Update node attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateNodeAttributesRequest(
+            data=_node_attrs_to_proto(data)
+        )
+        reply = stub.UpdateNodeAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            'gRPC UpdateNodeAttributes failed for '
+            f'{data.uuid}: {e}'
+        )
+        return False
+
+
+def _grpc_delete_node_attributes(
+    node_uuid: UUID,
+) -> bool:
+    """Delete node attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNodeAttributesRequest(
+            uuid=str(node_uuid)
+        )
+        reply = stub.DeleteNodeAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            'gRPC DeleteNodeAttributes failed for '
+            f'{node_uuid}: {e}'
+        )
+        return False
+
+
+# --- Proto conversion helpers for node attributes ---
+
+def _node_attrs_to_proto(
+    data: NodeAttributesData,
+) -> database_pb2.NodeAttributesProto:
+    """Convert NodeAttributesData to proto message."""
+    return database_pb2.NodeAttributesProto(
+        uuid=str(data.uuid),
+        last_seen=data.last_seen,
+        installed_version=(
+            data.installed_version or ''
+        ),
+        has_installed_version=(
+            data.installed_version is not None
+        ),
+        is_etcd_master=data.is_etcd_master,
+        is_hypervisor=data.is_hypervisor,
+        is_network_node=data.is_network_node,
+        is_eventlog_node=data.is_eventlog_node,
+        instances_json=json.dumps(data.instances),
+        daemons_json=json.dumps(data.daemons),
+        daemon_states_json=json.dumps(
+            data.daemon_states
+        ),
+        qemu_version_json=(
+            json.dumps(data.qemu_version)
+            if data.qemu_version is not None else ''
+        ),
+        has_qemu_version=(
+            data.qemu_version is not None
+        ),
+        libvirt_version_json=(
+            json.dumps(data.libvirt_version)
+            if data.libvirt_version is not None else ''
+        ),
+        has_libvirt_version=(
+            data.libvirt_version is not None
+        ),
+        python_version_json=(
+            json.dumps(data.python_version)
+            if data.python_version is not None else ''
+        ),
+        has_python_version=(
+            data.python_version is not None
+        ),
+        python_implementation=(
+            data.python_implementation or ''
+        ),
+        has_python_implementation=(
+            data.python_implementation is not None
+        ),
+        dependency_versions_json=json.dumps(
+            data.dependency_versions
+        ),
+        process_metrics_json=json.dumps(
+            data.process_metrics
+        ),
+    )
+
+
+def _node_attrs_from_proto(
+    d: database_pb2.NodeAttributesProto,
+) -> NodeAttributesData:
+    """Convert proto NodeAttributesProto to Pydantic model."""
+    return NodeAttributesData(
+        uuid=UUID(d.uuid),
+        last_seen=d.last_seen,
+        installed_version=(
+            d.installed_version
+            if d.has_installed_version else None
+        ),
+        is_etcd_master=d.is_etcd_master,
+        is_hypervisor=d.is_hypervisor,
+        is_network_node=d.is_network_node,
+        is_eventlog_node=d.is_eventlog_node,
+        instances=(
+            json.loads(d.instances_json)
+            if d.instances_json else []
+        ),
+        daemons=(
+            json.loads(d.daemons_json)
+            if d.daemons_json else []
+        ),
+        daemon_states=(
+            json.loads(d.daemon_states_json)
+            if d.daemon_states_json else {}
+        ),
+        qemu_version=(
+            json.loads(d.qemu_version_json)
+            if d.has_qemu_version else None
+        ),
+        libvirt_version=(
+            json.loads(d.libvirt_version_json)
+            if d.has_libvirt_version else None
+        ),
+        python_version=(
+            json.loads(d.python_version_json)
+            if d.has_python_version else None
+        ),
+        python_implementation=(
+            d.python_implementation
+            if d.has_python_implementation else None
+        ),
+        dependency_versions=(
+            json.loads(d.dependency_versions_json)
+            if d.dependency_versions_json else {}
+        ),
+        process_metrics=(
+            json.loads(d.process_metrics_json)
+            if d.process_metrics_json else {}
+        ),
+    )
+
+
+# --- Public node API functions ---
+
+def create_node(
+    node_uuid: UUID, fqdn: str, ip: str, version: int
+) -> bool:
+    """Create a node record.
+
+    Args:
+        node_uuid: The UUID of the node.
+        fqdn: The node's fully qualified domain name.
+        ip: The node's mesh network IP address.
+        version: The object version number.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_node(
+            node_uuid, fqdn, ip, version
+        )
+    return _direct_create_node(
+        node_uuid, fqdn, ip, version
+    )
+
+
+def get_node(node_uuid: UUID) -> Optional[NodeData]:
+    """Get node static values.
+
+    Args:
+        node_uuid: The UUID of the node.
+
+    Returns:
+        A NodeData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_node(node_uuid)
+    return _direct_get_node(node_uuid)
+
+
+def get_node_by_fqdn(fqdn: str) -> Optional[NodeData]:
+    """Get node static values by FQDN.
+
+    Args:
+        fqdn: The node's fully qualified domain name.
+
+    Returns:
+        A NodeData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_node_by_fqdn(fqdn)
+    return _direct_get_node_by_fqdn(fqdn)
+
+
+def get_all_node_uuids() -> list[str]:
+    """Get all node UUIDs.
+
+    Returns:
+        List of node UUID strings.
+    """
+    if _use_database_service():
+        return _grpc_get_all_node_uuids()
+    return _direct_get_all_node_uuids()
+
+
+def delete_node(node_uuid: UUID) -> bool:
+    """Delete a node record.
+
+    Args:
+        node_uuid: The UUID of the node.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_node(node_uuid)
+    return _direct_delete_node(node_uuid)
+
+
+def update_node(data: NodeData) -> bool:
+    """Update a node record.
+
+    Args:
+        data: The NodeData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_node(data)
+    return _direct_update_node(data)
+
+
+def create_node_attributes(
+    data: NodeAttributesData,
+) -> bool:
+    """Create node attributes record.
+
+    Args:
+        data: The NodeAttributesData to create.
+
+    Returns:
+        True if created successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_create_node_attributes(data)
+    return _direct_create_node_attributes(data)
+
+
+def get_node_attributes(
+    node_uuid: UUID,
+) -> Optional[NodeAttributesData]:
+    """Get node attributes.
+
+    Args:
+        node_uuid: The UUID of the node.
+
+    Returns:
+        NodeAttributesData if found, None otherwise.
+    """
+    if _use_database_service():
+        return _grpc_get_node_attributes(node_uuid)
+    return _direct_get_node_attributes(node_uuid)
+
+
+def update_node_attributes(
+    data: NodeAttributesData,
+) -> bool:
+    """Update node attributes.
+
+    Args:
+        data: The NodeAttributesData with updated values.
+
+    Returns:
+        True if updated successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_update_node_attributes(data)
+    return _direct_update_node_attributes(data)
+
+
+def delete_node_attributes(
+    node_uuid: UUID,
+) -> bool:
+    """Delete node attributes.
+
+    Args:
+        node_uuid: The UUID of the node.
+
+    Returns:
+        True if deleted successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_delete_node_attributes(node_uuid)
+    return _direct_delete_node_attributes(node_uuid)

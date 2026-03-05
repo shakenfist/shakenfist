@@ -18,6 +18,8 @@ from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist.schema.dnsmasq import DnsMasqData
+from shakenfist.schema.node_attributes import NodeAttributesData
+from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
@@ -38,6 +40,8 @@ class MockEtcd():
         self.mariadb_states = {}  # Mock MariaDB state storage
         self.ipam_reservations = {}  # Mock MariaDB IPAM reservations storage
         self.dnsmasq_objects = {}  # Mock MariaDB DnsMasq object storage
+        self.node_objects = {}  # Mock MariaDB node storage
+        self.node_attributes = {}  # Mock MariaDB node attributes
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -229,6 +233,81 @@ class MockEtcd():
             side_effect=self._mariadb_remove_all_references_from)
         self.mariadb_remove_all_references_from.start()
         self.test_obj.addCleanup(self.mariadb_remove_all_references_from.stop)
+
+        # Mock MariaDB Node operations
+        self.mariadb_create_node = mock.patch(
+            'shakenfist.mariadb.create_node',
+            side_effect=self._mariadb_create_node)
+        self.mariadb_create_node.start()
+        self.test_obj.addCleanup(
+            self.mariadb_create_node.stop)
+
+        self.mariadb_get_node = mock.patch(
+            'shakenfist.mariadb.get_node',
+            side_effect=self._mariadb_get_node)
+        self.mariadb_get_node.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_node.stop)
+
+        self.mariadb_get_node_by_fqdn = mock.patch(
+            'shakenfist.mariadb.get_node_by_fqdn',
+            side_effect=self._mariadb_get_node_by_fqdn)
+        self.mariadb_get_node_by_fqdn.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_node_by_fqdn.stop)
+
+        self.mariadb_get_all_node_uuids = mock.patch(
+            'shakenfist.mariadb.get_all_node_uuids',
+            side_effect=self._mariadb_get_all_node_uuids)
+        self.mariadb_get_all_node_uuids.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_all_node_uuids.stop)
+
+        self.mariadb_update_node = mock.patch(
+            'shakenfist.mariadb.update_node',
+            side_effect=self._mariadb_update_node)
+        self.mariadb_update_node.start()
+        self.test_obj.addCleanup(
+            self.mariadb_update_node.stop)
+
+        self.mariadb_delete_node = mock.patch(
+            'shakenfist.mariadb.delete_node',
+            side_effect=self._mariadb_delete_node)
+        self.mariadb_delete_node.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_node.stop)
+
+        self.mariadb_create_node_attributes = mock.patch(
+            'shakenfist.mariadb.create_node_attributes',
+            side_effect=(
+                self._mariadb_create_node_attributes))
+        self.mariadb_create_node_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_create_node_attributes.stop)
+
+        self.mariadb_get_node_attributes = mock.patch(
+            'shakenfist.mariadb.get_node_attributes',
+            side_effect=(
+                self._mariadb_get_node_attributes))
+        self.mariadb_get_node_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_node_attributes.stop)
+
+        self.mariadb_update_node_attributes = mock.patch(
+            'shakenfist.mariadb.update_node_attributes',
+            side_effect=(
+                self._mariadb_update_node_attributes))
+        self.mariadb_update_node_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_update_node_attributes.stop)
+
+        self.mariadb_delete_node_attributes = mock.patch(
+            'shakenfist.mariadb.delete_node_attributes',
+            side_effect=(
+                self._mariadb_delete_node_attributes))
+        self.mariadb_delete_node_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_node_attributes.stop)
 
         # Setup basic DB data
         for n in self.nodes:
@@ -519,6 +598,153 @@ class MockEtcd():
             f'MockMariaDB.remove_all_references_from({object_type}, '
             f'{object_uuid}): 0')
         return 0
+
+    #
+    # MariaDB Node mock operations
+    #
+
+    def _mariadb_create_node(self, node_uuid, fqdn,
+                             ip, version) -> bool:
+        """Mock implementation of mariadb.create_node()"""
+        import uuid as uuid_mod
+        key = str(node_uuid)
+        if key in self.node_objects:
+            self._trace(
+                f'MockMariaDB.create_node({key}): exists')
+            return False
+        if isinstance(node_uuid, str):
+            node_uuid = uuid_mod.UUID(node_uuid)
+        data = NodeData(
+            uuid=node_uuid, fqdn=fqdn,
+            ip=ip, version=version)
+        self.node_objects[key] = data
+        self._trace(
+            f'MockMariaDB.create_node({key}): created')
+        return True
+
+    def _mariadb_get_node(self, node_uuid
+                          ) -> Optional[NodeData]:
+        """Mock implementation of mariadb.get_node()"""
+        key = str(node_uuid)
+        data = self.node_objects.get(key)
+        self._trace(
+            f'MockMariaDB.get_node({key}): {data}')
+        return data
+
+    def _mariadb_get_node_by_fqdn(
+            self, fqdn) -> Optional[NodeData]:
+        """Mock implementation of
+        mariadb.get_node_by_fqdn()"""
+        for data in self.node_objects.values():
+            if data.fqdn == fqdn:
+                self._trace(
+                    f'MockMariaDB.get_node_by_fqdn'
+                    f'({fqdn}): {data}')
+                return data
+        self._trace(
+            f'MockMariaDB.get_node_by_fqdn'
+            f'({fqdn}): None')
+        return None
+
+    def _mariadb_get_all_node_uuids(self) -> list[str]:
+        """Mock implementation of
+        mariadb.get_all_node_uuids()"""
+        result = list(self.node_objects.keys())
+        self._trace(
+            f'MockMariaDB.get_all_node_uuids(): '
+            f'{result}')
+        return result
+
+    def _mariadb_update_node(self, data: NodeData
+                             ) -> bool:
+        """Mock implementation of
+        mariadb.update_node()"""
+        key = str(data.uuid)
+        if key in self.node_objects:
+            self.node_objects[key] = data
+            self._trace(
+                f'MockMariaDB.update_node({key}): '
+                f'updated')
+            return True
+        self._trace(
+            f'MockMariaDB.update_node({key}): '
+            f'not found')
+        return False
+
+    def _mariadb_delete_node(self, node_uuid) -> bool:
+        """Mock implementation of
+        mariadb.delete_node()"""
+        key = str(node_uuid)
+        if key in self.node_objects:
+            del self.node_objects[key]
+            self._trace(
+                f'MockMariaDB.delete_node({key}): '
+                f'deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_node({key}): '
+            f'not found')
+        return False
+
+    def _mariadb_create_node_attributes(
+            self, data: NodeAttributesData) -> bool:
+        """Mock implementation of
+        mariadb.create_node_attributes()"""
+        key = str(data.uuid)
+        if key in self.node_attributes:
+            self._trace(
+                f'MockMariaDB.create_node_attributes'
+                f'({key}): exists')
+            return False
+        self.node_attributes[key] = data
+        self._trace(
+            f'MockMariaDB.create_node_attributes'
+            f'({key}): created')
+        return True
+
+    def _mariadb_get_node_attributes(
+            self, node_uuid
+    ) -> Optional[NodeAttributesData]:
+        """Mock implementation of
+        mariadb.get_node_attributes()"""
+        key = str(node_uuid)
+        data = self.node_attributes.get(key)
+        self._trace(
+            f'MockMariaDB.get_node_attributes'
+            f'({key}): {data}')
+        return data
+
+    def _mariadb_update_node_attributes(
+            self, data: NodeAttributesData) -> bool:
+        """Mock implementation of
+        mariadb.update_node_attributes()"""
+        key = str(data.uuid)
+        if key in self.node_attributes:
+            self.node_attributes[key] = data
+            self._trace(
+                f'MockMariaDB.update_node_attributes'
+                f'({key}): updated')
+            return True
+        self._trace(
+            f'MockMariaDB.update_node_attributes'
+            f'({key}): not found')
+        return False
+
+    def _mariadb_delete_node_attributes(
+            self, node_uuid) -> bool:
+        """Mock implementation of
+        mariadb.delete_node_attributes()"""
+        key = str(node_uuid)
+        if key in self.node_attributes:
+            del self.node_attributes[key]
+            self._trace(
+                f'MockMariaDB.delete_node_attributes'
+                f'({key}): deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_node_attributes'
+            f'({key}): not found')
+        return False
 
     #
     # DB operations - Low level

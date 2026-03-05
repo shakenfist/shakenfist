@@ -50,7 +50,7 @@ Each object type has a dedicated key prefix:
 | Network Interface | `/sf/object/networkinterface/` |
 | Blob | `/sf/object/blob/` |
 | Artifact | `/sf/object/artifact/` |
-| Node | `/sf/object/node/` |
+| Node | MariaDB `nodes` table (migrated from etcd) |
 | Namespace | `/sf/object/namespace/` |
 
 ## MariaDB
@@ -307,22 +307,13 @@ print(state.obj_dict())   # {'value': 'created', 'update_time': 1234567890.123}
 
 ### Migration from etcd
 
-For existing deployments that stored state in etcd, use the migration command:
+For existing deployments that stored state in etcd, migration happens
+automatically when the database daemon starts. The migration reads state
+from etcd for all object types, writes it to MariaDB, and removes the old
+etcd entries.
 
-```bash
-# Stop all Shaken Fist services first
-sf-ctl migrate-state-to-mariadb
-```
-
-This command:
-1. Reads state from etcd for all object types
-2. Writes the state to MariaDB
-3. Removes the state entries from etcd
-
-Use `--dry-run` to preview what would be migrated without making changes.
-
-MariaDB is now required for all deployments - state is stored only in MariaDB,
-not in etcd.
+MariaDB is now required for all deployments - state is stored only in
+MariaDB, not in etcd.
 
 ## IPAM Reservation Storage
 
@@ -381,21 +372,10 @@ IPAM supports several reservation types:
 
 ### Migration from etcd
 
-For existing deployments that stored IPAM reservations in etcd, use the
-migration command:
-
-```bash
-# Stop all Shaken Fist services first
-sf-ctl migrate-ipam-to-mariadb --dry-run
-
-# Perform the migration
-sf-ctl migrate-ipam-to-mariadb
-```
-
-This command:
-1. Reads all reservations from `/sf/ipam_reservations/` in etcd
-2. Writes each reservation to the MariaDB ipam_reservations table
-3. Removes the reservation entries from etcd
+For existing deployments that stored IPAM reservations in etcd, migration
+happens automatically when the database daemon starts. The migration reads
+all reservations from etcd, writes them to the MariaDB `ipam_reservations`
+table, and removes the original etcd entries.
 
 ## Administrative Commands
 
@@ -455,49 +435,13 @@ sf-ctl register-daemon database --node-name sf-1
 This allows all node and daemon registration to happen before the database
 service starts, avoiding chicken-and-egg problems during bootstrap.
 
-### migrate-state-to-mariadb
+### Data Migrations
 
-Migrates object state from etcd to MariaDB for existing deployments:
-
-```bash
-# Preview what would be migrated
-sf-ctl migrate-state-to-mariadb --dry-run
-
-# Perform the migration
-sf-ctl migrate-state-to-mariadb
-```
-
-### migrate-ipam-to-mariadb
-
-Migrates IPAM reservations from etcd to MariaDB for existing deployments:
-
-```bash
-# Preview what would be migrated
-sf-ctl migrate-ipam-to-mariadb --dry-run
-
-# Perform the migration
-sf-ctl migrate-ipam-to-mariadb
-```
-
-This command scans all `/sf/ipam_reservations/` entries in etcd, converts them
-to the new IPAMReservation format, writes them to MariaDB, and removes the
-original entries from etcd.
-
-### migrate-uploads-to-mariadb
-
-Migrates upload objects from etcd to MariaDB for existing deployments:
-
-```bash
-# Preview what would be migrated
-sf-ctl migrate-uploads-to-mariadb --dry-run
-
-# Perform the migration
-sf-ctl migrate-uploads-to-mariadb
-```
-
-This command scans all upload objects in etcd, writes them to the MariaDB
-uploads table, and removes the original entries from etcd. Uploads are
-temporary objects used during artifact creation.
+Data migrations from etcd to MariaDB (for object states, IPAM reservations,
+uploads, blobs, nodes, and other types) run automatically when the database
+daemon starts. No manual commands are needed -- simply upgrade and restart
+the `sf-database` service. See the
+[Automatic Data Migrations](#automatic-data-migrations) section for details.
 
 ## Upload Object Storage
 
@@ -578,9 +522,11 @@ The migration is happening in phases:
 | 1 | Object state | Complete - `object_states` table |
 | 2 | IPAM reservations | Complete - `ipam_reservations` table |
 | 3 | Upload objects | Complete - `uploads` table |
-| 4 | DnsMasq objects | Planned |
-| 5 | Other object types | Future |
-| 6 | Object attributes | Future |
+| 4 | Blob objects | Complete - `blobs`, `blob_attributes`, `blob_hashes` tables |
+| 5 | Node objects | Complete - `nodes`, `node_attributes` tables |
+| 6 | DnsMasq objects | Complete - `dnsmasq` table |
+| 7 | Other object types | Future |
+| 8 | Object attributes | Future |
 
 ### Table Architecture
 
@@ -624,13 +570,25 @@ values (immutable data set at creation time):
 |-------|-------------|--------|
 | `uploads` | Upload | uuid, node, created_at, version |
 | `dnsmasq` | DnsMasq | uuid, namespace, owner_type, owner_uuid, provide_dhcp, provide_dns, version |
+| `blobs` | Blob | uuid, modified, fetched_at, version |
+| `nodes` | Node | uuid, fqdn (unique index), ip, version |
 
 These tables use the object's UUID as the primary key.
 
-#### Per-Type Attribute Tables (Future)
+#### Per-Type Attribute Tables
 
-Mutable attributes that are specific to an object type will be stored in
+Mutable attributes that are specific to an object type are stored in
 dedicated attribute tables:
+
+| Table | Object Type | Key Fields |
+|-------|-------------|------------|
+| `blob_attributes` | Blob | uuid, size, info, last_used, retention |
+| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, daemon_states, versions, metrics |
+
+Node attributes consolidate many separate etcd keys (observed, roles,
+daemons, daemon:{name}, instances, versions, etc.) into a single row.
+
+Future attribute tables will follow the same pattern:
 
 ```sql
 -- Example: instance_attributes (future)
@@ -728,16 +686,13 @@ read from the database with an older version:
 This allows rolling upgrades without requiring all objects to be migrated
 immediately.
 
-### Migration Commands
+### Automatic Data Migrations
 
-Each migration has a corresponding `sf-ctl` command:
+Data migrations from etcd to MariaDB run automatically when the database
+daemon starts. The `ensure_data_migrations()` function checks each table's
+version and runs any pending migrations. This includes migrations for object
+states, IPAM reservations, uploads, blobs, nodes, and other object types.
 
-```bash
-# Preview what would be migrated
-sf-ctl migrate-{type}-to-mariadb --dry-run
-
-# Perform the migration
-sf-ctl migrate-{type}-to-mariadb
-```
-
-Migrations are idempotent - running them multiple times is safe.
+No manual `sf-ctl` commands are needed for data migration -- simply
+upgrading and restarting the database daemon is sufficient. Migrations are
+idempotent and safe to re-run if the daemon restarts during migration.

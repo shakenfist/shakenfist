@@ -399,6 +399,63 @@ class DatabaseServiceStub:
         database_pb2.GetStaleTranscodedBlobUuidsReply,
     ]
 
+    CreateNode: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateNodeRequest,
+        database_pb2.StatusReply,
+    ]
+    """Node Operations (MariaDB)
+    These manage node static values (uuid, fqdn, ip) in MariaDB.
+    Nodes now use real UUID4 identifiers; FQDN is a separate indexed column.
+    """
+
+    GetNode: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeRequest,
+        database_pb2.GetNodeReply,
+    ]
+
+    GetNodeByFqdn: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeByFqdnRequest,
+        database_pb2.GetNodeReply,
+    ]
+
+    GetAllNodeUuids: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNodeUuidsRequest,
+        database_pb2.GetAllNodeUuidsReply,
+    ]
+
+    DeleteNode: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNodeRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateNode: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNodeRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateNodeAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateNodeAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Node Attributes Operations (MariaDB)
+    These store mutable node attributes, separate from NodeData (static values).
+    """
+
+    GetNodeAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeAttributesRequest,
+        database_pb2.GetNodeAttributesReply,
+    ]
+
+    UpdateNodeAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNodeAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteNodeAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNodeAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -778,6 +835,63 @@ class DatabaseServiceAsyncStub:
     GetStaleTranscodedBlobUuids: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetStaleTranscodedBlobUuidsRequest,
         database_pb2.GetStaleTranscodedBlobUuidsReply,
+    ]
+
+    CreateNode: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateNodeRequest,
+        database_pb2.StatusReply,
+    ]
+    """Node Operations (MariaDB)
+    These manage node static values (uuid, fqdn, ip) in MariaDB.
+    Nodes now use real UUID4 identifiers; FQDN is a separate indexed column.
+    """
+
+    GetNode: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeRequest,
+        database_pb2.GetNodeReply,
+    ]
+
+    GetNodeByFqdn: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeByFqdnRequest,
+        database_pb2.GetNodeReply,
+    ]
+
+    GetAllNodeUuids: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNodeUuidsRequest,
+        database_pb2.GetAllNodeUuidsReply,
+    ]
+
+    DeleteNode: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNodeRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateNode: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNodeRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateNodeAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateNodeAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Node Attributes Operations (MariaDB)
+    These store mutable node attributes, separate from NodeData (static values).
+    """
+
+    GetNodeAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeAttributesRequest,
+        database_pb2.GetNodeAttributesReply,
+    ]
+
+    UpdateNodeAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNodeAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteNodeAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNodeAttributesRequest,
+        database_pb2.StatusReply,
     ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
@@ -1306,5 +1420,82 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.GetStaleTranscodedBlobUuidsRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetStaleTranscodedBlobUuidsReply, collections.abc.Awaitable[database_pb2.GetStaleTranscodedBlobUuidsReply]]: ...
+
+    @abc.abstractmethod
+    def CreateNode(
+        self,
+        request: database_pb2.CreateNodeRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Node Operations (MariaDB)
+        These manage node static values (uuid, fqdn, ip) in MariaDB.
+        Nodes now use real UUID4 identifiers; FQDN is a separate indexed column.
+        """
+
+    @abc.abstractmethod
+    def GetNode(
+        self,
+        request: database_pb2.GetNodeRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNodeReply, collections.abc.Awaitable[database_pb2.GetNodeReply]]: ...
+
+    @abc.abstractmethod
+    def GetNodeByFqdn(
+        self,
+        request: database_pb2.GetNodeByFqdnRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNodeReply, collections.abc.Awaitable[database_pb2.GetNodeReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllNodeUuids(
+        self,
+        request: database_pb2.GetAllNodeUuidsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllNodeUuidsReply, collections.abc.Awaitable[database_pb2.GetAllNodeUuidsReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteNode(
+        self,
+        request: database_pb2.DeleteNodeRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateNode(
+        self,
+        request: database_pb2.UpdateNodeRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateNodeAttributes(
+        self,
+        request: database_pb2.CreateNodeAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Node Attributes Operations (MariaDB)
+        These store mutable node attributes, separate from NodeData (static values).
+        """
+
+    @abc.abstractmethod
+    def GetNodeAttributes(
+        self,
+        request: database_pb2.GetNodeAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNodeAttributesReply, collections.abc.Awaitable[database_pb2.GetNodeAttributesReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateNodeAttributes(
+        self,
+        request: database_pb2.UpdateNodeAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteNodeAttributes(
+        self,
+        request: database_pb2.DeleteNodeAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

@@ -331,7 +331,7 @@ class Monitor(daemon.Daemon):
 
             LOG.with_fields(
                 {
-                    'node': n.uuid,
+                    'node': n.fqdn,
                     'status_age': age,
                     'last_seen': n.last_seen,
                     'state': n.state.value
@@ -378,7 +378,7 @@ class Monitor(daemon.Daemon):
                     b.request_replication()
 
                 # Clean up any lingering queue tasks
-                for queue_name in get_all_node_queues(n.uuid):
+                for queue_name in get_all_node_queues(n.fqdn):
                     while jobname_workitem := etcd.dequeue(queue_name):
                         jobname, workitem = jobname_workitem
                         n.add_event(
