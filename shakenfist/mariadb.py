@@ -1798,7 +1798,7 @@ def _migrate_etcd_nodes(engine: sa.Engine) -> dict[str, Any]:
                 # existing UUID and re-key the state entry.
                 existing = get_node_by_fqdn(fqdn)
                 if existing:
-                    _migrate_node_state_key(fqdn, existing.uuid)
+                    _migrate_node_state_key(fqdn, str(existing.uuid))
                 etcd_mod.delete('node', None, fqdn)
                 skipped_count += 1
         except Exception as e:
