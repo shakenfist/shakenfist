@@ -4,6 +4,7 @@ import os
 import socket
 import sys
 from typing import NoReturn
+from typing import Optional
 
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import ConnectionFailedError
@@ -348,6 +349,14 @@ class SFConfig(BaseSettings):
     )
     NODE_NAME: str = Field(
         default_factory=get_node_name, description='FQDN of this node.'
+    )
+    NODE_UUID: Optional[str] = Field(
+        None,
+        description=(
+            'UUID of this node. Auto-assigned on first run and '
+            'persisted to {STORAGE_PATH}/node_uuid. Can also be '
+            'set via SHAKENFIST_NODE_UUID environment variable.'
+        )
     )
     NODE_EGRESS_IP: str = Field(
         '',
