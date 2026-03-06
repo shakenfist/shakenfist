@@ -1951,6 +1951,142 @@ def _migrate_etcd_node_attributes(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _migrate_etcd_namespaces(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Migrate namespace static values from etcd to MariaDB.
+
+    Old etcd format: key='namespace/None/{name}',
+    value={'uuid': name, 'version': int}
+
+    New MariaDB format: name (VARCHAR PK), version (INT).
+    """
+    from shakenfist import etcd as etcd_mod
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating namespaces from etcd...')
+
+    for objkey, data in etcd_mod.get_all('namespace', None):
+        name = objkey.split('/')[-1]
+
+        try:
+            version = data.get('version', 7)
+            success = create_namespace(name, version)
+            if success:
+                etcd_mod.delete('namespace', None, name)
+                migrated_count += 1
+            else:
+                etcd_mod.delete('namespace', None, name)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(
+                f'Error migrating namespace {name}: {e}')
+            error_count += 1
+
+        total = (migrated_count + skipped_count
+                 + error_count)
+        if total % 100 == 0:
+            LOG.info(f'  ... {total} namespaces processed')
+
+    LOG.info(
+        f'Namespace migration: '
+        f'{migrated_count} migrated, '
+        f'{skipped_count} skipped, '
+        f'{error_count} errors')
+
+    return {
+        'migrated_count': migrated_count,
+        'skipped_count': skipped_count,
+        'error_count': error_count
+    }
+
+
+def _migrate_etcd_namespace_attributes(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Migrate namespace attributes from etcd to MariaDB.
+
+    Consolidates separate etcd attribute keys per namespace
+    into a single namespace_attributes row. Must run after
+    _migrate_etcd_namespaces.
+
+    Old etcd attributes (at 'attribute/namespace/{name}/'):
+    - keys: {'nonced_keys': {...}}
+    - trust: {'full_trust': [...]}
+    """
+    from shakenfist import etcd as etcd_mod
+    from shakenfist.schema.namespace_attributes import (
+        NamespaceAttributesData)
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info(
+        'Migrating namespace attributes from etcd...')
+
+    all_names = get_all_namespace_names()
+
+    for name in all_names:
+        try:
+            keys_data = etcd_mod.get(
+                'attribute/namespace', name, 'keys')
+            trust_data = etcd_mod.get(
+                'attribute/namespace', name, 'trust')
+
+            keys: dict[str, Any] = {'nonced_keys': {}}
+            if keys_data:
+                keys = keys_data
+
+            trust = ['system']
+            if trust_data and 'full_trust' in trust_data:
+                trust = trust_data['full_trust']
+
+            attrs = NamespaceAttributesData(
+                name=name, keys=keys, trust=trust)
+            success = create_namespace_attributes(attrs)
+
+            if success:
+                # Clean up etcd entries
+                if keys_data:
+                    etcd_mod.delete(
+                        'attribute/namespace', name,
+                        'keys')
+                if trust_data:
+                    etcd_mod.delete(
+                        'attribute/namespace', name,
+                        'trust')
+                migrated_count += 1
+            else:
+                skipped_count += 1
+
+        except Exception as e:
+            LOG.warning(
+                f'Error migrating namespace attributes '
+                f'for {name}: {e}')
+            error_count += 1
+
+        total = (migrated_count + skipped_count
+                 + error_count)
+        if total % 100 == 0:
+            LOG.info(
+                f'  ... {total} namespace attributes '
+                f'processed')
+
+    LOG.info(
+        f'Namespace attribute migration: '
+        f'{migrated_count} migrated, '
+        f'{skipped_count} skipped, '
+        f'{error_count} errors')
+
+    return {
+        'migrated_count': migrated_count,
+        'skipped_count': skipped_count,
+        'error_count': error_count
+    }
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -1986,6 +2122,12 @@ DATA_MIGRATIONS.update({
     },
     'node_attributes': {
         2: _migrate_etcd_node_attributes,
+    },
+    'namespaces': {
+        2: _migrate_etcd_namespaces,
+    },
+    'namespace_attributes': {
+        2: _migrate_etcd_namespace_attributes,
     },
 })
 
