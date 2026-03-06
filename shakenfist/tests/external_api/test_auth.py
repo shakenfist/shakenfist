@@ -317,7 +317,7 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
             'name': 'foo',
             'state': 'created',
             'trust': {'full': ['system']},
-            'version': 6
+            'version': 7
         }, resp.get_json())
 
     def test_auth_add_key_missing_key(self):
@@ -439,7 +439,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                 'name': 'banana',
                 'state': 'created',
                 'trust': {'full': ['system']},
-                'version': 6
+                'version': 7
             },
             {
                 'keys': ['key1'],
@@ -447,7 +447,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                 'name': 'foo',
                 'state': 'created',
                 'trust': {'full': ['system']},
-                'version': 6
+                'version': 7
             },
             {
                 'keys': ['key1'],
@@ -455,7 +455,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                 'name': 'system',
                 'state': 'created',
                 'trust': {'full': ['system']},
-                'version': 6
+                'version': 7
             },
             {
                 'keys': ['key1'],
@@ -463,7 +463,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                 'name': 'three',
                 'state': 'created',
                 'trust': {'full': ['system']},
-                'version': 6
+                'version': 7
             },
             {
                 'keys': ['key1'],
@@ -471,7 +471,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                 'name': 'two',
                 'state': 'created',
                 'trust': {'full': ['system']},
-                'version': 6
+                'version': 7
             }
         ], resp.get_json())
 
@@ -622,5 +622,5 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
             'name': 'foo-unique',
             'state': 'created',
             'trust': {'full': ['system']},
-            'version': 6
+            'version': 7
         }, resp.get_json())
