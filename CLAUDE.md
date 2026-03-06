@@ -408,6 +408,9 @@ performance. This is required for all deployments - MariaDB must be configured.
 - **IPAM reservations** (`ipam_reservations` table): IP address allocations
 - **Uploads** (`uploads` table): Upload object static values (uuid, node,
   created_at, version)
+- **Namespaces** (`namespaces`, `namespace_attributes` tables): Namespace
+  static values and mutable attributes (keys, trust). Uses namespace name
+  (string) as primary key, not UUID.
 
 ### Migrating Existing Deployments
 
