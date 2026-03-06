@@ -62,12 +62,15 @@ jobs:
           echo "GITHUB_ACTIONS_URL=$actions_url" >> $GITHUB_ENV
 
       - name: Build dependencies image
+        env:
+          GITLAB_TESTDATA_TOKEN: ${{ secrets.GITLAB_TESTDATA_TOKEN }}
         run: |
           cd ${GITHUB_WORKSPACE}/actions
           ansible-playbook -i /home/debian/ansible-hosts \
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
               base_image=sf://label/ci-images/debian-12 base_image_user=debian \
-              label=ci-images/dependencies actions_url=$GITHUB_ACTIONS_URL" \
+              label=ci-images/dependencies actions_url=$GITHUB_ACTIONS_URL \
+              gitlab_testdata_token=${GITLAB_TESTDATA_TOKEN}" \
             ansible/ci-dependencies.yml
 
       - uses: JasonEtco/create-an-issue@v2
