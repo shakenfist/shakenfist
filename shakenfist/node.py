@@ -32,7 +32,7 @@ LOG, _ = logs.setup(__name__)
 
 class Node(dbo):
     object_type = ObjectType.NODE
-    initial_version = 2
+    initial_version = 10
     current_version = 11
 
     # docs/developer_guide/state_machine.md has a description of these states.
@@ -132,42 +132,6 @@ class Node(dbo):
         """Force reload of attributes on next access."""
         self.__attributes_loaded = False
         self.__attributes = None
-
-    # Upgrade steps (2-10 are etcd dict-based, retained for migration tool compatibility)
-    @classmethod
-    def _upgrade_step_2_to_3(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_3_to_4(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_4_to_5(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_5_to_6(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_6_to_7(cls, static_values):
-        etcd.delete('attribute/node', static_values['fqdn'], 'instances-active')
-
-    @classmethod
-    def _upgrade_step_7_to_8(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_8_to_9(cls, static_values):
-        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
-        ...
-
-    @classmethod
-    def _upgrade_step_9_to_10(cls, static_values):
-        # The node.blobs cache has been removed. Blob locations are now queried
-        # directly from MariaDB's object_references table (BLOB_LOCATION).
-        etcd.delete('attribute/node', static_values['fqdn'], 'blobs')
 
     @classmethod
     def _upgrade_step_10_to_11(cls, static_values):
