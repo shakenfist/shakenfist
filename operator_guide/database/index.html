@@ -3823,6 +3823,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#node-identity-and-uuid-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node Identity and UUID Persistence
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4694,6 +4705,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#node-identity-and-uuid-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node Identity and UUID Persistence
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5463,6 +5485,29 @@ dedicated attribute tables:</p>
 </table>
 <p>Node attributes consolidate many separate etcd keys (observed, roles,
 daemons, daemon:{name}, instances, versions, etc.) into a single row.</p>
+<h4 id="node-identity-and-uuid-persistence">Node Identity and UUID Persistence<a class="headerlink" href="#node-identity-and-uuid-persistence" title="Permanent link">&para;</a></h4>
+<p>Each node in the cluster is assigned a real UUID (UUID version 4) when it
+first registers with the cluster. Previously, nodes used their FQDN as a
+fake UUID, but all nodes now have proper UUIDs stored in the <code>nodes</code>
+MariaDB table with the FQDN as a separate uniquely-indexed column.</p>
+<p>To avoid an FQDN-to-UUID database lookup on every daemon startup, the
+node UUID is persisted locally to <code>{STORAGE_PATH}/node_uuid</code> (typically
+<code>/srv/shakenfist/node_uuid</code>). On subsequent daemon starts, the UUID is
+read from this local file for a direct database lookup by primary key.</p>
+<p>The node UUID can also be set explicitly via the <code>SHAKENFIST_NODE_UUID</code>
+environment variable or the <code>NODE_UUID</code> configuration field, which takes
+precedence over the local file. This is useful for disaster recovery
+scenarios where local storage has been lost but the node's UUID is known.</p>
+<p>The lookup precedence order is:</p>
+<ol>
+<li><code>NODE_UUID</code> configuration field / <code>SHAKENFIST_NODE_UUID</code> environment
+   variable</li>
+<li>Local file at <code>{STORAGE_PATH}/node_uuid</code></li>
+<li>FQDN-based lookup in the <code>nodes</code> table (fallback)</li>
+</ol>
+<p>If the persisted UUID does not match the current node's FQDN, it is
+ignored and the FQDN-based fallback is used. This guards against stale
+UUID files left over from a previous node installation.</p>
 <p>Future attribute tables will follow the same pattern:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1">-- Example: instance_attributes (future)</span>
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">instance_attributes</span><span class="w"> </span><span class="p">(</span>
