@@ -456,6 +456,53 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateNamespace: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateNamespaceRequest,
+        database_pb2.StatusReply,
+    ]
+    """Namespace Operations (MariaDB)
+    These manage namespace static values (name, version) in MariaDB.
+    Namespaces use their name as primary key (not a UUID).
+    """
+
+    GetNamespace: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNamespaceRequest,
+        database_pb2.GetNamespaceReply,
+    ]
+
+    GetAllNamespaceNames: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNamespaceNamesRequest,
+        database_pb2.GetAllNamespaceNamesReply,
+    ]
+
+    DeleteNamespace: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNamespaceRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateNamespaceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateNamespaceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Namespace Attributes Operations (MariaDB)
+    These store mutable namespace attributes (keys, trust).
+    """
+
+    GetNamespaceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNamespaceAttributesRequest,
+        database_pb2.GetNamespaceAttributesReply,
+    ]
+
+    UpdateNamespaceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNamespaceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteNamespaceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNamespaceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -891,6 +938,53 @@ class DatabaseServiceAsyncStub:
 
     DeleteNodeAttributes: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteNodeAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateNamespace: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateNamespaceRequest,
+        database_pb2.StatusReply,
+    ]
+    """Namespace Operations (MariaDB)
+    These manage namespace static values (name, version) in MariaDB.
+    Namespaces use their name as primary key (not a UUID).
+    """
+
+    GetNamespace: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNamespaceRequest,
+        database_pb2.GetNamespaceReply,
+    ]
+
+    GetAllNamespaceNames: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNamespaceNamesRequest,
+        database_pb2.GetAllNamespaceNamesReply,
+    ]
+
+    DeleteNamespace: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNamespaceRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateNamespaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateNamespaceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Namespace Attributes Operations (MariaDB)
+    These store mutable namespace attributes (keys, trust).
+    """
+
+    GetNamespaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNamespaceAttributesRequest,
+        database_pb2.GetNamespaceAttributesReply,
+    ]
+
+    UpdateNamespaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNamespaceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteNamespaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNamespaceAttributesRequest,
         database_pb2.StatusReply,
     ]
 
@@ -1495,6 +1589,69 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def DeleteNodeAttributes(
         self,
         request: database_pb2.DeleteNodeAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateNamespace(
+        self,
+        request: database_pb2.CreateNamespaceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Namespace Operations (MariaDB)
+        These manage namespace static values (name, version) in MariaDB.
+        Namespaces use their name as primary key (not a UUID).
+        """
+
+    @abc.abstractmethod
+    def GetNamespace(
+        self,
+        request: database_pb2.GetNamespaceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNamespaceReply, collections.abc.Awaitable[database_pb2.GetNamespaceReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllNamespaceNames(
+        self,
+        request: database_pb2.GetAllNamespaceNamesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllNamespaceNamesReply, collections.abc.Awaitable[database_pb2.GetAllNamespaceNamesReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteNamespace(
+        self,
+        request: database_pb2.DeleteNamespaceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateNamespaceAttributes(
+        self,
+        request: database_pb2.CreateNamespaceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Namespace Attributes Operations (MariaDB)
+        These store mutable namespace attributes (keys, trust).
+        """
+
+    @abc.abstractmethod
+    def GetNamespaceAttributes(
+        self,
+        request: database_pb2.GetNamespaceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNamespaceAttributesReply, collections.abc.Awaitable[database_pb2.GetNamespaceAttributesReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateNamespaceAttributes(
+        self,
+        request: database_pb2.UpdateNamespaceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteNamespaceAttributes(
+        self,
+        request: database_pb2.DeleteNamespaceAttributesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

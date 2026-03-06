@@ -39,6 +39,8 @@ from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
+from shakenfist.schema.namespace_attributes import NamespaceAttributesData
+from shakenfist.schema.namespace_data import NamespaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.blob_hash import BlobHash
@@ -95,6 +97,8 @@ BLOB_TRANSFERS_VERSION = 2
 BLOB_ATTRIBUTES_VERSION = 1
 NODES_VERSION = 2
 NODE_ATTRIBUTES_VERSION = 2
+NAMESPACES_VERSION = 2
+NAMESPACE_ATTRIBUTES_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -887,6 +891,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_blob_attributes_schema(engine))
     results.append(_ensure_nodes_schema(engine))
     results.append(_ensure_node_attributes_schema(engine))
+    results.append(_ensure_namespaces_schema(engine))
+    results.append(_ensure_namespace_attributes_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -7403,3 +7409,633 @@ def delete_node_attributes(
     if _use_database_service():
         return _grpc_delete_node_attributes(node_uuid)
     return _direct_delete_node_attributes(node_uuid)
+
+
+# =============================================================================
+# Namespace Table Definitions
+# =============================================================================
+
+_namespaces_table: Optional[sa.Table] = None
+_namespace_attributes_table: Optional[sa.Table] = None
+
+
+def _get_namespaces_table() -> sa.Table:
+    """Get or create the namespaces table definition."""
+    global _namespaces_table
+    if _namespaces_table is None:
+        metadata = _get_metadata()
+        _namespaces_table = sa.Table(
+            'namespaces',
+            metadata,
+            sa.Column(
+                'name', sa.String(255), primary_key=True
+            ),
+            sa.Column(
+                'version', sa.Integer(), nullable=False
+            ),
+        )
+    return _namespaces_table
+
+
+def _get_namespace_attributes_table() -> sa.Table:
+    """Get or create the namespace_attributes table definition."""
+    global _namespace_attributes_table
+    if _namespace_attributes_table is None:
+        metadata = _get_metadata()
+        _namespace_attributes_table = sa.Table(
+            'namespace_attributes',
+            metadata,
+            sa.Column(
+                'name', sa.String(255), primary_key=True
+            ),
+            sa.Column('keys', sa.JSON(), nullable=True),
+            sa.Column('trust', sa.JSON(), nullable=True),
+        )
+    return _namespace_attributes_table
+
+
+def _ensure_namespaces_schema(
+    engine: sa.Engine,
+) -> dict[str, Any]:
+    """Ensure the namespaces table schema is up to date."""
+    table_name = 'namespaces'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_namespaces_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True
+        )
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(
+                        f'Index {idx.name} creation '
+                        f'skipped: {e}'
+                    )
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NAMESPACES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_namespace_attributes_schema(
+    engine: sa.Engine,
+) -> dict[str, Any]:
+    """Ensure the namespace_attributes table schema is up to date."""
+    table_name = 'namespace_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_namespace_attributes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True
+        )
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(
+                        f'Index {idx.name} creation '
+                        f'skipped: {e}'
+                    )
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NAMESPACE_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+# =============================================================================
+# Namespace Direct Access Functions
+# =============================================================================
+
+def _direct_create_namespace(
+    name: str, version: int
+) -> bool:
+    """Create a namespace record in MariaDB."""
+    engine = _get_engine()
+    table = _get_namespaces_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                name=name,
+                version=version
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB create failed for namespace '
+            f'{name}: {e}'
+        )
+        return False
+
+
+def _direct_get_namespace(
+    name: str,
+) -> Optional[NamespaceData]:
+    """Get namespace static values from MariaDB."""
+    engine = _get_engine()
+    table = _get_namespaces_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.name == name
+            )
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return NamespaceData(
+                name=result.name,
+                version=result.version
+            )
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB get failed for namespace '
+            f'{name}: {e}'
+        )
+        return None
+
+
+def _direct_get_all_namespace_names() -> list[str]:
+    """Get all namespace names from MariaDB."""
+    engine = _get_engine()
+    table = _get_namespaces_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.name)
+            result = conn.execute(stmt).fetchall()
+            return [row.name for row in result]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for namespace names: {e}'
+        )
+        return []
+
+
+def _direct_delete_namespace(name: str) -> bool:
+    """Delete a namespace record from MariaDB."""
+    engine = _get_engine()
+    table = _get_namespaces_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.name == name
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB delete failed for namespace '
+            f'{name}: {e}'
+        )
+        return False
+
+
+# =============================================================================
+# Namespace Attributes Direct Access Functions
+# =============================================================================
+
+def _direct_create_namespace_attributes(
+    data: NamespaceAttributesData,
+) -> bool:
+    """Create a namespace_attributes record in MariaDB."""
+    engine = _get_engine()
+    table = _get_namespace_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                name=data.name,
+                keys=data.keys,
+                trust=data.trust,
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB create failed for '
+            f'namespace_attributes {data.name}: {e}'
+        )
+        return False
+
+
+def _direct_get_namespace_attributes(
+    name: str,
+) -> Optional[NamespaceAttributesData]:
+    """Get namespace attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_namespace_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.name == name
+            )
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return NamespaceAttributesData(
+                name=result.name,
+                keys=(
+                    result.keys
+                    if result.keys else {'nonced_keys': {}}
+                ),
+                trust=(
+                    result.trust
+                    if result.trust else ['system']
+                ),
+            )
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB get failed for '
+            f'namespace_attributes {name}: {e}'
+        )
+        return None
+
+
+def _direct_update_namespace_attributes(
+    data: NamespaceAttributesData,
+) -> bool:
+    """Update namespace attributes in MariaDB."""
+    engine = _get_engine()
+    table = _get_namespace_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.name == data.name
+            ).values(
+                keys=data.keys,
+                trust=data.trust,
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB update failed for '
+            f'namespace_attributes {data.name}: {e}'
+        )
+        return False
+
+
+def _direct_delete_namespace_attributes(
+    name: str,
+) -> bool:
+    """Delete namespace attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_namespace_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.name == name
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB delete failed for '
+            f'namespace_attributes {name}: {e}'
+        )
+        return False
+
+
+# =============================================================================
+# Namespace gRPC Client Functions
+# =============================================================================
+
+def _grpc_create_namespace(
+    name: str, version: int
+) -> bool:
+    """Create a namespace record via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateNamespaceRequest(
+            namespace=database_pb2.NamespaceStaticData(
+                name=name,
+                version=version
+            )
+        )
+        reply = stub.CreateNamespace(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateNamespace failed for {name}: {e}'
+        )
+        return False
+
+
+def _grpc_get_namespace(
+    name: str,
+) -> Optional[NamespaceData]:
+    """Get namespace static values via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNamespaceRequest(
+            name=name
+        )
+        reply = stub.GetNamespace(request)
+        if not reply.found:
+            return None
+        return NamespaceData(
+            name=reply.namespace.name,
+            version=reply.namespace.version
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetNamespace failed for {name}: {e}'
+        )
+        return None
+
+
+def _grpc_get_all_namespace_names() -> list[str]:
+    """Get all namespace names via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllNamespaceNamesRequest()
+        reply = stub.GetAllNamespaceNames(request)
+        return list(reply.names)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetAllNamespaceNames failed: {e}'
+        )
+        return []
+
+
+def _grpc_delete_namespace(name: str) -> bool:
+    """Delete a namespace record via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNamespaceRequest(
+            name=name
+        )
+        reply = stub.DeleteNamespace(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteNamespace failed for {name}: {e}'
+        )
+        return False
+
+
+def _grpc_create_namespace_attributes(
+    data: NamespaceAttributesData,
+) -> bool:
+    """Create namespace attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateNamespaceAttributesRequest(
+            data=database_pb2.NamespaceAttributesProto(
+                name=data.name,
+                keys_json=json.dumps(data.keys),
+                trust_json=json.dumps(data.trust),
+            )
+        )
+        reply = stub.CreateNamespaceAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            'gRPC CreateNamespaceAttributes failed for '
+            f'{data.name}: {e}'
+        )
+        return False
+
+
+def _grpc_get_namespace_attributes(
+    name: str,
+) -> Optional[NamespaceAttributesData]:
+    """Get namespace attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNamespaceAttributesRequest(
+            name=name
+        )
+        reply = stub.GetNamespaceAttributes(request)
+        if not reply.found:
+            return None
+        return NamespaceAttributesData(
+            name=reply.data.name,
+            keys=(
+                json.loads(reply.data.keys_json)
+                if reply.data.keys_json
+                else {'nonced_keys': {}}
+            ),
+            trust=(
+                json.loads(reply.data.trust_json)
+                if reply.data.trust_json
+                else ['system']
+            ),
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            'gRPC GetNamespaceAttributes failed for '
+            f'{name}: {e}'
+        )
+        return None
+
+
+def _grpc_update_namespace_attributes(
+    data: NamespaceAttributesData,
+) -> bool:
+    """Update namespace attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateNamespaceAttributesRequest(
+            data=database_pb2.NamespaceAttributesProto(
+                name=data.name,
+                keys_json=json.dumps(data.keys),
+                trust_json=json.dumps(data.trust),
+            )
+        )
+        reply = stub.UpdateNamespaceAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            'gRPC UpdateNamespaceAttributes failed for '
+            f'{data.name}: {e}'
+        )
+        return False
+
+
+def _grpc_delete_namespace_attributes(
+    name: str,
+) -> bool:
+    """Delete namespace attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNamespaceAttributesRequest(
+            name=name
+        )
+        reply = stub.DeleteNamespaceAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            'gRPC DeleteNamespaceAttributes failed for '
+            f'{name}: {e}'
+        )
+        return False
+
+
+# =============================================================================
+# Namespace Public API Functions
+# =============================================================================
+
+def create_namespace(
+    name: str, version: int
+) -> bool:
+    """Create a namespace record.
+
+    Args:
+        name: The namespace name (primary key).
+        version: The object version number.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_namespace(name, version)
+    return _direct_create_namespace(name, version)
+
+
+def get_namespace(name: str) -> Optional[NamespaceData]:
+    """Get namespace static values.
+
+    Args:
+        name: The namespace name.
+
+    Returns:
+        A NamespaceData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_namespace(name)
+    return _direct_get_namespace(name)
+
+
+def get_all_namespace_names() -> list[str]:
+    """Get all namespace names.
+
+    Returns:
+        List of namespace name strings.
+    """
+    if _use_database_service():
+        return _grpc_get_all_namespace_names()
+    return _direct_get_all_namespace_names()
+
+
+def delete_namespace(name: str) -> bool:
+    """Delete a namespace record.
+
+    Args:
+        name: The namespace name.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_namespace(name)
+    return _direct_delete_namespace(name)
+
+
+def create_namespace_attributes(
+    data: NamespaceAttributesData,
+) -> bool:
+    """Create namespace attributes record.
+
+    Args:
+        data: The NamespaceAttributesData to create.
+
+    Returns:
+        True if created successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_create_namespace_attributes(data)
+    return _direct_create_namespace_attributes(data)
+
+
+def get_namespace_attributes(
+    name: str,
+) -> Optional[NamespaceAttributesData]:
+    """Get namespace attributes.
+
+    Args:
+        name: The namespace name.
+
+    Returns:
+        NamespaceAttributesData if found, None otherwise.
+    """
+    if _use_database_service():
+        return _grpc_get_namespace_attributes(name)
+    return _direct_get_namespace_attributes(name)
+
+
+def update_namespace_attributes(
+    data: NamespaceAttributesData,
+) -> bool:
+    """Update namespace attributes.
+
+    Args:
+        data: The NamespaceAttributesData with updated values.
+
+    Returns:
+        True if updated successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_update_namespace_attributes(data)
+    return _direct_update_namespace_attributes(data)
+
+
+def delete_namespace_attributes(
+    name: str,
+) -> bool:
+    """Delete namespace attributes.
+
+    Args:
+        name: The namespace name.
+
+    Returns:
+        True if deleted successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_delete_namespace_attributes(name)
+    return _direct_delete_namespace_attributes(name)
