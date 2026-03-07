@@ -36,14 +36,14 @@ class ObjectReference(BaseModel):
 
     Attributes:
         source_object_type: The type of the object that holds the reference.
-        source_uuid: The identifier of the source object (UUID string, FQDN
-            for nodes, or name for namespaces).
+        source_uuid: The identifier of the source object (UUID string,
+            FQDN for node BLOB_LOCATION refs, or name for namespaces).
         relationship: The type of relationship (disk, artifact_index, etc.).
         relationship_value: Optional value for the relationship (e.g., disk
             index "0", transcode style "qcow2").
         target_object_type: The type of the referenced object.
         target_uuid: The identifier of the referenced object (UUID string,
-            FQDN for nodes, or name for namespaces).
+            FQDN for node BLOB_LOCATION refs, or name for namespaces).
         created: Unix timestamp when reference was created.
         last_active: Unix timestamp, updated by cleaner daemon when it
             observes the reference is still valid/in-use.
@@ -67,8 +67,8 @@ class ObjectReference(BaseModel):
 
     # Source object (the one holding the reference)
     # Note: source_uuid is a string (max 255 chars) rather than UUID because
-    # some objects use non-UUID identifiers (e.g. Namespace uses its name,
-    # Node references use FQDN in the object_references table).
+    # some objects use non-UUID identifiers: Namespace uses its name, and
+    # Node uses FQDN for BLOB_LOCATION references (node.py:487).
     source_object_type: ObjectType
     source_uuid: Annotated[str, Field(max_length=255)]
 
@@ -80,8 +80,8 @@ class ObjectReference(BaseModel):
 
     # Target object (the one being referenced)
     # Note: target_uuid is a string (max 255 chars) rather than UUID because
-    # some objects use non-UUID identifiers (e.g. Namespace uses its name,
-    # Node references use FQDN in the object_references table).
+    # some objects use non-UUID identifiers: Namespace uses its name, and
+    # Node uses FQDN for BLOB_LOCATION references (node.py:487).
     target_object_type: ObjectType
     target_uuid: Annotated[str, Field(max_length=255)]
 
