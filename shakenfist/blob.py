@@ -62,6 +62,28 @@ from shakenfist.util import concurrency as util_concurrency
 LOG, _ = logs.setup(__name__)
 
 
+def _local_node_uuid():
+    """Resolve the UUID of the current node.
+
+    config.NODE_UUID may be None when the environment variable was not
+    set.  Fall back to the persisted UUID file written by sentinel_first,
+    and finally to a database lookup by FQDN.
+    """
+    node_uuid = config.NODE_UUID
+    if node_uuid:
+        return node_uuid
+
+    node_uuid = Node._load_persisted_uuid()
+    if node_uuid:
+        return node_uuid
+
+    n = Node.from_db(config.NODE_NAME)
+    if n:
+        return str(n.uuid)
+
+    return None
+
+
 # NOTE(mikal): blobs are immutable objects, that is their content cannot change
 # once set. However, we don't always know the size or content of the blob when
 # we reserve its UUID, so we do allow the size of the blob to be set after
@@ -905,11 +927,17 @@ class Blob(dbo):
 
         # Request checksums be calculated
         if request_checksums:
-            nbo_create_and_enqueue(
-                config.NODE_UUID,
-                self.uuid,
-                [nbo_tasks.verify_size_and_checksum],
-                PRIORITY.background_high_io)
+            node_uuid = _local_node_uuid()
+            if node_uuid:
+                nbo_create_and_enqueue(
+                    node_uuid,
+                    self.uuid,
+                    [nbo_tasks.verify_size_and_checksum],
+                    PRIORITY.background_high_io)
+            else:
+                self.log.warning(
+                    'Cannot enqueue checksum operation, '
+                    'local node UUID is unknown')
 
         self.request_replication()
         os.unlink(dest_path + '.partial')
@@ -992,11 +1020,17 @@ class Blob(dbo):
         # If we're in a hurry but extra hashes are missing, enqueue those as
         # background tasks
         if needs_rehashing:
-            nbo_create_and_enqueue(
-                config.NODE_UUID,
-                self.uuid,
-                [nbo_tasks.verify_size_and_checksum],
-                PRIORITY.background_high_io)
+            node_uuid = _local_node_uuid()
+            if node_uuid:
+                nbo_create_and_enqueue(
+                    node_uuid,
+                    self.uuid,
+                    [nbo_tasks.verify_size_and_checksum],
+                    PRIORITY.background_high_io)
+            else:
+                self.log.warning(
+                    'Cannot enqueue rehash operation, '
+                    'local node UUID is unknown')
 
         # Validate sha512 hash against stored value
         is_new_hash = 'sha512' not in existing_by_alg
