@@ -40,6 +40,7 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
+from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.upload import UploadData
@@ -2158,6 +2159,133 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 success=False, error=str(e)
             )
 
+    # =========================================================
+    # Namespace Operations (MariaDB)
+    # =========================================================
+
+    def CreateNamespace(self, request: database_pb2.CreateNamespaceRequest,
+                        context: grpc.ServicerContext) -> database_pb2.StatusReply:
+        """Create a namespace record in MariaDB."""
+        try:
+            self.monitor.counters['create_namespace'].inc()
+            success = mariadb._direct_create_namespace(request.namespace.name,
+                                                       request.namespace.version)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database CreateNamespace failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetNamespace(self, request: database_pb2.GetNamespaceRequest,
+                     context: grpc.ServicerContext) -> database_pb2.GetNamespaceReply:
+        """Get namespace static values from MariaDB."""
+        try:
+            self.monitor.counters['get_namespace'].inc()
+            data = mariadb._direct_get_namespace(request.name)
+            if data is None:
+                return database_pb2.GetNamespaceReply(found=False)
+            return database_pb2.GetNamespaceReply(
+                found=True,
+                namespace=database_pb2.NamespaceStaticData(name=data.name, version=data.version))
+        except Exception as e:
+            util_exceptions.ignore_exception('database GetNamespace failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNamespaceReply(found=False)
+
+    def GetAllNamespaceNames(self, request: database_pb2.GetAllNamespaceNamesRequest,
+                             context: grpc.ServicerContext
+                             ) -> database_pb2.GetAllNamespaceNamesReply:
+        """Get all namespace names from MariaDB."""
+        try:
+            self.monitor.counters['get_all_namespace_names'].inc()
+            names = mariadb._direct_get_all_namespace_names()
+            return database_pb2.GetAllNamespaceNamesReply(names=names)
+        except Exception as e:
+            util_exceptions.ignore_exception('database GetAllNamespaceNames failed', e)
+            return database_pb2.GetAllNamespaceNamesReply(names=[])
+
+    def DeleteNamespace(self, request: database_pb2.DeleteNamespaceRequest,
+                        context: grpc.ServicerContext) -> database_pb2.StatusReply:
+        """Delete a namespace record from MariaDB."""
+        try:
+            self.monitor.counters['delete_namespace'].inc()
+            success = mariadb._direct_delete_namespace(request.name)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database DeleteNamespace failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    # =========================================================
+    # Namespace Attributes Operations (MariaDB)
+    # =========================================================
+
+    def CreateNamespaceAttributes(self, request: database_pb2.CreateNamespaceAttributesRequest,
+                                  context: grpc.ServicerContext) -> database_pb2.StatusReply:
+        """Create namespace attributes in MariaDB."""
+        try:
+            self.monitor.counters['create_namespace_attributes'].inc()
+            data = self._ns_attrs_from_proto(request.data)
+            success = mariadb._direct_create_namespace_attributes(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database CreateNamespaceAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetNamespaceAttributes(self, request: database_pb2.GetNamespaceAttributesRequest,
+                               context: grpc.ServicerContext
+                               ) -> database_pb2.GetNamespaceAttributesReply:
+        """Get namespace attributes from MariaDB."""
+        try:
+            self.monitor.counters['get_namespace_attributes'].inc()
+            data = mariadb._direct_get_namespace_attributes(request.name)
+            if data is None:
+                return database_pb2.GetNamespaceAttributesReply(found=False)
+            return database_pb2.GetNamespaceAttributesReply(
+                found=True, data=self._ns_attrs_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception('database GetNamespaceAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNamespaceAttributesReply(found=False)
+
+    def UpdateNamespaceAttributes(self, request: database_pb2.UpdateNamespaceAttributesRequest,
+                                  context: grpc.ServicerContext) -> database_pb2.StatusReply:
+        """Update namespace attributes in MariaDB."""
+        try:
+            self.monitor.counters['update_namespace_attributes'].inc()
+            data = self._ns_attrs_from_proto(request.data)
+            success = mariadb._direct_update_namespace_attributes(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database UpdateNamespaceAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def DeleteNamespaceAttributes(self, request: database_pb2.DeleteNamespaceAttributesRequest,
+                                  context: grpc.ServicerContext) -> database_pb2.StatusReply:
+        """Delete namespace attributes from MariaDB."""
+        try:
+            self.monitor.counters['delete_namespace_attributes'].inc()
+            success = mariadb._direct_delete_namespace_attributes(request.name)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database DeleteNamespaceAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def _ns_attrs_from_proto(self,
+                             d: database_pb2.NamespaceAttributesProto) -> 'NamespaceAttributesData':
+        """Convert a proto NamespaceAttributesProto to model."""
+        return NamespaceAttributesData(
+            name=d.name,
+            keys=json.loads(d.keys_json) if d.keys_json else {'nonced_keys': {}},
+            trust=json.loads(d.trust_json) if d.trust_json else ['system'],
+        )
+
+    def _ns_attrs_to_proto(self,
+                           data: 'NamespaceAttributesData') -> database_pb2.NamespaceAttributesProto:
+        """Convert a Pydantic NamespaceAttributesData to proto."""
+        return database_pb2.NamespaceAttributesProto(
+            name=data.name, keys_json=json.dumps(data.keys), trust_json=json.dumps(data.trust))
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -2217,7 +2345,15 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_all_node_uuids', 'delete_node', 'update_node',
             # MariaDB node attributes operations
             'create_node_attributes', 'get_node_attributes',
-            'update_node_attributes', 'delete_node_attributes'
+            'update_node_attributes', 'delete_node_attributes',
+            # MariaDB namespace operations
+            'create_namespace', 'get_namespace',
+            'get_all_namespace_names', 'delete_namespace',
+            # MariaDB namespace attributes operations
+            'create_namespace_attributes',
+            'get_namespace_attributes',
+            'update_namespace_attributes',
+            'delete_namespace_attributes'
         ]
         for op in operations:
             self.counters[op] = Counter(

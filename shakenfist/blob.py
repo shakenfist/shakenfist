@@ -881,14 +881,13 @@ class Blob(dbo):
                     if n in nodes:
                         nodes.remove(n)
 
-                for n in nodes[:targets]:
+                for node_fqdn in nodes[:targets]:
+                    node_obj = Node.from_db(node_fqdn)
+                    if not node_obj:
+                        continue
                     nbo_create_and_enqueue(
-                        n,
-                        self.uuid,
-                        [nbo_tasks.ensure_local],
-                        PRIORITY.background_high_io)
-                    self.log.with_fields({'node': n}).info(
-                        'Instructed to replicate blob')
+                        str(node_obj.uuid), self.uuid, [nbo_tasks.ensure_local], PRIORITY.background_high_io)
+                    self.log.with_fields({'node': node_fqdn}).info('Instructed to replicate blob')
 
     def register(self, request_checksums: bool = True) -> None:
         # We don't remove the partial file until we've finished registering the
@@ -907,7 +906,7 @@ class Blob(dbo):
         # Request checksums be calculated
         if request_checksums:
             nbo_create_and_enqueue(
-                config.NODE_NAME,
+                config.NODE_UUID,
                 self.uuid,
                 [nbo_tasks.verify_size_and_checksum],
                 PRIORITY.background_high_io)
@@ -994,7 +993,7 @@ class Blob(dbo):
         # background tasks
         if needs_rehashing:
             nbo_create_and_enqueue(
-                config.NODE_NAME,
+                config.NODE_UUID,
                 self.uuid,
                 [nbo_tasks.verify_size_and_checksum],
                 PRIORITY.background_high_io)

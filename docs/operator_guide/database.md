@@ -51,7 +51,7 @@ Each object type has a dedicated key prefix:
 | Blob | `/sf/object/blob/` |
 | Artifact | `/sf/object/artifact/` |
 | Node | MariaDB `nodes` table (migrated from etcd) |
-| Namespace | `/sf/object/namespace/` |
+| Namespace | MariaDB `namespaces` table (migrated from etcd) |
 
 ## MariaDB
 
@@ -525,8 +525,9 @@ The migration is happening in phases:
 | 4 | Blob objects | Complete - `blobs`, `blob_attributes`, `blob_hashes` tables |
 | 5 | Node objects | Complete - `nodes`, `node_attributes` tables |
 | 6 | DnsMasq objects | Complete - `dnsmasq` table |
-| 7 | Other object types | Future |
-| 8 | Object attributes | Future |
+| 7 | Namespace objects | Complete - `namespaces`, `namespace_attributes` tables |
+| 8 | Other object types | Future |
+| 9 | Object attributes | Future |
 
 ### Table Architecture
 
@@ -572,8 +573,10 @@ values (immutable data set at creation time):
 | `dnsmasq` | DnsMasq | uuid, namespace, owner_type, owner_uuid, provide_dhcp, provide_dns, version |
 | `blobs` | Blob | uuid, modified, fetched_at, version |
 | `nodes` | Node | uuid, fqdn (unique index), ip, version |
+| `namespaces` | Namespace | name (VARCHAR PK), version |
 
-These tables use the object's UUID as the primary key.
+These tables use the object's UUID as the primary key, except for
+`namespaces` which uses the namespace name (a string) as its primary key.
 
 #### Per-Type Attribute Tables
 
@@ -584,9 +587,13 @@ dedicated attribute tables:
 |-------|-------------|------------|
 | `blob_attributes` | Blob | uuid, size, info, last_used, retention |
 | `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, daemon_states, versions, metrics |
+| `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON) |
 
 Node attributes consolidate many separate etcd keys (observed, roles,
 daemons, daemon:{name}, instances, versions, etc.) into a single row.
+
+Namespace attributes consolidate keys (authentication) and trust
+(namespace trust relationships) from separate etcd keys into a single row.
 
 #### Node Identity and UUID Persistence
 

@@ -605,7 +605,7 @@ class Network(dbowo):
         # absolutely need to do this thing.
         for n in Nodes([], prefilter='active'):
             nn_create_and_enqueue(
-                n.fqdn,
+                str(n.uuid),
                 self.uuid,
                 [nn_tasks.network_destroy],
                 PRIORITY.user_facing,

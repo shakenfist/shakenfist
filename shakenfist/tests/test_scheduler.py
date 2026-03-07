@@ -37,6 +37,20 @@ class SchedulerTestCase(base.ShakenFistTestCase):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
 
+    def _node_uuid(self, fqdn):
+        """Helper to get node UUID from FQDN."""
+        return self.mock_etcd.node_uuids[fqdn]
+
+    def _node_uuids_set(self, *fqdns):
+        """Helper to get a set of node UUIDs from FQDNs."""
+        return {self.mock_etcd.node_uuids[f] for f in fqdns}
+
+    def _all_hypervisor_uuids(self):
+        """Helper to get UUIDs of all hypervisor nodes (excludes node1_net)."""
+        return {self.mock_etcd.node_uuids[n]
+                for n in self.mock_etcd.node_names
+                if n != 'node1_net'}
+
 
 class LowResourceTestCase(SchedulerTestCase):
     """Test low resource exceptions."""
@@ -177,8 +191,7 @@ class LowResourceTestCase(SchedulerTestCase):
         fake_inst = self.mock_etcd.create_instance('fake-inst')
 
         nodes = scheduler.Scheduler().find_candidates(fake_inst)
-        self.assertSetEqual(set(self.mock_etcd.node_names)-{'node1_net', },
-                            set(nodes))
+        self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))
 
 
 class CorrectAllocationTestCase(SchedulerTestCase):
@@ -191,8 +204,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
 
         fake_inst = self.mock_etcd.create_instance('fake-inst')
         nodes = scheduler.Scheduler().find_candidates(fake_inst)
-        self.assertSetEqual(set(self.mock_etcd.node_names)-{'node1_net', },
-                            set(nodes))
+        self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))
 
 
 class ForcedCandidatesTestCase(SchedulerTestCase):
@@ -204,9 +216,12 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
 
     def test_only_two(self):
         fake_inst = self.mock_etcd.create_instance('fake-inst')
+        candidates = [self._node_uuid('node1_net'),
+                      self._node_uuid('node2')]
         nodes = scheduler.Scheduler().find_candidates(
-            fake_inst, candidates=['node1_net', 'node2'])
-        self.assertSetEqual({'node2', }, set(nodes))
+            fake_inst, candidates=candidates)
+        self.assertSetEqual(
+            self._node_uuids_set('node2'), set(nodes))
 
     def test_no_such_node(self):
         fake_inst = self.mock_etcd.create_instance('fake-inst')
@@ -232,9 +247,10 @@ class MetricsRefreshTestCase(SchedulerTestCase):
 
         fake_inst = self.mock_etcd.create_instance('fake-inst')
 
+        net_uuid = self._node_uuid('node1_net')
         s = scheduler.Scheduler()
         s.find_candidates(fake_inst)
-        self.assertEqual(22000, s.metrics['node1_net']['memory_available'])
+        self.assertEqual(22000, s.metrics[net_uuid]['memory_available'])
 
         self.mock_etcd.set_node_metrics_same({
             'cpu_max_per_instance': 16,
@@ -247,7 +263,7 @@ class MetricsRefreshTestCase(SchedulerTestCase):
         })
         s.metrics_updated = time.time() - 400
         s.find_candidates(fake_inst)
-        self.assertEqual(11000, s.metrics['node1_net']['memory_available'])
+        self.assertEqual(11000, s.metrics[net_uuid]['memory_available'])
 
 
 class AffinityTestCase(SchedulerTestCase):
@@ -273,7 +289,8 @@ class AffinityTestCase(SchedulerTestCase):
             })
 
         nodes = scheduler.Scheduler().find_candidates(inst)
-        self.assertSetEqual({'node3'}, set(nodes))
+        self.assertSetEqual(
+            self._node_uuids_set('node3'), set(nodes))
 
     def test_anti_affinity_single_inst(self):
         self.mock_etcd.create_instance('instance-1',
@@ -290,7 +307,8 @@ class AffinityTestCase(SchedulerTestCase):
                 },
             })
         nodes = scheduler.Scheduler().find_candidates(inst)
-        self.assertSetEqual({'node2', 'node4'}, set(nodes))
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node4'), set(nodes))
 
     def test_anti_affinity_multiple_inst(self):
         self.mock_etcd.create_instance('instance-1',
@@ -311,7 +329,8 @@ class AffinityTestCase(SchedulerTestCase):
                 },
             })
         nodes = scheduler.Scheduler().find_candidates(inst)
-        self.assertSetEqual({'node2'}, set(nodes))
+        self.assertSetEqual(
+            self._node_uuids_set('node2'), set(nodes))
 
     def test_anti_affinity_multiple_inst_different_tags(self):
         self.mock_etcd.create_instance('instance-1',
@@ -332,4 +351,5 @@ class AffinityTestCase(SchedulerTestCase):
                 },
             })
         nodes = scheduler.Scheduler().find_candidates(inst)
-        self.assertSetEqual({'node3'}, set(nodes))
+        self.assertSetEqual(
+            self._node_uuids_set('node3'), set(nodes))
