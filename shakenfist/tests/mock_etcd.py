@@ -363,8 +363,10 @@ class MockEtcd():
         self.test_obj.addCleanup(self.mariadb_delete_namespace_attributes.stop)
 
         # Setup basic DB data
+        self.node_uuids = {}
         for n in self.nodes:
-            Node.new(n[0], n[1])
+            node_obj = Node.new(n[0], n[1])
+            self.node_uuids[n[0]] = str(node_obj.uuid)
 
     def next_uuid(self):
         """Generate predictable UUIDs that are unique during the testcase"""
@@ -995,9 +997,11 @@ class MockEtcd():
             }
 
         for n in self.nodes:
-            key = '/sf/metrics/%s/' % n[0]
+            node_uuid = self.node_uuids[n[0]]
+            key = '/sf/metrics/%s/' % node_uuid
             metrics['is_hypervisor'] = 'hypervisor' in n[2]
             data = {
+                'node_uuid': node_uuid,
                 'fqdn': n[0],
                 'timestamp': time.time(),
                 'metrics': metrics,

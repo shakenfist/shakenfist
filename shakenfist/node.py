@@ -668,7 +668,7 @@ def nodes_by_free_disk_descending(minimum=0, maximum=-1, intention=None):
         intention = '_%s' % intention
 
     for n in Nodes([], prefilter='active'):
-        metrics = etcd.get('metrics', n.fqdn, None)
+        metrics = etcd.get('metrics', str(n.uuid), None)
         if metrics:
             metrics = metrics.get('metrics', {})
         else:

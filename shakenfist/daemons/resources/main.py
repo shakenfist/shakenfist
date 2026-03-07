@@ -48,7 +48,7 @@ class Monitor(daemon.Daemon):
     def _get_stats(self):
         n = Node.from_db(config.NODE_NAME)
 
-        old_metrics = etcd.get('metrics', config.NODE_NAME, {})
+        old_metrics = etcd.get('metrics', config.NODE_UUID, {})
         timestamp = time.time()
 
         with util_libvirt.LibvirtConnection() as lc:
@@ -246,7 +246,7 @@ class Monitor(daemon.Daemon):
 
                 return processing, queued, deferred
 
-            for queue in get_node_user_facing_node_queues(config.NODE_NAME):
+            for queue in get_node_user_facing_node_queues(config.NODE_UUID):
                 processing, queued, deferred = _log_and_update_metrics_for_queue(
                     queue, 'User facing')
 
@@ -254,7 +254,7 @@ class Monitor(daemon.Daemon):
                 node_queue_waiting += queued
                 node_queue_deferred += deferred
 
-            for queue in get_all_background_node_queues(config.NODE_NAME):
+            for queue in get_all_background_node_queues(config.NODE_UUID):
                 processing, queued, deferred = _log_and_update_metrics_for_queue(
                     queue, 'Background')
 
@@ -414,10 +414,12 @@ class Monitor(daemon.Daemon):
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
         }
 
-        # Clear out any old metrics entries for this node
+        # Clear out any old metrics entries for this node. We check both
+        # UUID-keyed and FQDN-keyed entries to clean up legacy data.
         for k, d in etcd.get_all('metrics', None):
-            node_name = d['fqdn']
-            if node_name == config.NODE_NAME:
+            if d.get('node_uuid') == config.NODE_UUID:
+                etcd.delete_raw(k)
+            elif d.get('fqdn') == config.NODE_NAME:
                 etcd.delete_raw(k)
 
         # Some versions are static and only looked up at startup
@@ -439,8 +441,9 @@ class Monitor(daemon.Daemon):
                 gauges[metric].set(stats[metric])
 
             etcd.put(
-                'metrics', config.NODE_NAME, None,
+                'metrics', config.NODE_UUID, None,
                 {
+                    'node_uuid': config.NODE_UUID,
                     'fqdn': config.NODE_NAME,
                     'timestamp': time.time(),
                     'metrics': stats

@@ -205,6 +205,16 @@ performing an FQDN-to-UUID indirection. The UUID can also be set explicitly
 via the `NODE_UUID` config field or `SHAKENFIST_NODE_UUID` environment
 variable.
 
+Node UUIDs are used throughout the system:
+- **Metrics**: Stored in etcd under `metrics/{node_uuid}` with 120s TTL
+- **Scheduler**: Returns node UUIDs as placement candidates
+- **Instance placement**: `placement['node']` stores the node UUID
+- **Operation queues**: Queue paths use node UUIDs
+- **Operation schemas**: `node_uuid` field typed as `UUID4`
+
+Note: `BLOB_LOCATION` references in `object_references` still use FQDNs
+as the source identifier (separate from node UUID usage).
+
 ## API Architecture
 
 REST API built with Flask-RESTful:

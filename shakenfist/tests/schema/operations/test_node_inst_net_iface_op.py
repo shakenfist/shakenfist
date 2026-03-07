@@ -93,7 +93,7 @@ class NodeInstNetIfaceOpTestCase(base.ShakenFistTestCase):
     )
     @mock.patch('time.time', return_value=123.0)
     def test_create_and_enqueue(self, _mock_time, _mock_id):
-        node_uuid = 'sf-1'
+        node_uuid = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
         instance_uuid = '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7'
         network_uuid = '4c8ad117-8c78-4df0-8471-3dc1f1af6f2e'
         interface_uuid = 'a7a25f51-99fe-4a7e-be64-16d230609d51'
@@ -113,7 +113,7 @@ class NodeInstNetIfaceOpTestCase(base.ShakenFistTestCase):
                 'interface_uuid': 'a7a25f51-99fe-4a7e-be64-16d230609d51',
                 'depends_on': None,
                 'runs_after': None,
-                'node_uuid': 'sf-1',
+                'node_uuid': 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
                 'priority': 'user_waiting',
                 'request_id': None,
                 'tasks': [
@@ -138,14 +138,14 @@ class NodeInstNetIfaceOpTestCase(base.ShakenFistTestCase):
             },
             self.mock_etcd.get_raw(
                 (
-                    '/sf/queue/sf-1-clusteroperation-user_waiting/'
+                    '/sf/queue/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d-clusteroperation-user_waiting/'
                     '123.0-asdjfhkjadsfh'
                 )
             )
         )
 
     def test_load_from_etcd(self):
-        node_uuid = 'sf-1'
+        node_uuid = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
         instance_uuid = '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7'
         network_uuid = '4c8ad117-8c78-4df0-8471-3dc1f1af6f2e'
         interface_uuid = 'a7a25f51-99fe-4a7e-be64-16d230609d51'
