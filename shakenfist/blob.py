@@ -62,7 +62,7 @@ from shakenfist.util import concurrency as util_concurrency
 LOG, _ = logs.setup(__name__)
 
 
-def _local_node_uuid():
+def _local_node_uuid() -> Optional[str]:
     """Resolve the UUID of the current node.
 
     config.NODE_UUID may be None when the environment variable was not
