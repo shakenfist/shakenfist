@@ -1653,6 +1653,13 @@ class Instance(dbowo):
         else:
             node = placement['node']
 
+        if not node:
+            self.add_event(
+                EVENT_TYPE_AUDIT,
+                'cannot enqueue delete, instance has no placement '
+                'and local node UUID is not configured')
+            return
+
         # Determine which outstanding cluster operations should be cancelled
         # for this instance. I don't love this approach, but I cannot think
         # of something which isn't terrible in some other way right now either.
