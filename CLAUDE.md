@@ -87,7 +87,7 @@ performs essential post-processing.
 ### Python Style
 
 - Use **single quotes** for strings, **double quotes** for docstrings
-- Wrap lines at **80 characters**
+- Wrap lines at **120 characters**
 - Trim trailing whitespace
 - Follow existing import ordering (stdlib, third-party, shakenfist)
 

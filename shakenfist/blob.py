@@ -886,13 +886,8 @@ class Blob(dbo):
                     if not node_obj:
                         continue
                     nbo_create_and_enqueue(
-                        str(node_obj.uuid),
-                        self.uuid,
-                        [nbo_tasks.ensure_local],
-                        PRIORITY.background_high_io)
-                    self.log.with_fields(
-                        {'node': node_fqdn}).info(
-                        'Instructed to replicate blob')
+                        str(node_obj.uuid), self.uuid, [nbo_tasks.ensure_local], PRIORITY.background_high_io)
+                    self.log.with_fields({'node': node_fqdn}).info('Instructed to replicate blob')
 
     def register(self, request_checksums: bool = True) -> None:
         # We don't remove the partial file until we've finished registering the

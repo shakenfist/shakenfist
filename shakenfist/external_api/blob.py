@@ -320,10 +320,8 @@ class BlobChecksumEndpoint(api_base.Resource):
         if not location_node:
             return None
         nbo_create_and_enqueue(
-            str(location_node.uuid),
-            blob_from_db.uuid,
-            [nbo_tasks.verify_size_and_checksum],
-            PRIORITY.user_waiting)
+            str(location_node.uuid), blob_from_db.uuid,
+            [nbo_tasks.verify_size_and_checksum], PRIORITY.user_waiting)
 
 
 class BlobChecksumsEndpoint(api_base.Resource):

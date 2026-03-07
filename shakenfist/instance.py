@@ -329,8 +329,7 @@ class Instance(dbowo):
     def _upgrade_step_17_to_18(cls, static_values):
         # Convert placement['node'] from FQDN to node UUID. The scheduler
         # and queue system now use node UUIDs instead of FQDNs.
-        placement = etcd.get(
-            'attribute/instance', static_values['uuid'], 'placement')
+        placement = etcd.get('attribute/instance', static_values['uuid'], 'placement')
         if not placement or not placement.get('node'):
             return
 
@@ -343,9 +342,7 @@ class Instance(dbowo):
             n = Node.from_db(node_value)
             if n:
                 placement['node'] = str(n.uuid)
-                etcd.put(
-                    'attribute/instance', static_values['uuid'],
-                    'placement', placement)
+                etcd.put('attribute/instance', static_values['uuid'], 'placement', placement)
 
     @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,

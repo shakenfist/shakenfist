@@ -51,8 +51,7 @@ def get_active_node_metrics():
         try:
             # Metrics are stored under the node UUID
             node_uuid = str(n.uuid)
-            new_metrics = etcd.get(
-                'metrics', node_uuid, None)
+            new_metrics = etcd.get('metrics', node_uuid, None)
             if new_metrics:
                 if (time.time()
                         - new_metrics.get('timestamp', 0)
