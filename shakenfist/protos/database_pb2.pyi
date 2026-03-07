@@ -2700,3 +2700,232 @@ class DeleteNodeAttributesRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
 
 global___DeleteNodeAttributesRequest = DeleteNodeAttributesRequest
+
+@typing.final
+class NamespaceStaticData(google.protobuf.message.Message):
+    """Namespace Operations (MariaDB)
+    Namespaces use their name (string) as primary key, not a UUID.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """Namespace name (primary key)"""
+    version: builtins.int
+    """Object version number"""
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+        version: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["name", b"name", "version", b"version"]) -> None: ...
+
+global___NamespaceStaticData = NamespaceStaticData
+
+@typing.final
+class CreateNamespaceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    @property
+    def namespace(self) -> global___NamespaceStaticData: ...
+    def __init__(
+        self,
+        *,
+        namespace: global___NamespaceStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["namespace", b"namespace"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["namespace", b"namespace"]) -> None: ...
+
+global___CreateNamespaceRequest = CreateNamespaceRequest
+
+@typing.final
+class GetNamespaceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["name", b"name"]) -> None: ...
+
+global___GetNamespaceRequest = GetNamespaceRequest
+
+@typing.final
+class GetNamespaceReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def namespace(self) -> global___NamespaceStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        namespace: global___NamespaceStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["namespace", b"namespace"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["found", b"found", "namespace", b"namespace"]) -> None: ...
+
+global___GetNamespaceReply = GetNamespaceReply
+
+@typing.final
+class GetAllNamespaceNamesRequest(google.protobuf.message.Message):
+    """No filters - returns all namespace names"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetAllNamespaceNamesRequest = GetAllNamespaceNamesRequest
+
+@typing.final
+class GetAllNamespaceNamesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMES_FIELD_NUMBER: builtins.int
+    @property
+    def names(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        names: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["names", b"names"]) -> None: ...
+
+global___GetAllNamespaceNamesReply = GetAllNamespaceNamesReply
+
+@typing.final
+class DeleteNamespaceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["name", b"name"]) -> None: ...
+
+global___DeleteNamespaceRequest = DeleteNamespaceRequest
+
+@typing.final
+class NamespaceAttributesProto(google.protobuf.message.Message):
+    """Namespace Attributes Operations (MariaDB)"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    KEYS_JSON_FIELD_NUMBER: builtins.int
+    TRUST_JSON_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """References namespaces.name"""
+    keys_json: builtins.str
+    """JSON-encoded keys dict"""
+    trust_json: builtins.str
+    """JSON-encoded trust list"""
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+        keys_json: builtins.str = ...,
+        trust_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["keys_json", b"keys_json", "name", b"name", "trust_json", b"trust_json"]) -> None: ...
+
+global___NamespaceAttributesProto = NamespaceAttributesProto
+
+@typing.final
+class CreateNamespaceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___NamespaceAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___NamespaceAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateNamespaceAttributesRequest = CreateNamespaceAttributesRequest
+
+@typing.final
+class GetNamespaceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["name", b"name"]) -> None: ...
+
+global___GetNamespaceAttributesRequest = GetNamespaceAttributesRequest
+
+@typing.final
+class GetNamespaceAttributesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___NamespaceAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___NamespaceAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetNamespaceAttributesReply = GetNamespaceAttributesReply
+
+@typing.final
+class UpdateNamespaceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___NamespaceAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___NamespaceAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___UpdateNamespaceAttributesRequest = UpdateNamespaceAttributesRequest
+
+@typing.final
+class DeleteNamespaceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["name", b"name"]) -> None: ...
+
+global___DeleteNamespaceAttributesRequest = DeleteNamespaceAttributesRequest

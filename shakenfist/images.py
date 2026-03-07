@@ -316,7 +316,7 @@ class ImageFetchHelper:
                 # We will cache this transcode, but we do it later as part of a
                 # task so the instance isn't waiting for it.
                 ic_create_and_enqueue(
-                    config.NODE_NAME,
+                    config.NODE_UUID,
                     b.uuid,
                     cache_path,
                     TRANSCODE_DESCRIPTION,

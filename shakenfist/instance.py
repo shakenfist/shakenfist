@@ -14,6 +14,7 @@ import time
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from functools import partial
+import uuid
 from uuid import uuid4
 
 import jinja2
@@ -153,7 +154,7 @@ class ConnectedVSockChannel():
 
 class Instance(dbowo):
     object_type = ObjectType.INSTANCE
-    current_version = 17
+    current_version = 18
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -323,6 +324,25 @@ class Instance(dbowo):
     def _upgrade_step_16_to_17(cls, static_values):
         # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
+
+    @classmethod
+    def _upgrade_step_17_to_18(cls, static_values):
+        # Convert placement['node'] from FQDN to node UUID. The scheduler
+        # and queue system now use node UUIDs instead of FQDNs.
+        placement = etcd.get('attribute/instance', static_values['uuid'], 'placement')
+        if not placement or not placement.get('node'):
+            return
+
+        node_value = placement['node']
+        try:
+            uuid.UUID(node_value)
+            # Already a UUID, nothing to do
+        except ValueError:
+            # It's an FQDN, look up the node to get its UUID
+            n = Node.from_db(node_value)
+            if n:
+                placement['node'] = str(n.uuid)
+                etcd.put('attribute/instance', static_values['uuid'], 'placement', placement)
 
     @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
@@ -1629,7 +1649,7 @@ class Instance(dbowo):
         # If this instance is not on a node, just enqueue on this node
         placement = self.placement
         if not placement.get('node'):
-            node = config.NODE_NAME
+            node = config.NODE_UUID
         else:
             node = placement['node']
 
@@ -1757,7 +1777,7 @@ class Instance(dbowo):
                 ))
 
         op_type, op_uuid = niso_create_and_enqueue(
-            config.NODE_NAME,
+            config.NODE_UUID,
             self.uuid,
             snapshots,
             [niso_tasks.instance_snapshot],
