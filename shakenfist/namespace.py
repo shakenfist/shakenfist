@@ -261,7 +261,28 @@ class Namespaces(dbo_iter):
     base_object = Namespace
 
     def __iter__(self):
-        for name in mariadb.get_all_namespace_names():
+        all_names = mariadb.get_all_namespace_names()
+
+        # Apply state prefilter if specified
+        if self.prefilter:
+            if self.prefilter == 'active':
+                target_states = self.base_object.ACTIVE_STATES
+            elif self.prefilter == 'deleted':
+                target_states = [dbo.STATE_DELETED]
+            elif self.prefilter == 'healthy':
+                target_states = self.base_object.HEALTHY_STATES
+            elif self.prefilter == 'inactive':
+                target_states = self.base_object.INACTIVE_STATES
+            else:
+                # Late import to avoid circular imports
+                from shakenfist import exceptions
+                raise exceptions.InvalidObjectPrefilter(self.prefilter)
+
+            matching = set(mariadb.get_objects_by_state(
+                ObjectType.NAMESPACE, list(target_states)))
+            all_names = [n for n in all_names if n in matching]
+
+        for name in all_names:
             n = Namespace.from_db(name)
             if not n:
                 continue
