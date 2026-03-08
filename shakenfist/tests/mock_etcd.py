@@ -18,6 +18,8 @@ from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist.schema.dnsmasq import DnsMasqData
+from shakenfist.schema.namespace_attributes import NamespaceAttributesData
+from shakenfist.schema.namespace_data import NamespaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.ipam_reservation import IPAMReservation
@@ -40,6 +42,8 @@ class MockEtcd():
         self.mariadb_states = {}  # Mock MariaDB state storage
         self.ipam_reservations = {}  # Mock MariaDB IPAM reservations storage
         self.dnsmasq_objects = {}  # Mock MariaDB DnsMasq object storage
+        self.namespace_objects = {}  # Mock MariaDB namespace storage
+        self.namespace_attributes = {}  # Mock MariaDB namespace attributes
         self.node_objects = {}  # Mock MariaDB node storage
         self.node_attributes = {}  # Mock MariaDB node attributes
         self.obj_counter = count(1)
@@ -309,9 +313,60 @@ class MockEtcd():
         self.test_obj.addCleanup(
             self.mariadb_delete_node_attributes.stop)
 
+        # Mock MariaDB Namespace operations
+        self.mariadb_create_namespace = mock.patch(
+            'shakenfist.mariadb.create_namespace',
+            side_effect=self._mariadb_create_namespace)
+        self.mariadb_create_namespace.start()
+        self.test_obj.addCleanup(self.mariadb_create_namespace.stop)
+
+        self.mariadb_get_namespace = mock.patch(
+            'shakenfist.mariadb.get_namespace',
+            side_effect=self._mariadb_get_namespace)
+        self.mariadb_get_namespace.start()
+        self.test_obj.addCleanup(self.mariadb_get_namespace.stop)
+
+        self.mariadb_get_all_namespace_names = mock.patch(
+            'shakenfist.mariadb.get_all_namespace_names',
+            side_effect=self._mariadb_get_all_namespace_names)
+        self.mariadb_get_all_namespace_names.start()
+        self.test_obj.addCleanup(self.mariadb_get_all_namespace_names.stop)
+
+        self.mariadb_delete_namespace = mock.patch(
+            'shakenfist.mariadb.delete_namespace',
+            side_effect=self._mariadb_delete_namespace)
+        self.mariadb_delete_namespace.start()
+        self.test_obj.addCleanup(self.mariadb_delete_namespace.stop)
+
+        self.mariadb_create_namespace_attributes = mock.patch(
+            'shakenfist.mariadb.create_namespace_attributes',
+            side_effect=self._mariadb_create_namespace_attributes)
+        self.mariadb_create_namespace_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_create_namespace_attributes.stop)
+
+        self.mariadb_get_namespace_attributes = mock.patch(
+            'shakenfist.mariadb.get_namespace_attributes',
+            side_effect=self._mariadb_get_namespace_attributes)
+        self.mariadb_get_namespace_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_get_namespace_attributes.stop)
+
+        self.mariadb_update_namespace_attributes = mock.patch(
+            'shakenfist.mariadb.update_namespace_attributes',
+            side_effect=self._mariadb_update_namespace_attributes)
+        self.mariadb_update_namespace_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_update_namespace_attributes.stop)
+
+        self.mariadb_delete_namespace_attributes = mock.patch(
+            'shakenfist.mariadb.delete_namespace_attributes',
+            side_effect=self._mariadb_delete_namespace_attributes)
+        self.mariadb_delete_namespace_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_delete_namespace_attributes.stop)
+
         # Setup basic DB data
+        self.node_uuids = {}
         for n in self.nodes:
-            Node.new(n[0], n[1])
+            node_obj = Node.new(n[0], n[1])
+            self.node_uuids[n[0]] = str(node_obj.uuid)
 
     def next_uuid(self):
         """Generate predictable UUIDs that are unique during the testcase"""
@@ -747,6 +802,74 @@ class MockEtcd():
         return False
 
     #
+    # MariaDB Namespace mock operations
+    #
+
+    def _mariadb_create_namespace(self, name, version) -> bool:
+        """Mock implementation of mariadb.create_namespace()"""
+        if name in self.namespace_objects:
+            self._trace(f'MockMariaDB.create_namespace({name}): exists')
+            return False
+        data = NamespaceData(name=name, version=version)
+        self.namespace_objects[name] = data
+        self._trace(f'MockMariaDB.create_namespace({name}): created')
+        return True
+
+    def _mariadb_get_namespace(self, name) -> Optional[NamespaceData]:
+        """Mock implementation of mariadb.get_namespace()"""
+        data = self.namespace_objects.get(name)
+        self._trace(f'MockMariaDB.get_namespace({name}): {data}')
+        return data
+
+    def _mariadb_get_all_namespace_names(self) -> list[str]:
+        """Mock implementation of mariadb.get_all_namespace_names()"""
+        result = sorted(self.namespace_objects.keys())
+        self._trace(f'MockMariaDB.get_all_namespace_names(): {result}')
+        return result
+
+    def _mariadb_delete_namespace(self, name) -> bool:
+        """Mock implementation of mariadb.delete_namespace()"""
+        if name in self.namespace_objects:
+            del self.namespace_objects[name]
+            self._trace(f'MockMariaDB.delete_namespace({name}): deleted')
+            return True
+        self._trace(f'MockMariaDB.delete_namespace({name}): not found')
+        return False
+
+    def _mariadb_create_namespace_attributes(self, data: NamespaceAttributesData) -> bool:
+        """Mock implementation of mariadb.create_namespace_attributes()"""
+        if data.name in self.namespace_attributes:
+            self._trace(f'MockMariaDB.create_namespace_attributes({data.name}): exists')
+            return False
+        self.namespace_attributes[data.name] = data
+        self._trace(f'MockMariaDB.create_namespace_attributes({data.name}): created')
+        return True
+
+    def _mariadb_get_namespace_attributes(self, name) -> Optional[NamespaceAttributesData]:
+        """Mock implementation of mariadb.get_namespace_attributes()"""
+        data = self.namespace_attributes.get(name)
+        self._trace(f'MockMariaDB.get_namespace_attributes({name}): {data}')
+        return data
+
+    def _mariadb_update_namespace_attributes(self, data: NamespaceAttributesData) -> bool:
+        """Mock implementation of mariadb.update_namespace_attributes()"""
+        if data.name in self.namespace_attributes:
+            self.namespace_attributes[data.name] = data
+            self._trace(f'MockMariaDB.update_namespace_attributes({data.name}): updated')
+            return True
+        self._trace(f'MockMariaDB.update_namespace_attributes({data.name}): not found')
+        return False
+
+    def _mariadb_delete_namespace_attributes(self, name) -> bool:
+        """Mock implementation of mariadb.delete_namespace_attributes()"""
+        if name in self.namespace_attributes:
+            del self.namespace_attributes[name]
+            self._trace(f'MockMariaDB.delete_namespace_attributes({name}): deleted')
+            return True
+        self._trace(f'MockMariaDB.delete_namespace_attributes({name}): not found')
+        return False
+
+    #
     # DB operations - Low level
     #
 
@@ -874,9 +997,11 @@ class MockEtcd():
             }
 
         for n in self.nodes:
-            key = '/sf/metrics/%s/' % n[0]
+            node_uuid = self.node_uuids[n[0]]
+            key = '/sf/metrics/%s/' % node_uuid
             metrics['is_hypervisor'] = 'hypervisor' in n[2]
             data = {
+                'node_uuid': node_uuid,
                 'fqdn': n[0],
                 'timestamp': time.time(),
                 'metrics': metrics,

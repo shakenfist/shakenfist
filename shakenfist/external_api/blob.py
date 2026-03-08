@@ -23,6 +23,7 @@ from shakenfist.blob import Blob
 from shakenfist.constants import BLOB_HASH_ALGORITHMS
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import mariadb
+from shakenfist.node import Node
 from shakenfist.daemons import daemon
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
@@ -314,11 +315,13 @@ class BlobChecksumEndpoint(api_base.Resource):
         locations = blob_from_db.locations
         if not locations:
             return None
+        # Locations are FQDNs (from BLOB_LOCATION refs), convert to UUID
+        location_node = Node.from_db(locations[0])
+        if not location_node:
+            return None
         nbo_create_and_enqueue(
-            locations[0],
-            blob_from_db.uuid,
-            [nbo_tasks.verify_size_and_checksum],
-            PRIORITY.user_waiting)
+            str(location_node.uuid), blob_from_db.uuid,
+            [nbo_tasks.verify_size_and_checksum], PRIORITY.user_waiting)
 
 
 class BlobChecksumsEndpoint(api_base.Resource):

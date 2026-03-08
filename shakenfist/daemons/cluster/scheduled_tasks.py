@@ -114,11 +114,14 @@ def _process_per_blob_queue(execution_limit=10):
                 continue
 
             if not requests_by_node[node_uuid]:
+                # Blob locations are FQDNs (from BLOB_LOCATION refs),
+                # but create_and_enqueue requires a node UUID.
+                node_obj = Node.from_db(node_uuid)
+                if not node_obj:
+                    continue
                 nbo_schema.create_and_enqueue(
-                    node_uuid,
-                    b.uuid,
-                    [nbo_schema.model_tasks.verify_size_and_checksum],
-                    bco_schema.PRIORITY.background_high_io)
+                    str(node_obj.uuid), b.uuid,
+                    [nbo_schema.model_tasks.verify_size_and_checksum], bco_schema.PRIORITY.background_high_io)
 
 
 @util_general.recorded_method
@@ -185,7 +188,7 @@ def _process_per_instance_queue(execution_limit=10):
             continue
 
         nio_schema.create_and_enqueue(
-            node.fqdn,
+            str(node.uuid),
             inst.uuid,
             [
                 nio_schema.model_tasks.collect_billing_statistics,

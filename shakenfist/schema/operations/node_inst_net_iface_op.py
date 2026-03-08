@@ -31,8 +31,7 @@ class model_tasks(Enum):
 
 class model(BaseModel):
     uuid: UUID4
-    # This should be a UUID, but there's some history...
-    node_uuid: str
+    node_uuid: UUID4
     instance_uuid: UUID4
     network_uuid: UUID4
     interface_uuid: UUID4

@@ -121,6 +121,21 @@ service DatabaseService {
   rpc GetNodeAttributes (GetNodeAttributesRequest) returns (GetNodeAttributesReply) {}
   rpc UpdateNodeAttributes (UpdateNodeAttributesRequest) returns (StatusReply) {}
   rpc DeleteNodeAttributes (DeleteNodeAttributesRequest) returns (StatusReply) {}
+
+  // Namespace Operations (MariaDB)
+  // These manage namespace static values (name, version) in MariaDB.
+  // Namespaces use their name as primary key (not a UUID).
+  rpc CreateNamespace (CreateNamespaceRequest) returns (StatusReply) {}
+  rpc GetNamespace (GetNamespaceRequest) returns (GetNamespaceReply) {}
+  rpc GetAllNamespaceNames (GetAllNamespaceNamesRequest) returns (GetAllNamespaceNamesReply) {}
+  rpc DeleteNamespace (DeleteNamespaceRequest) returns (StatusReply) {}
+
+  // Namespace Attributes Operations (MariaDB)
+  // These store mutable namespace attributes (keys, trust).
+  rpc CreateNamespaceAttributes (CreateNamespaceAttributesRequest) returns (StatusReply) {}
+  rpc GetNamespaceAttributes (GetNamespaceAttributesRequest) returns (GetNamespaceAttributesReply) {}
+  rpc UpdateNamespaceAttributes (UpdateNamespaceAttributesRequest) returns (StatusReply) {}
+  rpc DeleteNamespaceAttributes (DeleteNamespaceAttributesRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -877,4 +892,66 @@ message UpdateNodeAttributesRequest {
 
 message DeleteNodeAttributesRequest {
   string uuid = 1;
+}
+
+// Namespace Operations (MariaDB)
+// Namespaces use their name (string) as primary key, not a UUID.
+
+message NamespaceStaticData {
+  string name = 1;        // Namespace name (primary key)
+  int32 version = 2;      // Object version number
+}
+
+message CreateNamespaceRequest {
+  NamespaceStaticData namespace = 1;
+}
+
+message GetNamespaceRequest {
+  string name = 1;
+}
+
+message GetNamespaceReply {
+  bool found = 1;
+  NamespaceStaticData namespace = 2;
+}
+
+message GetAllNamespaceNamesRequest {
+  // No filters - returns all namespace names
+}
+
+message GetAllNamespaceNamesReply {
+  repeated string names = 1;
+}
+
+message DeleteNamespaceRequest {
+  string name = 1;
+}
+
+// Namespace Attributes Operations (MariaDB)
+
+message NamespaceAttributesProto {
+  string name = 1;          // References namespaces.name
+  string keys_json = 2;     // JSON-encoded keys dict
+  string trust_json = 3;    // JSON-encoded trust list
+}
+
+message CreateNamespaceAttributesRequest {
+  NamespaceAttributesProto data = 1;
+}
+
+message GetNamespaceAttributesRequest {
+  string name = 1;
+}
+
+message GetNamespaceAttributesReply {
+  bool found = 1;
+  NamespaceAttributesProto data = 2;
+}
+
+message UpdateNamespaceAttributesRequest {
+  NamespaceAttributesProto data = 1;
+}
+
+message DeleteNamespaceAttributesRequest {
+  string name = 1;
 }

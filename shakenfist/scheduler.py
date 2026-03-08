@@ -49,9 +49,9 @@ def get_active_node_metrics():
 
     for n in Nodes([], prefilter='active'):
         try:
-            # Metrics are stored under the node FQDN
-            new_metrics = etcd.get(
-                'metrics', n.fqdn, None)
+            # Metrics are stored under the node UUID
+            node_uuid = str(n.uuid)
+            new_metrics = etcd.get('metrics', node_uuid, None)
             if new_metrics:
                 if (time.time()
                         - new_metrics.get('timestamp', 0)
@@ -70,7 +70,7 @@ def get_active_node_metrics():
                     'empty metrics from database '
                     'for node')
                 new_metrics = {}
-            metrics[n.fqdn] = new_metrics
+            metrics[node_uuid] = new_metrics
 
         except exceptions.ReadException:
             n.add_event(

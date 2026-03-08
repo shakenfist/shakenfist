@@ -76,7 +76,7 @@ class NodeAgentopOpTestCase(base.ShakenFistTestCase):
     )
     @mock.patch('time.time', return_value=123.0)
     def test_create_and_enqueue(self, _mock_time, _mock_id):
-        node_uuid = 'sf-1'
+        node_uuid = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
         agentoperation_uuid = '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7'
         op_type, op_uuid = create_and_enqueue(
             node_uuid, agentoperation_uuid, [model_tasks.preflight],
@@ -89,7 +89,7 @@ class NodeAgentopOpTestCase(base.ShakenFistTestCase):
                 'agentoperation_uuid': '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7',
                 'depends_on': None,
                 'runs_after': None,
-                'node_uuid': 'sf-1',
+                'node_uuid': 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
                 'priority': 'background',
                 'request_id': None,
                 'tasks': ['preflight'],
@@ -112,14 +112,14 @@ class NodeAgentopOpTestCase(base.ShakenFistTestCase):
             },
             self.mock_etcd.get_raw(
                 (
-                    '/sf/queue/sf-1-clusteroperation-background/'
+                    '/sf/queue/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d-clusteroperation-background/'
                     '123.0-asdjfhkjadsfh'
                 )
             )
         )
 
     def test_load_from_etcd(self):
-        node_uuid = 'sf-1'
+        node_uuid = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
         agentoperation_uuid = '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7'
         _, op_uuid = create_and_enqueue(
             node_uuid, agentoperation_uuid, [model_tasks.preflight],
