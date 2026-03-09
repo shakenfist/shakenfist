@@ -503,6 +503,81 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateArtifact: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateArtifactRequest,
+        database_pb2.StatusReply,
+    ]
+    """Artifact Operations (MariaDB)
+    These manage artifact static values (uuid, type, source_url, name, namespace)
+    in MariaDB. Artifacts represent versioned disk images.
+    """
+
+    GetArtifact: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetArtifactRequest,
+        database_pb2.GetArtifactReply,
+    ]
+
+    GetAllArtifacts: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllArtifactsRequest,
+        database_pb2.GetAllArtifactsReply,
+    ]
+
+    DeleteArtifact: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteArtifactRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateArtifactAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateArtifactAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Artifact Attributes Operations (MariaDB)
+    These store mutable artifact attributes (max_versions, shared, highest_index).
+    """
+
+    GetArtifactAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetArtifactAttributesRequest,
+        database_pb2.GetArtifactAttributesReply,
+    ]
+
+    UpdateArtifactAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateArtifactAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteArtifactAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteArtifactAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateArtifactIndex: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateArtifactIndexRequest,
+        database_pb2.StatusReply,
+    ]
+    """Artifact Index Operations (MariaDB)
+    These manage artifact version indexes, mapping index numbers to blob UUIDs.
+    """
+
+    GetArtifactIndex: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetArtifactIndexRequest,
+        database_pb2.GetArtifactIndexReply,
+    ]
+
+    GetAllArtifactIndexes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllArtifactIndexesRequest,
+        database_pb2.GetAllArtifactIndexesReply,
+    ]
+
+    DeleteArtifactIndex: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteArtifactIndexRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteAllArtifactIndexes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteAllArtifactIndexesRequest,
+        database_pb2.DeleteCountReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -986,6 +1061,81 @@ class DatabaseServiceAsyncStub:
     DeleteNamespaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteNamespaceAttributesRequest,
         database_pb2.StatusReply,
+    ]
+
+    CreateArtifact: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateArtifactRequest,
+        database_pb2.StatusReply,
+    ]
+    """Artifact Operations (MariaDB)
+    These manage artifact static values (uuid, type, source_url, name, namespace)
+    in MariaDB. Artifacts represent versioned disk images.
+    """
+
+    GetArtifact: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetArtifactRequest,
+        database_pb2.GetArtifactReply,
+    ]
+
+    GetAllArtifacts: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllArtifactsRequest,
+        database_pb2.GetAllArtifactsReply,
+    ]
+
+    DeleteArtifact: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteArtifactRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateArtifactAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateArtifactAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Artifact Attributes Operations (MariaDB)
+    These store mutable artifact attributes (max_versions, shared, highest_index).
+    """
+
+    GetArtifactAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetArtifactAttributesRequest,
+        database_pb2.GetArtifactAttributesReply,
+    ]
+
+    UpdateArtifactAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateArtifactAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteArtifactAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteArtifactAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateArtifactIndex: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateArtifactIndexRequest,
+        database_pb2.StatusReply,
+    ]
+    """Artifact Index Operations (MariaDB)
+    These manage artifact version indexes, mapping index numbers to blob UUIDs.
+    """
+
+    GetArtifactIndex: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetArtifactIndexRequest,
+        database_pb2.GetArtifactIndexReply,
+    ]
+
+    GetAllArtifactIndexes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllArtifactIndexesRequest,
+        database_pb2.GetAllArtifactIndexesReply,
+    ]
+
+    DeleteArtifactIndex: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteArtifactIndexRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteAllArtifactIndexes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteAllArtifactIndexesRequest,
+        database_pb2.DeleteCountReply,
     ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
@@ -1654,5 +1804,106 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteNamespaceAttributesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateArtifact(
+        self,
+        request: database_pb2.CreateArtifactRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Artifact Operations (MariaDB)
+        These manage artifact static values (uuid, type, source_url, name, namespace)
+        in MariaDB. Artifacts represent versioned disk images.
+        """
+
+    @abc.abstractmethod
+    def GetArtifact(
+        self,
+        request: database_pb2.GetArtifactRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetArtifactReply, collections.abc.Awaitable[database_pb2.GetArtifactReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllArtifacts(
+        self,
+        request: database_pb2.GetAllArtifactsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllArtifactsReply, collections.abc.Awaitable[database_pb2.GetAllArtifactsReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteArtifact(
+        self,
+        request: database_pb2.DeleteArtifactRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateArtifactAttributes(
+        self,
+        request: database_pb2.CreateArtifactAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Artifact Attributes Operations (MariaDB)
+        These store mutable artifact attributes (max_versions, shared, highest_index).
+        """
+
+    @abc.abstractmethod
+    def GetArtifactAttributes(
+        self,
+        request: database_pb2.GetArtifactAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetArtifactAttributesReply, collections.abc.Awaitable[database_pb2.GetArtifactAttributesReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateArtifactAttributes(
+        self,
+        request: database_pb2.UpdateArtifactAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteArtifactAttributes(
+        self,
+        request: database_pb2.DeleteArtifactAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateArtifactIndex(
+        self,
+        request: database_pb2.CreateArtifactIndexRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Artifact Index Operations (MariaDB)
+        These manage artifact version indexes, mapping index numbers to blob UUIDs.
+        """
+
+    @abc.abstractmethod
+    def GetArtifactIndex(
+        self,
+        request: database_pb2.GetArtifactIndexRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetArtifactIndexReply, collections.abc.Awaitable[database_pb2.GetArtifactIndexReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllArtifactIndexes(
+        self,
+        request: database_pb2.GetAllArtifactIndexesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllArtifactIndexesReply, collections.abc.Awaitable[database_pb2.GetAllArtifactIndexesReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteArtifactIndex(
+        self,
+        request: database_pb2.DeleteArtifactIndexRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteAllArtifactIndexes(
+        self,
+        request: database_pb2.DeleteAllArtifactIndexesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

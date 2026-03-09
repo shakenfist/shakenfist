@@ -136,6 +136,29 @@ service DatabaseService {
   rpc GetNamespaceAttributes (GetNamespaceAttributesRequest) returns (GetNamespaceAttributesReply) {}
   rpc UpdateNamespaceAttributes (UpdateNamespaceAttributesRequest) returns (StatusReply) {}
   rpc DeleteNamespaceAttributes (DeleteNamespaceAttributesRequest) returns (StatusReply) {}
+
+  // Artifact Operations (MariaDB)
+  // These manage artifact static values (uuid, type, source_url, name, namespace)
+  // in MariaDB. Artifacts represent versioned disk images.
+  rpc CreateArtifact (CreateArtifactRequest) returns (StatusReply) {}
+  rpc GetArtifact (GetArtifactRequest) returns (GetArtifactReply) {}
+  rpc GetAllArtifacts (GetAllArtifactsRequest) returns (GetAllArtifactsReply) {}
+  rpc DeleteArtifact (DeleteArtifactRequest) returns (StatusReply) {}
+
+  // Artifact Attributes Operations (MariaDB)
+  // These store mutable artifact attributes (max_versions, shared, highest_index).
+  rpc CreateArtifactAttributes (CreateArtifactAttributesRequest) returns (StatusReply) {}
+  rpc GetArtifactAttributes (GetArtifactAttributesRequest) returns (GetArtifactAttributesReply) {}
+  rpc UpdateArtifactAttributes (UpdateArtifactAttributesRequest) returns (StatusReply) {}
+  rpc DeleteArtifactAttributes (DeleteArtifactAttributesRequest) returns (StatusReply) {}
+
+  // Artifact Index Operations (MariaDB)
+  // These manage artifact version indexes, mapping index numbers to blob UUIDs.
+  rpc CreateArtifactIndex (CreateArtifactIndexRequest) returns (StatusReply) {}
+  rpc GetArtifactIndex (GetArtifactIndexRequest) returns (GetArtifactIndexReply) {}
+  rpc GetAllArtifactIndexes (GetAllArtifactIndexesRequest) returns (GetAllArtifactIndexesReply) {}
+  rpc DeleteArtifactIndex (DeleteArtifactIndexRequest) returns (StatusReply) {}
+  rpc DeleteAllArtifactIndexes (DeleteAllArtifactIndexesRequest) returns (DeleteCountReply) {}
 }
 
 // Generic status reply
@@ -954,4 +977,113 @@ message UpdateNamespaceAttributesRequest {
 
 message DeleteNamespaceAttributesRequest {
   string name = 1;
+}
+
+// Artifact Operations (MariaDB)
+// These manage artifact static values in MariaDB. Artifacts are versioned
+// disk images (snapshots, labels, images) with namespace ownership.
+
+message ArtifactStaticData {
+  string uuid = 1;            // UUID as string
+  string artifact_type = 2;   // 'snapshot', 'label', 'image', 'other'
+  string source_url = 3;      // Origin URL (sf://blob/, sf://snapshot/, etc.)
+  string name = 4;            // Human-readable name
+  string namespace = 5;       // Owning namespace
+  int32 version = 6;          // Object version number
+}
+
+message CreateArtifactRequest {
+  ArtifactStaticData artifact = 1;
+}
+
+message GetArtifactRequest {
+  string uuid = 1;
+}
+
+message GetArtifactReply {
+  bool found = 1;
+  ArtifactStaticData artifact = 2;
+}
+
+message GetAllArtifactsRequest {
+  // No filters currently needed - returns all artifacts
+}
+
+message GetAllArtifactsReply {
+  repeated ArtifactStaticData artifacts = 1;
+}
+
+message DeleteArtifactRequest {
+  string uuid = 1;
+}
+
+// Artifact Attributes Operations (MariaDB)
+// These store mutable artifact attributes, separate from ArtifactStaticData.
+
+message ArtifactAttributesProto {
+  string uuid = 1;            // References artifacts.uuid
+  int32 max_versions = 2;     // Maximum versions to keep
+  bool shared = 3;            // Whether shared across namespaces
+  int32 highest_index = 4;    // Current highest version index number
+}
+
+message CreateArtifactAttributesRequest {
+  ArtifactAttributesProto data = 1;
+}
+
+message GetArtifactAttributesRequest {
+  string uuid = 1;
+}
+
+message GetArtifactAttributesReply {
+  bool found = 1;
+  ArtifactAttributesProto data = 2;
+}
+
+message UpdateArtifactAttributesRequest {
+  ArtifactAttributesProto data = 1;
+}
+
+message DeleteArtifactAttributesRequest {
+  string uuid = 1;
+}
+
+// Artifact Index Operations (MariaDB)
+// These manage artifact version indexes, mapping index numbers to blob UUIDs.
+
+message ArtifactIndexProto {
+  string artifact_uuid = 1;   // The artifact's UUID
+  int32 index_number = 2;     // The version index number
+  string blob_uuid = 3;       // The blob UUID for this version
+}
+
+message CreateArtifactIndexRequest {
+  ArtifactIndexProto data = 1;
+}
+
+message GetArtifactIndexRequest {
+  string artifact_uuid = 1;
+  int32 index_number = 2;
+}
+
+message GetArtifactIndexReply {
+  bool found = 1;
+  ArtifactIndexProto data = 2;
+}
+
+message GetAllArtifactIndexesRequest {
+  string artifact_uuid = 1;
+}
+
+message GetAllArtifactIndexesReply {
+  repeated ArtifactIndexProto indexes = 1;
+}
+
+message DeleteArtifactIndexRequest {
+  string artifact_uuid = 1;
+  int32 index_number = 2;
+}
+
+message DeleteAllArtifactIndexesRequest {
+  string artifact_uuid = 1;
 }
