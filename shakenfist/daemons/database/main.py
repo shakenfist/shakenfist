@@ -38,6 +38,7 @@ from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
+from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
@@ -2286,6 +2287,299 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         return database_pb2.NamespaceAttributesProto(
             name=data.name, keys_json=json.dumps(data.keys), trust_json=json.dumps(data.trust))
 
+    # Artifact Operations (MariaDB)
+    def CreateArtifact(
+        self,
+        request: database_pb2.CreateArtifactRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create an artifact record in MariaDB."""
+        try:
+            self.monitor.counters['create_artifact'].inc()
+            success = mariadb._direct_create_artifact(
+                UUID(request.artifact.uuid),
+                request.artifact.artifact_type,
+                request.artifact.source_url,
+                request.artifact.name,
+                request.artifact.namespace,
+                request.artifact.version
+            )
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateArtifact failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetArtifact(
+        self,
+        request: database_pb2.GetArtifactRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetArtifactReply:
+        """Get artifact static values from MariaDB."""
+        try:
+            self.monitor.counters['get_artifact'].inc()
+            data = mariadb._direct_get_artifact(UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetArtifactReply(found=False)
+            return database_pb2.GetArtifactReply(
+                found=True,
+                artifact=database_pb2.ArtifactStaticData(
+                    uuid=str(data.uuid),
+                    artifact_type=data.artifact_type,
+                    source_url=data.source_url,
+                    name=data.name,
+                    namespace=data.namespace,
+                    version=data.version
+                )
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetArtifact failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetArtifactReply(found=False)
+
+    def GetAllArtifacts(
+        self,
+        request: database_pb2.GetAllArtifactsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllArtifactsReply:
+        """Get all artifacts from MariaDB."""
+        try:
+            self.monitor.counters['get_all_artifacts'].inc()
+            all_artifacts = mariadb._direct_get_all_artifacts()
+            return database_pb2.GetAllArtifactsReply(
+                artifacts=[
+                    database_pb2.ArtifactStaticData(
+                        uuid=str(a.uuid),
+                        artifact_type=a.artifact_type,
+                        source_url=a.source_url,
+                        name=a.name,
+                        namespace=a.namespace,
+                        version=a.version
+                    )
+                    for a in all_artifacts
+                ]
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllArtifacts failed', e)
+            return database_pb2.GetAllArtifactsReply(artifacts=[])
+
+    def DeleteArtifact(
+        self,
+        request: database_pb2.DeleteArtifactRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete an artifact record from MariaDB."""
+        try:
+            self.monitor.counters['delete_artifact'].inc()
+            success = mariadb._direct_delete_artifact(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteArtifact failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    # Artifact Attributes Operations (MariaDB)
+
+    def CreateArtifactAttributes(
+        self,
+        request: database_pb2.CreateArtifactAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create artifact attributes in MariaDB."""
+        try:
+            self.monitor.counters['create_artifact_attributes'].inc()
+            data = ArtifactAttributesData(
+                uuid=UUID(request.data.uuid),
+                max_versions=request.data.max_versions,
+                shared=request.data.shared,
+                highest_index=request.data.highest_index
+            )
+            success = mariadb._direct_create_artifact_attributes(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateArtifactAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetArtifactAttributes(
+        self,
+        request: database_pb2.GetArtifactAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetArtifactAttributesReply:
+        """Get artifact attributes from MariaDB."""
+        try:
+            self.monitor.counters['get_artifact_attributes'].inc()
+            data = mariadb._direct_get_artifact_attributes(
+                UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetArtifactAttributesReply(
+                    found=False)
+            return database_pb2.GetArtifactAttributesReply(
+                found=True,
+                data=database_pb2.ArtifactAttributesProto(
+                    uuid=str(data.uuid),
+                    max_versions=data.max_versions,
+                    shared=data.shared,
+                    highest_index=data.highest_index
+                )
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetArtifactAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetArtifactAttributesReply(found=False)
+
+    def UpdateArtifactAttributes(
+        self,
+        request: database_pb2.UpdateArtifactAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update artifact attributes in MariaDB."""
+        try:
+            self.monitor.counters['update_artifact_attributes'].inc()
+            data = ArtifactAttributesData(
+                uuid=UUID(request.data.uuid),
+                max_versions=request.data.max_versions,
+                shared=request.data.shared,
+                highest_index=request.data.highest_index
+            )
+            success = mariadb._direct_update_artifact_attributes(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateArtifactAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def DeleteArtifactAttributes(
+        self,
+        request: database_pb2.DeleteArtifactAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete artifact attributes from MariaDB."""
+        try:
+            self.monitor.counters['delete_artifact_attributes'].inc()
+            success = mariadb._direct_delete_artifact_attributes(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteArtifactAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    # Artifact Index Operations (MariaDB)
+
+    def CreateArtifactIndex(
+        self,
+        request: database_pb2.CreateArtifactIndexRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create an artifact index in MariaDB."""
+        try:
+            self.monitor.counters['create_artifact_index'].inc()
+            success = mariadb._direct_create_artifact_index(
+                UUID(request.data.artifact_uuid),
+                request.data.index_number,
+                UUID(request.data.blob_uuid)
+            )
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateArtifactIndex failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetArtifactIndex(
+        self,
+        request: database_pb2.GetArtifactIndexRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetArtifactIndexReply:
+        """Get a specific artifact index from MariaDB."""
+        try:
+            self.monitor.counters['get_artifact_index'].inc()
+            data = mariadb._direct_get_artifact_index(
+                UUID(request.artifact_uuid),
+                request.index_number
+            )
+            if data is None:
+                return database_pb2.GetArtifactIndexReply(found=False)
+            return database_pb2.GetArtifactIndexReply(
+                found=True,
+                data=database_pb2.ArtifactIndexProto(
+                    artifact_uuid=str(data.artifact_uuid),
+                    index_number=data.index_number,
+                    blob_uuid=str(data.blob_uuid)
+                )
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetArtifactIndex failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetArtifactIndexReply(found=False)
+
+    def GetAllArtifactIndexes(
+        self,
+        request: database_pb2.GetAllArtifactIndexesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllArtifactIndexesReply:
+        """Get all indexes for an artifact from MariaDB."""
+        try:
+            self.monitor.counters['get_all_artifact_indexes'].inc()
+            indexes = mariadb._direct_get_all_artifact_indexes(
+                UUID(request.artifact_uuid))
+            return database_pb2.GetAllArtifactIndexesReply(
+                indexes=[
+                    database_pb2.ArtifactIndexProto(
+                        artifact_uuid=str(idx.artifact_uuid),
+                        index_number=idx.index_number,
+                        blob_uuid=str(idx.blob_uuid)
+                    )
+                    for idx in indexes
+                ]
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllArtifactIndexes failed', e)
+            return database_pb2.GetAllArtifactIndexesReply(indexes=[])
+
+    def DeleteArtifactIndex(
+        self,
+        request: database_pb2.DeleteArtifactIndexRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a specific artifact index from MariaDB."""
+        try:
+            self.monitor.counters['delete_artifact_index'].inc()
+            success = mariadb._direct_delete_artifact_index(
+                UUID(request.artifact_uuid),
+                request.index_number
+            )
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteArtifactIndex failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def DeleteAllArtifactIndexes(
+        self,
+        request: database_pb2.DeleteAllArtifactIndexesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DeleteCountReply:
+        """Delete all indexes for an artifact from MariaDB."""
+        try:
+            self.monitor.counters['delete_all_artifact_indexes'].inc()
+            count = mariadb._direct_delete_all_artifact_indexes(
+                UUID(request.artifact_uuid))
+            return database_pb2.DeleteCountReply(count=count)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteAllArtifactIndexes failed', e)
+            return database_pb2.DeleteCountReply(count=0)
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -2353,7 +2647,17 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_namespace_attributes',
             'get_namespace_attributes',
             'update_namespace_attributes',
-            'delete_namespace_attributes'
+            'delete_namespace_attributes',
+            # MariaDB artifact operations
+            'create_artifact', 'get_artifact', 'get_all_artifacts',
+            'delete_artifact',
+            # MariaDB artifact attributes operations
+            'create_artifact_attributes', 'get_artifact_attributes',
+            'update_artifact_attributes', 'delete_artifact_attributes',
+            # MariaDB artifact index operations
+            'create_artifact_index', 'get_artifact_index',
+            'get_all_artifact_indexes', 'delete_artifact_index',
+            'delete_all_artifact_indexes'
         ]
         for op in operations:
             self.counters[op] = Counter(
