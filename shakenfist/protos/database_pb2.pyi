@@ -2929,3 +2929,402 @@ class DeleteNamespaceAttributesRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["name", b"name"]) -> None: ...
 
 global___DeleteNamespaceAttributesRequest = DeleteNamespaceAttributesRequest
+
+@typing.final
+class ArtifactStaticData(google.protobuf.message.Message):
+    """Artifact Operations (MariaDB)
+    These manage artifact static values in MariaDB. Artifacts are versioned
+    disk images (snapshots, labels, images) with namespace ownership.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    ARTIFACT_TYPE_FIELD_NUMBER: builtins.int
+    SOURCE_URL_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """UUID as string"""
+    artifact_type: builtins.str
+    """'snapshot', 'label', 'image', 'other'"""
+    source_url: builtins.str
+    """Origin URL (sf://blob/, sf://snapshot/, etc.)"""
+    name: builtins.str
+    """Human-readable name"""
+    namespace: builtins.str
+    """Owning namespace"""
+    version: builtins.int
+    """Object version number"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        artifact_type: builtins.str = ...,
+        source_url: builtins.str = ...,
+        name: builtins.str = ...,
+        namespace: builtins.str = ...,
+        version: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["artifact_type", b"artifact_type", "name", b"name", "namespace", b"namespace", "source_url", b"source_url", "uuid", b"uuid", "version", b"version"]) -> None: ...
+
+global___ArtifactStaticData = ArtifactStaticData
+
+@typing.final
+class CreateArtifactRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ARTIFACT_FIELD_NUMBER: builtins.int
+    @property
+    def artifact(self) -> global___ArtifactStaticData: ...
+    def __init__(
+        self,
+        *,
+        artifact: global___ArtifactStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["artifact", b"artifact"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["artifact", b"artifact"]) -> None: ...
+
+global___CreateArtifactRequest = CreateArtifactRequest
+
+@typing.final
+class GetArtifactRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetArtifactRequest = GetArtifactRequest
+
+@typing.final
+class GetArtifactReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    ARTIFACT_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def artifact(self) -> global___ArtifactStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        artifact: global___ArtifactStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["artifact", b"artifact"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["artifact", b"artifact", "found", b"found"]) -> None: ...
+
+global___GetArtifactReply = GetArtifactReply
+
+@typing.final
+class GetAllArtifactsRequest(google.protobuf.message.Message):
+    """No filters currently needed - returns all artifacts"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetAllArtifactsRequest = GetAllArtifactsRequest
+
+@typing.final
+class GetAllArtifactsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ARTIFACTS_FIELD_NUMBER: builtins.int
+    @property
+    def artifacts(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ArtifactStaticData]: ...
+    def __init__(
+        self,
+        *,
+        artifacts: collections.abc.Iterable[global___ArtifactStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["artifacts", b"artifacts"]) -> None: ...
+
+global___GetAllArtifactsReply = GetAllArtifactsReply
+
+@typing.final
+class DeleteArtifactRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteArtifactRequest = DeleteArtifactRequest
+
+@typing.final
+class ArtifactAttributesProto(google.protobuf.message.Message):
+    """Artifact Attributes Operations (MariaDB)
+    These store mutable artifact attributes, separate from ArtifactStaticData.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    MAX_VERSIONS_FIELD_NUMBER: builtins.int
+    SHARED_FIELD_NUMBER: builtins.int
+    HIGHEST_INDEX_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """References artifacts.uuid"""
+    max_versions: builtins.int
+    """Maximum versions to keep"""
+    shared: builtins.bool
+    """Whether shared across namespaces"""
+    highest_index: builtins.int
+    """Current highest version index number"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        max_versions: builtins.int = ...,
+        shared: builtins.bool = ...,
+        highest_index: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["highest_index", b"highest_index", "max_versions", b"max_versions", "shared", b"shared", "uuid", b"uuid"]) -> None: ...
+
+global___ArtifactAttributesProto = ArtifactAttributesProto
+
+@typing.final
+class CreateArtifactAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___ArtifactAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___ArtifactAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateArtifactAttributesRequest = CreateArtifactAttributesRequest
+
+@typing.final
+class GetArtifactAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetArtifactAttributesRequest = GetArtifactAttributesRequest
+
+@typing.final
+class GetArtifactAttributesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___ArtifactAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___ArtifactAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetArtifactAttributesReply = GetArtifactAttributesReply
+
+@typing.final
+class UpdateArtifactAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___ArtifactAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___ArtifactAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___UpdateArtifactAttributesRequest = UpdateArtifactAttributesRequest
+
+@typing.final
+class DeleteArtifactAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteArtifactAttributesRequest = DeleteArtifactAttributesRequest
+
+@typing.final
+class ArtifactIndexProto(google.protobuf.message.Message):
+    """Artifact Index Operations (MariaDB)
+    These manage artifact version indexes, mapping index numbers to blob UUIDs.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ARTIFACT_UUID_FIELD_NUMBER: builtins.int
+    INDEX_NUMBER_FIELD_NUMBER: builtins.int
+    BLOB_UUID_FIELD_NUMBER: builtins.int
+    artifact_uuid: builtins.str
+    """The artifact's UUID"""
+    index_number: builtins.int
+    """The version index number"""
+    blob_uuid: builtins.str
+    """The blob UUID for this version"""
+    def __init__(
+        self,
+        *,
+        artifact_uuid: builtins.str = ...,
+        index_number: builtins.int = ...,
+        blob_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["artifact_uuid", b"artifact_uuid", "blob_uuid", b"blob_uuid", "index_number", b"index_number"]) -> None: ...
+
+global___ArtifactIndexProto = ArtifactIndexProto
+
+@typing.final
+class CreateArtifactIndexRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___ArtifactIndexProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___ArtifactIndexProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateArtifactIndexRequest = CreateArtifactIndexRequest
+
+@typing.final
+class GetArtifactIndexRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ARTIFACT_UUID_FIELD_NUMBER: builtins.int
+    INDEX_NUMBER_FIELD_NUMBER: builtins.int
+    artifact_uuid: builtins.str
+    index_number: builtins.int
+    def __init__(
+        self,
+        *,
+        artifact_uuid: builtins.str = ...,
+        index_number: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["artifact_uuid", b"artifact_uuid", "index_number", b"index_number"]) -> None: ...
+
+global___GetArtifactIndexRequest = GetArtifactIndexRequest
+
+@typing.final
+class GetArtifactIndexReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___ArtifactIndexProto: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___ArtifactIndexProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetArtifactIndexReply = GetArtifactIndexReply
+
+@typing.final
+class GetAllArtifactIndexesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ARTIFACT_UUID_FIELD_NUMBER: builtins.int
+    artifact_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        artifact_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["artifact_uuid", b"artifact_uuid"]) -> None: ...
+
+global___GetAllArtifactIndexesRequest = GetAllArtifactIndexesRequest
+
+@typing.final
+class GetAllArtifactIndexesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INDEXES_FIELD_NUMBER: builtins.int
+    @property
+    def indexes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ArtifactIndexProto]: ...
+    def __init__(
+        self,
+        *,
+        indexes: collections.abc.Iterable[global___ArtifactIndexProto] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["indexes", b"indexes"]) -> None: ...
+
+global___GetAllArtifactIndexesReply = GetAllArtifactIndexesReply
+
+@typing.final
+class DeleteArtifactIndexRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ARTIFACT_UUID_FIELD_NUMBER: builtins.int
+    INDEX_NUMBER_FIELD_NUMBER: builtins.int
+    artifact_uuid: builtins.str
+    index_number: builtins.int
+    def __init__(
+        self,
+        *,
+        artifact_uuid: builtins.str = ...,
+        index_number: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["artifact_uuid", b"artifact_uuid", "index_number", b"index_number"]) -> None: ...
+
+global___DeleteArtifactIndexRequest = DeleteArtifactIndexRequest
+
+@typing.final
+class DeleteAllArtifactIndexesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ARTIFACT_UUID_FIELD_NUMBER: builtins.int
+    artifact_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        artifact_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["artifact_uuid", b"artifact_uuid"]) -> None: ...
+
+global___DeleteAllArtifactIndexesRequest = DeleteAllArtifactIndexesRequest
