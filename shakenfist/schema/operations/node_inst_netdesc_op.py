@@ -33,8 +33,7 @@ class model_tasks(Enum):
 
 class model(BaseModel):
     uuid: UUID4
-    # This should be a UUID, but there's some history...
-    node_uuid: str
+    node_uuid: UUID4
     instance_uuid: UUID4
     # TODO(mikal): This should be cleaned up to be more strongly typed...
     net_desc: List[dict]

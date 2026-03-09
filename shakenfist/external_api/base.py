@@ -28,6 +28,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.instance import Instance
 from shakenfist.namespace import get_api_token
+from shakenfist.node import Node
 from shakenfist.namespace import Namespace
 from shakenfist.upload import Upload
 from shakenfist.util.access_tokens import parse_jwt_identity
@@ -235,11 +236,22 @@ def redirect_instance_request(func):
         if not placement.get('node'):
             return
 
-        if placement.get('node') != config.NODE_NAME:
+        if not config.NODE_UUID:
+            LOG.warning(
+                'NODE_UUID is not set, cannot determine if '
+                'request should be proxied')
+            return sf_api.error(
+                503, 'node UUID not resolved, cannot route request')
+
+        if placement.get('node') != config.NODE_UUID:
+            target_node = Node.from_db(placement['node'])
+            if not target_node:
+                return sf_api.error(404, 'placement node not found')
+            target_ip = target_node.ip
             path = flask.request.environ['PATH_INFO']
-            url = f'http://{placement["node"]}:13000{path}'
+            url = f'http://{target_ip}:13000{path}'
             api_token = get_api_token(
-                f'http://{placement["node"]}:13000',
+                f'http://{target_ip}:13000',
                 namespace=request_namespace())
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,

@@ -315,14 +315,20 @@ class ImageFetchHelper:
 
                 # We will cache this transcode, but we do it later as part of a
                 # task so the instance isn't waiting for it.
-                ic_create_and_enqueue(
-                    config.NODE_NAME,
-                    b.uuid,
-                    cache_path,
-                    TRANSCODE_DESCRIPTION,
-                    [ic_tasks.archive_transcode],
-                    PRIORITY.background_high_io,
-                    request_id=util_general.get_request_id())
+                node_uuid = blob._local_node_uuid()
+                if node_uuid:
+                    ic_create_and_enqueue(
+                        node_uuid,
+                        b.uuid,
+                        cache_path,
+                        TRANSCODE_DESCRIPTION,
+                        [ic_tasks.archive_transcode],
+                        PRIORITY.background_high_io,
+                        request_id=util_general.get_request_id())
+                else:
+                    LOG.warning(
+                        'Cannot enqueue transcode cache task, '
+                        'node UUID is not available')
 
         shutil.chown(cache_path, config.LIBVIRT_USER, config.LIBVIRT_GROUP)
         add_event_multi(

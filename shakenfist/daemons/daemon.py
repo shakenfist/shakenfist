@@ -148,10 +148,32 @@ class Daemon:
         self.last_stability = None
         self.last_stability_log = 0
 
+    def _resolve_node_uuid(self):
+        """Populate config.NODE_UUID if not already set.
+
+        config.NODE_UUID may be None when SHAKENFIST_NODE_UUID was not
+        set in the environment. We resolve it from the persisted UUID
+        file (written by sentinel_first) or by looking up this node's
+        FQDN in the database.
+        """
+        if config.NODE_UUID:
+            return
+
+        node_uuid = Node._load_persisted_uuid()
+        if not node_uuid:
+            n = Node.from_db(config.NODE_NAME)
+            if n:
+                node_uuid = str(n.uuid)
+
+        if node_uuid:
+            config.NODE_UUID = node_uuid
+            LOG.with_fields({'node_uuid': node_uuid}).info('Resolved node UUID')
+
     def run(self):
         try:
             LOG.info('Starting')
             self.record_start()
+            self._resolve_node_uuid()
 
             self._run_inner()
         except ValueError as e:
@@ -297,6 +319,7 @@ class WorkerPoolDaemon(Daemon):
         try:
             LOG.info('Starting')
             self.record_start()
+            self._resolve_node_uuid()
 
             self._run_inner()
         except ValueError as e:
@@ -359,7 +382,7 @@ class WorkerPoolDaemon(Daemon):
         if num_workers > max_workers:
             return False
 
-        for queue_name in get_all_user_facing_node_queues(config.NODE_NAME):
+        for queue_name in get_all_user_facing_node_queues(config.NODE_UUID):
             jobname_workitem = etcd.dequeue(queue_name)
             if jobname_workitem:
                 args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
@@ -375,7 +398,7 @@ class WorkerPoolDaemon(Daemon):
         # busy. You can record more than 100% if there is more than one disk
         # in the system doing IO at the time.
         if time.time() - self.metrics_acquired_at > 30:
-            new_metrics = etcd.get('metrics', config.NODE_NAME, {})
+            new_metrics = etcd.get('metrics', config.NODE_UUID, {})
             if new_metrics:
                 self.metrics = new_metrics
                 self.metrics_acquired_at = time.time()
@@ -387,7 +410,7 @@ class WorkerPoolDaemon(Daemon):
         metrics_values = self.metrics.get('metrics', {})
         disk_busy = int(metrics_values.get(
             'disk_busy_time_delta_per_seconds', '0'))
-        for queue_name in get_all_background_node_queues(config.NODE_NAME):
+        for queue_name in get_all_background_node_queues(config.NODE_UUID):
             if queue_name.find('high_io') != -1 and disk_busy > 800:
                 LOG.debug('Skipping {queue_name} queue as local disk is busy')
                 continue

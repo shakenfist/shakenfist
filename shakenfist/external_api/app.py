@@ -28,6 +28,7 @@ from shakenfist import eventlog
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.config import config
 from shakenfist.daemons import daemon
+from shakenfist.node import Node
 from shakenfist.external_api import admin as api_admin
 from shakenfist.external_api import agentoperation as api_agentoperation
 from shakenfist.external_api import artifact as api_artifact
@@ -90,6 +91,29 @@ def _record_exception(sender, exception, **extra):
 
 
 got_request_exception.connect(_record_exception, app)
+
+
+@app.before_request
+def resolve_node_uuid():
+    """Resolve config.NODE_UUID if not already set.
+
+    Gunicorn workers don't go through Daemon.run(), so NODE_UUID won't be
+    populated by _resolve_node_uuid(). We resolve it lazily on the first
+    request instead.
+    """
+    if config.NODE_UUID:
+        return
+    node_uuid = Node._load_persisted_uuid()
+    if not node_uuid:
+        n = Node.from_db(config.NODE_NAME)
+        if n:
+            node_uuid = str(n.uuid)
+    if node_uuid:
+        config.NODE_UUID = node_uuid
+        LOG.with_fields({'node_uuid': node_uuid}).info(
+            'Resolved node UUID in API worker')
+    else:
+        LOG.warning('Failed to resolve node UUID in API worker')
 
 
 @app.before_request

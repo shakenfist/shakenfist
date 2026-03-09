@@ -11,7 +11,6 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import NoopLock
 from shakenfist.baseobject import State
 from shakenfist.config import BaseSettings
-from shakenfist.config import config
 from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.schema.object_types import ObjectType
@@ -30,7 +29,7 @@ class FakeResponse:
 
 class FakeScheduler:
     def find_candidates(self, *args, **kwargs):
-        return config.NODE_NAME
+        return ['a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d']
 
 
 class BaseFakeObject:
@@ -141,6 +140,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
 
         fake_config = SFConfig(
             NODE_NAME='node1',
+            NODE_UUID='a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
             ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch('shakenfist.instance.config', fake_config)
@@ -191,6 +191,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
         fake_config = SFConfig(
             NODE_NAME='node1',
+            NODE_UUID='a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
             ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch('shakenfist.instance.config', fake_config)

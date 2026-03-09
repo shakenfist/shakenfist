@@ -85,7 +85,7 @@ def _maintain_version_cache(max_cache_age):
             ObjectType.NODE, node_uuid_str)
         if not state or state.value not in target_states:
             continue
-        d = etcd.get('metrics', node_fqdn, None)
+        d = etcd.get('metrics', node_uuid_str, None)
         if not d:
             continue
 

@@ -112,7 +112,7 @@ class NodeBlobOp(BaseClusterOperation):
         if config.NODE_NAME in locations and os.path.exists(Blob.filepath(str(b.uuid))):
             return
 
-        metrics = etcd.get('metrics', config.NODE_NAME, None)
+        metrics = etcd.get('metrics', config.NODE_UUID, None)
         if metrics:
             metrics = metrics.get('metrics', {})
         else:

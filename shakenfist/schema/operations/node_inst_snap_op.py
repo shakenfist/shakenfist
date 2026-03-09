@@ -38,8 +38,7 @@ class snapshot(BaseModel):
 
 class model(BaseModel):
     uuid: UUID4
-    # This should be a UUID, but there's some history...
-    node_uuid: str
+    node_uuid: UUID4
     instance_uuid: UUID4
     snapshots: list[snapshot]
     priority: PRIORITY
