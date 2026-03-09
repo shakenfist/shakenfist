@@ -4871,7 +4871,7 @@ system works.</p>
 </tr>
 <tr>
 <td>Namespace</td>
-<td><code>/sf/object/namespace/</code></td>
+<td>MariaDB <code>namespaces</code> table (migrated from etcd)</td>
 </tr>
 </tbody>
 </table>
@@ -5368,11 +5368,16 @@ of the cluster through Galera replication.</p>
 </tr>
 <tr>
 <td>7</td>
+<td>Namespace objects</td>
+<td>Complete - <code>namespaces</code>, <code>namespace_attributes</code> tables</td>
+</tr>
+<tr>
+<td>8</td>
 <td>Other object types</td>
 <td>Future</td>
 </tr>
 <tr>
-<td>8</td>
+<td>9</td>
 <td>Object attributes</td>
 <td>Future</td>
 </tr>
@@ -5456,9 +5461,15 @@ values (immutable data set at creation time):</p>
 <td>Node</td>
 <td>uuid, fqdn (unique index), ip, version</td>
 </tr>
+<tr>
+<td><code>namespaces</code></td>
+<td>Namespace</td>
+<td>name (VARCHAR PK), version</td>
+</tr>
 </tbody>
 </table>
-<p>These tables use the object's UUID as the primary key.</p>
+<p>These tables use the object's UUID as the primary key, except for
+<code>namespaces</code> which uses the namespace name (a string) as its primary key.</p>
 <h4 id="per-type-attribute-tables">Per-Type Attribute Tables<a class="headerlink" href="#per-type-attribute-tables" title="Permanent link">&para;</a></h4>
 <p>Mutable attributes that are specific to an object type are stored in
 dedicated attribute tables:</p>
@@ -5481,10 +5492,17 @@ dedicated attribute tables:</p>
 <td>Node</td>
 <td>uuid, last_seen, installed_version, roles, daemons, daemon_states, versions, metrics</td>
 </tr>
+<tr>
+<td><code>namespace_attributes</code></td>
+<td>Namespace</td>
+<td>name, keys (JSON), trust (JSON)</td>
+</tr>
 </tbody>
 </table>
 <p>Node attributes consolidate many separate etcd keys (observed, roles,
 daemons, daemon:{name}, instances, versions, etc.) into a single row.</p>
+<p>Namespace attributes consolidate keys (authentication) and trust
+(namespace trust relationships) from separate etcd keys into a single row.</p>
 <h4 id="node-identity-and-uuid-persistence">Node Identity and UUID Persistence<a class="headerlink" href="#node-identity-and-uuid-persistence" title="Permanent link">&para;</a></h4>
 <p>Each node in the cluster is assigned a real UUID (UUID version 4) when it
 first registers with the cluster. Previously, nodes used their FQDN as a
