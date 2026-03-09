@@ -236,7 +236,7 @@ def redirect_instance_request(func):
         if not placement.get('node'):
             return
 
-        if placement.get('node') != config.NODE_UUID:
+        if config.NODE_UUID and placement.get('node') != config.NODE_UUID:
             target_node = Node.from_db(placement['node'])
             if not target_node:
                 return sf_api.error(404, 'placement node not found')

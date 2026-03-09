@@ -110,6 +110,10 @@ def resolve_node_uuid():
             node_uuid = str(n.uuid)
     if node_uuid:
         config.NODE_UUID = node_uuid
+        LOG.with_fields({'node_uuid': node_uuid}).info(
+            'Resolved node UUID in API worker')
+    else:
+        LOG.warning('Failed to resolve node UUID in API worker')
 
 
 @app.before_request
