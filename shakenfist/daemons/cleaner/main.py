@@ -109,7 +109,7 @@ class Monitor(daemon.Daemon):
                     continue
 
                 this_node = len(instance.instance_usage_for_blob_uuid(
-                    b.uuid, node=config.NODE_NAME))
+                    b.uuid, node=config.NODE_UUID))
                 LOG.with_fields(
                     {
                         'blob': blob_uuid,

@@ -143,7 +143,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
         # Try to place on this node
         s = scheduler.Scheduler()
         try:
-            s.find_candidates(inst, candidates=[config.NODE_NAME])
+            s.find_candidates(inst, candidates=[config.NODE_UUID])
             return None
 
         except LowResourceException as e:
@@ -164,7 +164,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
         try:
             candidates = []
             for node in s.metrics.keys():
-                if node != config.NODE_NAME:
+                if node != config.NODE_UUID:
                     candidates.append(node)
 
             candidates = s.find_candidates(inst, candidates=candidates)

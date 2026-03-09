@@ -1963,13 +1963,14 @@ def placement_filter(node, inst):
     return p.get('node') == node
 
 
-this_node_filter = partial(placement_filter, config.NODE_NAME)
+def this_node_filter(inst):
+    return placement_filter(config.NODE_UUID, inst)
 
 
 # Convenience helpers
 def healthy_instances_on_node(n):
     return Instances(
-        [partial(placement_filter, n.fqdn)],
+        [partial(placement_filter, str(n.uuid))],
         prefilter='healthy')
 
 

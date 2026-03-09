@@ -107,7 +107,7 @@ def update_power_states():
                         _delete_with_kill(instance_uuid, None)
                     continue
 
-                inst.place_instance(config.NODE_NAME)
+                inst.place_instance(config.NODE_UUID)
                 seen.append(domain.name())
 
                 db_state = inst.state
@@ -203,7 +203,7 @@ def update_power_states():
                             inst.state.value = dbo.STATE_DELETED
                         continue
 
-                    inst.place_instance(config.NODE_NAME)
+                    inst.place_instance(config.NODE_UUID)
 
                     db_power = inst.power_state
                     log_ctx.debug(
