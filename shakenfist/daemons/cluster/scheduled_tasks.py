@@ -86,7 +86,7 @@ def _process_per_blob_queue(execution_limit=10):
 
         # Every blob location should have a checksum performed at least every
         # config.CHECKSUM_VERIFICATION_FREQUENCY seconds.
-        node_uuids = b.locations
+        node_fqdns = b.locations
 
         # Get existing hash verification timestamps from MariaDB
         # We check sha512 since it's always computed
@@ -105,18 +105,18 @@ def _process_per_blob_queue(execution_limit=10):
             op = get_object_class(op_type).from_db(op_uuid)
             requests_by_node[op.node_uuid].append((op_type, op_uuid))
 
-        for node_uuid in node_uuids:
+        for node_fqdn in node_fqdns:
             # Check when this specific node last verified the blob
-            last_checksum = last_verified_by_node.get(node_uuid, 0)
+            last_checksum = last_verified_by_node.get(node_fqdn, 0)
             age = time.time() - last_checksum
 
             if age < config.CHECKSUM_VERIFICATION_FREQUENCY:
                 continue
 
-            if not requests_by_node[node_uuid]:
+            if not requests_by_node[node_fqdn]:
                 # Blob locations are FQDNs (from BLOB_LOCATION refs),
                 # but create_and_enqueue requires a node UUID.
-                node_obj = Node.from_db(node_uuid)
+                node_obj = Node.from_db(node_fqdn)
                 if not node_obj:
                     continue
                 nbo_schema.create_and_enqueue(
