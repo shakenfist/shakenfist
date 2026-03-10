@@ -4817,8 +4817,8 @@ system works.</p>
 <h2 id="etcd">etcd<a class="headerlink" href="#etcd" title="Permanent link">&para;</a></h2>
 <p>etcd is the primary database for Shaken Fist and is used for:</p>
 <ul>
-<li><strong>Object storage</strong>: All Shaken Fist objects (instances, networks, blobs,
-  artifacts, etc.) are stored in etcd.</li>
+<li><strong>Object storage</strong>: Shaken Fist objects not yet migrated to MariaDB
+  (instances, networks, etc.) are stored in etcd.</li>
 <li><strong>Cluster coordination</strong>: Node discovery, leader election, and distributed
   state.</li>
 <li><strong>Distributed locking</strong>: See the <a href="../locks/">Locks</a> documentation.</li>
@@ -4863,7 +4863,7 @@ system works.</p>
 </tr>
 <tr>
 <td>Artifact</td>
-<td><code>/sf/object/artifact/</code></td>
+<td>MariaDB <code>artifacts</code> table (migrated from etcd)</td>
 </tr>
 <tr>
 <td>Node</td>
@@ -5373,11 +5373,16 @@ of the cluster through Galera replication.</p>
 </tr>
 <tr>
 <td>8</td>
+<td>Artifact objects</td>
+<td>Complete - <code>artifacts</code>, <code>artifact_attributes</code>, <code>artifact_indexes</code> tables</td>
+</tr>
+<tr>
+<td>9</td>
 <td>Other object types</td>
 <td>Future</td>
 </tr>
 <tr>
-<td>9</td>
+<td>10</td>
 <td>Object attributes</td>
 <td>Future</td>
 </tr>
@@ -5466,6 +5471,11 @@ values (immutable data set at creation time):</p>
 <td>Namespace</td>
 <td>name (VARCHAR PK), version</td>
 </tr>
+<tr>
+<td><code>artifacts</code></td>
+<td>Artifact</td>
+<td>uuid, artifact_type, source_url, name, namespace, version</td>
+</tr>
 </tbody>
 </table>
 <p>These tables use the object's UUID as the primary key, except for
@@ -5496,6 +5506,16 @@ dedicated attribute tables:</p>
 <td><code>namespace_attributes</code></td>
 <td>Namespace</td>
 <td>name, keys (JSON), trust (JSON)</td>
+</tr>
+<tr>
+<td><code>artifact_attributes</code></td>
+<td>Artifact</td>
+<td>uuid, max_versions, shared, highest_index</td>
+</tr>
+<tr>
+<td><code>artifact_indexes</code></td>
+<td>Artifact</td>
+<td>artifact_uuid + index_number (composite PK), blob_uuid</td>
 </tr>
 </tbody>
 </table>
