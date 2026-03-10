@@ -17,8 +17,8 @@ Shaken Fist currently uses two database backends:
 
 etcd is the primary database for Shaken Fist and is used for:
 
-- **Object storage**: All Shaken Fist objects (instances, networks, blobs,
-  artifacts, etc.) are stored in etcd.
+- **Object storage**: Shaken Fist objects not yet migrated to MariaDB
+  (instances, networks, etc.) are stored in etcd.
 - **Cluster coordination**: Node discovery, leader election, and distributed
   state.
 - **Distributed locking**: See the [Locks](locks.md) documentation.
@@ -49,7 +49,7 @@ Each object type has a dedicated key prefix:
 | Network | `/sf/object/network/` |
 | Network Interface | `/sf/object/networkinterface/` |
 | Blob | `/sf/object/blob/` |
-| Artifact | `/sf/object/artifact/` |
+| Artifact | MariaDB `artifacts` table (migrated from etcd) |
 | Node | MariaDB `nodes` table (migrated from etcd) |
 | Namespace | MariaDB `namespaces` table (migrated from etcd) |
 
@@ -526,8 +526,9 @@ The migration is happening in phases:
 | 5 | Node objects | Complete - `nodes`, `node_attributes` tables |
 | 6 | DnsMasq objects | Complete - `dnsmasq` table |
 | 7 | Namespace objects | Complete - `namespaces`, `namespace_attributes` tables |
-| 8 | Other object types | Future |
-| 9 | Object attributes | Future |
+| 8 | Artifact objects | Complete - `artifacts`, `artifact_attributes`, `artifact_indexes` tables |
+| 9 | Other object types | Future |
+| 10 | Object attributes | Future |
 
 ### Table Architecture
 
@@ -574,6 +575,7 @@ values (immutable data set at creation time):
 | `blobs` | Blob | uuid, modified, fetched_at, version |
 | `nodes` | Node | uuid, fqdn (unique index), ip, version |
 | `namespaces` | Namespace | name (VARCHAR PK), version |
+| `artifacts` | Artifact | uuid, artifact_type, source_url, name, namespace, version |
 
 These tables use the object's UUID as the primary key, except for
 `namespaces` which uses the namespace name (a string) as its primary key.
@@ -588,6 +590,8 @@ dedicated attribute tables:
 | `blob_attributes` | Blob | uuid, size, info, last_used, retention |
 | `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, daemon_states, versions, metrics |
 | `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON) |
+| `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
+| `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
 
 Node attributes consolidate many separate etcd keys (observed, roles,
 daemons, daemon:{name}, instances, versions, etc.) into a single row.
