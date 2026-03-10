@@ -489,6 +489,76 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteNamespaceAttributesRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.CreateArtifact = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateArtifact',
+                request_serializer=database__pb2.CreateArtifactRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetArtifact = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetArtifact',
+                request_serializer=database__pb2.GetArtifactRequest.SerializeToString,
+                response_deserializer=database__pb2.GetArtifactReply.FromString,
+                _registered_method=True)
+        self.GetAllArtifacts = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllArtifacts',
+                request_serializer=database__pb2.GetAllArtifactsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAllArtifactsReply.FromString,
+                _registered_method=True)
+        self.UpdateArtifact = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateArtifact',
+                request_serializer=database__pb2.UpdateArtifactRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteArtifact = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteArtifact',
+                request_serializer=database__pb2.DeleteArtifactRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.CreateArtifactAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateArtifactAttributes',
+                request_serializer=database__pb2.CreateArtifactAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetArtifactAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetArtifactAttributes',
+                request_serializer=database__pb2.GetArtifactAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetArtifactAttributesReply.FromString,
+                _registered_method=True)
+        self.UpdateArtifactAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateArtifactAttributes',
+                request_serializer=database__pb2.UpdateArtifactAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteArtifactAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteArtifactAttributes',
+                request_serializer=database__pb2.DeleteArtifactAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.CreateArtifactIndex = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateArtifactIndex',
+                request_serializer=database__pb2.CreateArtifactIndexRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetArtifactIndex = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetArtifactIndex',
+                request_serializer=database__pb2.GetArtifactIndexRequest.SerializeToString,
+                response_deserializer=database__pb2.GetArtifactIndexReply.FromString,
+                _registered_method=True)
+        self.GetAllArtifactIndexes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllArtifactIndexes',
+                request_serializer=database__pb2.GetAllArtifactIndexesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAllArtifactIndexesReply.FromString,
+                _registered_method=True)
+        self.DeleteArtifactIndex = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteArtifactIndex',
+                request_serializer=database__pb2.DeleteArtifactIndexRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteAllArtifactIndexes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteAllArtifactIndexes',
+                request_serializer=database__pb2.DeleteAllArtifactIndexesRequest.SerializeToString,
+                response_deserializer=database__pb2.DeleteCountReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -1064,6 +1134,97 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateArtifact(self, request, context):
+        """Artifact Operations (MariaDB)
+        These manage artifact static values (uuid, type, source_url, name, namespace)
+        in MariaDB. Artifacts represent versioned disk images.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetArtifact(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAllArtifacts(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateArtifact(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteArtifact(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateArtifactAttributes(self, request, context):
+        """Artifact Attributes Operations (MariaDB)
+        These store mutable artifact attributes (max_versions, shared, highest_index).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetArtifactAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateArtifactAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteArtifactAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateArtifactIndex(self, request, context):
+        """Artifact Index Operations (MariaDB)
+        These manage artifact version indexes, mapping index numbers to blob UUIDs.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetArtifactIndex(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAllArtifactIndexes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteArtifactIndex(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteAllArtifactIndexes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1521,6 +1682,76 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.DeleteNamespaceAttributes,
                     request_deserializer=database__pb2.DeleteNamespaceAttributesRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateArtifact': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateArtifact,
+                    request_deserializer=database__pb2.CreateArtifactRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetArtifact': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetArtifact,
+                    request_deserializer=database__pb2.GetArtifactRequest.FromString,
+                    response_serializer=database__pb2.GetArtifactReply.SerializeToString,
+            ),
+            'GetAllArtifacts': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllArtifacts,
+                    request_deserializer=database__pb2.GetAllArtifactsRequest.FromString,
+                    response_serializer=database__pb2.GetAllArtifactsReply.SerializeToString,
+            ),
+            'UpdateArtifact': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateArtifact,
+                    request_deserializer=database__pb2.UpdateArtifactRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteArtifact': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteArtifact,
+                    request_deserializer=database__pb2.DeleteArtifactRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateArtifactAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateArtifactAttributes,
+                    request_deserializer=database__pb2.CreateArtifactAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetArtifactAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetArtifactAttributes,
+                    request_deserializer=database__pb2.GetArtifactAttributesRequest.FromString,
+                    response_serializer=database__pb2.GetArtifactAttributesReply.SerializeToString,
+            ),
+            'UpdateArtifactAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateArtifactAttributes,
+                    request_deserializer=database__pb2.UpdateArtifactAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteArtifactAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteArtifactAttributes,
+                    request_deserializer=database__pb2.DeleteArtifactAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateArtifactIndex': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateArtifactIndex,
+                    request_deserializer=database__pb2.CreateArtifactIndexRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetArtifactIndex': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetArtifactIndex,
+                    request_deserializer=database__pb2.GetArtifactIndexRequest.FromString,
+                    response_serializer=database__pb2.GetArtifactIndexReply.SerializeToString,
+            ),
+            'GetAllArtifactIndexes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllArtifactIndexes,
+                    request_deserializer=database__pb2.GetAllArtifactIndexesRequest.FromString,
+                    response_serializer=database__pb2.GetAllArtifactIndexesReply.SerializeToString,
+            ),
+            'DeleteArtifactIndex': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteArtifactIndex,
+                    request_deserializer=database__pb2.DeleteArtifactIndexRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteAllArtifactIndexes': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteAllArtifactIndexes,
+                    request_deserializer=database__pb2.DeleteAllArtifactIndexesRequest.FromString,
+                    response_serializer=database__pb2.DeleteCountReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -3980,6 +4211,384 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/DeleteNamespaceAttributes',
             database__pb2.DeleteNamespaceAttributesRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateArtifact(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateArtifact',
+            database__pb2.CreateArtifactRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetArtifact(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetArtifact',
+            database__pb2.GetArtifactRequest.SerializeToString,
+            database__pb2.GetArtifactReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAllArtifacts(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllArtifacts',
+            database__pb2.GetAllArtifactsRequest.SerializeToString,
+            database__pb2.GetAllArtifactsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateArtifact(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateArtifact',
+            database__pb2.UpdateArtifactRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteArtifact(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteArtifact',
+            database__pb2.DeleteArtifactRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateArtifactAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateArtifactAttributes',
+            database__pb2.CreateArtifactAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetArtifactAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetArtifactAttributes',
+            database__pb2.GetArtifactAttributesRequest.SerializeToString,
+            database__pb2.GetArtifactAttributesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateArtifactAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateArtifactAttributes',
+            database__pb2.UpdateArtifactAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteArtifactAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteArtifactAttributes',
+            database__pb2.DeleteArtifactAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateArtifactIndex(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateArtifactIndex',
+            database__pb2.CreateArtifactIndexRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetArtifactIndex(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetArtifactIndex',
+            database__pb2.GetArtifactIndexRequest.SerializeToString,
+            database__pb2.GetArtifactIndexReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAllArtifactIndexes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllArtifactIndexes',
+            database__pb2.GetAllArtifactIndexesRequest.SerializeToString,
+            database__pb2.GetAllArtifactIndexesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteArtifactIndex(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteArtifactIndex',
+            database__pb2.DeleteArtifactIndexRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteAllArtifactIndexes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteAllArtifactIndexes',
+            database__pb2.DeleteAllArtifactIndexesRequest.SerializeToString,
+            database__pb2.DeleteCountReply.FromString,
             options,
             channel_credentials,
             insecure,

@@ -107,7 +107,7 @@ jobs:
           python3 -mvenv /tmp/venv-test
           . /tmp/venv-test/bin/activate
           pip3 install uv
-          uv pip install tox tox-uv
+          uv pip install tox 'tox-uv<1.33.2'
 
       - name: Lint with flake8
         id: flake8

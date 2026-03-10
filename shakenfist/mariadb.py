@@ -37,6 +37,9 @@ from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.schema.artifact_attributes import ArtifactAttributesData
+from shakenfist.schema.artifact_data import ArtifactData
+from shakenfist.schema.artifact_index import ArtifactIndexData
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
@@ -80,6 +83,9 @@ _blob_transfers_table: Optional[sa.Table] = None
 _blob_attributes_table: Optional[sa.Table] = None
 _nodes_table: Optional[sa.Table] = None
 _node_attributes_table: Optional[sa.Table] = None
+_artifacts_table: Optional[sa.Table] = None
+_artifact_attributes_table: Optional[sa.Table] = None
+_artifact_indexes_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -99,6 +105,9 @@ NODES_VERSION = 2
 NODE_ATTRIBUTES_VERSION = 2
 NAMESPACES_VERSION = 2
 NAMESPACE_ATTRIBUTES_VERSION = 2
+ARTIFACTS_VERSION = 1
+ARTIFACT_ATTRIBUTES_VERSION = 1
+ARTIFACT_INDEXES_VERSION = 1
 
 
 def _use_database_service() -> bool:
@@ -854,6 +863,162 @@ def _ensure_blob_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _get_artifacts_table() -> sa.Table:
+    """Get or create the artifacts table definition.
+
+    This table stores static values for artifact objects. Artifacts are
+    versioned disk images (snapshots, labels, images) with namespace
+    ownership.
+
+    The table schema is generated from the ArtifactData Pydantic model in
+    schema/artifact_data.py. The uuid is the primary key, with indexes on
+    artifact_type, source_url, and namespace for query efficiency.
+    """
+    global _artifacts_table
+    if _artifacts_table is None:
+        metadata = _get_metadata()
+        _artifacts_table = pydantic_to_sqlalchemy_table(
+            ArtifactData,
+            'artifacts',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+    return _artifacts_table
+
+
+def _get_artifact_attributes_table() -> sa.Table:
+    """Get or create the artifact_attributes table definition.
+
+    This table stores mutable artifact attributes, separate from the
+    artifacts table which stores immutable static values.
+    """
+    global _artifact_attributes_table
+    if _artifact_attributes_table is None:
+        metadata = _get_metadata()
+        _artifact_attributes_table = sa.Table(
+            'artifact_attributes',
+            metadata,
+            sa.Column('uuid', sa.Uuid(), primary_key=True),
+            sa.Column('max_versions', sa.Integer(), nullable=False, default=0),
+            sa.Column('shared', sa.Boolean(), nullable=False, default=False),
+            sa.Column('highest_index', sa.Integer(), nullable=False, default=0),
+            sa.Index('idx_artifact_attrs_shared', 'shared'),
+        )
+    return _artifact_attributes_table
+
+
+def _get_artifact_indexes_table() -> sa.Table:
+    """Get or create the artifact_indexes table definition.
+
+    This table stores artifact version indexes, mapping index numbers to
+    blob UUIDs. Uses a composite primary key (artifact_uuid, index_number).
+    """
+    global _artifact_indexes_table
+    if _artifact_indexes_table is None:
+        metadata = _get_metadata()
+        _artifact_indexes_table = sa.Table(
+            'artifact_indexes',
+            metadata,
+            sa.Column('artifact_uuid', sa.Uuid(), nullable=False),
+            sa.Column('index_number', sa.Integer(), nullable=False),
+            sa.Column('blob_uuid', sa.Uuid(), nullable=False),
+            sa.PrimaryKeyConstraint('artifact_uuid', 'index_number'),
+            sa.Index('idx_artifact_idx_blob_uuid', 'blob_uuid'),
+        )
+    return _artifact_indexes_table
+
+
+def _ensure_artifacts_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the artifacts table schema is up to date."""
+    table_name = 'artifacts'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_artifacts_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': ARTIFACTS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_artifact_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the artifact_attributes table schema is up to date."""
+    table_name = 'artifact_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_artifact_attributes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': ARTIFACT_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_artifact_indexes_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the artifact_indexes table schema is up to date."""
+    table_name = 'artifact_indexes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_artifact_indexes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': ARTIFACT_INDEXES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def ensure_schema() -> list[dict[str, Any]]:
     """Ensure all MariaDB tables exist with current schema versions.
 
@@ -893,6 +1058,9 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_node_attributes_schema(engine))
     results.append(_ensure_namespaces_schema(engine))
     results.append(_ensure_namespace_attributes_schema(engine))
+    results.append(_ensure_artifacts_schema(engine))
+    results.append(_ensure_artifact_attributes_schema(engine))
+    results.append(_ensure_artifact_indexes_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -2060,6 +2228,223 @@ def _migrate_etcd_namespace_attributes(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _migrate_etcd_artifacts(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate artifact static values from etcd to MariaDB.
+
+    This migration scans all artifacts in etcd and copies their static values
+    to the MariaDB artifacts table. After successful migration, the etcd
+    entry is deleted.
+    """
+    from shakenfist import etcd
+    from shakenfist.artifact import Artifact
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating artifacts from etcd...')
+
+    for objkey, data in etcd.get_all('artifact', None):
+        artifact_uuid = objkey.split('/')[-1]
+
+        try:
+            artifact_uuid_obj = UUIDType(artifact_uuid)
+            success = create_artifact(
+                artifact_uuid_obj,
+                data.get('artifact_type', ''),
+                data.get('source_url', ''),
+                data.get('name', ''),
+                data.get('namespace', ''),
+                data.get('version', Artifact.current_version)
+            )
+            if success:
+                etcd.delete('artifact', None, artifact_uuid)
+                migrated_count += 1
+            else:
+                # Already exists
+                etcd.delete('artifact', None, artifact_uuid)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(f'Error migrating artifact {artifact_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count} artifacts processed')
+
+    LOG.info(f'Artifact migration: {migrated_count} migrated, '
+             f'{skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
+def _migrate_etcd_artifact_attributes(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate artifact attributes from etcd to MariaDB.
+
+    Reads max_versions, shared, and highest_index from etcd attributes
+    and creates artifact_attributes records.
+
+    The etcd attribute keys are:
+    - attribute/artifact/{uuid}/max_versions -> {'max_versions': int}
+    - attribute/artifact/{uuid}/shared -> {'shared': bool}
+    - attribute/artifact/{uuid}/highest_index -> {'index': int}
+    """
+    from shakenfist import etcd
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    # Get all artifact UUIDs from the artifacts table
+    artifacts_table = _get_artifacts_table()
+    with engine.connect() as conn:
+        stmt = sa.select(artifacts_table.c.uuid)
+        result = conn.execute(stmt)
+        artifact_uuids = [str(row.uuid) for row in result]
+
+    LOG.info(f'Migrating attributes for {len(artifact_uuids)} artifacts...')
+
+    for artifact_uuid in artifact_uuids:
+        try:
+            existing = _direct_get_artifact_attributes(
+                UUIDType(artifact_uuid))
+            if existing:
+                skipped_count += 1
+                continue
+
+            max_versions_data = etcd.get(
+                'attribute/artifact', artifact_uuid, 'max_versions')
+            shared_data = etcd.get(
+                'attribute/artifact', artifact_uuid, 'shared')
+            highest_index_data = etcd.get(
+                'attribute/artifact', artifact_uuid, 'highest_index')
+
+            max_versions = (max_versions_data.get('max_versions', 0)
+                            if max_versions_data else 0)
+            shared = (shared_data.get('shared', False)
+                      if shared_data else False)
+            highest_index = (highest_index_data.get('index', 0)
+                             if highest_index_data else 0)
+
+            attrs = ArtifactAttributesData(
+                uuid=UUIDType(artifact_uuid),
+                max_versions=max_versions,
+                shared=shared,
+                highest_index=highest_index
+            )
+            success = _direct_create_artifact_attributes(attrs)
+
+            if success:
+                if max_versions_data:
+                    etcd.delete(
+                        'attribute/artifact', artifact_uuid, 'max_versions')
+                if shared_data:
+                    etcd.delete(
+                        'attribute/artifact', artifact_uuid, 'shared')
+                if highest_index_data:
+                    etcd.delete(
+                        'attribute/artifact', artifact_uuid, 'highest_index')
+                migrated_count += 1
+            else:
+                error_count += 1
+
+        except Exception as e:
+            LOG.warning(
+                f'Failed to migrate attributes for artifact '
+                f'{artifact_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count + error_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count + error_count} '
+                f'artifacts processed')
+
+    LOG.info(f'Artifact attribute migration: {migrated_count} migrated, '
+             f'{skipped_count} skipped, {error_count} errors')
+
+    return {
+        'migrated_count': migrated_count,
+        'skipped_count': skipped_count,
+        'error_count': error_count
+    }
+
+
+def _migrate_etcd_artifact_indexes(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate artifact indexes from etcd to MariaDB.
+
+    Reads all index_* attributes from etcd for each artifact and creates
+    artifact_indexes records.
+
+    The etcd attribute keys are:
+    - attribute/artifact/{uuid}/index_NNNNNNNNNNNN -> {
+          'index': int, 'blob_uuid': str}
+    """
+    from shakenfist import etcd
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    # Get all artifact UUIDs from the artifacts table
+    artifacts_table = _get_artifacts_table()
+    with engine.connect() as conn:
+        stmt = sa.select(artifacts_table.c.uuid)
+        result = conn.execute(stmt)
+        artifact_uuids = [str(row.uuid) for row in result]
+
+    LOG.info(f'Migrating indexes for {len(artifact_uuids)} artifacts...')
+
+    for artifact_uuid in artifact_uuids:
+        try:
+            for key, data in etcd.get_all(
+                    'attribute/artifact', artifact_uuid, prefix='index_'):
+                if not data or 'index' not in data or 'blob_uuid' not in data:
+                    continue
+
+                index_number = data['index']
+                blob_uuid = data['blob_uuid']
+
+                try:
+                    success = _direct_create_artifact_index(
+                        UUIDType(artifact_uuid),
+                        index_number,
+                        UUIDType(blob_uuid)
+                    )
+                    if success:
+                        etcd.delete(
+                            'attribute/artifact', artifact_uuid, key)
+                        migrated_count += 1
+                    else:
+                        skipped_count += 1
+                except Exception as e:
+                    LOG.warning(
+                        f'Failed to migrate index {key} for artifact '
+                        f'{artifact_uuid}: {e}')
+                    error_count += 1
+
+        except Exception as e:
+            LOG.warning(
+                f'Failed to scan indexes for artifact '
+                f'{artifact_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count + error_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count + error_count} '
+                f'indexes processed')
+
+    LOG.info(f'Artifact index migration: {migrated_count} migrated, '
+             f'{skipped_count} skipped, {error_count} errors')
+
+    return {
+        'migrated_count': migrated_count,
+        'skipped_count': skipped_count,
+        'error_count': error_count
+    }
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -2101,6 +2486,15 @@ DATA_MIGRATIONS.update({
     },
     'namespace_attributes': {
         2: _migrate_etcd_namespace_attributes,
+    },
+    'artifacts': {
+        2: _migrate_etcd_artifacts,
+    },
+    'artifact_attributes': {
+        2: _migrate_etcd_artifact_attributes,
+    },
+    'artifact_indexes': {
+        2: _migrate_etcd_artifact_indexes,
     },
 })
 
@@ -8010,3 +8404,903 @@ def delete_namespace_attributes(name: str) -> bool:
     if _use_database_service():
         return _grpc_delete_namespace_attributes(name)
     return _direct_delete_namespace_attributes(name)
+
+
+# =============================================================================
+# Artifact Direct Access Functions
+# =============================================================================
+
+def _direct_create_artifact(artifact_uuid: UUID, artifact_type: str,
+                            source_url: str, name: str, namespace: str,
+                            version: int) -> bool:
+    """Create an artifact record in MariaDB."""
+    engine = _get_engine()
+    table = _get_artifacts_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=artifact_uuid,
+                artifact_type=artifact_type,
+                source_url=source_url,
+                name=name,
+                namespace=namespace,
+                version=version
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for artifact {artifact_uuid}: {e}')
+        return False
+
+
+def _direct_get_artifact(artifact_uuid: UUID) -> Optional[ArtifactData]:
+    """Get artifact static values from MariaDB."""
+    engine = _get_engine()
+    table = _get_artifacts_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == artifact_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return ArtifactData(
+                uuid=result.uuid,
+                artifact_type=result.artifact_type,
+                source_url=result.source_url,
+                name=result.name,
+                namespace=result.namespace,
+                version=result.version
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for artifact {artifact_uuid}: {e}')
+        return None
+
+
+def _direct_get_all_artifacts() -> list[ArtifactData]:
+    """Get all artifacts from MariaDB."""
+    engine = _get_engine()
+    table = _get_artifacts_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table)
+            result = conn.execute(stmt).fetchall()
+            return [
+                ArtifactData(
+                    uuid=row.uuid,
+                    artifact_type=row.artifact_type,
+                    source_url=row.source_url,
+                    name=row.name,
+                    namespace=row.namespace,
+                    version=row.version
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for all artifacts: {e}')
+        return []
+
+
+def _direct_update_artifact(data: ArtifactData) -> bool:
+    """Update an artifact record in MariaDB.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The ArtifactData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_artifacts_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                artifact_type=data.artifact_type,
+                source_url=data.source_url,
+                name=data.name,
+                namespace=data.namespace,
+                version=data.version
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB update failed for artifact {data.uuid}: {e}')
+        return False
+
+
+def _direct_delete_artifact(artifact_uuid: UUID) -> bool:
+    """Delete an artifact record from MariaDB."""
+    engine = _get_engine()
+    table = _get_artifacts_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == artifact_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for artifact {artifact_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Artifact Attributes Direct Access Functions
+# =============================================================================
+
+def _direct_create_artifact_attributes(
+        data: ArtifactAttributesData) -> bool:
+    """Create an artifact_attributes record in MariaDB."""
+    engine = _get_engine()
+    table = _get_artifact_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                max_versions=data.max_versions,
+                shared=data.shared,
+                highest_index=data.highest_index
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for artifact_attributes '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _direct_get_artifact_attributes(
+        artifact_uuid: UUID) -> Optional[ArtifactAttributesData]:
+    """Get artifact attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_artifact_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == artifact_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return ArtifactAttributesData(
+                uuid=result.uuid,
+                max_versions=result.max_versions,
+                shared=result.shared,
+                highest_index=result.highest_index
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for artifact_attributes '
+            f'{artifact_uuid}: {e}')
+        return None
+
+
+def _direct_update_artifact_attributes(
+        data: ArtifactAttributesData) -> bool:
+    """Update artifact attributes in MariaDB."""
+    engine = _get_engine()
+    table = _get_artifact_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                max_versions=data.max_versions,
+                shared=data.shared,
+                highest_index=data.highest_index
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB update failed for artifact_attributes '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _direct_delete_artifact_attributes(artifact_uuid: UUID) -> bool:
+    """Delete artifact attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_artifact_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == artifact_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for artifact_attributes '
+            f'{artifact_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Artifact Index Direct Access Functions
+# =============================================================================
+
+def _direct_create_artifact_index(artifact_uuid: UUID, index_number: int,
+                                  blob_uuid: UUID) -> bool:
+    """Create an artifact index record in MariaDB."""
+    engine = _get_engine()
+    table = _get_artifact_indexes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                artifact_uuid=artifact_uuid,
+                index_number=index_number,
+                blob_uuid=blob_uuid
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for artifact_index '
+            f'{artifact_uuid}/{index_number}: {e}')
+        return False
+
+
+def _direct_get_artifact_index(
+        artifact_uuid: UUID,
+        index_number: int) -> Optional[ArtifactIndexData]:
+    """Get a specific artifact index from MariaDB."""
+    engine = _get_engine()
+    table = _get_artifact_indexes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                sa.and_(
+                    table.c.artifact_uuid == artifact_uuid,
+                    table.c.index_number == index_number
+                )
+            )
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return ArtifactIndexData(
+                artifact_uuid=result.artifact_uuid,
+                index_number=result.index_number,
+                blob_uuid=result.blob_uuid
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for artifact_index '
+            f'{artifact_uuid}/{index_number}: {e}')
+        return None
+
+
+def _direct_get_all_artifact_indexes(
+        artifact_uuid: UUID) -> list[ArtifactIndexData]:
+    """Get all indexes for an artifact from MariaDB, ordered by
+    index_number."""
+    engine = _get_engine()
+    table = _get_artifact_indexes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.artifact_uuid == artifact_uuid
+            ).order_by(table.c.index_number)
+            result = conn.execute(stmt).fetchall()
+            return [
+                ArtifactIndexData(
+                    artifact_uuid=row.artifact_uuid,
+                    index_number=row.index_number,
+                    blob_uuid=row.blob_uuid
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for artifact_indexes '
+            f'{artifact_uuid}: {e}')
+        return []
+
+
+def _direct_delete_artifact_index(artifact_uuid: UUID,
+                                  index_number: int) -> bool:
+    """Delete a specific artifact index from MariaDB."""
+    engine = _get_engine()
+    table = _get_artifact_indexes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.artifact_uuid == artifact_uuid,
+                    table.c.index_number == index_number
+                )
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for artifact_index '
+            f'{artifact_uuid}/{index_number}: {e}')
+        return False
+
+
+def _direct_delete_all_artifact_indexes(artifact_uuid: UUID) -> int:
+    """Delete all indexes for an artifact from MariaDB."""
+    engine = _get_engine()
+    table = _get_artifact_indexes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.artifact_uuid == artifact_uuid
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete all failed for artifact_indexes '
+            f'{artifact_uuid}: {e}')
+        return 0
+
+
+# =============================================================================
+# Artifact gRPC Client Functions
+# =============================================================================
+
+def _grpc_create_artifact(artifact_uuid: UUID, artifact_type: str,
+                          source_url: str, name: str, namespace: str,
+                          version: int) -> bool:
+    """Create an artifact record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateArtifactRequest(
+            artifact=database_pb2.ArtifactStaticData(
+                uuid=str(artifact_uuid),
+                artifact_type=artifact_type,
+                source_url=source_url,
+                name=name,
+                namespace=namespace,
+                version=version
+            )
+        )
+        reply = stub.CreateArtifact(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateArtifact failed for {artifact_uuid}: {e}')
+        return False
+
+
+def _grpc_get_artifact(artifact_uuid: UUID) -> Optional[ArtifactData]:
+    """Get artifact static values via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetArtifactRequest(uuid=str(artifact_uuid))
+        reply = stub.GetArtifact(request)
+        if not reply.found:
+            return None
+        return ArtifactData(
+            uuid=reply.artifact.uuid,
+            artifact_type=reply.artifact.artifact_type,
+            source_url=reply.artifact.source_url,
+            name=reply.artifact.name,
+            namespace=reply.artifact.namespace,
+            version=reply.artifact.version
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetArtifact failed for {artifact_uuid}: {e}')
+        return None
+
+
+def _grpc_get_all_artifacts() -> list[ArtifactData]:
+    """Get all artifacts via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllArtifactsRequest()
+        reply = stub.GetAllArtifacts(request)
+        return [
+            ArtifactData(
+                uuid=a.uuid,
+                artifact_type=a.artifact_type,
+                source_url=a.source_url,
+                name=a.name,
+                namespace=a.namespace,
+                version=a.version
+            )
+            for a in reply.artifacts
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetAllArtifacts failed: {e}')
+        return []
+
+
+def _grpc_update_artifact(data: ArtifactData) -> bool:
+    """Update an artifact record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateArtifactRequest(
+            artifact=database_pb2.ArtifactStaticData(
+                uuid=str(data.uuid),
+                artifact_type=data.artifact_type,
+                source_url=data.source_url,
+                name=data.name,
+                namespace=data.namespace,
+                version=data.version
+            )
+        )
+        reply = stub.UpdateArtifact(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC UpdateArtifact failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_delete_artifact(artifact_uuid: UUID) -> bool:
+    """Delete an artifact record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteArtifactRequest(
+            uuid=str(artifact_uuid))
+        reply = stub.DeleteArtifact(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteArtifact failed for {artifact_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Artifact Attributes gRPC Client Functions
+# =============================================================================
+
+def _grpc_create_artifact_attributes(
+        data: ArtifactAttributesData) -> bool:
+    """Create artifact attributes via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateArtifactAttributesRequest(
+            data=database_pb2.ArtifactAttributesProto(
+                uuid=str(data.uuid),
+                max_versions=data.max_versions,
+                shared=data.shared,
+                highest_index=data.highest_index
+            )
+        )
+        reply = stub.CreateArtifactAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateArtifactAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_artifact_attributes(
+        artifact_uuid: UUID) -> Optional[ArtifactAttributesData]:
+    """Get artifact attributes via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetArtifactAttributesRequest(
+            uuid=str(artifact_uuid))
+        reply = stub.GetArtifactAttributes(request)
+        if not reply.found:
+            return None
+        d = reply.data
+        return ArtifactAttributesData(
+            uuid=UUID(d.uuid),
+            max_versions=d.max_versions,
+            shared=d.shared,
+            highest_index=d.highest_index
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetArtifactAttributes failed for '
+            f'{artifact_uuid}: {e}')
+        return None
+
+
+def _grpc_update_artifact_attributes(
+        data: ArtifactAttributesData) -> bool:
+    """Update artifact attributes via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateArtifactAttributesRequest(
+            data=database_pb2.ArtifactAttributesProto(
+                uuid=str(data.uuid),
+                max_versions=data.max_versions,
+                shared=data.shared,
+                highest_index=data.highest_index
+            )
+        )
+        reply = stub.UpdateArtifactAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC UpdateArtifactAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_delete_artifact_attributes(artifact_uuid: UUID) -> bool:
+    """Delete artifact attributes via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteArtifactAttributesRequest(
+            uuid=str(artifact_uuid))
+        reply = stub.DeleteArtifactAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteArtifactAttributes failed for '
+            f'{artifact_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Artifact Index gRPC Client Functions
+# =============================================================================
+
+def _grpc_create_artifact_index(artifact_uuid: UUID, index_number: int,
+                                blob_uuid: UUID) -> bool:
+    """Create an artifact index via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateArtifactIndexRequest(
+            data=database_pb2.ArtifactIndexProto(
+                artifact_uuid=str(artifact_uuid),
+                index_number=index_number,
+                blob_uuid=str(blob_uuid)
+            )
+        )
+        reply = stub.CreateArtifactIndex(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateArtifactIndex failed for '
+            f'{artifact_uuid}/{index_number}: {e}')
+        return False
+
+
+def _grpc_get_artifact_index(
+        artifact_uuid: UUID,
+        index_number: int) -> Optional[ArtifactIndexData]:
+    """Get a specific artifact index via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetArtifactIndexRequest(
+            artifact_uuid=str(artifact_uuid),
+            index_number=index_number
+        )
+        reply = stub.GetArtifactIndex(request)
+        if not reply.found:
+            return None
+        d = reply.data
+        return ArtifactIndexData(
+            artifact_uuid=UUID(d.artifact_uuid),
+            index_number=d.index_number,
+            blob_uuid=UUID(d.blob_uuid)
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetArtifactIndex failed for '
+            f'{artifact_uuid}/{index_number}: {e}')
+        return None
+
+
+def _grpc_get_all_artifact_indexes(
+        artifact_uuid: UUID) -> list[ArtifactIndexData]:
+    """Get all indexes for an artifact via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllArtifactIndexesRequest(
+            artifact_uuid=str(artifact_uuid))
+        reply = stub.GetAllArtifactIndexes(request)
+        return [
+            ArtifactIndexData(
+                artifact_uuid=UUID(idx.artifact_uuid),
+                index_number=idx.index_number,
+                blob_uuid=UUID(idx.blob_uuid)
+            )
+            for idx in reply.indexes
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetAllArtifactIndexes failed for '
+            f'{artifact_uuid}: {e}')
+        return []
+
+
+def _grpc_delete_artifact_index(artifact_uuid: UUID,
+                                index_number: int) -> bool:
+    """Delete a specific artifact index via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteArtifactIndexRequest(
+            artifact_uuid=str(artifact_uuid),
+            index_number=index_number
+        )
+        reply = stub.DeleteArtifactIndex(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteArtifactIndex failed for '
+            f'{artifact_uuid}/{index_number}: {e}')
+        return False
+
+
+def _grpc_delete_all_artifact_indexes(artifact_uuid: UUID) -> int:
+    """Delete all indexes for an artifact via the database
+    microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteAllArtifactIndexesRequest(
+            artifact_uuid=str(artifact_uuid))
+        reply = stub.DeleteAllArtifactIndexes(request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteAllArtifactIndexes failed for '
+            f'{artifact_uuid}: {e}')
+        return 0
+
+
+# =============================================================================
+# Artifact Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def create_artifact(artifact_uuid: UUID, artifact_type: str,
+                    source_url: str, name: str, namespace: str,
+                    version: int) -> bool:
+    """Create an artifact record.
+
+    Args:
+        artifact_uuid: The UUID of the artifact.
+        artifact_type: One of 'snapshot', 'label', 'image', 'other'.
+        source_url: Origin URL for the artifact content.
+        name: Human-readable name.
+        namespace: Owning namespace.
+        version: The object version number.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_artifact(
+            artifact_uuid, artifact_type, source_url, name,
+            namespace, version)
+    return _direct_create_artifact(
+        artifact_uuid, artifact_type, source_url, name,
+        namespace, version)
+
+
+def get_artifact(artifact_uuid: UUID) -> Optional[ArtifactData]:
+    """Get artifact static values.
+
+    Args:
+        artifact_uuid: The UUID of the artifact.
+
+    Returns:
+        An ArtifactData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_artifact(artifact_uuid)
+    return _direct_get_artifact(artifact_uuid)
+
+
+def get_all_artifacts() -> list[ArtifactData]:
+    """Get all artifacts.
+
+    Returns:
+        List of ArtifactData objects.
+    """
+    if _use_database_service():
+        return _grpc_get_all_artifacts()
+    return _direct_get_all_artifacts()
+
+
+def update_artifact(data: ArtifactData) -> bool:
+    """Update an artifact record.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The ArtifactData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_artifact(data)
+    return _direct_update_artifact(data)
+
+
+def delete_artifact(artifact_uuid: UUID) -> bool:
+    """Delete an artifact record.
+
+    Args:
+        artifact_uuid: The UUID of the artifact.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_artifact(artifact_uuid)
+    return _direct_delete_artifact(artifact_uuid)
+
+
+# =============================================================================
+# Artifact Attributes Public API Functions
+# =============================================================================
+
+def create_artifact_attributes(data: ArtifactAttributesData) -> bool:
+    """Create artifact attributes record.
+
+    Args:
+        data: The ArtifactAttributesData to create.
+
+    Returns:
+        True if created successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_create_artifact_attributes(data)
+    return _direct_create_artifact_attributes(data)
+
+
+def get_artifact_attributes(
+        artifact_uuid: UUID) -> Optional[ArtifactAttributesData]:
+    """Get artifact attributes.
+
+    Args:
+        artifact_uuid: The UUID of the artifact.
+
+    Returns:
+        ArtifactAttributesData if found, None otherwise.
+    """
+    if _use_database_service():
+        return _grpc_get_artifact_attributes(artifact_uuid)
+    return _direct_get_artifact_attributes(artifact_uuid)
+
+
+def update_artifact_attributes(data: ArtifactAttributesData) -> bool:
+    """Update artifact attributes.
+
+    Args:
+        data: The ArtifactAttributesData with updated values.
+
+    Returns:
+        True if updated successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_update_artifact_attributes(data)
+    return _direct_update_artifact_attributes(data)
+
+
+def delete_artifact_attributes(artifact_uuid: UUID) -> bool:
+    """Delete artifact attributes.
+
+    Args:
+        artifact_uuid: The UUID of the artifact.
+
+    Returns:
+        True if deleted successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_delete_artifact_attributes(artifact_uuid)
+    return _direct_delete_artifact_attributes(artifact_uuid)
+
+
+# =============================================================================
+# Artifact Index Public API Functions
+# =============================================================================
+
+def create_artifact_index(artifact_uuid: UUID, index_number: int,
+                          blob_uuid: UUID) -> bool:
+    """Create an artifact index record.
+
+    Args:
+        artifact_uuid: The UUID of the artifact.
+        index_number: The version index number.
+        blob_uuid: The UUID of the blob for this version.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_artifact_index(
+            artifact_uuid, index_number, blob_uuid)
+    return _direct_create_artifact_index(
+        artifact_uuid, index_number, blob_uuid)
+
+
+def get_artifact_index(artifact_uuid: UUID,
+                       index_number: int) -> Optional[ArtifactIndexData]:
+    """Get a specific artifact index.
+
+    Args:
+        artifact_uuid: The UUID of the artifact.
+        index_number: The version index number.
+
+    Returns:
+        ArtifactIndexData if found, None otherwise.
+    """
+    if _use_database_service():
+        return _grpc_get_artifact_index(artifact_uuid, index_number)
+    return _direct_get_artifact_index(artifact_uuid, index_number)
+
+
+def get_all_artifact_indexes(
+        artifact_uuid: UUID) -> list[ArtifactIndexData]:
+    """Get all indexes for an artifact, ordered by index_number.
+
+    Args:
+        artifact_uuid: The UUID of the artifact.
+
+    Returns:
+        List of ArtifactIndexData objects, ordered by index_number.
+    """
+    if _use_database_service():
+        return _grpc_get_all_artifact_indexes(artifact_uuid)
+    return _direct_get_all_artifact_indexes(artifact_uuid)
+
+
+def delete_artifact_index(artifact_uuid: UUID,
+                          index_number: int) -> bool:
+    """Delete a specific artifact index.
+
+    Args:
+        artifact_uuid: The UUID of the artifact.
+        index_number: The version index number.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_artifact_index(artifact_uuid, index_number)
+    return _direct_delete_artifact_index(artifact_uuid, index_number)
+
+
+def delete_all_artifact_indexes(artifact_uuid: UUID) -> int:
+    """Delete all indexes for an artifact.
+
+    Args:
+        artifact_uuid: The UUID of the artifact.
+
+    Returns:
+        Number of indexes deleted.
+    """
+    if _use_database_service():
+        return _grpc_delete_all_artifact_indexes(artifact_uuid)
+    return _direct_delete_all_artifact_indexes(artifact_uuid)
