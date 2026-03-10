@@ -143,6 +143,7 @@ service DatabaseService {
   rpc CreateArtifact (CreateArtifactRequest) returns (StatusReply) {}
   rpc GetArtifact (GetArtifactRequest) returns (GetArtifactReply) {}
   rpc GetAllArtifacts (GetAllArtifactsRequest) returns (GetAllArtifactsReply) {}
+  rpc UpdateArtifact (UpdateArtifactRequest) returns (StatusReply) {}
   rpc DeleteArtifact (DeleteArtifactRequest) returns (StatusReply) {}
 
   // Artifact Attributes Operations (MariaDB)
@@ -1011,6 +1012,10 @@ message GetAllArtifactsRequest {
 
 message GetAllArtifactsReply {
   repeated ArtifactStaticData artifacts = 1;
+}
+
+message UpdateArtifactRequest {
+  ArtifactStaticData artifact = 1;
 }
 
 message DeleteArtifactRequest {

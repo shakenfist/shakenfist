@@ -522,6 +522,11 @@ class DatabaseServiceStub:
         database_pb2.GetAllArtifactsReply,
     ]
 
+    UpdateArtifact: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateArtifactRequest,
+        database_pb2.StatusReply,
+    ]
+
     DeleteArtifact: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteArtifactRequest,
         database_pb2.StatusReply,
@@ -1080,6 +1085,11 @@ class DatabaseServiceAsyncStub:
     GetAllArtifacts: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetAllArtifactsRequest,
         database_pb2.GetAllArtifactsReply,
+    ]
+
+    UpdateArtifact: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateArtifactRequest,
+        database_pb2.StatusReply,
     ]
 
     DeleteArtifact: grpc.aio.UnaryUnaryMultiCallable[
@@ -1829,6 +1839,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.GetAllArtifactsRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetAllArtifactsReply, collections.abc.Awaitable[database_pb2.GetAllArtifactsReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateArtifact(
+        self,
+        request: database_pb2.UpdateArtifactRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
     @abc.abstractmethod
     def DeleteArtifact(

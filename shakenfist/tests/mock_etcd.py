@@ -17,6 +17,9 @@ from shakenfist.namespace import Namespace
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
+from shakenfist.schema.artifact_attributes import ArtifactAttributesData
+from shakenfist.schema.artifact_data import ArtifactData
+from shakenfist.schema.artifact_index import ArtifactIndexData
 from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
@@ -46,6 +49,9 @@ class MockEtcd():
         self.namespace_attributes = {}  # Mock MariaDB namespace attributes
         self.node_objects = {}  # Mock MariaDB node storage
         self.node_attributes = {}  # Mock MariaDB node attributes
+        self.artifact_objects = {}  # Mock MariaDB artifact storage
+        self.artifact_attributes = {}  # Mock MariaDB artifact attributes
+        self.artifact_indexes = {}  # Mock MariaDB artifact indexes
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -361,6 +367,93 @@ class MockEtcd():
             side_effect=self._mariadb_delete_namespace_attributes)
         self.mariadb_delete_namespace_attributes.start()
         self.test_obj.addCleanup(self.mariadb_delete_namespace_attributes.stop)
+
+        # MariaDB artifact operations
+        self.mariadb_create_artifact = mock.patch(
+            'shakenfist.mariadb.create_artifact',
+            side_effect=self._mariadb_create_artifact)
+        self.mariadb_create_artifact.start()
+        self.test_obj.addCleanup(self.mariadb_create_artifact.stop)
+
+        self.mariadb_get_artifact = mock.patch(
+            'shakenfist.mariadb.get_artifact',
+            side_effect=self._mariadb_get_artifact)
+        self.mariadb_get_artifact.start()
+        self.test_obj.addCleanup(self.mariadb_get_artifact.stop)
+
+        self.mariadb_get_all_artifacts = mock.patch(
+            'shakenfist.mariadb.get_all_artifacts',
+            side_effect=self._mariadb_get_all_artifacts)
+        self.mariadb_get_all_artifacts.start()
+        self.test_obj.addCleanup(self.mariadb_get_all_artifacts.stop)
+
+        self.mariadb_update_artifact = mock.patch(
+            'shakenfist.mariadb.update_artifact',
+            side_effect=self._mariadb_update_artifact)
+        self.mariadb_update_artifact.start()
+        self.test_obj.addCleanup(self.mariadb_update_artifact.stop)
+
+        self.mariadb_delete_artifact = mock.patch(
+            'shakenfist.mariadb.delete_artifact',
+            side_effect=self._mariadb_delete_artifact)
+        self.mariadb_delete_artifact.start()
+        self.test_obj.addCleanup(self.mariadb_delete_artifact.stop)
+
+        # MariaDB artifact attributes operations
+        self.mariadb_create_artifact_attributes = mock.patch(
+            'shakenfist.mariadb.create_artifact_attributes',
+            side_effect=self._mariadb_create_artifact_attributes)
+        self.mariadb_create_artifact_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_create_artifact_attributes.stop)
+
+        self.mariadb_get_artifact_attributes = mock.patch(
+            'shakenfist.mariadb.get_artifact_attributes',
+            side_effect=self._mariadb_get_artifact_attributes)
+        self.mariadb_get_artifact_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_get_artifact_attributes.stop)
+
+        self.mariadb_update_artifact_attributes = mock.patch(
+            'shakenfist.mariadb.update_artifact_attributes',
+            side_effect=self._mariadb_update_artifact_attributes)
+        self.mariadb_update_artifact_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_update_artifact_attributes.stop)
+
+        self.mariadb_delete_artifact_attributes = mock.patch(
+            'shakenfist.mariadb.delete_artifact_attributes',
+            side_effect=self._mariadb_delete_artifact_attributes)
+        self.mariadb_delete_artifact_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_delete_artifact_attributes.stop)
+
+        # MariaDB artifact index operations
+        self.mariadb_create_artifact_index = mock.patch(
+            'shakenfist.mariadb.create_artifact_index',
+            side_effect=self._mariadb_create_artifact_index)
+        self.mariadb_create_artifact_index.start()
+        self.test_obj.addCleanup(self.mariadb_create_artifact_index.stop)
+
+        self.mariadb_get_artifact_index = mock.patch(
+            'shakenfist.mariadb.get_artifact_index',
+            side_effect=self._mariadb_get_artifact_index)
+        self.mariadb_get_artifact_index.start()
+        self.test_obj.addCleanup(self.mariadb_get_artifact_index.stop)
+
+        self.mariadb_get_all_artifact_indexes = mock.patch(
+            'shakenfist.mariadb.get_all_artifact_indexes',
+            side_effect=self._mariadb_get_all_artifact_indexes)
+        self.mariadb_get_all_artifact_indexes.start()
+        self.test_obj.addCleanup(self.mariadb_get_all_artifact_indexes.stop)
+
+        self.mariadb_delete_artifact_index = mock.patch(
+            'shakenfist.mariadb.delete_artifact_index',
+            side_effect=self._mariadb_delete_artifact_index)
+        self.mariadb_delete_artifact_index.start()
+        self.test_obj.addCleanup(self.mariadb_delete_artifact_index.stop)
+
+        self.mariadb_delete_all_artifact_indexes = mock.patch(
+            'shakenfist.mariadb.delete_all_artifact_indexes',
+            side_effect=self._mariadb_delete_all_artifact_indexes)
+        self.mariadb_delete_all_artifact_indexes.start()
+        self.test_obj.addCleanup(self.mariadb_delete_all_artifact_indexes.stop)
 
         # Setup basic DB data
         self.node_uuids = {}
@@ -868,6 +961,119 @@ class MockEtcd():
             return True
         self._trace(f'MockMariaDB.delete_namespace_attributes({name}): not found')
         return False
+
+    # MariaDB Artifact mock implementations
+
+    def _mariadb_create_artifact(self, artifact_uuid, artifact_type,
+                                 source_url, name, namespace, version) -> bool:
+        """Mock implementation of mariadb.create_artifact()"""
+        key = str(artifact_uuid)
+        if key in self.artifact_objects:
+            return False
+        self.artifact_objects[key] = ArtifactData(
+            uuid=artifact_uuid, artifact_type=artifact_type,
+            source_url=source_url, name=name,
+            namespace=namespace, version=version)
+        self._trace(f'MockMariaDB.create_artifact({key})')
+        return True
+
+    def _mariadb_get_artifact(self, artifact_uuid) -> Optional[ArtifactData]:
+        """Mock implementation of mariadb.get_artifact()"""
+        key = str(artifact_uuid)
+        return self.artifact_objects.get(key)
+
+    def _mariadb_get_all_artifacts(self) -> list[ArtifactData]:
+        """Mock implementation of mariadb.get_all_artifacts()"""
+        return list(self.artifact_objects.values())
+
+    def _mariadb_update_artifact(self, data: ArtifactData) -> bool:
+        """Mock implementation of mariadb.update_artifact()"""
+        key = str(data.uuid)
+        if key in self.artifact_objects:
+            self.artifact_objects[key] = data
+            return True
+        return False
+
+    def _mariadb_delete_artifact(self, artifact_uuid) -> bool:
+        """Mock implementation of mariadb.delete_artifact()"""
+        key = str(artifact_uuid)
+        if key in self.artifact_objects:
+            del self.artifact_objects[key]
+            return True
+        return False
+
+    def _mariadb_create_artifact_attributes(
+            self, data: ArtifactAttributesData) -> bool:
+        """Mock implementation of mariadb.create_artifact_attributes()"""
+        key = str(data.uuid)
+        if key in self.artifact_attributes:
+            return False
+        self.artifact_attributes[key] = data
+        return True
+
+    def _mariadb_get_artifact_attributes(
+            self, artifact_uuid) -> Optional[ArtifactAttributesData]:
+        """Mock implementation of mariadb.get_artifact_attributes()"""
+        key = str(artifact_uuid)
+        return self.artifact_attributes.get(key)
+
+    def _mariadb_update_artifact_attributes(
+            self, data: ArtifactAttributesData) -> bool:
+        """Mock implementation of mariadb.update_artifact_attributes()"""
+        key = str(data.uuid)
+        if key in self.artifact_attributes:
+            self.artifact_attributes[key] = data
+            return True
+        return False
+
+    def _mariadb_delete_artifact_attributes(self, artifact_uuid) -> bool:
+        """Mock implementation of mariadb.delete_artifact_attributes()"""
+        key = str(artifact_uuid)
+        if key in self.artifact_attributes:
+            del self.artifact_attributes[key]
+            return True
+        return False
+
+    def _mariadb_create_artifact_index(self, artifact_uuid,
+                                       index_number, blob_uuid) -> bool:
+        """Mock implementation of mariadb.create_artifact_index()"""
+        key = (str(artifact_uuid), index_number)
+        if key in self.artifact_indexes:
+            return False
+        self.artifact_indexes[key] = ArtifactIndexData(
+            artifact_uuid=artifact_uuid, index_number=index_number,
+            blob_uuid=blob_uuid)
+        return True
+
+    def _mariadb_get_artifact_index(self, artifact_uuid,
+                                    index_number) -> Optional[ArtifactIndexData]:
+        """Mock implementation of mariadb.get_artifact_index()"""
+        key = (str(artifact_uuid), index_number)
+        return self.artifact_indexes.get(key)
+
+    def _mariadb_get_all_artifact_indexes(
+            self, artifact_uuid) -> list[ArtifactIndexData]:
+        """Mock implementation of mariadb.get_all_artifact_indexes()"""
+        prefix = str(artifact_uuid)
+        return [v for k, v in self.artifact_indexes.items()
+                if k[0] == prefix]
+
+    def _mariadb_delete_artifact_index(self, artifact_uuid,
+                                       index_number) -> bool:
+        """Mock implementation of mariadb.delete_artifact_index()"""
+        key = (str(artifact_uuid), index_number)
+        if key in self.artifact_indexes:
+            del self.artifact_indexes[key]
+            return True
+        return False
+
+    def _mariadb_delete_all_artifact_indexes(self, artifact_uuid) -> int:
+        """Mock implementation of mariadb.delete_all_artifact_indexes()"""
+        prefix = str(artifact_uuid)
+        to_delete = [k for k in self.artifact_indexes if k[0] == prefix]
+        for k in to_delete:
+            del self.artifact_indexes[k]
+        return len(to_delete)
 
     #
     # DB operations - Low level

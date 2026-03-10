@@ -504,6 +504,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetAllArtifactsRequest.SerializeToString,
                 response_deserializer=database__pb2.GetAllArtifactsReply.FromString,
                 _registered_method=True)
+        self.UpdateArtifact = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateArtifact',
+                request_serializer=database__pb2.UpdateArtifactRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
         self.DeleteArtifact = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteArtifact',
                 request_serializer=database__pb2.DeleteArtifactRequest.SerializeToString,
@@ -1150,6 +1155,12 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def UpdateArtifact(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DeleteArtifact(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1686,6 +1697,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetAllArtifacts,
                     request_deserializer=database__pb2.GetAllArtifactsRequest.FromString,
                     response_serializer=database__pb2.GetAllArtifactsReply.SerializeToString,
+            ),
+            'UpdateArtifact': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateArtifact,
+                    request_deserializer=database__pb2.UpdateArtifactRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
             'DeleteArtifact': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteArtifact,
@@ -4276,6 +4292,33 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetAllArtifacts',
             database__pb2.GetAllArtifactsRequest.SerializeToString,
             database__pb2.GetAllArtifactsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateArtifact(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateArtifact',
+            database__pb2.UpdateArtifactRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
             insecure,
