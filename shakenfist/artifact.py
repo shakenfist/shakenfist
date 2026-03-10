@@ -10,7 +10,6 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import baseobject
 from shakenfist import blob
-from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -41,6 +40,7 @@ UPLOAD_URL = 'sf://upload/'
 
 class Artifact(dbowo):
     object_type = ObjectType.ARTIFACT
+    initial_version = 8
     current_version = 9
 
     # docs/developer_guide/state_machine.md has a description of these states.
@@ -112,35 +112,6 @@ class Artifact(dbowo):
         )
         mariadb.update_artifact_attributes(updated)
         self.__attributes = updated
-
-    @classmethod
-    def _upgrade_step_2_to_3(cls, static_values):
-        static_values['namespace'] = 'sharedwithall'
-
-    @classmethod
-    def _upgrade_step_3_to_4(cls, static_values):
-        if static_values['namespace'] == 'sharedwithall':
-            static_values['namespace'] = 'system'
-            etcd.put(
-                'attribute/artifact', static_values['uuid'], 'shared',
-                {'shared': True})
-
-    @classmethod
-    def _upgrade_step_4_to_5(cls, static_values):
-        cls._upgrade_metadata_to_attribute(static_values['uuid'])
-
-    @classmethod
-    def _upgrade_step_5_to_6(cls, static_values):
-        static_values['name'] = static_values['source_url'].split('/')[-1]
-
-    @classmethod
-    def _upgrade_step_6_to_7(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_7_to_8(cls, static_values):
-        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
-        ...
 
     @classmethod
     def _upgrade_step_8_to_9(cls, static_values):

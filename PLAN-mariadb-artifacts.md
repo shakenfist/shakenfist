@@ -364,3 +364,36 @@ is sufficient.
 - **mock_etcd.py**: ~50 lines of mock updates
 - **test_mariadb_artifacts.py**: ~200 lines new test file
 - **Documentation**: ~50 lines across 3 files
+
+## Deferred Work
+
+The following items were identified during implementation but are out of
+scope for this migration:
+
+- **`last_cluster_operation` and `metadata` attributes remain in etcd.**
+  These are inherited from the base class and shared across all object
+  types. Migrating them requires changes to the base class infrastructure.
+- **Push namespace/source_url filtering down to MariaDB.** The
+  `Artifacts` iterator now reads from MariaDB but still applies filters
+  in Python. A future optimization could use SQL WHERE clauses for
+  `namespace` and `source_url` filters via `from_url()` and
+  `artifacts_in_namespace()`.
+- **Replace etcd lock in `add_index()` with MariaDB transaction.**
+  The `get_lock_attr('index', ...)` call still uses etcd for locking.
+  Once all locking is migrated to MariaDB, this could use a database
+  transaction instead.
+- **TODO(andy) in `external_view()`**: Artifacts should not reference
+  non-existent blobs. This pre-dates the migration and is unchanged.
+- **Consolidate `from_db` and `_db_get` into base class.** The
+  `from_db()` and `_db_get()` overrides are now near-identical across
+  Artifact, Blob, Node, Namespace, Upload, and DnsMasq. The base class
+  `from_db()` could be updated to handle Pydantic models directly,
+  eliminating the override in every subclass.
+- **Extract lazy attribute loading pattern.** The `_load_attributes`,
+  `_ensure_attributes`, `_update_attributes` pattern is duplicated
+  between Artifact and Blob. A base class mixin or generic method
+  parameterized by the attributes type and mariadb functions would
+  reduce duplication.
+- **Reduce mock registration boilerplate in mock_etcd.py.** The
+  3-line mock.patch/start/addCleanup pattern is repeated ~40 times.
+  A helper method would eliminate ~120 lines of mechanical code.

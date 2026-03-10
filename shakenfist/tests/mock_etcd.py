@@ -980,10 +980,15 @@ class MockEtcd():
     def _mariadb_get_artifact(self, artifact_uuid) -> Optional[ArtifactData]:
         """Mock implementation of mariadb.get_artifact()"""
         key = str(artifact_uuid)
-        return self.artifact_objects.get(key)
+        data = self.artifact_objects.get(key)
+        self._trace(f'MockMariaDB.get_artifact({key}): {data}')
+        return data
 
     def _mariadb_get_all_artifacts(self) -> list[ArtifactData]:
         """Mock implementation of mariadb.get_all_artifacts()"""
+        self._trace(
+            f'MockMariaDB.get_all_artifacts(): '
+            f'{len(self.artifact_objects)} results')
         return list(self.artifact_objects.values())
 
     def _mariadb_update_artifact(self, data: ArtifactData) -> bool:
@@ -991,7 +996,9 @@ class MockEtcd():
         key = str(data.uuid)
         if key in self.artifact_objects:
             self.artifact_objects[key] = data
+            self._trace(f'MockMariaDB.update_artifact({key}): updated')
             return True
+        self._trace(f'MockMariaDB.update_artifact({key}): not found')
         return False
 
     def _mariadb_delete_artifact(self, artifact_uuid) -> bool:
@@ -999,7 +1006,9 @@ class MockEtcd():
         key = str(artifact_uuid)
         if key in self.artifact_objects:
             del self.artifact_objects[key]
+            self._trace(f'MockMariaDB.delete_artifact({key}): deleted')
             return True
+        self._trace(f'MockMariaDB.delete_artifact({key}): not found')
         return False
 
     def _mariadb_create_artifact_attributes(
@@ -1007,15 +1016,22 @@ class MockEtcd():
         """Mock implementation of mariadb.create_artifact_attributes()"""
         key = str(data.uuid)
         if key in self.artifact_attributes:
+            self._trace(
+                f'MockMariaDB.create_artifact_attributes({key}): exists')
             return False
         self.artifact_attributes[key] = data
+        self._trace(
+            f'MockMariaDB.create_artifact_attributes({key}): created')
         return True
 
     def _mariadb_get_artifact_attributes(
             self, artifact_uuid) -> Optional[ArtifactAttributesData]:
         """Mock implementation of mariadb.get_artifact_attributes()"""
         key = str(artifact_uuid)
-        return self.artifact_attributes.get(key)
+        data = self.artifact_attributes.get(key)
+        self._trace(
+            f'MockMariaDB.get_artifact_attributes({key}): {data}')
+        return data
 
     def _mariadb_update_artifact_attributes(
             self, data: ArtifactAttributesData) -> bool:
@@ -1023,7 +1039,11 @@ class MockEtcd():
         key = str(data.uuid)
         if key in self.artifact_attributes:
             self.artifact_attributes[key] = data
+            self._trace(
+                f'MockMariaDB.update_artifact_attributes({key}): updated')
             return True
+        self._trace(
+            f'MockMariaDB.update_artifact_attributes({key}): not found')
         return False
 
     def _mariadb_delete_artifact_attributes(self, artifact_uuid) -> bool:
@@ -1031,7 +1051,11 @@ class MockEtcd():
         key = str(artifact_uuid)
         if key in self.artifact_attributes:
             del self.artifact_attributes[key]
+            self._trace(
+                f'MockMariaDB.delete_artifact_attributes({key}): deleted')
             return True
+        self._trace(
+            f'MockMariaDB.delete_artifact_attributes({key}): not found')
         return False
 
     def _mariadb_create_artifact_index(self, artifact_uuid,
@@ -1039,24 +1063,35 @@ class MockEtcd():
         """Mock implementation of mariadb.create_artifact_index()"""
         key = (str(artifact_uuid), index_number)
         if key in self.artifact_indexes:
+            self._trace(
+                f'MockMariaDB.create_artifact_index({key}): exists')
             return False
         self.artifact_indexes[key] = ArtifactIndexData(
             artifact_uuid=artifact_uuid, index_number=index_number,
             blob_uuid=blob_uuid)
+        self._trace(
+            f'MockMariaDB.create_artifact_index({key}): created')
         return True
 
     def _mariadb_get_artifact_index(self, artifact_uuid,
                                     index_number) -> Optional[ArtifactIndexData]:
         """Mock implementation of mariadb.get_artifact_index()"""
         key = (str(artifact_uuid), index_number)
-        return self.artifact_indexes.get(key)
+        data = self.artifact_indexes.get(key)
+        self._trace(
+            f'MockMariaDB.get_artifact_index({key}): {data}')
+        return data
 
     def _mariadb_get_all_artifact_indexes(
             self, artifact_uuid) -> list[ArtifactIndexData]:
         """Mock implementation of mariadb.get_all_artifact_indexes()"""
         prefix = str(artifact_uuid)
-        return [v for k, v in self.artifact_indexes.items()
-                if k[0] == prefix]
+        result = [v for k, v in self.artifact_indexes.items()
+                  if k[0] == prefix]
+        self._trace(
+            f'MockMariaDB.get_all_artifact_indexes({prefix}): '
+            f'{len(result)} results')
+        return result
 
     def _mariadb_delete_artifact_index(self, artifact_uuid,
                                        index_number) -> bool:
@@ -1064,7 +1099,11 @@ class MockEtcd():
         key = (str(artifact_uuid), index_number)
         if key in self.artifact_indexes:
             del self.artifact_indexes[key]
+            self._trace(
+                f'MockMariaDB.delete_artifact_index({key}): deleted')
             return True
+        self._trace(
+            f'MockMariaDB.delete_artifact_index({key}): not found')
         return False
 
     def _mariadb_delete_all_artifact_indexes(self, artifact_uuid) -> int:
@@ -1073,6 +1112,9 @@ class MockEtcd():
         to_delete = [k for k in self.artifact_indexes if k[0] == prefix]
         for k in to_delete:
             del self.artifact_indexes[k]
+        self._trace(
+            f'MockMariaDB.delete_all_artifact_indexes({prefix}): '
+            f'{len(to_delete)} deleted')
         return len(to_delete)
 
     #

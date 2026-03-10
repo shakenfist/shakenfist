@@ -129,6 +129,7 @@ class Blob(dbo):
             attrs = BlobAttributesData(uuid=self.uuid)
             mariadb.create_blob_attributes(attrs)
             self.__attributes = attrs
+            self.__attributes_loaded = True
         return attrs
 
     @classmethod
