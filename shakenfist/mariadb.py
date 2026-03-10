@@ -8490,6 +8490,40 @@ def _direct_get_all_artifacts() -> list[ArtifactData]:
         return []
 
 
+def _direct_update_artifact(data: ArtifactData) -> bool:
+    """Update an artifact record in MariaDB.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The ArtifactData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_artifacts_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                artifact_type=data.artifact_type,
+                source_url=data.source_url,
+                name=data.name,
+                namespace=data.namespace,
+                version=data.version
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB update failed for artifact {data.uuid}: {e}')
+        return False
+
+
 def _direct_delete_artifact(artifact_uuid: UUID) -> bool:
     """Delete an artifact record from MariaDB."""
     engine = _get_engine()
@@ -8812,6 +8846,27 @@ def _grpc_get_all_artifacts() -> list[ArtifactData]:
         return []
 
 
+def _grpc_update_artifact(data: ArtifactData) -> bool:
+    """Update an artifact record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateArtifactRequest(
+            artifact=database_pb2.ArtifactStaticData(
+                uuid=str(data.uuid),
+                artifact_type=data.artifact_type,
+                source_url=data.source_url,
+                name=data.name,
+                namespace=data.namespace,
+                version=data.version
+            )
+        )
+        reply = stub.UpdateArtifact(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC UpdateArtifact failed for {data.uuid}: {e}')
+        return False
+
+
 def _grpc_delete_artifact(artifact_uuid: UUID) -> bool:
     """Delete an artifact record via the database microservice."""
     try:
@@ -9074,6 +9129,22 @@ def get_all_artifacts() -> list[ArtifactData]:
     if _use_database_service():
         return _grpc_get_all_artifacts()
     return _direct_get_all_artifacts()
+
+
+def update_artifact(data: ArtifactData) -> bool:
+    """Update an artifact record.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The ArtifactData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_artifact(data)
+    return _direct_update_artifact(data)
 
 
 def delete_artifact(artifact_uuid: UUID) -> bool:

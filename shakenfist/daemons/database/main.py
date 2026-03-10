@@ -2366,6 +2366,30 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetAllArtifacts failed', e)
             return database_pb2.GetAllArtifactsReply(artifacts=[])
 
+    def UpdateArtifact(
+        self,
+        request: database_pb2.UpdateArtifactRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update an artifact record in MariaDB."""
+        try:
+            self.monitor.counters['update_artifact'].inc()
+            from shakenfist.schema.artifact_data import ArtifactData
+            data = ArtifactData(
+                uuid=UUID(request.artifact.uuid),
+                artifact_type=request.artifact.artifact_type,
+                source_url=request.artifact.source_url,
+                name=request.artifact.name,
+                namespace=request.artifact.namespace,
+                version=request.artifact.version
+            )
+            success = mariadb._direct_update_artifact(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateArtifact failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
     def DeleteArtifact(
         self,
         request: database_pb2.DeleteArtifactRequest,
@@ -2650,7 +2674,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'delete_namespace_attributes',
             # MariaDB artifact operations
             'create_artifact', 'get_artifact', 'get_all_artifacts',
-            'delete_artifact',
+            'update_artifact', 'delete_artifact',
             # MariaDB artifact attributes operations
             'create_artifact_attributes', 'get_artifact_attributes',
             'update_artifact_attributes', 'delete_artifact_attributes',

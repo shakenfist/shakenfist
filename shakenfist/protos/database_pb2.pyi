@@ -3052,6 +3052,23 @@ class GetAllArtifactsReply(google.protobuf.message.Message):
 global___GetAllArtifactsReply = GetAllArtifactsReply
 
 @typing.final
+class UpdateArtifactRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ARTIFACT_FIELD_NUMBER: builtins.int
+    @property
+    def artifact(self) -> global___ArtifactStaticData: ...
+    def __init__(
+        self,
+        *,
+        artifact: global___ArtifactStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["artifact", b"artifact"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["artifact", b"artifact"]) -> None: ...
+
+global___UpdateArtifactRequest = UpdateArtifactRequest
+
+@typing.final
 class DeleteArtifactRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
