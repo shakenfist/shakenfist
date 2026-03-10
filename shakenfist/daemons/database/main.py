@@ -39,6 +39,7 @@ from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
+from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
@@ -2374,7 +2375,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Update an artifact record in MariaDB."""
         try:
             self.monitor.counters['update_artifact'].inc()
-            from shakenfist.schema.artifact_data import ArtifactData
             data = ArtifactData(
                 uuid=UUID(request.artifact.uuid),
                 artifact_type=request.artifact.artifact_type,
