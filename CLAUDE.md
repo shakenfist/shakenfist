@@ -411,6 +411,9 @@ performance. This is required for all deployments - MariaDB must be configured.
 - **Namespaces** (`namespaces`, `namespace_attributes` tables): Namespace
   static values and mutable attributes (keys, trust). Uses namespace name
   (string) as primary key, not UUID.
+- **Artifacts** (`artifacts`, `artifact_attributes`, `artifact_indexes` tables):
+  Artifact static values (uuid, type, source_url, name, namespace), mutable
+  attributes (max_versions, shared, highest_index), and version indexes.
 
 ### Migrating Existing Deployments
 
