@@ -414,6 +414,10 @@ performance. This is required for all deployments - MariaDB must be configured.
 - **Artifacts** (`artifacts`, `artifact_attributes`, `artifact_indexes` tables):
   Artifact static values (uuid, type, source_url, name, namespace), mutable
   attributes (max_versions, shared, highest_index), and version indexes.
+- **Network Interfaces** (`network_interfaces`, `network_interface_attributes`
+  tables): Network interface static values (uuid, network_uuid, instance_uuid,
+  macaddr, ipv4, order, model) and mutable attributes (floating_address).
+  Dual-write with etcd fallback for unmigrated objects.
 
 ### Migrating Existing Deployments
 

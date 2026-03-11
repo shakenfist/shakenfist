@@ -3345,3 +3345,288 @@ class DeleteAllArtifactIndexesRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["artifact_uuid", b"artifact_uuid"]) -> None: ...
 
 global___DeleteAllArtifactIndexesRequest = DeleteAllArtifactIndexesRequest
+
+@typing.final
+class NetworkInterfaceStaticData(google.protobuf.message.Message):
+    """NetworkInterface Operations (MariaDB)
+    These operations manage NetworkInterface objects in MariaDB.
+    NetworkInterfaces represent virtual NICs attached to instances.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    INSTANCE_UUID_FIELD_NUMBER: builtins.int
+    MACADDR_FIELD_NUMBER: builtins.int
+    IPV4_FIELD_NUMBER: builtins.int
+    ORDER_FIELD_NUMBER: builtins.int
+    MODEL_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """NetworkInterface UUID"""
+    network_uuid: builtins.str
+    """Network this interface belongs to"""
+    instance_uuid: builtins.str
+    """Instance this interface is attached to"""
+    macaddr: builtins.str
+    """MAC address"""
+    ipv4: builtins.str
+    """IPv4 address"""
+    order: builtins.int
+    """Interface ordering index"""
+    model: builtins.str
+    """Virtio device model"""
+    version: builtins.int
+    """Object version number"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        network_uuid: builtins.str = ...,
+        instance_uuid: builtins.str = ...,
+        macaddr: builtins.str = ...,
+        ipv4: builtins.str = ...,
+        order: builtins.int = ...,
+        model: builtins.str = ...,
+        version: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["instance_uuid", b"instance_uuid", "ipv4", b"ipv4", "macaddr", b"macaddr", "model", b"model", "network_uuid", b"network_uuid", "order", b"order", "uuid", b"uuid", "version", b"version"]) -> None: ...
+
+global___NetworkInterfaceStaticData = NetworkInterfaceStaticData
+
+@typing.final
+class CreateNetworkInterfaceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NETWORK_INTERFACE_FIELD_NUMBER: builtins.int
+    @property
+    def network_interface(self) -> global___NetworkInterfaceStaticData: ...
+    def __init__(
+        self,
+        *,
+        network_interface: global___NetworkInterfaceStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["network_interface", b"network_interface"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["network_interface", b"network_interface"]) -> None: ...
+
+global___CreateNetworkInterfaceRequest = CreateNetworkInterfaceRequest
+
+@typing.final
+class GetNetworkInterfaceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetNetworkInterfaceRequest = GetNetworkInterfaceRequest
+
+@typing.final
+class GetNetworkInterfaceReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    NETWORK_INTERFACE_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def network_interface(self) -> global___NetworkInterfaceStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        network_interface: global___NetworkInterfaceStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["network_interface", b"network_interface"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["found", b"found", "network_interface", b"network_interface"]) -> None: ...
+
+global___GetNetworkInterfaceReply = GetNetworkInterfaceReply
+
+@typing.final
+class GetNetworkInterfacesByInstanceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INSTANCE_UUID_FIELD_NUMBER: builtins.int
+    instance_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        instance_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["instance_uuid", b"instance_uuid"]) -> None: ...
+
+global___GetNetworkInterfacesByInstanceRequest = GetNetworkInterfacesByInstanceRequest
+
+@typing.final
+class GetNetworkInterfacesByNetworkRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    network_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        network_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["network_uuid", b"network_uuid"]) -> None: ...
+
+global___GetNetworkInterfacesByNetworkRequest = GetNetworkInterfacesByNetworkRequest
+
+@typing.final
+class GetNetworkInterfacesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NETWORK_INTERFACES_FIELD_NUMBER: builtins.int
+    @property
+    def network_interfaces(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NetworkInterfaceStaticData]: ...
+    def __init__(
+        self,
+        *,
+        network_interfaces: collections.abc.Iterable[global___NetworkInterfaceStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["network_interfaces", b"network_interfaces"]) -> None: ...
+
+global___GetNetworkInterfacesReply = GetNetworkInterfacesReply
+
+@typing.final
+class DeleteNetworkInterfaceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteNetworkInterfaceRequest = DeleteNetworkInterfaceRequest
+
+@typing.final
+class UpdateNetworkInterfaceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NETWORK_INTERFACE_FIELD_NUMBER: builtins.int
+    @property
+    def network_interface(self) -> global___NetworkInterfaceStaticData: ...
+    def __init__(
+        self,
+        *,
+        network_interface: global___NetworkInterfaceStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["network_interface", b"network_interface"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["network_interface", b"network_interface"]) -> None: ...
+
+global___UpdateNetworkInterfaceRequest = UpdateNetworkInterfaceRequest
+
+@typing.final
+class NetworkInterfaceAttributesProto(google.protobuf.message.Message):
+    """NetworkInterface Attributes Operations (MariaDB)"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    FLOATING_ADDRESS_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """References network_interfaces.uuid"""
+    floating_address: builtins.str
+    """Floating IP address (empty = None)"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        floating_address: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["floating_address", b"floating_address", "uuid", b"uuid"]) -> None: ...
+
+global___NetworkInterfaceAttributesProto = NetworkInterfaceAttributesProto
+
+@typing.final
+class CreateNetworkInterfaceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___NetworkInterfaceAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___NetworkInterfaceAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateNetworkInterfaceAttributesRequest = CreateNetworkInterfaceAttributesRequest
+
+@typing.final
+class GetNetworkInterfaceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetNetworkInterfaceAttributesRequest = GetNetworkInterfaceAttributesRequest
+
+@typing.final
+class GetNetworkInterfaceAttributesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___NetworkInterfaceAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___NetworkInterfaceAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetNetworkInterfaceAttributesReply = GetNetworkInterfaceAttributesReply
+
+@typing.final
+class UpdateNetworkInterfaceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___NetworkInterfaceAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___NetworkInterfaceAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___UpdateNetworkInterfaceAttributesRequest = UpdateNetworkInterfaceAttributesRequest
+
+@typing.final
+class DeleteNetworkInterfaceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteNetworkInterfaceAttributesRequest = DeleteNetworkInterfaceAttributesRequest
