@@ -75,12 +75,21 @@ class NetworkInterface(dbo):
         # Write to etcd (base class behavior)
         super()._db_create(object_uuid, metadata)
 
-        # Also write static values to MariaDB. Convert string UUIDs to
-        # uuid.UUID objects as required by SQLAlchemy's native UUID type.
+        # Also write static values to MariaDB. Ensure UUIDs are uuid.UUID
+        # objects as required by SQLAlchemy's native UUID type. Values may
+        # already be UUID objects (e.g. from baseobject.uuid property).
+        _uuid = object_uuid if isinstance(object_uuid, UUID) else UUID(object_uuid)
+        _net_uuid = metadata['network_uuid']
+        if not isinstance(_net_uuid, UUID):
+            _net_uuid = UUID(_net_uuid)
+        _inst_uuid = metadata['instance_uuid']
+        if not isinstance(_inst_uuid, UUID):
+            _inst_uuid = UUID(_inst_uuid)
+
         data = NetworkInterfaceData(
-            uuid=UUID(object_uuid),
-            network_uuid=UUID(metadata['network_uuid']),
-            instance_uuid=UUID(metadata['instance_uuid']),
+            uuid=_uuid,
+            network_uuid=_net_uuid,
+            instance_uuid=_inst_uuid,
             macaddr=metadata['macaddr'],
             ipv4=metadata['ipv4'],
             order=metadata['order'],
