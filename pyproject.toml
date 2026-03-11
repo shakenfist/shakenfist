@@ -116,7 +116,7 @@ dependencies = [
     "zope.interface==8.2",
     "wraps==0.15.0",
     "certifi==2026.1.4",
-    "charset-normalizer==3.4.4",
+    "charset-normalizer==3.4.5",
     "debtcollector==3.0.0",
     "fasteners==0.20",
     "idna==3.11",
