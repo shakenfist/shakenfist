@@ -75,11 +75,12 @@ class NetworkInterface(dbo):
         # Write to etcd (base class behavior)
         super()._db_create(object_uuid, metadata)
 
-        # Also write static values to MariaDB
+        # Also write static values to MariaDB. Convert string UUIDs to
+        # uuid.UUID objects as required by SQLAlchemy's native UUID type.
         data = NetworkInterfaceData(
-            uuid=object_uuid,  # type: ignore[arg-type]
-            network_uuid=metadata['network_uuid'],  # type: ignore[arg-type]
-            instance_uuid=metadata['instance_uuid'],  # type: ignore[arg-type]
+            uuid=UUID(object_uuid),
+            network_uuid=UUID(metadata['network_uuid']),
+            instance_uuid=UUID(metadata['instance_uuid']),
             macaddr=metadata['macaddr'],
             ipv4=metadata['ipv4'],
             order=metadata['order'],
@@ -89,9 +90,12 @@ class NetworkInterface(dbo):
         mariadb.create_network_interface(data)
 
     @classmethod
-    def _db_get(cls, object_uuid: UUID) -> Optional[dict]:
+    def _db_get(cls, object_uuid) -> Optional[dict]:
         """Get NetworkInterface static values, trying MariaDB first."""
-        # Try MariaDB first
+        # Try MariaDB first. Ensure we pass a uuid.UUID object as required
+        # by SQLAlchemy's native UUID column type.
+        if not isinstance(object_uuid, UUID):
+            object_uuid = UUID(object_uuid)
         data = mariadb.get_network_interface(object_uuid)
         if data:
             result = {
@@ -145,7 +149,7 @@ class NetworkInterface(dbo):
 
         # Also create initial attributes record in MariaDB
         attrs = NetworkInterfaceAttributesData(
-            uuid=interface_uuid,  # type: ignore[arg-type]
+            uuid=UUID(interface_uuid),
             floating_address=None
         )
         mariadb.create_network_interface_attributes(attrs)
