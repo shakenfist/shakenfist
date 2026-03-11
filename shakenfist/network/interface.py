@@ -1,14 +1,20 @@
 # Copyright 2020 Michael Still
 from functools import partial
+from typing import Any
+from typing import Optional
+from uuid import UUID
 from uuid import uuid4
 
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
+from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
@@ -25,7 +31,7 @@ LOG, _ = logs.setup(__name__)
 class NetworkInterface(dbo):
     object_type = ObjectType.INTERFACE
     initial_version = 2
-    current_version = 4
+    current_version = 5
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -58,6 +64,56 @@ class NetworkInterface(dbo):
         ...
 
     @classmethod
+    def _upgrade_step_4_to_5(cls, static_values):
+        # Static values and attributes migration to MariaDB is handled by the
+        # database daemon data migrations.
+        ...
+
+    @classmethod
+    def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
+        """Create a NetworkInterface record in both etcd and MariaDB."""
+        # Write to etcd (base class behavior)
+        super()._db_create(object_uuid, metadata)
+
+        # Also write static values to MariaDB
+        data = NetworkInterfaceData(
+            uuid=object_uuid,  # type: ignore[arg-type]
+            network_uuid=metadata['network_uuid'],  # type: ignore[arg-type]
+            instance_uuid=metadata['instance_uuid'],  # type: ignore[arg-type]
+            macaddr=metadata['macaddr'],
+            ipv4=metadata['ipv4'],
+            order=metadata['order'],
+            model=metadata['model'],
+            version=metadata['version']
+        )
+        mariadb.create_network_interface(data)
+
+    @classmethod
+    def _db_get(cls, object_uuid: UUID) -> Optional[dict]:
+        """Get NetworkInterface static values, trying MariaDB first."""
+        # Try MariaDB first
+        data = mariadb.get_network_interface(object_uuid)
+        if data:
+            result = {
+                'uuid': str(data.uuid),
+                'network_uuid': str(data.network_uuid),
+                'instance_uuid': str(data.instance_uuid),
+                'macaddr': data.macaddr,
+                'ipv4': data.ipv4,
+                'order': data.order,
+                'model': data.model,
+                'version': data.version
+            }
+            if result.get('version', 0) != cls.current_version:
+                if not cls.upgrade_supported:
+                    raise exceptions.BadObjectVersion(
+                        f'Unsupported object version - {cls.object_type}: {result}')
+            return result
+
+        # Fall back to etcd for unmigrated objects
+        return super()._db_get(object_uuid)
+
+    @classmethod
     def new(cls, interface_uuid, netdesc, instance_uuid, order):
         if 'macaddress' not in netdesc or not netdesc['macaddress']:
             possible_mac = util_network.random_macaddr()
@@ -86,6 +142,14 @@ class NetworkInterface(dbo):
 
         ni = NetworkInterface.from_db(interface_uuid)
         ni._db_set_attribute('floating', {'floating_address': None})
+
+        # Also create initial attributes record in MariaDB
+        attrs = NetworkInterfaceAttributesData(
+            uuid=interface_uuid,  # type: ignore[arg-type]
+            floating_address=None
+        )
+        mariadb.create_network_interface_attributes(attrs)
+
         ni.state = NetworkInterface.STATE_INITIAL
 
         n = network.Network.from_db(netdesc['network_uuid'])
@@ -109,8 +173,7 @@ class NetworkInterface(dbo):
             'model': self.model
         })
 
-        n['floating'] = self._db_get_attribute(
-            'floating').get('floating_address')
+        n['floating'] = self.floating.get('floating_address')
         return n
 
     # Static values
@@ -141,6 +204,11 @@ class NetworkInterface(dbo):
     # Values routed to attributes, writes are via helper methods.
     @property
     def floating(self):
+        # Try MariaDB first
+        attrs = mariadb.get_network_interface_attributes(self.uuid)
+        if attrs:
+            return {'floating_address': attrs.floating_address}
+        # Fall back to etcd for unmigrated objects
         return self._db_get_attribute('floating')
 
     @floating.setter
@@ -148,6 +216,15 @@ class NetworkInterface(dbo):
         if address and self.floating.get('floating_address') is not None:
             raise exceptions.NetworkInterfaceAlreadyFloating()
         self._db_set_attribute('floating', {'floating_address': address})
+
+        # Also update MariaDB
+        attrs = mariadb.get_network_interface_attributes(self.uuid)
+        if attrs:
+            updated = NetworkInterfaceAttributesData(
+                uuid=attrs.uuid,
+                floating_address=address
+            )
+            mariadb.update_network_interface_attributes(updated)
 
     def delete(self):
         floating_address = self.floating['floating_address']
@@ -176,6 +253,8 @@ class NetworkInterface(dbo):
 
     def hard_delete(self):
         etcd.delete('macaddress', None, self.macaddr)
+        mariadb.delete_network_interface_attributes(self.uuid)
+        mariadb.delete_network_interface(self.uuid)
         super().hard_delete()
 
 

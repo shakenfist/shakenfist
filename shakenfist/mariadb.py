@@ -49,6 +49,8 @@ from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.dnsmasq import DnsMasqData
+from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
+from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_reference import ObjectReference
@@ -86,6 +88,8 @@ _node_attributes_table: Optional[sa.Table] = None
 _artifacts_table: Optional[sa.Table] = None
 _artifact_attributes_table: Optional[sa.Table] = None
 _artifact_indexes_table: Optional[sa.Table] = None
+_network_interfaces_table: Optional[sa.Table] = None
+_network_interface_attributes_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -108,6 +112,8 @@ NAMESPACE_ATTRIBUTES_VERSION = 2
 ARTIFACTS_VERSION = 1
 ARTIFACT_ATTRIBUTES_VERSION = 1
 ARTIFACT_INDEXES_VERSION = 1
+NETWORK_INTERFACES_VERSION = 2
+NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -1061,6 +1067,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_artifacts_schema(engine))
     results.append(_ensure_artifact_attributes_schema(engine))
     results.append(_ensure_artifact_indexes_schema(engine))
+    results.append(_ensure_network_interfaces_schema(engine))
+    results.append(_ensure_network_interface_attributes_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -2445,6 +2453,134 @@ def _migrate_etcd_artifact_indexes(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _migrate_etcd_network_interfaces(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate NetworkInterface static values from etcd to MariaDB."""
+    from shakenfist import etcd
+    from shakenfist.network.interface import NetworkInterface
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating NetworkInterface objects from etcd...')
+
+    for objkey, data in etcd.get_all('networkinterface', None):
+        ni_uuid = objkey.split('/')[-1]
+
+        try:
+            # Apply upgrades to legacy data
+            version = data.get('version', NetworkInterface.initial_version)
+            while version < NetworkInterface.current_version:
+                step_name = f'_upgrade_step_{version}_to_{version + 1}'
+                step_func = getattr(NetworkInterface, step_name, None)
+                if step_func:
+                    step_func(data)
+                version += 1
+                data['version'] = version
+
+            ni_data = NetworkInterfaceData(
+                uuid=UUIDType(ni_uuid),
+                network_uuid=UUIDType(data['network_uuid']),
+                instance_uuid=UUIDType(data['instance_uuid']),
+                macaddr=data.get('macaddr', ''),
+                ipv4=data.get('ipv4', ''),
+                order=data.get('order', 0),
+                model=data.get('model', 'virtio'),
+                version=NetworkInterface.current_version,
+            )
+            success = create_network_interface(ni_data)
+            if success:
+                etcd.delete('networkinterface', None, ni_uuid)
+                migrated_count += 1
+            else:
+                etcd.delete('networkinterface', None, ni_uuid)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(f'Error migrating NetworkInterface {ni_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count} '
+                f'NetworkInterface objects processed')
+
+    LOG.info(
+        f'NetworkInterface migration: {migrated_count} migrated, '
+        f'{skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
+def _migrate_etcd_network_interface_attributes(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Migrate NetworkInterface attributes from etcd to MariaDB.
+
+    Reads the 'floating' attribute from etcd for each NetworkInterface and
+    creates network_interface_attributes records.
+    """
+    from shakenfist import etcd
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    # Get all network interface UUIDs from the network_interfaces table
+    ni_table = _get_network_interfaces_table()
+    with engine.connect() as conn:
+        stmt = sa.select(ni_table.c.uuid)
+        result = conn.execute(stmt)
+        ni_uuids = [str(row.uuid) for row in result]
+
+    LOG.info(
+        f'Migrating attributes for {len(ni_uuids)} '
+        f'NetworkInterface objects...')
+
+    for ni_uuid in ni_uuids:
+        try:
+            # Check if already migrated
+            existing = get_network_interface_attributes(UUIDType(ni_uuid))
+            if existing:
+                skipped_count += 1
+                continue
+
+            # Read floating attribute from etcd
+            floating_data = etcd.get(
+                'attribute/networkinterface', ni_uuid, 'floating')
+            floating_address = None
+            if floating_data:
+                floating_address = floating_data.get('floating_address')
+
+            attrs = NetworkInterfaceAttributesData(
+                uuid=UUIDType(ni_uuid),
+                floating_address=floating_address,
+            )
+            success = create_network_interface_attributes(attrs)
+            if success:
+                # Delete the etcd attribute after migration
+                if floating_data:
+                    etcd.delete(
+                        'attribute/networkinterface', ni_uuid, 'floating')
+                migrated_count += 1
+            else:
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(
+                f'Error migrating NetworkInterface attributes '
+                f'{ni_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count} '
+                f'NetworkInterface attributes processed')
+
+    LOG.info(
+        f'NetworkInterface attributes migration: {migrated_count} '
+        f'migrated, {skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -2495,6 +2631,12 @@ DATA_MIGRATIONS.update({
     },
     'artifact_indexes': {
         2: _migrate_etcd_artifact_indexes,
+    },
+    'network_interfaces': {
+        2: _migrate_etcd_network_interfaces,
+    },
+    'network_interface_attributes': {
+        2: _migrate_etcd_network_interface_attributes,
     },
 })
 
@@ -9304,3 +9446,818 @@ def delete_all_artifact_indexes(artifact_uuid: UUID) -> int:
     if _use_database_service():
         return _grpc_delete_all_artifact_indexes(artifact_uuid)
     return _direct_delete_all_artifact_indexes(artifact_uuid)
+
+
+# =============================================================================
+# NetworkInterface Table Definitions
+# =============================================================================
+
+def _get_network_interfaces_table() -> sa.Table:
+    """Get or create the network_interfaces table definition.
+
+    This table stores static values for NetworkInterface objects.
+    NetworkInterfaces represent virtual NICs attached to instances.
+
+    The table schema is generated from the NetworkInterfaceData Pydantic
+    model. The uuid is the primary key, with indexes on network_uuid,
+    instance_uuid, and macaddr.
+    """
+    global _network_interfaces_table
+    if _network_interfaces_table is None:
+        metadata = _get_metadata()
+        _network_interfaces_table = pydantic_to_sqlalchemy_table(
+            NetworkInterfaceData,
+            'network_interfaces',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+    return _network_interfaces_table
+
+
+def _get_network_interface_attributes_table() -> sa.Table:
+    """Get or create the network_interface_attributes table definition."""
+    global _network_interface_attributes_table
+    if _network_interface_attributes_table is None:
+        metadata = _get_metadata()
+        _network_interface_attributes_table = pydantic_to_sqlalchemy_table(
+            NetworkInterfaceAttributesData,
+            'network_interface_attributes',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+    return _network_interface_attributes_table
+
+
+def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the network_interfaces table schema is up to date."""
+    table_name = 'network_interfaces'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_network_interfaces_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NETWORK_INTERFACES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_network_interface_attributes_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the network_interface_attributes table schema is up to
+    date."""
+    table_name = 'network_interface_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_network_interface_attributes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NETWORK_INTERFACE_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+# =============================================================================
+# NetworkInterface Direct Access Functions
+# These are used by the database daemon for NetworkInterface object storage.
+# =============================================================================
+
+def _direct_create_network_interface(data: NetworkInterfaceData) -> bool:
+    """Create a NetworkInterface record in MariaDB.
+
+    Args:
+        data: The NetworkInterfaceData to insert.
+
+    Returns:
+        True if the record was created, False if it already exists or
+        error.
+    """
+    engine = _get_engine()
+    table = _get_network_interfaces_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                network_uuid=data.network_uuid,
+                instance_uuid=data.instance_uuid,
+                macaddr=data.macaddr,
+                ipv4=data.ipv4,
+                order=data.order,
+                model=data.model,
+                version=data.version
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for network_interface '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _direct_get_network_interface(
+        ni_uuid: UUID) -> Optional[NetworkInterfaceData]:
+    """Get NetworkInterface static values from MariaDB.
+
+    Args:
+        ni_uuid: The UUID of the NetworkInterface.
+
+    Returns:
+        A NetworkInterfaceData object, or None if not found.
+    """
+    engine = _get_engine()
+    table = _get_network_interfaces_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == ni_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return NetworkInterfaceData(
+                uuid=result.uuid,
+                network_uuid=result.network_uuid,
+                instance_uuid=result.instance_uuid,
+                macaddr=result.macaddr,
+                ipv4=result.ipv4,
+                order=result.order,
+                model=result.model,
+                version=result.version
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for network_interface {ni_uuid}: {e}')
+        return None
+
+
+def _direct_get_network_interfaces_by_instance(
+        instance_uuid: UUID) -> list[NetworkInterfaceData]:
+    """Get NetworkInterfaces for an instance from MariaDB.
+
+    Args:
+        instance_uuid: The UUID of the instance.
+
+    Returns:
+        List of NetworkInterfaceData objects.
+    """
+    engine = _get_engine()
+    table = _get_network_interfaces_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.instance_uuid == instance_uuid)
+            result = conn.execute(stmt).fetchall()
+
+            return [
+                NetworkInterfaceData(
+                    uuid=row.uuid,
+                    network_uuid=row.network_uuid,
+                    instance_uuid=row.instance_uuid,
+                    macaddr=row.macaddr,
+                    ipv4=row.ipv4,
+                    order=row.order,
+                    model=row.model,
+                    version=row.version
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for network_interfaces by '
+            f'instance {instance_uuid}: {e}')
+        return []
+
+
+def _direct_get_network_interfaces_by_network(
+        network_uuid: UUID) -> list[NetworkInterfaceData]:
+    """Get NetworkInterfaces for a network from MariaDB.
+
+    Args:
+        network_uuid: The UUID of the network.
+
+    Returns:
+        List of NetworkInterfaceData objects.
+    """
+    engine = _get_engine()
+    table = _get_network_interfaces_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.network_uuid == network_uuid)
+            result = conn.execute(stmt).fetchall()
+
+            return [
+                NetworkInterfaceData(
+                    uuid=row.uuid,
+                    network_uuid=row.network_uuid,
+                    instance_uuid=row.instance_uuid,
+                    macaddr=row.macaddr,
+                    ipv4=row.ipv4,
+                    order=row.order,
+                    model=row.model,
+                    version=row.version
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for network_interfaces by '
+            f'network {network_uuid}: {e}')
+        return []
+
+
+def _direct_delete_network_interface(ni_uuid: UUID) -> bool:
+    """Delete a NetworkInterface record from MariaDB.
+
+    Args:
+        ni_uuid: The UUID of the NetworkInterface.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_network_interfaces_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == ni_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for network_interface '
+            f'{ni_uuid}: {e}')
+        return False
+
+
+def _direct_update_network_interface(
+        data: NetworkInterfaceData) -> bool:
+    """Update a NetworkInterface record in MariaDB.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The NetworkInterfaceData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_network_interfaces_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                network_uuid=data.network_uuid,
+                instance_uuid=data.instance_uuid,
+                macaddr=data.macaddr,
+                ipv4=data.ipv4,
+                order=data.order,
+                model=data.model,
+                version=data.version
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB update failed for network_interface '
+            f'{data.uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# NetworkInterface Attributes Direct Access Functions
+# =============================================================================
+
+def _direct_create_network_interface_attributes(
+        data: NetworkInterfaceAttributesData) -> bool:
+    """Create a network_interface_attributes record in MariaDB."""
+    engine = _get_engine()
+    table = _get_network_interface_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                floating_address=data.floating_address)
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for '
+            f'network_interface_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_network_interface_attributes(
+        ni_uuid: UUID) -> Optional[NetworkInterfaceAttributesData]:
+    """Get NetworkInterface attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_network_interface_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == ni_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return NetworkInterfaceAttributesData(
+                uuid=result.uuid,
+                floating_address=result.floating_address,
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for '
+            f'network_interface_attributes {ni_uuid}: {e}')
+        return None
+
+
+def _direct_update_network_interface_attributes(
+        data: NetworkInterfaceAttributesData) -> bool:
+    """Update NetworkInterface attributes in MariaDB."""
+    engine = _get_engine()
+    table = _get_network_interface_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(floating_address=data.floating_address)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB update failed for '
+            f'network_interface_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_delete_network_interface_attributes(
+        ni_uuid: UUID) -> bool:
+    """Delete NetworkInterface attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_network_interface_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == ni_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for '
+            f'network_interface_attributes {ni_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# NetworkInterface gRPC Client Functions
+# These call the database microservice for NetworkInterface operations.
+# =============================================================================
+
+def _grpc_create_network_interface(
+        data: NetworkInterfaceData) -> bool:
+    """Create a NetworkInterface record via the database
+    microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateNetworkInterfaceRequest(
+            network_interface=database_pb2.NetworkInterfaceStaticData(
+                uuid=str(data.uuid),
+                network_uuid=str(data.network_uuid),
+                instance_uuid=str(data.instance_uuid),
+                macaddr=data.macaddr,
+                ipv4=data.ipv4,
+                order=data.order,
+                model=data.model or '',
+                version=data.version
+            )
+        )
+        reply = stub.CreateNetworkInterface(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateNetworkInterface failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_network_interface(
+        ni_uuid: UUID) -> Optional[NetworkInterfaceData]:
+    """Get NetworkInterface static values via the database
+    microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNetworkInterfaceRequest(
+            uuid=str(ni_uuid))
+        reply = stub.GetNetworkInterface(request)
+        if not reply.found:
+            return None
+        d = reply.network_interface
+        return NetworkInterfaceData(
+            uuid=d.uuid,
+            network_uuid=d.network_uuid,
+            instance_uuid=d.instance_uuid,
+            macaddr=d.macaddr,
+            ipv4=d.ipv4,
+            order=d.order,
+            model=d.model or None,
+            version=d.version
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetNetworkInterface failed for {ni_uuid}: {e}')
+        return None
+
+
+def _grpc_get_network_interfaces_by_instance(
+        instance_uuid: UUID) -> list[NetworkInterfaceData]:
+    """Get NetworkInterfaces for an instance via the database
+    microservice."""
+    try:
+        stub = _get_database_stub()
+        request = \
+            database_pb2.GetNetworkInterfacesByInstanceRequest(
+                instance_uuid=str(instance_uuid))
+        reply = stub.GetNetworkInterfacesByInstance(request)
+        return [
+            NetworkInterfaceData(
+                uuid=d.uuid,
+                network_uuid=d.network_uuid,
+                instance_uuid=d.instance_uuid,
+                macaddr=d.macaddr,
+                ipv4=d.ipv4,
+                order=d.order,
+                model=d.model or None,
+                version=d.version
+            )
+            for d in reply.network_interfaces
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetNetworkInterfacesByInstance failed for '
+            f'{instance_uuid}: {e}')
+        return []
+
+
+def _grpc_get_network_interfaces_by_network(
+        network_uuid: UUID) -> list[NetworkInterfaceData]:
+    """Get NetworkInterfaces for a network via the database
+    microservice."""
+    try:
+        stub = _get_database_stub()
+        request = \
+            database_pb2.GetNetworkInterfacesByNetworkRequest(
+                network_uuid=str(network_uuid))
+        reply = stub.GetNetworkInterfacesByNetwork(request)
+        return [
+            NetworkInterfaceData(
+                uuid=d.uuid,
+                network_uuid=d.network_uuid,
+                instance_uuid=d.instance_uuid,
+                macaddr=d.macaddr,
+                ipv4=d.ipv4,
+                order=d.order,
+                model=d.model or None,
+                version=d.version
+            )
+            for d in reply.network_interfaces
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetNetworkInterfacesByNetwork failed for '
+            f'{network_uuid}: {e}')
+        return []
+
+
+def _grpc_delete_network_interface(ni_uuid: UUID) -> bool:
+    """Delete a NetworkInterface record via the database
+    microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNetworkInterfaceRequest(
+            uuid=str(ni_uuid))
+        reply = stub.DeleteNetworkInterface(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteNetworkInterface failed for '
+            f'{ni_uuid}: {e}')
+        return False
+
+
+def _grpc_update_network_interface(
+        data: NetworkInterfaceData) -> bool:
+    """Update a NetworkInterface record via the database
+    microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateNetworkInterfaceRequest(
+            network_interface=database_pb2.NetworkInterfaceStaticData(
+                uuid=str(data.uuid),
+                network_uuid=str(data.network_uuid),
+                instance_uuid=str(data.instance_uuid),
+                macaddr=data.macaddr,
+                ipv4=data.ipv4,
+                order=data.order,
+                model=data.model or '',
+                version=data.version
+            )
+        )
+        reply = stub.UpdateNetworkInterface(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC UpdateNetworkInterface failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# NetworkInterface Attributes gRPC Client Functions
+# =============================================================================
+
+def _grpc_create_network_interface_attributes(
+        data: NetworkInterfaceAttributesData) -> bool:
+    """Create NetworkInterface attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = \
+            database_pb2.CreateNetworkInterfaceAttributesRequest(
+                data=database_pb2.NetworkInterfaceAttributesProto(
+                    uuid=str(data.uuid),
+                    floating_address=data.floating_address or ''))
+        reply = stub.CreateNetworkInterfaceAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateNetworkInterfaceAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_network_interface_attributes(
+        ni_uuid: UUID) -> Optional[NetworkInterfaceAttributesData]:
+    """Get NetworkInterface attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = \
+            database_pb2.GetNetworkInterfaceAttributesRequest(
+                uuid=str(ni_uuid))
+        reply = stub.GetNetworkInterfaceAttributes(request)
+        if not reply.found:
+            return None
+        return NetworkInterfaceAttributesData(
+            uuid=reply.data.uuid,
+            floating_address=(reply.data.floating_address
+                              if reply.data.floating_address
+                              else None),
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetNetworkInterfaceAttributes failed for '
+            f'{ni_uuid}: {e}')
+        return None
+
+
+def _grpc_update_network_interface_attributes(
+        data: NetworkInterfaceAttributesData) -> bool:
+    """Update NetworkInterface attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = \
+            database_pb2.UpdateNetworkInterfaceAttributesRequest(
+                data=database_pb2.NetworkInterfaceAttributesProto(
+                    uuid=str(data.uuid),
+                    floating_address=data.floating_address or ''))
+        reply = stub.UpdateNetworkInterfaceAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC UpdateNetworkInterfaceAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_delete_network_interface_attributes(
+        ni_uuid: UUID) -> bool:
+    """Delete NetworkInterface attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = \
+            database_pb2.DeleteNetworkInterfaceAttributesRequest(
+                uuid=str(ni_uuid))
+        reply = stub.DeleteNetworkInterfaceAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteNetworkInterfaceAttributes failed for '
+            f'{ni_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# NetworkInterface Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def create_network_interface(data: NetworkInterfaceData) -> bool:
+    """Create a NetworkInterface record.
+
+    Args:
+        data: The NetworkInterfaceData to insert.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_network_interface(data)
+    return _direct_create_network_interface(data)
+
+
+def get_network_interface(
+        ni_uuid: UUID) -> Optional[NetworkInterfaceData]:
+    """Get NetworkInterface static values.
+
+    Args:
+        ni_uuid: The UUID of the NetworkInterface.
+
+    Returns:
+        A NetworkInterfaceData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_network_interface(ni_uuid)
+    return _direct_get_network_interface(ni_uuid)
+
+
+def get_network_interfaces_by_instance(
+        instance_uuid: UUID) -> list[NetworkInterfaceData]:
+    """Get NetworkInterfaces for an instance.
+
+    Args:
+        instance_uuid: The UUID of the instance.
+
+    Returns:
+        List of NetworkInterfaceData objects.
+    """
+    if _use_database_service():
+        return _grpc_get_network_interfaces_by_instance(instance_uuid)
+    return _direct_get_network_interfaces_by_instance(instance_uuid)
+
+
+def get_network_interfaces_by_network(
+        network_uuid: UUID) -> list[NetworkInterfaceData]:
+    """Get NetworkInterfaces for a network.
+
+    Args:
+        network_uuid: The UUID of the network.
+
+    Returns:
+        List of NetworkInterfaceData objects.
+    """
+    if _use_database_service():
+        return _grpc_get_network_interfaces_by_network(network_uuid)
+    return _direct_get_network_interfaces_by_network(network_uuid)
+
+
+def delete_network_interface(ni_uuid: UUID) -> bool:
+    """Delete a NetworkInterface record.
+
+    Args:
+        ni_uuid: The UUID of the NetworkInterface.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_network_interface(ni_uuid)
+    return _direct_delete_network_interface(ni_uuid)
+
+
+def update_network_interface(data: NetworkInterfaceData) -> bool:
+    """Update a NetworkInterface record.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The NetworkInterfaceData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_network_interface(data)
+    return _direct_update_network_interface(data)
+
+
+def create_network_interface_attributes(
+        data: NetworkInterfaceAttributesData) -> bool:
+    """Create NetworkInterface attributes record.
+
+    Args:
+        data: The NetworkInterfaceAttributesData to create.
+
+    Returns:
+        True if created successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_create_network_interface_attributes(data)
+    return _direct_create_network_interface_attributes(data)
+
+
+def get_network_interface_attributes(
+        ni_uuid: UUID) -> Optional[NetworkInterfaceAttributesData]:
+    """Get NetworkInterface attributes.
+
+    Args:
+        ni_uuid: The UUID of the NetworkInterface.
+
+    Returns:
+        NetworkInterfaceAttributesData if found, None otherwise.
+    """
+    if _use_database_service():
+        return _grpc_get_network_interface_attributes(ni_uuid)
+    return _direct_get_network_interface_attributes(ni_uuid)
+
+
+def update_network_interface_attributes(
+        data: NetworkInterfaceAttributesData) -> bool:
+    """Update NetworkInterface attributes.
+
+    Args:
+        data: The NetworkInterfaceAttributesData with updated values.
+
+    Returns:
+        True if updated successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_update_network_interface_attributes(data)
+    return _direct_update_network_interface_attributes(data)
+
+
+def delete_network_interface_attributes(ni_uuid: UUID) -> bool:
+    """Delete NetworkInterface attributes.
+
+    Args:
+        ni_uuid: The UUID of the NetworkInterface.
+
+    Returns:
+        True if deleted successfully, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_delete_network_interface_attributes(ni_uuid)
+    return _direct_delete_network_interface_attributes(ni_uuid)

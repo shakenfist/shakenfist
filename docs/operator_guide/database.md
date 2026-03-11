@@ -47,7 +47,7 @@ Each object type has a dedicated key prefix:
 |-------------|------------|
 | Instance | `/sf/object/instance/` |
 | Network | `/sf/object/network/` |
-| Network Interface | `/sf/object/networkinterface/` |
+| Network Interface | MariaDB `network_interfaces` table (migrated from etcd) |
 | Blob | `/sf/object/blob/` |
 | Artifact | MariaDB `artifacts` table (migrated from etcd) |
 | Node | MariaDB `nodes` table (migrated from etcd) |
@@ -527,8 +527,9 @@ The migration is happening in phases:
 | 6 | DnsMasq objects | Complete - `dnsmasq` table |
 | 7 | Namespace objects | Complete - `namespaces`, `namespace_attributes` tables |
 | 8 | Artifact objects | Complete - `artifacts`, `artifact_attributes`, `artifact_indexes` tables |
-| 9 | Other object types | Future |
-| 10 | Object attributes | Future |
+| 9 | NetworkInterface objects | Complete - `network_interfaces`, `network_interface_attributes` tables |
+| 10 | Other object types | Future |
+| 11 | Object attributes | Future |
 
 ### Table Architecture
 
@@ -576,6 +577,7 @@ values (immutable data set at creation time):
 | `nodes` | Node | uuid, fqdn (unique index), ip, version |
 | `namespaces` | Namespace | name (VARCHAR PK), version |
 | `artifacts` | Artifact | uuid, artifact_type, source_url, name, namespace, version |
+| `network_interfaces` | NetworkInterface | uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version |
 
 These tables use the object's UUID as the primary key, except for
 `namespaces` which uses the namespace name (a string) as its primary key.
@@ -592,6 +594,7 @@ dedicated attribute tables:
 | `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON) |
 | `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
+| `network_interface_attributes` | NetworkInterface | uuid, floating_address |
 
 Node attributes consolidate many separate etcd keys (observed, roles,
 daemons, daemon:{name}, instances, versions, etc.) into a single row.
