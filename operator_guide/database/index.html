@@ -4855,7 +4855,7 @@ system works.</p>
 </tr>
 <tr>
 <td>Network Interface</td>
-<td><code>/sf/object/networkinterface/</code></td>
+<td>MariaDB <code>network_interfaces</code> table (migrated from etcd)</td>
 </tr>
 <tr>
 <td>Blob</td>
@@ -5378,11 +5378,21 @@ of the cluster through Galera replication.</p>
 </tr>
 <tr>
 <td>9</td>
+<td>NetworkInterface objects</td>
+<td>Complete - <code>network_interfaces</code>, <code>network_interface_attributes</code> tables</td>
+</tr>
+<tr>
+<td>10</td>
+<td>IPAM objects</td>
+<td>Complete - <code>ipams</code> table</td>
+</tr>
+<tr>
+<td>11</td>
 <td>Other object types</td>
 <td>Future</td>
 </tr>
 <tr>
-<td>10</td>
+<td>12</td>
 <td>Object attributes</td>
 <td>Future</td>
 </tr>
@@ -5476,6 +5486,16 @@ values (immutable data set at creation time):</p>
 <td>Artifact</td>
 <td>uuid, artifact_type, source_url, name, namespace, version</td>
 </tr>
+<tr>
+<td><code>network_interfaces</code></td>
+<td>NetworkInterface</td>
+<td>uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version</td>
+</tr>
+<tr>
+<td><code>ipams</code></td>
+<td>IPAM</td>
+<td>uuid, namespace, network_uuid, ipblock, version</td>
+</tr>
 </tbody>
 </table>
 <p>These tables use the object's UUID as the primary key, except for
@@ -5516,6 +5536,11 @@ dedicated attribute tables:</p>
 <td><code>artifact_indexes</code></td>
 <td>Artifact</td>
 <td>artifact_uuid + index_number (composite PK), blob_uuid</td>
+</tr>
+<tr>
+<td><code>network_interface_attributes</code></td>
+<td>NetworkInterface</td>
+<td>uuid, floating_address</td>
 </tr>
 </tbody>
 </table>
