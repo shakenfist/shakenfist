@@ -13,7 +13,7 @@ GET_ALL_INTERFACES = [
         'ipv4': '127.0.0.5',
         'order': 0,
         'model': 'virtio',
-        'version': 4
+        'version': 5
     }),
     (None, {
         'uuid': '44444444-4444-4444-8444-444444444444',
@@ -23,7 +23,7 @@ GET_ALL_INTERFACES = [
         'ipv4': '127.0.0.6',
         'order': 1,
         'model': 'virtio',
-        'version': 4
+        'version': 5
     })
 ]
 
@@ -36,7 +36,7 @@ JUST_INTERFACES = [
         'ipv4': '127.0.0.5',
         'order': 0,
         'model': 'virtio',
-        'version': 4
+        'version': 5
     },
     {
         'uuid': '44444444-4444-4444-8444-444444444444',
@@ -46,7 +46,7 @@ JUST_INTERFACES = [
         'ipv4': '127.0.0.6',
         'order': 1,
         'model': 'virtio',
-        'version': 4
+        'version': 5
     }
 ]
 
@@ -54,5 +54,6 @@ JUST_INTERFACES = [
 class NetworkInterfaceTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get', side_effect=JUST_INTERFACES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INTERFACES)
-    def test_ni_iterator_mocking(self, mock_get_all, mock_get):
+    @mock.patch('shakenfist.mariadb.get_network_interface', return_value=None)
+    def test_ni_iterator_mocking(self, mock_mariadb_get, mock_get_all, mock_get):
         self.assertEqual(2, len(list(NetworkInterfaces([]))))

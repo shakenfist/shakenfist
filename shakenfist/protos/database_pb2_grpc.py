@@ -559,6 +559,56 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteAllArtifactIndexesRequest.SerializeToString,
                 response_deserializer=database__pb2.DeleteCountReply.FromString,
                 _registered_method=True)
+        self.CreateNetworkInterface = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateNetworkInterface',
+                request_serializer=database__pb2.CreateNetworkInterfaceRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetNetworkInterface = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNetworkInterface',
+                request_serializer=database__pb2.GetNetworkInterfaceRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNetworkInterfaceReply.FromString,
+                _registered_method=True)
+        self.GetNetworkInterfacesByInstance = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNetworkInterfacesByInstance',
+                request_serializer=database__pb2.GetNetworkInterfacesByInstanceRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNetworkInterfacesReply.FromString,
+                _registered_method=True)
+        self.GetNetworkInterfacesByNetwork = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNetworkInterfacesByNetwork',
+                request_serializer=database__pb2.GetNetworkInterfacesByNetworkRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNetworkInterfacesReply.FromString,
+                _registered_method=True)
+        self.DeleteNetworkInterface = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteNetworkInterface',
+                request_serializer=database__pb2.DeleteNetworkInterfaceRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.UpdateNetworkInterface = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateNetworkInterface',
+                request_serializer=database__pb2.UpdateNetworkInterfaceRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.CreateNetworkInterfaceAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateNetworkInterfaceAttributes',
+                request_serializer=database__pb2.CreateNetworkInterfaceAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetNetworkInterfaceAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNetworkInterfaceAttributes',
+                request_serializer=database__pb2.GetNetworkInterfaceAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNetworkInterfaceAttributesReply.FromString,
+                _registered_method=True)
+        self.UpdateNetworkInterfaceAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateNetworkInterfaceAttributes',
+                request_serializer=database__pb2.UpdateNetworkInterfaceAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteNetworkInterfaceAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteNetworkInterfaceAttributes',
+                request_serializer=database__pb2.DeleteNetworkInterfaceAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -1225,6 +1275,70 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateNetworkInterface(self, request, context):
+        """NetworkInterface Operations (MariaDB)
+        These manage NetworkInterface static values in MariaDB.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNetworkInterface(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNetworkInterfacesByInstance(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNetworkInterfacesByNetwork(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteNetworkInterface(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateNetworkInterface(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateNetworkInterfaceAttributes(self, request, context):
+        """NetworkInterface Attributes Operations (MariaDB)
+        These store mutable NetworkInterface attributes (floating address).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNetworkInterfaceAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateNetworkInterfaceAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteNetworkInterfaceAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1752,6 +1866,56 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.DeleteAllArtifactIndexes,
                     request_deserializer=database__pb2.DeleteAllArtifactIndexesRequest.FromString,
                     response_serializer=database__pb2.DeleteCountReply.SerializeToString,
+            ),
+            'CreateNetworkInterface': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateNetworkInterface,
+                    request_deserializer=database__pb2.CreateNetworkInterfaceRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetNetworkInterface': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNetworkInterface,
+                    request_deserializer=database__pb2.GetNetworkInterfaceRequest.FromString,
+                    response_serializer=database__pb2.GetNetworkInterfaceReply.SerializeToString,
+            ),
+            'GetNetworkInterfacesByInstance': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNetworkInterfacesByInstance,
+                    request_deserializer=database__pb2.GetNetworkInterfacesByInstanceRequest.FromString,
+                    response_serializer=database__pb2.GetNetworkInterfacesReply.SerializeToString,
+            ),
+            'GetNetworkInterfacesByNetwork': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNetworkInterfacesByNetwork,
+                    request_deserializer=database__pb2.GetNetworkInterfacesByNetworkRequest.FromString,
+                    response_serializer=database__pb2.GetNetworkInterfacesReply.SerializeToString,
+            ),
+            'DeleteNetworkInterface': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteNetworkInterface,
+                    request_deserializer=database__pb2.DeleteNetworkInterfaceRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'UpdateNetworkInterface': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateNetworkInterface,
+                    request_deserializer=database__pb2.UpdateNetworkInterfaceRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateNetworkInterfaceAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateNetworkInterfaceAttributes,
+                    request_deserializer=database__pb2.CreateNetworkInterfaceAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetNetworkInterfaceAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNetworkInterfaceAttributes,
+                    request_deserializer=database__pb2.GetNetworkInterfaceAttributesRequest.FromString,
+                    response_serializer=database__pb2.GetNetworkInterfaceAttributesReply.SerializeToString,
+            ),
+            'UpdateNetworkInterfaceAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateNetworkInterfaceAttributes,
+                    request_deserializer=database__pb2.UpdateNetworkInterfaceAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteNetworkInterfaceAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteNetworkInterfaceAttributes,
+                    request_deserializer=database__pb2.DeleteNetworkInterfaceAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -4589,6 +4753,276 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/DeleteAllArtifactIndexes',
             database__pb2.DeleteAllArtifactIndexesRequest.SerializeToString,
             database__pb2.DeleteCountReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateNetworkInterface(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateNetworkInterface',
+            database__pb2.CreateNetworkInterfaceRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNetworkInterface(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNetworkInterface',
+            database__pb2.GetNetworkInterfaceRequest.SerializeToString,
+            database__pb2.GetNetworkInterfaceReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNetworkInterfacesByInstance(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNetworkInterfacesByInstance',
+            database__pb2.GetNetworkInterfacesByInstanceRequest.SerializeToString,
+            database__pb2.GetNetworkInterfacesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNetworkInterfacesByNetwork(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNetworkInterfacesByNetwork',
+            database__pb2.GetNetworkInterfacesByNetworkRequest.SerializeToString,
+            database__pb2.GetNetworkInterfacesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteNetworkInterface(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteNetworkInterface',
+            database__pb2.DeleteNetworkInterfaceRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateNetworkInterface(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateNetworkInterface',
+            database__pb2.UpdateNetworkInterfaceRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateNetworkInterfaceAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateNetworkInterfaceAttributes',
+            database__pb2.CreateNetworkInterfaceAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNetworkInterfaceAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNetworkInterfaceAttributes',
+            database__pb2.GetNetworkInterfaceAttributesRequest.SerializeToString,
+            database__pb2.GetNetworkInterfaceAttributesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateNetworkInterfaceAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateNetworkInterfaceAttributes',
+            database__pb2.UpdateNetworkInterfaceAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteNetworkInterfaceAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteNetworkInterfaceAttributes',
+            database__pb2.DeleteNetworkInterfaceAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
             insecure,

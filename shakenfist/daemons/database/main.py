@@ -43,6 +43,8 @@ from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
+from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
+from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.upload import UploadData
@@ -2288,6 +2290,226 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         return database_pb2.NamespaceAttributesProto(
             name=data.name, keys_json=json.dumps(data.keys), trust_json=json.dumps(data.trust))
 
+    # =========================================================================
+    # NetworkInterface Operations (MariaDB)
+    # =========================================================================
+
+    def CreateNetworkInterface(
+        self,
+        request: database_pb2.CreateNetworkInterfaceRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create a NetworkInterface record in MariaDB."""
+        try:
+            self.monitor.counters['create_network_interface'].inc()
+            data = self._ni_from_proto(request.network_interface)
+            success = mariadb._direct_create_network_interface(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database CreateNetworkInterface failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetNetworkInterface(
+        self,
+        request: database_pb2.GetNetworkInterfaceRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNetworkInterfaceReply:
+        """Get NetworkInterface static values from MariaDB."""
+        try:
+            self.monitor.counters['get_network_interface'].inc()
+            data = mariadb._direct_get_network_interface(UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetNetworkInterfaceReply(found=False)
+            return database_pb2.GetNetworkInterfaceReply(
+                found=True,
+                network_interface=self._ni_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception('database GetNetworkInterface failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNetworkInterfaceReply(found=False)
+
+    def GetNetworkInterfacesByInstance(
+        self,
+        request: database_pb2.GetNetworkInterfacesByInstanceRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNetworkInterfacesReply:
+        """Get NetworkInterfaces for an instance from MariaDB."""
+        try:
+            self.monitor.counters['get_network_interfaces_by_instance'].inc()
+            nis = mariadb._direct_get_network_interfaces_by_instance(
+                UUID(request.instance_uuid))
+            return database_pb2.GetNetworkInterfacesReply(
+                network_interfaces=[self._ni_to_proto(d) for d in nis])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNetworkInterfacesByInstance failed', e)
+            return database_pb2.GetNetworkInterfacesReply(network_interfaces=[])
+
+    def GetNetworkInterfacesByNetwork(
+        self,
+        request: database_pb2.GetNetworkInterfacesByNetworkRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNetworkInterfacesReply:
+        """Get NetworkInterfaces for a network from MariaDB."""
+        try:
+            self.monitor.counters['get_network_interfaces_by_network'].inc()
+            nis = mariadb._direct_get_network_interfaces_by_network(
+                UUID(request.network_uuid))
+            return database_pb2.GetNetworkInterfacesReply(
+                network_interfaces=[self._ni_to_proto(d) for d in nis])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNetworkInterfacesByNetwork failed', e)
+            return database_pb2.GetNetworkInterfacesReply(network_interfaces=[])
+
+    def DeleteNetworkInterface(
+        self,
+        request: database_pb2.DeleteNetworkInterfaceRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a NetworkInterface record from MariaDB."""
+        try:
+            self.monitor.counters['delete_network_interface'].inc()
+            success = mariadb._direct_delete_network_interface(UUID(request.uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database DeleteNetworkInterface failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def UpdateNetworkInterface(
+        self,
+        request: database_pb2.UpdateNetworkInterfaceRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update a NetworkInterface record in MariaDB."""
+        try:
+            self.monitor.counters['update_network_interface'].inc()
+            data = self._ni_from_proto(request.network_interface)
+            success = mariadb._direct_update_network_interface(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database UpdateNetworkInterface failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    # =========================================================================
+    # NetworkInterface Attributes Operations (MariaDB)
+    # =========================================================================
+
+    def CreateNetworkInterfaceAttributes(
+        self,
+        request: database_pb2.CreateNetworkInterfaceAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create NetworkInterface attributes in MariaDB."""
+        try:
+            self.monitor.counters['create_network_interface_attributes'].inc()
+            data = self._ni_attrs_from_proto(request.data)
+            success = mariadb._direct_create_network_interface_attributes(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateNetworkInterfaceAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetNetworkInterfaceAttributes(
+        self,
+        request: database_pb2.GetNetworkInterfaceAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNetworkInterfaceAttributesReply:
+        """Get NetworkInterface attributes from MariaDB."""
+        try:
+            self.monitor.counters['get_network_interface_attributes'].inc()
+            data = mariadb._direct_get_network_interface_attributes(UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetNetworkInterfaceAttributesReply(found=False)
+            return database_pb2.GetNetworkInterfaceAttributesReply(
+                found=True, data=self._ni_attrs_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNetworkInterfaceAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNetworkInterfaceAttributesReply(found=False)
+
+    def UpdateNetworkInterfaceAttributes(
+        self,
+        request: database_pb2.UpdateNetworkInterfaceAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update NetworkInterface attributes in MariaDB."""
+        try:
+            self.monitor.counters['update_network_interface_attributes'].inc()
+            data = self._ni_attrs_from_proto(request.data)
+            success = mariadb._direct_update_network_interface_attributes(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateNetworkInterfaceAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def DeleteNetworkInterfaceAttributes(
+        self,
+        request: database_pb2.DeleteNetworkInterfaceAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete NetworkInterface attributes from MariaDB."""
+        try:
+            self.monitor.counters['delete_network_interface_attributes'].inc()
+            success = mariadb._direct_delete_network_interface_attributes(UUID(request.uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteNetworkInterfaceAttributes failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def _ni_from_proto(self,
+                       d: database_pb2.NetworkInterfaceStaticData) -> NetworkInterfaceData:
+        """Convert a proto NetworkInterfaceStaticData to model."""
+        return NetworkInterfaceData(
+            uuid=UUID(d.uuid),
+            network_uuid=UUID(d.network_uuid),
+            instance_uuid=UUID(d.instance_uuid),
+            macaddr=d.macaddr,
+            ipv4=d.ipv4,
+            order=d.order,
+            model=d.model or None,
+            version=d.version
+        )
+
+    def _ni_to_proto(self,
+                     data: NetworkInterfaceData) -> database_pb2.NetworkInterfaceStaticData:
+        """Convert a Pydantic NetworkInterfaceData to proto."""
+        return database_pb2.NetworkInterfaceStaticData(
+            uuid=str(data.uuid),
+            network_uuid=str(data.network_uuid),
+            instance_uuid=str(data.instance_uuid),
+            macaddr=data.macaddr,
+            ipv4=data.ipv4,
+            order=data.order,
+            model=data.model or '',
+            version=data.version
+        )
+
+    def _ni_attrs_from_proto(
+            self,
+            d: database_pb2.NetworkInterfaceAttributesProto
+    ) -> NetworkInterfaceAttributesData:
+        """Convert a proto NetworkInterfaceAttributesProto to model."""
+        return NetworkInterfaceAttributesData(
+            uuid=UUID(d.uuid),
+            floating_address=d.floating_address if d.floating_address else None,
+        )
+
+    def _ni_attrs_to_proto(
+            self,
+            data: NetworkInterfaceAttributesData
+    ) -> database_pb2.NetworkInterfaceAttributesProto:
+        """Convert a Pydantic NetworkInterfaceAttributesData to proto."""
+        return database_pb2.NetworkInterfaceAttributesProto(
+            uuid=str(data.uuid),
+            floating_address=data.floating_address or '')
+
     # Artifact Operations (MariaDB)
     def CreateArtifact(
         self,
@@ -2672,6 +2894,16 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_namespace_attributes',
             'update_namespace_attributes',
             'delete_namespace_attributes',
+            # MariaDB network interface operations
+            'create_network_interface', 'get_network_interface',
+            'get_network_interfaces_by_instance',
+            'get_network_interfaces_by_network',
+            'delete_network_interface', 'update_network_interface',
+            # MariaDB network interface attributes operations
+            'create_network_interface_attributes',
+            'get_network_interface_attributes',
+            'update_network_interface_attributes',
+            'delete_network_interface_attributes',
             # MariaDB artifact operations
             'create_artifact', 'get_artifact', 'get_all_artifacts',
             'update_artifact', 'delete_artifact',

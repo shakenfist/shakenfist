@@ -160,6 +160,22 @@ service DatabaseService {
   rpc GetAllArtifactIndexes (GetAllArtifactIndexesRequest) returns (GetAllArtifactIndexesReply) {}
   rpc DeleteArtifactIndex (DeleteArtifactIndexRequest) returns (StatusReply) {}
   rpc DeleteAllArtifactIndexes (DeleteAllArtifactIndexesRequest) returns (DeleteCountReply) {}
+
+  // NetworkInterface Operations (MariaDB)
+  // These manage NetworkInterface static values in MariaDB.
+  rpc CreateNetworkInterface (CreateNetworkInterfaceRequest) returns (StatusReply) {}
+  rpc GetNetworkInterface (GetNetworkInterfaceRequest) returns (GetNetworkInterfaceReply) {}
+  rpc GetNetworkInterfacesByInstance (GetNetworkInterfacesByInstanceRequest) returns (GetNetworkInterfacesReply) {}
+  rpc GetNetworkInterfacesByNetwork (GetNetworkInterfacesByNetworkRequest) returns (GetNetworkInterfacesReply) {}
+  rpc DeleteNetworkInterface (DeleteNetworkInterfaceRequest) returns (StatusReply) {}
+  rpc UpdateNetworkInterface (UpdateNetworkInterfaceRequest) returns (StatusReply) {}
+
+  // NetworkInterface Attributes Operations (MariaDB)
+  // These store mutable NetworkInterface attributes (floating address).
+  rpc CreateNetworkInterfaceAttributes (CreateNetworkInterfaceAttributesRequest) returns (StatusReply) {}
+  rpc GetNetworkInterfaceAttributes (GetNetworkInterfaceAttributesRequest) returns (GetNetworkInterfaceAttributesReply) {}
+  rpc UpdateNetworkInterfaceAttributes (UpdateNetworkInterfaceAttributesRequest) returns (StatusReply) {}
+  rpc DeleteNetworkInterfaceAttributes (DeleteNetworkInterfaceAttributesRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -1091,4 +1107,80 @@ message DeleteArtifactIndexRequest {
 
 message DeleteAllArtifactIndexesRequest {
   string artifact_uuid = 1;
+}
+
+// NetworkInterface Operations (MariaDB)
+// These operations manage NetworkInterface objects in MariaDB.
+// NetworkInterfaces represent virtual NICs attached to instances.
+
+message NetworkInterfaceStaticData {
+  string uuid = 1;              // NetworkInterface UUID
+  string network_uuid = 2;      // Network this interface belongs to
+  string instance_uuid = 3;     // Instance this interface is attached to
+  string macaddr = 4;           // MAC address
+  string ipv4 = 5;              // IPv4 address
+  int32 order = 6;              // Interface ordering index
+  string model = 7;             // Virtio device model
+  int32 version = 8;            // Object version number
+}
+
+message CreateNetworkInterfaceRequest {
+  NetworkInterfaceStaticData network_interface = 1;
+}
+
+message GetNetworkInterfaceRequest {
+  string uuid = 1;
+}
+
+message GetNetworkInterfaceReply {
+  bool found = 1;
+  NetworkInterfaceStaticData network_interface = 2;
+}
+
+message GetNetworkInterfacesByInstanceRequest {
+  string instance_uuid = 1;
+}
+
+message GetNetworkInterfacesByNetworkRequest {
+  string network_uuid = 1;
+}
+
+message GetNetworkInterfacesReply {
+  repeated NetworkInterfaceStaticData network_interfaces = 1;
+}
+
+message DeleteNetworkInterfaceRequest {
+  string uuid = 1;
+}
+
+message UpdateNetworkInterfaceRequest {
+  NetworkInterfaceStaticData network_interface = 1;
+}
+
+// NetworkInterface Attributes Operations (MariaDB)
+
+message NetworkInterfaceAttributesProto {
+  string uuid = 1;                // References network_interfaces.uuid
+  string floating_address = 2;    // Floating IP address (empty = None)
+}
+
+message CreateNetworkInterfaceAttributesRequest {
+  NetworkInterfaceAttributesProto data = 1;
+}
+
+message GetNetworkInterfaceAttributesRequest {
+  string uuid = 1;
+}
+
+message GetNetworkInterfaceAttributesReply {
+  bool found = 1;
+  NetworkInterfaceAttributesProto data = 2;
+}
+
+message UpdateNetworkInterfaceAttributesRequest {
+  NetworkInterfaceAttributesProto data = 1;
+}
+
+message DeleteNetworkInterfaceAttributesRequest {
+  string uuid = 1;
 }

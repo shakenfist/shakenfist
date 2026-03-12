@@ -583,6 +583,62 @@ class DatabaseServiceStub:
         database_pb2.DeleteCountReply,
     ]
 
+    CreateNetworkInterface: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateNetworkInterfaceRequest,
+        database_pb2.StatusReply,
+    ]
+    """NetworkInterface Operations (MariaDB)
+    These manage NetworkInterface static values in MariaDB.
+    """
+
+    GetNetworkInterface: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkInterfaceRequest,
+        database_pb2.GetNetworkInterfaceReply,
+    ]
+
+    GetNetworkInterfacesByInstance: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkInterfacesByInstanceRequest,
+        database_pb2.GetNetworkInterfacesReply,
+    ]
+
+    GetNetworkInterfacesByNetwork: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkInterfacesByNetworkRequest,
+        database_pb2.GetNetworkInterfacesReply,
+    ]
+
+    DeleteNetworkInterface: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNetworkInterfaceRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateNetworkInterface: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNetworkInterfaceRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateNetworkInterfaceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateNetworkInterfaceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """NetworkInterface Attributes Operations (MariaDB)
+    These store mutable NetworkInterface attributes (floating address).
+    """
+
+    GetNetworkInterfaceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkInterfaceAttributesRequest,
+        database_pb2.GetNetworkInterfaceAttributesReply,
+    ]
+
+    UpdateNetworkInterfaceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNetworkInterfaceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteNetworkInterfaceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNetworkInterfaceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -1146,6 +1202,62 @@ class DatabaseServiceAsyncStub:
     DeleteAllArtifactIndexes: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteAllArtifactIndexesRequest,
         database_pb2.DeleteCountReply,
+    ]
+
+    CreateNetworkInterface: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateNetworkInterfaceRequest,
+        database_pb2.StatusReply,
+    ]
+    """NetworkInterface Operations (MariaDB)
+    These manage NetworkInterface static values in MariaDB.
+    """
+
+    GetNetworkInterface: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkInterfaceRequest,
+        database_pb2.GetNetworkInterfaceReply,
+    ]
+
+    GetNetworkInterfacesByInstance: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkInterfacesByInstanceRequest,
+        database_pb2.GetNetworkInterfacesReply,
+    ]
+
+    GetNetworkInterfacesByNetwork: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkInterfacesByNetworkRequest,
+        database_pb2.GetNetworkInterfacesReply,
+    ]
+
+    DeleteNetworkInterface: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNetworkInterfaceRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateNetworkInterface: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNetworkInterfaceRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateNetworkInterfaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateNetworkInterfaceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """NetworkInterface Attributes Operations (MariaDB)
+    These store mutable NetworkInterface attributes (floating address).
+    """
+
+    GetNetworkInterfaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkInterfaceAttributesRequest,
+        database_pb2.GetNetworkInterfaceAttributesReply,
+    ]
+
+    UpdateNetworkInterfaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNetworkInterfaceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteNetworkInterfaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNetworkInterfaceAttributesRequest,
+        database_pb2.StatusReply,
     ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
@@ -1922,5 +2034,81 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteAllArtifactIndexesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
+
+    @abc.abstractmethod
+    def CreateNetworkInterface(
+        self,
+        request: database_pb2.CreateNetworkInterfaceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """NetworkInterface Operations (MariaDB)
+        These manage NetworkInterface static values in MariaDB.
+        """
+
+    @abc.abstractmethod
+    def GetNetworkInterface(
+        self,
+        request: database_pb2.GetNetworkInterfaceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNetworkInterfaceReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfaceReply]]: ...
+
+    @abc.abstractmethod
+    def GetNetworkInterfacesByInstance(
+        self,
+        request: database_pb2.GetNetworkInterfacesByInstanceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNetworkInterfacesReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfacesReply]]: ...
+
+    @abc.abstractmethod
+    def GetNetworkInterfacesByNetwork(
+        self,
+        request: database_pb2.GetNetworkInterfacesByNetworkRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNetworkInterfacesReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfacesReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteNetworkInterface(
+        self,
+        request: database_pb2.DeleteNetworkInterfaceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateNetworkInterface(
+        self,
+        request: database_pb2.UpdateNetworkInterfaceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateNetworkInterfaceAttributes(
+        self,
+        request: database_pb2.CreateNetworkInterfaceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """NetworkInterface Attributes Operations (MariaDB)
+        These store mutable NetworkInterface attributes (floating address).
+        """
+
+    @abc.abstractmethod
+    def GetNetworkInterfaceAttributes(
+        self,
+        request: database_pb2.GetNetworkInterfaceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNetworkInterfaceAttributesReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfaceAttributesReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateNetworkInterfaceAttributes(
+        self,
+        request: database_pb2.UpdateNetworkInterfaceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteNetworkInterfaceAttributes(
+        self,
+        request: database_pb2.DeleteNetworkInterfaceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...
