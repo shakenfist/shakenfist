@@ -33,9 +33,11 @@ IPAM_RESERVATIONS_PATH = '/sf/ipam_reservations/%s/'
 
 class IPAM(dbo):
     # There were older versions of ipam, but we don't admit to them because
-    # the upgrade is painful.
+    # the upgrade is painful. We only support migration to MariaDB of objects
+    # that were already at version 8 (the version immediately before MariaDB
+    # static values work started).
     object_type = ObjectType.IPAM
-    initial_version = 7
+    initial_version = 8
     current_version = 9
 
     state_targets = {
@@ -43,11 +45,6 @@ class IPAM(dbo):
         dbo.STATE_CREATED: (dbo.STATE_DELETED),
         dbo.STATE_DELETED: None
     }
-
-    @classmethod
-    def _upgrade_step_7_to_8(cls, static_values: dict[str, Any]) -> None:
-        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
-        ...
 
     @classmethod
     def _upgrade_step_8_to_9(cls, static_values: dict[str, Any]) -> None:
