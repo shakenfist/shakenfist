@@ -176,6 +176,14 @@ service DatabaseService {
   rpc GetNetworkInterfaceAttributes (GetNetworkInterfaceAttributesRequest) returns (GetNetworkInterfaceAttributesReply) {}
   rpc UpdateNetworkInterfaceAttributes (UpdateNetworkInterfaceAttributesRequest) returns (StatusReply) {}
   rpc DeleteNetworkInterfaceAttributes (DeleteNetworkInterfaceAttributesRequest) returns (StatusReply) {}
+
+  // IPAM Operations (MariaDB)
+  // These manage IPAM static values (uuid, namespace, network_uuid, ipblock)
+  // in MariaDB. IPAMs track IP address allocation within a network.
+  rpc CreateIPAM (CreateIPAMRequest) returns (StatusReply) {}
+  rpc GetIPAM (GetIPAMRequest) returns (GetIPAMReply) {}
+  rpc DeleteIPAM (DeleteIPAMRequest) returns (StatusReply) {}
+  rpc UpdateIPAM (UpdateIPAMRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -1183,4 +1191,35 @@ message UpdateNetworkInterfaceAttributesRequest {
 
 message DeleteNetworkInterfaceAttributesRequest {
   string uuid = 1;
+}
+
+// IPAM Operations (MariaDB)
+
+message IPAMStaticData {
+  string uuid = 1;              // IPAM UUID (same as network UUID)
+  string namespace = 2;         // Namespace (empty = None)
+  string network_uuid = 3;      // Network this IPAM manages
+  string ipblock = 4;           // CIDR notation IP block
+  int32 version = 5;            // Object version number
+}
+
+message CreateIPAMRequest {
+  IPAMStaticData ipam = 1;
+}
+
+message GetIPAMRequest {
+  string uuid = 1;
+}
+
+message GetIPAMReply {
+  bool found = 1;
+  IPAMStaticData ipam = 2;
+}
+
+message DeleteIPAMRequest {
+  string uuid = 1;
+}
+
+message UpdateIPAMRequest {
+  IPAMStaticData ipam = 1;
 }

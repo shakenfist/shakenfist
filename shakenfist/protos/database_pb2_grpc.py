@@ -609,6 +609,26 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteNetworkInterfaceAttributesRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.CreateIPAM = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateIPAM',
+                request_serializer=database__pb2.CreateIPAMRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetIPAM = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetIPAM',
+                request_serializer=database__pb2.GetIPAMRequest.SerializeToString,
+                response_deserializer=database__pb2.GetIPAMReply.FromString,
+                _registered_method=True)
+        self.DeleteIPAM = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteIPAM',
+                request_serializer=database__pb2.DeleteIPAMRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.UpdateIPAM = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateIPAM',
+                request_serializer=database__pb2.UpdateIPAMRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -1339,6 +1359,33 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateIPAM(self, request, context):
+        """IPAM Operations (MariaDB)
+        These manage IPAM static values (uuid, namespace, network_uuid, ipblock)
+        in MariaDB. IPAMs track IP address allocation within a network.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetIPAM(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteIPAM(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateIPAM(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1915,6 +1962,26 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'DeleteNetworkInterfaceAttributes': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteNetworkInterfaceAttributes,
                     request_deserializer=database__pb2.DeleteNetworkInterfaceAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateIPAM': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateIPAM,
+                    request_deserializer=database__pb2.CreateIPAMRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetIPAM': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetIPAM,
+                    request_deserializer=database__pb2.GetIPAMRequest.FromString,
+                    response_serializer=database__pb2.GetIPAMReply.SerializeToString,
+            ),
+            'DeleteIPAM': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteIPAM,
+                    request_deserializer=database__pb2.DeleteIPAMRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'UpdateIPAM': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateIPAM,
+                    request_deserializer=database__pb2.UpdateIPAMRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
@@ -5022,6 +5089,114 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/DeleteNetworkInterfaceAttributes',
             database__pb2.DeleteNetworkInterfaceAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateIPAM(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateIPAM',
+            database__pb2.CreateIPAMRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetIPAM(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetIPAM',
+            database__pb2.GetIPAMRequest.SerializeToString,
+            database__pb2.GetIPAMReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteIPAM(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteIPAM',
+            database__pb2.DeleteIPAMRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateIPAM(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateIPAM',
+            database__pb2.UpdateIPAMRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
