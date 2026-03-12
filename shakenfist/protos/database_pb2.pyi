@@ -3630,3 +3630,121 @@ class DeleteNetworkInterfaceAttributesRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
 
 global___DeleteNetworkInterfaceAttributesRequest = DeleteNetworkInterfaceAttributesRequest
+
+@typing.final
+class IPAMStaticData(google.protobuf.message.Message):
+    """IPAM Operations (MariaDB)"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    IPBLOCK_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """IPAM UUID (same as network UUID)"""
+    namespace: builtins.str
+    """Namespace (empty = None)"""
+    network_uuid: builtins.str
+    """Network this IPAM manages"""
+    ipblock: builtins.str
+    """CIDR notation IP block"""
+    version: builtins.int
+    """Object version number"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        namespace: builtins.str = ...,
+        network_uuid: builtins.str = ...,
+        ipblock: builtins.str = ...,
+        version: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["ipblock", b"ipblock", "namespace", b"namespace", "network_uuid", b"network_uuid", "uuid", b"uuid", "version", b"version"]) -> None: ...
+
+global___IPAMStaticData = IPAMStaticData
+
+@typing.final
+class CreateIPAMRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IPAM_FIELD_NUMBER: builtins.int
+    @property
+    def ipam(self) -> global___IPAMStaticData: ...
+    def __init__(
+        self,
+        *,
+        ipam: global___IPAMStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["ipam", b"ipam"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["ipam", b"ipam"]) -> None: ...
+
+global___CreateIPAMRequest = CreateIPAMRequest
+
+@typing.final
+class GetIPAMRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetIPAMRequest = GetIPAMRequest
+
+@typing.final
+class GetIPAMReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    IPAM_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def ipam(self) -> global___IPAMStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        ipam: global___IPAMStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["ipam", b"ipam"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["found", b"found", "ipam", b"ipam"]) -> None: ...
+
+global___GetIPAMReply = GetIPAMReply
+
+@typing.final
+class DeleteIPAMRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteIPAMRequest = DeleteIPAMRequest
+
+@typing.final
+class UpdateIPAMRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IPAM_FIELD_NUMBER: builtins.int
+    @property
+    def ipam(self) -> global___IPAMStaticData: ...
+    def __init__(
+        self,
+        *,
+        ipam: global___IPAMStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["ipam", b"ipam"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["ipam", b"ipam"]) -> None: ...
+
+global___UpdateIPAMRequest = UpdateIPAMRequest

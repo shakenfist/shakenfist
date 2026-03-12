@@ -639,6 +639,30 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateIPAM: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateIPAMRequest,
+        database_pb2.StatusReply,
+    ]
+    """IPAM Operations (MariaDB)
+    These manage IPAM static values (uuid, namespace, network_uuid, ipblock)
+    in MariaDB. IPAMs track IP address allocation within a network.
+    """
+
+    GetIPAM: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetIPAMRequest,
+        database_pb2.GetIPAMReply,
+    ]
+
+    DeleteIPAM: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteIPAMRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateIPAM: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateIPAMRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -1257,6 +1281,30 @@ class DatabaseServiceAsyncStub:
 
     DeleteNetworkInterfaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteNetworkInterfaceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateIPAM: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateIPAMRequest,
+        database_pb2.StatusReply,
+    ]
+    """IPAM Operations (MariaDB)
+    These manage IPAM static values (uuid, namespace, network_uuid, ipblock)
+    in MariaDB. IPAMs track IP address allocation within a network.
+    """
+
+    GetIPAM: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetIPAMRequest,
+        database_pb2.GetIPAMReply,
+    ]
+
+    DeleteIPAM: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteIPAMRequest,
+        database_pb2.StatusReply,
+    ]
+
+    UpdateIPAM: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateIPAMRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2108,6 +2156,38 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def DeleteNetworkInterfaceAttributes(
         self,
         request: database_pb2.DeleteNetworkInterfaceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateIPAM(
+        self,
+        request: database_pb2.CreateIPAMRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """IPAM Operations (MariaDB)
+        These manage IPAM static values (uuid, namespace, network_uuid, ipblock)
+        in MariaDB. IPAMs track IP address allocation within a network.
+        """
+
+    @abc.abstractmethod
+    def GetIPAM(
+        self,
+        request: database_pb2.GetIPAMRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetIPAMReply, collections.abc.Awaitable[database_pb2.GetIPAMReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteIPAM(
+        self,
+        request: database_pb2.DeleteIPAMRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateIPAM(
+        self,
+        request: database_pb2.UpdateIPAMRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

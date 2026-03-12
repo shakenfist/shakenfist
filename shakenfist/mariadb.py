@@ -49,6 +49,7 @@ from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.dnsmasq import DnsMasqData
+from shakenfist.schema.ipam_data import IPAMData
 from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.ipam_reservation import IPAMReservation
@@ -90,6 +91,7 @@ _artifact_attributes_table: Optional[sa.Table] = None
 _artifact_indexes_table: Optional[sa.Table] = None
 _network_interfaces_table: Optional[sa.Table] = None
 _network_interface_attributes_table: Optional[sa.Table] = None
+_ipams_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -114,6 +116,7 @@ ARTIFACT_ATTRIBUTES_VERSION = 1
 ARTIFACT_INDEXES_VERSION = 1
 NETWORK_INTERFACES_VERSION = 2
 NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
+IPAMS_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -1069,6 +1072,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_artifact_indexes_schema(engine))
     results.append(_ensure_network_interfaces_schema(engine))
     results.append(_ensure_network_interface_attributes_schema(engine))
+    results.append(_ensure_ipams_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -2581,6 +2585,61 @@ def _migrate_etcd_network_interface_attributes(
     return {'migrated_count': migrated_count, 'error_count': error_count}
 
 
+def _migrate_etcd_ipams(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate IPAM static values from etcd to MariaDB."""
+    from shakenfist import etcd
+    from shakenfist.ipam import IPAM
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating IPAM objects from etcd...')
+
+    for objkey, data in etcd.get_all('ipam', None):
+        ipam_uuid = objkey.split('/')[-1]
+
+        try:
+            # Apply upgrades to legacy data
+            version = data.get('version', IPAM.initial_version)
+            while version < IPAM.current_version:
+                step_name = f'_upgrade_step_{version}_to_{version + 1}'
+                step_func = getattr(IPAM, step_name, None)
+                if step_func:
+                    step_func(data)
+                version += 1
+                data['version'] = version
+
+            ipam_data = IPAMData(
+                uuid=UUIDType(ipam_uuid),
+                namespace=data.get('namespace'),
+                network_uuid=UUIDType(data['network_uuid']),
+                ipblock=data['ipblock'],
+                version=IPAM.current_version,
+            )
+            success = create_ipam(ipam_data)
+            if success:
+                etcd.delete('ipam', None, ipam_uuid)
+                migrated_count += 1
+            else:
+                etcd.delete('ipam', None, ipam_uuid)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(f'Error migrating IPAM {ipam_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count} '
+                f'IPAM objects processed')
+
+    LOG.info(
+        f'IPAM migration: {migrated_count} migrated, '
+        f'{skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -2637,6 +2696,9 @@ DATA_MIGRATIONS.update({
     },
     'network_interface_attributes': {
         2: _migrate_etcd_network_interface_attributes,
+    },
+    'ipams': {
+        2: _migrate_etcd_ipams,
     },
 })
 
@@ -10261,3 +10323,322 @@ def delete_network_interface_attributes(ni_uuid: UUID) -> bool:
     if _use_database_service():
         return _grpc_delete_network_interface_attributes(ni_uuid)
     return _direct_delete_network_interface_attributes(ni_uuid)
+
+
+# =============================================================================
+# IPAM Table Definitions
+# =============================================================================
+
+def _get_ipams_table() -> sa.Table:
+    """Get or create the ipams table definition.
+
+    This table stores static values for IPAM objects. IPAMs track IP
+    address allocation within a network's IP block.
+
+    The table schema is generated from the IPAMData Pydantic model.
+    The uuid is the primary key, with an index on network_uuid.
+    """
+    global _ipams_table
+    if _ipams_table is None:
+        metadata = _get_metadata()
+        _ipams_table = pydantic_to_sqlalchemy_table(
+            IPAMData,
+            'ipams',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+    return _ipams_table
+
+
+def _ensure_ipams_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the ipams table schema is up to date."""
+    table_name = 'ipams'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_ipams_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': IPAMS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+# =============================================================================
+# IPAM Direct Access Functions
+# These are used by the database daemon for IPAM object storage.
+# =============================================================================
+
+def _direct_create_ipam(data: IPAMData) -> bool:
+    """Create an IPAM record in MariaDB.
+
+    Args:
+        data: The IPAMData to insert.
+
+    Returns:
+        True if created successfully, False if duplicate or error.
+    """
+    engine = _get_engine()
+    table = _get_ipams_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                namespace=data.namespace,
+                network_uuid=data.network_uuid,
+                ipblock=data.ipblock,
+                version=data.version
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(f'MariaDB create failed for ipam {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_ipam(ipam_uuid: UUID) -> Optional[IPAMData]:
+    """Get IPAM static values from MariaDB.
+
+    Args:
+        ipam_uuid: The UUID of the IPAM.
+
+    Returns:
+        An IPAMData object, or None if not found.
+    """
+    engine = _get_engine()
+    table = _get_ipams_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == ipam_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return IPAMData(
+                uuid=result.uuid,
+                namespace=result.namespace,
+                network_uuid=result.network_uuid,
+                ipblock=result.ipblock,
+                version=result.version
+            )
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get failed for ipam {ipam_uuid}: {e}')
+        return None
+
+
+def _direct_delete_ipam(ipam_uuid: UUID) -> bool:
+    """Delete an IPAM record from MariaDB.
+
+    Args:
+        ipam_uuid: The UUID of the IPAM to delete.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_ipams_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == ipam_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for ipam {ipam_uuid}: {e}')
+        return False
+
+
+def _direct_update_ipam(data: IPAMData) -> bool:
+    """Update an IPAM record in MariaDB.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The IPAMData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_ipams_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                namespace=data.namespace,
+                network_uuid=data.network_uuid,
+                ipblock=data.ipblock,
+                version=data.version
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB update failed for ipam {data.uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# IPAM gRPC Client Functions
+# These are used by non-database daemons to access IPAM data via gRPC.
+# =============================================================================
+
+def _grpc_create_ipam(data: IPAMData) -> bool:
+    """Create an IPAM record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateIPAMRequest(
+            ipam=database_pb2.IPAMStaticData(
+                uuid=str(data.uuid),
+                namespace=data.namespace or '',
+                network_uuid=str(data.network_uuid),
+                ipblock=data.ipblock,
+                version=data.version
+            )
+        )
+        reply = stub.CreateIPAM(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC CreateIPAM failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_ipam(ipam_uuid: UUID) -> Optional[IPAMData]:
+    """Get IPAM static values via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetIPAMRequest(uuid=str(ipam_uuid))
+        reply = stub.GetIPAM(request)
+        if not reply.found:
+            return None
+        d = reply.ipam
+        return IPAMData(
+            uuid=d.uuid,
+            namespace=d.namespace or None,
+            network_uuid=d.network_uuid,
+            ipblock=d.ipblock,
+            version=d.version
+        )
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetIPAM failed for {ipam_uuid}: {e}')
+        return None
+
+
+def _grpc_delete_ipam(ipam_uuid: UUID) -> bool:
+    """Delete an IPAM record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteIPAMRequest(uuid=str(ipam_uuid))
+        reply = stub.DeleteIPAM(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC DeleteIPAM failed for {ipam_uuid}: {e}')
+        return False
+
+
+def _grpc_update_ipam(data: IPAMData) -> bool:
+    """Update an IPAM record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateIPAMRequest(
+            ipam=database_pb2.IPAMStaticData(
+                uuid=str(data.uuid),
+                namespace=data.namespace or '',
+                network_uuid=str(data.network_uuid),
+                ipblock=data.ipblock,
+                version=data.version
+            )
+        )
+        reply = stub.UpdateIPAM(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC UpdateIPAM failed for {data.uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# IPAM Public API Functions
+# =============================================================================
+
+def create_ipam(data: IPAMData) -> bool:
+    """Create an IPAM record.
+
+    Args:
+        data: The IPAMData to insert.
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_create_ipam(data)
+    return _direct_create_ipam(data)
+
+
+def get_ipam(ipam_uuid: UUID) -> Optional[IPAMData]:
+    """Get IPAM static values.
+
+    Args:
+        ipam_uuid: The UUID of the IPAM.
+
+    Returns:
+        An IPAMData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_ipam(ipam_uuid)
+    return _direct_get_ipam(ipam_uuid)
+
+
+def delete_ipam(ipam_uuid: UUID) -> bool:
+    """Delete an IPAM record.
+
+    Args:
+        ipam_uuid: The UUID of the IPAM.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_ipam(ipam_uuid)
+    return _direct_delete_ipam(ipam_uuid)
+
+
+def update_ipam(data: IPAMData) -> bool:
+    """Update an IPAM record.
+
+    This is used to persist version upgrades.
+
+    Args:
+        data: The IPAMData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_ipam(data)
+    return _direct_update_ipam(data)

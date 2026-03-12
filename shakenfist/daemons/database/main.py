@@ -44,6 +44,7 @@ from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
+from shakenfist.schema.ipam_data import IPAMData
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_data import NodeData
@@ -2510,6 +2511,94 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             uuid=str(data.uuid),
             floating_address=data.floating_address or '')
 
+    # =========================================================================
+    # IPAM Operations (MariaDB)
+    # =========================================================================
+
+    def CreateIPAM(
+        self,
+        request: database_pb2.CreateIPAMRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create an IPAM record in MariaDB."""
+        try:
+            self.monitor.counters['create_ipam'].inc()
+            data = self._ipam_from_proto(request.ipam)
+            success = mariadb._direct_create_ipam(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database CreateIPAM failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetIPAM(
+        self,
+        request: database_pb2.GetIPAMRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetIPAMReply:
+        """Get IPAM static values from MariaDB."""
+        try:
+            self.monitor.counters['get_ipam'].inc()
+            data = mariadb._direct_get_ipam(UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetIPAMReply(found=False)
+            return database_pb2.GetIPAMReply(
+                found=True,
+                ipam=self._ipam_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception('database GetIPAM failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetIPAMReply(found=False)
+
+    def DeleteIPAM(
+        self,
+        request: database_pb2.DeleteIPAMRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete an IPAM record from MariaDB."""
+        try:
+            self.monitor.counters['delete_ipam'].inc()
+            success = mariadb._direct_delete_ipam(UUID(request.uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database DeleteIPAM failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def UpdateIPAM(
+        self,
+        request: database_pb2.UpdateIPAMRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update an IPAM record in MariaDB."""
+        try:
+            self.monitor.counters['update_ipam'].inc()
+            data = self._ipam_from_proto(request.ipam)
+            success = mariadb._direct_update_ipam(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database UpdateIPAM failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def _ipam_from_proto(self, d: database_pb2.IPAMStaticData) -> IPAMData:
+        """Convert a proto IPAMStaticData to model."""
+        return IPAMData(
+            uuid=UUID(d.uuid),
+            namespace=d.namespace or None,
+            network_uuid=UUID(d.network_uuid),
+            ipblock=d.ipblock,
+            version=d.version
+        )
+
+    def _ipam_to_proto(self, data: IPAMData) -> database_pb2.IPAMStaticData:
+        """Convert a Pydantic IPAMData to proto."""
+        return database_pb2.IPAMStaticData(
+            uuid=str(data.uuid),
+            namespace=data.namespace or '',
+            network_uuid=str(data.network_uuid),
+            ipblock=data.ipblock,
+            version=data.version
+        )
+
     # Artifact Operations (MariaDB)
     def CreateArtifact(
         self,
@@ -2904,6 +2993,9 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_network_interface_attributes',
             'update_network_interface_attributes',
             'delete_network_interface_attributes',
+            # MariaDB IPAM operations
+            'create_ipam', 'get_ipam',
+            'delete_ipam', 'update_ipam',
             # MariaDB artifact operations
             'create_artifact', 'get_artifact', 'get_all_artifacts',
             'update_artifact', 'delete_artifact',

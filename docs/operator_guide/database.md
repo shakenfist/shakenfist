@@ -528,8 +528,9 @@ The migration is happening in phases:
 | 7 | Namespace objects | Complete - `namespaces`, `namespace_attributes` tables |
 | 8 | Artifact objects | Complete - `artifacts`, `artifact_attributes`, `artifact_indexes` tables |
 | 9 | NetworkInterface objects | Complete - `network_interfaces`, `network_interface_attributes` tables |
-| 10 | Other object types | Future |
-| 11 | Object attributes | Future |
+| 10 | IPAM objects | Complete - `ipams` table |
+| 11 | Other object types | Future |
+| 12 | Object attributes | Future |
 
 ### Table Architecture
 
@@ -578,6 +579,7 @@ values (immutable data set at creation time):
 | `namespaces` | Namespace | name (VARCHAR PK), version |
 | `artifacts` | Artifact | uuid, artifact_type, source_url, name, namespace, version |
 | `network_interfaces` | NetworkInterface | uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version |
+| `ipams` | IPAM | uuid, namespace, network_uuid, ipblock, version |
 
 These tables use the object's UUID as the primary key, except for
 `namespaces` which uses the namespace name (a string) as its primary key.
