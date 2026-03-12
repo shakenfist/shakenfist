@@ -418,6 +418,9 @@ performance. This is required for all deployments - MariaDB must be configured.
   tables): Network interface static values (uuid, network_uuid, instance_uuid,
   macaddr, ipv4, order, model) and mutable attributes (floating_address).
   Dual-write with etcd fallback for unmigrated objects.
+- **IPAMs** (`ipams` table): IPAM static values (uuid, namespace,
+  network_uuid, ipblock). No mutable attributes. Dual-write with etcd
+  fallback for unmigrated objects.
 
 ### Migrating Existing Deployments
 
