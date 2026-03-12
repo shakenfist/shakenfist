@@ -50,6 +50,8 @@ from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_data import IPAMData
+from shakenfist.schema.network_attributes import NetworkAttributesData
+from shakenfist.schema.network_data import NetworkData
 from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.ipam_reservation import IPAMReservation
@@ -91,6 +93,8 @@ _artifact_attributes_table: Optional[sa.Table] = None
 _artifact_indexes_table: Optional[sa.Table] = None
 _network_interfaces_table: Optional[sa.Table] = None
 _network_interface_attributes_table: Optional[sa.Table] = None
+_networks_table: Optional[sa.Table] = None
+_network_attributes_table: Optional[sa.Table] = None
 _ipams_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
@@ -116,6 +120,8 @@ ARTIFACT_ATTRIBUTES_VERSION = 1
 ARTIFACT_INDEXES_VERSION = 1
 NETWORK_INTERFACES_VERSION = 2
 NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
+NETWORKS_VERSION = 2
+NETWORK_ATTRIBUTES_VERSION = 2
 IPAMS_VERSION = 2
 
 
@@ -1072,6 +1078,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_artifact_indexes_schema(engine))
     results.append(_ensure_network_interfaces_schema(engine))
     results.append(_ensure_network_interface_attributes_schema(engine))
+    results.append(_ensure_networks_schema(engine))
+    results.append(_ensure_network_attributes_schema(engine))
     results.append(_ensure_ipams_schema(engine))
 
     # Log summary
@@ -2640,6 +2648,170 @@ def _migrate_etcd_ipams(engine: sa.Engine) -> dict[str, Any]:
     return {'migrated_count': migrated_count, 'error_count': error_count}
 
 
+def _migrate_etcd_networks(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate Network static values from etcd to MariaDB."""
+    from shakenfist import etcd
+    from shakenfist.network.network import Network
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating Network objects from etcd...')
+
+    for objkey, data in etcd.get_all('network', None):
+        net_uuid = objkey.split('/')[-1]
+
+        try:
+            # Apply upgrades to legacy data
+            version = data.get('version', Network.initial_version)
+            while version < Network.current_version:
+                step_name = f'_upgrade_step_{version}_to_{version + 1}'
+                step_func = getattr(Network, step_name, None)
+                if step_func:
+                    step_func(data)
+                version += 1
+                data['version'] = version
+
+            net_data = NetworkData(
+                uuid=UUIDType(net_uuid),
+                name=data.get('name', ''),
+                namespace=data.get('namespace'),
+                netblock=data.get('netblock', ''),
+                provide_dhcp=data.get('provide_dhcp', False),
+                provide_nat=data.get('provide_nat', False),
+                provide_dns=data.get('provide_dns', False),
+                vxid=data.get('vxid', 0),
+                egress_nic=data.get('egress_nic'),
+                mesh_nic=data.get('mesh_nic'),
+                version=Network.current_version,
+            )
+            success = create_network(net_data)
+            if success:
+                etcd.delete('network', None, net_uuid)
+                migrated_count += 1
+            else:
+                etcd.delete('network', None, net_uuid)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(f'Error migrating Network {net_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count} '
+                f'Network objects processed')
+
+    # Clean up vxlan allocation keys — uniqueness is now enforced by
+    # the UNIQUE constraint on networks.vxid.
+    vxlan_cleaned = 0
+    for objkey, _data in etcd.get_all('vxlan', None):
+        vxid = objkey.split('/')[-1]
+        etcd.delete('vxlan', None, vxid)
+        vxlan_cleaned += 1
+
+    LOG.info(
+        f'Network migration: {migrated_count} migrated, '
+        f'{skipped_count} skipped, '
+        f'{vxlan_cleaned} vxlan keys cleaned')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
+def _migrate_etcd_network_attributes(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Migrate Network attributes from etcd to MariaDB."""
+    from shakenfist import etcd
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating Network attributes from etcd...')
+
+    # Get all network UUIDs from the static values table
+    static_table = _get_networks_table()
+    with engine.connect() as conn:
+        stmt = sa.select(static_table.c.uuid)
+        result = conn.execute(stmt)
+        net_uuids = [str(row.uuid) for row in result]
+
+    for net_uuid in net_uuids:
+        try:
+            existing = _direct_get_network_attributes(
+                UUIDType(net_uuid))
+            if existing:
+                skipped_count += 1
+                continue
+
+            # Read attributes from etcd
+            routing_data = etcd.get(
+                'attribute/network', net_uuid, 'routing')
+            ni_data = etcd.get(
+                'attribute/network', net_uuid,
+                'networkinterfaces')
+            dns_data = etcd.get(
+                'attribute/network', net_uuid, 'hosteddns')
+
+            # Extract values with defaults
+            floating_gateway = None
+            if routing_data:
+                floating_gateway = routing_data.get(
+                    'floating_gateway')
+
+            networkinterfaces: list[str] = []
+            networkinterfaces_initialized = False
+            if ni_data:
+                networkinterfaces = ni_data.get(
+                    'networkinterfaces', [])
+                networkinterfaces_initialized = ni_data.get(
+                    'initialized', False)
+
+            hosteddns: dict[str, Any] = {}
+            if dns_data:
+                hosteddns = dns_data
+
+            attrs = NetworkAttributesData(
+                uuid=UUIDType(net_uuid),
+                floating_gateway=floating_gateway,
+                networkinterfaces=networkinterfaces,
+                networkinterfaces_initialized=(
+                    networkinterfaces_initialized),
+                hosteddns=hosteddns,
+            )
+            success = _direct_create_network_attributes(attrs)
+
+            if success:
+                # Delete etcd attributes after successful migration
+                etcd.delete(
+                    'attribute/network', net_uuid, 'routing')
+                etcd.delete(
+                    'attribute/network', net_uuid,
+                    'networkinterfaces')
+                etcd.delete(
+                    'attribute/network', net_uuid, 'hosteddns')
+                migrated_count += 1
+            else:
+                error_count += 1
+
+        except Exception as e:
+            LOG.warning(
+                f'Failed to migrate attributes for '
+                f'Network {net_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count} '
+                f'Network attributes processed')
+
+    LOG.info(
+        f'Network attributes migration: {migrated_count} '
+        f'migrated, {skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -2699,6 +2871,12 @@ DATA_MIGRATIONS.update({
     },
     'ipams': {
         2: _migrate_etcd_ipams,
+    },
+    'networks': {
+        2: _migrate_etcd_networks,
+    },
+    'network_attributes': {
+        2: _migrate_etcd_network_attributes,
     },
 })
 
@@ -10642,3 +10820,681 @@ def update_ipam(data: IPAMData) -> bool:
     if _use_database_service():
         return _grpc_update_ipam(data)
     return _direct_update_ipam(data)
+
+
+# =============================================================================
+# Network Table Definitions
+# =============================================================================
+
+def _get_networks_table() -> sa.Table:
+    """Get or create the networks table definition.
+
+    This table stores static values for Network objects. Networks are
+    virtual L2 networks with optional DHCP, NAT, and DNS services.
+
+    The table schema is generated from the NetworkData Pydantic model.
+    The uuid is the primary key, with a UNIQUE constraint on vxid
+    and an index on namespace.
+    """
+    global _networks_table
+    if _networks_table is None:
+        metadata = _get_metadata()
+        _networks_table = pydantic_to_sqlalchemy_table(
+            NetworkData,
+            'networks',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+        # Add UNIQUE constraint on vxid for atomic VXLAN allocation
+        sa.UniqueConstraint(
+            _networks_table.c.vxid, name='uq_networks_vxid')
+    return _networks_table
+
+
+def _get_network_attributes_table() -> sa.Table:
+    """Get or create the network_attributes table definition."""
+    global _network_attributes_table
+    if _network_attributes_table is None:
+        metadata = _get_metadata()
+        _network_attributes_table = pydantic_to_sqlalchemy_table(
+            NetworkAttributesData,
+            'network_attributes',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+    return _network_attributes_table
+
+
+def _ensure_networks_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the networks table schema is up to date."""
+    table_name = 'networks'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_networks_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(
+                        f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NETWORKS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_network_attributes_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the network_attributes table schema is up to date."""
+    table_name = 'network_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_network_attributes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(
+                        f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NETWORK_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+# =============================================================================
+# Network Direct Access Functions
+# These are used by the database daemon for Network object storage.
+# =============================================================================
+
+def _direct_create_network(data: NetworkData) -> bool:
+    """Create a Network record in MariaDB.
+
+    Args:
+        data: The NetworkData to insert.
+
+    Returns:
+        True if created successfully, False if duplicate or error.
+    """
+    engine = _get_engine()
+    table = _get_networks_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                name=data.name,
+                namespace=data.namespace,
+                netblock=data.netblock,
+                provide_dhcp=data.provide_dhcp,
+                provide_nat=data.provide_nat,
+                provide_dns=data.provide_dns,
+                vxid=data.vxid,
+                egress_nic=data.egress_nic,
+                mesh_nic=data.mesh_nic,
+                version=data.version
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for network {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_network(
+        net_uuid: UUID) -> Optional[NetworkData]:
+    """Get Network static values from MariaDB.
+
+    Args:
+        net_uuid: The UUID of the Network.
+
+    Returns:
+        A NetworkData object, or None if not found.
+    """
+    engine = _get_engine()
+    table = _get_networks_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.uuid == net_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return NetworkData(
+                uuid=result.uuid,
+                name=result.name,
+                namespace=result.namespace,
+                netblock=result.netblock,
+                provide_dhcp=result.provide_dhcp,
+                provide_nat=result.provide_nat,
+                provide_dns=result.provide_dns,
+                vxid=result.vxid,
+                egress_nic=result.egress_nic,
+                mesh_nic=result.mesh_nic,
+                version=result.version
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for network {net_uuid}: {e}')
+        return None
+
+
+def _direct_get_all_networks() -> list[NetworkData]:
+    """Get all Network records from MariaDB.
+
+    Returns:
+        List of NetworkData objects.
+    """
+    engine = _get_engine()
+    table = _get_networks_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table)
+            result = conn.execute(stmt).fetchall()
+
+            return [
+                NetworkData(
+                    uuid=row.uuid,
+                    name=row.name,
+                    namespace=row.namespace,
+                    netblock=row.netblock,
+                    provide_dhcp=row.provide_dhcp,
+                    provide_nat=row.provide_nat,
+                    provide_dns=row.provide_dns,
+                    vxid=row.vxid,
+                    egress_nic=row.egress_nic,
+                    mesh_nic=row.mesh_nic,
+                    version=row.version
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for all networks: {e}')
+        return []
+
+
+def _direct_delete_network(net_uuid: UUID) -> bool:
+    """Delete a Network record from MariaDB.
+
+    Args:
+        net_uuid: The UUID of the Network to delete.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_networks_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.uuid == net_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for network {net_uuid}: {e}')
+        return False
+
+
+def _direct_create_network_attributes(
+        data: NetworkAttributesData) -> bool:
+    """Create a network_attributes record in MariaDB."""
+    engine = _get_engine()
+    table = _get_network_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                floating_gateway=data.floating_gateway,
+                networkinterfaces=json.dumps(
+                    data.networkinterfaces),
+                networkinterfaces_initialized=(
+                    data.networkinterfaces_initialized),
+                hosteddns=json.dumps(data.hosteddns))
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for '
+            f'network_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_network_attributes(
+        net_uuid: UUID) -> Optional[NetworkAttributesData]:
+    """Get Network attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_network_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.uuid == net_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            # Parse JSON fields
+            nis = result.networkinterfaces
+            if isinstance(nis, str):
+                nis = json.loads(nis)
+            dns = result.hosteddns
+            if isinstance(dns, str):
+                dns = json.loads(dns)
+
+            return NetworkAttributesData(
+                uuid=result.uuid,
+                floating_gateway=result.floating_gateway,
+                networkinterfaces=nis if nis else [],
+                networkinterfaces_initialized=(
+                    result.networkinterfaces_initialized),
+                hosteddns=dns if dns else {},
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for '
+            f'network_attributes {net_uuid}: {e}')
+        return None
+
+
+def _direct_update_network_attributes(
+        data: NetworkAttributesData) -> bool:
+    """Update Network attributes in MariaDB."""
+    engine = _get_engine()
+    table = _get_network_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                floating_gateway=data.floating_gateway,
+                networkinterfaces=json.dumps(
+                    data.networkinterfaces),
+                networkinterfaces_initialized=(
+                    data.networkinterfaces_initialized),
+                hosteddns=json.dumps(data.hosteddns))
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB update failed for '
+            f'network_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_delete_network_attributes(
+        net_uuid: UUID) -> bool:
+    """Delete Network attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_network_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.uuid == net_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for '
+            f'network_attributes {net_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Network gRPC Client Functions
+# These call the database microservice for Network operations.
+# =============================================================================
+
+def _grpc_create_network(data: NetworkData) -> bool:
+    """Create a Network record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateNetworkRequest(
+            network=database_pb2.NetworkStaticData(
+                uuid=str(data.uuid),
+                name=data.name,
+                namespace=data.namespace or '',
+                netblock=data.netblock,
+                provide_dhcp=data.provide_dhcp,
+                provide_nat=data.provide_nat,
+                provide_dns=data.provide_dns,
+                vxid=data.vxid,
+                egress_nic=data.egress_nic or '',
+                mesh_nic=data.mesh_nic or '',
+                version=data.version
+            )
+        )
+        reply = stub.CreateNetwork(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateNetwork failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_network(
+        net_uuid: UUID) -> Optional[NetworkData]:
+    """Get Network static values via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNetworkRequest(
+            uuid=str(net_uuid))
+        reply = stub.GetNetwork(request)
+        if not reply.found:
+            return None
+        d = reply.network
+        return NetworkData(
+            uuid=d.uuid,
+            name=d.name,
+            namespace=d.namespace or None,
+            netblock=d.netblock,
+            provide_dhcp=d.provide_dhcp,
+            provide_nat=d.provide_nat,
+            provide_dns=d.provide_dns,
+            vxid=d.vxid,
+            egress_nic=d.egress_nic or None,
+            mesh_nic=d.mesh_nic or None,
+            version=d.version
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetNetwork failed for {net_uuid}: {e}')
+        return None
+
+
+def _grpc_get_all_networks() -> list[NetworkData]:
+    """Get all Network records via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllNetworksRequest()
+        reply = stub.GetAllNetworks(request)
+        return [
+            NetworkData(
+                uuid=d.uuid,
+                name=d.name,
+                namespace=d.namespace or None,
+                netblock=d.netblock,
+                provide_dhcp=d.provide_dhcp,
+                provide_nat=d.provide_nat,
+                provide_dns=d.provide_dns,
+                vxid=d.vxid,
+                egress_nic=d.egress_nic or None,
+                mesh_nic=d.mesh_nic or None,
+                version=d.version
+            )
+            for d in reply.networks
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetAllNetworks failed: {e}')
+        return []
+
+
+def _grpc_delete_network(net_uuid: UUID) -> bool:
+    """Delete a Network record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNetworkRequest(
+            uuid=str(net_uuid))
+        reply = stub.DeleteNetwork(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteNetwork failed for {net_uuid}: {e}')
+        return False
+
+
+def _grpc_create_network_attributes(
+        data: NetworkAttributesData) -> bool:
+    """Create Network attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateNetworkAttributesRequest(
+            data=database_pb2.NetworkAttributesProto(
+                uuid=str(data.uuid),
+                floating_gateway=(
+                    data.floating_gateway or ''),
+                networkinterfaces=data.networkinterfaces,
+                networkinterfaces_initialized=(
+                    data.networkinterfaces_initialized),
+                hosteddns_json=json.dumps(data.hosteddns)))
+        reply = stub.CreateNetworkAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateNetworkAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_network_attributes(
+        net_uuid: UUID) -> Optional[NetworkAttributesData]:
+    """Get Network attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNetworkAttributesRequest(
+            uuid=str(net_uuid))
+        reply = stub.GetNetworkAttributes(request)
+        if not reply.found:
+            return None
+        d = reply.data
+        dns = json.loads(d.hosteddns_json) if d.hosteddns_json else {}
+        return NetworkAttributesData(
+            uuid=d.uuid,
+            floating_gateway=(
+                d.floating_gateway
+                if d.floating_gateway else None),
+            networkinterfaces=list(d.networkinterfaces),
+            networkinterfaces_initialized=(
+                d.networkinterfaces_initialized),
+            hosteddns=dns,
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetNetworkAttributes failed for '
+            f'{net_uuid}: {e}')
+        return None
+
+
+def _grpc_update_network_attributes(
+        data: NetworkAttributesData) -> bool:
+    """Update Network attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateNetworkAttributesRequest(
+            data=database_pb2.NetworkAttributesProto(
+                uuid=str(data.uuid),
+                floating_gateway=(
+                    data.floating_gateway or ''),
+                networkinterfaces=data.networkinterfaces,
+                networkinterfaces_initialized=(
+                    data.networkinterfaces_initialized),
+                hosteddns_json=json.dumps(data.hosteddns)))
+        reply = stub.UpdateNetworkAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC UpdateNetworkAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_delete_network_attributes(
+        net_uuid: UUID) -> bool:
+    """Delete Network attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNetworkAttributesRequest(
+            uuid=str(net_uuid))
+        reply = stub.DeleteNetworkAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteNetworkAttributes failed for '
+            f'{net_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Network Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def create_network(data: NetworkData) -> bool:
+    """Create a Network record.
+
+    Args:
+        data: The NetworkData to insert.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_network(data)
+    return _direct_create_network(data)
+
+
+def get_network(net_uuid: UUID) -> Optional[NetworkData]:
+    """Get Network static values.
+
+    Args:
+        net_uuid: The UUID of the Network.
+
+    Returns:
+        A NetworkData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_network(net_uuid)
+    return _direct_get_network(net_uuid)
+
+
+def get_all_networks() -> list[NetworkData]:
+    """Get all Network records.
+
+    Returns:
+        List of NetworkData objects.
+    """
+    if _use_database_service():
+        return _grpc_get_all_networks()
+    return _direct_get_all_networks()
+
+
+def delete_network(net_uuid: UUID) -> bool:
+    """Delete a Network record.
+
+    Args:
+        net_uuid: The UUID of the Network.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_network(net_uuid)
+    return _direct_delete_network(net_uuid)
+
+
+def create_network_attributes(
+        data: NetworkAttributesData) -> bool:
+    """Create Network attributes record.
+
+    Args:
+        data: The NetworkAttributesData to create.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_network_attributes(data)
+    return _direct_create_network_attributes(data)
+
+
+def get_network_attributes(
+        net_uuid: UUID) -> Optional[NetworkAttributesData]:
+    """Get Network attributes.
+
+    Args:
+        net_uuid: The UUID of the Network.
+
+    Returns:
+        A NetworkAttributesData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_network_attributes(net_uuid)
+    return _direct_get_network_attributes(net_uuid)
+
+
+def update_network_attributes(
+        data: NetworkAttributesData) -> bool:
+    """Update Network attributes.
+
+    Args:
+        data: The NetworkAttributesData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_network_attributes(data)
+    return _direct_update_network_attributes(data)
+
+
+def delete_network_attributes(net_uuid: UUID) -> bool:
+    """Delete Network attributes.
+
+    Args:
+        net_uuid: The UUID of the Network.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_network_attributes(net_uuid)
+    return _direct_delete_network_attributes(net_uuid)

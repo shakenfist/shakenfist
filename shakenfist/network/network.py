@@ -4,6 +4,8 @@ import os
 import random
 import time
 from functools import partial
+from typing import Optional
+from uuid import UUID
 from uuid import uuid4
 
 from shakenfist_utilities import logs  # noreorder
@@ -14,8 +16,11 @@ from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import ipam
+from shakenfist import mariadb
 from shakenfist.network import interface
 from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.network_attributes import NetworkAttributesData
+from shakenfist.schema.network_data import NetworkData
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations as dbowo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
@@ -54,8 +59,8 @@ LOG, _ = logs.setup(__name__)
 
 class Network(dbowo):
     object_type = ObjectType.NETWORK
-    initial_version = 2
-    current_version = 8
+    initial_version = 8
+    current_version = 9
 
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
@@ -101,42 +106,108 @@ class Network(dbowo):
         self.__broadcast = self.ipam.broadcast_address
         self.__network_address = self.ipam.network_address
 
-    @classmethod
-    def _upgrade_step_2_to_3(cls, static_values):
-        cls._upgrade_metadata_to_attribute(static_values['uuid'])
+        # Lazy-load attributes from MariaDB
+        self.__attributes: Optional[NetworkAttributesData] = None
+        self.__attributes_loaded: bool = False
 
     @classmethod
-    def _upgrade_step_3_to_4(cls, static_values):
-        nis = []
-        for ni in interface.NetworkInterfaces(
-                [partial(interface.network_uuid_filter, static_values['uuid'])],
-                prefilter='active'):
-            nis.append(ni.uuid)
-        etcd.put('attribute/network', static_values['uuid'], 'networkinterfaces',
-                 {
-                     'networkinterfaces': nis,
-                     'initialized': True
-                 })
-
-    @classmethod
-    def _upgrade_step_4_to_5(cls, static_values):
-        static_values['provide_dns'] = False
-
-    @classmethod
-    def _upgrade_step_5_to_6(cls, static_values):
-        etcd.put('attribute/network', static_values['uuid'], 'hosteddns', {})
-
-    @classmethod
-    def _upgrade_step_6_to_7(cls, static_values):
+    def _upgrade_step_8_to_9(cls, static_values):
+        # Migration to MariaDB networks/network_attributes tables is
+        # handled by sf-ctl migrate-data-to-mariadb.
         ...
 
     @classmethod
-    def _upgrade_step_7_to_8(cls, static_values):
-        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
-        ...
+    def _db_create(cls, object_uuid, metadata):
+        """Create a Network record in both etcd and MariaDB."""
+        # Write to etcd (base class behavior)
+        super()._db_create(object_uuid, metadata)
+
+        # Also write static values to MariaDB
+        _uuid = object_uuid if isinstance(object_uuid, UUID) else UUID(object_uuid)
+        data = NetworkData(
+            uuid=_uuid,
+            name=metadata.get('name', ''),
+            namespace=metadata.get('namespace'),
+            netblock=metadata.get('netblock', ''),
+            provide_dhcp=metadata.get('provide_dhcp', False),
+            provide_nat=metadata.get('provide_nat', False),
+            provide_dns=metadata.get('provide_dns', False),
+            vxid=metadata.get('vxid', 0),
+            egress_nic=metadata.get('egress_nic'),
+            mesh_nic=metadata.get('mesh_nic'),
+            version=metadata.get('version', cls.current_version)
+        )
+        mariadb.create_network(data)
+
+        # Create initial attributes record in MariaDB
+        attrs = NetworkAttributesData(uuid=_uuid)
+        mariadb.create_network_attributes(attrs)
+
+    @classmethod
+    def _db_get(cls, object_uuid) -> Optional[dict]:
+        """Get Network static values, trying MariaDB first."""
+        if not isinstance(object_uuid, UUID):
+            object_uuid = UUID(str(object_uuid))
+        data = mariadb.get_network(object_uuid)
+        if data:
+            result = {
+                'uuid': str(data.uuid),
+                'name': data.name,
+                'namespace': data.namespace,
+                'netblock': data.netblock,
+                'provide_dhcp': data.provide_dhcp,
+                'provide_nat': data.provide_nat,
+                'provide_dns': data.provide_dns,
+                'vxid': data.vxid,
+                'egress_nic': data.egress_nic,
+                'mesh_nic': data.mesh_nic,
+                'version': data.version
+            }
+            if result.get('version', 0) != cls.current_version:
+                from shakenfist import exceptions
+                if not cls.upgrade_supported:
+                    raise exceptions.BadObjectVersion(
+                        f'Unsupported object version - '
+                        f'{cls.object_type}: {result}')
+            return result
+
+        # Fall back to etcd for unmigrated objects
+        return super()._db_get(object_uuid)
+
+    def _load_attributes(self) -> Optional[NetworkAttributesData]:
+        """Load attributes from MariaDB."""
+        if not self.__attributes_loaded:
+            self.__attributes = mariadb.get_network_attributes(
+                UUID(str(self.uuid)))
+            self.__attributes_loaded = True
+        return self.__attributes
+
+    def _ensure_attributes(self) -> NetworkAttributesData:
+        """Ensure attributes record exists, creating defaults
+        if needed."""
+        attrs = self._load_attributes()
+        if attrs is None:
+            attrs = NetworkAttributesData(
+                uuid=UUID(str(self.uuid)))
+            if not mariadb.create_network_attributes(attrs):
+                # Another thread/process created the record first;
+                # reload the actual data from MariaDB.
+                attrs = mariadb.get_network_attributes(
+                    UUID(str(self.uuid)))
+            self.__attributes = attrs
+        return attrs
+
+    def _save_attributes(self) -> None:
+        """Persist current attributes to MariaDB."""
+        if self.__attributes is not None:
+            mariadb.update_network_attributes(self.__attributes)
 
     @staticmethod
     def allocate_vxid(net_id):
+        # VXLAN ID uniqueness is now enforced by the UNIQUE constraint
+        # on the networks.vxid column. We still generate random IDs here
+        # but the actual uniqueness check happens at insert time in
+        # _db_create. If there's a collision, the caller retries.
         reservation = {
             'network_uuid': net_id,
             'when': time.time()
@@ -224,11 +295,20 @@ class Network(dbowo):
 
     @property
     def floating_gateway(self):
+        # Try MariaDB first
+        attrs = self._load_attributes()
+        if attrs:
+            return attrs.floating_gateway
+        # Fall back to etcd for unmigrated objects
         fg = self._db_get_attribute('routing', {'floating_gateway': None})
         return fg['floating_gateway']
 
     @property
     def routing(self):
+        # Try MariaDB first — reconstruct dict for backward compat
+        attrs = self._load_attributes()
+        if attrs:
+            return {'floating_gateway': attrs.floating_gateway}
         return self._db_get_attribute('routing')
 
     @property
@@ -286,18 +366,52 @@ class Network(dbowo):
 
     @property
     def networkinterfaces(self):
+        # Try MariaDB first
+        attrs = self._load_attributes()
+        if attrs:
+            return attrs.networkinterfaces
+        # Fall back to etcd for unmigrated objects
         nis = self._db_get_attribute('networkinterfaces', {})
         return nis.get('networkinterfaces', [])
 
     def add_networkinterface(self, ni):
-        self._add_item_in_attribute_list('networkinterfaces', str(ni.uuid))
+        attrs = self._load_attributes()
+        if attrs:
+            ni_uuid = str(ni.uuid)
+            if ni_uuid not in attrs.networkinterfaces:
+                attrs.networkinterfaces.append(ni_uuid)
+                attrs.networkinterfaces_initialized = True
+                self._save_attributes()
+        else:
+            self._add_item_in_attribute_list(
+                'networkinterfaces', str(ni.uuid))
 
     def remove_networkinterface(self, ni):
         if ni.ipv4:
             self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
-        self._remove_item_in_attribute_list('networkinterfaces', str(ni.uuid))
+        attrs = self._load_attributes()
+        if attrs:
+            ni_uuid = str(ni.uuid)
+            if ni_uuid in attrs.networkinterfaces:
+                attrs.networkinterfaces.remove(ni_uuid)
+                self._save_attributes()
+        else:
+            self._remove_item_in_attribute_list(
+                'networkinterfaces', str(ni.uuid))
 
     def _update_floating_gateway(self, gateway):
+        # Try MariaDB first
+        attrs = self._load_attributes()
+        if attrs:
+            if attrs.floating_gateway == gateway:
+                return True
+            if attrs.floating_gateway and gateway is not None:
+                return False
+            attrs.floating_gateway = gateway
+            self._save_attributes()
+            return True
+
+        # Fall back to etcd for unmigrated objects
         original_routing = self.routing
         original_gateway = original_routing.get('floating_gateway')
         if original_gateway == gateway:
@@ -370,7 +484,12 @@ class Network(dbowo):
 
         # Hosted DNS entries
         if self.provide_dns:
-            retval['hosted_dns'] = self._db_get_attribute('hosteddns', {})
+            attrs = self._load_attributes()
+            if attrs:
+                retval['hosted_dns'] = attrs.hosteddns
+            else:
+                retval['hosted_dns'] = self._db_get_attribute(
+                    'hosteddns', {})
         else:
             retval['hosted_dns'] = {}
 
@@ -616,6 +735,8 @@ class Network(dbowo):
 
     def hard_delete(self):
         etcd.delete('vxlan', None, self.vxid)
+        mariadb.delete_network_attributes(UUID(str(self.uuid)))
+        mariadb.delete_network(UUID(str(self.uuid)))
         super().hard_delete()
 
     def _get_dnsmasq_object(self):
@@ -698,13 +819,21 @@ class Network(dbowo):
         if not self.provide_dns:
             return
 
-        with self.get_lock_attr('hosteddns', 'Update hosted DNS entry'):
-            entries = self._db_get_attribute('hosteddns', {})
-            entries[name] = value
-            self._db_set_attribute('hosteddns', entries)
+        attrs = self._load_attributes()
+        if attrs:
+            attrs.hosteddns[name] = value
+            self._save_attributes()
+        else:
+            with self.get_lock_attr(
+                    'hosteddns', 'Update hosted DNS entry'):
+                entries = self._db_get_attribute('hosteddns', {})
+                entries[name] = value
+                self._db_set_attribute('hosteddns', entries)
 
         if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network update DnsMasq', global_scope=False):
+            with self.get_lock(
+                    op='Network update DnsMasq',
+                    global_scope=False):
                 d = self._get_dnsmasq_object()
                 d.restart()
         else:
@@ -718,14 +847,23 @@ class Network(dbowo):
         if not self.provide_dns:
             return
 
-        with self.get_lock_attr('hosteddns', 'Remove hosted DNS entry'):
-            entries = self._db_get_attribute('hosteddns', {})
-            if name in entries:
-                del entries[name]
-                self._db_set_attribute('hosteddns', entries)
+        attrs = self._load_attributes()
+        if attrs:
+            if name in attrs.hosteddns:
+                del attrs.hosteddns[name]
+                self._save_attributes()
+        else:
+            with self.get_lock_attr(
+                    'hosteddns', 'Remove hosted DNS entry'):
+                entries = self._db_get_attribute('hosteddns', {})
+                if name in entries:
+                    del entries[name]
+                    self._db_set_attribute('hosteddns', entries)
 
         if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network update DnsMasq', global_scope=False):
+            with self.get_lock(
+                    op='Network update DnsMasq',
+                    global_scope=False):
                 d = self._get_dnsmasq_object()
                 d.restart()
         else:

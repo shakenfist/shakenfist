@@ -3748,3 +3748,281 @@ class UpdateIPAMRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["ipam", b"ipam"]) -> None: ...
 
 global___UpdateIPAMRequest = UpdateIPAMRequest
+
+@typing.final
+class NetworkStaticData(google.protobuf.message.Message):
+    """Network Operations (MariaDB)
+    These manage Network static values in MariaDB. Networks are virtual L2
+    networks with optional DHCP, NAT, and DNS services connected via VXLAN.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    NETBLOCK_FIELD_NUMBER: builtins.int
+    PROVIDE_DHCP_FIELD_NUMBER: builtins.int
+    PROVIDE_NAT_FIELD_NUMBER: builtins.int
+    PROVIDE_DNS_FIELD_NUMBER: builtins.int
+    VXID_FIELD_NUMBER: builtins.int
+    EGRESS_NIC_FIELD_NUMBER: builtins.int
+    MESH_NIC_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """Network UUID"""
+    name: builtins.str
+    """Human-readable name"""
+    namespace: builtins.str
+    """Owning namespace (empty = None)"""
+    netblock: builtins.str
+    """CIDR notation network block"""
+    provide_dhcp: builtins.bool
+    """Whether DHCP services are enabled"""
+    provide_nat: builtins.bool
+    """Whether NAT services are enabled"""
+    provide_dns: builtins.bool
+    """Whether DNS services are enabled"""
+    vxid: builtins.int
+    """VXLAN ID (1-16777215, globally unique)"""
+    egress_nic: builtins.str
+    """Egress NIC override (empty = None)"""
+    mesh_nic: builtins.str
+    """Mesh NIC override (empty = None)"""
+    version: builtins.int
+    """Object version number"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        name: builtins.str = ...,
+        namespace: builtins.str = ...,
+        netblock: builtins.str = ...,
+        provide_dhcp: builtins.bool = ...,
+        provide_nat: builtins.bool = ...,
+        provide_dns: builtins.bool = ...,
+        vxid: builtins.int = ...,
+        egress_nic: builtins.str = ...,
+        mesh_nic: builtins.str = ...,
+        version: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["egress_nic", b"egress_nic", "mesh_nic", b"mesh_nic", "name", b"name", "namespace", b"namespace", "netblock", b"netblock", "provide_dhcp", b"provide_dhcp", "provide_dns", b"provide_dns", "provide_nat", b"provide_nat", "uuid", b"uuid", "version", b"version", "vxid", b"vxid"]) -> None: ...
+
+global___NetworkStaticData = NetworkStaticData
+
+@typing.final
+class CreateNetworkRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NETWORK_FIELD_NUMBER: builtins.int
+    @property
+    def network(self) -> global___NetworkStaticData: ...
+    def __init__(
+        self,
+        *,
+        network: global___NetworkStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["network", b"network"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["network", b"network"]) -> None: ...
+
+global___CreateNetworkRequest = CreateNetworkRequest
+
+@typing.final
+class GetNetworkRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetNetworkRequest = GetNetworkRequest
+
+@typing.final
+class GetNetworkReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    NETWORK_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def network(self) -> global___NetworkStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        network: global___NetworkStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["network", b"network"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["found", b"found", "network", b"network"]) -> None: ...
+
+global___GetNetworkReply = GetNetworkReply
+
+@typing.final
+class GetAllNetworksRequest(google.protobuf.message.Message):
+    """No filters currently needed - returns all networks"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetAllNetworksRequest = GetAllNetworksRequest
+
+@typing.final
+class GetAllNetworksReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NETWORKS_FIELD_NUMBER: builtins.int
+    @property
+    def networks(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NetworkStaticData]: ...
+    def __init__(
+        self,
+        *,
+        networks: collections.abc.Iterable[global___NetworkStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["networks", b"networks"]) -> None: ...
+
+global___GetAllNetworksReply = GetAllNetworksReply
+
+@typing.final
+class DeleteNetworkRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteNetworkRequest = DeleteNetworkRequest
+
+@typing.final
+class NetworkAttributesProto(google.protobuf.message.Message):
+    """Network Attributes Operations (MariaDB)
+    These store mutable Network attributes, separate from NetworkStaticData.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    FLOATING_GATEWAY_FIELD_NUMBER: builtins.int
+    NETWORKINTERFACES_FIELD_NUMBER: builtins.int
+    NETWORKINTERFACES_INITIALIZED_FIELD_NUMBER: builtins.int
+    HOSTEDDNS_JSON_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """References networks.uuid"""
+    floating_gateway: builtins.str
+    """Floating IP gateway (empty = None)"""
+    networkinterfaces_initialized: builtins.bool
+    """Whether NI list has been populated"""
+    hosteddns_json: builtins.str
+    """JSON-encoded {name: address} dict"""
+    @property
+    def networkinterfaces(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """List of NI UUIDs"""
+
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        floating_gateway: builtins.str = ...,
+        networkinterfaces: collections.abc.Iterable[builtins.str] | None = ...,
+        networkinterfaces_initialized: builtins.bool = ...,
+        hosteddns_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["floating_gateway", b"floating_gateway", "hosteddns_json", b"hosteddns_json", "networkinterfaces", b"networkinterfaces", "networkinterfaces_initialized", b"networkinterfaces_initialized", "uuid", b"uuid"]) -> None: ...
+
+global___NetworkAttributesProto = NetworkAttributesProto
+
+@typing.final
+class CreateNetworkAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___NetworkAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___NetworkAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateNetworkAttributesRequest = CreateNetworkAttributesRequest
+
+@typing.final
+class GetNetworkAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetNetworkAttributesRequest = GetNetworkAttributesRequest
+
+@typing.final
+class GetNetworkAttributesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___NetworkAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___NetworkAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetNetworkAttributesReply = GetNetworkAttributesReply
+
+@typing.final
+class UpdateNetworkAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___NetworkAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___NetworkAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___UpdateNetworkAttributesRequest = UpdateNetworkAttributesRequest
+
+@typing.final
+class DeleteNetworkAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteNetworkAttributesRequest = DeleteNetworkAttributesRequest
