@@ -7,12 +7,15 @@ from typing import Any, Optional, Union
 
 from shakenfist_utilities import logs  # noreorder
 
+from uuid import UUID
+
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.schema.ipam_data import IPAMData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
@@ -33,7 +36,7 @@ class IPAM(dbo):
     # the upgrade is painful.
     object_type = ObjectType.IPAM
     initial_version = 7
-    current_version = 8
+    current_version = 9
 
     state_targets = {
         None: (dbo.STATE_CREATED),
@@ -45,6 +48,56 @@ class IPAM(dbo):
     def _upgrade_step_7_to_8(cls, static_values: dict[str, Any]) -> None:
         # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
+
+    @classmethod
+    def _upgrade_step_8_to_9(cls, static_values: dict[str, Any]) -> None:
+        # Static values migration to MariaDB is handled by the
+        # database daemon data migrations.
+        ...
+
+    @classmethod
+    def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
+        """Create an IPAM record in both etcd and MariaDB."""
+        # Write to etcd (base class behavior)
+        super()._db_create(object_uuid, metadata)
+
+        # Also write static values to MariaDB
+        _uuid = object_uuid if isinstance(object_uuid, UUID) else UUID(object_uuid)
+        _net_uuid = metadata['network_uuid']
+        if not isinstance(_net_uuid, UUID):
+            _net_uuid = UUID(_net_uuid)
+
+        data = IPAMData(
+            uuid=_uuid,
+            namespace=metadata.get('namespace'),
+            network_uuid=_net_uuid,
+            ipblock=metadata['ipblock'],
+            version=metadata['version']
+        )
+        mariadb.create_ipam(data)
+
+    @classmethod
+    def _db_get(cls, object_uuid: str) -> Optional[dict]:
+        """Get IPAM static values, trying MariaDB first."""
+        if not isinstance(object_uuid, UUID):
+            object_uuid = UUID(object_uuid)
+        data = mariadb.get_ipam(object_uuid)
+        if data:
+            result = {
+                'uuid': str(data.uuid),
+                'namespace': data.namespace,
+                'network_uuid': str(data.network_uuid),
+                'ipblock': data.ipblock,
+                'version': data.version
+            }
+            if result.get('version', 0) != cls.current_version:
+                if not cls.upgrade_supported:
+                    raise exceptions.BadObjectVersion(
+                        f'Unsupported object version - {cls.object_type}: {result}')
+            return result
+
+        # Fall back to etcd for unmigrated objects
+        return super()._db_get(object_uuid)
 
     def __init__(self, static_values: dict[str, Any]) -> None:
         self._in_memory_only: bool = static_values.get('in_memory_only', False)
@@ -349,6 +402,7 @@ class IPAM(dbo):
             return
 
         mariadb.delete_reservations_for_ipam(self.uuid)
+        mariadb.delete_ipam(self.uuid)
         super().hard_delete()
 
 

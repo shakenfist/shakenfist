@@ -21,6 +21,7 @@ from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.artifact_index import ArtifactIndexData
 from shakenfist.schema.dnsmasq import DnsMasqData
+from shakenfist.schema.ipam_data import IPAMData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
 from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
@@ -56,6 +57,7 @@ class MockEtcd():
         self.artifact_indexes = {}  # Mock MariaDB artifact indexes
         self.network_interface_objects = {}  # Mock MariaDB network interface storage
         self.network_interface_attributes = {}  # Mock MariaDB network interface attributes
+        self.ipam_objects = {}  # Mock MariaDB IPAM storage
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -508,6 +510,31 @@ class MockEtcd():
             side_effect=self._mariadb_delete_network_interface_attributes)
         self.mariadb_delete_network_interface_attributes.start()
         self.test_obj.addCleanup(self.mariadb_delete_network_interface_attributes.stop)
+
+        # MariaDB IPAM operations
+        self.mariadb_create_ipam = mock.patch(
+            'shakenfist.mariadb.create_ipam',
+            side_effect=self._mariadb_create_ipam)
+        self.mariadb_create_ipam.start()
+        self.test_obj.addCleanup(self.mariadb_create_ipam.stop)
+
+        self.mariadb_get_ipam = mock.patch(
+            'shakenfist.mariadb.get_ipam',
+            side_effect=self._mariadb_get_ipam)
+        self.mariadb_get_ipam.start()
+        self.test_obj.addCleanup(self.mariadb_get_ipam.stop)
+
+        self.mariadb_delete_ipam = mock.patch(
+            'shakenfist.mariadb.delete_ipam',
+            side_effect=self._mariadb_delete_ipam)
+        self.mariadb_delete_ipam.start()
+        self.test_obj.addCleanup(self.mariadb_delete_ipam.stop)
+
+        self.mariadb_update_ipam = mock.patch(
+            'shakenfist.mariadb.update_ipam',
+            side_effect=self._mariadb_update_ipam)
+        self.mariadb_update_ipam.start()
+        self.test_obj.addCleanup(self.mariadb_update_ipam.stop)
 
         # Setup basic DB data
         self.node_uuids = {}
@@ -1258,6 +1285,43 @@ class MockEtcd():
             return True
         self._trace(
             f'MockMariaDB.delete_network_interface_attributes({key}): not found')
+        return False
+
+    def _mariadb_create_ipam(self, data: IPAMData) -> bool:
+        """Mock implementation of mariadb.create_ipam()"""
+        key = str(data.uuid)
+        if key in self.ipam_objects:
+            self._trace(f'MockMariaDB.create_ipam({key}): already exists')
+            return False
+        self.ipam_objects[key] = data
+        self._trace(f'MockMariaDB.create_ipam({key}): created')
+        return True
+
+    def _mariadb_get_ipam(self, ipam_uuid) -> Optional[IPAMData]:
+        """Mock implementation of mariadb.get_ipam()"""
+        key = str(ipam_uuid)
+        data = self.ipam_objects.get(key)
+        self._trace(f'MockMariaDB.get_ipam({key}): {data}')
+        return data
+
+    def _mariadb_delete_ipam(self, ipam_uuid) -> bool:
+        """Mock implementation of mariadb.delete_ipam()"""
+        key = str(ipam_uuid)
+        if key in self.ipam_objects:
+            del self.ipam_objects[key]
+            self._trace(f'MockMariaDB.delete_ipam({key}): deleted')
+            return True
+        self._trace(f'MockMariaDB.delete_ipam({key}): not found')
+        return False
+
+    def _mariadb_update_ipam(self, data: IPAMData) -> bool:
+        """Mock implementation of mariadb.update_ipam()"""
+        key = str(data.uuid)
+        if key in self.ipam_objects:
+            self.ipam_objects[key] = data
+            self._trace(f'MockMariaDB.update_ipam({key}): updated')
+            return True
+        self._trace(f'MockMariaDB.update_ipam({key}): not found')
         return False
 
     #
