@@ -189,6 +189,12 @@ class AgentOperation(BaseOperation):
                 results[str(index)] = value
                 self._db_set_attribute('results', {'results': results})
 
+    def hard_delete(self):
+        _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
+        mariadb.delete_agent_operation_attributes(_uuid)
+        mariadb.delete_agent_operation(_uuid)
+        super().hard_delete()
+
     def delete(self):
         # Remove MariaDB records
         _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
