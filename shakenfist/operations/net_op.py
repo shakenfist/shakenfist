@@ -1,6 +1,7 @@
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.schema.operations import net_op as schema
+from shakenfist.exceptions import CreateVXLANInterfaceFailed
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import EnsureMeshFailed
 from shakenfist.network.network import Network
@@ -80,6 +81,11 @@ class NetOp(BaseClusterOperation):
 
         try:
             self.__getattribute__(f'_{task.name}')(n)
+
+        except CreateVXLANInterfaceFailed:
+            self.log.warning(
+                'Failed to create VXLAN interface, will retry')
+            self.state = NetOp.STATE_ERROR
 
         except EnsureMeshFailed as e:
             if n.state.value in n.ACTIVE_STATES:
