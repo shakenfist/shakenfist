@@ -22,6 +22,8 @@ from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.artifact_index import ArtifactIndexData
 from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_data import IPAMData
+from shakenfist.schema.network_attributes import NetworkAttributesData
+from shakenfist.schema.network_data import NetworkData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
 from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
@@ -57,6 +59,8 @@ class MockEtcd():
         self.artifact_indexes = {}  # Mock MariaDB artifact indexes
         self.network_interface_objects = {}  # Mock MariaDB network interface storage
         self.network_interface_attributes = {}  # Mock MariaDB network interface attributes
+        self.network_objects = {}  # Mock MariaDB network storage
+        self.network_attributes = {}  # Mock MariaDB network attributes
         self.ipam_objects = {}  # Mock MariaDB IPAM storage
         self.obj_counter = count(1)
 
@@ -510,6 +514,56 @@ class MockEtcd():
             side_effect=self._mariadb_delete_network_interface_attributes)
         self.mariadb_delete_network_interface_attributes.start()
         self.test_obj.addCleanup(self.mariadb_delete_network_interface_attributes.stop)
+
+        # MariaDB network operations
+        self.mariadb_create_network = mock.patch(
+            'shakenfist.mariadb.create_network',
+            side_effect=self._mariadb_create_network)
+        self.mariadb_create_network.start()
+        self.test_obj.addCleanup(self.mariadb_create_network.stop)
+
+        self.mariadb_get_network = mock.patch(
+            'shakenfist.mariadb.get_network',
+            side_effect=self._mariadb_get_network)
+        self.mariadb_get_network.start()
+        self.test_obj.addCleanup(self.mariadb_get_network.stop)
+
+        self.mariadb_get_all_networks = mock.patch(
+            'shakenfist.mariadb.get_all_networks',
+            side_effect=self._mariadb_get_all_networks)
+        self.mariadb_get_all_networks.start()
+        self.test_obj.addCleanup(self.mariadb_get_all_networks.stop)
+
+        self.mariadb_delete_network = mock.patch(
+            'shakenfist.mariadb.delete_network',
+            side_effect=self._mariadb_delete_network)
+        self.mariadb_delete_network.start()
+        self.test_obj.addCleanup(self.mariadb_delete_network.stop)
+
+        # MariaDB network attributes operations
+        self.mariadb_create_network_attributes = mock.patch(
+            'shakenfist.mariadb.create_network_attributes',
+            side_effect=self._mariadb_create_network_attributes)
+        self.mariadb_create_network_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_create_network_attributes.stop)
+
+        self.mariadb_get_network_attributes = mock.patch(
+            'shakenfist.mariadb.get_network_attributes',
+            side_effect=self._mariadb_get_network_attributes)
+        self.mariadb_get_network_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_get_network_attributes.stop)
+
+        self.mariadb_update_network_attributes = mock.patch(
+            'shakenfist.mariadb.update_network_attributes',
+            side_effect=self._mariadb_update_network_attributes)
+        self.mariadb_update_network_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_update_network_attributes.stop)
+
+        self.mariadb_delete_network_attributes = mock.patch(
+            'shakenfist.mariadb.delete_network_attributes',
+            side_effect=self._mariadb_delete_network_attributes)
+        self.mariadb_delete_network_attributes.start()
+        self.test_obj.addCleanup(self.mariadb_delete_network_attributes.stop)
 
         # MariaDB IPAM operations
         self.mariadb_create_ipam = mock.patch(
@@ -1285,6 +1339,90 @@ class MockEtcd():
             return True
         self._trace(
             f'MockMariaDB.delete_network_interface_attributes({key}): not found')
+        return False
+
+    def _mariadb_create_network(self, data: NetworkData) -> bool:
+        """Mock implementation of mariadb.create_network()"""
+        key = str(data.uuid)
+        if key in self.network_objects:
+            self._trace(f'MockMariaDB.create_network({key}): already exists')
+            return False
+        self.network_objects[key] = data
+        self._trace(f'MockMariaDB.create_network({key}): created')
+        return True
+
+    def _mariadb_get_network(self, net_uuid) -> Optional[NetworkData]:
+        """Mock implementation of mariadb.get_network()"""
+        key = str(net_uuid)
+        data = self.network_objects.get(key)
+        self._trace(f'MockMariaDB.get_network({key}): {data}')
+        return data
+
+    def _mariadb_get_all_networks(self) -> list[NetworkData]:
+        """Mock implementation of mariadb.get_all_networks()"""
+        self._trace('MockMariaDB.get_all_networks()')
+        return list(self.network_objects.values())
+
+    def _mariadb_delete_network(self, net_uuid) -> bool:
+        """Mock implementation of mariadb.delete_network()"""
+        key = str(net_uuid)
+        if key in self.network_objects:
+            del self.network_objects[key]
+            self._trace(f'MockMariaDB.delete_network({key}): deleted')
+            return True
+        self._trace(f'MockMariaDB.delete_network({key}): not found')
+        return False
+
+    def _mariadb_create_network_attributes(
+            self, data: NetworkAttributesData) -> bool:
+        """Mock implementation of mariadb.create_network_attributes()"""
+        key = str(data.uuid)
+        if key in self.network_attributes:
+            self._trace(
+                f'MockMariaDB.create_network_attributes({key}): '
+                f'already exists')
+            return False
+        self.network_attributes[key] = data
+        self._trace(
+            f'MockMariaDB.create_network_attributes({key}): created')
+        return True
+
+    def _mariadb_get_network_attributes(
+            self, net_uuid) -> Optional[NetworkAttributesData]:
+        """Mock implementation of mariadb.get_network_attributes()"""
+        key = str(net_uuid)
+        data = self.network_attributes.get(key)
+        self._trace(
+            f'MockMariaDB.get_network_attributes({key}): {data}')
+        return data
+
+    def _mariadb_update_network_attributes(
+            self, data: NetworkAttributesData) -> bool:
+        """Mock implementation of mariadb.update_network_attributes()"""
+        key = str(data.uuid)
+        if key in self.network_attributes:
+            self.network_attributes[key] = data
+            self._trace(
+                f'MockMariaDB.update_network_attributes({key}): '
+                f'updated')
+            return True
+        self._trace(
+            f'MockMariaDB.update_network_attributes({key}): '
+            f'not found')
+        return False
+
+    def _mariadb_delete_network_attributes(self, net_uuid) -> bool:
+        """Mock implementation of mariadb.delete_network_attributes()"""
+        key = str(net_uuid)
+        if key in self.network_attributes:
+            del self.network_attributes[key]
+            self._trace(
+                f'MockMariaDB.delete_network_attributes({key}): '
+                f'deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_network_attributes({key}): '
+            f'not found')
         return False
 
     def _mariadb_create_ipam(self, data: IPAMData) -> bool:

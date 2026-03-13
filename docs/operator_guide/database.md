@@ -46,7 +46,7 @@ Each object type has a dedicated key prefix:
 | Object Type | Key Prefix |
 |-------------|------------|
 | Instance | `/sf/object/instance/` |
-| Network | `/sf/object/network/` |
+| Network | MariaDB `networks` table (migrated from etcd) |
 | Network Interface | MariaDB `network_interfaces` table (migrated from etcd) |
 | Blob | `/sf/object/blob/` |
 | Artifact | MariaDB `artifacts` table (migrated from etcd) |
@@ -529,8 +529,9 @@ The migration is happening in phases:
 | 8 | Artifact objects | Complete - `artifacts`, `artifact_attributes`, `artifact_indexes` tables |
 | 9 | NetworkInterface objects | Complete - `network_interfaces`, `network_interface_attributes` tables |
 | 10 | IPAM objects | Complete - `ipams` table |
-| 11 | Other object types | Future |
-| 12 | Object attributes | Future |
+| 11 | Network objects | Complete - `networks`, `network_attributes` tables |
+| 12 | Other object types | Future |
+| 13 | Object attributes | Future |
 
 ### Table Architecture
 
@@ -580,6 +581,7 @@ values (immutable data set at creation time):
 | `artifacts` | Artifact | uuid, artifact_type, source_url, name, namespace, version |
 | `network_interfaces` | NetworkInterface | uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version |
 | `ipams` | IPAM | uuid, namespace, network_uuid, ipblock, version |
+| `networks` | Network | uuid, name, namespace, netblock, provide_dhcp, provide_nat, provide_dns, vxid (unique), egress_nic, mesh_nic, version |
 
 These tables use the object's UUID as the primary key, except for
 `namespaces` which uses the namespace name (a string) as its primary key.
@@ -597,6 +599,7 @@ dedicated attribute tables:
 | `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
 | `network_interface_attributes` | NetworkInterface | uuid, floating_address |
+| `network_attributes` | Network | uuid, floating_gateway, networkinterfaces (JSON list), networkinterfaces_initialized, hosteddns (JSON dict) |
 
 Node attributes consolidate many separate etcd keys (observed, roles,
 daemons, daemon:{name}, instances, versions, etc.) into a single row.

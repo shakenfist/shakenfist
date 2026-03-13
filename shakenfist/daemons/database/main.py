@@ -45,6 +45,8 @@ from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
 from shakenfist.schema.ipam_data import IPAMData
+from shakenfist.schema.network_attributes import NetworkAttributesData
+from shakenfist.schema.network_data import NetworkData
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_data import NodeData
@@ -2599,6 +2601,240 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             version=data.version
         )
 
+    # Network Operations (MariaDB)
+
+    def CreateNetwork(
+        self,
+        request: database_pb2.CreateNetworkRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create a Network record in MariaDB."""
+        try:
+            self.monitor.counters['create_network'].inc()
+            data = self._network_from_proto(request.network)
+            success = mariadb._direct_create_network(data)
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateNetwork failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetNetwork(
+        self,
+        request: database_pb2.GetNetworkRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNetworkReply:
+        """Get Network static values from MariaDB."""
+        try:
+            self.monitor.counters['get_network'].inc()
+            data = mariadb._direct_get_network(
+                UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetNetworkReply(found=False)
+            return database_pb2.GetNetworkReply(
+                found=True,
+                network=self._network_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNetwork failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNetworkReply(found=False)
+
+    def GetAllNetworks(
+        self,
+        request: database_pb2.GetAllNetworksRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllNetworksReply:
+        """Get all Network records from MariaDB."""
+        try:
+            self.monitor.counters['get_all_networks'].inc()
+            networks = mariadb._direct_get_all_networks()
+            return database_pb2.GetAllNetworksReply(
+                networks=[
+                    self._network_to_proto(d)
+                    for d in networks
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllNetworks failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetAllNetworksReply(networks=[])
+
+    def DeleteNetwork(
+        self,
+        request: database_pb2.DeleteNetworkRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a Network record from MariaDB."""
+        try:
+            self.monitor.counters['delete_network'].inc()
+            success = mariadb._direct_delete_network(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteNetwork failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def _network_from_proto(
+            self,
+            d: database_pb2.NetworkStaticData) -> NetworkData:
+        """Convert a proto NetworkStaticData to model."""
+        return NetworkData(
+            uuid=UUID(d.uuid),
+            name=d.name,
+            namespace=d.namespace or None,
+            netblock=d.netblock,
+            provide_dhcp=d.provide_dhcp,
+            provide_nat=d.provide_nat,
+            provide_dns=d.provide_dns,
+            vxid=d.vxid,
+            egress_nic=d.egress_nic or None,
+            mesh_nic=d.mesh_nic or None,
+            version=d.version
+        )
+
+    def _network_to_proto(
+            self,
+            data: NetworkData) -> database_pb2.NetworkStaticData:
+        """Convert a Pydantic NetworkData to proto."""
+        return database_pb2.NetworkStaticData(
+            uuid=str(data.uuid),
+            name=data.name,
+            namespace=data.namespace or '',
+            netblock=data.netblock,
+            provide_dhcp=data.provide_dhcp,
+            provide_nat=data.provide_nat,
+            provide_dns=data.provide_dns,
+            vxid=data.vxid,
+            egress_nic=data.egress_nic or '',
+            mesh_nic=data.mesh_nic or '',
+            version=data.version
+        )
+
+    # Network Attributes Operations (MariaDB)
+
+    def CreateNetworkAttributes(
+        self,
+        request: database_pb2.CreateNetworkAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create Network attributes in MariaDB."""
+        try:
+            self.monitor.counters[
+                'create_network_attributes'].inc()
+            data = self._network_attrs_from_proto(request.data)
+            success = mariadb._direct_create_network_attributes(
+                data)
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateNetworkAttributes failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetNetworkAttributes(
+        self,
+        request: database_pb2.GetNetworkAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNetworkAttributesReply:
+        """Get Network attributes from MariaDB."""
+        try:
+            self.monitor.counters[
+                'get_network_attributes'].inc()
+            data = mariadb._direct_get_network_attributes(
+                UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetNetworkAttributesReply(
+                    found=False)
+            return database_pb2.GetNetworkAttributesReply(
+                found=True,
+                data=self._network_attrs_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNetworkAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNetworkAttributesReply(
+                found=False)
+
+    def UpdateNetworkAttributes(
+        self,
+        request: database_pb2.UpdateNetworkAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update Network attributes in MariaDB."""
+        try:
+            self.monitor.counters[
+                'update_network_attributes'].inc()
+            data = self._network_attrs_from_proto(request.data)
+            success = mariadb._direct_update_network_attributes(
+                data)
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateNetworkAttributes failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def DeleteNetworkAttributes(
+        self,
+        request: database_pb2.DeleteNetworkAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete Network attributes from MariaDB."""
+        try:
+            self.monitor.counters[
+                'delete_network_attributes'].inc()
+            success = mariadb._direct_delete_network_attributes(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteNetworkAttributes failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def _network_attrs_from_proto(
+            self,
+            d: database_pb2.NetworkAttributesProto
+    ) -> NetworkAttributesData:
+        """Convert a proto NetworkAttributesProto to model."""
+        dns = (json.loads(d.hosteddns_json)
+               if d.hosteddns_json else {})
+        return NetworkAttributesData(
+            uuid=UUID(d.uuid),
+            floating_gateway=(
+                d.floating_gateway
+                if d.floating_gateway else None),
+            networkinterfaces=list(d.networkinterfaces),
+            networkinterfaces_initialized=(
+                d.networkinterfaces_initialized),
+            hosteddns=dns,
+        )
+
+    def _network_attrs_to_proto(
+            self,
+            data: NetworkAttributesData
+    ) -> database_pb2.NetworkAttributesProto:
+        """Convert a Pydantic NetworkAttributesData to proto."""
+        return database_pb2.NetworkAttributesProto(
+            uuid=str(data.uuid),
+            floating_gateway=data.floating_gateway or '',
+            networkinterfaces=data.networkinterfaces,
+            networkinterfaces_initialized=(
+                data.networkinterfaces_initialized),
+            hosteddns_json=json.dumps(data.hosteddns))
+
     # Artifact Operations (MariaDB)
     def CreateArtifact(
         self,
@@ -2996,6 +3232,14 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB IPAM operations
             'create_ipam', 'get_ipam',
             'delete_ipam', 'update_ipam',
+            # MariaDB network operations
+            'create_network', 'get_network',
+            'get_all_networks', 'delete_network',
+            # MariaDB network attributes operations
+            'create_network_attributes',
+            'get_network_attributes',
+            'update_network_attributes',
+            'delete_network_attributes',
             # MariaDB artifact operations
             'create_artifact', 'get_artifact', 'get_all_artifacts',
             'update_artifact', 'delete_artifact',
