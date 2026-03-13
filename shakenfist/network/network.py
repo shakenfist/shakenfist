@@ -94,10 +94,8 @@ class Network(dbowo):
         self.__provide_dns = static_values.get('provide_dns', False)
         self.__vxid = static_values.get('vxid')
 
-        self.egress_nic = static_values.get(
-            'egress_nic', config.NODE_EGRESS_NIC)
-        self.mesh_nic = static_values.get(
-            'mesh_nic', config.NODE_MESH_NIC)
+        self.egress_nic = static_values.get('egress_nic') or config.NODE_EGRESS_NIC
+        self.mesh_nic = static_values.get('mesh_nic') or config.NODE_MESH_NIC
 
         self.__ipblock = self.ipam.network_address
         self.__router = self.ipam.get_address_at_index(1)
