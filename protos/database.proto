@@ -184,6 +184,21 @@ service DatabaseService {
   rpc GetIPAM (GetIPAMRequest) returns (GetIPAMReply) {}
   rpc DeleteIPAM (DeleteIPAMRequest) returns (StatusReply) {}
   rpc UpdateIPAM (UpdateIPAMRequest) returns (StatusReply) {}
+
+  // Network Operations (MariaDB)
+  // These manage Network static values in MariaDB. Networks are virtual L2
+  // networks with optional DHCP, NAT, and DNS services connected via VXLAN.
+  rpc CreateNetwork (CreateNetworkRequest) returns (StatusReply) {}
+  rpc GetNetwork (GetNetworkRequest) returns (GetNetworkReply) {}
+  rpc GetAllNetworks (GetAllNetworksRequest) returns (GetAllNetworksReply) {}
+  rpc DeleteNetwork (DeleteNetworkRequest) returns (StatusReply) {}
+
+  // Network Attributes Operations (MariaDB)
+  // These store mutable Network attributes (floating gateway, NI list, DNS).
+  rpc CreateNetworkAttributes (CreateNetworkAttributesRequest) returns (StatusReply) {}
+  rpc GetNetworkAttributes (GetNetworkAttributesRequest) returns (GetNetworkAttributesReply) {}
+  rpc UpdateNetworkAttributes (UpdateNetworkAttributesRequest) returns (StatusReply) {}
+  rpc DeleteNetworkAttributes (DeleteNetworkAttributesRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -1222,4 +1237,79 @@ message DeleteIPAMRequest {
 
 message UpdateIPAMRequest {
   IPAMStaticData ipam = 1;
+}
+
+// Network Operations (MariaDB)
+// These manage Network static values in MariaDB. Networks are virtual L2
+// networks with optional DHCP, NAT, and DNS services connected via VXLAN.
+
+message NetworkStaticData {
+  string uuid = 1;            // Network UUID
+  string name = 2;            // Human-readable name
+  string namespace = 3;       // Owning namespace (empty = None)
+  string netblock = 4;        // CIDR notation network block
+  bool provide_dhcp = 5;      // Whether DHCP services are enabled
+  bool provide_nat = 6;       // Whether NAT services are enabled
+  bool provide_dns = 7;       // Whether DNS services are enabled
+  int32 vxid = 8;             // VXLAN ID (1-16777215, globally unique)
+  string egress_nic = 9;      // Egress NIC override (empty = None)
+  string mesh_nic = 10;       // Mesh NIC override (empty = None)
+  int32 version = 11;         // Object version number
+}
+
+message CreateNetworkRequest {
+  NetworkStaticData network = 1;
+}
+
+message GetNetworkRequest {
+  string uuid = 1;
+}
+
+message GetNetworkReply {
+  bool found = 1;
+  NetworkStaticData network = 2;
+}
+
+message GetAllNetworksRequest {
+  // No filters currently needed - returns all networks
+}
+
+message GetAllNetworksReply {
+  repeated NetworkStaticData networks = 1;
+}
+
+message DeleteNetworkRequest {
+  string uuid = 1;
+}
+
+// Network Attributes Operations (MariaDB)
+// These store mutable Network attributes, separate from NetworkStaticData.
+
+message NetworkAttributesProto {
+  string uuid = 1;                        // References networks.uuid
+  string floating_gateway = 2;            // Floating IP gateway (empty = None)
+  repeated string networkinterfaces = 3;  // List of NI UUIDs
+  bool networkinterfaces_initialized = 4; // Whether NI list has been populated
+  string hosteddns_json = 5;              // JSON-encoded {name: address} dict
+}
+
+message CreateNetworkAttributesRequest {
+  NetworkAttributesProto data = 1;
+}
+
+message GetNetworkAttributesRequest {
+  string uuid = 1;
+}
+
+message GetNetworkAttributesReply {
+  bool found = 1;
+  NetworkAttributesProto data = 2;
+}
+
+message UpdateNetworkAttributesRequest {
+  NetworkAttributesProto data = 1;
+}
+
+message DeleteNetworkAttributesRequest {
+  string uuid = 1;
 }

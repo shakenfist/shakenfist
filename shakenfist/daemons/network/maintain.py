@@ -7,8 +7,9 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
-from shakenfist.exceptions import LockException
+from shakenfist.exceptions import CreateVXLANInterfaceFailed
 from shakenfist.exceptions import DeadNetwork
+from shakenfist.exceptions import LockException
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
 from shakenfist.network import network
@@ -170,6 +171,10 @@ class Job(util_concurrency.Job):
 
                     n.ensure_mesh()
 
+                except CreateVXLANInterfaceFailed:
+                    LOG.with_fields({'network': n}).warning(
+                        'Failed to create VXLAN interface during '
+                        'network maintenance, will retry')
                 except LockException as e:
                     LOG.warning(
                         'Failed to acquire lock while maintaining networks: %s' % e)

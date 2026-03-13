@@ -663,6 +663,53 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateNetwork: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateNetworkRequest,
+        database_pb2.StatusReply,
+    ]
+    """Network Operations (MariaDB)
+    These manage Network static values in MariaDB. Networks are virtual L2
+    networks with optional DHCP, NAT, and DNS services connected via VXLAN.
+    """
+
+    GetNetwork: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkRequest,
+        database_pb2.GetNetworkReply,
+    ]
+
+    GetAllNetworks: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNetworksRequest,
+        database_pb2.GetAllNetworksReply,
+    ]
+
+    DeleteNetwork: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNetworkRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateNetworkAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateNetworkAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Network Attributes Operations (MariaDB)
+    These store mutable Network attributes (floating gateway, NI list, DNS).
+    """
+
+    GetNetworkAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkAttributesRequest,
+        database_pb2.GetNetworkAttributesReply,
+    ]
+
+    UpdateNetworkAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNetworkAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteNetworkAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNetworkAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -1305,6 +1352,53 @@ class DatabaseServiceAsyncStub:
 
     UpdateIPAM: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.UpdateIPAMRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateNetwork: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateNetworkRequest,
+        database_pb2.StatusReply,
+    ]
+    """Network Operations (MariaDB)
+    These manage Network static values in MariaDB. Networks are virtual L2
+    networks with optional DHCP, NAT, and DNS services connected via VXLAN.
+    """
+
+    GetNetwork: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkRequest,
+        database_pb2.GetNetworkReply,
+    ]
+
+    GetAllNetworks: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNetworksRequest,
+        database_pb2.GetAllNetworksReply,
+    ]
+
+    DeleteNetwork: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNetworkRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateNetworkAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateNetworkAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Network Attributes Operations (MariaDB)
+    These store mutable Network attributes (floating gateway, NI list, DNS).
+    """
+
+    GetNetworkAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNetworkAttributesRequest,
+        database_pb2.GetNetworkAttributesReply,
+    ]
+
+    UpdateNetworkAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateNetworkAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteNetworkAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNetworkAttributesRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2188,6 +2282,69 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def UpdateIPAM(
         self,
         request: database_pb2.UpdateIPAMRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateNetwork(
+        self,
+        request: database_pb2.CreateNetworkRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Network Operations (MariaDB)
+        These manage Network static values in MariaDB. Networks are virtual L2
+        networks with optional DHCP, NAT, and DNS services connected via VXLAN.
+        """
+
+    @abc.abstractmethod
+    def GetNetwork(
+        self,
+        request: database_pb2.GetNetworkRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNetworkReply, collections.abc.Awaitable[database_pb2.GetNetworkReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllNetworks(
+        self,
+        request: database_pb2.GetAllNetworksRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllNetworksReply, collections.abc.Awaitable[database_pb2.GetAllNetworksReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteNetwork(
+        self,
+        request: database_pb2.DeleteNetworkRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateNetworkAttributes(
+        self,
+        request: database_pb2.CreateNetworkAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Network Attributes Operations (MariaDB)
+        These store mutable Network attributes (floating gateway, NI list, DNS).
+        """
+
+    @abc.abstractmethod
+    def GetNetworkAttributes(
+        self,
+        request: database_pb2.GetNetworkAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNetworkAttributesReply, collections.abc.Awaitable[database_pb2.GetNetworkAttributesReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateNetworkAttributes(
+        self,
+        request: database_pb2.UpdateNetworkAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteNetworkAttributes(
+        self,
+        request: database_pb2.DeleteNetworkAttributesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

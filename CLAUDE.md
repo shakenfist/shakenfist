@@ -421,6 +421,12 @@ performance. This is required for all deployments - MariaDB must be configured.
 - **IPAMs** (`ipams` table): IPAM static values (uuid, namespace,
   network_uuid, ipblock). No mutable attributes. Dual-write with etcd
   fallback for unmigrated objects.
+- **Networks** (`networks`, `network_attributes` tables): Network static
+  values (uuid, name, namespace, netblock, provide_dhcp/nat/dns, vxid,
+  egress_nic, mesh_nic) and mutable attributes (floating_gateway,
+  networkinterfaces, networkinterfaces_initialized, hosteddns).
+  VXLAN ID uniqueness enforced by UNIQUE constraint on vxid column.
+  Dual-write with etcd fallback for unmigrated objects.
 
 ### Migrating Existing Deployments
 
