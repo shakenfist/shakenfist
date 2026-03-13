@@ -3466,7 +3466,15 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB artifact index operations
             'create_artifact_index', 'get_artifact_index',
             'get_all_artifact_indexes', 'delete_artifact_index',
-            'delete_all_artifact_indexes'
+            'delete_all_artifact_indexes',
+            # MariaDB agent operation operations
+            'create_agent_operation', 'get_agent_operation',
+            'delete_agent_operation',
+            # MariaDB agent operation attributes operations
+            'create_agent_operation_attributes',
+            'get_agent_operation_attributes',
+            'update_agent_operation_attributes',
+            'delete_agent_operation_attributes'
         ]
         for op in operations:
             self.counters[op] = Counter(
