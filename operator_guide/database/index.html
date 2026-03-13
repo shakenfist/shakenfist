@@ -4851,7 +4851,7 @@ system works.</p>
 </tr>
 <tr>
 <td>Network</td>
-<td><code>/sf/object/network/</code></td>
+<td>MariaDB <code>networks</code> table (migrated from etcd)</td>
 </tr>
 <tr>
 <td>Network Interface</td>
@@ -5388,11 +5388,16 @@ of the cluster through Galera replication.</p>
 </tr>
 <tr>
 <td>11</td>
+<td>Network objects</td>
+<td>Complete - <code>networks</code>, <code>network_attributes</code> tables</td>
+</tr>
+<tr>
+<td>12</td>
 <td>Other object types</td>
 <td>Future</td>
 </tr>
 <tr>
-<td>12</td>
+<td>13</td>
 <td>Object attributes</td>
 <td>Future</td>
 </tr>
@@ -5496,6 +5501,11 @@ values (immutable data set at creation time):</p>
 <td>IPAM</td>
 <td>uuid, namespace, network_uuid, ipblock, version</td>
 </tr>
+<tr>
+<td><code>networks</code></td>
+<td>Network</td>
+<td>uuid, name, namespace, netblock, provide_dhcp, provide_nat, provide_dns, vxid (unique), egress_nic, mesh_nic, version</td>
+</tr>
 </tbody>
 </table>
 <p>These tables use the object's UUID as the primary key, except for
@@ -5541,6 +5551,11 @@ dedicated attribute tables:</p>
 <td><code>network_interface_attributes</code></td>
 <td>NetworkInterface</td>
 <td>uuid, floating_address</td>
+</tr>
+<tr>
+<td><code>network_attributes</code></td>
+<td>Network</td>
+<td>uuid, floating_gateway, networkinterfaces (JSON list), networkinterfaces_initialized, hosteddns (JSON dict)</td>
 </tr>
 </tbody>
 </table>
