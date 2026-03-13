@@ -199,6 +199,20 @@ service DatabaseService {
   rpc GetNetworkAttributes (GetNetworkAttributesRequest) returns (GetNetworkAttributesReply) {}
   rpc UpdateNetworkAttributes (UpdateNetworkAttributesRequest) returns (StatusReply) {}
   rpc DeleteNetworkAttributes (DeleteNetworkAttributesRequest) returns (StatusReply) {}
+
+  // AgentOperation Operations (MariaDB)
+  // These manage AgentOperation static values in MariaDB. AgentOperations
+  // represent in-guest agent tasks (execute, get-file, put-blob, chmod).
+  rpc CreateAgentOperation (CreateAgentOperationRequest) returns (StatusReply) {}
+  rpc GetAgentOperation (GetAgentOperationRequest) returns (GetAgentOperationReply) {}
+  rpc DeleteAgentOperation (DeleteAgentOperationRequest) returns (StatusReply) {}
+
+  // AgentOperation Attributes Operations (MariaDB)
+  // These store mutable AgentOperation attributes (results).
+  rpc CreateAgentOperationAttributes (CreateAgentOperationAttributesRequest) returns (StatusReply) {}
+  rpc GetAgentOperationAttributes (GetAgentOperationAttributesRequest) returns (GetAgentOperationAttributesReply) {}
+  rpc UpdateAgentOperationAttributes (UpdateAgentOperationAttributesRequest) returns (StatusReply) {}
+  rpc DeleteAgentOperationAttributes (DeleteAgentOperationAttributesRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -1311,5 +1325,65 @@ message UpdateNetworkAttributesRequest {
 }
 
 message DeleteNetworkAttributesRequest {
+  string uuid = 1;
+}
+
+// AgentOperation Operations (MariaDB)
+// These manage AgentOperation static values. AgentOperations represent
+// in-guest agent tasks (execute, get-file, put-blob, chmod) queued
+// against an Instance.
+
+message AgentOperationStaticData {
+  string uuid = 1;            // AgentOperation UUID
+  string namespace = 2;       // Namespace
+  string instance_uuid = 3;   // Instance this operation targets
+  string commands_json = 4;   // JSON-encoded list of command dicts
+  int32 version = 5;          // Schema version
+}
+
+message CreateAgentOperationRequest {
+  AgentOperationStaticData data = 1;
+}
+
+message GetAgentOperationRequest {
+  string uuid = 1;
+}
+
+message GetAgentOperationReply {
+  bool found = 1;
+  AgentOperationStaticData data = 2;
+}
+
+message DeleteAgentOperationRequest {
+  string uuid = 1;
+}
+
+// AgentOperation Attributes Operations (MariaDB)
+// These store mutable AgentOperation attributes (results from executed
+// commands).
+
+message AgentOperationAttributesProto {
+  string uuid = 1;            // References agent_operations.uuid
+  string results_json = 2;    // JSON-encoded {index: result_dict}
+}
+
+message CreateAgentOperationAttributesRequest {
+  AgentOperationAttributesProto data = 1;
+}
+
+message GetAgentOperationAttributesRequest {
+  string uuid = 1;
+}
+
+message GetAgentOperationAttributesReply {
+  bool found = 1;
+  AgentOperationAttributesProto data = 2;
+}
+
+message UpdateAgentOperationAttributesRequest {
+  AgentOperationAttributesProto data = 1;
+}
+
+message DeleteAgentOperationAttributesRequest {
   string uuid = 1;
 }

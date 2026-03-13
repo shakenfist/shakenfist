@@ -17,6 +17,8 @@ from shakenfist.namespace import Namespace
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
+from shakenfist.schema.agentoperation_attributes import AgentOperationAttributesData
+from shakenfist.schema.agentoperation_data import AgentOperationData
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.artifact_index import ArtifactIndexData
@@ -62,6 +64,8 @@ class MockEtcd():
         self.network_objects = {}  # Mock MariaDB network storage
         self.network_attributes = {}  # Mock MariaDB network attributes
         self.ipam_objects = {}  # Mock MariaDB IPAM storage
+        self.agent_operation_objects = {}  # Mock MariaDB agent operation storage
+        self.agent_operation_attributes = {}  # Mock MariaDB agent operation attributes
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -589,6 +593,54 @@ class MockEtcd():
             side_effect=self._mariadb_update_ipam)
         self.mariadb_update_ipam.start()
         self.test_obj.addCleanup(self.mariadb_update_ipam.stop)
+
+        # MariaDB agent operation operations
+        self.mariadb_create_agent_operation = mock.patch(
+            'shakenfist.mariadb.create_agent_operation',
+            side_effect=self._mariadb_create_agent_operation)
+        self.mariadb_create_agent_operation.start()
+        self.test_obj.addCleanup(self.mariadb_create_agent_operation.stop)
+
+        self.mariadb_get_agent_operation = mock.patch(
+            'shakenfist.mariadb.get_agent_operation',
+            side_effect=self._mariadb_get_agent_operation)
+        self.mariadb_get_agent_operation.start()
+        self.test_obj.addCleanup(self.mariadb_get_agent_operation.stop)
+
+        self.mariadb_delete_agent_operation = mock.patch(
+            'shakenfist.mariadb.delete_agent_operation',
+            side_effect=self._mariadb_delete_agent_operation)
+        self.mariadb_delete_agent_operation.start()
+        self.test_obj.addCleanup(self.mariadb_delete_agent_operation.stop)
+
+        # MariaDB agent operation attributes operations
+        self.mariadb_create_agent_operation_attributes = mock.patch(
+            'shakenfist.mariadb.create_agent_operation_attributes',
+            side_effect=self._mariadb_create_agent_operation_attributes)
+        self.mariadb_create_agent_operation_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_create_agent_operation_attributes.stop)
+
+        self.mariadb_get_agent_operation_attributes = mock.patch(
+            'shakenfist.mariadb.get_agent_operation_attributes',
+            side_effect=self._mariadb_get_agent_operation_attributes)
+        self.mariadb_get_agent_operation_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_agent_operation_attributes.stop)
+
+        self.mariadb_update_agent_operation_attributes = mock.patch(
+            'shakenfist.mariadb.update_agent_operation_attributes',
+            side_effect=self._mariadb_update_agent_operation_attributes)
+        self.mariadb_update_agent_operation_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_update_agent_operation_attributes.stop)
+
+        self.mariadb_delete_agent_operation_attributes = mock.patch(
+            'shakenfist.mariadb.delete_agent_operation_attributes',
+            side_effect=self._mariadb_delete_agent_operation_attributes)
+        self.mariadb_delete_agent_operation_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_agent_operation_attributes.stop)
 
         # Setup basic DB data
         self.node_uuids = {}
@@ -1460,6 +1512,99 @@ class MockEtcd():
             self._trace(f'MockMariaDB.update_ipam({key}): updated')
             return True
         self._trace(f'MockMariaDB.update_ipam({key}): not found')
+        return False
+
+    def _mariadb_create_agent_operation(
+            self, data: AgentOperationData) -> bool:
+        """Mock implementation of mariadb.create_agent_operation()"""
+        key = str(data.uuid)
+        if key in self.agent_operation_objects:
+            self._trace(
+                f'MockMariaDB.create_agent_operation({key}): '
+                f'already exists')
+            return False
+        self.agent_operation_objects[key] = data
+        self._trace(
+            f'MockMariaDB.create_agent_operation({key}): created')
+        return True
+
+    def _mariadb_get_agent_operation(
+            self, aop_uuid) -> Optional[AgentOperationData]:
+        """Mock implementation of mariadb.get_agent_operation()"""
+        key = str(aop_uuid)
+        data = self.agent_operation_objects.get(key)
+        self._trace(
+            f'MockMariaDB.get_agent_operation({key}): {data}')
+        return data
+
+    def _mariadb_delete_agent_operation(self, aop_uuid) -> bool:
+        """Mock implementation of mariadb.delete_agent_operation()"""
+        key = str(aop_uuid)
+        if key in self.agent_operation_objects:
+            del self.agent_operation_objects[key]
+            self._trace(
+                f'MockMariaDB.delete_agent_operation({key}): '
+                f'deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_agent_operation({key}): '
+            f'not found')
+        return False
+
+    def _mariadb_create_agent_operation_attributes(
+            self, data: AgentOperationAttributesData) -> bool:
+        """Mock implementation of mariadb.create_agent_operation_attributes()"""
+        key = str(data.uuid)
+        if key in self.agent_operation_attributes:
+            self._trace(
+                f'MockMariaDB.create_agent_operation_attributes'
+                f'({key}): already exists')
+            return False
+        self.agent_operation_attributes[key] = data
+        self._trace(
+            f'MockMariaDB.create_agent_operation_attributes'
+            f'({key}): created')
+        return True
+
+    def _mariadb_get_agent_operation_attributes(
+            self, aop_uuid
+    ) -> Optional[AgentOperationAttributesData]:
+        """Mock implementation of mariadb.get_agent_operation_attributes()"""
+        key = str(aop_uuid)
+        data = self.agent_operation_attributes.get(key)
+        self._trace(
+            f'MockMariaDB.get_agent_operation_attributes'
+            f'({key}): {data}')
+        return data
+
+    def _mariadb_update_agent_operation_attributes(
+            self, data: AgentOperationAttributesData) -> bool:
+        """Mock implementation of mariadb.update_agent_operation_attributes()"""
+        key = str(data.uuid)
+        if key in self.agent_operation_attributes:
+            self.agent_operation_attributes[key] = data
+            self._trace(
+                f'MockMariaDB.update_agent_operation_attributes'
+                f'({key}): updated')
+            return True
+        self._trace(
+            f'MockMariaDB.update_agent_operation_attributes'
+            f'({key}): not found')
+        return False
+
+    def _mariadb_delete_agent_operation_attributes(
+            self, aop_uuid) -> bool:
+        """Mock implementation of mariadb.delete_agent_operation_attributes()"""
+        key = str(aop_uuid)
+        if key in self.agent_operation_attributes:
+            del self.agent_operation_attributes[key]
+            self._trace(
+                f'MockMariaDB.delete_agent_operation_attributes'
+                f'({key}): deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_agent_operation_attributes'
+            f'({key}): not found')
         return False
 
     #

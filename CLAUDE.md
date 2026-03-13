@@ -427,6 +427,10 @@ performance. This is required for all deployments - MariaDB must be configured.
   networkinterfaces, networkinterfaces_initialized, hosteddns).
   VXLAN ID uniqueness enforced by UNIQUE constraint on vxid column.
   Dual-write with etcd fallback for unmigrated objects.
+- **AgentOperations** (`agent_operations`, `agent_operation_attributes`
+  tables): AgentOperation static values (uuid, namespace, instance_uuid,
+  commands) and mutable attributes (results). Commands and results stored
+  as JSON. Dual-write with etcd fallback for unmigrated objects.
 
 ### Migrating Existing Deployments
 
