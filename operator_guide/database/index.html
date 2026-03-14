@@ -4858,6 +4858,10 @@ system works.</p>
 <td>MariaDB <code>network_interfaces</code> table (migrated from etcd)</td>
 </tr>
 <tr>
+<td>AgentOperation</td>
+<td>MariaDB <code>agent_operations</code> table (migrated from etcd)</td>
+</tr>
+<tr>
 <td>Blob</td>
 <td><code>/sf/object/blob/</code></td>
 </tr>
@@ -5393,11 +5397,16 @@ of the cluster through Galera replication.</p>
 </tr>
 <tr>
 <td>12</td>
+<td>AgentOperation objects</td>
+<td>Complete - <code>agent_operations</code>, <code>agent_operation_attributes</code> tables</td>
+</tr>
+<tr>
+<td>13</td>
 <td>Other object types</td>
 <td>Future</td>
 </tr>
 <tr>
-<td>13</td>
+<td>14</td>
 <td>Object attributes</td>
 <td>Future</td>
 </tr>
@@ -5506,6 +5515,11 @@ values (immutable data set at creation time):</p>
 <td>Network</td>
 <td>uuid, name, namespace, netblock, provide_dhcp, provide_nat, provide_dns, vxid (unique), egress_nic, mesh_nic, version</td>
 </tr>
+<tr>
+<td><code>agent_operations</code></td>
+<td>AgentOperation</td>
+<td>uuid, namespace, instance_uuid (indexed), commands (JSON list), version</td>
+</tr>
 </tbody>
 </table>
 <p>These tables use the object's UUID as the primary key, except for
@@ -5556,6 +5570,11 @@ dedicated attribute tables:</p>
 <td><code>network_attributes</code></td>
 <td>Network</td>
 <td>uuid, floating_gateway, networkinterfaces (JSON list), networkinterfaces_initialized, hosteddns (JSON dict)</td>
+</tr>
+<tr>
+<td><code>agent_operation_attributes</code></td>
+<td>AgentOperation</td>
+<td>uuid, results (JSON dict)</td>
 </tr>
 </tbody>
 </table>
