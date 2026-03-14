@@ -39,6 +39,8 @@ from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.agentoperation_attributes import AgentOperationAttributesData
 from shakenfist.schema.agentoperation_data import AgentOperationData
+from shakenfist.schema.instance_attributes import InstanceAttributesData
+from shakenfist.schema.instance_data import InstanceData
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.artifact_index import ArtifactIndexData
@@ -100,6 +102,8 @@ _network_attributes_table: Optional[sa.Table] = None
 _ipams_table: Optional[sa.Table] = None
 _agent_operations_table: Optional[sa.Table] = None
 _agent_operation_attributes_table: Optional[sa.Table] = None
+_instances_table: Optional[sa.Table] = None
+_instance_attributes_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -129,6 +133,8 @@ NETWORK_ATTRIBUTES_VERSION = 2
 IPAMS_VERSION = 2
 AGENT_OPERATIONS_VERSION = 2
 AGENT_OPERATION_ATTRIBUTES_VERSION = 2
+INSTANCES_VERSION = 1
+INSTANCE_ATTRIBUTES_VERSION = 1
 
 
 def _use_database_service() -> bool:
@@ -1089,6 +1095,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_ipams_schema(engine))
     results.append(_ensure_agent_operations_schema(engine))
     results.append(_ensure_agent_operation_attributes_schema(engine))
+    results.append(_ensure_instances_schema(engine))
+    results.append(_ensure_instance_attributes_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -12196,3 +12204,877 @@ def delete_agent_operation_attributes(aop_uuid: UUID) -> bool:
     if _use_database_service():
         return _grpc_delete_agent_operation_attributes(aop_uuid)
     return _direct_delete_agent_operation_attributes(aop_uuid)
+
+
+# =============================================================================
+# Instance Table Definitions
+# =============================================================================
+
+def _get_instances_table() -> sa.Table:
+    """Get or create the instances table definition.
+
+    This table stores static values for Instance objects. Instances
+    represent virtual machines with CPU, memory, disk, and network
+    configuration.
+
+    The table schema is generated from the InstanceData Pydantic
+    model. The uuid is the primary key, with an index on namespace.
+    """
+    global _instances_table
+    if _instances_table is None:
+        metadata = _get_metadata()
+        _instances_table = pydantic_to_sqlalchemy_table(
+            InstanceData,
+            'instances',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+    return _instances_table
+
+
+def _get_instance_attributes_table() -> sa.Table:
+    """Get or create the instance_attributes table definition."""
+    global _instance_attributes_table
+    if _instance_attributes_table is None:
+        metadata = _get_metadata()
+        _instance_attributes_table = pydantic_to_sqlalchemy_table(
+            InstanceAttributesData,
+            'instance_attributes',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+    return _instance_attributes_table
+
+
+def _ensure_instances_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the instances table schema is up to date."""
+    table_name = 'instances'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_instances_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(
+                        f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': INSTANCES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_instance_attributes_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the instance_attributes table schema is up to date."""
+    table_name = 'instance_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_instance_attributes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(
+                        f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': INSTANCE_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+# =============================================================================
+# Instance Direct Access Functions
+# These are used by the database daemon for Instance object storage.
+# =============================================================================
+
+def _direct_create_instance(data: InstanceData) -> bool:
+    """Create an Instance record in MariaDB.
+
+    Args:
+        data: The InstanceData to insert.
+
+    Returns:
+        True if created successfully, False if duplicate or error.
+    """
+    engine = _get_engine()
+    table = _get_instances_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                cpus=data.cpus,
+                disk_spec=json.dumps(data.disk_spec),
+                memory=data.memory,
+                name=data.name,
+                namespace=data.namespace,
+                requested_placement=json.dumps(
+                    data.requested_placement),
+                ssh_key=data.ssh_key or '',
+                user_data=data.user_data or '',
+                video=json.dumps(data.video),
+                uefi=data.uefi,
+                configdrive=data.configdrive,
+                nvram_template=data.nvram_template or '',
+                secure_boot=data.secure_boot,
+                machine_type=data.machine_type,
+                side_channels=json.dumps(data.side_channels),
+                version=data.version
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for '
+            f'instance {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_instance(
+        inst_uuid: UUID) -> Optional[InstanceData]:
+    """Get Instance static values from MariaDB.
+
+    Args:
+        inst_uuid: The UUID of the Instance.
+
+    Returns:
+        An InstanceData object, or None if not found.
+    """
+    engine = _get_engine()
+    table = _get_instances_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.uuid == inst_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            # Parse JSON fields
+            disk_spec = result.disk_spec
+            if isinstance(disk_spec, str):
+                disk_spec = json.loads(disk_spec)
+
+            requested_placement = result.requested_placement
+            if isinstance(requested_placement, str):
+                requested_placement = json.loads(
+                    requested_placement)
+            if not requested_placement:
+                requested_placement = None
+
+            video = result.video
+            if isinstance(video, str):
+                video = json.loads(video)
+
+            side_channels = result.side_channels
+            if isinstance(side_channels, str):
+                side_channels = json.loads(side_channels)
+
+            return InstanceData(
+                uuid=result.uuid,
+                cpus=result.cpus,
+                disk_spec=disk_spec if disk_spec else [],
+                memory=result.memory,
+                name=result.name,
+                namespace=result.namespace,
+                requested_placement=requested_placement,
+                ssh_key=result.ssh_key or None,
+                user_data=result.user_data or None,
+                video=video if video else {},
+                uefi=result.uefi,
+                configdrive=result.configdrive,
+                nvram_template=(
+                    result.nvram_template or None),
+                secure_boot=result.secure_boot,
+                machine_type=result.machine_type,
+                side_channels=(
+                    side_channels if side_channels else []),
+                version=result.version
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for '
+            f'instance {inst_uuid}: {e}')
+        return None
+
+
+def _direct_get_all_instances() -> list[InstanceData]:
+    """Get all Instance static values from MariaDB.
+
+    Returns:
+        A list of InstanceData objects.
+    """
+    engine = _get_engine()
+    table = _get_instances_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table)
+            rows = conn.execute(stmt).fetchall()
+
+            results = []
+            for result in rows:
+                disk_spec = result.disk_spec
+                if isinstance(disk_spec, str):
+                    disk_spec = json.loads(disk_spec)
+
+                requested_placement = (
+                    result.requested_placement)
+                if isinstance(requested_placement, str):
+                    requested_placement = json.loads(
+                        requested_placement)
+                if not requested_placement:
+                    requested_placement = None
+
+                video = result.video
+                if isinstance(video, str):
+                    video = json.loads(video)
+
+                side_channels = result.side_channels
+                if isinstance(side_channels, str):
+                    side_channels = json.loads(side_channels)
+
+                results.append(InstanceData(
+                    uuid=result.uuid,
+                    cpus=result.cpus,
+                    disk_spec=disk_spec if disk_spec else [],
+                    memory=result.memory,
+                    name=result.name,
+                    namespace=result.namespace,
+                    requested_placement=requested_placement,
+                    ssh_key=result.ssh_key or None,
+                    user_data=result.user_data or None,
+                    video=video if video else {},
+                    uefi=result.uefi,
+                    configdrive=result.configdrive,
+                    nvram_template=(
+                        result.nvram_template or None),
+                    secure_boot=result.secure_boot,
+                    machine_type=result.machine_type,
+                    side_channels=(
+                        side_channels
+                        if side_channels else []),
+                    version=result.version
+                ))
+            return results
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for all instances: {e}')
+        return []
+
+
+def _direct_delete_instance(inst_uuid: UUID) -> bool:
+    """Delete an Instance record from MariaDB.
+
+    Args:
+        inst_uuid: The UUID of the Instance to delete.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_instances_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.uuid == inst_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for '
+            f'instance {inst_uuid}: {e}')
+        return False
+
+
+def _direct_create_instance_attributes(
+        data: InstanceAttributesData) -> bool:
+    """Create an instance_attributes record in MariaDB."""
+    engine = _get_engine()
+    table = _get_instance_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                placement=json.dumps(data.placement),
+                power_state=json.dumps(data.power_state),
+                ports=json.dumps(data.ports),
+                enforced_deletes=json.dumps(
+                    data.enforced_deletes),
+                block_devices=json.dumps(
+                    data.block_devices),
+                interfaces=json.dumps(data.interfaces),
+                agent_state=json.dumps(data.agent_state),
+                agent_attributes=json.dumps(
+                    data.agent_attributes),
+                agent_operations=json.dumps(
+                    data.agent_operations),
+                kvm_pid=data.kvm_pid,
+                error_message=data.error_message or '')
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for '
+            f'instance_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_instance_attributes(
+        inst_uuid: UUID
+) -> Optional[InstanceAttributesData]:
+    """Get Instance attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_instance_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.uuid == inst_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            def _parse_json(val: Any) -> Any:
+                if isinstance(val, str):
+                    return json.loads(val) if val else None
+                return val
+
+            placement = _parse_json(result.placement)
+            power_state = _parse_json(result.power_state)
+            ports = _parse_json(result.ports)
+            enforced_deletes = _parse_json(
+                result.enforced_deletes)
+            block_devices = _parse_json(
+                result.block_devices)
+            interfaces = _parse_json(result.interfaces)
+            agent_state = _parse_json(result.agent_state)
+            agent_attributes = _parse_json(
+                result.agent_attributes)
+            agent_operations = _parse_json(
+                result.agent_operations)
+
+            return InstanceAttributesData(
+                uuid=result.uuid,
+                placement=placement,
+                power_state=power_state,
+                ports=ports,
+                enforced_deletes=enforced_deletes,
+                block_devices=block_devices,
+                interfaces=(
+                    interfaces if interfaces else []),
+                agent_state=agent_state,
+                agent_attributes=agent_attributes,
+                agent_operations=agent_operations,
+                kvm_pid=result.kvm_pid,
+                error_message=(
+                    result.error_message or None),
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for '
+            f'instance_attributes {inst_uuid}: {e}')
+        return None
+
+
+def _direct_update_instance_attributes(
+        data: InstanceAttributesData) -> bool:
+    """Update Instance attributes in MariaDB."""
+    engine = _get_engine()
+    table = _get_instance_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                placement=json.dumps(data.placement),
+                power_state=json.dumps(data.power_state),
+                ports=json.dumps(data.ports),
+                enforced_deletes=json.dumps(
+                    data.enforced_deletes),
+                block_devices=json.dumps(
+                    data.block_devices),
+                interfaces=json.dumps(data.interfaces),
+                agent_state=json.dumps(data.agent_state),
+                agent_attributes=json.dumps(
+                    data.agent_attributes),
+                agent_operations=json.dumps(
+                    data.agent_operations),
+                kvm_pid=data.kvm_pid,
+                error_message=data.error_message or '')
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB update failed for '
+            f'instance_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_delete_instance_attributes(
+        inst_uuid: UUID) -> bool:
+    """Delete Instance attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_instance_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.uuid == inst_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for '
+            f'instance_attributes {inst_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Instance gRPC Client Functions
+# These call the database microservice for Instance operations.
+# =============================================================================
+
+def _grpc_create_instance(data: InstanceData) -> bool:
+    """Create an Instance record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateInstanceRequest(
+            data=database_pb2.InstanceStaticData(
+                uuid=str(data.uuid),
+                cpus=data.cpus,
+                disk_spec_json=json.dumps(data.disk_spec),
+                memory=data.memory,
+                name=data.name,
+                namespace=data.namespace,
+                requested_placement_json=json.dumps(
+                    data.requested_placement),
+                ssh_key=data.ssh_key or '',
+                user_data=data.user_data or '',
+                video_json=json.dumps(data.video),
+                uefi=data.uefi,
+                configdrive=data.configdrive,
+                nvram_template=(
+                    data.nvram_template or ''),
+                secure_boot=data.secure_boot,
+                machine_type=data.machine_type,
+                side_channels_json=json.dumps(
+                    data.side_channels),
+                version=data.version
+            )
+        )
+        reply = stub.CreateInstance(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateInstance failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_instance(
+        inst_uuid: UUID) -> Optional[InstanceData]:
+    """Get Instance static values via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetInstanceRequest(
+            uuid=str(inst_uuid))
+        reply = stub.GetInstance(request)
+        if not reply.found:
+            return None
+        d = reply.data
+        disk_spec = (json.loads(d.disk_spec_json)
+                     if d.disk_spec_json else [])
+        requested_placement = (
+            json.loads(d.requested_placement_json)
+            if d.requested_placement_json else None)
+        if not requested_placement:
+            requested_placement = None
+        video = (json.loads(d.video_json)
+                 if d.video_json else {})
+        side_channels = (json.loads(d.side_channels_json)
+                         if d.side_channels_json else [])
+        return InstanceData(
+            uuid=d.uuid,
+            cpus=d.cpus,
+            disk_spec=disk_spec,
+            memory=d.memory,
+            name=d.name,
+            namespace=d.namespace,
+            requested_placement=requested_placement,
+            ssh_key=d.ssh_key or None,
+            user_data=d.user_data or None,
+            video=video,
+            uefi=d.uefi,
+            configdrive=d.configdrive,
+            nvram_template=d.nvram_template or None,
+            secure_boot=d.secure_boot,
+            machine_type=d.machine_type,
+            side_channels=side_channels,
+            version=d.version
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetInstance failed for '
+            f'{inst_uuid}: {e}')
+        return None
+
+
+def _grpc_get_all_instances() -> list[InstanceData]:
+    """Get all Instance static values via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllInstancesRequest()
+        reply = stub.GetAllInstances(request)
+        results = []
+        for d in reply.instances:
+            disk_spec = (json.loads(d.disk_spec_json)
+                         if d.disk_spec_json else [])
+            requested_placement = (
+                json.loads(d.requested_placement_json)
+                if d.requested_placement_json else None)
+            if not requested_placement:
+                requested_placement = None
+            video = (json.loads(d.video_json)
+                     if d.video_json else {})
+            side_channels = (
+                json.loads(d.side_channels_json)
+                if d.side_channels_json else [])
+            results.append(InstanceData(
+                uuid=d.uuid,
+                cpus=d.cpus,
+                disk_spec=disk_spec,
+                memory=d.memory,
+                name=d.name,
+                namespace=d.namespace,
+                requested_placement=requested_placement,
+                ssh_key=d.ssh_key or None,
+                user_data=d.user_data or None,
+                video=video,
+                uefi=d.uefi,
+                configdrive=d.configdrive,
+                nvram_template=d.nvram_template or None,
+                secure_boot=d.secure_boot,
+                machine_type=d.machine_type,
+                side_channels=side_channels,
+                version=d.version
+            ))
+        return results
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetAllInstances failed: {e}')
+        return []
+
+
+def _grpc_delete_instance(inst_uuid: UUID) -> bool:
+    """Delete an Instance record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteInstanceRequest(
+            uuid=str(inst_uuid))
+        reply = stub.DeleteInstance(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteInstance failed for '
+            f'{inst_uuid}: {e}')
+        return False
+
+
+def _grpc_create_instance_attributes(
+        data: InstanceAttributesData) -> bool:
+    """Create Instance attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateInstanceAttributesRequest(
+            data=database_pb2.InstanceAttributesProto(
+                uuid=str(data.uuid),
+                placement_json=json.dumps(
+                    data.placement),
+                power_state_json=json.dumps(
+                    data.power_state),
+                ports_json=json.dumps(data.ports),
+                enforced_deletes_json=json.dumps(
+                    data.enforced_deletes),
+                block_devices_json=json.dumps(
+                    data.block_devices),
+                interfaces_json=json.dumps(
+                    data.interfaces),
+                agent_state_json=json.dumps(
+                    data.agent_state),
+                agent_attributes_json=json.dumps(
+                    data.agent_attributes),
+                agent_operations_json=json.dumps(
+                    data.agent_operations),
+                kvm_pid=data.kvm_pid or 0,
+                error_message=(
+                    data.error_message or '')))
+        reply = stub.CreateInstanceAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateInstanceAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_instance_attributes(
+        inst_uuid: UUID
+) -> Optional[InstanceAttributesData]:
+    """Get Instance attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetInstanceAttributesRequest(
+            uuid=str(inst_uuid))
+        reply = stub.GetInstanceAttributes(request)
+        if not reply.found:
+            return None
+        d = reply.data
+
+        def _parse(val: str) -> Any:
+            return json.loads(val) if val else None
+
+        interfaces = _parse(d.interfaces_json)
+        return InstanceAttributesData(
+            uuid=d.uuid,
+            placement=_parse(d.placement_json),
+            power_state=_parse(d.power_state_json),
+            ports=_parse(d.ports_json),
+            enforced_deletes=_parse(
+                d.enforced_deletes_json),
+            block_devices=_parse(
+                d.block_devices_json),
+            interfaces=(
+                interfaces if interfaces else []),
+            agent_state=_parse(d.agent_state_json),
+            agent_attributes=_parse(
+                d.agent_attributes_json),
+            agent_operations=_parse(
+                d.agent_operations_json),
+            kvm_pid=d.kvm_pid or None,
+            error_message=d.error_message or None,
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetInstanceAttributes failed for '
+            f'{inst_uuid}: {e}')
+        return None
+
+
+def _grpc_update_instance_attributes(
+        data: InstanceAttributesData) -> bool:
+    """Update Instance attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateInstanceAttributesRequest(
+            data=database_pb2.InstanceAttributesProto(
+                uuid=str(data.uuid),
+                placement_json=json.dumps(
+                    data.placement),
+                power_state_json=json.dumps(
+                    data.power_state),
+                ports_json=json.dumps(data.ports),
+                enforced_deletes_json=json.dumps(
+                    data.enforced_deletes),
+                block_devices_json=json.dumps(
+                    data.block_devices),
+                interfaces_json=json.dumps(
+                    data.interfaces),
+                agent_state_json=json.dumps(
+                    data.agent_state),
+                agent_attributes_json=json.dumps(
+                    data.agent_attributes),
+                agent_operations_json=json.dumps(
+                    data.agent_operations),
+                kvm_pid=data.kvm_pid or 0,
+                error_message=(
+                    data.error_message or '')))
+        reply = stub.UpdateInstanceAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC UpdateInstanceAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_delete_instance_attributes(
+        inst_uuid: UUID) -> bool:
+    """Delete Instance attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteInstanceAttributesRequest(
+            uuid=str(inst_uuid))
+        reply = stub.DeleteInstanceAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteInstanceAttributes failed for '
+            f'{inst_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Instance Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def create_instance(data: InstanceData) -> bool:
+    """Create an Instance record.
+
+    Args:
+        data: The InstanceData to insert.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_instance(data)
+    return _direct_create_instance(data)
+
+
+def get_instance(
+        inst_uuid: UUID) -> Optional[InstanceData]:
+    """Get Instance static values.
+
+    Args:
+        inst_uuid: The UUID of the Instance.
+
+    Returns:
+        An InstanceData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_instance(inst_uuid)
+    return _direct_get_instance(inst_uuid)
+
+
+def get_all_instances() -> list[InstanceData]:
+    """Get all Instance static values.
+
+    Returns:
+        A list of InstanceData objects.
+    """
+    if _use_database_service():
+        return _grpc_get_all_instances()
+    return _direct_get_all_instances()
+
+
+def delete_instance(inst_uuid: UUID) -> bool:
+    """Delete an Instance record.
+
+    Args:
+        inst_uuid: The UUID of the Instance.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_instance(inst_uuid)
+    return _direct_delete_instance(inst_uuid)
+
+
+def create_instance_attributes(
+        data: InstanceAttributesData) -> bool:
+    """Create Instance attributes record.
+
+    Args:
+        data: The InstanceAttributesData to create.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_instance_attributes(data)
+    return _direct_create_instance_attributes(data)
+
+
+def get_instance_attributes(
+        inst_uuid: UUID
+) -> Optional[InstanceAttributesData]:
+    """Get Instance attributes.
+
+    Args:
+        inst_uuid: The UUID of the Instance.
+
+    Returns:
+        An InstanceAttributesData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_instance_attributes(inst_uuid)
+    return _direct_get_instance_attributes(inst_uuid)
+
+
+def update_instance_attributes(
+        data: InstanceAttributesData) -> bool:
+    """Update Instance attributes.
+
+    Args:
+        data: The InstanceAttributesData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_instance_attributes(data)
+    return _direct_update_instance_attributes(data)
+
+
+def delete_instance_attributes(inst_uuid: UUID) -> bool:
+    """Delete Instance attributes.
+
+    Args:
+        inst_uuid: The UUID of the Instance.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_instance_attributes(inst_uuid)
+    return _direct_delete_instance_attributes(inst_uuid)

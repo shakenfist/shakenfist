@@ -752,6 +752,54 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateInstance: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateInstanceRequest,
+        database_pb2.StatusReply,
+    ]
+    """Instance Operations (MariaDB)
+    These manage Instance static values in MariaDB. Instances represent
+    virtual machines with CPU, memory, disk, and network configuration.
+    """
+
+    GetInstance: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetInstanceRequest,
+        database_pb2.GetInstanceReply,
+    ]
+
+    GetAllInstances: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllInstancesRequest,
+        database_pb2.GetAllInstancesReply,
+    ]
+
+    DeleteInstance: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteInstanceRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateInstanceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateInstanceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Instance Attributes Operations (MariaDB)
+    These store mutable Instance attributes (placement, power state, ports,
+    block devices, interfaces, agent state, etc.).
+    """
+
+    GetInstanceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetInstanceAttributesRequest,
+        database_pb2.GetInstanceAttributesReply,
+    ]
+
+    UpdateInstanceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateInstanceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteInstanceAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteInstanceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -1483,6 +1531,54 @@ class DatabaseServiceAsyncStub:
 
     DeleteAgentOperationAttributes: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteAgentOperationAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateInstance: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateInstanceRequest,
+        database_pb2.StatusReply,
+    ]
+    """Instance Operations (MariaDB)
+    These manage Instance static values in MariaDB. Instances represent
+    virtual machines with CPU, memory, disk, and network configuration.
+    """
+
+    GetInstance: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetInstanceRequest,
+        database_pb2.GetInstanceReply,
+    ]
+
+    GetAllInstances: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllInstancesRequest,
+        database_pb2.GetAllInstancesReply,
+    ]
+
+    DeleteInstance: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteInstanceRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateInstanceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateInstanceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """Instance Attributes Operations (MariaDB)
+    These store mutable Instance attributes (placement, power state, ports,
+    block devices, interfaces, agent state, etc.).
+    """
+
+    GetInstanceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetInstanceAttributesRequest,
+        database_pb2.GetInstanceAttributesReply,
+    ]
+
+    UpdateInstanceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateInstanceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteInstanceAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteInstanceAttributesRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2485,6 +2581,70 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def DeleteAgentOperationAttributes(
         self,
         request: database_pb2.DeleteAgentOperationAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateInstance(
+        self,
+        request: database_pb2.CreateInstanceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Instance Operations (MariaDB)
+        These manage Instance static values in MariaDB. Instances represent
+        virtual machines with CPU, memory, disk, and network configuration.
+        """
+
+    @abc.abstractmethod
+    def GetInstance(
+        self,
+        request: database_pb2.GetInstanceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetInstanceReply, collections.abc.Awaitable[database_pb2.GetInstanceReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllInstances(
+        self,
+        request: database_pb2.GetAllInstancesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllInstancesReply, collections.abc.Awaitable[database_pb2.GetAllInstancesReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteInstance(
+        self,
+        request: database_pb2.DeleteInstanceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateInstanceAttributes(
+        self,
+        request: database_pb2.CreateInstanceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Instance Attributes Operations (MariaDB)
+        These store mutable Instance attributes (placement, power state, ports,
+        block devices, interfaces, agent state, etc.).
+        """
+
+    @abc.abstractmethod
+    def GetInstanceAttributes(
+        self,
+        request: database_pb2.GetInstanceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetInstanceAttributesReply, collections.abc.Awaitable[database_pb2.GetInstanceAttributesReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateInstanceAttributes(
+        self,
+        request: database_pb2.UpdateInstanceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteInstanceAttributes(
+        self,
+        request: database_pb2.DeleteInstanceAttributesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

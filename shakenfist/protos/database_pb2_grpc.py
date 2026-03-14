@@ -704,6 +704,46 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteAgentOperationAttributesRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.CreateInstance = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateInstance',
+                request_serializer=database__pb2.CreateInstanceRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetInstance = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetInstance',
+                request_serializer=database__pb2.GetInstanceRequest.SerializeToString,
+                response_deserializer=database__pb2.GetInstanceReply.FromString,
+                _registered_method=True)
+        self.GetAllInstances = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllInstances',
+                request_serializer=database__pb2.GetAllInstancesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAllInstancesReply.FromString,
+                _registered_method=True)
+        self.DeleteInstance = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteInstance',
+                request_serializer=database__pb2.DeleteInstanceRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.CreateInstanceAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateInstanceAttributes',
+                request_serializer=database__pb2.CreateInstanceAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetInstanceAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetInstanceAttributes',
+                request_serializer=database__pb2.GetInstanceAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetInstanceAttributesReply.FromString,
+                _registered_method=True)
+        self.UpdateInstanceAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateInstanceAttributes',
+                request_serializer=database__pb2.UpdateInstanceAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteInstanceAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteInstanceAttributes',
+                request_serializer=database__pb2.DeleteInstanceAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -1561,6 +1601,60 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateInstance(self, request, context):
+        """Instance Operations (MariaDB)
+        These manage Instance static values in MariaDB. Instances represent
+        virtual machines with CPU, memory, disk, and network configuration.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetInstance(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAllInstances(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteInstance(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateInstanceAttributes(self, request, context):
+        """Instance Attributes Operations (MariaDB)
+        These store mutable Instance attributes (placement, power state, ports,
+        block devices, interfaces, agent state, etc.).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetInstanceAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateInstanceAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteInstanceAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -2232,6 +2326,46 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'DeleteAgentOperationAttributes': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteAgentOperationAttributes,
                     request_deserializer=database__pb2.DeleteAgentOperationAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateInstance': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateInstance,
+                    request_deserializer=database__pb2.CreateInstanceRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetInstance': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetInstance,
+                    request_deserializer=database__pb2.GetInstanceRequest.FromString,
+                    response_serializer=database__pb2.GetInstanceReply.SerializeToString,
+            ),
+            'GetAllInstances': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllInstances,
+                    request_deserializer=database__pb2.GetAllInstancesRequest.FromString,
+                    response_serializer=database__pb2.GetAllInstancesReply.SerializeToString,
+            ),
+            'DeleteInstance': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteInstance,
+                    request_deserializer=database__pb2.DeleteInstanceRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateInstanceAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateInstanceAttributes,
+                    request_deserializer=database__pb2.CreateInstanceAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetInstanceAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetInstanceAttributes,
+                    request_deserializer=database__pb2.GetInstanceAttributesRequest.FromString,
+                    response_serializer=database__pb2.GetInstanceAttributesReply.SerializeToString,
+            ),
+            'UpdateInstanceAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateInstanceAttributes,
+                    request_deserializer=database__pb2.UpdateInstanceAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteInstanceAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteInstanceAttributes,
+                    request_deserializer=database__pb2.DeleteInstanceAttributesRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
@@ -5852,6 +5986,222 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/DeleteAgentOperationAttributes',
             database__pb2.DeleteAgentOperationAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateInstance(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateInstance',
+            database__pb2.CreateInstanceRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetInstance(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetInstance',
+            database__pb2.GetInstanceRequest.SerializeToString,
+            database__pb2.GetInstanceReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAllInstances(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllInstances',
+            database__pb2.GetAllInstancesRequest.SerializeToString,
+            database__pb2.GetAllInstancesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteInstance(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteInstance',
+            database__pb2.DeleteInstanceRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateInstanceAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateInstanceAttributes',
+            database__pb2.CreateInstanceAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetInstanceAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetInstanceAttributes',
+            database__pb2.GetInstanceAttributesRequest.SerializeToString,
+            database__pb2.GetInstanceAttributesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateInstanceAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateInstanceAttributes',
+            database__pb2.UpdateInstanceAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteInstanceAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteInstanceAttributes',
+            database__pb2.DeleteInstanceAttributesRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
