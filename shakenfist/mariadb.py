@@ -2949,6 +2949,219 @@ def _migrate_etcd_agent_operation_attributes(
     return {'migrated_count': migrated_count, 'error_count': error_count}
 
 
+def _migrate_etcd_instances(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate Instance static values from etcd to MariaDB."""
+    from shakenfist import etcd
+    from shakenfist.instance import Instance
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating Instance objects from etcd...')
+
+    for objkey, data in etcd.get_all('instance', None):
+        inst_uuid = objkey.split('/')[-1]
+
+        try:
+            # Apply upgrades to legacy data
+            version = data.get('version', Instance.initial_version)
+            while version < Instance.current_version:
+                step_name = f'_upgrade_step_{version}_to_{version + 1}'
+                step_func = getattr(Instance, step_name, None)
+                if step_func:
+                    step_func(data)
+                version += 1
+                data['version'] = version
+
+            # Normalize values for Pydantic validation
+            requested_placement = data.get('requested_placement')
+            if not isinstance(requested_placement, dict):
+                requested_placement = None
+
+            video = data.get('video', {})
+            if not isinstance(video, dict):
+                video = {'model': str(video)} if video else {}
+
+            side_channels = data.get('side_channels')
+            if not isinstance(side_channels, list):
+                side_channels = []
+
+            inst_data = InstanceData(
+                uuid=UUIDType(inst_uuid),
+                cpus=data.get('cpus', 0),
+                disk_spec=data.get('disk_spec', []),
+                memory=data.get('memory', 0),
+                name=data.get('name', ''),
+                namespace=data.get('namespace', ''),
+                requested_placement=requested_placement,
+                ssh_key=data.get('ssh_key'),
+                user_data=data.get('user_data'),
+                video=video,
+                uefi=data.get('uefi', False),
+                configdrive=data.get(
+                    'configdrive', 'openstack-disk'),
+                nvram_template=data.get('nvram_template'),
+                secure_boot=data.get('secure_boot', False),
+                machine_type=data.get('machine_type', 'pc'),
+                side_channels=side_channels,
+                version=Instance.current_version,
+            )
+            success = create_instance(inst_data)
+            if success:
+                etcd.delete('instance', None, inst_uuid)
+                migrated_count += 1
+            else:
+                etcd.delete('instance', None, inst_uuid)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(
+                f'Error migrating Instance {inst_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count} '
+                f'Instance objects processed')
+
+    LOG.info(
+        f'Instance migration: {migrated_count} migrated, '
+        f'{skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
+def _migrate_etcd_instance_attributes(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Migrate Instance attributes from etcd to MariaDB."""
+    from shakenfist import etcd
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating Instance attributes from etcd...')
+
+    # Get all instance UUIDs from the static values table
+    static_table = _get_instances_table()
+    with engine.connect() as conn:
+        stmt = sa.select(static_table.c.uuid)
+        result = conn.execute(stmt)
+        inst_uuids = [str(row.uuid) for row in result]
+
+    for inst_uuid in inst_uuids:
+        try:
+            existing = _direct_get_instance_attributes(
+                UUIDType(inst_uuid))
+            if existing:
+                skipped_count += 1
+                continue
+
+            # Read each attribute from etcd
+            placement = etcd.get(
+                'attribute/instance', inst_uuid, 'placement')
+            power_state = etcd.get(
+                'attribute/instance', inst_uuid, 'power_state')
+            ports = etcd.get(
+                'attribute/instance', inst_uuid, 'ports')
+            enforced_deletes = etcd.get(
+                'attribute/instance', inst_uuid,
+                'enforced_deletes')
+            block_devices = etcd.get(
+                'attribute/instance', inst_uuid, 'block_devices')
+            interfaces_data = etcd.get(
+                'attribute/instance', inst_uuid, 'interfaces')
+            agent_state = etcd.get(
+                'attribute/instance', inst_uuid, 'agent_state')
+            agent_attributes = etcd.get(
+                'attribute/instance', inst_uuid,
+                'agent_attributes')
+            agent_operations = etcd.get(
+                'attribute/instance', inst_uuid,
+                'agent_operations')
+            kvm_pid_data = etcd.get(
+                'attribute/instance', inst_uuid, 'kvm_pid')
+            error_data = etcd.get(
+                'attribute/instance', inst_uuid, 'error')
+
+            # Extract values from etcd format
+            interfaces = []
+            if interfaces_data and isinstance(
+                    interfaces_data, list):
+                interfaces = interfaces_data
+            elif interfaces_data and isinstance(
+                    interfaces_data, dict):
+                interfaces = interfaces_data.get(
+                    'interfaces', [])
+
+            kvm_pid = None
+            if kvm_pid_data and isinstance(
+                    kvm_pid_data, dict):
+                kvm_pid = kvm_pid_data.get('pid')
+
+            error_message = None
+            if error_data and isinstance(
+                    error_data, dict):
+                error_message = error_data.get('message')
+
+            attrs = InstanceAttributesData(
+                uuid=UUIDType(inst_uuid),
+                placement=placement if isinstance(
+                    placement, dict) else None,
+                power_state=power_state if isinstance(
+                    power_state, dict) else None,
+                ports=ports if isinstance(
+                    ports, dict) else None,
+                enforced_deletes=enforced_deletes if isinstance(
+                    enforced_deletes, dict) else None,
+                block_devices=block_devices if isinstance(
+                    block_devices, dict) else None,
+                interfaces=interfaces,
+                agent_state=agent_state if isinstance(
+                    agent_state, dict) else None,
+                agent_attributes=agent_attributes if isinstance(
+                    agent_attributes, dict) else None,
+                agent_operations=agent_operations if isinstance(
+                    agent_operations, dict) else None,
+                kvm_pid=kvm_pid,
+                error_message=error_message,
+            )
+            success = _direct_create_instance_attributes(attrs)
+
+            if success:
+                # Delete etcd attributes after successful migration
+                for attr_name in [
+                    'placement', 'power_state', 'ports',
+                    'enforced_deletes', 'block_devices',
+                    'interfaces', 'agent_state',
+                    'agent_attributes', 'agent_operations',
+                    'kvm_pid', 'error',
+                ]:
+                    etcd.delete(
+                        'attribute/instance', inst_uuid,
+                        attr_name)
+                migrated_count += 1
+            else:
+                error_count += 1
+
+        except Exception as e:
+            LOG.warning(
+                f'Failed to migrate attributes for '
+                f'Instance {inst_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count} '
+                f'Instance attributes processed')
+
+    LOG.info(
+        f'Instance attributes migration: {migrated_count} '
+        f'migrated, {skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -3020,6 +3233,12 @@ DATA_MIGRATIONS.update({
     },
     'agent_operation_attributes': {
         2: _migrate_etcd_agent_operation_attributes,
+    },
+    'instances': {
+        2: _migrate_etcd_instances,
+    },
+    'instance_attributes': {
+        2: _migrate_etcd_instance_attributes,
     },
 })
 
