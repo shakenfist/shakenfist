@@ -45,7 +45,7 @@ Each object type has a dedicated key prefix:
 
 | Object Type | Key Prefix |
 |-------------|------------|
-| Instance | `/sf/object/instance/` |
+| Instance | MariaDB `instances` table (migrated from etcd) |
 | Network | MariaDB `networks` table (migrated from etcd) |
 | Network Interface | MariaDB `network_interfaces` table (migrated from etcd) |
 | AgentOperation | MariaDB `agent_operations` table (migrated from etcd) |
@@ -532,8 +532,9 @@ The migration is happening in phases:
 | 10 | IPAM objects | Complete - `ipams` table |
 | 11 | Network objects | Complete - `networks`, `network_attributes` tables |
 | 12 | AgentOperation objects | Complete - `agent_operations`, `agent_operation_attributes` tables |
-| 13 | Other object types | Future |
-| 14 | Object attributes | Future |
+| 13 | Instance objects | Complete - `instances`, `instance_attributes` tables |
+| 14 | Other object types | Future |
+| 15 | Object attributes | Future |
 
 ### Table Architecture
 
@@ -585,6 +586,7 @@ values (immutable data set at creation time):
 | `ipams` | IPAM | uuid, namespace, network_uuid, ipblock, version |
 | `networks` | Network | uuid, name, namespace, netblock, provide_dhcp, provide_nat, provide_dns, vxid (unique), egress_nic, mesh_nic, version |
 | `agent_operations` | AgentOperation | uuid, namespace, instance_uuid (indexed), commands (JSON list), version |
+| `instances` | Instance | uuid, cpus, disk_spec (JSON), memory, name, namespace (indexed), requested_placement (JSON), ssh_key, user_data, video (JSON), uefi, configdrive, nvram_template, secure_boot, machine_type, side_channels (JSON), version |
 
 These tables use the object's UUID as the primary key, except for
 `namespaces` which uses the namespace name (a string) as its primary key.
@@ -604,6 +606,7 @@ dedicated attribute tables:
 | `network_interface_attributes` | NetworkInterface | uuid, floating_address |
 | `network_attributes` | Network | uuid, floating_gateway, networkinterfaces (JSON list), networkinterfaces_initialized, hosteddns (JSON dict) |
 | `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict) |
+| `instance_attributes` | Instance | uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), interfaces (JSON list), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message |
 
 Node attributes consolidate many separate etcd keys (observed, roles,
 daemons, daemon:{name}, instances, versions, etc.) into a single row.

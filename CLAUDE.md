@@ -431,6 +431,14 @@ performance. This is required for all deployments - MariaDB must be configured.
   tables): AgentOperation static values (uuid, namespace, instance_uuid,
   commands) and mutable attributes (results). Commands and results stored
   as JSON. Dual-write with etcd fallback for unmigrated objects.
+- **Instances** (`instances`, `instance_attributes` tables): Instance
+  static values (uuid, cpus, disk_spec, memory, name, namespace,
+  requested_placement, ssh_key, user_data, video, uefi, configdrive,
+  nvram_template, secure_boot, machine_type, side_channels) and mutable
+  attributes (placement, power_state, ports, enforced_deletes,
+  block_devices, interfaces, agent_state, agent_attributes,
+  agent_operations, kvm_pid, error_message). Complex fields stored as
+  JSON. Dual-write with etcd fallback for unmigrated objects.
 
 ### Migrating Existing Deployments
 
