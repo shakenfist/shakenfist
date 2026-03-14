@@ -710,6 +710,48 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateAgentOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateAgentOperationRequest,
+        database_pb2.StatusReply,
+    ]
+    """AgentOperation Operations (MariaDB)
+    These manage AgentOperation static values in MariaDB. AgentOperations
+    represent in-guest agent tasks (execute, get-file, put-blob, chmod).
+    """
+
+    GetAgentOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAgentOperationRequest,
+        database_pb2.GetAgentOperationReply,
+    ]
+
+    DeleteAgentOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteAgentOperationRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateAgentOperationAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateAgentOperationAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """AgentOperation Attributes Operations (MariaDB)
+    These store mutable AgentOperation attributes (results).
+    """
+
+    GetAgentOperationAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAgentOperationAttributesRequest,
+        database_pb2.GetAgentOperationAttributesReply,
+    ]
+
+    UpdateAgentOperationAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpdateAgentOperationAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteAgentOperationAttributes: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteAgentOperationAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -1399,6 +1441,48 @@ class DatabaseServiceAsyncStub:
 
     DeleteNetworkAttributes: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteNetworkAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateAgentOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateAgentOperationRequest,
+        database_pb2.StatusReply,
+    ]
+    """AgentOperation Operations (MariaDB)
+    These manage AgentOperation static values in MariaDB. AgentOperations
+    represent in-guest agent tasks (execute, get-file, put-blob, chmod).
+    """
+
+    GetAgentOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAgentOperationRequest,
+        database_pb2.GetAgentOperationReply,
+    ]
+
+    DeleteAgentOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteAgentOperationRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateAgentOperationAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateAgentOperationAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+    """AgentOperation Attributes Operations (MariaDB)
+    These store mutable AgentOperation attributes (results).
+    """
+
+    GetAgentOperationAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAgentOperationAttributesRequest,
+        database_pb2.GetAgentOperationAttributesReply,
+    ]
+
+    UpdateAgentOperationAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpdateAgentOperationAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteAgentOperationAttributes: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteAgentOperationAttributesRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2345,6 +2429,62 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def DeleteNetworkAttributes(
         self,
         request: database_pb2.DeleteNetworkAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateAgentOperation(
+        self,
+        request: database_pb2.CreateAgentOperationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """AgentOperation Operations (MariaDB)
+        These manage AgentOperation static values in MariaDB. AgentOperations
+        represent in-guest agent tasks (execute, get-file, put-blob, chmod).
+        """
+
+    @abc.abstractmethod
+    def GetAgentOperation(
+        self,
+        request: database_pb2.GetAgentOperationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAgentOperationReply, collections.abc.Awaitable[database_pb2.GetAgentOperationReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteAgentOperation(
+        self,
+        request: database_pb2.DeleteAgentOperationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateAgentOperationAttributes(
+        self,
+        request: database_pb2.CreateAgentOperationAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """AgentOperation Attributes Operations (MariaDB)
+        These store mutable AgentOperation attributes (results).
+        """
+
+    @abc.abstractmethod
+    def GetAgentOperationAttributes(
+        self,
+        request: database_pb2.GetAgentOperationAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAgentOperationAttributesReply, collections.abc.Awaitable[database_pb2.GetAgentOperationAttributesReply]]: ...
+
+    @abc.abstractmethod
+    def UpdateAgentOperationAttributes(
+        self,
+        request: database_pb2.UpdateAgentOperationAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteAgentOperationAttributes(
+        self,
+        request: database_pb2.DeleteAgentOperationAttributesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

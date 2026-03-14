@@ -4026,3 +4026,217 @@ class DeleteNetworkAttributesRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
 
 global___DeleteNetworkAttributesRequest = DeleteNetworkAttributesRequest
+
+@typing.final
+class AgentOperationStaticData(google.protobuf.message.Message):
+    """AgentOperation Operations (MariaDB)
+    These manage AgentOperation static values. AgentOperations represent
+    in-guest agent tasks (execute, get-file, put-blob, chmod) queued
+    against an Instance.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    INSTANCE_UUID_FIELD_NUMBER: builtins.int
+    COMMANDS_JSON_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """AgentOperation UUID"""
+    namespace: builtins.str
+    """Namespace"""
+    instance_uuid: builtins.str
+    """Instance this operation targets"""
+    commands_json: builtins.str
+    """JSON-encoded list of command dicts"""
+    version: builtins.int
+    """Schema version"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        namespace: builtins.str = ...,
+        instance_uuid: builtins.str = ...,
+        commands_json: builtins.str = ...,
+        version: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["commands_json", b"commands_json", "instance_uuid", b"instance_uuid", "namespace", b"namespace", "uuid", b"uuid", "version", b"version"]) -> None: ...
+
+global___AgentOperationStaticData = AgentOperationStaticData
+
+@typing.final
+class CreateAgentOperationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___AgentOperationStaticData: ...
+    def __init__(
+        self,
+        *,
+        data: global___AgentOperationStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateAgentOperationRequest = CreateAgentOperationRequest
+
+@typing.final
+class GetAgentOperationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetAgentOperationRequest = GetAgentOperationRequest
+
+@typing.final
+class GetAgentOperationReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___AgentOperationStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___AgentOperationStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetAgentOperationReply = GetAgentOperationReply
+
+@typing.final
+class DeleteAgentOperationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteAgentOperationRequest = DeleteAgentOperationRequest
+
+@typing.final
+class AgentOperationAttributesProto(google.protobuf.message.Message):
+    """AgentOperation Attributes Operations (MariaDB)
+    These store mutable AgentOperation attributes (results from executed
+    commands).
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    RESULTS_JSON_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """References agent_operations.uuid"""
+    results_json: builtins.str
+    """JSON-encoded {index: result_dict}"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        results_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["results_json", b"results_json", "uuid", b"uuid"]) -> None: ...
+
+global___AgentOperationAttributesProto = AgentOperationAttributesProto
+
+@typing.final
+class CreateAgentOperationAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___AgentOperationAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___AgentOperationAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateAgentOperationAttributesRequest = CreateAgentOperationAttributesRequest
+
+@typing.final
+class GetAgentOperationAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetAgentOperationAttributesRequest = GetAgentOperationAttributesRequest
+
+@typing.final
+class GetAgentOperationAttributesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___AgentOperationAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___AgentOperationAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetAgentOperationAttributesReply = GetAgentOperationAttributesReply
+
+@typing.final
+class UpdateAgentOperationAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___AgentOperationAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___AgentOperationAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___UpdateAgentOperationAttributesRequest = UpdateAgentOperationAttributesRequest
+
+@typing.final
+class DeleteAgentOperationAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteAgentOperationAttributesRequest = DeleteAgentOperationAttributesRequest

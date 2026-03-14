@@ -37,6 +37,8 @@ from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.schema.agentoperation_attributes import AgentOperationAttributesData
+from shakenfist.schema.agentoperation_data import AgentOperationData
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.artifact_index import ArtifactIndexData
@@ -96,6 +98,8 @@ _network_interface_attributes_table: Optional[sa.Table] = None
 _networks_table: Optional[sa.Table] = None
 _network_attributes_table: Optional[sa.Table] = None
 _ipams_table: Optional[sa.Table] = None
+_agent_operations_table: Optional[sa.Table] = None
+_agent_operation_attributes_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -123,6 +127,8 @@ NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
 NETWORKS_VERSION = 2
 NETWORK_ATTRIBUTES_VERSION = 2
 IPAMS_VERSION = 2
+AGENT_OPERATIONS_VERSION = 2
+AGENT_OPERATION_ATTRIBUTES_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -1081,6 +1087,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_networks_schema(engine))
     results.append(_ensure_network_attributes_schema(engine))
     results.append(_ensure_ipams_schema(engine))
+    results.append(_ensure_agent_operations_schema(engine))
+    results.append(_ensure_agent_operation_attributes_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -2812,6 +2820,127 @@ def _migrate_etcd_network_attributes(
     return {'migrated_count': migrated_count, 'error_count': error_count}
 
 
+def _migrate_etcd_agent_operations(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate AgentOperation static values from etcd to MariaDB."""
+    from shakenfist import etcd
+    from shakenfist.operations.agentoperation import AgentOperation
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating AgentOperation objects from etcd...')
+
+    for objkey, data in etcd.get_all('agentoperation', None):
+        aop_uuid = objkey.split('/')[-1]
+
+        try:
+            # Apply upgrades to legacy data
+            version = data.get('version', AgentOperation.initial_version)
+            while version < AgentOperation.current_version:
+                step_name = f'_upgrade_step_{version}_to_{version + 1}'
+                step_func = getattr(AgentOperation, step_name, None)
+                if step_func:
+                    step_func(data)
+                version += 1
+                data['version'] = version
+
+            aop_data = AgentOperationData(
+                uuid=UUIDType(aop_uuid),
+                namespace=data.get('namespace', ''),
+                instance_uuid=UUIDType(data['instance_uuid']),
+                commands=data.get('commands', []),
+                version=AgentOperation.current_version,
+            )
+            success = create_agent_operation(aop_data)
+            if success:
+                etcd.delete('agentoperation', None, aop_uuid)
+                migrated_count += 1
+            else:
+                etcd.delete('agentoperation', None, aop_uuid)
+                skipped_count += 1
+        except Exception as e:
+            LOG.warning(f'Error migrating AgentOperation {aop_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count} '
+                f'AgentOperation objects processed')
+
+    LOG.info(
+        f'AgentOperation migration: {migrated_count} migrated, '
+        f'{skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
+def _migrate_etcd_agent_operation_attributes(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Migrate AgentOperation attributes from etcd to MariaDB."""
+    from shakenfist import etcd
+    from uuid import UUID as UUIDType
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating AgentOperation attributes from etcd...')
+
+    # Get all agent operation UUIDs from the static values table
+    static_table = _get_agent_operations_table()
+    with engine.connect() as conn:
+        stmt = sa.select(static_table.c.uuid)
+        result = conn.execute(stmt)
+        aop_uuids = [str(row.uuid) for row in result]
+
+    for aop_uuid in aop_uuids:
+        try:
+            existing = _direct_get_agent_operation_attributes(
+                UUIDType(aop_uuid))
+            if existing:
+                skipped_count += 1
+                continue
+
+            # Read results attribute from etcd
+            results_data = etcd.get(
+                'attribute/agentoperation', aop_uuid, 'results')
+
+            results: dict[str, Any] = {}
+            if results_data:
+                results = results_data.get('results', {})
+
+            attrs = AgentOperationAttributesData(
+                uuid=UUIDType(aop_uuid),
+                results=results,
+            )
+            success = _direct_create_agent_operation_attributes(attrs)
+
+            if success:
+                # Delete etcd attributes after successful migration
+                etcd.delete(
+                    'attribute/agentoperation', aop_uuid, 'results')
+                migrated_count += 1
+            else:
+                error_count += 1
+
+        except Exception as e:
+            LOG.warning(
+                f'Failed to migrate attributes for '
+                f'AgentOperation {aop_uuid}: {e}')
+            error_count += 1
+
+        if (migrated_count + skipped_count) % 100 == 0:
+            LOG.info(
+                f'  ... {migrated_count + skipped_count} '
+                f'AgentOperation attributes processed')
+
+    LOG.info(
+        f'AgentOperation attributes migration: {migrated_count} '
+        f'migrated, {skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -2877,6 +3006,12 @@ DATA_MIGRATIONS.update({
     },
     'network_attributes': {
         2: _migrate_etcd_network_attributes,
+    },
+    'agent_operations': {
+        2: _migrate_etcd_agent_operations,
+    },
+    'agent_operation_attributes': {
+        2: _migrate_etcd_agent_operation_attributes,
     },
 })
 
@@ -11498,3 +11633,566 @@ def delete_network_attributes(net_uuid: UUID) -> bool:
     if _use_database_service():
         return _grpc_delete_network_attributes(net_uuid)
     return _direct_delete_network_attributes(net_uuid)
+
+
+# =============================================================================
+# AgentOperation Table Definitions
+# =============================================================================
+
+def _get_agent_operations_table() -> sa.Table:
+    """Get or create the agent_operations table definition.
+
+    This table stores static values for AgentOperation objects.
+    AgentOperations represent in-guest agent tasks queued against
+    an Instance.
+
+    The table schema is generated from the AgentOperationData
+    Pydantic model. The uuid is the primary key, with an index on
+    instance_uuid.
+    """
+    global _agent_operations_table
+    if _agent_operations_table is None:
+        metadata = _get_metadata()
+        _agent_operations_table = pydantic_to_sqlalchemy_table(
+            AgentOperationData,
+            'agent_operations',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+    return _agent_operations_table
+
+
+def _get_agent_operation_attributes_table() -> sa.Table:
+    """Get or create the agent_operation_attributes table definition."""
+    global _agent_operation_attributes_table
+    if _agent_operation_attributes_table is None:
+        metadata = _get_metadata()
+        _agent_operation_attributes_table = pydantic_to_sqlalchemy_table(
+            AgentOperationAttributesData,
+            'agent_operation_attributes',
+            metadata,
+            primary_key_fields=['uuid'],
+            include_id_column=False
+        )
+    return _agent_operation_attributes_table
+
+
+def _ensure_agent_operations_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the agent_operations table schema is up to date."""
+    table_name = 'agent_operations'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_agent_operations_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(
+                        f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': AGENT_OPERATIONS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_agent_operation_attributes_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the agent_operation_attributes table schema is up to date."""
+    table_name = 'agent_operation_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_agent_operation_attributes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(
+                        f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': AGENT_OPERATION_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+# =============================================================================
+# AgentOperation Direct Access Functions
+# These are used by the database daemon for AgentOperation object storage.
+# =============================================================================
+
+def _direct_create_agent_operation(data: AgentOperationData) -> bool:
+    """Create an AgentOperation record in MariaDB.
+
+    Args:
+        data: The AgentOperationData to insert.
+
+    Returns:
+        True if created successfully, False if duplicate or error.
+    """
+    engine = _get_engine()
+    table = _get_agent_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                namespace=data.namespace,
+                instance_uuid=data.instance_uuid,
+                commands=json.dumps(data.commands),
+                version=data.version
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for '
+            f'agent_operation {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_agent_operation(
+        aop_uuid: UUID) -> Optional[AgentOperationData]:
+    """Get AgentOperation static values from MariaDB.
+
+    Args:
+        aop_uuid: The UUID of the AgentOperation.
+
+    Returns:
+        An AgentOperationData object, or None if not found.
+    """
+    engine = _get_engine()
+    table = _get_agent_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.uuid == aop_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            # Parse JSON commands field
+            commands = result.commands
+            if isinstance(commands, str):
+                commands = json.loads(commands)
+
+            return AgentOperationData(
+                uuid=result.uuid,
+                namespace=result.namespace,
+                instance_uuid=result.instance_uuid,
+                commands=commands if commands else [],
+                version=result.version
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for '
+            f'agent_operation {aop_uuid}: {e}')
+        return None
+
+
+def _direct_delete_agent_operation(aop_uuid: UUID) -> bool:
+    """Delete an AgentOperation record from MariaDB.
+
+    Args:
+        aop_uuid: The UUID of the AgentOperation to delete.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_agent_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.uuid == aop_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for '
+            f'agent_operation {aop_uuid}: {e}')
+        return False
+
+
+def _direct_create_agent_operation_attributes(
+        data: AgentOperationAttributesData) -> bool:
+    """Create an agent_operation_attributes record in MariaDB."""
+    engine = _get_engine()
+    table = _get_agent_operation_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                results=json.dumps(data.results))
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for '
+            f'agent_operation_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_agent_operation_attributes(
+        aop_uuid: UUID
+) -> Optional[AgentOperationAttributesData]:
+    """Get AgentOperation attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_agent_operation_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.uuid == aop_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            # Parse JSON results field
+            results = result.results
+            if isinstance(results, str):
+                results = json.loads(results)
+
+            return AgentOperationAttributesData(
+                uuid=result.uuid,
+                results=results if results else {},
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for '
+            f'agent_operation_attributes {aop_uuid}: {e}')
+        return None
+
+
+def _direct_update_agent_operation_attributes(
+        data: AgentOperationAttributesData) -> bool:
+    """Update AgentOperation attributes in MariaDB."""
+    engine = _get_engine()
+    table = _get_agent_operation_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                results=json.dumps(data.results))
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB update failed for '
+            f'agent_operation_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_delete_agent_operation_attributes(
+        aop_uuid: UUID) -> bool:
+    """Delete AgentOperation attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_agent_operation_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.uuid == aop_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for '
+            f'agent_operation_attributes {aop_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# AgentOperation gRPC Client Functions
+# These call the database microservice for AgentOperation operations.
+# =============================================================================
+
+def _grpc_create_agent_operation(data: AgentOperationData) -> bool:
+    """Create an AgentOperation record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateAgentOperationRequest(
+            data=database_pb2.AgentOperationStaticData(
+                uuid=str(data.uuid),
+                namespace=data.namespace or '',
+                instance_uuid=str(data.instance_uuid),
+                commands_json=json.dumps(data.commands),
+                version=data.version
+            )
+        )
+        reply = stub.CreateAgentOperation(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateAgentOperation failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_agent_operation(
+        aop_uuid: UUID) -> Optional[AgentOperationData]:
+    """Get AgentOperation static values via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAgentOperationRequest(
+            uuid=str(aop_uuid))
+        reply = stub.GetAgentOperation(request)
+        if not reply.found:
+            return None
+        d = reply.data
+        commands = json.loads(d.commands_json) if d.commands_json else []
+        return AgentOperationData(
+            uuid=d.uuid,
+            namespace=d.namespace or '',
+            instance_uuid=d.instance_uuid,
+            commands=commands,
+            version=d.version
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetAgentOperation failed for '
+            f'{aop_uuid}: {e}')
+        return None
+
+
+def _grpc_delete_agent_operation(aop_uuid: UUID) -> bool:
+    """Delete an AgentOperation record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteAgentOperationRequest(
+            uuid=str(aop_uuid))
+        reply = stub.DeleteAgentOperation(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteAgentOperation failed for '
+            f'{aop_uuid}: {e}')
+        return False
+
+
+def _grpc_create_agent_operation_attributes(
+        data: AgentOperationAttributesData) -> bool:
+    """Create AgentOperation attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateAgentOperationAttributesRequest(
+            data=database_pb2.AgentOperationAttributesProto(
+                uuid=str(data.uuid),
+                results_json=json.dumps(data.results)))
+        reply = stub.CreateAgentOperationAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateAgentOperationAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_agent_operation_attributes(
+        aop_uuid: UUID
+) -> Optional[AgentOperationAttributesData]:
+    """Get AgentOperation attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAgentOperationAttributesRequest(
+            uuid=str(aop_uuid))
+        reply = stub.GetAgentOperationAttributes(request)
+        if not reply.found:
+            return None
+        d = reply.data
+        results = json.loads(d.results_json) if d.results_json else {}
+        return AgentOperationAttributesData(
+            uuid=d.uuid,
+            results=results,
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetAgentOperationAttributes failed for '
+            f'{aop_uuid}: {e}')
+        return None
+
+
+def _grpc_update_agent_operation_attributes(
+        data: AgentOperationAttributesData) -> bool:
+    """Update AgentOperation attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateAgentOperationAttributesRequest(
+            data=database_pb2.AgentOperationAttributesProto(
+                uuid=str(data.uuid),
+                results_json=json.dumps(data.results)))
+        reply = stub.UpdateAgentOperationAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC UpdateAgentOperationAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_delete_agent_operation_attributes(
+        aop_uuid: UUID) -> bool:
+    """Delete AgentOperation attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteAgentOperationAttributesRequest(
+            uuid=str(aop_uuid))
+        reply = stub.DeleteAgentOperationAttributes(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteAgentOperationAttributes failed for '
+            f'{aop_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# AgentOperation Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def create_agent_operation(data: AgentOperationData) -> bool:
+    """Create an AgentOperation record.
+
+    Args:
+        data: The AgentOperationData to insert.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_agent_operation(data)
+    return _direct_create_agent_operation(data)
+
+
+def get_agent_operation(
+        aop_uuid: UUID) -> Optional[AgentOperationData]:
+    """Get AgentOperation static values.
+
+    Args:
+        aop_uuid: The UUID of the AgentOperation.
+
+    Returns:
+        An AgentOperationData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_agent_operation(aop_uuid)
+    return _direct_get_agent_operation(aop_uuid)
+
+
+def delete_agent_operation(aop_uuid: UUID) -> bool:
+    """Delete an AgentOperation record.
+
+    Args:
+        aop_uuid: The UUID of the AgentOperation.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_agent_operation(aop_uuid)
+    return _direct_delete_agent_operation(aop_uuid)
+
+
+def create_agent_operation_attributes(
+        data: AgentOperationAttributesData) -> bool:
+    """Create AgentOperation attributes record.
+
+    Args:
+        data: The AgentOperationAttributesData to create.
+
+    Returns:
+        True if created, False if already exists or error.
+    """
+    if _use_database_service():
+        return _grpc_create_agent_operation_attributes(data)
+    return _direct_create_agent_operation_attributes(data)
+
+
+def get_agent_operation_attributes(
+        aop_uuid: UUID
+) -> Optional[AgentOperationAttributesData]:
+    """Get AgentOperation attributes.
+
+    Args:
+        aop_uuid: The UUID of the AgentOperation.
+
+    Returns:
+        An AgentOperationAttributesData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_agent_operation_attributes(aop_uuid)
+    return _direct_get_agent_operation_attributes(aop_uuid)
+
+
+def update_agent_operation_attributes(
+        data: AgentOperationAttributesData) -> bool:
+    """Update AgentOperation attributes.
+
+    Args:
+        data: The AgentOperationAttributesData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_agent_operation_attributes(data)
+    return _direct_update_agent_operation_attributes(data)
+
+
+def delete_agent_operation_attributes(aop_uuid: UUID) -> bool:
+    """Delete AgentOperation attributes.
+
+    Args:
+        aop_uuid: The UUID of the AgentOperation.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_agent_operation_attributes(aop_uuid)
+    return _direct_delete_agent_operation_attributes(aop_uuid)

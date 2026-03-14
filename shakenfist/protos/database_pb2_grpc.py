@@ -669,6 +669,41 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteNetworkAttributesRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.CreateAgentOperation = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateAgentOperation',
+                request_serializer=database__pb2.CreateAgentOperationRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetAgentOperation = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAgentOperation',
+                request_serializer=database__pb2.GetAgentOperationRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAgentOperationReply.FromString,
+                _registered_method=True)
+        self.DeleteAgentOperation = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteAgentOperation',
+                request_serializer=database__pb2.DeleteAgentOperationRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.CreateAgentOperationAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateAgentOperationAttributes',
+                request_serializer=database__pb2.CreateAgentOperationAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetAgentOperationAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAgentOperationAttributes',
+                request_serializer=database__pb2.GetAgentOperationAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAgentOperationAttributesReply.FromString,
+                _registered_method=True)
+        self.UpdateAgentOperationAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpdateAgentOperationAttributes',
+                request_serializer=database__pb2.UpdateAgentOperationAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteAgentOperationAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteAgentOperationAttributes',
+                request_serializer=database__pb2.DeleteAgentOperationAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -1479,6 +1514,53 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateAgentOperation(self, request, context):
+        """AgentOperation Operations (MariaDB)
+        These manage AgentOperation static values in MariaDB. AgentOperations
+        represent in-guest agent tasks (execute, get-file, put-blob, chmod).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAgentOperation(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteAgentOperation(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateAgentOperationAttributes(self, request, context):
+        """AgentOperation Attributes Operations (MariaDB)
+        These store mutable AgentOperation attributes (results).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAgentOperationAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateAgentOperationAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteAgentOperationAttributes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -2115,6 +2197,41 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'DeleteNetworkAttributes': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteNetworkAttributes,
                     request_deserializer=database__pb2.DeleteNetworkAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateAgentOperation': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateAgentOperation,
+                    request_deserializer=database__pb2.CreateAgentOperationRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetAgentOperation': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAgentOperation,
+                    request_deserializer=database__pb2.GetAgentOperationRequest.FromString,
+                    response_serializer=database__pb2.GetAgentOperationReply.SerializeToString,
+            ),
+            'DeleteAgentOperation': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteAgentOperation,
+                    request_deserializer=database__pb2.DeleteAgentOperationRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateAgentOperationAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateAgentOperationAttributes,
+                    request_deserializer=database__pb2.CreateAgentOperationAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetAgentOperationAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAgentOperationAttributes,
+                    request_deserializer=database__pb2.GetAgentOperationAttributesRequest.FromString,
+                    response_serializer=database__pb2.GetAgentOperationAttributesReply.SerializeToString,
+            ),
+            'UpdateAgentOperationAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateAgentOperationAttributes,
+                    request_deserializer=database__pb2.UpdateAgentOperationAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteAgentOperationAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteAgentOperationAttributes,
+                    request_deserializer=database__pb2.DeleteAgentOperationAttributesRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
@@ -5546,6 +5663,195 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/DeleteNetworkAttributes',
             database__pb2.DeleteNetworkAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateAgentOperation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateAgentOperation',
+            database__pb2.CreateAgentOperationRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAgentOperation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAgentOperation',
+            database__pb2.GetAgentOperationRequest.SerializeToString,
+            database__pb2.GetAgentOperationReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteAgentOperation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteAgentOperation',
+            database__pb2.DeleteAgentOperationRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateAgentOperationAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateAgentOperationAttributes',
+            database__pb2.CreateAgentOperationAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAgentOperationAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAgentOperationAttributes',
+            database__pb2.GetAgentOperationAttributesRequest.SerializeToString,
+            database__pb2.GetAgentOperationAttributesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateAgentOperationAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpdateAgentOperationAttributes',
+            database__pb2.UpdateAgentOperationAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteAgentOperationAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteAgentOperationAttributes',
+            database__pb2.DeleteAgentOperationAttributesRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,

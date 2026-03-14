@@ -38,6 +38,8 @@ from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
+from shakenfist.schema.agentoperation_attributes import AgentOperationAttributesData
+from shakenfist.schema.agentoperation_data import AgentOperationData
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.blob_attributes import BlobAttributesData
@@ -2835,6 +2837,221 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 data.networkinterfaces_initialized),
             hosteddns_json=json.dumps(data.hosteddns))
 
+    # AgentOperation Operations (MariaDB)
+
+    def CreateAgentOperation(
+        self,
+        request: database_pb2.CreateAgentOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create an AgentOperation record in MariaDB."""
+        try:
+            self.monitor.counters[
+                'create_agent_operation'].inc()
+            data = self._agentop_from_proto(request.data)
+            success = mariadb._direct_create_agent_operation(
+                data)
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateAgentOperation failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetAgentOperation(
+        self,
+        request: database_pb2.GetAgentOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAgentOperationReply:
+        """Get AgentOperation static values from MariaDB."""
+        try:
+            self.monitor.counters[
+                'get_agent_operation'].inc()
+            data = mariadb._direct_get_agent_operation(
+                UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetAgentOperationReply(
+                    found=False)
+            return database_pb2.GetAgentOperationReply(
+                found=True,
+                data=self._agentop_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAgentOperation failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetAgentOperationReply(
+                found=False)
+
+    def DeleteAgentOperation(
+        self,
+        request: database_pb2.DeleteAgentOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete an AgentOperation record from MariaDB."""
+        try:
+            self.monitor.counters[
+                'delete_agent_operation'].inc()
+            success = mariadb._direct_delete_agent_operation(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteAgentOperation failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def _agentop_from_proto(
+            self,
+            d: database_pb2.AgentOperationStaticData
+    ) -> AgentOperationData:
+        """Convert a proto AgentOperationStaticData to model."""
+        commands = (json.loads(d.commands_json)
+                    if d.commands_json else [])
+        return AgentOperationData(
+            uuid=UUID(d.uuid),
+            namespace=d.namespace or '',
+            instance_uuid=UUID(d.instance_uuid),
+            commands=commands,
+            version=d.version
+        )
+
+    def _agentop_to_proto(
+            self,
+            data: AgentOperationData
+    ) -> database_pb2.AgentOperationStaticData:
+        """Convert a Pydantic AgentOperationData to proto."""
+        return database_pb2.AgentOperationStaticData(
+            uuid=str(data.uuid),
+            namespace=data.namespace or '',
+            instance_uuid=str(data.instance_uuid),
+            commands_json=json.dumps(data.commands),
+            version=data.version
+        )
+
+    # AgentOperation Attributes Operations (MariaDB)
+
+    def CreateAgentOperationAttributes(
+        self,
+        request: database_pb2.CreateAgentOperationAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create AgentOperation attributes in MariaDB."""
+        try:
+            self.monitor.counters[
+                'create_agent_operation_attributes'].inc()
+            data = self._agentop_attrs_from_proto(request.data)
+            success = (
+                mariadb._direct_create_agent_operation_attributes(
+                    data))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateAgentOperationAttributes failed',
+                e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetAgentOperationAttributes(
+        self,
+        request: database_pb2.GetAgentOperationAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAgentOperationAttributesReply:
+        """Get AgentOperation attributes from MariaDB."""
+        try:
+            self.monitor.counters[
+                'get_agent_operation_attributes'].inc()
+            data = (
+                mariadb._direct_get_agent_operation_attributes(
+                    UUID(request.uuid)))
+            if data is None:
+                return (
+                    database_pb2
+                    .GetAgentOperationAttributesReply(
+                        found=False))
+            return (
+                database_pb2
+                .GetAgentOperationAttributesReply(
+                    found=True,
+                    data=self._agentop_attrs_to_proto(data)))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAgentOperationAttributes failed',
+                e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return (
+                database_pb2
+                .GetAgentOperationAttributesReply(found=False))
+
+    def UpdateAgentOperationAttributes(
+        self,
+        request: database_pb2.UpdateAgentOperationAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update AgentOperation attributes in MariaDB."""
+        try:
+            self.monitor.counters[
+                'update_agent_operation_attributes'].inc()
+            data = self._agentop_attrs_from_proto(request.data)
+            success = (
+                mariadb._direct_update_agent_operation_attributes(
+                    data))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateAgentOperationAttributes failed',
+                e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def DeleteAgentOperationAttributes(
+        self,
+        request: database_pb2.DeleteAgentOperationAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete AgentOperation attributes from MariaDB."""
+        try:
+            self.monitor.counters[
+                'delete_agent_operation_attributes'].inc()
+            success = (
+                mariadb
+                ._direct_delete_agent_operation_attributes(
+                    UUID(request.uuid)))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteAgentOperationAttributes failed',
+                e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def _agentop_attrs_from_proto(
+            self,
+            d: database_pb2.AgentOperationAttributesProto
+    ) -> AgentOperationAttributesData:
+        """Convert a proto AgentOperationAttributesProto to model."""
+        results = (json.loads(d.results_json)
+                   if d.results_json else {})
+        return AgentOperationAttributesData(
+            uuid=UUID(d.uuid),
+            results=results,
+        )
+
+    def _agentop_attrs_to_proto(
+            self,
+            data: AgentOperationAttributesData
+    ) -> database_pb2.AgentOperationAttributesProto:
+        """Convert AgentOperationAttributesData to proto."""
+        return database_pb2.AgentOperationAttributesProto(
+            uuid=str(data.uuid),
+            results_json=json.dumps(data.results))
+
     # Artifact Operations (MariaDB)
     def CreateArtifact(
         self,
@@ -3249,7 +3466,15 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB artifact index operations
             'create_artifact_index', 'get_artifact_index',
             'get_all_artifact_indexes', 'delete_artifact_index',
-            'delete_all_artifact_indexes'
+            'delete_all_artifact_indexes',
+            # MariaDB agent operation operations
+            'create_agent_operation', 'get_agent_operation',
+            'delete_agent_operation',
+            # MariaDB agent operation attributes operations
+            'create_agent_operation_attributes',
+            'get_agent_operation_attributes',
+            'update_agent_operation_attributes',
+            'delete_agent_operation_attributes'
         ]
         for op in operations:
             self.counters[op] = Counter(
