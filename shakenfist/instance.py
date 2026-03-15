@@ -2059,8 +2059,10 @@ class Instance(dbowo):
             if 'all' not in db_data:
                 db_data['all'] = []
 
-            db_data['queue'].append(agentop_uuid)
-            db_data['all'].append(agentop_uuid)
+            # Ensure UUID is stored as a string for JSON serialization
+            agentop_uuid_str = str(agentop_uuid)
+            db_data['queue'].append(agentop_uuid_str)
+            db_data['all'].append(agentop_uuid_str)
             self._db_set_attribute('agent_operations', db_data)
 
     def get_screenshot(self):

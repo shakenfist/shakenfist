@@ -75,6 +75,21 @@ LOG, _ = logs.setup(__name__)
 # This uses a name that cannot conflict with real hostnames.
 MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
 
+
+class _UUIDEncoder(json.JSONEncoder):
+    """JSON encoder that converts UUID objects to strings."""
+
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, UUID):
+            return str(obj)
+        return super().default(obj)
+
+
+def _json_dumps(data: Any) -> str:
+    """JSON-serialize data, converting UUID objects to strings."""
+    return json.dumps(data, cls=_UUIDEncoder)
+
+
 # Thread-local storage for database connections and gRPC channels
 _local = threading.local()
 
@@ -12755,18 +12770,18 @@ def _direct_create_instance_attributes(
         with engine.connect() as conn:
             stmt = sa.insert(table).values(
                 uuid=data.uuid,
-                placement=json.dumps(data.placement),
-                power_state=json.dumps(data.power_state),
-                ports=json.dumps(data.ports),
-                enforced_deletes=json.dumps(
+                placement=_json_dumps(data.placement),
+                power_state=_json_dumps(data.power_state),
+                ports=_json_dumps(data.ports),
+                enforced_deletes=_json_dumps(
                     data.enforced_deletes),
-                block_devices=json.dumps(
+                block_devices=_json_dumps(
                     data.block_devices),
-                interfaces=json.dumps(data.interfaces),
-                agent_state=json.dumps(data.agent_state),
-                agent_attributes=json.dumps(
+                interfaces=_json_dumps(data.interfaces),
+                agent_state=_json_dumps(data.agent_state),
+                agent_attributes=_json_dumps(
                     data.agent_attributes),
-                agent_operations=json.dumps(
+                agent_operations=_json_dumps(
                     data.agent_operations),
                 kvm_pid=data.kvm_pid,
                 error_message=data.error_message or '')
@@ -12851,18 +12866,18 @@ def _direct_update_instance_attributes(
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                placement=json.dumps(data.placement),
-                power_state=json.dumps(data.power_state),
-                ports=json.dumps(data.ports),
-                enforced_deletes=json.dumps(
+                placement=_json_dumps(data.placement),
+                power_state=_json_dumps(data.power_state),
+                ports=_json_dumps(data.ports),
+                enforced_deletes=_json_dumps(
                     data.enforced_deletes),
-                block_devices=json.dumps(
+                block_devices=_json_dumps(
                     data.block_devices),
-                interfaces=json.dumps(data.interfaces),
-                agent_state=json.dumps(data.agent_state),
-                agent_attributes=json.dumps(
+                interfaces=_json_dumps(data.interfaces),
+                agent_state=_json_dumps(data.agent_state),
+                agent_attributes=_json_dumps(
                     data.agent_attributes),
-                agent_operations=json.dumps(
+                agent_operations=_json_dumps(
                     data.agent_operations),
                 kvm_pid=data.kvm_pid,
                 error_message=data.error_message or '')
@@ -13055,22 +13070,22 @@ def _grpc_create_instance_attributes(
         request = database_pb2.CreateInstanceAttributesRequest(
             data=database_pb2.InstanceAttributesProto(
                 uuid=str(data.uuid),
-                placement_json=json.dumps(
+                placement_json=_json_dumps(
                     data.placement),
-                power_state_json=json.dumps(
+                power_state_json=_json_dumps(
                     data.power_state),
-                ports_json=json.dumps(data.ports),
-                enforced_deletes_json=json.dumps(
+                ports_json=_json_dumps(data.ports),
+                enforced_deletes_json=_json_dumps(
                     data.enforced_deletes),
-                block_devices_json=json.dumps(
+                block_devices_json=_json_dumps(
                     data.block_devices),
-                interfaces_json=json.dumps(
+                interfaces_json=_json_dumps(
                     data.interfaces),
-                agent_state_json=json.dumps(
+                agent_state_json=_json_dumps(
                     data.agent_state),
-                agent_attributes_json=json.dumps(
+                agent_attributes_json=_json_dumps(
                     data.agent_attributes),
-                agent_operations_json=json.dumps(
+                agent_operations_json=_json_dumps(
                     data.agent_operations),
                 kvm_pid=data.kvm_pid or 0,
                 error_message=(
@@ -13135,22 +13150,22 @@ def _grpc_update_instance_attributes(
         request = database_pb2.UpdateInstanceAttributesRequest(
             data=database_pb2.InstanceAttributesProto(
                 uuid=str(data.uuid),
-                placement_json=json.dumps(
+                placement_json=_json_dumps(
                     data.placement),
-                power_state_json=json.dumps(
+                power_state_json=_json_dumps(
                     data.power_state),
-                ports_json=json.dumps(data.ports),
-                enforced_deletes_json=json.dumps(
+                ports_json=_json_dumps(data.ports),
+                enforced_deletes_json=_json_dumps(
                     data.enforced_deletes),
-                block_devices_json=json.dumps(
+                block_devices_json=_json_dumps(
                     data.block_devices),
-                interfaces_json=json.dumps(
+                interfaces_json=_json_dumps(
                     data.interfaces),
-                agent_state_json=json.dumps(
+                agent_state_json=_json_dumps(
                     data.agent_state),
-                agent_attributes_json=json.dumps(
+                agent_attributes_json=_json_dumps(
                     data.agent_attributes),
-                agent_operations_json=json.dumps(
+                agent_operations_json=_json_dumps(
                     data.agent_operations),
                 kvm_pid=data.kvm_pid or 0,
                 error_message=(
