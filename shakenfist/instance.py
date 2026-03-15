@@ -487,6 +487,11 @@ class Instance(dbowo):
                     attrs.error_message = value.get('message', '') if isinstance(value, dict) else str(value)
                 elif attribute == 'interfaces':
                     attrs.interfaces = value if isinstance(value, list) else value
+                elif attribute == 'agent_state':
+                    if hasattr(value, 'model_dump'):
+                        attrs.agent_state = value.model_dump()
+                    else:
+                        attrs.agent_state = value
                 else:
                     setattr(attrs, attribute, value)
 
