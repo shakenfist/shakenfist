@@ -20,6 +20,7 @@ from pydantic import Field
 from pydantic import UUID4
 
 from shakenfist.schema.sqlalchemy import SQLIndex
+from shakenfist.schema.sqlalchemy import SQLLongText
 from shakenfist.schema.sqlalchemy import SQLNativeUUID
 
 
@@ -77,10 +78,10 @@ class InstanceData(BaseModel):
     requested_placement: Optional[dict[str, Any]] = None
 
     # SSH public key to inject (nullable, can be large)
-    ssh_key: Optional[str] = None
+    ssh_key: Annotated[Optional[str], SQLLongText()] = None
 
     # Cloud-init user data (nullable, can be large)
-    user_data: Optional[str] = None
+    user_data: Annotated[Optional[str], SQLLongText()] = None
 
     # Video configuration dict (model, memory, vdi type)
     video: dict[str, Any] = Field(default_factory=dict)
