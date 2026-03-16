@@ -3620,6 +3620,134 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    # Object Metadata Operations
+
+    def GetObjectMetadata(
+        self,
+        request: database_pb2.GetObjectMetadataRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetObjectMetadataReply:
+        """Get metadata for an object from MariaDB."""
+        try:
+            self.monitor.counters[
+                'get_object_metadata'].inc()
+            object_type = ObjectType.from_proto_id(
+                request.object_type)
+            if object_type is None:
+                return database_pb2.GetObjectMetadataReply(
+                    found=False)
+            data = mariadb._direct_get_object_metadata(
+                object_type, request.object_uuid)
+            if data is None:
+                return database_pb2.GetObjectMetadataReply(
+                    found=False)
+            return database_pb2.GetObjectMetadataReply(
+                found=True,
+                metadata_json=(
+                    json.dumps(data.metadata)
+                    if data.metadata is not None else ''),
+                last_cluster_operation_json=(
+                    json.dumps(data.last_cluster_operation)
+                    if data.last_cluster_operation is not None
+                    else '')
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetObjectMetadata failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetObjectMetadataReply(
+                found=False)
+
+    def SetMetadata(
+        self,
+        request: database_pb2.SetMetadataRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Set metadata for an object in MariaDB."""
+        try:
+            self.monitor.counters['set_metadata'].inc()
+            object_type = ObjectType.from_proto_id(
+                request.object_type)
+            if object_type is None:
+                return database_pb2.StatusReply(
+                    success=False,
+                    error='Invalid object_type')
+            metadata_dict = (
+                json.loads(request.metadata_json)
+                if request.metadata_json else None)
+            success = mariadb._direct_set_metadata(
+                object_type,
+                request.object_uuid,
+                metadata_dict)
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database SetMetadata failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def SetLastClusterOperation(
+        self,
+        request: database_pb2.SetLastClusterOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Set last_cluster_operation for an object in MariaDB."""
+        try:
+            self.monitor.counters[
+                'set_last_cluster_operation'].inc()
+            object_type = ObjectType.from_proto_id(
+                request.object_type)
+            if object_type is None:
+                return database_pb2.StatusReply(
+                    success=False,
+                    error='Invalid object_type')
+            lco_dict = (
+                json.loads(
+                    request.last_cluster_operation_json)
+                if request.last_cluster_operation_json
+                else None)
+            success = (
+                mariadb._direct_set_last_cluster_operation(
+                    object_type,
+                    request.object_uuid,
+                    lco_dict))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database SetLastClusterOperation failed',
+                e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def DeleteObjectMetadata(
+        self,
+        request: database_pb2.DeleteObjectMetadataRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete metadata for an object from MariaDB."""
+        try:
+            self.monitor.counters[
+                'delete_object_metadata'].inc()
+            object_type = ObjectType.from_proto_id(
+                request.object_type)
+            if object_type is None:
+                return database_pb2.StatusReply(
+                    success=False,
+                    error='Invalid object_type')
+            success = (
+                mariadb._direct_delete_object_metadata(
+                    object_type, request.object_uuid))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteObjectMetadata failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     def _instance_attrs_from_proto(
             self,
             d: database_pb2.InstanceAttributesProto
@@ -3788,7 +3916,11 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_instance_attributes',
             'get_instance_attributes',
             'update_instance_attributes',
-            'delete_instance_attributes'
+            'delete_instance_attributes',
+            # MariaDB object metadata operations
+            'get_object_metadata', 'set_metadata',
+            'set_last_cluster_operation',
+            'delete_object_metadata'
         ]
         for op in operations:
             self.counters[op] = Counter(

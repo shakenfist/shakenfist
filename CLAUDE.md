@@ -439,6 +439,10 @@ performance. This is required for all deployments - MariaDB must be configured.
   block_devices, interfaces, agent_state, agent_attributes,
   agent_operations, kvm_pid, error_message). Complex fields stored as
   JSON. Dual-write with etcd fallback for unmigrated objects.
+- **Object Metadata** (`object_metadata` table): User-defined metadata
+  key-value pairs and last_cluster_operation for all object types.
+  Uses composite primary key (object_type, object_uuid) following the
+  same pattern as object_states. Dual-write with etcd fallback.
 
 ### Migrating Existing Deployments
 

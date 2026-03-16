@@ -744,6 +744,26 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteInstanceAttributesRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.GetObjectMetadata = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetObjectMetadata',
+                request_serializer=database__pb2.GetObjectMetadataRequest.SerializeToString,
+                response_deserializer=database__pb2.GetObjectMetadataReply.FromString,
+                _registered_method=True)
+        self.SetMetadata = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/SetMetadata',
+                request_serializer=database__pb2.SetMetadataRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.SetLastClusterOperation = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/SetLastClusterOperation',
+                request_serializer=database__pb2.SetLastClusterOperationRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteObjectMetadata = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteObjectMetadata',
+                request_serializer=database__pb2.DeleteObjectMetadataRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -1655,6 +1675,33 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetObjectMetadata(self, request, context):
+        """Object Metadata Operations (MariaDB)
+        These store user-defined metadata and last_cluster_operation for all
+        object types in a single shared table (like object_states).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetMetadata(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetLastClusterOperation(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteObjectMetadata(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -2366,6 +2413,26 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'DeleteInstanceAttributes': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteInstanceAttributes,
                     request_deserializer=database__pb2.DeleteInstanceAttributesRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetObjectMetadata': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetObjectMetadata,
+                    request_deserializer=database__pb2.GetObjectMetadataRequest.FromString,
+                    response_serializer=database__pb2.GetObjectMetadataReply.SerializeToString,
+            ),
+            'SetMetadata': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetMetadata,
+                    request_deserializer=database__pb2.SetMetadataRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'SetLastClusterOperation': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetLastClusterOperation,
+                    request_deserializer=database__pb2.SetLastClusterOperationRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteObjectMetadata': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteObjectMetadata,
+                    request_deserializer=database__pb2.DeleteObjectMetadataRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
@@ -6202,6 +6269,114 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/DeleteInstanceAttributes',
             database__pb2.DeleteInstanceAttributesRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetObjectMetadata(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetObjectMetadata',
+            database__pb2.GetObjectMetadataRequest.SerializeToString,
+            database__pb2.GetObjectMetadataReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetMetadata(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/SetMetadata',
+            database__pb2.SetMetadataRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetLastClusterOperation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/SetLastClusterOperation',
+            database__pb2.SetLastClusterOperationRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteObjectMetadata(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteObjectMetadata',
+            database__pb2.DeleteObjectMetadataRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
