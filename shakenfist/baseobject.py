@@ -690,8 +690,8 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
 
     def set_last_cluster_operation(self, op_type, op_uuid):
         lco = {
-            'op_type': op_type,
-            'op_uuid': op_uuid
+            'op_type': str(op_type),
+            'op_uuid': str(op_uuid)
         }
         if not self.in_memory_only:
             mariadb.set_last_cluster_operation(
