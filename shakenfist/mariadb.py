@@ -12570,21 +12570,21 @@ def _direct_create_instance(data: InstanceData) -> bool:
             stmt = sa.insert(table).values(
                 uuid=data.uuid,
                 cpus=data.cpus,
-                disk_spec=json.dumps(data.disk_spec),
+                disk_spec=_json_dumps(data.disk_spec),
                 memory=data.memory,
                 name=data.name,
                 namespace=data.namespace,
-                requested_placement=json.dumps(
+                requested_placement=_json_dumps(
                     data.requested_placement),
                 ssh_key=data.ssh_key or '',
                 user_data=data.user_data or '',
-                video=json.dumps(data.video),
+                video=_json_dumps(data.video),
                 uefi=data.uefi,
                 configdrive=data.configdrive,
                 nvram_template=data.nvram_template or '',
                 secure_boot=data.secure_boot,
                 machine_type=data.machine_type,
-                side_channels=json.dumps(data.side_channels),
+                side_channels=_json_dumps(data.side_channels),
                 version=data.version
             )
             conn.execute(stmt)
@@ -12924,22 +12924,22 @@ def _grpc_create_instance(data: InstanceData) -> bool:
             data=database_pb2.InstanceStaticData(
                 uuid=str(data.uuid),
                 cpus=data.cpus,
-                disk_spec_json=json.dumps(data.disk_spec),
+                disk_spec_json=_json_dumps(data.disk_spec),
                 memory=data.memory,
                 name=data.name,
                 namespace=data.namespace,
-                requested_placement_json=json.dumps(
+                requested_placement_json=_json_dumps(
                     data.requested_placement),
                 ssh_key=data.ssh_key or '',
                 user_data=data.user_data or '',
-                video_json=json.dumps(data.video),
+                video_json=_json_dumps(data.video),
                 uefi=data.uefi,
                 configdrive=data.configdrive,
                 nvram_template=(
                     data.nvram_template or ''),
                 secure_boot=data.secure_boot,
                 machine_type=data.machine_type,
-                side_channels_json=json.dumps(
+                side_channels_json=_json_dumps(
                     data.side_channels),
                 version=data.version
             )
