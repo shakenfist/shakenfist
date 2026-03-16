@@ -8,7 +8,8 @@
 # Field annotations:
 #   Use Annotated types to add SQL-specific markers to fields:
 #
-#   from shakenfist.schema.sqlalchemy import SQLIndex, SQLUniqueIndex, SQLNativeUUID
+#   from shakenfist.schema.sqlalchemy import SQLIndex, SQLLongText, SQLNativeUUID
+#   from shakenfist.schema.sqlalchemy import SQLUniqueIndex
 #
 #   class MyModel(BaseModel):
 #       # Regular index
@@ -82,6 +83,19 @@ class SQLNativeUUID:
     pass
 
 
+class SQLLongText:
+    """Marker to indicate this str field should use LONGTEXT instead of VARCHAR.
+
+    By default, str fields are stored as VARCHAR(255). Use this marker for
+    fields that may contain more than 255 characters (e.g., SSH keys,
+    cloud-init user data).
+
+    Usage:
+        ssh_key: Annotated[Optional[str], SQLLongText()] = None
+    """
+    pass
+
+
 def _get_index_markers_from_metadata(
         metadata: list[Any]) -> tuple[bool, bool]:
     """Extract index markers from Pydantic field metadata.
@@ -100,6 +114,14 @@ def _has_native_uuid_marker(metadata: list[Any]) -> bool:
     """Check if field metadata contains a SQLNativeUUID marker."""
     for item in metadata:
         if isinstance(item, SQLNativeUUID):
+            return True
+    return False
+
+
+def _has_longtext_marker(metadata: list[Any]) -> bool:
+    """Check if field metadata contains a SQLLongText marker."""
+    for item in metadata:
+        if isinstance(item, SQLLongText):
             return True
     return False
 
@@ -242,6 +264,11 @@ def _get_sqlalchemy_type(
 
     # Complex types (lists, dicts, nested models) -> JSON
     if _is_complex_type(annotation):
+        return mysql.LONGTEXT()
+
+    # Check for SQLLongText marker on str fields
+    if annotation is str and field_metadata and _has_longtext_marker(
+            field_metadata):
         return mysql.LONGTEXT()
 
     # Basic Python types

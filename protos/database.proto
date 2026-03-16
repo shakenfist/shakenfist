@@ -213,6 +213,22 @@ service DatabaseService {
   rpc GetAgentOperationAttributes (GetAgentOperationAttributesRequest) returns (GetAgentOperationAttributesReply) {}
   rpc UpdateAgentOperationAttributes (UpdateAgentOperationAttributesRequest) returns (StatusReply) {}
   rpc DeleteAgentOperationAttributes (DeleteAgentOperationAttributesRequest) returns (StatusReply) {}
+
+  // Instance Operations (MariaDB)
+  // These manage Instance static values in MariaDB. Instances represent
+  // virtual machines with CPU, memory, disk, and network configuration.
+  rpc CreateInstance (CreateInstanceRequest) returns (StatusReply) {}
+  rpc GetInstance (GetInstanceRequest) returns (GetInstanceReply) {}
+  rpc GetAllInstances (GetAllInstancesRequest) returns (GetAllInstancesReply) {}
+  rpc DeleteInstance (DeleteInstanceRequest) returns (StatusReply) {}
+
+  // Instance Attributes Operations (MariaDB)
+  // These store mutable Instance attributes (placement, power state, ports,
+  // block devices, interfaces, agent state, etc.).
+  rpc CreateInstanceAttributes (CreateInstanceAttributesRequest) returns (StatusReply) {}
+  rpc GetInstanceAttributes (GetInstanceAttributesRequest) returns (GetInstanceAttributesReply) {}
+  rpc UpdateInstanceAttributes (UpdateInstanceAttributesRequest) returns (StatusReply) {}
+  rpc DeleteInstanceAttributes (DeleteInstanceAttributesRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -1385,5 +1401,94 @@ message UpdateAgentOperationAttributesRequest {
 }
 
 message DeleteAgentOperationAttributesRequest {
+  string uuid = 1;
+}
+
+// Instance Operations (MariaDB)
+// These manage Instance static values. Instances represent virtual machines
+// with CPU, memory, disk, and network configuration.
+
+message InstanceStaticData {
+  string uuid = 1;                     // Instance UUID
+  int32 cpus = 2;                      // Virtual CPU count
+  string disk_spec_json = 3;           // JSON-encoded list of disk spec dicts
+  int32 memory = 4;                    // Memory in MB
+  string name = 5;                     // Instance name
+  string namespace = 6;                // Tenant namespace
+  string requested_placement_json = 7; // JSON-encoded placement hint (or empty)
+  string ssh_key = 8;                  // SSH public key (or empty)
+  string user_data = 9;               // Cloud-init user data (or empty)
+  string video_json = 10;              // JSON-encoded video config dict
+  bool uefi = 11;                      // UEFI boot enabled
+  string configdrive = 12;             // Config drive type
+  string nvram_template = 13;          // NVRAM template blob UUID (or empty)
+  bool secure_boot = 14;               // Secure boot enabled
+  string machine_type = 15;            // QEMU machine type
+  string side_channels_json = 16;      // JSON-encoded side channels list
+  int32 version = 17;                  // Schema version
+}
+
+message CreateInstanceRequest {
+  InstanceStaticData data = 1;
+}
+
+message GetInstanceRequest {
+  string uuid = 1;
+}
+
+message GetInstanceReply {
+  bool found = 1;
+  InstanceStaticData data = 2;
+}
+
+message GetAllInstancesRequest {
+  // No filters currently needed - returns all instances
+}
+
+message GetAllInstancesReply {
+  repeated InstanceStaticData instances = 1;
+}
+
+message DeleteInstanceRequest {
+  string uuid = 1;
+}
+
+// Instance Attributes Operations (MariaDB)
+// These store mutable Instance attributes (placement, power state, ports,
+// block devices, interfaces, agent state, etc.).
+
+message InstanceAttributesProto {
+  string uuid = 1;                     // References instances.uuid
+  string placement_json = 2;           // JSON: {node, placement_attempts}
+  string power_state_json = 3;         // JSON: {power_state, previous, updated}
+  string ports_json = 4;               // JSON: {console_port, vdi_port, ...}
+  string enforced_deletes_json = 5;    // JSON: {count}
+  string block_devices_json = 6;       // JSON: {devices, extracommands, finalized}
+  string interfaces_json = 7;          // JSON: list of NI UUIDs
+  string agent_state_json = 8;         // JSON: {value, update_time}
+  string agent_attributes_json = 9;    // JSON: {start_time, boot_time, facts}
+  string agent_operations_json = 10;   // JSON: {queue, queued, running, completed}
+  int32 kvm_pid = 11;                  // KVM process PID (0 = not running)
+  string error_message = 12;           // Error message (or empty)
+}
+
+message CreateInstanceAttributesRequest {
+  InstanceAttributesProto data = 1;
+}
+
+message GetInstanceAttributesRequest {
+  string uuid = 1;
+}
+
+message GetInstanceAttributesReply {
+  bool found = 1;
+  InstanceAttributesProto data = 2;
+}
+
+message UpdateInstanceAttributesRequest {
+  InstanceAttributesProto data = 1;
+}
+
+message DeleteInstanceAttributesRequest {
   string uuid = 1;
 }

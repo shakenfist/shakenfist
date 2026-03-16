@@ -4240,3 +4240,332 @@ class DeleteAgentOperationAttributesRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
 
 global___DeleteAgentOperationAttributesRequest = DeleteAgentOperationAttributesRequest
+
+@typing.final
+class InstanceStaticData(google.protobuf.message.Message):
+    """Instance Operations (MariaDB)
+    These manage Instance static values. Instances represent virtual machines
+    with CPU, memory, disk, and network configuration.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    CPUS_FIELD_NUMBER: builtins.int
+    DISK_SPEC_JSON_FIELD_NUMBER: builtins.int
+    MEMORY_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    REQUESTED_PLACEMENT_JSON_FIELD_NUMBER: builtins.int
+    SSH_KEY_FIELD_NUMBER: builtins.int
+    USER_DATA_FIELD_NUMBER: builtins.int
+    VIDEO_JSON_FIELD_NUMBER: builtins.int
+    UEFI_FIELD_NUMBER: builtins.int
+    CONFIGDRIVE_FIELD_NUMBER: builtins.int
+    NVRAM_TEMPLATE_FIELD_NUMBER: builtins.int
+    SECURE_BOOT_FIELD_NUMBER: builtins.int
+    MACHINE_TYPE_FIELD_NUMBER: builtins.int
+    SIDE_CHANNELS_JSON_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """Instance UUID"""
+    cpus: builtins.int
+    """Virtual CPU count"""
+    disk_spec_json: builtins.str
+    """JSON-encoded list of disk spec dicts"""
+    memory: builtins.int
+    """Memory in MB"""
+    name: builtins.str
+    """Instance name"""
+    namespace: builtins.str
+    """Tenant namespace"""
+    requested_placement_json: builtins.str
+    """JSON-encoded placement hint (or empty)"""
+    ssh_key: builtins.str
+    """SSH public key (or empty)"""
+    user_data: builtins.str
+    """Cloud-init user data (or empty)"""
+    video_json: builtins.str
+    """JSON-encoded video config dict"""
+    uefi: builtins.bool
+    """UEFI boot enabled"""
+    configdrive: builtins.str
+    """Config drive type"""
+    nvram_template: builtins.str
+    """NVRAM template blob UUID (or empty)"""
+    secure_boot: builtins.bool
+    """Secure boot enabled"""
+    machine_type: builtins.str
+    """QEMU machine type"""
+    side_channels_json: builtins.str
+    """JSON-encoded side channels list"""
+    version: builtins.int
+    """Schema version"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        cpus: builtins.int = ...,
+        disk_spec_json: builtins.str = ...,
+        memory: builtins.int = ...,
+        name: builtins.str = ...,
+        namespace: builtins.str = ...,
+        requested_placement_json: builtins.str = ...,
+        ssh_key: builtins.str = ...,
+        user_data: builtins.str = ...,
+        video_json: builtins.str = ...,
+        uefi: builtins.bool = ...,
+        configdrive: builtins.str = ...,
+        nvram_template: builtins.str = ...,
+        secure_boot: builtins.bool = ...,
+        machine_type: builtins.str = ...,
+        side_channels_json: builtins.str = ...,
+        version: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["configdrive", b"configdrive", "cpus", b"cpus", "disk_spec_json", b"disk_spec_json", "machine_type", b"machine_type", "memory", b"memory", "name", b"name", "namespace", b"namespace", "nvram_template", b"nvram_template", "requested_placement_json", b"requested_placement_json", "secure_boot", b"secure_boot", "side_channels_json", b"side_channels_json", "ssh_key", b"ssh_key", "uefi", b"uefi", "user_data", b"user_data", "uuid", b"uuid", "version", b"version", "video_json", b"video_json"]) -> None: ...
+
+global___InstanceStaticData = InstanceStaticData
+
+@typing.final
+class CreateInstanceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___InstanceStaticData: ...
+    def __init__(
+        self,
+        *,
+        data: global___InstanceStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateInstanceRequest = CreateInstanceRequest
+
+@typing.final
+class GetInstanceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetInstanceRequest = GetInstanceRequest
+
+@typing.final
+class GetInstanceReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___InstanceStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___InstanceStaticData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetInstanceReply = GetInstanceReply
+
+@typing.final
+class GetAllInstancesRequest(google.protobuf.message.Message):
+    """No filters currently needed - returns all instances"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetAllInstancesRequest = GetAllInstancesRequest
+
+@typing.final
+class GetAllInstancesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INSTANCES_FIELD_NUMBER: builtins.int
+    @property
+    def instances(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___InstanceStaticData]: ...
+    def __init__(
+        self,
+        *,
+        instances: collections.abc.Iterable[global___InstanceStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["instances", b"instances"]) -> None: ...
+
+global___GetAllInstancesReply = GetAllInstancesReply
+
+@typing.final
+class DeleteInstanceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteInstanceRequest = DeleteInstanceRequest
+
+@typing.final
+class InstanceAttributesProto(google.protobuf.message.Message):
+    """Instance Attributes Operations (MariaDB)
+    These store mutable Instance attributes (placement, power state, ports,
+    block devices, interfaces, agent state, etc.).
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    PLACEMENT_JSON_FIELD_NUMBER: builtins.int
+    POWER_STATE_JSON_FIELD_NUMBER: builtins.int
+    PORTS_JSON_FIELD_NUMBER: builtins.int
+    ENFORCED_DELETES_JSON_FIELD_NUMBER: builtins.int
+    BLOCK_DEVICES_JSON_FIELD_NUMBER: builtins.int
+    INTERFACES_JSON_FIELD_NUMBER: builtins.int
+    AGENT_STATE_JSON_FIELD_NUMBER: builtins.int
+    AGENT_ATTRIBUTES_JSON_FIELD_NUMBER: builtins.int
+    AGENT_OPERATIONS_JSON_FIELD_NUMBER: builtins.int
+    KVM_PID_FIELD_NUMBER: builtins.int
+    ERROR_MESSAGE_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """References instances.uuid"""
+    placement_json: builtins.str
+    """JSON: {node, placement_attempts}"""
+    power_state_json: builtins.str
+    """JSON: {power_state, previous, updated}"""
+    ports_json: builtins.str
+    """JSON: {console_port, vdi_port, ...}"""
+    enforced_deletes_json: builtins.str
+    """JSON: {count}"""
+    block_devices_json: builtins.str
+    """JSON: {devices, extracommands, finalized}"""
+    interfaces_json: builtins.str
+    """JSON: list of NI UUIDs"""
+    agent_state_json: builtins.str
+    """JSON: {value, update_time}"""
+    agent_attributes_json: builtins.str
+    """JSON: {start_time, boot_time, facts}"""
+    agent_operations_json: builtins.str
+    """JSON: {queue, queued, running, completed}"""
+    kvm_pid: builtins.int
+    """KVM process PID (0 = not running)"""
+    error_message: builtins.str
+    """Error message (or empty)"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        placement_json: builtins.str = ...,
+        power_state_json: builtins.str = ...,
+        ports_json: builtins.str = ...,
+        enforced_deletes_json: builtins.str = ...,
+        block_devices_json: builtins.str = ...,
+        interfaces_json: builtins.str = ...,
+        agent_state_json: builtins.str = ...,
+        agent_attributes_json: builtins.str = ...,
+        agent_operations_json: builtins.str = ...,
+        kvm_pid: builtins.int = ...,
+        error_message: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_attributes_json", b"agent_attributes_json", "agent_operations_json", b"agent_operations_json", "agent_state_json", b"agent_state_json", "block_devices_json", b"block_devices_json", "enforced_deletes_json", b"enforced_deletes_json", "error_message", b"error_message", "interfaces_json", b"interfaces_json", "kvm_pid", b"kvm_pid", "placement_json", b"placement_json", "ports_json", b"ports_json", "power_state_json", b"power_state_json", "uuid", b"uuid"]) -> None: ...
+
+global___InstanceAttributesProto = InstanceAttributesProto
+
+@typing.final
+class CreateInstanceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___InstanceAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___InstanceAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateInstanceAttributesRequest = CreateInstanceAttributesRequest
+
+@typing.final
+class GetInstanceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetInstanceAttributesRequest = GetInstanceAttributesRequest
+
+@typing.final
+class GetInstanceAttributesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___InstanceAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___InstanceAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetInstanceAttributesReply = GetInstanceAttributesReply
+
+@typing.final
+class UpdateInstanceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___InstanceAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: global___InstanceAttributesProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___UpdateInstanceAttributesRequest = UpdateInstanceAttributesRequest
+
+@typing.final
+class DeleteInstanceAttributesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteInstanceAttributesRequest = DeleteInstanceAttributesRequest

@@ -11,6 +11,7 @@ enable future migration to other database backends.
 from concurrent import futures
 from ipaddress import IPv4Address
 import json
+from typing import Any
 from typing import cast
 from uuid import UUID
 
@@ -40,6 +41,8 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.agentoperation_attributes import AgentOperationAttributesData
 from shakenfist.schema.agentoperation_data import AgentOperationData
+from shakenfist.schema.instance_attributes import InstanceAttributesData
+from shakenfist.schema.instance_data import InstanceData
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.blob_attributes import BlobAttributesData
@@ -3368,6 +3371,309 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteAllArtifactIndexes failed', e)
             return database_pb2.DeleteCountReply(count=0)
 
+    # Instance Operations (MariaDB)
+    def CreateInstance(
+        self,
+        request: database_pb2.CreateInstanceRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create an Instance record in MariaDB."""
+        try:
+            self.monitor.counters['create_instance'].inc()
+            data = self._instance_from_proto(request.data)
+            success = mariadb._direct_create_instance(data)
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateInstance failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetInstance(
+        self,
+        request: database_pb2.GetInstanceRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetInstanceReply:
+        """Get Instance static values from MariaDB."""
+        try:
+            self.monitor.counters['get_instance'].inc()
+            data = mariadb._direct_get_instance(
+                UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetInstanceReply(
+                    found=False)
+            return database_pb2.GetInstanceReply(
+                found=True,
+                data=self._instance_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetInstance failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetInstanceReply(
+                found=False)
+
+    def GetAllInstances(
+        self,
+        request: database_pb2.GetAllInstancesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllInstancesReply:
+        """Get all Instance static values from MariaDB."""
+        try:
+            self.monitor.counters['get_all_instances'].inc()
+            all_data = mariadb._direct_get_all_instances()
+            return database_pb2.GetAllInstancesReply(
+                instances=[
+                    self._instance_to_proto(d)
+                    for d in all_data
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllInstances failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetAllInstancesReply(
+                instances=[])
+
+    def DeleteInstance(
+        self,
+        request: database_pb2.DeleteInstanceRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete an Instance record from MariaDB."""
+        try:
+            self.monitor.counters['delete_instance'].inc()
+            success = mariadb._direct_delete_instance(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteInstance failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def _instance_from_proto(
+            self,
+            d: database_pb2.InstanceStaticData
+    ) -> InstanceData:
+        """Convert a proto InstanceStaticData to model."""
+        disk_spec = (json.loads(d.disk_spec_json)
+                     if d.disk_spec_json else [])
+        requested_placement = (
+            json.loads(d.requested_placement_json)
+            if d.requested_placement_json else None)
+        if not requested_placement:
+            requested_placement = None
+        video = (json.loads(d.video_json)
+                 if d.video_json else {})
+        side_channels = (json.loads(d.side_channels_json)
+                         if d.side_channels_json else [])
+        return InstanceData(
+            uuid=UUID(d.uuid),
+            cpus=d.cpus,
+            disk_spec=disk_spec,
+            memory=d.memory,
+            name=d.name,
+            namespace=d.namespace,
+            requested_placement=requested_placement,
+            ssh_key=d.ssh_key or None,
+            user_data=d.user_data or None,
+            video=video,
+            uefi=d.uefi,
+            configdrive=d.configdrive,
+            nvram_template=d.nvram_template or None,
+            secure_boot=d.secure_boot,
+            machine_type=d.machine_type,
+            side_channels=side_channels,
+            version=d.version
+        )
+
+    def _instance_to_proto(
+            self,
+            data: InstanceData
+    ) -> database_pb2.InstanceStaticData:
+        """Convert InstanceData to proto."""
+        return database_pb2.InstanceStaticData(
+            uuid=str(data.uuid),
+            cpus=data.cpus,
+            disk_spec_json=json.dumps(data.disk_spec),
+            memory=data.memory,
+            name=data.name,
+            namespace=data.namespace,
+            requested_placement_json=json.dumps(
+                data.requested_placement),
+            ssh_key=data.ssh_key or '',
+            user_data=data.user_data or '',
+            video_json=json.dumps(data.video),
+            uefi=data.uefi,
+            configdrive=data.configdrive,
+            nvram_template=data.nvram_template or '',
+            secure_boot=data.secure_boot,
+            machine_type=data.machine_type,
+            side_channels_json=json.dumps(
+                data.side_channels),
+            version=data.version
+        )
+
+    # Instance Attributes Operations (MariaDB)
+    def CreateInstanceAttributes(
+        self,
+        request: database_pb2.CreateInstanceAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create Instance attributes in MariaDB."""
+        try:
+            self.monitor.counters[
+                'create_instance_attributes'].inc()
+            data = self._instance_attrs_from_proto(
+                request.data)
+            success = (
+                mariadb._direct_create_instance_attributes(
+                    data))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateInstanceAttributes failed',
+                e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetInstanceAttributes(
+        self,
+        request: database_pb2.GetInstanceAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetInstanceAttributesReply:
+        """Get Instance attributes from MariaDB."""
+        try:
+            self.monitor.counters[
+                'get_instance_attributes'].inc()
+            data = (
+                mariadb._direct_get_instance_attributes(
+                    UUID(request.uuid)))
+            if data is None:
+                return (
+                    database_pb2
+                    .GetInstanceAttributesReply(
+                        found=False))
+            return (
+                database_pb2
+                .GetInstanceAttributesReply(
+                    found=True,
+                    data=self._instance_attrs_to_proto(
+                        data)))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetInstanceAttributes failed',
+                e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return (
+                database_pb2
+                .GetInstanceAttributesReply(
+                    found=False))
+
+    def UpdateInstanceAttributes(
+        self,
+        request: database_pb2.UpdateInstanceAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update Instance attributes in MariaDB."""
+        try:
+            self.monitor.counters[
+                'update_instance_attributes'].inc()
+            data = self._instance_attrs_from_proto(
+                request.data)
+            success = (
+                mariadb
+                ._direct_update_instance_attributes(data))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateInstanceAttributes failed',
+                e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def DeleteInstanceAttributes(
+        self,
+        request: database_pb2.DeleteInstanceAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete Instance attributes from MariaDB."""
+        try:
+            self.monitor.counters[
+                'delete_instance_attributes'].inc()
+            success = (
+                mariadb
+                ._direct_delete_instance_attributes(
+                    UUID(request.uuid)))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteInstanceAttributes failed',
+                e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def _instance_attrs_from_proto(
+            self,
+            d: database_pb2.InstanceAttributesProto
+    ) -> InstanceAttributesData:
+        """Convert a proto InstanceAttributesProto to model."""
+        def _parse(val: str) -> Any:
+            return json.loads(val) if val else None
+
+        interfaces = _parse(d.interfaces_json)
+        return InstanceAttributesData(
+            uuid=UUID(d.uuid),
+            placement=_parse(d.placement_json),
+            power_state=_parse(d.power_state_json),
+            ports=_parse(d.ports_json),
+            enforced_deletes=_parse(
+                d.enforced_deletes_json),
+            block_devices=_parse(
+                d.block_devices_json),
+            interfaces=(
+                interfaces if interfaces else []),
+            agent_state=_parse(d.agent_state_json),
+            agent_attributes=_parse(
+                d.agent_attributes_json),
+            agent_operations=_parse(
+                d.agent_operations_json),
+            kvm_pid=d.kvm_pid or None,
+            error_message=d.error_message or None,
+        )
+
+    def _instance_attrs_to_proto(
+            self,
+            data: InstanceAttributesData
+    ) -> database_pb2.InstanceAttributesProto:
+        """Convert InstanceAttributesData to proto."""
+        return database_pb2.InstanceAttributesProto(
+            uuid=str(data.uuid),
+            placement_json=json.dumps(data.placement),
+            power_state_json=json.dumps(
+                data.power_state),
+            ports_json=json.dumps(data.ports),
+            enforced_deletes_json=json.dumps(
+                data.enforced_deletes),
+            block_devices_json=json.dumps(
+                data.block_devices),
+            interfaces_json=json.dumps(data.interfaces),
+            agent_state_json=json.dumps(
+                data.agent_state),
+            agent_attributes_json=json.dumps(
+                data.agent_attributes),
+            agent_operations_json=json.dumps(
+                data.agent_operations),
+            kvm_pid=data.kvm_pid or 0,
+            error_message=data.error_message or '')
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
@@ -3474,7 +3780,15 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_agent_operation_attributes',
             'get_agent_operation_attributes',
             'update_agent_operation_attributes',
-            'delete_agent_operation_attributes'
+            'delete_agent_operation_attributes',
+            # MariaDB instance operations
+            'create_instance', 'get_instance',
+            'get_all_instances', 'delete_instance',
+            # MariaDB instance attributes operations
+            'create_instance_attributes',
+            'get_instance_attributes',
+            'update_instance_attributes',
+            'delete_instance_attributes'
         ]
         for op in operations:
             self.counters[op] = Counter(

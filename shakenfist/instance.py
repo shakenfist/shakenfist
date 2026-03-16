@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 from collections import defaultdict
 from functools import partial
 import uuid
+from uuid import UUID
 from uuid import uuid4
 
 import jinja2
@@ -28,6 +29,8 @@ from shakenfist import constants
 from shakenfist.constants import get_object_class
 from shakenfist import etcd
 from shakenfist import mariadb
+from shakenfist.schema.instance_attributes import InstanceAttributesData
+from shakenfist.schema.instance_data import InstanceData
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.operations.node_inst_op \
     import create_and_enqueue as nio_create_and_enqueue
@@ -154,7 +157,14 @@ class ConnectedVSockChannel():
 
 class Instance(dbowo):
     object_type = ObjectType.INSTANCE
-    current_version = 18
+    current_version = 19
+
+    # Attributes stored in MariaDB (everything else stays in etcd)
+    MARIADB_ATTRIBUTES = {
+        'placement', 'power_state', 'ports', 'enforced_deletes',
+        'block_devices', 'interfaces', 'agent_state',
+        'agent_attributes', 'agent_operations', 'kvm_pid', 'error',
+    }
 
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -343,6 +353,156 @@ class Instance(dbowo):
             if n:
                 placement['node'] = str(n.uuid)
                 etcd.put('attribute/instance', static_values['uuid'], 'placement', placement)
+
+    @classmethod
+    def _upgrade_step_18_to_19(cls, static_values):
+        # Static values migration to MariaDB is handled by the
+        # database daemon data migrations.
+        ...
+
+    @classmethod
+    def _db_create(cls, object_uuid, metadata):
+        """Create an Instance record in both etcd and MariaDB."""
+        # Write to etcd (base class behavior)
+        super()._db_create(object_uuid, metadata)
+
+        # Also write static values to MariaDB
+        _uuid = object_uuid if isinstance(object_uuid, UUID) else UUID(object_uuid)
+
+        # Normalize values for Pydantic validation
+        requested_placement = metadata.get('requested_placement')
+        if not isinstance(requested_placement, dict):
+            requested_placement = None
+
+        video = metadata.get('video', {})
+        if not isinstance(video, dict):
+            video = {'model': str(video)} if video else {}
+
+        side_channels = metadata.get('side_channels')
+        if not isinstance(side_channels, list):
+            side_channels = []
+
+        data = InstanceData(
+            uuid=_uuid,
+            cpus=metadata.get('cpus', 0),
+            disk_spec=metadata.get('disk_spec', []),
+            memory=metadata.get('memory', 0),
+            name=metadata.get('name', ''),
+            namespace=metadata.get('namespace', ''),
+            requested_placement=requested_placement,
+            ssh_key=metadata.get('ssh_key'),
+            user_data=metadata.get('user_data'),
+            video=video,
+            uefi=metadata.get('uefi', False),
+            configdrive=metadata.get('configdrive', 'openstack-disk'),
+            nvram_template=metadata.get('nvram_template'),
+            secure_boot=metadata.get('secure_boot', False),
+            machine_type=metadata.get('machine_type', 'pc'),
+            side_channels=side_channels,
+            version=metadata.get('version', cls.current_version)
+        )
+        mariadb.create_instance(data)
+
+        # Create initial attributes record
+        attrs = InstanceAttributesData(uuid=_uuid)
+        mariadb.create_instance_attributes(attrs)
+
+    @classmethod
+    def _db_get(cls, object_uuid):
+        """Get Instance static values, trying MariaDB first."""
+        _uuid = object_uuid if isinstance(object_uuid, UUID) else UUID(object_uuid)
+        data = mariadb.get_instance(_uuid)
+        if data:
+            result = {
+                'uuid': str(data.uuid),
+                'cpus': data.cpus,
+                'disk_spec': data.disk_spec,
+                'memory': data.memory,
+                'name': data.name,
+                'namespace': data.namespace,
+                'requested_placement': data.requested_placement,
+                'ssh_key': data.ssh_key,
+                'user_data': data.user_data,
+                'video': data.video,
+                'uefi': data.uefi,
+                'configdrive': data.configdrive,
+                'nvram_template': data.nvram_template,
+                'secure_boot': data.secure_boot,
+                'machine_type': data.machine_type,
+                'side_channels': data.side_channels,
+                'version': data.version
+            }
+            if result.get('version', 0) != cls.current_version:
+                if not cls.upgrade_supported:
+                    raise exceptions.BadObjectVersion(
+                        f'Unsupported object version - {cls.object_type}: {result}')
+            return result
+
+        # Fall back to etcd for unmigrated objects
+        return super()._db_get(object_uuid)
+
+    def _db_get_attribute(self, attribute, default=None):
+        """Get an attribute, routing MariaDB-stored attributes appropriately."""
+        if attribute in self.MARIADB_ATTRIBUTES:
+            _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
+            attrs = mariadb.get_instance_attributes(_uuid)
+            if attrs:
+                # Map the attribute name to the model field
+                field_name = attribute
+                if attribute == 'error':
+                    field_name = 'error_message'
+
+                val = getattr(attrs, field_name, None)
+
+                # Handle special cases for compatibility with etcd format
+                if attribute == 'kvm_pid':
+                    if val is not None:
+                        return {'pid': val}
+                    return default if default is not None else {}
+                if attribute == 'error':
+                    if val:
+                        return {'message': val}
+                    return default if default is not None else {}
+                if attribute == 'interfaces':
+                    return val if val else (default if default is not None else [])
+
+                if val is not None:
+                    return val
+                return default if default is not None else {}
+
+        # Fall through to etcd for non-MariaDB attributes
+        # (metadata, last_cluster_operation, vsock_cid:*, etc.)
+        return super()._db_get_attribute(attribute, default)
+
+    def _db_set_attribute(self, attribute, value):
+        """Set an attribute, routing MariaDB-stored attributes appropriately."""
+        if attribute in self.MARIADB_ATTRIBUTES:
+            _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
+            attrs = mariadb.get_instance_attributes(_uuid)
+            if attrs:
+                # Map the attribute name to the model field
+                if attribute == 'kvm_pid':
+                    attrs.kvm_pid = value.get('pid') if isinstance(value, dict) else value
+                elif attribute == 'error':
+                    attrs.error_message = value.get('message', '') if isinstance(value, dict) else str(value)
+                elif attribute == 'interfaces':
+                    attrs.interfaces = value if isinstance(value, list) else value
+                elif attribute == 'agent_state':
+                    if hasattr(value, 'model_dump'):
+                        attrs.agent_state = value.model_dump()
+                    else:
+                        attrs.agent_state = value
+                else:
+                    setattr(attrs, attribute, value)
+
+                mariadb.update_instance_attributes(attrs)
+
+                # Preserve event logging from base class
+                super()._db_set_attribute(attribute, value)
+                return
+
+        # Fall through to etcd for non-MariaDB attributes
+        super()._db_set_attribute(attribute, value)
 
     @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
@@ -904,6 +1064,11 @@ class Instance(dbowo):
                 [partial(agent_instance_filter, self)],
                 suppress_failure_audit=True):
             agentop.delete()
+
+        # Clean up MariaDB records
+        _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
+        mariadb.delete_instance_attributes(_uuid)
+        mariadb.delete_instance(_uuid)
 
         if self.state.value.endswith(f'-{self.STATE_ERROR}'):
             self.state = self.STATE_ERROR
@@ -1894,8 +2059,10 @@ class Instance(dbowo):
             if 'all' not in db_data:
                 db_data['all'] = []
 
-            db_data['queue'].append(agentop_uuid)
-            db_data['all'].append(agentop_uuid)
+            # Ensure UUID is stored as a string for JSON serialization
+            agentop_uuid_str = str(agentop_uuid)
+            db_data['queue'].append(agentop_uuid_str)
+            db_data['all'].append(agentop_uuid_str)
             self._db_set_attribute('agent_operations', db_data)
 
     def get_screenshot(self):

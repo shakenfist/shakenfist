@@ -20,6 +20,8 @@ from shakenfist.node import Node
 from shakenfist.schema.agentoperation_attributes import AgentOperationAttributesData
 from shakenfist.schema.agentoperation_data import AgentOperationData
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
+from shakenfist.schema.instance_attributes import InstanceAttributesData
+from shakenfist.schema.instance_data import InstanceData
 from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.artifact_index import ArtifactIndexData
 from shakenfist.schema.dnsmasq import DnsMasqData
@@ -66,6 +68,8 @@ class MockEtcd():
         self.ipam_objects = {}  # Mock MariaDB IPAM storage
         self.agent_operation_objects = {}  # Mock MariaDB agent operation storage
         self.agent_operation_attributes = {}  # Mock MariaDB agent operation attributes
+        self.instance_objects = {}  # Mock MariaDB instance storage
+        self.instance_attributes = {}  # Mock MariaDB instance attributes
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -641,6 +645,60 @@ class MockEtcd():
         self.mariadb_delete_agent_operation_attributes.start()
         self.test_obj.addCleanup(
             self.mariadb_delete_agent_operation_attributes.stop)
+
+        # MariaDB instance operations
+        self.mariadb_create_instance = mock.patch(
+            'shakenfist.mariadb.create_instance',
+            side_effect=self._mariadb_create_instance)
+        self.mariadb_create_instance.start()
+        self.test_obj.addCleanup(self.mariadb_create_instance.stop)
+
+        self.mariadb_get_instance = mock.patch(
+            'shakenfist.mariadb.get_instance',
+            side_effect=self._mariadb_get_instance)
+        self.mariadb_get_instance.start()
+        self.test_obj.addCleanup(self.mariadb_get_instance.stop)
+
+        self.mariadb_get_all_instances = mock.patch(
+            'shakenfist.mariadb.get_all_instances',
+            side_effect=self._mariadb_get_all_instances)
+        self.mariadb_get_all_instances.start()
+        self.test_obj.addCleanup(self.mariadb_get_all_instances.stop)
+
+        self.mariadb_delete_instance = mock.patch(
+            'shakenfist.mariadb.delete_instance',
+            side_effect=self._mariadb_delete_instance)
+        self.mariadb_delete_instance.start()
+        self.test_obj.addCleanup(self.mariadb_delete_instance.stop)
+
+        # MariaDB instance attributes operations
+        self.mariadb_create_instance_attributes = mock.patch(
+            'shakenfist.mariadb.create_instance_attributes',
+            side_effect=self._mariadb_create_instance_attributes)
+        self.mariadb_create_instance_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_create_instance_attributes.stop)
+
+        self.mariadb_get_instance_attributes = mock.patch(
+            'shakenfist.mariadb.get_instance_attributes',
+            side_effect=self._mariadb_get_instance_attributes)
+        self.mariadb_get_instance_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_instance_attributes.stop)
+
+        self.mariadb_update_instance_attributes = mock.patch(
+            'shakenfist.mariadb.update_instance_attributes',
+            side_effect=self._mariadb_update_instance_attributes)
+        self.mariadb_update_instance_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_update_instance_attributes.stop)
+
+        self.mariadb_delete_instance_attributes = mock.patch(
+            'shakenfist.mariadb.delete_instance_attributes',
+            side_effect=self._mariadb_delete_instance_attributes)
+        self.mariadb_delete_instance_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_instance_attributes.stop)
 
         # Setup basic DB data
         self.node_uuids = {}
@@ -1605,6 +1663,96 @@ class MockEtcd():
         self._trace(
             f'MockMariaDB.delete_agent_operation_attributes'
             f'({key}): not found')
+        return False
+
+    # MariaDB Instance mock operations
+
+    def _mariadb_create_instance(self, data: InstanceData) -> bool:
+        """Mock implementation of mariadb.create_instance()"""
+        key = str(data.uuid)
+        if key in self.instance_objects:
+            self._trace(
+                f'MockMariaDB.create_instance({key}): already exists')
+            return False
+        self.instance_objects[key] = data
+        self._trace(f'MockMariaDB.create_instance({key}): created')
+        return True
+
+    def _mariadb_get_instance(
+            self, inst_uuid) -> Optional[InstanceData]:
+        """Mock implementation of mariadb.get_instance()"""
+        key = str(inst_uuid)
+        data = self.instance_objects.get(key)
+        self._trace(f'MockMariaDB.get_instance({key}): {data}')
+        return data
+
+    def _mariadb_get_all_instances(self) -> list[InstanceData]:
+        """Mock implementation of mariadb.get_all_instances()"""
+        self._trace('MockMariaDB.get_all_instances()')
+        return list(self.instance_objects.values())
+
+    def _mariadb_delete_instance(self, inst_uuid) -> bool:
+        """Mock implementation of mariadb.delete_instance()"""
+        key = str(inst_uuid)
+        if key in self.instance_objects:
+            del self.instance_objects[key]
+            self._trace(
+                f'MockMariaDB.delete_instance({key}): deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_instance({key}): not found')
+        return False
+
+    def _mariadb_create_instance_attributes(
+            self, data: InstanceAttributesData) -> bool:
+        """Mock implementation of mariadb.create_instance_attributes()"""
+        key = str(data.uuid)
+        if key in self.instance_attributes:
+            self._trace(
+                f'MockMariaDB.create_instance_attributes({key}): '
+                f'already exists')
+            return False
+        self.instance_attributes[key] = data
+        self._trace(
+            f'MockMariaDB.create_instance_attributes({key}): created')
+        return True
+
+    def _mariadb_get_instance_attributes(
+            self, inst_uuid) -> Optional[InstanceAttributesData]:
+        """Mock implementation of mariadb.get_instance_attributes()"""
+        key = str(inst_uuid)
+        data = self.instance_attributes.get(key)
+        self._trace(
+            f'MockMariaDB.get_instance_attributes({key}): {data}')
+        return data
+
+    def _mariadb_update_instance_attributes(
+            self, data: InstanceAttributesData) -> bool:
+        """Mock implementation of mariadb.update_instance_attributes()"""
+        key = str(data.uuid)
+        if key in self.instance_attributes:
+            self.instance_attributes[key] = data
+            self._trace(
+                f'MockMariaDB.update_instance_attributes({key}): '
+                f'updated')
+            return True
+        self._trace(
+            f'MockMariaDB.update_instance_attributes({key}): '
+            f'not found')
+        return False
+
+    def _mariadb_delete_instance_attributes(self, inst_uuid) -> bool:
+        """Mock implementation of mariadb.delete_instance_attributes()"""
+        key = str(inst_uuid)
+        if key in self.instance_attributes:
+            del self.instance_attributes[key]
+            self._trace(
+                f'MockMariaDB.delete_instance_attributes({key}): '
+                f'deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_instance_attributes({key}): '
+            f'not found')
         return False
 
     #
