@@ -4847,7 +4847,7 @@ system works.</p>
 <tbody>
 <tr>
 <td>Instance</td>
-<td><code>/sf/object/instance/</code></td>
+<td>MariaDB <code>instances</code> table (migrated from etcd)</td>
 </tr>
 <tr>
 <td>Network</td>
@@ -5402,11 +5402,16 @@ of the cluster through Galera replication.</p>
 </tr>
 <tr>
 <td>13</td>
+<td>Instance objects</td>
+<td>Complete - <code>instances</code>, <code>instance_attributes</code> tables</td>
+</tr>
+<tr>
+<td>14</td>
 <td>Other object types</td>
 <td>Future</td>
 </tr>
 <tr>
-<td>14</td>
+<td>15</td>
 <td>Object attributes</td>
 <td>Future</td>
 </tr>
@@ -5520,6 +5525,11 @@ values (immutable data set at creation time):</p>
 <td>AgentOperation</td>
 <td>uuid, namespace, instance_uuid (indexed), commands (JSON list), version</td>
 </tr>
+<tr>
+<td><code>instances</code></td>
+<td>Instance</td>
+<td>uuid, cpus, disk_spec (JSON), memory, name, namespace (indexed), requested_placement (JSON), ssh_key, user_data, video (JSON), uefi, configdrive, nvram_template, secure_boot, machine_type, side_channels (JSON), version</td>
+</tr>
 </tbody>
 </table>
 <p>These tables use the object's UUID as the primary key, except for
@@ -5575,6 +5585,11 @@ dedicated attribute tables:</p>
 <td><code>agent_operation_attributes</code></td>
 <td>AgentOperation</td>
 <td>uuid, results (JSON dict)</td>
+</tr>
+<tr>
+<td><code>instance_attributes</code></td>
+<td>Instance</td>
+<td>uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), interfaces (JSON list), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message</td>
 </tr>
 </tbody>
 </table>
