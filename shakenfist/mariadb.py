@@ -3028,7 +3028,6 @@ def _migrate_etcd_instances(engine: sa.Engine) -> dict[str, Any]:
                 etcd.delete('instance', None, inst_uuid)
                 migrated_count += 1
             else:
-                etcd.delete('instance', None, inst_uuid)
                 skipped_count += 1
         except Exception as e:
             LOG.warning(
