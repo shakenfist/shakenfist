@@ -27,10 +27,9 @@
 # - attribute/instance/{uuid}/kvm_pid -> kvm_pid
 # - attribute/instance/{uuid}/error -> error_message
 #
-# NOTE: metadata, last_cluster_operation, and vsock_cid:* attributes
-# remain in etcd. metadata and last_cluster_operation are shared across
-# all object types (deferred to phase 14). vsock_cid:* uses dynamic
-# keys and is per-node ephemeral state.
+# NOTE: metadata and last_cluster_operation are stored in the shared
+# object_metadata table (phase 14). vsock_cid:* attributes remain in
+# etcd as they use dynamic keys and are per-node ephemeral state.
 
 from typing import Annotated
 from typing import Any

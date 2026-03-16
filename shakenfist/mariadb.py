@@ -60,6 +60,7 @@ from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttri
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_metadata import ObjectMetadataData
 from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
@@ -119,6 +120,7 @@ _agent_operations_table: Optional[sa.Table] = None
 _agent_operation_attributes_table: Optional[sa.Table] = None
 _instances_table: Optional[sa.Table] = None
 _instance_attributes_table: Optional[sa.Table] = None
+_object_metadata_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -150,6 +152,7 @@ AGENT_OPERATIONS_VERSION = 2
 AGENT_OPERATION_ATTRIBUTES_VERSION = 2
 INSTANCES_VERSION = 1
 INSTANCE_ATTRIBUTES_VERSION = 1
+OBJECT_METADATA_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -384,6 +387,55 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': OBJECT_STATES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_object_metadata_table() -> sa.Table:
+    """Get or create the object_metadata table definition.
+
+    This table stores user-defined metadata and last_cluster_operation for all
+    object types. It uses a composite primary key of (object_type, object_uuid)
+    following the same pattern as the object_states table.
+    """
+    global _object_metadata_table
+    if _object_metadata_table is None:
+        metadata = _get_metadata()
+        _object_metadata_table = sa.Table(
+            'object_metadata',
+            metadata,
+            sa.Column('object_uuid', sa.String(36), nullable=False),
+            sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
+            sa.Column('metadata_json', sa.Text(), nullable=True),
+            sa.Column('last_cluster_operation_json', sa.Text(), nullable=True),
+            # Composite primary key
+            sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
+        )
+    return _object_metadata_table
+
+
+def _ensure_object_metadata_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the object_metadata table schema is up to date.
+
+    Applies any necessary migrations based on the current version.
+    Returns a dict with migration status information.
+    """
+    table_name = 'object_metadata'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_object_metadata_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': OBJECT_METADATA_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -1112,6 +1164,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_agent_operation_attributes_schema(engine))
     results.append(_ensure_instances_schema(engine))
     results.append(_ensure_instance_attributes_schema(engine))
+    results.append(_ensure_object_metadata_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -3176,6 +3229,98 @@ def _migrate_etcd_instance_attributes(
     return {'migrated_count': migrated_count, 'error_count': error_count}
 
 
+def _migrate_etcd_object_metadata(
+    engine: sa.Engine
+) -> dict[str, Any]:
+    """Migrate metadata and last_cluster_operation from etcd to MariaDB.
+
+    Iterates all object types and migrates metadata and
+    last_cluster_operation attributes from etcd into the shared
+    object_metadata table.
+
+    This migration must run after all object type migrations (phases 1-13)
+    because those migrations may move or delete etcd keys.
+    """
+    from shakenfist import etcd
+
+    migrated_count = 0
+    skipped_count = 0
+    error_count = 0
+
+    for ot in ObjectType:
+        # Collect UUIDs for this object type by scanning etcd attribute keys.
+        # We can't rely on MariaDB static value tables because not all object
+        # types have been migrated to MariaDB (e.g., operations).
+        try:
+            uuids_seen: set[str] = set()
+            for key, _data in etcd.get_all(
+                    'attribute/%s' % ot.value, None):
+                # Keys look like: /sf/attribute/{type}/{uuid}/{attr}
+                # After get_all, key is just the UUID/attr portion.
+                parts = key.split('/')
+                if parts:
+                    uuids_seen.add(parts[0])
+        except Exception as e:
+            LOG.warning(
+                f'Object metadata migration: failed to scan '
+                f'etcd for {ot.value}: {e}')
+            continue
+
+        for obj_uuid in uuids_seen:
+            try:
+                # Check if already migrated
+                existing = _direct_get_object_metadata(ot, obj_uuid)
+                if existing is not None:
+                    skipped_count += 1
+                    continue
+
+                # Read metadata and last_cluster_operation from etcd
+                md = etcd.get(
+                    f'attribute/{ot.value}', obj_uuid, 'metadata')
+                lco = etcd.get(
+                    f'attribute/{ot.value}', obj_uuid,
+                    'last_cluster_operation')
+
+                if md is None and lco is None:
+                    skipped_count += 1
+                    continue
+
+                # Write to MariaDB using direct upsert functions
+                if md is not None:
+                    _direct_set_metadata(ot, obj_uuid, md)
+                if lco is not None:
+                    _direct_set_last_cluster_operation(
+                        ot, obj_uuid, lco)
+
+                # Delete from etcd after successful migration
+                if md is not None:
+                    etcd.delete(
+                        f'attribute/{ot.value}', obj_uuid,
+                        'metadata')
+                if lco is not None:
+                    etcd.delete(
+                        f'attribute/{ot.value}', obj_uuid,
+                        'last_cluster_operation')
+
+                migrated_count += 1
+            except Exception as e:
+                LOG.warning(
+                    f'Object metadata migration: failed for '
+                    f'{ot.value}/{obj_uuid}: {e}')
+                error_count += 1
+
+            if (migrated_count + skipped_count) % 100 == 0:
+                LOG.info(
+                    f'Object metadata migration progress: '
+                    f'{migrated_count} migrated, '
+                    f'{skipped_count} skipped')
+
+    LOG.info(
+        f'Object metadata migration: {migrated_count} '
+        f'migrated, {skipped_count} skipped')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -3253,6 +3398,9 @@ DATA_MIGRATIONS.update({
     },
     'instance_attributes': {
         2: _migrate_etcd_instance_attributes,
+    },
+    'object_metadata': {
+        2: _migrate_etcd_object_metadata,
     },
 })
 
@@ -3750,6 +3898,329 @@ def get_all_states_for_type(object_type: ObjectType) -> list[tuple[str, State]]:
     except OperationalError as e:
         LOG.warning(f'MariaDB query failed for type {object_type}: {e}')
         return []
+
+
+# =============================================================================
+# Object Metadata Direct Access Functions
+# These store user-defined metadata and last_cluster_operation for all objects.
+# =============================================================================
+
+def _direct_get_object_metadata(
+    object_type: ObjectType,
+    object_uuid: str
+) -> Optional[ObjectMetadataData]:
+    """Read object metadata directly from MariaDB."""
+    engine = _get_engine()
+    table = _get_object_metadata_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                sa.and_(
+                    table.c.object_type == object_type,
+                    table.c.object_uuid == object_uuid
+                )
+            )
+            result = conn.execute(stmt).fetchone()
+            if result is None:
+                return None
+
+            metadata = json.loads(result.metadata_json) if result.metadata_json else None
+            lco = (json.loads(result.last_cluster_operation_json)
+                   if result.last_cluster_operation_json else None)
+
+            return ObjectMetadataData(
+                object_type=object_type.value,
+                object_uuid=object_uuid,
+                metadata=metadata,
+                last_cluster_operation=lco
+            )
+    except OperationalError as e:
+        LOG.warning(f'MariaDB read failed for object_metadata {object_type}/{object_uuid}: {e}')
+        return None
+
+
+def _direct_set_metadata(
+    object_type: ObjectType,
+    object_uuid: str,
+    metadata_dict: Optional[dict[str, Any]]
+) -> bool:
+    """Write metadata for an object directly to MariaDB.
+
+    Uses INSERT ... ON DUPLICATE KEY UPDATE for atomic upsert.
+    Only updates the metadata_json column.
+    """
+    engine = _get_engine()
+    table = _get_object_metadata_table()
+
+    try:
+        metadata_json = json.dumps(metadata_dict) if metadata_dict is not None else None
+        with engine.connect() as conn:
+            stmt = sa.dialects.mysql.insert(table).values(
+                object_uuid=object_uuid,
+                object_type=object_type,
+                metadata_json=metadata_json,
+                last_cluster_operation_json=None
+            )
+            stmt = stmt.on_duplicate_key_update(
+                metadata_json=metadata_json
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB write failed for object_metadata '
+            f'{object_type}/{object_uuid}: {e}')
+        return False
+
+
+def _direct_set_last_cluster_operation(
+    object_type: ObjectType,
+    object_uuid: str,
+    lco_dict: Optional[dict[str, Any]]
+) -> bool:
+    """Write last_cluster_operation for an object directly to MariaDB.
+
+    Uses INSERT ... ON DUPLICATE KEY UPDATE for atomic upsert.
+    Only updates the last_cluster_operation_json column.
+    """
+    engine = _get_engine()
+    table = _get_object_metadata_table()
+
+    try:
+        lco_json = json.dumps(lco_dict) if lco_dict is not None else None
+        with engine.connect() as conn:
+            stmt = sa.dialects.mysql.insert(table).values(
+                object_uuid=object_uuid,
+                object_type=object_type,
+                metadata_json=None,
+                last_cluster_operation_json=lco_json
+            )
+            stmt = stmt.on_duplicate_key_update(
+                last_cluster_operation_json=lco_json
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB write failed for object_metadata '
+            f'{object_type}/{object_uuid}: {e}')
+        return False
+
+
+def _direct_delete_object_metadata(
+    object_type: ObjectType,
+    object_uuid: str
+) -> bool:
+    """Delete object metadata directly from MariaDB."""
+    engine = _get_engine()
+    table = _get_object_metadata_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.object_type == object_type,
+                    table.c.object_uuid == object_uuid
+                )
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for object_metadata '
+            f'{object_type}/{object_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Object Metadata gRPC Client Functions
+# These call the database microservice for object metadata operations.
+# =============================================================================
+
+def _grpc_get_object_metadata(
+    object_type: ObjectType,
+    object_uuid: str
+) -> Optional[ObjectMetadataData]:
+    """Read object metadata via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetObjectMetadataRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
+            object_uuid=object_uuid
+        )
+        reply = stub.GetObjectMetadata(request)
+        if not reply.found:
+            return None
+
+        metadata = json.loads(reply.metadata_json) if reply.metadata_json else None
+        lco = (json.loads(reply.last_cluster_operation_json)
+               if reply.last_cluster_operation_json else None)
+
+        return ObjectMetadataData(
+            object_type=object_type.value,
+            object_uuid=object_uuid,
+            metadata=metadata,
+            last_cluster_operation=lco
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetObjectMetadata failed for '
+            f'{object_type}/{object_uuid}: {e}')
+        return None
+
+
+def _grpc_set_metadata(
+    object_type: ObjectType,
+    object_uuid: str,
+    metadata_dict: Optional[dict[str, Any]]
+) -> bool:
+    """Write metadata for an object via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.SetMetadataRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
+            object_uuid=object_uuid,
+            metadata_json=json.dumps(metadata_dict) if metadata_dict is not None else ''
+        )
+        reply = stub.SetMetadata(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC SetMetadata failed for '
+            f'{object_type}/{object_uuid}: {e}')
+        return False
+
+
+def _grpc_set_last_cluster_operation(
+    object_type: ObjectType,
+    object_uuid: str,
+    lco_dict: Optional[dict[str, Any]]
+) -> bool:
+    """Write last_cluster_operation for an object via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.SetLastClusterOperationRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
+            object_uuid=object_uuid,
+            last_cluster_operation_json=(
+                json.dumps(lco_dict) if lco_dict is not None else '')
+        )
+        reply = stub.SetLastClusterOperation(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC SetLastClusterOperation failed for '
+            f'{object_type}/{object_uuid}: {e}')
+        return False
+
+
+def _grpc_delete_object_metadata(
+    object_type: ObjectType,
+    object_uuid: str
+) -> bool:
+    """Delete object metadata via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteObjectMetadataRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
+            object_uuid=object_uuid
+        )
+        reply = stub.DeleteObjectMetadata(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteObjectMetadata failed for '
+            f'{object_type}/{object_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Object Metadata Public API
+# These route to either direct access or gRPC based on configuration.
+# =============================================================================
+
+def get_object_metadata(
+    object_type: ObjectType,
+    object_uuid: str
+) -> Optional[ObjectMetadataData]:
+    """Read metadata and last_cluster_operation for an object.
+
+    Args:
+        object_type: The type of object.
+        object_uuid: The UUID of the object.
+
+    Returns:
+        An ObjectMetadataData object, or None if no metadata exists.
+    """
+    if _use_database_service():
+        return _grpc_get_object_metadata(object_type, object_uuid)
+    return _direct_get_object_metadata(object_type, object_uuid)
+
+
+def set_metadata(
+    object_type: ObjectType,
+    object_uuid: str,
+    metadata_dict: Optional[dict[str, Any]]
+) -> bool:
+    """Write metadata for an object.
+
+    Args:
+        object_type: The type of object.
+        object_uuid: The UUID of the object.
+        metadata_dict: The metadata dict to store, or None.
+
+    Returns:
+        True if the write succeeded, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_set_metadata(object_type, object_uuid, metadata_dict)
+    return _direct_set_metadata(object_type, object_uuid, metadata_dict)
+
+
+def set_last_cluster_operation(
+    object_type: ObjectType,
+    object_uuid: str,
+    lco_dict: Optional[dict[str, Any]]
+) -> bool:
+    """Write last_cluster_operation for an object.
+
+    Args:
+        object_type: The type of object.
+        object_uuid: The UUID of the object.
+        lco_dict: The last_cluster_operation dict, or None.
+
+    Returns:
+        True if the write succeeded, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_set_last_cluster_operation(object_type, object_uuid, lco_dict)
+    return _direct_set_last_cluster_operation(object_type, object_uuid, lco_dict)
+
+
+def delete_object_metadata(
+    object_type: ObjectType,
+    object_uuid: str
+) -> bool:
+    """Delete metadata and last_cluster_operation for an object.
+
+    Args:
+        object_type: The type of object.
+        object_uuid: The UUID of the object.
+
+    Returns:
+        True if the delete succeeded (or row didn't exist), False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_delete_object_metadata(object_type, object_uuid)
+    return _direct_delete_object_metadata(object_type, object_uuid)
 
 
 # =============================================================================

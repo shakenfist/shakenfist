@@ -70,6 +70,7 @@ class MockEtcd():
         self.agent_operation_attributes = {}  # Mock MariaDB agent operation attributes
         self.instance_objects = {}  # Mock MariaDB instance storage
         self.instance_attributes = {}  # Mock MariaDB instance attributes
+        self.object_metadata = {}  # Mock MariaDB object metadata storage
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -699,6 +700,35 @@ class MockEtcd():
         self.mariadb_delete_instance_attributes.start()
         self.test_obj.addCleanup(
             self.mariadb_delete_instance_attributes.stop)
+
+        # Mock MariaDB functions for object metadata
+        self.mariadb_get_object_metadata = mock.patch(
+            'shakenfist.mariadb.get_object_metadata',
+            side_effect=self._mariadb_get_object_metadata)
+        self.mariadb_get_object_metadata.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_object_metadata.stop)
+
+        self.mariadb_set_metadata = mock.patch(
+            'shakenfist.mariadb.set_metadata',
+            side_effect=self._mariadb_set_metadata)
+        self.mariadb_set_metadata.start()
+        self.test_obj.addCleanup(
+            self.mariadb_set_metadata.stop)
+
+        self.mariadb_set_last_cluster_operation = mock.patch(
+            'shakenfist.mariadb.set_last_cluster_operation',
+            side_effect=self._mariadb_set_last_cluster_operation)
+        self.mariadb_set_last_cluster_operation.start()
+        self.test_obj.addCleanup(
+            self.mariadb_set_last_cluster_operation.stop)
+
+        self.mariadb_delete_object_metadata = mock.patch(
+            'shakenfist.mariadb.delete_object_metadata',
+            side_effect=self._mariadb_delete_object_metadata)
+        self.mariadb_delete_object_metadata.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_object_metadata.stop)
 
         # Setup basic DB data
         self.node_uuids = {}
@@ -1752,6 +1782,71 @@ class MockEtcd():
             return True
         self._trace(
             f'MockMariaDB.delete_instance_attributes({key}): '
+            f'not found')
+        return False
+
+    #
+    # Mock MariaDB object metadata functions
+    #
+
+    def _mariadb_get_object_metadata(self, object_type, object_uuid):
+        """Mock implementation of mariadb.get_object_metadata()"""
+        from shakenfist.schema.object_metadata import ObjectMetadataData
+
+        key = f'{object_type}/{object_uuid}'
+        if key in self.object_metadata:
+            data = self.object_metadata[key]
+            self._trace(
+                f'MockMariaDB.get_object_metadata({key}): '
+                f'found')
+            return ObjectMetadataData(
+                object_type=str(object_type),
+                object_uuid=object_uuid,
+                metadata=data.get('metadata'),
+                last_cluster_operation=data.get(
+                    'last_cluster_operation')
+            )
+        self._trace(
+            f'MockMariaDB.get_object_metadata({key}): '
+            f'not found')
+        return None
+
+    def _mariadb_set_metadata(self, object_type, object_uuid,
+                              metadata_dict):
+        """Mock implementation of mariadb.set_metadata()"""
+        key = f'{object_type}/{object_uuid}'
+        if key not in self.object_metadata:
+            self.object_metadata[key] = {}
+        self.object_metadata[key]['metadata'] = metadata_dict
+        self._trace(
+            f'MockMariaDB.set_metadata({key}): stored')
+        return True
+
+    def _mariadb_set_last_cluster_operation(
+            self, object_type, object_uuid, lco_dict):
+        """Mock implementation of mariadb.set_last_cluster_operation()"""
+        key = f'{object_type}/{object_uuid}'
+        if key not in self.object_metadata:
+            self.object_metadata[key] = {}
+        self.object_metadata[key][
+            'last_cluster_operation'] = lco_dict
+        self._trace(
+            f'MockMariaDB.set_last_cluster_operation({key}): '
+            f'stored')
+        return True
+
+    def _mariadb_delete_object_metadata(self, object_type,
+                                        object_uuid):
+        """Mock implementation of mariadb.delete_object_metadata()"""
+        key = f'{object_type}/{object_uuid}'
+        if key in self.object_metadata:
+            del self.object_metadata[key]
+            self._trace(
+                f'MockMariaDB.delete_object_metadata({key}): '
+                f'deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_object_metadata({key}): '
             f'not found')
         return False
 

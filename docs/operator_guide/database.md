@@ -533,8 +533,7 @@ The migration is happening in phases:
 | 11 | Network objects | Complete - `networks`, `network_attributes` tables |
 | 12 | AgentOperation objects | Complete - `agent_operations`, `agent_operation_attributes` tables |
 | 13 | Instance objects | Complete - `instances`, `instance_attributes` tables |
-| 14 | Other object types | Future |
-| 15 | Object attributes | Future |
+| 14 | Object metadata | Complete - `object_metadata` table (metadata + last_cluster_operation) |
 
 ### Table Architecture
 
@@ -549,6 +548,7 @@ tables with `(object_type, object_uuid)` keys:
 | Table | Purpose |
 |-------|---------|
 | `object_states` | State value, update time, message for all objects |
+| `object_metadata` | User-defined metadata and last_cluster_operation for all objects |
 
 These tables are efficient for cross-type queries (e.g., "find all objects
 in error state").

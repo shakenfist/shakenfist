@@ -229,6 +229,14 @@ service DatabaseService {
   rpc GetInstanceAttributes (GetInstanceAttributesRequest) returns (GetInstanceAttributesReply) {}
   rpc UpdateInstanceAttributes (UpdateInstanceAttributesRequest) returns (StatusReply) {}
   rpc DeleteInstanceAttributes (DeleteInstanceAttributesRequest) returns (StatusReply) {}
+
+  // Object Metadata Operations (MariaDB)
+  // These store user-defined metadata and last_cluster_operation for all
+  // object types in a single shared table (like object_states).
+  rpc GetObjectMetadata (GetObjectMetadataRequest) returns (GetObjectMetadataReply) {}
+  rpc SetMetadata (SetMetadataRequest) returns (StatusReply) {}
+  rpc SetLastClusterOperation (SetLastClusterOperationRequest) returns (StatusReply) {}
+  rpc DeleteObjectMetadata (DeleteObjectMetadataRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -1491,4 +1499,34 @@ message UpdateInstanceAttributesRequest {
 
 message DeleteInstanceAttributesRequest {
   string uuid = 1;
+}
+
+// Object Metadata Operations
+
+message GetObjectMetadataRequest {
+  ObjectType object_type = 1;
+  string object_uuid = 2;
+}
+
+message GetObjectMetadataReply {
+  bool found = 1;
+  string metadata_json = 2;                  // JSON dict or empty
+  string last_cluster_operation_json = 3;    // JSON dict or empty
+}
+
+message SetMetadataRequest {
+  ObjectType object_type = 1;
+  string object_uuid = 2;
+  string metadata_json = 3;                  // JSON dict or empty
+}
+
+message SetLastClusterOperationRequest {
+  ObjectType object_type = 1;
+  string object_uuid = 2;
+  string last_cluster_operation_json = 3;    // JSON dict or empty
+}
+
+message DeleteObjectMetadataRequest {
+  ObjectType object_type = 1;
+  string object_uuid = 2;
 }
