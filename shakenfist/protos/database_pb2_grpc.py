@@ -764,6 +764,36 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteObjectMetadataRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.CreateClusterOperationTarget = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateClusterOperationTarget',
+                request_serializer=database__pb2.CreateClusterOperationTargetRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetClusterOperationTarget = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetClusterOperationTarget',
+                request_serializer=database__pb2.GetClusterOperationTargetRequest.SerializeToString,
+                response_deserializer=database__pb2.GetClusterOperationTargetReply.FromString,
+                _registered_method=True)
+        self.GetClusterOperationTargetsForObject = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetClusterOperationTargetsForObject',
+                request_serializer=database__pb2.GetClusterOperationTargetsForObjectRequest.SerializeToString,
+                response_deserializer=database__pb2.GetClusterOperationTargetsForObjectReply.FromString,
+                _registered_method=True)
+        self.GetLatestClusterOperationTarget = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetLatestClusterOperationTarget',
+                request_serializer=database__pb2.GetLatestClusterOperationTargetRequest.SerializeToString,
+                response_deserializer=database__pb2.GetClusterOperationTargetReply.FromString,
+                _registered_method=True)
+        self.DeleteClusterOperationTarget = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteClusterOperationTarget',
+                request_serializer=database__pb2.DeleteClusterOperationTargetRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteClusterOperationTargetsForObject = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteClusterOperationTargetsForObject',
+                request_serializer=database__pb2.DeleteClusterOperationTargetsForObjectRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -1702,6 +1732,44 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateClusterOperationTarget(self, request, context):
+        """Cluster Operation Target Operations (MariaDB)
+        Track which operations target which objects, with sequence ordering.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetClusterOperationTarget(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetClusterOperationTargetsForObject(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetLatestClusterOperationTarget(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteClusterOperationTarget(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteClusterOperationTargetsForObject(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -2433,6 +2501,36 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'DeleteObjectMetadata': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteObjectMetadata,
                     request_deserializer=database__pb2.DeleteObjectMetadataRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateClusterOperationTarget': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateClusterOperationTarget,
+                    request_deserializer=database__pb2.CreateClusterOperationTargetRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetClusterOperationTarget': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetClusterOperationTarget,
+                    request_deserializer=database__pb2.GetClusterOperationTargetRequest.FromString,
+                    response_serializer=database__pb2.GetClusterOperationTargetReply.SerializeToString,
+            ),
+            'GetClusterOperationTargetsForObject': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetClusterOperationTargetsForObject,
+                    request_deserializer=database__pb2.GetClusterOperationTargetsForObjectRequest.FromString,
+                    response_serializer=database__pb2.GetClusterOperationTargetsForObjectReply.SerializeToString,
+            ),
+            'GetLatestClusterOperationTarget': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetLatestClusterOperationTarget,
+                    request_deserializer=database__pb2.GetLatestClusterOperationTargetRequest.FromString,
+                    response_serializer=database__pb2.GetClusterOperationTargetReply.SerializeToString,
+            ),
+            'DeleteClusterOperationTarget': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteClusterOperationTarget,
+                    request_deserializer=database__pb2.DeleteClusterOperationTargetRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteClusterOperationTargetsForObject': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteClusterOperationTargetsForObject,
+                    request_deserializer=database__pb2.DeleteClusterOperationTargetsForObjectRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
@@ -6377,6 +6475,168 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/DeleteObjectMetadata',
             database__pb2.DeleteObjectMetadataRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateClusterOperationTarget(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateClusterOperationTarget',
+            database__pb2.CreateClusterOperationTargetRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetClusterOperationTarget(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetClusterOperationTarget',
+            database__pb2.GetClusterOperationTargetRequest.SerializeToString,
+            database__pb2.GetClusterOperationTargetReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetClusterOperationTargetsForObject(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetClusterOperationTargetsForObject',
+            database__pb2.GetClusterOperationTargetsForObjectRequest.SerializeToString,
+            database__pb2.GetClusterOperationTargetsForObjectReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetLatestClusterOperationTarget(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetLatestClusterOperationTarget',
+            database__pb2.GetLatestClusterOperationTargetRequest.SerializeToString,
+            database__pb2.GetClusterOperationTargetReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteClusterOperationTarget(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteClusterOperationTarget',
+            database__pb2.DeleteClusterOperationTargetRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteClusterOperationTargetsForObject(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteClusterOperationTargetsForObject',
+            database__pb2.DeleteClusterOperationTargetsForObjectRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,

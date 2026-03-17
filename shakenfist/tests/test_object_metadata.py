@@ -188,7 +188,12 @@ class HardDeleteMetadataTestCase(base.ShakenFistTestCase):
 
 
 class LastClusterOperationTestCase(base.ShakenFistTestCase):
-    """Test last_cluster_operation property routing."""
+    """Test last_cluster_operation property routing via object_metadata fallback.
+
+    The primary path now uses cluster_operation_targets (tested in
+    test_cluster_operation_targets.py). These tests verify the
+    object_metadata fallback when no targets exist.
+    """
 
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
@@ -199,7 +204,10 @@ class LastClusterOperationTestCase(base.ShakenFistTestCase):
                         'op_uuid': 'abcd1234-0000-0000-0000-000000000000'
                     }
                 ))
-    def test_lco_reads_from_mariadb(self, mock_get):
+    @mock.patch('shakenfist.mariadb.get_latest_cluster_operation_target',
+                return_value=None)
+    def test_lco_reads_from_object_metadata_fallback(
+            self, mock_get_latest, mock_get):
         d = DatabaseBackedObjectWithOperations(TEST_UUID)
         result = d.last_cluster_operation
         self.assertEqual(result, {
@@ -212,7 +220,10 @@ class LastClusterOperationTestCase(base.ShakenFistTestCase):
         return_value={'op_type': 'etcd_op', 'op_uuid': 'from-etcd'})
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=None)
-    def test_lco_falls_back_to_etcd(self, mock_get, mock_etcd_get):
+    @mock.patch('shakenfist.mariadb.get_latest_cluster_operation_target',
+                return_value=None)
+    def test_lco_falls_back_to_etcd(
+            self, mock_get_latest, mock_get, mock_etcd_get):
         d = DatabaseBackedObjectWithOperations(TEST_UUID)
         result = d.last_cluster_operation
         self.assertEqual(result, {
@@ -229,8 +240,10 @@ class LastClusterOperationTestCase(base.ShakenFistTestCase):
                     object_uuid=TEST_UUID,
                     last_cluster_operation=None
                 ))
+    @mock.patch('shakenfist.mariadb.get_latest_cluster_operation_target',
+                return_value=None)
     def test_lco_falls_back_when_mariadb_lco_is_none(
-            self, mock_get, mock_etcd_get):
+            self, mock_get_latest, mock_get, mock_etcd_get):
         d = DatabaseBackedObjectWithOperations(TEST_UUID)
         result = d.last_cluster_operation
         self.assertEqual(result, {
@@ -245,7 +258,12 @@ class SetLastClusterOperationTestCase(base.ShakenFistTestCase):
         'shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.mariadb.set_last_cluster_operation',
                 return_value=True)
-    def test_set_lco_dual_writes(self, mock_set_lco, mock_etcd_set):
+    @mock.patch('shakenfist.mariadb.create_cluster_operation_target',
+                return_value=True)
+    @mock.patch('shakenfist.baseobject.time')
+    def test_set_lco_dual_writes(self, mock_time, mock_create_target,
+                                 mock_set_lco, mock_etcd_set):
+        mock_time.time.return_value = 9999.0
         d = DatabaseBackedObjectWithOperations(TEST_UUID)
         d.set_last_cluster_operation('instance_preflight', 'op-uuid-1')
 
@@ -253,6 +271,7 @@ class SetLastClusterOperationTestCase(base.ShakenFistTestCase):
             'op_type': 'instance_preflight',
             'op_uuid': 'op-uuid-1'
         }
+        mock_create_target.assert_called_once()
         mock_set_lco.assert_called_once_with(
             d.object_type, TEST_UUID, expected)
         mock_etcd_set.assert_called_once_with(
