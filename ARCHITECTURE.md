@@ -57,7 +57,9 @@ Shaken Fist runs several daemons on each cluster node:
                                          |  instances, |
                                          |  dnsmasq,   |
                                          |  object_    |
-                                         |  references)|
+                                         |  references,|
+                                         |  object_    |
+                                         |  metadata)  |
                                          +-------------+
 ```
 

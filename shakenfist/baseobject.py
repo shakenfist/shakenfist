@@ -621,12 +621,22 @@ class DatabaseBackedObject:
 
     @property
     def metadata(self):
+        if not self.in_memory_only:
+            obj_meta = mariadb.get_object_metadata(
+                self.object_type, str(self.uuid))
+            if obj_meta and obj_meta.metadata is not None:
+                return obj_meta.metadata
+            # Fallback to etcd for unmigrated objects
         return self._db_get_attribute('metadata', {})
 
     def add_metadata_key(self, key, value):
         with self.get_lock_attr('metadata', 'Add metadata key'):
             md = self.metadata
             md[key] = value
+            if not self.in_memory_only:
+                mariadb.set_metadata(
+                    self.object_type, str(self.uuid), md)
+            # Dual-write to etcd during migration period
             self._db_set_attribute('metadata', md)
 
     def remove_metadata_key(self, key):
@@ -634,6 +644,10 @@ class DatabaseBackedObject:
             md = self.metadata
             if key in md:
                 del md[key]
+                if not self.in_memory_only:
+                    mariadb.set_metadata(
+                        self.object_type, str(self.uuid), md)
+                # Dual-write to etcd during migration period
                 self._db_set_attribute('metadata', md)
 
     def _external_view(self):
@@ -659,22 +673,31 @@ class DatabaseBackedObject:
         etcd.delete(self.object_type, None, str(self.uuid))
         etcd.delete_all('attribute/%s' % self.object_type, str(self.uuid))
         mariadb.delete_state(self.object_type, str(self.uuid))
+        mariadb.delete_object_metadata(self.object_type, str(self.uuid))
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
 
 
 class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
     @property
     def last_cluster_operation(self):
+        if not self.in_memory_only:
+            obj_meta = mariadb.get_object_metadata(
+                self.object_type, str(self.uuid))
+            if obj_meta and obj_meta.last_cluster_operation is not None:
+                return obj_meta.last_cluster_operation
+            # Fallback to etcd for unmigrated objects
         return self._db_get_attribute('last_cluster_operation')
 
     def set_last_cluster_operation(self, op_type, op_uuid):
-        self._db_set_attribute(
-            'last_cluster_operation',
-            {
-                'op_type': op_type,
-                'op_uuid': op_uuid
-            }
-        )
+        lco = {
+            'op_type': str(op_type),
+            'op_uuid': str(op_uuid)
+        }
+        if not self.in_memory_only:
+            mariadb.set_last_cluster_operation(
+                self.object_type, str(self.uuid), lco)
+        # Dual-write to etcd during migration period
+        self._db_set_attribute('last_cluster_operation', lco)
 
     def get_cluster_operations(self, outstanding_only=True):
         last_op = self.last_cluster_operation

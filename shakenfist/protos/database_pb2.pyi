@@ -4569,3 +4569,108 @@ class DeleteInstanceAttributesRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
 
 global___DeleteInstanceAttributesRequest = DeleteInstanceAttributesRequest
+
+@typing.final
+class GetObjectMetadataRequest(google.protobuf.message.Message):
+    """Object Metadata Operations"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    object_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        object_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+
+global___GetObjectMetadataRequest = GetObjectMetadataRequest
+
+@typing.final
+class GetObjectMetadataReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    METADATA_JSON_FIELD_NUMBER: builtins.int
+    LAST_CLUSTER_OPERATION_JSON_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    metadata_json: builtins.str
+    """JSON dict or empty"""
+    last_cluster_operation_json: builtins.str
+    """JSON dict or empty"""
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        metadata_json: builtins.str = ...,
+        last_cluster_operation_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["found", b"found", "last_cluster_operation_json", b"last_cluster_operation_json", "metadata_json", b"metadata_json"]) -> None: ...
+
+global___GetObjectMetadataReply = GetObjectMetadataReply
+
+@typing.final
+class SetMetadataRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
+    METADATA_JSON_FIELD_NUMBER: builtins.int
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    object_uuid: builtins.str
+    metadata_json: builtins.str
+    """JSON dict or empty"""
+    def __init__(
+        self,
+        *,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        object_uuid: builtins.str = ...,
+        metadata_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["metadata_json", b"metadata_json", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+
+global___SetMetadataRequest = SetMetadataRequest
+
+@typing.final
+class SetLastClusterOperationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
+    LAST_CLUSTER_OPERATION_JSON_FIELD_NUMBER: builtins.int
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    object_uuid: builtins.str
+    last_cluster_operation_json: builtins.str
+    """JSON dict or empty"""
+    def __init__(
+        self,
+        *,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        object_uuid: builtins.str = ...,
+        last_cluster_operation_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["last_cluster_operation_json", b"last_cluster_operation_json", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+
+global___SetLastClusterOperationRequest = SetLastClusterOperationRequest
+
+@typing.final
+class DeleteObjectMetadataRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    object_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        object_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+
+global___DeleteObjectMetadataRequest = DeleteObjectMetadataRequest

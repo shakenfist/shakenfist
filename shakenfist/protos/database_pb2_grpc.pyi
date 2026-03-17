@@ -800,6 +800,30 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    GetObjectMetadata: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetObjectMetadataRequest,
+        database_pb2.GetObjectMetadataReply,
+    ]
+    """Object Metadata Operations (MariaDB)
+    These store user-defined metadata and last_cluster_operation for all
+    object types in a single shared table (like object_states).
+    """
+
+    SetMetadata: grpc.UnaryUnaryMultiCallable[
+        database_pb2.SetMetadataRequest,
+        database_pb2.StatusReply,
+    ]
+
+    SetLastClusterOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.SetLastClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteObjectMetadata: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteObjectMetadataRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -1579,6 +1603,30 @@ class DatabaseServiceAsyncStub:
 
     DeleteInstanceAttributes: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteInstanceAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    GetObjectMetadata: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetObjectMetadataRequest,
+        database_pb2.GetObjectMetadataReply,
+    ]
+    """Object Metadata Operations (MariaDB)
+    These store user-defined metadata and last_cluster_operation for all
+    object types in a single shared table (like object_states).
+    """
+
+    SetMetadata: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.SetMetadataRequest,
+        database_pb2.StatusReply,
+    ]
+
+    SetLastClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.SetLastClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteObjectMetadata: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteObjectMetadataRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2645,6 +2693,38 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def DeleteInstanceAttributes(
         self,
         request: database_pb2.DeleteInstanceAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def GetObjectMetadata(
+        self,
+        request: database_pb2.GetObjectMetadataRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetObjectMetadataReply, collections.abc.Awaitable[database_pb2.GetObjectMetadataReply]]:
+        """Object Metadata Operations (MariaDB)
+        These store user-defined metadata and last_cluster_operation for all
+        object types in a single shared table (like object_states).
+        """
+
+    @abc.abstractmethod
+    def SetMetadata(
+        self,
+        request: database_pb2.SetMetadataRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def SetLastClusterOperation(
+        self,
+        request: database_pb2.SetLastClusterOperationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteObjectMetadata(
+        self,
+        request: database_pb2.DeleteObjectMetadataRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
