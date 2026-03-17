@@ -4674,3 +4674,182 @@ class DeleteObjectMetadataRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
 
 global___DeleteObjectMetadataRequest = DeleteObjectMetadataRequest
+
+@typing.final
+class ClusterOperationTargetProto(google.protobuf.message.Message):
+    """Cluster Operation Target Operations"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OPERATION_UUID_FIELD_NUMBER: builtins.int
+    OPERATION_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    SEQUENCE_NUMBER_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    operation_uuid: builtins.str
+    operation_type: builtins.str
+    target_object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    sequence_number: builtins.int
+    created_at: builtins.float
+    def __init__(
+        self,
+        *,
+        operation_uuid: builtins.str = ...,
+        operation_type: builtins.str = ...,
+        target_object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+        sequence_number: builtins.int = ...,
+        created_at: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "operation_type", b"operation_type", "operation_uuid", b"operation_uuid", "sequence_number", b"sequence_number", "target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___ClusterOperationTargetProto = ClusterOperationTargetProto
+
+@typing.final
+class CreateClusterOperationTargetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OPERATION_UUID_FIELD_NUMBER: builtins.int
+    OPERATION_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    operation_uuid: builtins.str
+    operation_type: builtins.str
+    target_object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    created_at: builtins.float
+    def __init__(
+        self,
+        *,
+        operation_uuid: builtins.str = ...,
+        operation_type: builtins.str = ...,
+        target_object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+        created_at: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "operation_type", b"operation_type", "operation_uuid", b"operation_uuid", "target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___CreateClusterOperationTargetRequest = CreateClusterOperationTargetRequest
+
+@typing.final
+class GetClusterOperationTargetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OPERATION_UUID_FIELD_NUMBER: builtins.int
+    operation_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        operation_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["operation_uuid", b"operation_uuid"]) -> None: ...
+
+global___GetClusterOperationTargetRequest = GetClusterOperationTargetRequest
+
+@typing.final
+class GetClusterOperationTargetReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    TARGET_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def target(self) -> global___ClusterOperationTargetProto: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        target: global___ClusterOperationTargetProto | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["target", b"target"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["found", b"found", "target", b"target"]) -> None: ...
+
+global___GetClusterOperationTargetReply = GetClusterOperationTargetReply
+
+@typing.final
+class GetClusterOperationTargetsForObjectRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    target_object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        target_object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___GetClusterOperationTargetsForObjectRequest = GetClusterOperationTargetsForObjectRequest
+
+@typing.final
+class GetClusterOperationTargetsForObjectReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGETS_FIELD_NUMBER: builtins.int
+    @property
+    def targets(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ClusterOperationTargetProto]: ...
+    def __init__(
+        self,
+        *,
+        targets: collections.abc.Iterable[global___ClusterOperationTargetProto] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["targets", b"targets"]) -> None: ...
+
+global___GetClusterOperationTargetsForObjectReply = GetClusterOperationTargetsForObjectReply
+
+@typing.final
+class GetLatestClusterOperationTargetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    target_object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        target_object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___GetLatestClusterOperationTargetRequest = GetLatestClusterOperationTargetRequest
+
+@typing.final
+class DeleteClusterOperationTargetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OPERATION_UUID_FIELD_NUMBER: builtins.int
+    operation_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        operation_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["operation_uuid", b"operation_uuid"]) -> None: ...
+
+global___DeleteClusterOperationTargetRequest = DeleteClusterOperationTargetRequest
+
+@typing.final
+class DeleteClusterOperationTargetsForObjectRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    target_object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        target_object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___DeleteClusterOperationTargetsForObjectRequest = DeleteClusterOperationTargetsForObjectRequest

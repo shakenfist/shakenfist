@@ -60,6 +60,7 @@ from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttri
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.object_metadata import ObjectMetadataData
 from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_state import State
@@ -121,6 +122,7 @@ _agent_operation_attributes_table: Optional[sa.Table] = None
 _instances_table: Optional[sa.Table] = None
 _instance_attributes_table: Optional[sa.Table] = None
 _object_metadata_table: Optional[sa.Table] = None
+_cluster_operation_targets_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -153,6 +155,7 @@ AGENT_OPERATION_ATTRIBUTES_VERSION = 2
 INSTANCES_VERSION = 1
 INSTANCE_ATTRIBUTES_VERSION = 1
 OBJECT_METADATA_VERSION = 2
+CLUSTER_OPERATION_TARGETS_VERSION = 1
 
 
 def _use_database_service() -> bool:
@@ -436,6 +439,64 @@ def _ensure_object_metadata_schema(engine: sa.Engine) -> dict[str, Any]:
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': OBJECT_METADATA_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_cluster_operation_targets_table() -> sa.Table:
+    """Get or create the cluster_operation_targets table definition.
+
+    This table records every cluster operation that targets an object
+    (Instance, Artifact, Network). Each row represents one operation-to-target
+    relationship with an auto-incrementing sequence number for ordering.
+
+    The sequence_number column uses AUTO_INCREMENT so MariaDB assigns ordering
+    automatically on insert. This requires a manual table definition rather
+    than Pydantic-generated schema.
+    """
+    global _cluster_operation_targets_table
+    if _cluster_operation_targets_table is None:
+        metadata = _get_metadata()
+        _cluster_operation_targets_table = sa.Table(
+            'cluster_operation_targets',
+            metadata,
+            sa.Column('operation_uuid', sa.String(36),
+                      nullable=False, primary_key=True),
+            sa.Column('operation_type', sa.String(64), nullable=False),
+            sa.Column('target_object_type', sa.Enum(ObjectType),
+                      nullable=False),
+            sa.Column('target_uuid', sa.String(36), nullable=False),
+            sa.Column('sequence_number', sa.BigInteger(),
+                      nullable=False, autoincrement=True,
+                      unique=True),
+            sa.Column('created_at', sa.Double(), nullable=False),
+            # Indexes for common query patterns
+            sa.Index('idx_cot_target', 'target_object_type', 'target_uuid'),
+            sa.Index('idx_cot_created', 'created_at'),
+        )
+    return _cluster_operation_targets_table
+
+
+def _ensure_cluster_operation_targets_schema(
+    engine: sa.Engine
+) -> dict[str, Any]:
+    """Ensure the cluster_operation_targets table schema is up to date."""
+    table_name = 'cluster_operation_targets'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_cluster_operation_targets_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': CLUSTER_OPERATION_TARGETS_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -1165,6 +1226,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_instances_schema(engine))
     results.append(_ensure_instance_attributes_schema(engine))
     results.append(_ensure_object_metadata_schema(engine))
+    results.append(_ensure_cluster_operation_targets_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -4221,6 +4283,453 @@ def delete_object_metadata(
     if _use_database_service():
         return _grpc_delete_object_metadata(object_type, object_uuid)
     return _direct_delete_object_metadata(object_type, object_uuid)
+
+
+# =============================================================================
+# Cluster Operation Target Functions
+# Track which cluster operations target which objects, with sequence ordering.
+# =============================================================================
+
+def _direct_create_cluster_operation_target(
+    operation_uuid: str,
+    operation_type: str,
+    target_object_type: ObjectType,
+    target_uuid: str,
+    created_at: float
+) -> bool:
+    """Insert a cluster operation target row directly into MariaDB.
+
+    The sequence_number is assigned automatically by AUTO_INCREMENT.
+    """
+    engine = _get_engine()
+    table = _get_cluster_operation_targets_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                operation_uuid=operation_uuid,
+                operation_type=operation_type,
+                target_object_type=target_object_type,
+                target_uuid=target_uuid,
+                created_at=created_at
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        # Duplicate operation_uuid — already recorded
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB write failed for cluster_operation_targets '
+            f'{operation_uuid}: {e}')
+        return False
+
+
+def _direct_get_cluster_operation_target(
+    operation_uuid: str
+) -> Optional[ClusterOperationTargetData]:
+    """Read a single cluster operation target by operation_uuid."""
+    engine = _get_engine()
+    table = _get_cluster_operation_targets_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.operation_uuid == operation_uuid
+            )
+            result = conn.execute(stmt).fetchone()
+            if result is None:
+                return None
+
+            return ClusterOperationTargetData(
+                operation_uuid=result.operation_uuid,
+                operation_type=result.operation_type,
+                target_object_type=result.target_object_type.value,
+                target_uuid=result.target_uuid,
+                sequence_number=result.sequence_number,
+                created_at=result.created_at
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for cluster_operation_targets '
+            f'{operation_uuid}: {e}')
+        return None
+
+
+def _direct_get_cluster_operation_targets_for_object(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> list[ClusterOperationTargetData]:
+    """Get all cluster operation targets for an object, ordered by sequence."""
+    engine = _get_engine()
+    table = _get_cluster_operation_targets_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                sa.and_(
+                    table.c.target_object_type == target_object_type,
+                    table.c.target_uuid == target_uuid
+                )
+            ).order_by(table.c.sequence_number)
+            results = conn.execute(stmt).fetchall()
+            return [
+                ClusterOperationTargetData(
+                    operation_uuid=r.operation_uuid,
+                    operation_type=r.operation_type,
+                    target_object_type=r.target_object_type.value,
+                    target_uuid=r.target_uuid,
+                    sequence_number=r.sequence_number,
+                    created_at=r.created_at
+                )
+                for r in results
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for cluster_operation_targets '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return []
+
+
+def _direct_get_latest_cluster_operation_target(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> Optional[ClusterOperationTargetData]:
+    """Get the most recent cluster operation target for an object."""
+    engine = _get_engine()
+    table = _get_cluster_operation_targets_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                sa.and_(
+                    table.c.target_object_type == target_object_type,
+                    table.c.target_uuid == target_uuid
+                )
+            ).order_by(table.c.sequence_number.desc()).limit(1)
+            result = conn.execute(stmt).fetchone()
+            if result is None:
+                return None
+
+            return ClusterOperationTargetData(
+                operation_uuid=result.operation_uuid,
+                operation_type=result.operation_type,
+                target_object_type=result.target_object_type.value,
+                target_uuid=result.target_uuid,
+                sequence_number=result.sequence_number,
+                created_at=result.created_at
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for cluster_operation_targets '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return None
+
+
+def _direct_delete_cluster_operation_target(
+    operation_uuid: str
+) -> bool:
+    """Delete a single cluster operation target row."""
+    engine = _get_engine()
+    table = _get_cluster_operation_targets_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.operation_uuid == operation_uuid
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for cluster_operation_targets '
+            f'{operation_uuid}: {e}')
+        return False
+
+
+def _direct_delete_cluster_operation_targets_for_object(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> bool:
+    """Delete all cluster operation target rows for an object."""
+    engine = _get_engine()
+    table = _get_cluster_operation_targets_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.target_object_type == target_object_type,
+                    table.c.target_uuid == target_uuid
+                )
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for cluster_operation_targets '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return False
+
+
+# gRPC client functions for cluster operation targets
+
+def _grpc_create_cluster_operation_target(
+    operation_uuid: str,
+    operation_type: str,
+    target_object_type: ObjectType,
+    target_uuid: str,
+    created_at: float
+) -> bool:
+    """Insert a cluster operation target via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateClusterOperationTargetRequest(
+            operation_uuid=operation_uuid,
+            operation_type=operation_type,
+            target_object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_object_type.proto_id),
+            target_uuid=target_uuid,
+            created_at=created_at
+        )
+        reply = stub.CreateClusterOperationTarget(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateClusterOperationTarget failed for '
+            f'{operation_uuid}: {e}')
+        return False
+
+
+def _target_from_proto(
+    t: 'database_pb2.ClusterOperationTargetProto'
+) -> ClusterOperationTargetData:
+    """Convert a proto ClusterOperationTargetProto to model."""
+    ot = ObjectType.from_proto_id(t.target_object_type)
+    return ClusterOperationTargetData(
+        operation_uuid=t.operation_uuid,
+        operation_type=t.operation_type,
+        target_object_type=ot.value if ot else 'unknown',
+        target_uuid=t.target_uuid,
+        sequence_number=t.sequence_number if t.sequence_number else None,
+        created_at=t.created_at
+    )
+
+
+def _grpc_get_cluster_operation_target(
+    operation_uuid: str
+) -> Optional[ClusterOperationTargetData]:
+    """Read a single cluster operation target via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetClusterOperationTargetRequest(
+            operation_uuid=operation_uuid
+        )
+        reply = stub.GetClusterOperationTarget(request)
+        if not reply.found:
+            return None
+        return _target_from_proto(reply.target)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetClusterOperationTarget failed for '
+            f'{operation_uuid}: {e}')
+        return None
+
+
+def _grpc_get_cluster_operation_targets_for_object(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> list[ClusterOperationTargetData]:
+    """Get all cluster operation targets for an object via gRPC."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetClusterOperationTargetsForObjectRequest(
+            target_object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_object_type.proto_id),
+            target_uuid=target_uuid
+        )
+        reply = stub.GetClusterOperationTargetsForObject(request)
+        return [_target_from_proto(t) for t in reply.targets]
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetClusterOperationTargetsForObject failed for '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return []
+
+
+def _grpc_get_latest_cluster_operation_target(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> Optional[ClusterOperationTargetData]:
+    """Get the most recent cluster operation target via gRPC."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetLatestClusterOperationTargetRequest(
+            target_object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_object_type.proto_id),
+            target_uuid=target_uuid
+        )
+        reply = stub.GetLatestClusterOperationTarget(request)
+        if not reply.found:
+            return None
+        return _target_from_proto(reply.target)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetLatestClusterOperationTarget failed for '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return None
+
+
+def _grpc_delete_cluster_operation_target(
+    operation_uuid: str
+) -> bool:
+    """Delete a single cluster operation target via gRPC."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteClusterOperationTargetRequest(
+            operation_uuid=operation_uuid
+        )
+        reply = stub.DeleteClusterOperationTarget(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteClusterOperationTarget failed for '
+            f'{operation_uuid}: {e}')
+        return False
+
+
+def _grpc_delete_cluster_operation_targets_for_object(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> bool:
+    """Delete all cluster operation targets for an object via gRPC."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteClusterOperationTargetsForObjectRequest(
+            target_object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_object_type.proto_id),
+            target_uuid=target_uuid
+        )
+        reply = stub.DeleteClusterOperationTargetsForObject(request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteClusterOperationTargetsForObject failed for '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return False
+
+
+# Public API functions for cluster operation targets
+
+def create_cluster_operation_target(
+    operation_uuid: str,
+    operation_type: str,
+    target_object_type: ObjectType,
+    target_uuid: str,
+    created_at: float
+) -> bool:
+    """Record that a cluster operation targets an object.
+
+    Args:
+        operation_uuid: UUID of the cluster operation.
+        operation_type: The operation type string.
+        target_object_type: The ObjectType of the target object.
+        target_uuid: UUID of the target object.
+        created_at: Unix timestamp when the operation was enqueued.
+
+    Returns:
+        True if the row was created, False on duplicate or error.
+    """
+    if _use_database_service():
+        return _grpc_create_cluster_operation_target(
+            operation_uuid, operation_type, target_object_type,
+            target_uuid, created_at)
+    return _direct_create_cluster_operation_target(
+        operation_uuid, operation_type, target_object_type,
+        target_uuid, created_at)
+
+
+def get_cluster_operation_target(
+    operation_uuid: str
+) -> Optional[ClusterOperationTargetData]:
+    """Get a cluster operation target by operation UUID.
+
+    Returns:
+        The target data, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_cluster_operation_target(operation_uuid)
+    return _direct_get_cluster_operation_target(operation_uuid)
+
+
+def get_cluster_operation_targets_for_object(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> list[ClusterOperationTargetData]:
+    """Get all cluster operation targets for an object, ordered by sequence.
+
+    Returns:
+        List of target data ordered by sequence_number ascending.
+    """
+    if _use_database_service():
+        return _grpc_get_cluster_operation_targets_for_object(
+            target_object_type, target_uuid)
+    return _direct_get_cluster_operation_targets_for_object(
+        target_object_type, target_uuid)
+
+
+def get_latest_cluster_operation_target(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> Optional[ClusterOperationTargetData]:
+    """Get the most recent cluster operation target for an object.
+
+    Returns:
+        The most recent target data, or None if no operations exist.
+    """
+    if _use_database_service():
+        return _grpc_get_latest_cluster_operation_target(
+            target_object_type, target_uuid)
+    return _direct_get_latest_cluster_operation_target(
+        target_object_type, target_uuid)
+
+
+def delete_cluster_operation_target(
+    operation_uuid: str
+) -> bool:
+    """Delete a single cluster operation target.
+
+    Returns:
+        True if the delete succeeded, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_delete_cluster_operation_target(operation_uuid)
+    return _direct_delete_cluster_operation_target(operation_uuid)
+
+
+def delete_cluster_operation_targets_for_object(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> bool:
+    """Delete all cluster operation targets for an object.
+
+    Used by hard_delete() to clean up when an object is destroyed.
+
+    Returns:
+        True if the delete succeeded, False otherwise.
+    """
+    if _use_database_service():
+        return _grpc_delete_cluster_operation_targets_for_object(
+            target_object_type, target_uuid)
+    return _direct_delete_cluster_operation_targets_for_object(
+        target_object_type, target_uuid)
 
 
 # =============================================================================

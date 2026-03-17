@@ -71,6 +71,8 @@ class MockEtcd():
         self.instance_objects = {}  # Mock MariaDB instance storage
         self.instance_attributes = {}  # Mock MariaDB instance attributes
         self.object_metadata = {}  # Mock MariaDB object metadata storage
+        self.cluster_operation_targets = {}  # Mock MariaDB cluster op targets
+        self._cot_sequence = count(1)  # AUTO_INCREMENT mock
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -729,6 +731,49 @@ class MockEtcd():
         self.mariadb_delete_object_metadata.start()
         self.test_obj.addCleanup(
             self.mariadb_delete_object_metadata.stop)
+
+        # Mock MariaDB functions for cluster operation targets
+        self.mariadb_create_cluster_operation_target = mock.patch(
+            'shakenfist.mariadb.create_cluster_operation_target',
+            side_effect=self._mariadb_create_cluster_operation_target)
+        self.mariadb_create_cluster_operation_target.start()
+        self.test_obj.addCleanup(
+            self.mariadb_create_cluster_operation_target.stop)
+
+        self.mariadb_get_cluster_operation_target = mock.patch(
+            'shakenfist.mariadb.get_cluster_operation_target',
+            side_effect=self._mariadb_get_cluster_operation_target)
+        self.mariadb_get_cluster_operation_target.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_cluster_operation_target.stop)
+
+        self.mariadb_get_cluster_operation_targets_for_object = mock.patch(
+            'shakenfist.mariadb.get_cluster_operation_targets_for_object',
+            side_effect=self._mariadb_get_cluster_operation_targets_for_object)
+        self.mariadb_get_cluster_operation_targets_for_object.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_cluster_operation_targets_for_object.stop)
+
+        self.mariadb_get_latest_cluster_operation_target = mock.patch(
+            'shakenfist.mariadb.get_latest_cluster_operation_target',
+            side_effect=self._mariadb_get_latest_cluster_operation_target)
+        self.mariadb_get_latest_cluster_operation_target.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_latest_cluster_operation_target.stop)
+
+        self.mariadb_delete_cluster_operation_target = mock.patch(
+            'shakenfist.mariadb.delete_cluster_operation_target',
+            side_effect=self._mariadb_delete_cluster_operation_target)
+        self.mariadb_delete_cluster_operation_target.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_cluster_operation_target.stop)
+
+        self.mariadb_delete_cluster_operation_targets_for_object = mock.patch(
+            'shakenfist.mariadb.delete_cluster_operation_targets_for_object',
+            side_effect=self._mariadb_delete_cluster_operation_targets_for_object)
+        self.mariadb_delete_cluster_operation_targets_for_object.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_cluster_operation_targets_for_object.stop)
 
         # Setup basic DB data
         self.node_uuids = {}
@@ -1849,6 +1894,98 @@ class MockEtcd():
             f'MockMariaDB.delete_object_metadata({key}): '
             f'not found')
         return False
+
+    def _mariadb_create_cluster_operation_target(
+            self, operation_uuid, operation_type,
+            target_object_type, target_uuid, created_at):
+        """Mock implementation of mariadb.create_cluster_operation_target()"""
+        from shakenfist.schema.cluster_operation_target import (
+            ClusterOperationTargetData)
+
+        if operation_uuid in self.cluster_operation_targets:
+            self._trace(
+                f'MockMariaDB.create_cluster_operation_target'
+                f'({operation_uuid}): duplicate')
+            return False
+
+        seq = next(self._cot_sequence)
+        self.cluster_operation_targets[operation_uuid] = (
+            ClusterOperationTargetData(
+                operation_uuid=operation_uuid,
+                operation_type=str(operation_type),
+                target_object_type=str(target_object_type),
+                target_uuid=target_uuid,
+                sequence_number=seq,
+                created_at=created_at
+            ))
+        self._trace(
+            f'MockMariaDB.create_cluster_operation_target'
+            f'({operation_uuid}): created seq={seq}')
+        return True
+
+    def _mariadb_get_cluster_operation_target(
+            self, operation_uuid):
+        """Mock implementation of mariadb.get_cluster_operation_target()"""
+        data = self.cluster_operation_targets.get(operation_uuid)
+        self._trace(
+            f'MockMariaDB.get_cluster_operation_target'
+            f'({operation_uuid}): '
+            f'{"found" if data else "not found"}')
+        return data
+
+    def _mariadb_get_cluster_operation_targets_for_object(
+            self, target_object_type, target_uuid):
+        """Mock implementation of mariadb.get_cluster_operation_targets_for_object()"""
+        results = [
+            d for d in self.cluster_operation_targets.values()
+            if (d.target_object_type == str(target_object_type)
+                and d.target_uuid == target_uuid)
+        ]
+        results.sort(key=lambda d: d.sequence_number or 0)
+        self._trace(
+            f'MockMariaDB.get_cluster_operation_targets_for_object'
+            f'({target_object_type}/{target_uuid}): '
+            f'{len(results)} found')
+        return results
+
+    def _mariadb_get_latest_cluster_operation_target(
+            self, target_object_type, target_uuid):
+        """Mock implementation of mariadb.get_latest_cluster_operation_target()"""
+        results = self._mariadb_get_cluster_operation_targets_for_object(
+            target_object_type, target_uuid)
+        if not results:
+            return None
+        return results[-1]
+
+    def _mariadb_delete_cluster_operation_target(
+            self, operation_uuid):
+        """Mock implementation of mariadb.delete_cluster_operation_target()"""
+        if operation_uuid in self.cluster_operation_targets:
+            del self.cluster_operation_targets[operation_uuid]
+            self._trace(
+                f'MockMariaDB.delete_cluster_operation_target'
+                f'({operation_uuid}): deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_cluster_operation_target'
+            f'({operation_uuid}): not found')
+        return False
+
+    def _mariadb_delete_cluster_operation_targets_for_object(
+            self, target_object_type, target_uuid):
+        """Mock implementation of mariadb.delete_cluster_operation_targets_for_object()"""
+        to_delete = [
+            k for k, d in self.cluster_operation_targets.items()
+            if (d.target_object_type == str(target_object_type)
+                and d.target_uuid == target_uuid)
+        ]
+        for k in to_delete:
+            del self.cluster_operation_targets[k]
+        self._trace(
+            f'MockMariaDB.delete_cluster_operation_targets_for_object'
+            f'({target_object_type}/{target_uuid}): '
+            f'{len(to_delete)} deleted')
+        return True
 
     #
     # DB operations - Low level

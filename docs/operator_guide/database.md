@@ -534,6 +534,7 @@ The migration is happening in phases:
 | 12 | AgentOperation objects | Complete - `agent_operations`, `agent_operation_attributes` tables |
 | 13 | Instance objects | Complete - `instances`, `instance_attributes` tables |
 | 14 | Object metadata | Complete - `object_metadata` table (metadata + last_cluster_operation) |
+| 15 | Cluster operation targets | Complete - `cluster_operation_targets` table (operation ordering per object) |
 
 ### Table Architecture
 
@@ -561,6 +562,7 @@ constraints. These get dedicated tables optimized for their access patterns:
 | Table | Purpose |
 |-------|---------|
 | `ipam_reservations` | IP address allocations with uniqueness constraints |
+| `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering |
 
 IPAM reservations are stored separately because:
 
@@ -568,6 +570,15 @@ IPAM reservations are stored separately because:
 - **High churn**: Addresses are frequently reserved and released
 - **Cross-object queries**: Need to find all addresses for an IPAM, not just
   one object
+
+Cluster operation targets are stored separately because:
+
+- **Append-only history**: Every operation enqueued against an object creates
+  a row, giving full operation history per target
+- **Automatic ordering**: AUTO_INCREMENT sequence_number replaces the implicit
+  dependency chain traversal
+- **Indexed queries**: Efficient lookups for "latest operation on this instance"
+  and "all operations on this object in order"
 
 #### Per-Type Static Value Tables
 

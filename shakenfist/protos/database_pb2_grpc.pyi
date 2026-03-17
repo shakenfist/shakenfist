@@ -824,6 +824,39 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateClusterOperationTargetRequest,
+        database_pb2.StatusReply,
+    ]
+    """Cluster Operation Target Operations (MariaDB)
+    Track which operations target which objects, with sequence ordering.
+    """
+
+    GetClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationTargetRequest,
+        database_pb2.GetClusterOperationTargetReply,
+    ]
+
+    GetClusterOperationTargetsForObject: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationTargetsForObjectRequest,
+        database_pb2.GetClusterOperationTargetsForObjectReply,
+    ]
+
+    GetLatestClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetLatestClusterOperationTargetRequest,
+        database_pb2.GetClusterOperationTargetReply,
+    ]
+
+    DeleteClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationTargetRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteClusterOperationTargetsForObject: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationTargetsForObjectRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -1627,6 +1660,39 @@ class DatabaseServiceAsyncStub:
 
     DeleteObjectMetadata: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteObjectMetadataRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateClusterOperationTargetRequest,
+        database_pb2.StatusReply,
+    ]
+    """Cluster Operation Target Operations (MariaDB)
+    Track which operations target which objects, with sequence ordering.
+    """
+
+    GetClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationTargetRequest,
+        database_pb2.GetClusterOperationTargetReply,
+    ]
+
+    GetClusterOperationTargetsForObject: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationTargetsForObjectRequest,
+        database_pb2.GetClusterOperationTargetsForObjectReply,
+    ]
+
+    GetLatestClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetLatestClusterOperationTargetRequest,
+        database_pb2.GetClusterOperationTargetReply,
+    ]
+
+    DeleteClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationTargetRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteClusterOperationTargetsForObject: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationTargetsForObjectRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2725,6 +2791,51 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def DeleteObjectMetadata(
         self,
         request: database_pb2.DeleteObjectMetadataRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateClusterOperationTarget(
+        self,
+        request: database_pb2.CreateClusterOperationTargetRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Cluster Operation Target Operations (MariaDB)
+        Track which operations target which objects, with sequence ordering.
+        """
+
+    @abc.abstractmethod
+    def GetClusterOperationTarget(
+        self,
+        request: database_pb2.GetClusterOperationTargetRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetClusterOperationTargetReply, collections.abc.Awaitable[database_pb2.GetClusterOperationTargetReply]]: ...
+
+    @abc.abstractmethod
+    def GetClusterOperationTargetsForObject(
+        self,
+        request: database_pb2.GetClusterOperationTargetsForObjectRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetClusterOperationTargetsForObjectReply, collections.abc.Awaitable[database_pb2.GetClusterOperationTargetsForObjectReply]]: ...
+
+    @abc.abstractmethod
+    def GetLatestClusterOperationTarget(
+        self,
+        request: database_pb2.GetLatestClusterOperationTargetRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetClusterOperationTargetReply, collections.abc.Awaitable[database_pb2.GetClusterOperationTargetReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteClusterOperationTarget(
+        self,
+        request: database_pb2.DeleteClusterOperationTargetRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteClusterOperationTargetsForObject(
+        self,
+        request: database_pb2.DeleteClusterOperationTargetsForObjectRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

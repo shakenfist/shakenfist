@@ -237,6 +237,15 @@ service DatabaseService {
   rpc SetMetadata (SetMetadataRequest) returns (StatusReply) {}
   rpc SetLastClusterOperation (SetLastClusterOperationRequest) returns (StatusReply) {}
   rpc DeleteObjectMetadata (DeleteObjectMetadataRequest) returns (StatusReply) {}
+
+  // Cluster Operation Target Operations (MariaDB)
+  // Track which operations target which objects, with sequence ordering.
+  rpc CreateClusterOperationTarget (CreateClusterOperationTargetRequest) returns (StatusReply) {}
+  rpc GetClusterOperationTarget (GetClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
+  rpc GetClusterOperationTargetsForObject (GetClusterOperationTargetsForObjectRequest) returns (GetClusterOperationTargetsForObjectReply) {}
+  rpc GetLatestClusterOperationTarget (GetLatestClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
+  rpc DeleteClusterOperationTarget (DeleteClusterOperationTargetRequest) returns (StatusReply) {}
+  rpc DeleteClusterOperationTargetsForObject (DeleteClusterOperationTargetsForObjectRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -1529,4 +1538,55 @@ message SetLastClusterOperationRequest {
 message DeleteObjectMetadataRequest {
   ObjectType object_type = 1;
   string object_uuid = 2;
+}
+
+// Cluster Operation Target Operations
+
+message ClusterOperationTargetProto {
+  string operation_uuid = 1;
+  string operation_type = 2;
+  ObjectType target_object_type = 3;
+  string target_uuid = 4;
+  int64 sequence_number = 5;
+  double created_at = 6;
+}
+
+message CreateClusterOperationTargetRequest {
+  string operation_uuid = 1;
+  string operation_type = 2;
+  ObjectType target_object_type = 3;
+  string target_uuid = 4;
+  double created_at = 5;
+}
+
+message GetClusterOperationTargetRequest {
+  string operation_uuid = 1;
+}
+
+message GetClusterOperationTargetReply {
+  bool found = 1;
+  ClusterOperationTargetProto target = 2;
+}
+
+message GetClusterOperationTargetsForObjectRequest {
+  ObjectType target_object_type = 1;
+  string target_uuid = 2;
+}
+
+message GetClusterOperationTargetsForObjectReply {
+  repeated ClusterOperationTargetProto targets = 1;
+}
+
+message GetLatestClusterOperationTargetRequest {
+  ObjectType target_object_type = 1;
+  string target_uuid = 2;
+}
+
+message DeleteClusterOperationTargetRequest {
+  string operation_uuid = 1;
+}
+
+message DeleteClusterOperationTargetsForObjectRequest {
+  ObjectType target_object_type = 1;
+  string target_uuid = 2;
 }

@@ -35,6 +35,7 @@ from shakenfist.node import Node
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
@@ -3748,6 +3749,206 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    # Cluster Operation Target Operations
+
+    def _target_to_proto(
+        self,
+        data: ClusterOperationTargetData
+    ) -> database_pb2.ClusterOperationTargetProto:
+        """Convert ClusterOperationTargetData to proto."""
+        # Look up the ObjectType by string value to get proto_id
+        proto_id = 0
+        for ot in ObjectType:
+            if ot.value == data.target_object_type:
+                proto_id = ot.proto_id
+                break
+        return database_pb2.ClusterOperationTargetProto(
+            operation_uuid=data.operation_uuid,
+            operation_type=data.operation_type,
+            target_object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                proto_id),
+            target_uuid=data.target_uuid,
+            sequence_number=data.sequence_number or 0,
+            created_at=data.created_at
+        )
+
+    def CreateClusterOperationTarget(
+        self,
+        request: database_pb2.CreateClusterOperationTargetRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Record a cluster operation targeting an object."""
+        try:
+            self.monitor.counters[
+                'create_cluster_operation_target'].inc()
+            target_object_type = ObjectType.from_proto_id(
+                request.target_object_type)
+            if target_object_type is None:
+                return database_pb2.StatusReply(
+                    success=False,
+                    error='Invalid target_object_type')
+            success = (
+                mariadb._direct_create_cluster_operation_target(
+                    request.operation_uuid,
+                    request.operation_type,
+                    target_object_type,
+                    request.target_uuid,
+                    request.created_at))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateClusterOperationTarget failed',
+                e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetClusterOperationTarget(
+        self,
+        request: database_pb2.GetClusterOperationTargetRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetClusterOperationTargetReply:
+        """Get a single cluster operation target by operation UUID."""
+        try:
+            self.monitor.counters[
+                'get_cluster_operation_target'].inc()
+            data = (
+                mariadb._direct_get_cluster_operation_target(
+                    request.operation_uuid))
+            if data is None:
+                return database_pb2.GetClusterOperationTargetReply(
+                    found=False)
+            return database_pb2.GetClusterOperationTargetReply(
+                found=True,
+                target=self._target_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetClusterOperationTarget failed',
+                e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetClusterOperationTargetReply(
+                found=False)
+
+    def GetClusterOperationTargetsForObject(
+        self,
+        request: database_pb2.GetClusterOperationTargetsForObjectRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetClusterOperationTargetsForObjectReply:
+        """Get all cluster operation targets for an object."""
+        try:
+            self.monitor.counters[
+                'get_cluster_operation_targets_for_object'].inc()
+            target_object_type = ObjectType.from_proto_id(
+                request.target_object_type)
+            if target_object_type is None:
+                return database_pb2.GetClusterOperationTargetsForObjectReply(
+                    targets=[])
+            data_list = (
+                mariadb
+                ._direct_get_cluster_operation_targets_for_object(
+                    target_object_type,
+                    request.target_uuid))
+            return database_pb2.GetClusterOperationTargetsForObjectReply(
+                targets=[
+                    self._target_to_proto(d)
+                    for d in data_list
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetClusterOperationTargetsForObject'
+                ' failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetClusterOperationTargetsForObjectReply(
+                targets=[])
+
+    def GetLatestClusterOperationTarget(
+        self,
+        request: database_pb2.GetLatestClusterOperationTargetRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetClusterOperationTargetReply:
+        """Get the most recent cluster operation target for an object."""
+        try:
+            self.monitor.counters[
+                'get_latest_cluster_operation_target'].inc()
+            target_object_type = ObjectType.from_proto_id(
+                request.target_object_type)
+            if target_object_type is None:
+                return database_pb2.GetClusterOperationTargetReply(
+                    found=False)
+            data = (
+                mariadb
+                ._direct_get_latest_cluster_operation_target(
+                    target_object_type,
+                    request.target_uuid))
+            if data is None:
+                return database_pb2.GetClusterOperationTargetReply(
+                    found=False)
+            return database_pb2.GetClusterOperationTargetReply(
+                found=True,
+                target=self._target_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetLatestClusterOperationTarget'
+                ' failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetClusterOperationTargetReply(
+                found=False)
+
+    def DeleteClusterOperationTarget(
+        self,
+        request: database_pb2.DeleteClusterOperationTargetRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a single cluster operation target."""
+        try:
+            self.monitor.counters[
+                'delete_cluster_operation_target'].inc()
+            success = (
+                mariadb._direct_delete_cluster_operation_target(
+                    request.operation_uuid))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteClusterOperationTarget failed',
+                e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def DeleteClusterOperationTargetsForObject(
+        self,
+        request: database_pb2.DeleteClusterOperationTargetsForObjectRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete all cluster operation targets for an object."""
+        try:
+            self.monitor.counters[
+                'delete_cluster_operation_targets_for_object'
+            ].inc()
+            target_object_type = ObjectType.from_proto_id(
+                request.target_object_type)
+            if target_object_type is None:
+                return database_pb2.StatusReply(
+                    success=False,
+                    error='Invalid target_object_type')
+            success = (
+                mariadb
+                ._direct_delete_cluster_operation_targets_for_object(
+                    target_object_type,
+                    request.target_uuid))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteClusterOperationTargetsForObject'
+                ' failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     def _instance_attrs_from_proto(
             self,
             d: database_pb2.InstanceAttributesProto
@@ -3920,7 +4121,14 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB object metadata operations
             'get_object_metadata', 'set_metadata',
             'set_last_cluster_operation',
-            'delete_object_metadata'
+            'delete_object_metadata',
+            # MariaDB cluster operation target operations
+            'create_cluster_operation_target',
+            'get_cluster_operation_target',
+            'get_cluster_operation_targets_for_object',
+            'get_latest_cluster_operation_target',
+            'delete_cluster_operation_target',
+            'delete_cluster_operation_targets_for_object'
         ]
         for op in operations:
             self.counters[op] = Counter(

@@ -681,11 +681,22 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
     @property
     def last_cluster_operation(self):
         if not self.in_memory_only:
+            # Try cluster_operation_targets table first (new table)
+            latest = mariadb.get_latest_cluster_operation_target(
+                self.object_type, str(self.uuid))
+            if latest is not None:
+                return {
+                    'op_type': latest.operation_type,
+                    'op_uuid': latest.operation_uuid
+                }
+
+            # Fallback to object_metadata for dual-write migration
             obj_meta = mariadb.get_object_metadata(
                 self.object_type, str(self.uuid))
             if obj_meta and obj_meta.last_cluster_operation is not None:
                 return obj_meta.last_cluster_operation
-            # Fallback to etcd for unmigrated objects
+
+        # Fallback to etcd for unmigrated objects
         return self._db_get_attribute('last_cluster_operation')
 
     def set_last_cluster_operation(self, op_type, op_uuid):
@@ -694,8 +705,19 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
             'op_uuid': str(op_uuid)
         }
         if not self.in_memory_only:
+            # Write to cluster_operation_targets (new table)
+            mariadb.create_cluster_operation_target(
+                operation_uuid=str(op_uuid),
+                operation_type=str(op_type),
+                target_object_type=self.object_type,
+                target_uuid=str(self.uuid),
+                created_at=time.time()
+            )
+
+            # Dual-write to object_metadata during migration period
             mariadb.set_last_cluster_operation(
                 self.object_type, str(self.uuid), lco)
+
         # Dual-write to etcd during migration period
         self._db_set_attribute('last_cluster_operation', lco)
 
@@ -732,6 +754,11 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
             outstanding.append(dep_op)
 
         return outstanding
+
+    def hard_delete(self):
+        mariadb.delete_cluster_operation_targets_for_object(
+            self.object_type, str(self.uuid))
+        super().hard_delete()
 
 
 class DatabaseBackedObjectIterator:
