@@ -5407,13 +5407,8 @@ of the cluster through Galera replication.</p>
 </tr>
 <tr>
 <td>14</td>
-<td>Other object types</td>
-<td>Future</td>
-</tr>
-<tr>
-<td>15</td>
-<td>Object attributes</td>
-<td>Future</td>
+<td>Object metadata</td>
+<td>Complete - <code>object_metadata</code> table (metadata + last_cluster_operation)</td>
 </tr>
 </tbody>
 </table>
@@ -5434,6 +5429,10 @@ tables with <code>(object_type, object_uuid)</code> keys:</p>
 <tr>
 <td><code>object_states</code></td>
 <td>State value, update time, message for all objects</td>
+</tr>
+<tr>
+<td><code>object_metadata</code></td>
+<td>User-defined metadata and last_cluster_operation for all objects</td>
 </tr>
 </tbody>
 </table>
