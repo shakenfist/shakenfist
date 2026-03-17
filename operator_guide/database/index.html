@@ -5410,6 +5410,11 @@ of the cluster through Galera replication.</p>
 <td>Object metadata</td>
 <td>Complete - <code>object_metadata</code> table (metadata + last_cluster_operation)</td>
 </tr>
+<tr>
+<td>15</td>
+<td>Cluster operation targets</td>
+<td>Complete - <code>cluster_operation_targets</code> table (operation ordering per object)</td>
+</tr>
 </tbody>
 </table>
 <h3 id="table-architecture">Table Architecture<a class="headerlink" href="#table-architecture" title="Permanent link">&para;</a></h3>
@@ -5453,6 +5458,10 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 <td><code>ipam_reservations</code></td>
 <td>IP address allocations with uniqueness constraints</td>
 </tr>
+<tr>
+<td><code>cluster_operation_targets</code></td>
+<td>Operation-to-object targeting with AUTO_INCREMENT ordering</td>
+</tr>
 </tbody>
 </table>
 <p>IPAM reservations are stored separately because:</p>
@@ -5461,6 +5470,15 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 <li><strong>High churn</strong>: Addresses are frequently reserved and released</li>
 <li><strong>Cross-object queries</strong>: Need to find all addresses for an IPAM, not just
   one object</li>
+</ul>
+<p>Cluster operation targets are stored separately because:</p>
+<ul>
+<li><strong>Append-only history</strong>: Every operation enqueued against an object creates
+  a row, giving full operation history per target</li>
+<li><strong>Automatic ordering</strong>: AUTO_INCREMENT sequence_number replaces the implicit
+  dependency chain traversal</li>
+<li><strong>Indexed queries</strong>: Efficient lookups for "latest operation on this instance"
+  and "all operations on this object in order"</li>
 </ul>
 <h4 id="per-type-static-value-tables">Per-Type Static Value Tables<a class="headerlink" href="#per-type-static-value-tables" title="Permanent link">&para;</a></h4>
 <p>Each concrete object type that is migrated gets its own table for static
