@@ -6,6 +6,9 @@ permissions:
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Rebuild CI images"]
+    types: [completed]
   schedule:
     - cron: '00 00 * * *'        # utc
 
@@ -17,6 +20,10 @@ env:
 
 jobs:
   ci-dependencies:
+    # Skip if triggered by a failed image build
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: [self-hosted, vm, debian-12]
     timeout-minutes: 120
     concurrency:
