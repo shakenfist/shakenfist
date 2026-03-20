@@ -86,6 +86,15 @@ jobs:
                 'scheduled': True,
                 'runs_on': 'debian-12'
             },
+            {
+                'name': 'debian-gnome-12',
+                'baseimage': 'debian-gnome:12',
+                'baseuser': 'debian',
+                'outputlabel': 'ci-images/debian-gnome-12',
+                'scheduled': True,
+                'runs_on': 'debian-12',
+                'playbook': 'ansible/ci-image-desktop.yml'
+            },
         ]
     runs-on: [self-hosted, vm, '${{ matrix.os.runs_on }}']
     concurrency:
@@ -117,7 +126,7 @@ jobs:
             ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
                 base_image=${{ matrix.os.baseimage }} base_image_user=${{ matrix.os.baseuser }} label=${{ matrix.os.outputlabel }}" \
-              ansible/ci-image.yml
+              ${{ matrix.os.playbook || 'ansible/ci-image.yml' }}
 
         - uses: JasonEtco/create-an-issue@v2
           if: failure()
