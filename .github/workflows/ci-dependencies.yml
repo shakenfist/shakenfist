@@ -71,9 +71,11 @@ jobs:
       - name: Build dependencies image
         env:
           GITLAB_TESTDATA_TOKEN: ${{ secrets.GITLAB_TESTDATA_TOKEN }}
+          PYTHONUNBUFFERED: "1"
         run: |
+          df -h && free -m
           cd ${GITHUB_WORKSPACE}/actions
-          ansible-playbook -i /home/debian/ansible-hosts \
+          ansible-playbook -v -i /home/debian/ansible-hosts \
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
               base_image=sf://label/ci-images/debian-12 base_image_user=debian \
               label=ci-images/dependencies actions_url=$GITHUB_ACTIONS_URL \
