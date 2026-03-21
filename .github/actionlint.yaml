@@ -10,4 +10,6 @@ self-hosted-runner:
     - debian-12
     - ubuntu-22-04
     - ubuntu-24-04
+    - xs
     - s
+    - m

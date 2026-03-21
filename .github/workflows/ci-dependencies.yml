@@ -24,7 +24,7 @@ jobs:
     if: >-
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
-    runs-on: [self-hosted, vm, debian-12]
+    runs-on: [self-hosted, vm, debian-12, xs]
     timeout-minutes: 120
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}

@@ -96,7 +96,7 @@ jobs:
                 'playbook': 'ansible/ci-image-desktop.yml'
             },
         ]
-    runs-on: [self-hosted, vm, '${{ matrix.os.runs_on }}']
+    runs-on: [self-hosted, vm, '${{ matrix.os.runs_on }}', m]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os.name }}
       cancel-in-progress: true
