@@ -114,6 +114,12 @@ nav:
             - Plans:
                 - "A more structured and less verbose approach to logging": components/occystrap/plans/PLAN-structured-logging.md
                 - "Implementing `info` and `check` subcommands for occystrap": components/occystrap/plans/PLAN-info-check.md
+                - "Phase 1: Quay.io API client": components/occystrap/plans/PLAN-quay-label-search-phase-01-api-client.md
+                - "Phase 2: quay:// URI parsing and multi-image resolution": components/occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input.md
+                - "Phase 3: info and process multi-image support": components/occystrap/plans/PLAN-quay-label-search-phase-03-commands.md
+                - "Phase 4: Functional tests and documentation": components/occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs.md
+                - "Phase 5: Filter by tag age (`since` parameter)": components/occystrap/plans/PLAN-quay-label-search-phase-05-since-filter.md
+                - "Quay.io tag-based bulk image discovery and download": components/occystrap/plans/PLAN-quay-label-search.md
                 - "Registry Proxy Mode (dockerpush as persistent registry)": components/occystrap/plans/PLAN-registry-proxy.md
     - Features: features.md
     - Release notes:

@@ -379,6 +379,74 @@ registry://myregistry.example.com/myproject/myimage:latest
 registry://docker.io/library/busybox:latest?os=linux&arch=arm64&variant=v8
 ```
 
+### quay://
+
+Discover and fetch multiple images from a quay.io organization by tag.
+This is a **multi-image** input — a single `quay://` URI can resolve to
+many images. It uses the quay.io proprietary REST API (not the Docker
+Registry V2 API) to list repositories in the org, filter by a glob
+pattern, check tag existence, and then fetch matching images through the
+standard registry pipeline.
+
+```
+quay://ORG/GLOB:TAG[?token=TOKEN]
+```
+
+**Components:**
+
+| Component | Description |
+|-----------|-------------|
+| `ORG` | Quay.io organization / namespace |
+| `GLOB` | Glob pattern for repository names (`*` for all) |
+| `TAG` | Exact image tag to match |
+
+**Query Options:**
+
+| Option | Description |
+|--------|-------------|
+| `token=TOKEN` | Quay.io API token for private organizations |
+| `since=YYYY-MM-DD` | Only include images whose tag was created/updated on or after this date |
+
+If no token is provided, `--password` is used as the quay.io API token
+(robot account tokens work for both the quay.io API and Docker Registry
+V2 auth). Public organizations do not require authentication.
+
+**Multi-image output compatibility:**
+
+| Output | Behavior |
+|--------|----------|
+| `dir://?unique_names=true` | Recommended — each image gets unique prefixes |
+| `registry://` | Each image pushed with its original name |
+| `docker://` | Each image loaded with its original name |
+| `dir://` (no unique_names) | Warning — last image overwrites previous |
+| `tar://` | Error — not supported for multi-image sources |
+| `oci://`, `mounts://` | Error — not supported for multi-image sources |
+
+**Examples:**
+
+```bash
+# List all images tagged "latest" in the kolla org
+occystrap info quay://kolla/*:latest
+
+# List as JSON
+occystrap -O json info quay://kolla/*:2025.1-debian
+
+# Download all matching images to a directory
+occystrap process quay://kolla/*:latest dir://./kolla?unique_names=true
+
+# Only repos starting with "centos-"
+occystrap process quay://kolla/centos-*:latest dir://./out?unique_names=true
+
+# Private org with token
+occystrap process "quay://myorg/*:latest?token=abc123" dir://./out?unique_names=true
+
+# Private org using --password
+occystrap --password mytoken process quay://myorg/*:latest dir://./out?unique_names=true
+
+# Only images whose tag was updated after 2024-01-01
+occystrap info "quay://kolla/*:latest?since=2024-01-01"
+```
+
 ### docker://
 
 Fetch images from the local Docker or Podman daemon.
