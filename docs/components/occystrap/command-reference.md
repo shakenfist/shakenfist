@@ -61,6 +61,15 @@ occystrap process registry://docker.io/library/python:3.11 dir://python \
 occystrap process docker://myimage:v1 registry://myregistry.com/myimage:v1
 ```
 
+After processing completes, a summary line is printed to stderr showing
+the number of images (for bulk operations), layers, bytes transferred,
+elapsed time, and any retries or rate-limit events:
+
+```
+Summary: 47/47 images, 312 layers, 4.2 GB, 38.1s
+Summary: 3 layers, 125.4 MB, 2.3s, 1 retries
+```
+
 ### search
 
 Search for files within container image layers.
