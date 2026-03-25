@@ -108,17 +108,25 @@ nav:
             - "Command Reference": components/occystrap/command-reference.md
             - "Docker Tarball Format Reference": components/occystrap/docker-tarball-formats.md
             - "Installation": components/occystrap/installation.md
+            - "Performance Tuning": components/occystrap/performance.md
             - "Pipeline Architecture": components/occystrap/pipeline.md
             - "Tar Format Selection": components/occystrap/tar-format-selection.md
             - "Use Cases": components/occystrap/use-cases.md
             - Plans:
                 - "A more structured and less verbose approach to logging": components/occystrap/plans/PLAN-structured-logging.md
                 - "Implementing `info` and `check` subcommands for occystrap": components/occystrap/plans/PLAN-info-check.md
+                - "Make the speed: occystrap performance overhaul": components/occystrap/plans/PLAN-make-the-speed.md
                 - "Phase 1: Quay.io API client": components/occystrap/plans/PLAN-quay-label-search-phase-01-api-client.md
+                - "Phase 1: Replace requests with httpx": components/occystrap/plans/PLAN-make-the-speed-phase-01-httpx.md
+                - "Phase 2: Parallel Quay API resolution": components/occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution.md
                 - "Phase 2: quay:// URI parsing and multi-image resolution": components/occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input.md
+                - "Phase 3: Concurrent multi-image processing": components/occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency.md
                 - "Phase 3: info and process multi-image support": components/occystrap/plans/PLAN-quay-label-search-phase-03-commands.md
                 - "Phase 4: Functional tests and documentation": components/occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs.md
+                - "Phase 4: Parallel and async output I/O": components/occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io.md
+                - "Phase 5: Benchmarking and tuning": components/occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking.md
                 - "Phase 5: Filter by tag age (`since` parameter)": components/occystrap/plans/PLAN-quay-label-search-phase-05-since-filter.md
+                - "Post-write verification for output integrity": components/occystrap/plans/PLAN-post-write-verification.md
                 - "Quay.io tag-based bulk image discovery and download": components/occystrap/plans/PLAN-quay-label-search.md
                 - "Registry Proxy Mode (dockerpush as persistent registry)": components/occystrap/plans/PLAN-registry-proxy.md
     - Features: features.md
