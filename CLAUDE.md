@@ -445,8 +445,8 @@ performance. This is required for all deployments - MariaDB must be configured.
   same pattern as object_states. Dual-write with etcd fallback.
 - **Cluster Operation Targets** (`cluster_operation_targets` table):
   Records every cluster operation targeting an object (Instance,
-  Artifact, Network) with AUTO_INCREMENT sequence numbering for
-  ordering. Replaces the single-pointer `last_cluster_operation`
+  Artifact, Network, Blob) with AUTO_INCREMENT sequence numbering
+  for ordering. Replaces the single-pointer `last_cluster_operation`
   in `object_metadata` with a full append-only history. Primary key
   is `operation_uuid`, indexed on `(target_object_type, target_uuid)`
   and `created_at`. Dual-write with object_metadata fallback.

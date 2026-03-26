@@ -4,7 +4,7 @@
 
 * Convert from etcd to mariadb for persistent storage to take advantage of secondary indices
 * Artifacts have been migrated to mariadb (static values, attributes, and version indexes).
-* NEXT: finish converting blob's incomplete locations and the transfer tracking to mariadb -- this work was skipped when doing blob references because it was getting too big.
+* Blob transfer tracking and incomplete locations are now fully in mariadb (blob_transfers table). The clusteroperations-by-blob etcd index has been replaced with the cluster_operation_targets mariadb table. The per-blob scheduled task queue now enumerates blobs from mariadb instead of etcd.
 * Add mypy type hints
 * Use shakenfist.schema for all data storage requiring a schema -- etcd while it lasts, generation of mariadb schemas, REST API outputs
 * REST API input schema validation

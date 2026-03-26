@@ -80,7 +80,7 @@ def create_and_enqueue(node_uuid, instance_uuid, tasks, priority, request_id=Non
             'depends_on': depends_on,
             'runs_after': runs_after,
             'version': current_version
-        }).error(f'etcd schema validation error: {exc}')
+        }).error(f'schema validation error: {exc}')
         raise exc
 
     mutations, job_name, queue_name, work_item = \

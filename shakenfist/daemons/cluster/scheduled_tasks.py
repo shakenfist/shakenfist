@@ -1,4 +1,3 @@
-from collections import defaultdict
 import queue
 import time
 
@@ -48,12 +47,9 @@ def per_blob_checks():
 
 
 def _fill_per_blob_queue():
-    for objkey, _ in etcd.get_all(Blob.object_type, None):
-        blob_uuid = objkey.split('/')[-1]
-        state_data = etcd.get(
-            f'attribute/{Blob.object_type}', blob_uuid, 'state')
-        if not state_data or state_data.get('value') != Blob.STATE_CREATED:
-            continue
+    blob_uuids = mariadb.get_objects_by_state(
+        ObjectType.BLOB, [Blob.STATE_CREATED])
+    for blob_uuid in blob_uuids:
         b = Blob.from_db(blob_uuid)
         if not b:
             continue
@@ -98,12 +94,19 @@ def _process_per_blob_queue(execution_limit=10):
                         h.last_verified_at > last_verified_by_node[h.node]):
                     last_verified_by_node[h.node] = h.last_verified_at
 
-        requests_by_node = defaultdict(list)
-        for _, value in etcd.get_prefix_raw('/sf/clusteroperations-by-blob/'):
-            op_type = value.get('operation_type')
-            op_uuid = value.get('operation_uuid')
-            op = get_object_class(op_type).from_db(op_uuid)
-            requests_by_node[op.node_uuid].append((op_type, op_uuid))
+        # Find nodes that already have pending blob operations for this
+        # blob, so we don't schedule duplicate checksum requests.
+        nodes_with_pending_ops = set()
+        pending_ops = mariadb.get_cluster_operation_targets_for_object(
+            ObjectType.BLOB, str(b.uuid))
+        for target in pending_ops:
+            op = get_object_class(target.operation_type).from_db(
+                target.operation_uuid)
+            if op and op.is_outstanding():
+                # Resolve node UUID to FQDN for comparison with locations
+                n = Node.from_db(op.node_uuid)
+                if n:
+                    nodes_with_pending_ops.add(n.fqdn)
 
         for node_fqdn in node_fqdns:
             # Check when this specific node last verified the blob
@@ -113,7 +116,7 @@ def _process_per_blob_queue(execution_limit=10):
             if age < config.CHECKSUM_VERIFICATION_FREQUENCY:
                 continue
 
-            if not requests_by_node[node_fqdn]:
+            if node_fqdn not in nodes_with_pending_ops:
                 # Blob locations are FQDNs (from BLOB_LOCATION refs),
                 # but create_and_enqueue requires a node UUID.
                 node_obj = Node.from_db(node_fqdn)
@@ -121,7 +124,8 @@ def _process_per_blob_queue(execution_limit=10):
                     continue
                 nbo_schema.create_and_enqueue(
                     str(node_obj.uuid), b.uuid,
-                    [nbo_schema.model_tasks.verify_size_and_checksum], bco_schema.PRIORITY.background_high_io)
+                    [nbo_schema.model_tasks.verify_size_and_checksum],
+                    bco_schema.PRIORITY.background_high_io)
 
 
 @util_general.recorded_method
