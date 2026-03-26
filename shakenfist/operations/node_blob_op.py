@@ -6,6 +6,7 @@ from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.schema.operations import node_blob_op as schema
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -79,8 +80,7 @@ class NodeBlobOp(BaseClusterOperation):
         try:
             super().execute()
         finally:
-            etcd.delete_raw(
-                f'/sf/clusteroperations-by-blob/{self.blob_uuid}/{self.uuid}')
+            mariadb.delete_cluster_operation_target(str(self.uuid))
 
     def dispatch_task(self, task):
         if task not in schema.model_tasks:

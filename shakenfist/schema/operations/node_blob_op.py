@@ -1,3 +1,4 @@
+import time
 from enum import Enum
 from typing import List
 from typing import Optional
@@ -10,6 +11,7 @@ from pydantic import UUID4
 from pydantic import ValidationError
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import _convert_deps
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -79,19 +81,21 @@ def create_and_enqueue(node_uuid, blob_uuid, tasks, priority, request_id=None,
             'depends_on': depends_on,
             'runs_after': runs_after,
             'version': current_version
-        }).error(f'etcd schema validation error: {exc}')
+        }).error(f'schema validation error: {exc}')
         raise exc
 
     mutations, job_name, queue_name, work_item = \
         base_mutations(object_type, m.model_dump(mode='json'))
-    mutations.append(
-        {
-            'path': (
-                f'/sf/clusteroperations-by-blob/{blob_uuid}/{operation_uuid}'
-            ),
-            'original_data': None,
-            'new_data': work_item
-        },
-    )
     enqueue(mutations, job_name, queue_name, work_item)
+
+    # Record that this operation targets the blob in MariaDB so that
+    # scheduled_tasks can discover pending blob operations without etcd.
+    mariadb.create_cluster_operation_target(
+        operation_uuid=operation_uuid,
+        operation_type=object_type.value,
+        target_object_type=ObjectType.BLOB,
+        target_uuid=str(blob_uuid),
+        created_at=time.time()
+    )
+
     return object_type, operation_uuid
