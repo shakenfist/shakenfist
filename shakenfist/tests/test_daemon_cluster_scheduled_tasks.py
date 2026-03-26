@@ -1,3 +1,4 @@
+# Copyright 2019 Michael Still and contributors
 import time
 from unittest import mock
 
