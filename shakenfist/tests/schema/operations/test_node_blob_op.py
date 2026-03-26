@@ -130,6 +130,14 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
             )
         )
 
+        # Verify that create_and_enqueue records the blob as the operation
+        # target in MariaDB cluster_operation_targets table
+        target = self.mock_etcd.cluster_operation_targets.get(op_uuid)
+        self.assertIsNotNone(target)
+        self.assertEqual('node_blob_op', target.operation_type)
+        self.assertEqual('blob', target.target_object_type)
+        self.assertEqual(blob_uuid, target.target_uuid)
+
     def test_load_from_etcd(self):
         node_uuid = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
         blob_uuid = '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7'
