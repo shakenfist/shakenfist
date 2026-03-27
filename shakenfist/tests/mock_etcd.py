@@ -668,6 +668,13 @@ class MockEtcd():
         self.mariadb_get_all_instances.start()
         self.test_obj.addCleanup(self.mariadb_get_all_instances.stop)
 
+        self.mariadb_get_all_instance_uuids = mock.patch(
+            'shakenfist.mariadb.get_all_instance_uuids',
+            side_effect=self._mariadb_get_all_instance_uuids)
+        self.mariadb_get_all_instance_uuids.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_all_instance_uuids.stop)
+
         self.mariadb_delete_instance = mock.patch(
             'shakenfist.mariadb.delete_instance',
             side_effect=self._mariadb_delete_instance)
@@ -1765,6 +1772,11 @@ class MockEtcd():
         """Mock implementation of mariadb.get_all_instances()"""
         self._trace('MockMariaDB.get_all_instances()')
         return list(self.instance_objects.values())
+
+    def _mariadb_get_all_instance_uuids(self) -> list[str]:
+        """Mock implementation of mariadb.get_all_instance_uuids()"""
+        self._trace('MockMariaDB.get_all_instance_uuids()')
+        return list(self.instance_objects.keys())
 
     def _mariadb_delete_instance(self, inst_uuid) -> bool:
         """Mock implementation of mariadb.delete_instance()"""

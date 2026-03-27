@@ -407,39 +407,51 @@ class Instance(dbowo):
         attrs = InstanceAttributesData(uuid=_uuid)
         mariadb.create_instance_attributes(attrs)
 
+    @staticmethod
+    def _static_values_to_dict(data):
+        """Convert InstanceData to the dict format used internally."""
+        return {
+            'uuid': str(data.uuid),
+            'cpus': data.cpus,
+            'disk_spec': data.disk_spec,
+            'memory': data.memory,
+            'name': data.name,
+            'namespace': data.namespace,
+            'requested_placement': data.requested_placement,
+            'ssh_key': data.ssh_key,
+            'user_data': data.user_data,
+            'video': data.video,
+            'uefi': data.uefi,
+            'configdrive': data.configdrive,
+            'nvram_template': data.nvram_template,
+            'secure_boot': data.secure_boot,
+            'machine_type': data.machine_type,
+            'side_channels': data.side_channels,
+            'version': data.version,
+        }
+
     @classmethod
     def _db_get(cls, object_uuid):
-        """Get Instance static values, trying MariaDB first."""
+        """Get Instance static values from MariaDB."""
         _uuid = object_uuid if isinstance(object_uuid, UUID) else UUID(object_uuid)
         data = mariadb.get_instance(_uuid)
-        if data:
-            result = {
-                'uuid': str(data.uuid),
-                'cpus': data.cpus,
-                'disk_spec': data.disk_spec,
-                'memory': data.memory,
-                'name': data.name,
-                'namespace': data.namespace,
-                'requested_placement': data.requested_placement,
-                'ssh_key': data.ssh_key,
-                'user_data': data.user_data,
-                'video': data.video,
-                'uefi': data.uefi,
-                'configdrive': data.configdrive,
-                'nvram_template': data.nvram_template,
-                'secure_boot': data.secure_boot,
-                'machine_type': data.machine_type,
-                'side_channels': data.side_channels,
-                'version': data.version
-            }
-            if result.get('version', 0) != cls.current_version:
-                if not cls.upgrade_supported:
-                    raise exceptions.BadObjectVersion(
-                        f'Unsupported object version - {cls.object_type}: {result}')
-            return result
+        if not data:
+            return None
 
-        # Fall back to etcd for unmigrated objects
-        return super()._db_get(object_uuid)
+        result = cls._static_values_to_dict(data)
+        if result.get('version', 0) != cls.current_version:
+            if not cls.upgrade_supported:
+                raise exceptions.BadObjectVersion(
+                    f'Unsupported object version - {cls.object_type}: {result}')
+        return result
+
+    @classmethod
+    def filter(cls, filters):
+        """Override base class to use MariaDB instead of etcd."""
+        for data in mariadb.get_all_instances():
+            obj = cls(cls._static_values_to_dict(data))
+            if all(f(obj) for f in filters):
+                yield obj
 
     def _db_get_attribute(self, attribute, default=None):
         """Get an attribute, routing MariaDB-stored attributes appropriately."""
@@ -2114,6 +2126,37 @@ class Instance(dbowo):
 class Instances(dbo_iter):
     base_object = Instance
 
+    def get_iterator(self):
+        if self.prefilter:
+            if self.prefilter == 'active':
+                target_states = Instance.ACTIVE_STATES
+            elif self.prefilter == 'deleted':
+                target_states = [dbo.STATE_DELETED]
+            elif self.prefilter == 'healthy':
+                target_states = Instance.HEALTHY_STATES
+            elif self.prefilter == 'inactive':
+                target_states = Instance.INACTIVE_STATES
+            else:
+                raise exceptions.InvalidObjectPrefilter(
+                    self.prefilter)
+
+            matching_uuids = set(
+                mariadb.get_objects_by_state(
+                    Instance.object_type,
+                    list(target_states)))
+
+            results = []
+            for data in mariadb.get_all_instances():
+                if str(data.uuid) in matching_uuids:
+                    results.append(
+                        (str(data.uuid),
+                         Instance._static_values_to_dict(data)))
+            yield from results
+        else:
+            for data in mariadb.get_all_instances():
+                yield (str(data.uuid),
+                       Instance._static_values_to_dict(data))
+
     def __iter__(self):
         for _, static_values in self.get_iterator():
             i = Instance(static_values)
@@ -2146,9 +2189,7 @@ def instances_in_namespace(namespace):
 
 
 def all_instances():
-    for object_key, _ in etcd.get_all(Instance.object_type, None):
-        # object_key is the full etcd path like /sf/instance/{uuid}
-        object_uuid = object_key.split('/')[-1]
+    for object_uuid in mariadb.get_all_instance_uuids():
         i = Instance.from_db(object_uuid, suppress_failure_audit=True)
         if i:
             yield i

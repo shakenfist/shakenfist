@@ -66,15 +66,14 @@ class Upload(dbo):
 
     @classmethod
     def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
-        """Create an upload record in MariaDB instead of etcd."""
+        """Create an upload record in MariaDB."""
         mariadb.create_upload(
             uuid.UUID(object_uuid),
             metadata['node'],
             metadata['created_at'],
             metadata['version']
         )
-        eventlog.add_event(EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
-                           'db record created', extra=metadata)
+        super()._db_create(object_uuid, metadata)
 
     @classmethod
     def _db_get(cls, object_uuid: str) -> UploadData | None:

@@ -771,6 +771,11 @@ class DatabaseServiceStub:
         database_pb2.GetAllInstancesReply,
     ]
 
+    GetAllInstanceUuids: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllInstanceUuidsRequest,
+        database_pb2.GetAllInstanceUuidsReply,
+    ]
+
     DeleteInstance: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteInstanceRequest,
         database_pb2.StatusReply,
@@ -1608,6 +1613,11 @@ class DatabaseServiceAsyncStub:
     GetAllInstances: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetAllInstancesRequest,
         database_pb2.GetAllInstancesReply,
+    ]
+
+    GetAllInstanceUuids: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllInstanceUuidsRequest,
+        database_pb2.GetAllInstanceUuidsReply,
     ]
 
     DeleteInstance: grpc.aio.UnaryUnaryMultiCallable[
@@ -2722,6 +2732,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.GetAllInstancesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetAllInstancesReply, collections.abc.Awaitable[database_pb2.GetAllInstancesReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllInstanceUuids(
+        self,
+        request: database_pb2.GetAllInstanceUuidsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllInstanceUuidsReply, collections.abc.Awaitable[database_pb2.GetAllInstanceUuidsReply]]: ...
 
     @abc.abstractmethod
     def DeleteInstance(

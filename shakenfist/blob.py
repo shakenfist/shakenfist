@@ -157,15 +157,14 @@ class Blob(dbo):
 
     @classmethod
     def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
-        """Create a blob record in MariaDB instead of etcd."""
+        """Create a blob record in MariaDB."""
         mariadb.create_blob(
             uuid.UUID(object_uuid),
             metadata['modified'],
             metadata['fetched_at'],
             metadata['version']
         )
-        add_event(EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
-                  'db record created', extra=metadata)
+        super()._db_create(object_uuid, metadata)
 
     @classmethod
     def _db_get(cls, object_uuid: Union[str, uuid.UUID]) -> BlobData | None:

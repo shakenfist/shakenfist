@@ -408,7 +408,6 @@ class DatabaseBackedObject:
     @classmethod
     def _db_create(cls, object_uuid, metadata):
         metadata['uuid'] = object_uuid
-        etcd.create(cls.object_type, None, object_uuid, metadata)
         eventlog.add_event(EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
                            'db record created', extra=metadata)
 

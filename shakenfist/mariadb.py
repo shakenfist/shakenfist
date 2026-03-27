@@ -152,7 +152,7 @@ NETWORK_ATTRIBUTES_VERSION = 2
 IPAMS_VERSION = 2
 AGENT_OPERATIONS_VERSION = 2
 AGENT_OPERATION_ATTRIBUTES_VERSION = 2
-INSTANCES_VERSION = 1
+INSTANCES_VERSION = 2
 INSTANCE_ATTRIBUTES_VERSION = 1
 OBJECT_METADATA_VERSION = 2
 CLUSTER_OPERATION_TARGETS_VERSION = 1
@@ -13729,6 +13729,25 @@ def _direct_get_all_instances() -> list[InstanceData]:
         return []
 
 
+def _direct_get_all_instance_uuids() -> list[str]:
+    """Get all instance UUIDs from MariaDB.
+
+    Returns only UUIDs (not full records) for efficient enumeration.
+    """
+    engine = _get_engine()
+    table = _get_instances_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.uuid)
+            result = conn.execute(stmt)
+            return [str(row[0]) for row in result]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get_all_instance_uuids failed: {e}')
+        return []
+
+
 def _direct_delete_instance(inst_uuid: UUID) -> bool:
     """Delete an Instance record from MariaDB.
 
@@ -14042,6 +14061,19 @@ def _grpc_get_all_instances() -> list[InstanceData]:
         return []
 
 
+def _grpc_get_all_instance_uuids() -> list[str]:
+    """Get all instance UUIDs via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllInstanceUuidsRequest()
+        reply = stub.GetAllInstanceUuids(request)
+        return list(reply.uuids)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetAllInstanceUuids failed: {e}')
+        return []
+
+
 def _grpc_delete_instance(inst_uuid: UUID) -> bool:
     """Delete an Instance record via the database microservice."""
     try:
@@ -14233,6 +14265,16 @@ def get_all_instances() -> list[InstanceData]:
     if _use_database_service():
         return _grpc_get_all_instances()
     return _direct_get_all_instances()
+
+
+def get_all_instance_uuids() -> list[str]:
+    """Get all instance UUIDs.
+
+    Returns only UUIDs (not full records) for efficient enumeration.
+    """
+    if _use_database_service():
+        return _grpc_get_all_instance_uuids()
+    return _direct_get_all_instance_uuids()
 
 
 def delete_instance(inst_uuid: UUID) -> bool:

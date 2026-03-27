@@ -3437,6 +3437,25 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetAllInstancesReply(
                 instances=[])
 
+    def GetAllInstanceUuids(
+        self,
+        request: database_pb2.GetAllInstanceUuidsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllInstanceUuidsReply:
+        """Get all instance UUIDs from MariaDB."""
+        try:
+            self.monitor.counters['get_all_instance_uuids'].inc()
+            uuids = mariadb._direct_get_all_instance_uuids()
+            return database_pb2.GetAllInstanceUuidsReply(
+                uuids=uuids)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllInstanceUuids failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetAllInstanceUuidsReply(
+                uuids=[])
+
     def DeleteInstance(
         self,
         request: database_pb2.DeleteInstanceRequest,

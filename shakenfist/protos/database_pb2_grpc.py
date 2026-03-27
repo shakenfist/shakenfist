@@ -719,6 +719,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetAllInstancesRequest.SerializeToString,
                 response_deserializer=database__pb2.GetAllInstancesReply.FromString,
                 _registered_method=True)
+        self.GetAllInstanceUuids = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllInstanceUuids',
+                request_serializer=database__pb2.GetAllInstanceUuidsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAllInstanceUuidsReply.FromString,
+                _registered_method=True)
         self.DeleteInstance = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteInstance',
                 request_serializer=database__pb2.DeleteInstanceRequest.SerializeToString,
@@ -1672,6 +1677,12 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetAllInstanceUuids(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DeleteInstance(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -2457,6 +2468,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetAllInstances,
                     request_deserializer=database__pb2.GetAllInstancesRequest.FromString,
                     response_serializer=database__pb2.GetAllInstancesReply.SerializeToString,
+            ),
+            'GetAllInstanceUuids': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllInstanceUuids,
+                    request_deserializer=database__pb2.GetAllInstanceUuidsRequest.FromString,
+                    response_serializer=database__pb2.GetAllInstanceUuidsReply.SerializeToString,
             ),
             'DeleteInstance': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteInstance,
@@ -6233,6 +6249,33 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetAllInstances',
             database__pb2.GetAllInstancesRequest.SerializeToString,
             database__pb2.GetAllInstancesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAllInstanceUuids(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllInstanceUuids',
+            database__pb2.GetAllInstanceUuidsRequest.SerializeToString,
+            database__pb2.GetAllInstanceUuidsReply.FromString,
             options,
             channel_credentials,
             insecure,

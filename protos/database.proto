@@ -220,6 +220,7 @@ service DatabaseService {
   rpc CreateInstance (CreateInstanceRequest) returns (StatusReply) {}
   rpc GetInstance (GetInstanceRequest) returns (GetInstanceReply) {}
   rpc GetAllInstances (GetAllInstancesRequest) returns (GetAllInstancesReply) {}
+  rpc GetAllInstanceUuids (GetAllInstanceUuidsRequest) returns (GetAllInstanceUuidsReply) {}
   rpc DeleteInstance (DeleteInstanceRequest) returns (StatusReply) {}
 
   // Instance Attributes Operations (MariaDB)
@@ -1464,6 +1465,13 @@ message GetAllInstancesRequest {
 
 message GetAllInstancesReply {
   repeated InstanceStaticData instances = 1;
+}
+
+message GetAllInstanceUuidsRequest {
+}
+
+message GetAllInstanceUuidsReply {
+  repeated string uuids = 1;
 }
 
 message DeleteInstanceRequest {

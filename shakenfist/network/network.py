@@ -140,36 +140,48 @@ class Network(dbowo):
         attrs = NetworkAttributesData(uuid=_uuid)
         mariadb.create_network_attributes(attrs)
 
+    @staticmethod
+    def _static_values_to_dict(data):
+        """Convert NetworkData to the dict format used internally."""
+        return {
+            'uuid': str(data.uuid),
+            'name': data.name,
+            'namespace': data.namespace,
+            'netblock': data.netblock,
+            'provide_dhcp': data.provide_dhcp,
+            'provide_nat': data.provide_nat,
+            'provide_dns': data.provide_dns,
+            'vxid': data.vxid,
+            'egress_nic': data.egress_nic,
+            'mesh_nic': data.mesh_nic,
+            'version': data.version,
+        }
+
     @classmethod
     def _db_get(cls, object_uuid) -> Optional[dict]:
-        """Get Network static values, trying MariaDB first."""
+        """Get Network static values from MariaDB."""
         if not isinstance(object_uuid, UUID):
             object_uuid = UUID(str(object_uuid))
         data = mariadb.get_network(object_uuid)
-        if data:
-            result = {
-                'uuid': str(data.uuid),
-                'name': data.name,
-                'namespace': data.namespace,
-                'netblock': data.netblock,
-                'provide_dhcp': data.provide_dhcp,
-                'provide_nat': data.provide_nat,
-                'provide_dns': data.provide_dns,
-                'vxid': data.vxid,
-                'egress_nic': data.egress_nic,
-                'mesh_nic': data.mesh_nic,
-                'version': data.version
-            }
-            if result.get('version', 0) != cls.current_version:
-                from shakenfist import exceptions
-                if not cls.upgrade_supported:
-                    raise exceptions.BadObjectVersion(
-                        f'Unsupported object version - '
-                        f'{cls.object_type}: {result}')
-            return result
+        if not data:
+            return None
 
-        # Fall back to etcd for unmigrated objects
-        return super()._db_get(object_uuid)
+        result = cls._static_values_to_dict(data)
+        if result.get('version', 0) != cls.current_version:
+            from shakenfist import exceptions
+            if not cls.upgrade_supported:
+                raise exceptions.BadObjectVersion(
+                    f'Unsupported object version - '
+                    f'{cls.object_type}: {result}')
+        return result
+
+    @classmethod
+    def filter(cls, filters):
+        """Override base class to use MariaDB instead of etcd."""
+        for data in mariadb.get_all_networks():
+            obj = cls(cls._static_values_to_dict(data))
+            if all(f(obj) for f in filters):
+                yield obj
 
     def _load_attributes(self) -> Optional[NetworkAttributesData]:
         """Load attributes from MariaDB."""
@@ -901,6 +913,39 @@ class Network(dbowo):
 
 class Networks(dbo_iter):
     base_object = Network
+
+    def get_iterator(self):
+        from shakenfist import exceptions
+
+        if self.prefilter:
+            if self.prefilter == 'active':
+                target_states = Network.ACTIVE_STATES
+            elif self.prefilter == 'deleted':
+                target_states = [dbo.STATE_DELETED]
+            elif self.prefilter == 'healthy':
+                target_states = Network.HEALTHY_STATES
+            elif self.prefilter == 'inactive':
+                target_states = Network.INACTIVE_STATES
+            else:
+                raise exceptions.InvalidObjectPrefilter(
+                    self.prefilter)
+
+            matching_uuids = set(
+                mariadb.get_objects_by_state(
+                    Network.object_type,
+                    list(target_states)))
+
+            results = []
+            for data in mariadb.get_all_networks():
+                if str(data.uuid) in matching_uuids:
+                    results.append(
+                        (str(data.uuid),
+                         Network._static_values_to_dict(data)))
+            yield from results
+        else:
+            for data in mariadb.get_all_networks():
+                yield (str(data.uuid),
+                       Network._static_values_to_dict(data))
 
     def __iter__(self):
         for _, static_values in self.get_iterator():

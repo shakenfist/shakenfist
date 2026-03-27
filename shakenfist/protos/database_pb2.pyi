@@ -4407,6 +4407,32 @@ class GetAllInstancesReply(google.protobuf.message.Message):
 global___GetAllInstancesReply = GetAllInstancesReply
 
 @typing.final
+class GetAllInstanceUuidsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetAllInstanceUuidsRequest = GetAllInstanceUuidsRequest
+
+@typing.final
+class GetAllInstanceUuidsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUIDS_FIELD_NUMBER: builtins.int
+    @property
+    def uuids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        uuids: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuids", b"uuids"]) -> None: ...
+
+global___GetAllInstanceUuidsReply = GetAllInstanceUuidsReply
+
+@typing.final
 class DeleteInstanceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
