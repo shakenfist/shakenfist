@@ -118,10 +118,14 @@ nav:
                 - "Make the speed: occystrap performance overhaul": components/occystrap/plans/PLAN-make-the-speed.md
                 - "Phase 1: Quay.io API client": components/occystrap/plans/PLAN-quay-label-search-phase-01-api-client.md
                 - "Phase 1: Replace requests with httpx": components/occystrap/plans/PLAN-make-the-speed-phase-01-httpx.md
+                - "Phase 1: Verification framework and DirWriter verifier": components/occystrap/plans/PLAN-post-write-verification-phase-01-framework.md
                 - "Phase 2: Parallel Quay API resolution": components/occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution.md
                 - "Phase 2: quay:// URI parsing and multi-image resolution": components/occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input.md
+                - "Phase 2: TarWriter and DockerWriter verifiers": components/occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker.md
                 - "Phase 3: Concurrent multi-image processing": components/occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency.md
                 - "Phase 3: info and process multi-image support": components/occystrap/plans/PLAN-quay-label-search-phase-03-commands.md
+                - "Phase 3: RegistryWriter verifier": components/occystrap/plans/PLAN-post-write-verification-phase-03-registry.md
+                - "Phase 4: Documentation and functional tests": components/occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests.md
                 - "Phase 4: Functional tests and documentation": components/occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs.md
                 - "Phase 4: Parallel and async output I/O": components/occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io.md
                 - "Phase 5: Benchmarking and tuning": components/occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking.md
