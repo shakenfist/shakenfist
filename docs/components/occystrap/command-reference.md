@@ -23,6 +23,8 @@ name:
 | `--temp-dir PATH` | `OCCYSTRAP_TEMP_DIR` | Directory for temporary files (default: system temp) |
 | `--layer-cache PATH` | `OCCYSTRAP_LAYER_CACHE` | JSON file for cross-invocation layer caching |
 | `-O`, `--output-format` | | Output format for `info`/`check`: `text` (default) or `json` |
+| `--verify` / `--no-verify` | `OCCYSTRAP_VERIFY` | Verify output after processing (default: enabled) |
+| `--verify-full` | `OCCYSTRAP_VERIFY_FULL` | Full verification: re-read and validate all layer data |
 
 Example:
 
@@ -757,6 +759,80 @@ recalculated after modification.
 # Exclude multiple patterns
 -f "exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc"
 ```
+
+## Post-write Verification
+
+The `--verify` flag (enabled by default) runs a post-write
+verification step after each image is processed. Verification
+reads back what was written and checks it against what was
+expected, catching issues like incomplete writes, missing
+layers, or corrupt output.
+
+### Verification levels
+
+| Flag | What it checks | Cost |
+|------|---------------|------|
+| `--verify` (default) | Existence and sizes of all expected files/blobs | Negligible |
+| `--verify-full` | Everything above, plus re-reads and validates layer data | Moderate (re-reads all layers) |
+| `--no-verify` | Skips verification entirely | None |
+
+### What each output type verifies
+
+**`dir://` output:**
+
+- Manifest file exists and is valid JSON
+- Config file exists
+- Each layer directory and `layer.tar` file exists
+- Each layer file size matches what was recorded during write
+- Full mode: validates each `layer.tar` is a valid tarball
+
+**`tar://` output:**
+
+- Tarball can be opened and read
+- `manifest.json` entry exists and is valid JSON with
+  required keys (`Layers`, `Config`)
+- Config entry exists in the tarball
+- All layer entries listed in the manifest exist in the tarball
+- Full mode: validates each layer entry is a valid inner tarball
+
+**`registry://` output:**
+
+- HEAD request confirms each layer blob exists in the registry
+- HEAD request confirms config blob exists
+- GET manifest and compare config digest and layer digests
+  against what was pushed
+- Network errors during verification are reported as warnings
+  (the push already succeeded)
+
+**`docker://` output:**
+
+- Queries the Docker API (`/images/json`) for the loaded image
+- Confirms the image ID matches the expected config digest
+
+### Summary output
+
+Verification results appear in the summary line:
+
+```
+Summary: 47/47 images, 312 layers, 4.2 GB, 38.1s, verified OK
+```
+
+On failure:
+
+```
+Summary: 47/47 images, 312 layers, 4.2 GB, 38.1s, 2 verify errors
+Verification errors: 2
+```
+
+When verification errors occur, the process command exits
+with code 1.
+
+### Environment variables
+
+| Variable | Effect |
+|----------|--------|
+| `OCCYSTRAP_VERIFY=0` | Equivalent to `--no-verify` |
+| `OCCYSTRAP_VERIFY_FULL=1` | Equivalent to `--verify-full` |
 
 ## Layer Cache
 

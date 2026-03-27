@@ -47,19 +47,24 @@ but also increases the chance that transient errors (network
 glitches, rate-limiting, disk I/O issues) could silently produce
 incomplete output.
 
-The existing `check` command validates images from an *input*
-source — it reads a manifest and config from a registry, then
-optionally downloads and verifies all layers. But there is no
-equivalent verification for *output* — after `process` writes
-an image, nothing confirms that the written output is complete
-and correct.
+### What exists today for confidence
 
-Users running bulk mirrors (e.g., `quay://` → `dir://` with
-hundreds of images) need confidence that every image landed
-correctly, especially when they saw transient errors scroll past
-during processing.
+**Processing summary (added in the performance overhaul):**
+The `process` command now prints a summary line after completion:
 
-### What exists today
+```
+Summary: 47/47 images, 312 layers, 4.2 GB, 38.1s, 2 retries
+No failed images.
+```
+
+This shows aggregate stats including retry counts and rate-limit
+events, plus an explicit "No failed images" confirmation for bulk
+operations. The `RequestStats` class in `util.py` tracks retries
+and rate-limit events across all threads. This addresses the
+*visibility* problem — users can see at a glance whether anything
+went wrong — but does not address the *correctness* problem of
+verifying what was actually written to disk or pushed to a
+registry.
 
 **`check.py` module:**
 - `CheckResults` class: accumulates errors/warnings/info with
@@ -77,15 +82,19 @@ during processing.
   `check_layers` (unless `--fast`).
 - Reports results in text or JSON format.
 - Only works against *input* sources (registries, tarballs,
-  Docker daemon).
+  Docker daemon). Does **not** support `dir://` as a check
+  source.
 
 **Output writers (`finalize()` state):**
 - `DirWriter`: writes layers as files in subdirectories, writes
   `manifest-{name}-{tag}.json` and updates `catalog.json`.
+  Uses `os.rename()` for zero-copy layer placement when
+  `temp_path` is available.
 - `TarWriter`: writes layers and manifest into a tarball,
   closes the tarball.
 - `RegistryWriter`: pushes blobs and manifest to a registry,
-  reports upload stats.
+  reports upload stats. Already checks blob existence before
+  upload via HEAD requests.
 - `DockerWriter`: builds a tarball and POSTs to Docker API.
 - `OCIBundleWriter` / `MountWriter`: extend DirWriter with
   OCI bundle / overlay extraction.
@@ -93,6 +102,8 @@ during processing.
 **Base output tracking (`ImageOutput`):**
 - `_track_element(type, size)`: counts layers and bytes.
 - `_total_bytes`, `_layer_count`: available after processing.
+- Stats returned from `_fetch()` as a dict with bytes, layers,
+  retries, and rate_limits.
 
 None of the output writers verify their own output after
 writing. The pipeline trusts that if no exception was raised,
@@ -100,122 +111,159 @@ the output is correct.
 
 ## Mission and problem statement
 
-Add a `--verify` flag to the `process` command that runs
-post-write verification after each image completes. The
-verification should confirm that the output is complete and
-correct by reading back what was written and checking it
-against what should have been written.
+Add a `--verify` / `--no-verify` flag to the `process` command
+that runs post-write verification after each image completes.
+Verification confirms that the output is complete and correct
+by reading back what was written and checking it against what
+should have been written.
 
-For bulk operations, provide an aggregate summary
-("47/47 images verified OK" or "45/47 verified, 2 FAILED")
-so users can trust the result without scrolling through logs.
+The goal is confidence, not exhaustive validation. A user
+running a bulk mirror of 200 images should be able to look at
+the output and know definitively whether every image landed
+correctly — without manually running `check` on each one.
 
 The verification should be:
 - **On by default** — users shouldn't have to opt in to
-  correctness. A `--no-verify` flag disables it for speed.
+  correctness. `--no-verify` disables it for speed.
 - **Output-type-specific** — each output format has different
   things to verify.
 - **Non-destructive** — verification reads but never modifies
   the output.
 - **Efficient** — avoid re-downloading or re-reading more data
-  than necessary. For directory output, stat files and check
-  hashes. For registry output, HEAD requests for blob
-  existence.
+  than necessary. Default mode checks existence and sizes.
+  Full mode re-reads and hashes.
+- **Integrated with the summary** — verification results feed
+  into the existing processing summary line.
+
+## Design decisions
+
+1. **`--verify` is on by default** with `--no-verify` to
+   disable. The performance cost is small relative to the
+   transfer, and the confidence benefit is high.
+
+2. **Two verification levels.** The default `--verify` checks
+   file/blob existence and sizes (fast). `--verify=full` also
+   re-reads and hashes every layer (thorough but slower). This
+   mirrors the `check` command's `--fast` vs full distinction.
+
+3. **Each output writer records its expectations during
+   processing.** The writer knows what files/blobs it wrote
+   and at what sizes. Verification checks reality against
+   those expectations. This sidesteps the filter interaction
+   problem entirely — filters transform content before the
+   writer sees it, so the writer's expectations already
+   reflect the filtered output.
+
+4. **Verification failures cause non-zero exit code.** Exit
+   code 0 means all images processed *and* verified. Exit
+   code 1 means processing or verification failure.
+
+5. **Verification results integrate with the existing summary
+   line.** After `Summary: 47/47 images, 312 layers, ...` the
+   verification adds `47/47 verified` or
+   `45/47 verified, 2 FAILED`. The `_print_summary` function
+   already accepts these counters.
+
+6. **`verify()` is a concrete method on `ImageOutput`, not
+   abstract.** The default implementation returns success
+   (no-op). Output writers override it to add type-specific
+   checks. This avoids requiring every output writer and
+   filter to implement an empty method.
 
 ## Open questions
 
-1. **Should `--verify` be on by default?**
+1. **Should `check dir://` be added as part of this work?**
 
-   *Recommendation:* Yes, on by default with `--no-verify` to
-   disable. The performance cost is small relative to the
-   transfer, and the confidence benefit is high. Users who
-   want maximum speed can opt out.
+   The existing `check` command only supports input URIs
+   (registry, tar, docker). Adding `dir://` as a check source
+   would allow `occystrap check dir:///path/to/output` as a
+   standalone operation, separate from the `--verify` flag on
+   process. This would be useful but is a larger change to the
+   input infrastructure.
 
-2. **Should verification re-read and hash every layer, or
-   just check file existence and size?**
+   *Recommendation:* Defer to future work. The `--verify` flag
+   on `process` covers the primary use case. Adding `dir://`
+   as a check source is a separate plan.
 
-   *Recommendation:* Two levels. The default `--verify`
-   checks existence and size (fast). A `--verify=full` mode
-   also re-reads and hashes layers (thorough but slower).
-   This mirrors the `check` command's `--fast` vs full mode.
+2. **Should registry verification re-fetch the manifest or
+   just HEAD the blobs?**
 
-3. **How should verification interact with filters?**
-
-   When filters modify layer content (e.g., `exclude`,
-   `normalize-timestamps`), the output layers have different
-   hashes than the input layers. Verification needs to check
-   against what the output *should* contain, not what the
-   input had.
-
-   *Recommendation:* The output writer knows what it wrote.
-   Have each writer record what it expects (file paths, sizes,
-   digests) during processing, then verify against those
-   expectations. This avoids any filter confusion.
-
-4. **Should verification failures cause a non-zero exit code?**
-
-   *Recommendation:* Yes. Exit code 0 = all images processed
-   and verified. Exit code 1 = processing or verification
-   failure.
+   *Recommendation:* Default mode: HEAD each blob and GET the
+   manifest to compare against what was pushed. Full mode:
+   additionally GET each blob and hash it. The manifest GET is
+   cheap and catches manifest push failures.
 
 ## Execution
 
 ### Phase 1: Verification framework and DirWriter verifier
 
-Add the `--verify` / `--no-verify` flags to the `process`
-command. Define an abstract `verify()` method on `ImageOutput`
-that subclasses implement. Implement verification for
-`DirWriter` (the most common output for bulk operations):
+Add `--verify` / `--no-verify` flags to the `process` command.
+Add a `verify()` method to `ImageOutput` (default: return
+empty `CheckResults`). Each writer records expectations during
+`process_image_element()` and checks them in `verify()`.
+
+Implement for `DirWriter` (the most common output for bulk
+operations):
 
 - Check manifest file exists and is valid JSON.
-- Check config file exists and matches expected size.
+- Check config file exists.
 - Check each layer directory and `layer.tar` file exists.
-- Check each layer file size matches what was written.
-- Optionally (full mode): re-read and hash each layer.
+- Check each layer file size matches what was recorded during
+  write.
+- Full mode: re-read and SHA256-hash each layer file.
 
-Also implement for `OCIBundleWriter` and `MountWriter` which
-extend `DirWriter`.
+`OCIBundleWriter` and `MountWriter` inherit from `DirWriter`
+and get its verification for free.
+
+Wire `verify()` into `_fetch()` so it runs after `finalize()`.
+Add verification counts to the stats dict returned by `_fetch`
+and to `_print_summary`.
 
 ### Phase 2: TarWriter and DockerWriter verifiers
 
-Implement verification for `TarWriter`:
+**TarWriter:**
+- Re-open the tarball read-only and list entries.
+- Check manifest.json, config file, and all layer tarballs
+  are present.
+- Check sizes match recorded expectations.
+- Full mode: re-read and hash layers within the tarball.
 
-- Re-open the tarball and list its entries.
-- Check manifest.json, config, and all layer tarballs present.
-- Check sizes match.
-- Optionally (full mode): re-read and hash layers within the
-  tarball.
-
-Implement verification for `DockerWriter`:
-
-- Query Docker API to confirm the image was loaded.
+**DockerWriter:**
+- Query Docker API (`/images/{id}/json`) to confirm the image
+  was loaded.
 - Check image ID matches expected config digest.
 
 ### Phase 3: RegistryWriter verifier
 
-Implement verification for `RegistryWriter`:
-
 - HEAD each layer blob to confirm it exists in the registry.
 - HEAD the config blob.
-- GET the manifest and verify it matches what was pushed.
-- Optionally (full mode): GET and hash each blob.
+- GET the manifest and compare against what was pushed (byte
+  comparison of the JSON body).
+- Full mode: GET each blob and hash it.
 
-### Phase 4: Bulk verification summary and documentation
+Note: `RegistryWriter` already does a blob-exists HEAD check
+*before* upload to skip existing blobs. Verification is the
+complementary check *after* the full push completes, confirming
+the manifest and all blobs are reachable.
 
-Add aggregate reporting to `_process_multi()`:
+### Phase 4: Documentation and functional tests
 
-- Track verification results per image.
-- Print summary line: "47/47 images verified OK" or
-  "45/47 verified, 2 FAILED: [list]".
-- Update README, ARCHITECTURE.md, docs/command-reference.md.
-- Add functional tests for the verification flow.
+- Update `docs/command-reference.md` with `--verify` /
+  `--no-verify` / `--verify=full` documentation.
+- Update README, ARCHITECTURE.md.
+- Add functional tests:
+  - `test_verify_dir.py`: process to dir, verify passes.
+  - `test_verify_tar.py`: process to tar, verify passes.
+  - `test_verify_registry.py`: process to registry, verify
+    passes.
+  - Negative tests: corrupt output, verify detects failure.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Verification framework and DirWriter | PLAN-post-write-verification-phase-01-framework.md | Not started |
-| 2. TarWriter and DockerWriter verifiers | PLAN-post-write-verification-phase-02-tar-docker.md | Not started |
-| 3. RegistryWriter verifier | PLAN-post-write-verification-phase-03-registry.md | Not started |
-| 4. Bulk summary and documentation | PLAN-post-write-verification-phase-04-summary.md | Not started |
+| 1. Verification framework and DirWriter | PLAN-post-write-verification-phase-01-framework.md | Complete |
+| 2. TarWriter and DockerWriter verifiers | PLAN-post-write-verification-phase-02-tar-docker.md | Complete |
+| 3. RegistryWriter verifier | PLAN-post-write-verification-phase-03-registry.md | Complete |
+| 4. Documentation and functional tests | PLAN-post-write-verification-phase-04-docs-tests.md | Complete |
 
 ## Administration and logistics
 
@@ -238,19 +286,24 @@ because the following statements will be true:
   updated if the change adds or modifies modules or CLI commands.
 * `process --verify` is on by default and exits non-zero on
   verification failure.
-* Bulk operations print an aggregate verification summary.
+* Summary line includes verification counts.
 * Each output writer has a type-specific verify() implementation.
+* Functional tests cover both positive and negative verification
+  cases.
 
 ### Future work
 
-- Integrate with the existing `check` command so that
-  `check dir:///path/to/output` works (currently `check` only
-  supports input URIs).
+- Add `dir://` as a source for the `check` command so that
+  `occystrap check dir:///path/to/output` works standalone.
 - Add a `--verify-only` mode that re-verifies a previously
   written output without reprocessing.
 - Verification for the `proxy` command's downstream writes.
 - Checksums file (e.g., `SHA256SUMS`) written alongside
   directory output for external verification tools.
+- Pre-existing security issues found during the performance
+  audit: URL encoding in auth scope parameters, auth token
+  redaction in debug logs. These are not related to
+  verification but were noted in the audit.
 
 ### Bugs fixed during this work
 

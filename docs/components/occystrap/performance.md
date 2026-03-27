@@ -158,3 +158,15 @@ same workflow to find the optimal settings for your environment.
 Benchmarks measure raw transfer performance with no layer cache. Real-world
 performance will be faster when the layer cache (`--layer-cache`) is
 enabled, as duplicate layers are skipped.
+
+## Verification overhead
+
+Post-write verification (`--verify`, enabled by default) adds negligible
+overhead for most output types — it checks file existence and sizes, which
+are metadata-only operations. For `registry://` output, verification adds
+one HEAD request per blob plus one GET for the manifest.
+
+`--verify-full` re-reads and validates all layer data, which roughly doubles
+the disk I/O for `dir://` and `tar://` output. Use `--no-verify` if
+verification overhead is a concern in high-throughput CI pipelines where
+correctness is validated downstream.
