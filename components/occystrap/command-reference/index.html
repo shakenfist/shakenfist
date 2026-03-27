@@ -1799,6 +1799,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#post-write-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-write Verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Post-write Verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#verification-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification levels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-each-output-type-verifies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each output type verifies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#layer-cache" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2263,6 +2324,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Verification framework and DirWriter verifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
         
   
@@ -2319,6 +2408,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: TarWriter and DockerWriter verifiers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
         
   
@@ -2355,6 +2472,62 @@
     
   
     Phase 3: info and process multi-image support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: RegistryWriter verifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Documentation and functional tests
   
 
     
@@ -4580,6 +4753,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#post-write-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-write Verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Post-write Verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#verification-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification levels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-each-output-type-verifies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each output type verifies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#layer-cache" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4773,6 +5007,16 @@ name:</p>
 <td><code>-O</code>, <code>--output-format</code></td>
 <td></td>
 <td>Output format for <code>info</code>/<code>check</code>: <code>text</code> (default) or <code>json</code></td>
+</tr>
+<tr>
+<td><code>--verify</code> / <code>--no-verify</code></td>
+<td><code>OCCYSTRAP_VERIFY</code></td>
+<td>Verify output after processing (default: enabled)</td>
+</tr>
+<tr>
+<td><code>--verify-full</code></td>
+<td><code>OCCYSTRAP_VERIFY_FULL</code></td>
+<td>Full verification: re-read and validate all layer data</td>
 </tr>
 </tbody>
 </table>
@@ -5597,6 +5841,100 @@ recalculated after modification.</p>
 <a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a><span class="c1"># Exclude multiple patterns</span>
 <a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>-f<span class="w"> </span><span class="s2">&quot;exclude:pattern=**/.git/**,**/__pycache__/**,**/*.pyc&quot;</span>
 </code></pre></div>
+<h2 id="post-write-verification">Post-write Verification<a class="headerlink" href="#post-write-verification" title="Permanent link">&para;</a></h2>
+<p>The <code>--verify</code> flag (enabled by default) runs a post-write
+verification step after each image is processed. Verification
+reads back what was written and checks it against what was
+expected, catching issues like incomplete writes, missing
+layers, or corrupt output.</p>
+<h3 id="verification-levels">Verification levels<a class="headerlink" href="#verification-levels" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>What it checks</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--verify</code> (default)</td>
+<td>Existence and sizes of all expected files/blobs</td>
+<td>Negligible</td>
+</tr>
+<tr>
+<td><code>--verify-full</code></td>
+<td>Everything above, plus re-reads and validates layer data</td>
+<td>Moderate (re-reads all layers)</td>
+</tr>
+<tr>
+<td><code>--no-verify</code></td>
+<td>Skips verification entirely</td>
+<td>None</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-each-output-type-verifies">What each output type verifies<a class="headerlink" href="#what-each-output-type-verifies" title="Permanent link">&para;</a></h3>
+<p><strong><code>dir://</code> output:</strong></p>
+<ul>
+<li>Manifest file exists and is valid JSON</li>
+<li>Config file exists</li>
+<li>Each layer directory and <code>layer.tar</code> file exists</li>
+<li>Each layer file size matches what was recorded during write</li>
+<li>Full mode: validates each <code>layer.tar</code> is a valid tarball</li>
+</ul>
+<p><strong><code>tar://</code> output:</strong></p>
+<ul>
+<li>Tarball can be opened and read</li>
+<li><code>manifest.json</code> entry exists and is valid JSON with
+  required keys (<code>Layers</code>, <code>Config</code>)</li>
+<li>Config entry exists in the tarball</li>
+<li>All layer entries listed in the manifest exist in the tarball</li>
+<li>Full mode: validates each layer entry is a valid inner tarball</li>
+</ul>
+<p><strong><code>registry://</code> output:</strong></p>
+<ul>
+<li>HEAD request confirms each layer blob exists in the registry</li>
+<li>HEAD request confirms config blob exists</li>
+<li>GET manifest and compare config digest and layer digests
+  against what was pushed</li>
+<li>Network errors during verification are reported as warnings
+  (the push already succeeded)</li>
+</ul>
+<p><strong><code>docker://</code> output:</strong></p>
+<ul>
+<li>Queries the Docker API (<code>/images/json</code>) for the loaded image</li>
+<li>Confirms the image ID matches the expected config digest</li>
+</ul>
+<h3 id="summary-output">Summary output<a class="headerlink" href="#summary-output" title="Permanent link">&para;</a></h3>
+<p>Verification results appear in the summary line:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>Summary: 47/47 images, 312 layers, 4.2 GB, 38.1s, verified OK
+</code></pre></div>
+<p>On failure:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>Summary: 47/47 images, 312 layers, 4.2 GB, 38.1s, 2 verify errors
+<a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>Verification errors: 2
+</code></pre></div>
+<p>When verification errors occur, the process command exits
+with code 1.</p>
+<h3 id="environment-variables">Environment variables<a class="headerlink" href="#environment-variables" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OCCYSTRAP_VERIFY=0</code></td>
+<td>Equivalent to <code>--no-verify</code></td>
+</tr>
+<tr>
+<td><code>OCCYSTRAP_VERIFY_FULL=1</code></td>
+<td>Equivalent to <code>--verify-full</code></td>
+</tr>
+</tbody>
+</table>
 <h2 id="layer-cache">Layer Cache<a class="headerlink" href="#layer-cache" title="Permanent link">&para;</a></h2>
 <p>The <code>--layer-cache</code> option enables a persistent cache that tracks which
 layers have already been processed and uploaded to a registry. This is
@@ -5612,13 +5950,13 @@ filter configuration), occystrap verifies the compressed blob still
 exists in the target registry via a HEAD request. If it does, the
 entire layer is skipped -- no fetch, no filter, no compress, no upload.</p>
 <h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a><span class="c1"># First push: all layers processed normally, results cached</span>
-<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a><span class="w">    </span>process<span class="w"> </span>docker://app1:v1<span class="w"> </span>registry://myregistry/app1:v1
-<a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a>
-<a id="__codelineno-42-5" name="__codelineno-42-5" href="#__codelineno-42-5"></a><span class="c1"># Second push: shared base layers are skipped</span>
-<a id="__codelineno-42-6" name="__codelineno-42-6" href="#__codelineno-42-6"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-42-7" name="__codelineno-42-7" href="#__codelineno-42-7"></a><span class="w">    </span>process<span class="w"> </span>docker://app2:v1<span class="w"> </span>registry://myregistry/app2:v1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="c1"># First push: all layers processed normally, results cached</span>
+<a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a><span class="w">    </span>process<span class="w"> </span>docker://app1:v1<span class="w"> </span>registry://myregistry/app1:v1
+<a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a>
+<a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a><span class="c1"># Second push: shared base layers are skipped</span>
+<a id="__codelineno-44-6" name="__codelineno-44-6" href="#__codelineno-44-6"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-44-7" name="__codelineno-44-7" href="#__codelineno-44-7"></a><span class="w">    </span>process<span class="w"> </span>docker://app2:v1<span class="w"> </span>registry://myregistry/app2:v1
 </code></pre></div>
 <p>The cache path can also be set via the <code>OCCYSTRAP_LAYER_CACHE</code>
 environment variable.</p>
@@ -5632,13 +5970,13 @@ have zero local transfer overhead.</p>
 <p>A digest mapping file (<code>{cache_path}.digests</code>) is created alongside the
 cache to translate between Docker's compressed digests and the DiffIDs used
 as cache keys.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="c1"># First push: all layers transferred and cached</span>
-<a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a><span class="w">    </span>process<span class="w"> </span>dockerpush://app:v1<span class="w"> </span>registry://myregistry/app:v1
-<a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a>
-<a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a><span class="c1"># Second push: Docker skips uploading shared layers entirely</span>
-<a id="__codelineno-43-6" name="__codelineno-43-6" href="#__codelineno-43-6"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-43-7" name="__codelineno-43-7" href="#__codelineno-43-7"></a><span class="w">    </span>process<span class="w"> </span>dockerpush://app:v2<span class="w"> </span>registry://myregistry/app:v2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="c1"># First push: all layers transferred and cached</span>
+<a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a><span class="w">    </span>process<span class="w"> </span>dockerpush://app:v1<span class="w"> </span>registry://myregistry/app:v1
+<a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a>
+<a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a><span class="c1"># Second push: Docker skips uploading shared layers entirely</span>
+<a id="__codelineno-45-6" name="__codelineno-45-6" href="#__codelineno-45-6"></a>occystrap<span class="w"> </span>--layer-cache<span class="w"> </span>/tmp/cache.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-45-7" name="__codelineno-45-7" href="#__codelineno-45-7"></a><span class="w">    </span>process<span class="w"> </span>dockerpush://app:v2<span class="w"> </span>registry://myregistry/app:v2
 </code></pre></div>
 <h3 id="pipeline-awareness">Pipeline Awareness<a class="headerlink" href="#pipeline-awareness" title="Permanent link">&para;</a></h3>
 <p>Cache entries are keyed by the input layer DiffID and a hash of the
@@ -5656,18 +5994,18 @@ to start fresh -- the only cost is re-processing layers on the next
 push.</p>
 <h3 id="cache-file-format">Cache File Format<a class="headerlink" href="#cache-file-format" title="Permanent link">&para;</a></h3>
 <p>The cache is stored as a JSON file:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="p">{</span>
-<a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a><span class="w">  </span><span class="nt">&quot;layers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a><span class="w">    </span><span class="nt">&quot;sha256:abc123...&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a><span class="w">      </span><span class="nt">&quot;compressed_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:def456...&quot;</span><span class="p">,</span>
-<a id="__codelineno-44-6" name="__codelineno-44-6" href="#__codelineno-44-6"></a><span class="w">      </span><span class="nt">&quot;compressed_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">45678901</span><span class="p">,</span>
-<a id="__codelineno-44-7" name="__codelineno-44-7" href="#__codelineno-44-7"></a><span class="w">      </span><span class="nt">&quot;media_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;application/vnd.docker.image.rootfs.diff.tar.gzip&quot;</span><span class="p">,</span>
-<a id="__codelineno-44-8" name="__codelineno-44-8" href="#__codelineno-44-8"></a><span class="w">      </span><span class="nt">&quot;filters_hash&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;none&quot;</span><span class="p">,</span>
-<a id="__codelineno-44-9" name="__codelineno-44-9" href="#__codelineno-44-9"></a><span class="w">      </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-02-09T12:34:56.789012+00:00&quot;</span>
-<a id="__codelineno-44-10" name="__codelineno-44-10" href="#__codelineno-44-10"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-44-11" name="__codelineno-44-11" href="#__codelineno-44-11"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-44-12" name="__codelineno-44-12" href="#__codelineno-44-12"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="p">{</span>
+<a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a><span class="w">  </span><span class="nt">&quot;layers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a><span class="w">    </span><span class="nt">&quot;sha256:abc123...&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-46-5" name="__codelineno-46-5" href="#__codelineno-46-5"></a><span class="w">      </span><span class="nt">&quot;compressed_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:def456...&quot;</span><span class="p">,</span>
+<a id="__codelineno-46-6" name="__codelineno-46-6" href="#__codelineno-46-6"></a><span class="w">      </span><span class="nt">&quot;compressed_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">45678901</span><span class="p">,</span>
+<a id="__codelineno-46-7" name="__codelineno-46-7" href="#__codelineno-46-7"></a><span class="w">      </span><span class="nt">&quot;media_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;application/vnd.docker.image.rootfs.diff.tar.gzip&quot;</span><span class="p">,</span>
+<a id="__codelineno-46-8" name="__codelineno-46-8" href="#__codelineno-46-8"></a><span class="w">      </span><span class="nt">&quot;filters_hash&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;none&quot;</span><span class="p">,</span>
+<a id="__codelineno-46-9" name="__codelineno-46-9" href="#__codelineno-46-9"></a><span class="w">      </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-02-09T12:34:56.789012+00:00&quot;</span>
+<a id="__codelineno-46-10" name="__codelineno-46-10" href="#__codelineno-46-10"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-46-11" name="__codelineno-46-11" href="#__codelineno-46-11"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-46-12" name="__codelineno-46-12" href="#__codelineno-46-12"></a><span class="p">}</span>
 </code></pre></div>
 <table>
 <thead>

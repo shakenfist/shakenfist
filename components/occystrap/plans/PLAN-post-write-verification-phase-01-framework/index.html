@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/occystrap/plans/PLAN-post-write-verification/">
+        <link rel="canonical" href="https://shakenfist.com/components/occystrap/plans/PLAN-post-write-verification-phase-01-framework/">
       
       
-        <link rel="prev" href="../PLAN-quay-label-search-phase-05-since-filter/">
+        <link rel="prev" href="../PLAN-make-the-speed-phase-01-httpx/">
       
       
-        <link rel="next" href="../PLAN-quay-label-search/">
+        <link rel="next" href="../PLAN-make-the-speed-phase-02-parallel-resolution/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Post-write verification for output integrity - Shaken Fist</title>
+        <title>Phase 1: Verification framework and DirWriter verifier - Shaken Fist</title>
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#post-write-verification-for-output-integrity" class="md-skip">
+        <a href="#phase-1-verification-framework-and-dirwriter-verifier" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Post-write verification for output integrity
+              Phase 1: Verification framework and DirWriter verifier
             
           </span>
         </div>
@@ -1822,10 +1822,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Verification framework and DirWriter verifier
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1841,6 +1868,363 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current state
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Current state">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dirwriter-file-layout-after-finalize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DirWriter file layout after finalize()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#imageoutput-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ImageOutput base class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ocibundlewriter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OCIBundleWriter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mountwriter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MountWriter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkresults-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CheckResults API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_fetch-and-stats-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _fetch() and stats flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-verify-fits-in-the-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where --verify fits in the CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#verify-method-on-imageoutput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        verify() method on ImageOutput
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dirwriterverify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DirWriter.verify()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ocibundlewriterverify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OCIBundleWriter.verify()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mountwriterverify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MountWriter.verify()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli-flag-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI flag design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation steps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-add-verify-to-imageoutput-and-checkresults-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Add verify() to ImageOutput and CheckResults import
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-add-_expected_layers-tracking-to-dirwriter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Add _expected_layers tracking to DirWriter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-implement-dirwriterverify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Implement DirWriter.verify()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-add-verify-no-verify-and-verify-full-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Add --verify/--no-verify and --verify-full flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-wire-verify-into-_process_single-and-_process_multi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: Wire verify into _process_single and _process_multi
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-6-update-_print_summary-with-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6: Update _print_summary with verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-7-add-unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7: Add unit tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-8-update-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 8: Update documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commit-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commit plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risk-assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk assessment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2158,37 +2542,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Post-write verification for output integrity
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../PLAN-post-write-verification/" class="md-nav__link">
         
   
   
@@ -2204,220 +2561,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prompt
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Situation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Situation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-exists-today-for-confidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What exists today for confidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#mission-and-problem-statement" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mission and problem statement
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#design-decisions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Design decisions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Open questions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Execution">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#phase-1-verification-framework-and-dirwriter-verifier" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 1: Verification framework and DirWriter verifier
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#phase-2-tarwriter-and-dockerwriter-verifiers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 2: TarWriter and DockerWriter verifiers
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#phase-3-registrywriter-verifier" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 3: RegistryWriter verifier
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#phase-4-documentation-and-functional-tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 4: Documentation and functional tests
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Administration and logistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Administration and logistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success criteria
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -4207,22 +4350,99 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
+  <a href="#goal" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Situation
+        Goal
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Situation">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current state
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Current state">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#what-exists-today-for-confidence" class="md-nav__link">
+  <a href="#dirwriter-file-layout-after-finalize" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What exists today for confidence
+        DirWriter file layout after finalize()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#imageoutput-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ImageOutput base class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ocibundlewriter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OCIBundleWriter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mountwriter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MountWriter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkresults-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CheckResults API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_fetch-and-stats-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _fetch() and stats flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-verify-fits-in-the-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where --verify fits in the CLI
       
     </span>
   </a>
@@ -4235,55 +4455,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mission-and-problem-statement" class="md-nav__link">
+  <a href="#design" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mission and problem statement
+        Design
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#design-decisions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Design decisions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Open questions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Execution">
+    <nav class="md-nav" aria-label="Design">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#phase-1-verification-framework-and-dirwriter-verifier" class="md-nav__link">
+  <a href="#verify-method-on-imageoutput" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 1: Verification framework and DirWriter verifier
+        verify() method on ImageOutput
       
     </span>
   </a>
@@ -4291,10 +4478,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#phase-2-tarwriter-and-dockerwriter-verifiers" class="md-nav__link">
+  <a href="#dirwriterverify" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 2: TarWriter and DockerWriter verifiers
+        DirWriter.verify()
       
     </span>
   </a>
@@ -4302,10 +4489,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#phase-3-registrywriter-verifier" class="md-nav__link">
+  <a href="#ocibundlewriterverify" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 3: RegistryWriter verifier
+        OCIBundleWriter.verify()
       
     </span>
   </a>
@@ -4313,10 +4500,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#phase-4-documentation-and-functional-tests" class="md-nav__link">
+  <a href="#mountwriterverify" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 4: Documentation and functional tests
+        MountWriter.verify()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli-flag-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI flag design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary integration
       
     </span>
   </a>
@@ -4329,22 +4538,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
+  <a href="#implementation-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Administration and logistics
+        Implementation steps
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Administration and logistics">
+    <nav class="md-nav" aria-label="Implementation steps">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
+  <a href="#step-1-add-verify-to-imageoutput-and-checkresults-import" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Success criteria
+        Step 1: Add verify() to ImageOutput and CheckResults import
       
     </span>
   </a>
@@ -4352,10 +4561,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
+  <a href="#step-2-add-_expected_layers-tracking-to-dirwriter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Future work
+        Step 2: Add _expected_layers tracking to DirWriter
       
     </span>
   </a>
@@ -4363,10 +4572,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+  <a href="#step-3-implement-dirwriterverify" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bugs fixed during this work
+        Step 3: Implement DirWriter.verify()
       
     </span>
   </a>
@@ -4374,6 +4583,88 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#step-4-add-verify-no-verify-and-verify-full-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Add --verify/--no-verify and --verify-full flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-wire-verify-into-_process_single-and-_process_multi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: Wire verify into _process_single and _process_multi
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-6-update-_print_summary-with-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6: Update _print_summary with verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-7-add-unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7: Add unit tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-8-update-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 8: Update documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commit-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commit plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risk-assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk assessment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#back-brief" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4381,11 +4672,6 @@
       
     </span>
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -4410,7 +4696,7 @@
   
 
 
-<h1 id="post-write-verification-for-output-integrity">Post-write verification for output integrity<a class="headerlink" href="#post-write-verification-for-output-integrity" title="Permanent link">&para;</a></h1>
+<h1 id="phase-1-verification-framework-and-dirwriter-verifier">Phase 1: Verification framework and DirWriter verifier<a class="headerlink" href="#phase-1-verification-framework-and-dirwriter-verifier" title="Permanent link">&para;</a></h1>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the occystrap codebase thoroughly. Read relevant
@@ -4426,294 +4712,312 @@ answer. Flag any uncertainty explicitly rather than guessing.</p>
 input/filter/output interfaces, and cross-cutting concerns (layer
 caching, parallel downloads, compression). Consult <code>CLAUDE.md</code> for
 build commands and project conventions.</p>
-<p>When we get to detailed planning, I prefer a separate plan file
-per detailed phase. These separate files should be named for the
-master plan, in the same directory as the master plan, and simply
-have <code>-phase-NN-descriptive</code> appended before the <code>.md</code> file
-extension. Tracking of these sub-phases should be done via a table
-like this in this master plan under the Execution section:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>| Phase | Plan | Status |
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>|-------|------|--------|
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>| 1. Registry listing API | PLAN-thing-phase-01-listing.md | Not started |
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>| 2. Label filtering | PLAN-thing-phase-02-labels.md | Not started |
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>| ...   | ...  | ...    |
-</code></pre></div>
 <p>I prefer one commit per logical change, and at minimum one commit
 per phase. Do not batch unrelated changes into a single commit.
 Each commit should be self-contained: it should build, pass tests,
 and have a clear commit message explaining what changed and why.</p>
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>Occystrap recently gained significant parallelism (httpx with
-HTTP/2, concurrent multi-image processing, parallel layer
-downloads and uploads). This makes bulk operations much faster
-but also increases the chance that transient errors (network
-glitches, rate-limiting, disk I/O issues) could silently produce
-incomplete output.</p>
-<h3 id="what-exists-today-for-confidence">What exists today for confidence<a class="headerlink" href="#what-exists-today-for-confidence" title="Permanent link">&para;</a></h3>
-<p><strong>Processing summary (added in the performance overhaul):</strong>
-The <code>process</code> command now prints a summary line after completion:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Summary: 47/47 images, 312 layers, 4.2 GB, 38.1s, 2 retries
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>No failed images.
+<h2 id="goal">Goal<a class="headerlink" href="#goal" title="Permanent link">&para;</a></h2>
+<p>Add a <code>--verify</code> / <code>--no-verify</code> flag to the <code>process</code> command,
+a <code>verify()</code> method on <code>ImageOutput</code>, and a concrete
+implementation for <code>DirWriter</code> that checks the written output
+is complete and correct.</p>
+<h2 id="current-state">Current state<a class="headerlink" href="#current-state" title="Permanent link">&para;</a></h2>
+<h3 id="dirwriter-file-layout-after-finalize">DirWriter file layout after finalize()<a class="headerlink" href="#dirwriter-file-layout-after-finalize" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{image_path}/
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── catalog.json
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── manifest-{image}_{tag}.json   (or manifest.json)
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── {config_hash}.json
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>├── {layer1_hash}/
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│   └── layer.tar
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── {layer2_hash}/
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│   └── layer.tar
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>└── ...
 </code></pre></div>
-<p>This shows aggregate stats including retry counts and rate-limit
-events, plus an explicit "No failed images" confirmation for bulk
-operations. The <code>RequestStats</code> class in <code>util.py</code> tracks retries
-and rate-limit events across all threads. This addresses the
-<em>visibility</em> problem — users can see at a glance whether anything
-went wrong — but does not address the <em>correctness</em> problem of
-verifying what was actually written to disk or pushed to a
-registry.</p>
-<p><strong><code>check.py</code> module:</strong>
-- <code>CheckResults</code> class: accumulates errors/warnings/info with
-  <code>error()</code>, <code>warning()</code>, <code>info()</code> methods and <code>has_errors</code>
-  property.
-- <code>check_metadata(manifest, config, results)</code>: fast-mode
-  validation of manifest structure, schema version, layer count
-  consistency, compression compatibility, media types.
-- <code>check_layers(input_source, manifest, config, results)</code>:
-  full validation that downloads layers and verifies diff_ids,
-  tar format, whiteout correctness.</p>
-<p><strong><code>check</code> CLI command:</strong>
-- Takes a source URI and runs <code>check_metadata</code> (always) plus
-  <code>check_layers</code> (unless <code>--fast</code>).
-- Reports results in text or JSON format.
-- Only works against <em>input</em> sources (registries, tarballs,
-  Docker daemon). Does <strong>not</strong> support <code>dir://</code> as a check
-  source.</p>
-<p><strong>Output writers (<code>finalize()</code> state):</strong>
-- <code>DirWriter</code>: writes layers as files in subdirectories, writes
-  <code>manifest-{name}-{tag}.json</code> and updates <code>catalog.json</code>.
-  Uses <code>os.rename()</code> for zero-copy layer placement when
-  <code>temp_path</code> is available.
-- <code>TarWriter</code>: writes layers and manifest into a tarball,
-  closes the tarball.
-- <code>RegistryWriter</code>: pushes blobs and manifest to a registry,
-  reports upload stats. Already checks blob existence before
-  upload via HEAD requests.
-- <code>DockerWriter</code>: builds a tarball and POSTs to Docker API.
-- <code>OCIBundleWriter</code> / <code>MountWriter</code>: extend DirWriter with
-  OCI bundle / overlay extraction.</p>
-<p><strong>Base output tracking (<code>ImageOutput</code>):</strong>
-- <code>_track_element(type, size)</code>: counts layers and bytes.
-- <code>_total_bytes</code>, <code>_layer_count</code>: available after processing.
-- Stats returned from <code>_fetch()</code> as a dict with bytes, layers,
-  retries, and rate_limits.</p>
-<p>None of the output writers verify their own output after
-writing. The pipeline trusts that if no exception was raised,
-the output is correct.</p>
-<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
-<p>Add a <code>--verify</code> / <code>--no-verify</code> flag to the <code>process</code> command
-that runs post-write verification after each image completes.
-Verification confirms that the output is complete and correct
-by reading back what was written and checking it against what
-should have been written.</p>
-<p>The goal is confidence, not exhaustive validation. A user
-running a bulk mirror of 200 images should be able to look at
-the output and know definitively whether every image landed
-correctly — without manually running <code>check</code> on each one.</p>
-<p>The verification should be:
-- <strong>On by default</strong> — users shouldn't have to opt in to
-  correctness. <code>--no-verify</code> disables it for speed.
-- <strong>Output-type-specific</strong> — each output format has different
-  things to verify.
-- <strong>Non-destructive</strong> — verification reads but never modifies
-  the output.
-- <strong>Efficient</strong> — avoid re-downloading or re-reading more data
-  than necessary. Default mode checks existence and sizes.
-  Full mode re-reads and hashes.
-- <strong>Integrated with the summary</strong> — verification results feed
-  into the existing processing summary line.</p>
-<h2 id="design-decisions">Design decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h2>
+<p><strong>Instance variables available after finalize():</strong>
+- <code>self.image_path</code> — root output directory
+- <code>self.tar_manifest[0]['Config']</code> — config filename
+  (e.g., <code>abc123.json</code>)
+- <code>self.tar_manifest[0]['Layers']</code> — list of layer paths
+  (e.g., <code>['def456/layer.tar', 'ghi789/layer.tar']</code>)
+- <code>self._manifest_filename()</code> — returns the manifest
+  filename stem (e.g., <code>manifest</code> or
+  <code>manifest-docker.io_library_busybox-latest</code>)</p>
+<h3 id="imageoutput-base-class">ImageOutput base class<a class="headerlink" href="#imageoutput-base-class" title="Permanent link">&para;</a></h3>
+<p>Abstract base with <code>_track_element()</code>, <code>_total_bytes</code>,
+<code>_layer_count</code>. Three abstract methods: <code>fetch_callback()</code>,
+<code>process_image_element()</code>, <code>finalize()</code>.</p>
+<h3 id="ocibundlewriter">OCIBundleWriter<a class="headerlink" href="#ocibundlewriter" title="Permanent link">&para;</a></h3>
+<p>Extends DirWriter with <code>expand=True</code>. Its <code>finalize()</code>
+calls <code>_log_bundle()</code> and <code>_log_summary()</code> but does NOT
+write manifest or catalog files. After <code>write_bundle()</code>,
+layers are extracted to <code>rootfs/</code> and layer directories
+are removed. Verification must account for this different
+layout.</p>
+<h3 id="mountwriter">MountWriter<a class="headerlink" href="#mountwriter" title="Permanent link">&para;</a></h3>
+<p>Direct <code>ImageOutput</code> subclass (NOT DirWriter). Has its own
+<code>process_image_element()</code> and <code>finalize()</code> that writes
+manifest and catalog. Layers are extracted per-directory
+with overlay whiteout handling (xattrs, mknod). After
+<code>write_bundle()</code>, layers are overlay-mounted.</p>
+<h3 id="checkresults-api">CheckResults API<a class="headerlink" href="#checkresults-api" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">results</span> <span class="o">=</span> <span class="n">CheckResults</span><span class="p">()</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">results</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;check_id&#39;</span><span class="p">,</span> <span class="s1">&#39;message&#39;</span><span class="p">)</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">results</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;check_id&#39;</span><span class="p">,</span> <span class="s1">&#39;message&#39;</span><span class="p">)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">results</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;check_id&#39;</span><span class="p">,</span> <span class="s1">&#39;message&#39;</span><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">results</span><span class="o">.</span><span class="n">has_errors</span>     <span class="c1"># bool</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">results</span><span class="o">.</span><span class="n">error_count</span>    <span class="c1"># int</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">results</span><span class="o">.</span><span class="n">warning_count</span>  <span class="c1"># int</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">results</span><span class="o">.</span><span class="n">results</span>        <span class="c1"># list of dicts</span>
+</code></pre></div>
+<h3 id="_fetch-and-stats-flow">_fetch() and stats flow<a class="headerlink" href="#_fetch-and-stats-flow" title="Permanent link">&para;</a></h3>
+<p><code>_fetch()</code> returns a stats dict:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="s1">&#39;bytes&#39;</span><span class="p">:</span> <span class="n">N</span><span class="p">,</span> <span class="s1">&#39;layers&#39;</span><span class="p">:</span> <span class="n">N</span><span class="p">,</span> <span class="s1">&#39;retries&#39;</span><span class="p">:</span> <span class="n">N</span><span class="p">,</span> <span class="s1">&#39;rate_limits&#39;</span><span class="p">:</span> <span class="n">N</span><span class="p">}</span>
+</code></pre></div></p>
+<p>Stats feed into <code>_print_summary()</code> which outputs:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Summary: 47/47 images, 312 layers, 4.2 GB, 38.1s
+</code></pre></div></p>
+<h3 id="where-verify-fits-in-the-cli">Where --verify fits in the CLI<a class="headerlink" href="#where-verify-fits-in-the-cli" title="Permanent link">&para;</a></h3>
+<p>Global options are on the <code>cli</code> group (lines 33-80 of
+main.py). The <code>--verify</code> flag should go here so it's
+available to <code>process</code> and potentially other commands.
+Stored in <code>ctx.obj['VERIFY']</code>.</p>
+<h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>
+<h3 id="verify-method-on-imageoutput">verify() method on ImageOutput<a class="headerlink" href="#verify-method-on-imageoutput" title="Permanent link">&para;</a></h3>
+<p>A <strong>concrete</strong> method (not abstract) with a default no-op
+implementation. Returns a <code>CheckResults</code> instance. Output
+writers override it to add type-specific checks.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># outputs/base.py</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">verify</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">full</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Verify the output is complete and correct.</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="sd">    Called after finalize(). Returns CheckResults.</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="sd">    Override in subclasses for type-specific checks.</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="sd">    Args:</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="sd">        full: If True, re-read and hash all data.</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="sd">            If False, only check existence and sizes.</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="k">return</span> <span class="n">CheckResults</span><span class="p">()</span>
+</code></pre></div>
+<p>The <code>full</code> parameter controls the depth:
+- <code>full=False</code> (default <code>--verify</code>): stat files, check
+  existence and sizes.
+- <code>full=True</code> (<code>--verify=full</code>): also re-read and SHA256
+  hash every layer.</p>
+<h3 id="dirwriterverify">DirWriter.verify()<a class="headerlink" href="#dirwriterverify" title="Permanent link">&para;</a></h3>
+<p>Checks performed:</p>
+<ol>
+<li><strong>Manifest file exists and is valid JSON.</strong></li>
+<li>Path: <code>{image_path}/{manifest_filename}.json</code></li>
+<li>
+<p>Parse as JSON, verify it has <code>Layers</code> and <code>Config</code>
+     keys.</p>
+</li>
+<li>
+<p><strong>Config file exists.</strong></p>
+</li>
+<li>
+<p>Path: <code>{image_path}/{tar_manifest[0]['Config']}</code></p>
+</li>
+<li>
+<p><strong>Each layer file exists.</strong></p>
+</li>
+<li>
+<p>For each entry in <code>tar_manifest[0]['Layers']</code>:
+     path <code>{image_path}/{layer_path}</code> must exist.</p>
+</li>
+<li>
+<p><strong>Layer file sizes match expectations.</strong></p>
+</li>
+<li>During <code>process_image_element()</code>, record each
+     layer's size in a new <code>self._expected_layers</code> dict
+     mapping layer path to size.</li>
+<li>
+<p>In <code>verify()</code>, <code>os.path.getsize()</code> each layer and
+     compare.</p>
+</li>
+<li>
+<p><strong>Full mode: re-read and hash each layer.</strong></p>
+</li>
+<li>Read each layer file in 64KB chunks, compute
+     SHA256.</li>
+<li>Compare against the layer digest (which is the
+     directory name).</li>
+<li>Note: for DirWriter, the layer file is the
+     <em>decompressed</em> tarball. The directory name is the
+     compressed digest from the registry. So
+     hash-checking the decompressed file against the
+     compressed digest won't match. Instead, just
+     verify the file is a valid tarball by opening it
+     with <code>tarfile.open()</code>.</li>
+</ol>
+<h3 id="ocibundlewriterverify">OCIBundleWriter.verify()<a class="headerlink" href="#ocibundlewriterverify" title="Permanent link">&para;</a></h3>
+<p>After <code>write_bundle()</code>:
+- <code>rootfs/</code> directory exists
+- <code>config.json</code> exists and is valid JSON
+- <code>container-config.json</code> exists
+- Layer directories have been removed</p>
+<p>Before <code>write_bundle()</code> (if verify runs after finalize
+but before write_bundle):
+- Same as DirWriter checks, since layers are still on
+  disk.</p>
+<p><em>Decision:</em> Verify should run after the full pipeline
+including <code>write_bundle()</code>. So OCIBundleWriter needs its
+own verify that checks the post-bundle layout. However,
+<code>write_bundle()</code> is called from <code>_process_single()</code> in
+main.py, <em>after</em> <code>_fetch()</code>. So we need to call
+<code>verify()</code> after <code>write_bundle()</code>, not inside <code>_fetch()</code>.</p>
+<p><em>Revised flow:</em>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">_fetch</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">output</span><span class="p">):</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="o">...</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">output</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="k">return</span> <span class="n">stats</span>  <span class="c1"># verify NOT called here</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">_process_single</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">destination</span><span class="p">,</span> <span class="n">filters</span><span class="p">):</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="o">...</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">stats</span> <span class="o">=</span> <span class="n">_fetch</span><span class="p">(</span><span class="n">input_source</span><span class="p">,</span> <span class="n">output</span><span class="p">)</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="s1">&#39;write_bundle&#39;</span><span class="p">):</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>        <span class="n">output</span><span class="o">.</span><span class="n">write_bundle</span><span class="p">()</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="c1"># NOW verify</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">obj</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;VERIFY&#39;</span><span class="p">):</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>        <span class="n">writer</span> <span class="o">=</span> <span class="n">_get_inner_writer</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>        <span class="n">results</span> <span class="o">=</span> <span class="n">writer</span><span class="o">.</span><span class="n">verify</span><span class="p">(</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>            <span class="n">full</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">obj</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;VERIFY_FULL&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;verify_errors&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">error_count</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;verify_warnings&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">warning_count</span>
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    <span class="k">return</span> <span class="n">stats</span>
+</code></pre></div></p>
+<p>This means OCIBundleWriter can verify the post-bundle
+layout, and DirWriter verifies the post-finalize layout.</p>
+<h3 id="mountwriterverify">MountWriter.verify()<a class="headerlink" href="#mountwriterverify" title="Permanent link">&para;</a></h3>
+<p>MountWriter is a direct ImageOutput subclass, not a
+DirWriter. Its layout after finalize is similar to
+DirWriter (manifest, catalog, layer directories). But
+after <code>write_bundle()</code>, layers are overlay-mounted.</p>
+<p>For Phase 1, MountWriter gets the default no-op verify.
+It can be implemented in a later phase if needed — mount
+operations are less common than dir or tar output.</p>
+<h3 id="cli-flag-design">CLI flag design<a class="headerlink" href="#cli-flag-design" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s1">&#39;--verify/--no-verify&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>              <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Verify output after processing &#39;</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>                   <span class="s1">&#39;(default: enabled)&#39;</span><span class="p">)</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s1">&#39;--verify-full&#39;</span><span class="p">,</span> <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>              <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>              <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Full verification: re-read and &#39;</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>                   <span class="s1">&#39;hash all layers&#39;</span><span class="p">)</span>
+</code></pre></div>
+<p>Two separate flags rather than <code>--verify=full</code> because
+Click's boolean flag syntax (<code>--verify/--no-verify</code>)
+doesn't support value arguments. The <code>--verify-full</code>
+flag implies <code>--verify</code>.</p>
+<h3 id="summary-integration">Summary integration<a class="headerlink" href="#summary-integration" title="Permanent link">&para;</a></h3>
+<p>Add <code>verify_errors</code> and <code>verify_warnings</code> to
+<code>_print_summary()</code>. When verification is enabled:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Summary: 3 layers, 125.4 MB, 2.3s, verified OK
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Summary: 3 layers, 125.4 MB, 2.3s, 2 verify errors
+</code></pre></div>
+<p>For bulk operations:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>Summary: 47/47 images, 312 layers, 4.2 GB, 38.1s, 47/47 verified
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Summary: 47/47 images, 312 layers, 4.2 GB, 38.1s, 45/47 verified, 2 verify errors
+</code></pre></div></p>
+<h2 id="implementation-steps">Implementation steps<a class="headerlink" href="#implementation-steps" title="Permanent link">&para;</a></h2>
+<h3 id="step-1-add-verify-to-imageoutput-and-checkresults-import">Step 1: Add verify() to ImageOutput and CheckResults import<a class="headerlink" href="#step-1-add-verify-to-imageoutput-and-checkresults-import" title="Permanent link">&para;</a></h3>
+<p>Add a concrete <code>verify(full=False)</code> method to
+<code>ImageOutput</code> that returns an empty <code>CheckResults</code>.
+Import <code>CheckResults</code> from <code>check.py</code>.</p>
+<h3 id="step-2-add-_expected_layers-tracking-to-dirwriter">Step 2: Add _expected_layers tracking to DirWriter<a class="headerlink" href="#step-2-add-_expected_layers-tracking-to-dirwriter" title="Permanent link">&para;</a></h3>
+<p>In <code>DirWriter.process_image_element()</code>, record each
+layer's written size in <code>self._expected_layers</code> (a dict
+mapping layer path to size in bytes). Also record the
+config file size in <code>self._expected_config_size</code>.</p>
+<h3 id="step-3-implement-dirwriterverify">Step 3: Implement DirWriter.verify()<a class="headerlink" href="#step-3-implement-dirwriterverify" title="Permanent link">&para;</a></h3>
+<p>Override <code>verify()</code> in DirWriter to check:
+- Manifest file exists and is valid JSON
+- Config file exists and size matches
+- Each layer file exists and size matches
+- Full mode: open each layer with <code>tarfile.open()</code> to
+  validate it's a valid tar</p>
+<h3 id="step-4-add-verify-no-verify-and-verify-full-flags">Step 4: Add --verify/--no-verify and --verify-full flags<a class="headerlink" href="#step-4-add-verify-no-verify-and-verify-full-flags" title="Permanent link">&para;</a></h3>
+<p>Add the flags to the <code>cli</code> group in main.py. Store in
+<code>ctx.obj['VERIFY']</code> and <code>ctx.obj['VERIFY_FULL']</code>.</p>
+<h3 id="step-5-wire-verify-into-_process_single-and-_process_multi">Step 5: Wire verify into _process_single and _process_multi<a class="headerlink" href="#step-5-wire-verify-into-_process_single-and-_process_multi" title="Permanent link">&para;</a></h3>
+<p>Call <code>writer.verify()</code> after finalize/write_bundle in
+<code>_process_single</code>. Add <code>verify_errors</code> and
+<code>verify_warnings</code> to the stats dict. In
+<code>_process_multi</code>, aggregate verification counts.</p>
+<h3 id="step-6-update-_print_summary-with-verification">Step 6: Update _print_summary with verification<a class="headerlink" href="#step-6-update-_print_summary-with-verification" title="Permanent link">&para;</a></h3>
+<p>Add verification counts to the summary line. Show
+"verified OK" when all pass, "N verify errors" when
+some fail.</p>
+<h3 id="step-7-add-unit-tests">Step 7: Add unit tests<a class="headerlink" href="#step-7-add-unit-tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Test DirWriter.verify() with a correctly written image
+  (expect no errors).</li>
+<li>Test DirWriter.verify() with a missing layer file
+  (expect error).</li>
+<li>Test DirWriter.verify() with wrong layer size (expect
+  error).</li>
+<li>Test DirWriter.verify(full=True) with a corrupt layer
+  (expect error).</li>
+<li>Test that --no-verify skips verification.</li>
+<li>Test the summary line includes verification results.</li>
+</ul>
+<h3 id="step-8-update-documentation">Step 8: Update documentation<a class="headerlink" href="#step-8-update-documentation" title="Permanent link">&para;</a></h3>
+<p>Update docs/command-reference.md, README.md,
+ARCHITECTURE.md, and AGENTS.md.</p>
+<h2 id="commit-plan">Commit plan<a class="headerlink" href="#commit-plan" title="Permanent link">&para;</a></h2>
 <ol>
 <li>
-<p><strong><code>--verify</code> is on by default</strong> with <code>--no-verify</code> to
-   disable. The performance cost is small relative to the
-   transfer, and the confidence benefit is high.</p>
+<p><strong>Add verification framework and DirWriter verifier.</strong>
+   Add <code>verify()</code> to ImageOutput, implement in DirWriter,
+   add <code>--verify/--no-verify</code> and <code>--verify-full</code> flags,
+   wire into _process_single/_process_multi, update
+   summary line. Add unit tests.</p>
 </li>
 <li>
-<p><strong>Two verification levels.</strong> The default <code>--verify</code> checks
-   file/blob existence and sizes (fast). <code>--verify=full</code> also
-   re-reads and hashes every layer (thorough but slower). This
-   mirrors the <code>check</code> command's <code>--fast</code> vs full distinction.</p>
-</li>
-<li>
-<p><strong>Each output writer records its expectations during
-   processing.</strong> The writer knows what files/blobs it wrote
-   and at what sizes. Verification checks reality against
-   those expectations. This sidesteps the filter interaction
-   problem entirely — filters transform content before the
-   writer sees it, so the writer's expectations already
-   reflect the filtered output.</p>
-</li>
-<li>
-<p><strong>Verification failures cause non-zero exit code.</strong> Exit
-   code 0 means all images processed <em>and</em> verified. Exit
-   code 1 means processing or verification failure.</p>
-</li>
-<li>
-<p><strong>Verification results integrate with the existing summary
-   line.</strong> After <code>Summary: 47/47 images, 312 layers, ...</code> the
-   verification adds <code>47/47 verified</code> or
-   <code>45/47 verified, 2 FAILED</code>. The <code>_print_summary</code> function
-   already accepts these counters.</p>
-</li>
-<li>
-<p><strong><code>verify()</code> is a concrete method on <code>ImageOutput</code>, not
-   abstract.</strong> The default implementation returns success
-   (no-op). Output writers override it to add type-specific
-   checks. This avoids requiring every output writer and
-   filter to implement an empty method.</p>
+<p><strong>Update documentation for --verify flag.</strong>
+   Update command-reference.md, README.md,
+   ARCHITECTURE.md, AGENTS.md.</p>
 </li>
 </ol>
-<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
-<ol>
-<li><strong>Should <code>check dir://</code> be added as part of this work?</strong></li>
-</ol>
-<p>The existing <code>check</code> command only supports input URIs
-   (registry, tar, docker). Adding <code>dir://</code> as a check source
-   would allow <code>occystrap check dir:///path/to/output</code> as a
-   standalone operation, separate from the <code>--verify</code> flag on
-   process. This would be useful but is a larger change to the
-   input infrastructure.</p>
-<p><em>Recommendation:</em> Defer to future work. The <code>--verify</code> flag
-   on <code>process</code> covers the primary use case. Adding <code>dir://</code>
-   as a check source is a separate plan.</p>
-<ol>
-<li><strong>Should registry verification re-fetch the manifest or
-   just HEAD the blobs?</strong></li>
-</ol>
-<p><em>Recommendation:</em> Default mode: HEAD each blob and GET the
-   manifest to compare against what was pushed. Full mode:
-   additionally GET each blob and hash it. The manifest GET is
-   cheap and catches manifest push failures.</p>
-<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<h3 id="phase-1-verification-framework-and-dirwriter-verifier">Phase 1: Verification framework and DirWriter verifier<a class="headerlink" href="#phase-1-verification-framework-and-dirwriter-verifier" title="Permanent link">&para;</a></h3>
-<p>Add <code>--verify</code> / <code>--no-verify</code> flags to the <code>process</code> command.
-Add a <code>verify()</code> method to <code>ImageOutput</code> (default: return
-empty <code>CheckResults</code>). Each writer records expectations during
-<code>process_image_element()</code> and checks them in <code>verify()</code>.</p>
-<p>Implement for <code>DirWriter</code> (the most common output for bulk
-operations):</p>
-<ul>
-<li>Check manifest file exists and is valid JSON.</li>
-<li>Check config file exists.</li>
-<li>Check each layer directory and <code>layer.tar</code> file exists.</li>
-<li>Check each layer file size matches what was recorded during
-  write.</li>
-<li>Full mode: re-read and SHA256-hash each layer file.</li>
-</ul>
-<p><code>OCIBundleWriter</code> and <code>MountWriter</code> inherit from <code>DirWriter</code>
-and get its verification for free.</p>
-<p>Wire <code>verify()</code> into <code>_fetch()</code> so it runs after <code>finalize()</code>.
-Add verification counts to the stats dict returned by <code>_fetch</code>
-and to <code>_print_summary</code>.</p>
-<h3 id="phase-2-tarwriter-and-dockerwriter-verifiers">Phase 2: TarWriter and DockerWriter verifiers<a class="headerlink" href="#phase-2-tarwriter-and-dockerwriter-verifiers" title="Permanent link">&para;</a></h3>
-<p><strong>TarWriter:</strong>
-- Re-open the tarball read-only and list entries.
-- Check manifest.json, config file, and all layer tarballs
-  are present.
-- Check sizes match recorded expectations.
-- Full mode: re-read and hash layers within the tarball.</p>
-<p><strong>DockerWriter:</strong>
-- Query Docker API (<code>/images/{id}/json</code>) to confirm the image
-  was loaded.
-- Check image ID matches expected config digest.</p>
-<h3 id="phase-3-registrywriter-verifier">Phase 3: RegistryWriter verifier<a class="headerlink" href="#phase-3-registrywriter-verifier" title="Permanent link">&para;</a></h3>
-<ul>
-<li>HEAD each layer blob to confirm it exists in the registry.</li>
-<li>HEAD the config blob.</li>
-<li>GET the manifest and compare against what was pushed (byte
-  comparison of the JSON body).</li>
-<li>Full mode: GET each blob and hash it.</li>
-</ul>
-<p>Note: <code>RegistryWriter</code> already does a blob-exists HEAD check
-<em>before</em> upload to skip existing blobs. Verification is the
-complementary check <em>after</em> the full push completes, confirming
-the manifest and all blobs are reachable.</p>
-<h3 id="phase-4-documentation-and-functional-tests">Phase 4: Documentation and functional tests<a class="headerlink" href="#phase-4-documentation-and-functional-tests" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Update <code>docs/command-reference.md</code> with <code>--verify</code> /
-  <code>--no-verify</code> / <code>--verify=full</code> documentation.</li>
-<li>Update README, ARCHITECTURE.md.</li>
-<li>Add functional tests:</li>
-<li><code>test_verify_dir.py</code>: process to dir, verify passes.</li>
-<li><code>test_verify_tar.py</code>: process to tar, verify passes.</li>
-<li><code>test_verify_registry.py</code>: process to registry, verify
-    passes.</li>
-<li>Negative tests: corrupt output, verify detects failure.</li>
-</ul>
+<h2 id="risk-assessment">Risk assessment<a class="headerlink" href="#risk-assessment" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Phase</th>
-<th>Plan</th>
-<th>Status</th>
+<th>Risk</th>
+<th>Likelihood</th>
+<th>Impact</th>
+<th>Mitigation</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>1. Verification framework and DirWriter</td>
-<td>PLAN-post-write-verification-phase-01-framework.md</td>
-<td>Complete</td>
+<td>verify() slows bulk operations</td>
+<td>Low</td>
+<td>Low</td>
+<td>Default mode is stat-only, very fast</td>
 </tr>
 <tr>
-<td>2. TarWriter and DockerWriter verifiers</td>
-<td>PLAN-post-write-verification-phase-02-tar-docker.md</td>
-<td>Complete</td>
+<td>Filter chain complicates writer access</td>
+<td>Low</td>
+<td>Low</td>
+<td>Walk _wrapped chain (already done in _fetch)</td>
 </tr>
 <tr>
-<td>3. RegistryWriter verifier</td>
-<td>PLAN-post-write-verification-phase-03-registry.md</td>
-<td>Complete</td>
+<td>OCIBundleWriter post-bundle layout differs</td>
+<td>Medium</td>
+<td>Low</td>
+<td>Defer OCIBundleWriter verify to later phase</td>
 </tr>
 <tr>
-<td>4. Documentation and functional tests</td>
-<td>PLAN-post-write-verification-phase-04-docs-tests.md</td>
-<td>Complete</td>
+<td>False positives from race conditions</td>
+<td>Very low</td>
+<td>Medium</td>
+<td>Verify runs single-threaded after finalize</td>
 </tr>
 </tbody>
 </table>
-<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
-<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
-<p>We will know when this plan has been successfully implemented
-because the following statements will be true:</p>
-<ul>
-<li>The code passes <code>flake8 --max-line-length=120</code> and
-  <code>pre-commit run --all-files</code>.</li>
-<li>New code follows the existing pipeline pattern (input/filter/
-  output interfaces) where applicable.</li>
-<li>There are unit tests for core logic and integration tests for
-  new CLI commands.</li>
-<li>Lines are wrapped at 120 characters, single quotes for strings,
-  double quotes for docstrings.</li>
-<li>Documentation in <code>docs/</code> has been updated to describe any new
-  commands or features.</li>
-<li><code>ARCHITECTURE.md</code>, <code>README.md</code>, and <code>AGENTS.md</code> have been
-  updated if the change adds or modifies modules or CLI commands.</li>
-<li><code>process --verify</code> is on by default and exits non-zero on
-  verification failure.</li>
-<li>Summary line includes verification counts.</li>
-<li>Each output writer has a type-specific verify() implementation.</li>
-<li>Functional tests cover both positive and negative verification
-  cases.</li>
-</ul>
-<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Add <code>dir://</code> as a source for the <code>check</code> command so that
-  <code>occystrap check dir:///path/to/output</code> works standalone.</li>
-<li>Add a <code>--verify-only</code> mode that re-verifies a previously
-  written output without reprocessing.</li>
-<li>Verification for the <code>proxy</code> command's downstream writes.</li>
-<li>Checksums file (e.g., <code>SHA256SUMS</code>) written alongside
-  directory output for external verification tools.</li>
-<li>Pre-existing security issues found during the performance
-  audit: URL encoding in auth scope parameters, auth token
-  redaction in debug logs. These are not related to
-  verification but were noted in the audit.</li>
-</ul>
-<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>(None yet.)</p>
-<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, please back brief the
 operator as to your understanding of the plan and how the work
 you intend to do aligns with that plan.</p>
@@ -4737,7 +5041,7 @@ you intend to do aligns with that plan.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/occystrap/plans/PLAN-post-write-verification.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/occystrap/plans/PLAN-post-write-verification.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/occystrap/plans/PLAN-post-write-verification/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/occystrap/plans/PLAN-post-write-verification-phase-01-framework.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/occystrap/plans/PLAN-post-write-verification-phase-01-framework.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/occystrap/plans/PLAN-post-write-verification-phase-01-framework/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
