@@ -1332,6 +1332,23 @@ def ensure_data_migrations() -> list[dict[str, Any]]:
             try:
                 from_ver = current_ver
                 stats = migrate_func(engine)
+
+                error_count = stats.get('error_count', 0)
+                if error_count > 0:
+                    LOG.error(
+                        f'Data migration for {table_name} had '
+                        f'{error_count} errors, not bumping version '
+                        f'(will retry on next restart)')
+                    results.append({
+                        'table': table_name,
+                        'from_version': from_ver,
+                        'to_version': target_ver,
+                        'migrated': False,
+                        'stats': stats,
+                        'error': f'{error_count} objects failed'
+                    })
+                    break
+
                 _set_table_version(engine, table_name, target_ver)
                 current_ver = target_ver
 
@@ -1345,8 +1362,7 @@ def ensure_data_migrations() -> list[dict[str, Any]]:
 
                 LOG.info(
                     f'Data migration complete for {table_name}: '
-                    f'migrated {stats.get("migrated_count", "?")} items, '
-                    f'{stats.get("error_count", 0)} errors'
+                    f'migrated {stats.get("migrated_count", "?")} items'
                 )
 
             except Exception as e:
