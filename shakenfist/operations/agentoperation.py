@@ -6,6 +6,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.operations.baseoperation import BaseOperation
 from shakenfist.schema.agentoperation_attributes import AgentOperationAttributesData
 from shakenfist.schema.agentoperation_data import AgentOperationData
@@ -153,17 +154,14 @@ class AgentOperation(BaseOperation):
 
     @property
     def results(self):
-        # Try MariaDB first
         _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
         attrs = mariadb.get_agent_operation_attributes(_uuid)
-        if attrs:
-            return attrs.results
-
-        # Fall back to etcd for unmigrated objects
-        db_data = self._db_get_attribute('results')
-        if not db_data:
-            return {}
-        return db_data.get('results', {})
+        if not attrs:
+            attrs = AgentOperationAttributesData(uuid=_uuid, results={})
+            if not mariadb.create_agent_operation_attributes(attrs):
+                # Another thread created the record; re-read it
+                attrs = mariadb.get_agent_operation_attributes(_uuid)
+        return attrs.results
 
     def add_result(self, index, value):
         if 'command' in value:
@@ -174,20 +172,18 @@ class AgentOperation(BaseOperation):
         with self.get_lock_attr('results', op='add result'):
             _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
             attrs = mariadb.get_agent_operation_attributes(_uuid)
-            if attrs:
-                # Update via MariaDB
-                results = dict(attrs.results)
-                results[str(index)] = value
-                updated = AgentOperationAttributesData(
-                    uuid=_uuid,
-                    results=results,
-                )
-                mariadb.update_agent_operation_attributes(updated)
-            else:
-                # Fall back to etcd for unmigrated objects
-                results = self.results
-                results[str(index)] = value
-                self._db_set_attribute('results', {'results': results})
+            if not attrs:
+                attrs = AgentOperationAttributesData(uuid=_uuid, results={})
+                if not mariadb.create_agent_operation_attributes(attrs):
+                    attrs = mariadb.get_agent_operation_attributes(_uuid)
+
+            results = dict(attrs.results)
+            results[str(index)] = value
+            updated = AgentOperationAttributesData(uuid=_uuid, results=results)
+            mariadb.update_agent_operation_attributes(updated)
+
+        self.add_event(EVENT_TYPE_MUTATE, 'add result',
+                       extra={'index': str(index)})
 
     def hard_delete(self):
         _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)

@@ -761,3 +761,7 @@ states, IPAM reservations, uploads, blobs, nodes, and other object types.
 No manual `sf-ctl` commands are needed for data migration -- simply
 upgrading and restarting the database daemon is sufficient. Migrations are
 idempotent and safe to re-run if the daemon restarts during migration.
+
+If any objects fail to migrate, the table version is not bumped and the
+migration will retry on the next daemon restart. This ensures all objects
+are successfully migrated before the version advances.

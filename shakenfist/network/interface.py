@@ -10,6 +10,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import mariadb
+from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
@@ -30,7 +31,7 @@ LOG, _ = logs.setup(__name__)
 
 class NetworkInterface(dbo):
     object_type = ObjectType.INTERFACE
-    initial_version = 2
+    initial_version = 4
     current_version = 5
 
     # docs/developer_guide/state_machine.md has a description of these states.
@@ -53,15 +54,6 @@ class NetworkInterface(dbo):
         self.__ipv4 = static_values['ipv4']
         self.__order = static_values['order']
         self.__model = static_values['model']
-
-    @classmethod
-    def _upgrade_step_2_to_3(cls, static_values):
-        cls._upgrade_metadata_to_attribute(static_values['uuid'])
-
-    @classmethod
-    def _upgrade_step_3_to_4(cls, static_values):
-        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
-        ...
 
     @classmethod
     def _upgrade_step_4_to_5(cls, static_values):
@@ -154,9 +146,8 @@ class NetworkInterface(dbo):
         )
 
         ni = NetworkInterface.from_db(interface_uuid)
-        ni._db_set_attribute('floating', {'floating_address': None})
 
-        # Also create initial attributes record in MariaDB
+        # Create initial attributes record in MariaDB
         attrs = NetworkInterfaceAttributesData(
             uuid=UUID(interface_uuid),
             floating_address=None
@@ -217,27 +208,37 @@ class NetworkInterface(dbo):
     # Values routed to attributes, writes are via helper methods.
     @property
     def floating(self):
-        # Try MariaDB first
         attrs = mariadb.get_network_interface_attributes(self.uuid)
-        if attrs:
-            return {'floating_address': attrs.floating_address}
-        # Fall back to etcd for unmigrated objects
-        return self._db_get_attribute('floating')
+        if not attrs:
+            _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(str(self.uuid))
+            attrs = NetworkInterfaceAttributesData(uuid=_uuid, floating_address=None)
+            if not mariadb.create_network_interface_attributes(attrs):
+                # Another thread created the record; re-read it
+                attrs = mariadb.get_network_interface_attributes(self.uuid)
+        return {'floating_address': attrs.floating_address}
 
     @floating.setter
     def floating(self, address):
         if address and self.floating.get('floating_address') is not None:
             raise exceptions.NetworkInterfaceAlreadyFloating()
-        self._db_set_attribute('floating', {'floating_address': address})
 
-        # Also update MariaDB
+        _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(str(self.uuid))
         attrs = mariadb.get_network_interface_attributes(self.uuid)
-        if attrs:
+        if not attrs:
+            attrs = NetworkInterfaceAttributesData(uuid=_uuid, floating_address=address)
+            if not mariadb.create_network_interface_attributes(attrs):
+                # Another thread created the record; update instead
+                updated = NetworkInterfaceAttributesData(
+                    uuid=_uuid, floating_address=address)
+                mariadb.update_network_interface_attributes(updated)
+        else:
             updated = NetworkInterfaceAttributesData(
-                uuid=attrs.uuid,
-                floating_address=address
-            )
+                uuid=attrs.uuid, floating_address=address)
             mariadb.update_network_interface_attributes(updated)
+
+        self.add_event(EVENT_TYPE_MUTATE, 'set attribute',
+                       extra={'attribute': 'floating',
+                              'floating_address': address})
 
     def delete(self):
         floating_address = self.floating['floating_address']

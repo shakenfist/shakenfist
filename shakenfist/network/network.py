@@ -1,5 +1,4 @@
 # Copyright 2020 Michael Still
-import copy
 import os
 import random
 import time
@@ -275,15 +274,6 @@ class Network(dbowo):
             'last_cluster_operation': self.last_cluster_operation
         })
 
-        for attrname in ['routing']:
-            d = self._db_get_attribute(attrname)
-            for key in d:
-                # We skip keys with no value
-                if d[key] is None:
-                    continue
-
-                n[key] = d[key]
-
         return n
 
     # Static values
@@ -293,21 +283,8 @@ class Network(dbowo):
 
     @property
     def floating_gateway(self):
-        # Try MariaDB first
-        attrs = self._load_attributes()
-        if attrs:
-            return attrs.floating_gateway
-        # Fall back to etcd for unmigrated objects
-        fg = self._db_get_attribute('routing', {'floating_gateway': None})
-        return fg['floating_gateway']
-
-    @property
-    def routing(self):
-        # Try MariaDB first — reconstruct dict for backward compat
-        attrs = self._load_attributes()
-        if attrs:
-            return {'floating_gateway': attrs.floating_gateway}
-        return self._db_get_attribute('routing')
+        attrs = self._ensure_attributes()
+        return attrs.floating_gateway
 
     @property
     def name(self):
@@ -364,70 +341,41 @@ class Network(dbowo):
 
     @property
     def networkinterfaces(self):
-        # Try MariaDB first
-        attrs = self._load_attributes()
-        if attrs:
-            return attrs.networkinterfaces
-        # Fall back to etcd for unmigrated objects
-        nis = self._db_get_attribute('networkinterfaces', {})
-        return nis.get('networkinterfaces', [])
+        attrs = self._ensure_attributes()
+        return attrs.networkinterfaces
 
     def add_networkinterface(self, ni):
-        attrs = self._load_attributes()
-        if attrs:
-            ni_uuid = str(ni.uuid)
-            if ni_uuid not in attrs.networkinterfaces:
-                attrs.networkinterfaces.append(ni_uuid)
-                attrs.networkinterfaces_initialized = True
-                self._save_attributes()
-        else:
-            self._add_item_in_attribute_list(
-                'networkinterfaces', str(ni.uuid))
+        attrs = self._ensure_attributes()
+        ni_uuid = str(ni.uuid)
+        if ni_uuid not in attrs.networkinterfaces:
+            attrs.networkinterfaces.append(ni_uuid)
+            attrs.networkinterfaces_initialized = True
+            self._save_attributes()
+            self.add_event(EVENT_TYPE_MUTATE, 'add networkinterface',
+                           extra={'networkinterface': ni_uuid})
 
     def remove_networkinterface(self, ni):
         if ni.ipv4:
             self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
-        attrs = self._load_attributes()
-        if attrs:
-            ni_uuid = str(ni.uuid)
-            if ni_uuid in attrs.networkinterfaces:
-                attrs.networkinterfaces.remove(ni_uuid)
-                self._save_attributes()
-        else:
-            self._remove_item_in_attribute_list(
-                'networkinterfaces', str(ni.uuid))
+        attrs = self._ensure_attributes()
+        ni_uuid = str(ni.uuid)
+        if ni_uuid in attrs.networkinterfaces:
+            attrs.networkinterfaces.remove(ni_uuid)
+            self._save_attributes()
+            self.add_event(EVENT_TYPE_MUTATE, 'remove networkinterface',
+                           extra={'networkinterface': ni_uuid})
 
     def _update_floating_gateway(self, gateway):
-        # Try MariaDB first
-        attrs = self._load_attributes()
-        if attrs:
-            if attrs.floating_gateway == gateway:
-                return True
-            if attrs.floating_gateway and gateway is not None:
-                return False
-            attrs.floating_gateway = gateway
-            self._save_attributes()
+        attrs = self._ensure_attributes()
+        if attrs.floating_gateway == gateway:
             return True
-
-        # Fall back to etcd for unmigrated objects
-        original_routing = self.routing
-        original_gateway = original_routing.get('floating_gateway')
-        if original_gateway == gateway:
-            return True
-        if original_gateway:
+        if attrs.floating_gateway and gateway is not None:
             return False
-
-        if not original_routing:
-            original_routing = None
-            updated_routing = {
-                'floating_gateway': gateway
-            }
-        else:
-            updated_routing = copy.copy(original_routing)
-            updated_routing['floating_gateway'] = gateway
-
-        return etcd.replace('attribute/network', self.uuid, 'routing',
-                            original_routing, updated_routing)
+        attrs.floating_gateway = gateway
+        self._save_attributes()
+        self.add_event(EVENT_TYPE_MUTATE, 'update floating gateway',
+                       extra={'floating_gateway': gateway})
+        return True
 
     def assign_floating_gateway(self):
         fn = floating_network()
@@ -482,12 +430,8 @@ class Network(dbowo):
 
         # Hosted DNS entries
         if self.provide_dns:
-            attrs = self._load_attributes()
-            if attrs:
-                retval['hosted_dns'] = attrs.hosteddns
-            else:
-                retval['hosted_dns'] = self._db_get_attribute(
-                    'hosteddns', {})
+            attrs = self._ensure_attributes()
+            retval['hosted_dns'] = attrs.hosteddns
         else:
             retval['hosted_dns'] = {}
 
@@ -817,16 +761,11 @@ class Network(dbowo):
         if not self.provide_dns:
             return
 
-        attrs = self._load_attributes()
-        if attrs:
-            attrs.hosteddns[name] = value
-            self._save_attributes()
-        else:
-            with self.get_lock_attr(
-                    'hosteddns', 'Update hosted DNS entry'):
-                entries = self._db_get_attribute('hosteddns', {})
-                entries[name] = value
-                self._db_set_attribute('hosteddns', entries)
+        attrs = self._ensure_attributes()
+        attrs.hosteddns[name] = value
+        self._save_attributes()
+        self.add_event(EVENT_TYPE_MUTATE, 'update dns entry',
+                       extra={'name': name, 'value': value})
 
         if config.NODE_IS_NETWORK_NODE:
             with self.get_lock(
@@ -845,18 +784,12 @@ class Network(dbowo):
         if not self.provide_dns:
             return
 
-        attrs = self._load_attributes()
-        if attrs:
-            if name in attrs.hosteddns:
-                del attrs.hosteddns[name]
-                self._save_attributes()
-        else:
-            with self.get_lock_attr(
-                    'hosteddns', 'Remove hosted DNS entry'):
-                entries = self._db_get_attribute('hosteddns', {})
-                if name in entries:
-                    del entries[name]
-                    self._db_set_attribute('hosteddns', entries)
+        attrs = self._ensure_attributes()
+        if name in attrs.hosteddns:
+            del attrs.hosteddns[name]
+            self._save_attributes()
+            self.add_event(EVENT_TYPE_MUTATE, 'remove dns entry',
+                           extra={'name': name})
 
         if config.NODE_IS_NETWORK_NODE:
             with self.get_lock(
