@@ -2167,7 +2167,8 @@ class MockEtcd():
                             )
 
         if metadata:
-            inst._db_set_attribute('metadata', metadata)
+            for k, v in metadata.items():
+                inst.add_metadata_key(k, v)
 
         # We just smash the requested state into the object, we don't attempt
         # to find a valid path to that state.
@@ -2204,7 +2205,8 @@ class MockEtcd():
                               )
 
         if metadata:
-            network._db_set_attribute('metadata', metadata)
+            for k, v in metadata.items():
+                network.add_metadata_key(k, v)
 
         state_path = defaultdict(set)
         for initial, allowed in Network.state_targets.items():

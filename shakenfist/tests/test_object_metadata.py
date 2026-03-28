@@ -9,7 +9,7 @@ TEST_UUID = '12345678-1234-4321-8234-123456789012'
 
 
 class MetadataPropertyTestCase(base.ShakenFistTestCase):
-    """Test metadata property routing: MariaDB first, etcd fallback."""
+    """Test metadata property reads from MariaDB only."""
 
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
@@ -23,34 +23,26 @@ class MetadataPropertyTestCase(base.ShakenFistTestCase):
         self.assertEqual(result, {'key1': 'val1', 'key2': 'val2'})
         mock_get.assert_called_once_with(d.object_type, TEST_UUID)
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
-                return_value={'etcd_key': 'etcd_val'})
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=None)
-    def test_metadata_falls_back_to_etcd(self, mock_get, mock_etcd_get):
+    def test_metadata_returns_empty_when_no_record(self, mock_get):
         d = DatabaseBackedObject(TEST_UUID)
         result = d.metadata
-        self.assertEqual(result, {'etcd_key': 'etcd_val'})
-        mock_etcd_get.assert_called_once_with('metadata', {})
+        self.assertEqual(result, {})
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
-                return_value={'etcd_key': 'etcd_val'})
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
                     object_type='unknown',
                     object_uuid=TEST_UUID,
                     metadata=None
                 ))
-    def test_metadata_falls_back_when_mariadb_metadata_is_none(
-            self, mock_get, mock_etcd_get):
+    def test_metadata_returns_empty_when_column_is_none(
+            self, mock_get):
         """MariaDB row exists but metadata column is NULL."""
         d = DatabaseBackedObject(TEST_UUID)
         result = d.metadata
-        self.assertEqual(result, {'etcd_key': 'etcd_val'})
-        mock_etcd_get.assert_called_once_with('metadata', {})
+        self.assertEqual(result, {})
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
-                return_value={})
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
                     object_type='unknown',
@@ -58,14 +50,13 @@ class MetadataPropertyTestCase(base.ShakenFistTestCase):
                     metadata={}
                 ))
     def test_metadata_returns_empty_dict_from_mariadb(
-            self, mock_get, mock_etcd_get):
-        """Empty dict is a valid value, should not fall back to etcd."""
+            self, mock_get):
+        """Empty dict is a valid value."""
         d = DatabaseBackedObject(TEST_UUID)
         result = d.metadata
         self.assertEqual(result, {})
-        mock_etcd_get.assert_not_called()
 
-    def test_metadata_in_memory_only_uses_etcd(self):
+    def test_metadata_in_memory_only_uses_in_memory_store(self):
         d = DatabaseBackedObject(TEST_UUID, in_memory_only=True)
         # In-memory values are stored as JSON strings
         d._DatabaseBackedObject__in_memory_values = {
@@ -76,9 +67,8 @@ class MetadataPropertyTestCase(base.ShakenFistTestCase):
 
 
 class AddMetadataKeyTestCase(base.ShakenFistTestCase):
-    """Test add_metadata_key dual-write behavior."""
+    """Test add_metadata_key writes to MariaDB only."""
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.mariadb.set_metadata', return_value=True)
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
@@ -87,8 +77,8 @@ class AddMetadataKeyTestCase(base.ShakenFistTestCase):
                     metadata={'existing': 'val'}
                 ))
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
-    def test_add_metadata_key_dual_writes(
-            self, mock_lock, mock_get, mock_set, mock_etcd_set):
+    def test_add_metadata_key_writes_to_mariadb(
+            self, mock_lock, mock_get, mock_set):
         mock_lock.return_value.__enter__ = mock.Mock()
         mock_lock.return_value.__exit__ = mock.Mock(return_value=False)
 
@@ -97,9 +87,7 @@ class AddMetadataKeyTestCase(base.ShakenFistTestCase):
 
         expected = {'existing': 'val', 'new_key': 'new_val'}
         mock_set.assert_called_once_with(d.object_type, TEST_UUID, expected)
-        mock_etcd_set.assert_called_once_with('metadata', expected)
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.mariadb.set_metadata', return_value=True)
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
@@ -109,7 +97,7 @@ class AddMetadataKeyTestCase(base.ShakenFistTestCase):
                 ))
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
     def test_add_metadata_key_overwrites_existing(
-            self, mock_lock, mock_get, mock_set, mock_etcd_set):
+            self, mock_lock, mock_get, mock_set):
         mock_lock.return_value.__enter__ = mock.Mock()
         mock_lock.return_value.__exit__ = mock.Mock(return_value=False)
 
@@ -118,13 +106,11 @@ class AddMetadataKeyTestCase(base.ShakenFistTestCase):
 
         expected = {'key': 'new'}
         mock_set.assert_called_once_with(d.object_type, TEST_UUID, expected)
-        mock_etcd_set.assert_called_once_with('metadata', expected)
 
 
 class RemoveMetadataKeyTestCase(base.ShakenFistTestCase):
-    """Test remove_metadata_key dual-write behavior."""
+    """Test remove_metadata_key writes to MariaDB only."""
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.mariadb.set_metadata', return_value=True)
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
@@ -133,8 +119,8 @@ class RemoveMetadataKeyTestCase(base.ShakenFistTestCase):
                     metadata={'keep': 'yes', 'remove': 'me'}
                 ))
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
-    def test_remove_metadata_key_dual_writes(
-            self, mock_lock, mock_get, mock_set, mock_etcd_set):
+    def test_remove_metadata_key_writes_to_mariadb(
+            self, mock_lock, mock_get, mock_set):
         mock_lock.return_value.__enter__ = mock.Mock()
         mock_lock.return_value.__exit__ = mock.Mock(return_value=False)
 
@@ -143,9 +129,7 @@ class RemoveMetadataKeyTestCase(base.ShakenFistTestCase):
 
         expected = {'keep': 'yes'}
         mock_set.assert_called_once_with(d.object_type, TEST_UUID, expected)
-        mock_etcd_set.assert_called_once_with('metadata', expected)
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.mariadb.set_metadata')
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
@@ -155,7 +139,7 @@ class RemoveMetadataKeyTestCase(base.ShakenFistTestCase):
                 ))
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
     def test_remove_nonexistent_key_is_noop(
-            self, mock_lock, mock_get, mock_set, mock_etcd_set):
+            self, mock_lock, mock_get, mock_set):
         mock_lock.return_value.__enter__ = mock.Mock()
         mock_lock.return_value.__exit__ = mock.Mock(return_value=False)
 
@@ -163,7 +147,6 @@ class RemoveMetadataKeyTestCase(base.ShakenFistTestCase):
         d.remove_metadata_key('nonexistent')
 
         mock_set.assert_not_called()
-        mock_etcd_set.assert_not_called()
 
 
 class HardDeleteMetadataTestCase(base.ShakenFistTestCase):

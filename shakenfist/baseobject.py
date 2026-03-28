@@ -620,34 +620,34 @@ class DatabaseBackedObject:
 
     @property
     def metadata(self):
-        if not self.in_memory_only:
-            obj_meta = mariadb.get_object_metadata(
-                self.object_type, str(self.uuid))
-            if obj_meta and obj_meta.metadata is not None:
-                return obj_meta.metadata
-            # Fallback to etcd for unmigrated objects
-        return self._db_get_attribute('metadata', {})
+        if self.in_memory_only:
+            return self._db_get_attribute('metadata', {})
+        obj_meta = mariadb.get_object_metadata(
+            self.object_type, str(self.uuid))
+        if obj_meta and obj_meta.metadata is not None:
+            return obj_meta.metadata
+        return {}
 
     def add_metadata_key(self, key, value):
         with self.get_lock_attr('metadata', 'Add metadata key'):
             md = self.metadata
             md[key] = value
-            if not self.in_memory_only:
+            if self.in_memory_only:
+                self._db_set_attribute('metadata', md)
+            else:
                 mariadb.set_metadata(
                     self.object_type, str(self.uuid), md)
-            # Dual-write to etcd during migration period
-            self._db_set_attribute('metadata', md)
 
     def remove_metadata_key(self, key):
         with self.get_lock_attr('metadata', 'Remove metadata key'):
             md = self.metadata
             if key in md:
                 del md[key]
-                if not self.in_memory_only:
+                if self.in_memory_only:
+                    self._db_set_attribute('metadata', md)
+                else:
                     mariadb.set_metadata(
                         self.object_type, str(self.uuid), md)
-                # Dual-write to etcd during migration period
-                self._db_set_attribute('metadata', md)
 
     def _external_view(self):
         # Import here to avoid circular imports during module loading

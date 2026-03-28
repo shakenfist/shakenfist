@@ -328,9 +328,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'foo': 'bar'},
-            json.loads(self.mock_etcd.db[
-                '/sf/attribute/instance/12345678-1234-4321-8234-000000000001'
-                '/metadata']))
+            self.mock_etcd.object_metadata[
+                'instance/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_post_instance_metadata(self):
         self.mock_etcd.create_instance('banana')
@@ -345,9 +344,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'foo': 'bar'},
-            json.loads(self.mock_etcd.db[
-                '/sf/attribute/instance/12345678-1234-4321-8234-000000000001/'
-                'metadata']))
+            self.mock_etcd.object_metadata[
+                'instance/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_get_network(self):
         self.mock_etcd.create_network('barry')
@@ -410,8 +408,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'foo': 'bar'},
-            json.loads(self.mock_etcd.db[
-                '/sf/attribute/network/12345678-1234-4321-8234-000000000001/metadata']))
+            self.mock_etcd.object_metadata[
+                'network/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_post_network_metadata(self):
         self.mock_etcd.create_network('banana', namespace='foo')
@@ -426,8 +424,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'foo': 'bar'},
-            json.loads(self.mock_etcd.db[
-                '/sf/attribute/network/12345678-1234-4321-8234-000000000001/metadata']))
+            self.mock_etcd.object_metadata[
+                'network/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_delete_instance_metadata(self):
         self.mock_etcd.create_instance('banana',
@@ -439,8 +437,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(
             {'real': 'smart'},
-            json.loads(self.mock_etcd.db[
-                '/sf/attribute/instance/12345678-1234-4321-8234-000000000001/metadata']))
+            self.mock_etcd.object_metadata[
+                'instance/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_delete_instance_metadata_bad_key(self):
         # We now just silently ignore deletes of things which don't exist
@@ -462,8 +460,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'real': 'smart'},
-            json.loads(self.mock_etcd.db[
-                '/sf/attribute/network/12345678-1234-4321-8234-000000000001/metadata']))
+            self.mock_etcd.object_metadata[
+                'network/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_delete_network_metadata_bad_key(self):
         # We now just silently ignore deletes of things which don't exist
